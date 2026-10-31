@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/loopback"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -142,9 +143,9 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 }
 
 // ValidateClientAndRedirectURI answers RFC 6749 4.1.2.1: a missing or invalid client_id, or a
-// missing, non-absolute or unregistered redirect_uri, "MUST NOT automatically redirect the
+// missing, non-absolute, plain-http or unregistered redirect_uri, "MUST NOT automatically redirect the
 // user-agent to the invalid redirection URI". Every rejection here therefore reaches a rendered
-// page and never an error_description, which is why these six are *i18n.LocalizedError and
+// page and never an error_description, which is why these seven are *i18n.LocalizedError and
 // render in the visitor's locale, while the validations that run after this one return
 // oauth.ErrorDetail and stay English (#213).
 //
@@ -212,6 +213,22 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		slog.WarnContext(ctx, "rejected an authorization request whose redirect_uri is not an absolute uri, or is an http or https uri naming no host",
 			"client_identifier", client.ClientIdentifier)
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotAbsolute, nil)
+	}
+
+	// RFC 9700 section 2.6: "Authorization responses MUST NOT be transmitted over unencrypted
+	// network connections", with RFC 8252 section 7.3's loopback exception. Intake has refused
+	// such a URI since #575, and this gate reaches the rows stored before it, as the absolute-URI
+	// gate above reaches older non-absolute ones. A page answer, never a redirect: an error
+	// response is an authorization response too (RFC 6749 4.1.2.1), so nothing at all may travel
+	// to the URI (#590).
+	//
+	// Placed with the absolute-URI gate, before ClientLoadRedirectURIs, so it costs no query and an
+	// unregistered plain-http URI is named for its scheme rather than called unregistered. The
+	// record names the client and not the URI, for the reason given above.
+	if loopback.IsPlainHTTPOff(input.RedirectURI) {
+		slog.WarnContext(ctx, "rejected an authorization request whose redirect_uri uses plain http off the loopback interface",
+			"client_identifier", client.ClientIdentifier)
+		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURIInsecureHTTP, nil)
 	}
 
 	err = val.database.ClientLoadRedirectURIs(ctx, nil, client)

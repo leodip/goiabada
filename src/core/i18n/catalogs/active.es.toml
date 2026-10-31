@@ -1776,6 +1776,8 @@
 "handler.account_logout.client_identifier_invalid" = "El identificador del cliente no es válido"
 "handler.account_logout.client_unresolved" = "No se pudo identificar al cliente a partir de postLogoutRedirectUri; indica clientIdentifier."
 "handler.account_logout.post_logout_redirect_uri_not_registered" = "postLogoutRedirectUri no está registrado para el cliente"
+"handler.account_logout.post_logout_redirect_uri_not_absolute" = "postLogoutRedirectUri debe ser una URI absoluta: debe incluir un esquema, no puede tener un fragmento, las secuencias de escape con % deben estar bien formadas y las URI http o https deben indicar un host"
+"handler.account_logout.post_logout_redirect_uri_insecure_http" = "postLogoutRedirectUri no puede usar http sin cifrar fuera de la interfaz de loopback (127.0.0.1, [::1] o localhost)"
 "handler.settings_general.app_name_required" = "El nombre de la aplicación es obligatorio."
 "handler.settings_general.app_name_too_long" = "El nombre de la aplicación es demasiado largo. El máximo es de {{.max}} caracteres."
 "handler.settings_general.issuer_uri_invalid" = "El emisor no es válido. Escribe una URL https sin parámetros de consulta, fragmento ni datos de usuario, o la URL base del servidor de autenticación."
@@ -1887,6 +1889,7 @@
 "validator.authorize.client_disabled" = "El parámetro client_id no es válido. La aplicación está desactivada."
 "validator.authorize.redirect_uri_missing" = "Falta el parámetro redirect_uri."
 "validator.authorize.redirect_uri_not_absolute" = "El parámetro redirect_uri no es válido. La URI de redirección debe ser absoluta: debe incluir un esquema, no puede tener un fragmento, las secuencias de escape con % deben estar bien formadas y las URI http o https deben indicar un host."
+"validator.authorize.redirect_uri_insecure_http" = "El parámetro redirect_uri no es válido. La URI de redirección no puede usar http sin cifrar fuera de la interfaz de loopback (127.0.0.1, [::1] o localhost)."
 "validator.authorize.redirect_uri_not_registered" = "El parámetro redirect_uri no es válido. La aplicación no tiene registrada esta URI de redirección."
 
 # --- Email subjects ----------------------------------------------------------

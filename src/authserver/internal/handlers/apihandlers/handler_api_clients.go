@@ -1124,9 +1124,9 @@ func HandleClientRedirectURIsPut(
 			writeJSONError(w, "expectedRedirectURIs is required: send the redirect URIs as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		expected, loaded := loadedURIList(req.ExpectedRedirectURIs)
+		expected := expectedURIList(req.ExpectedRedirectURIs)
 
-		normalized, refusal := normalizeURIList(req.RedirectURIs, loaded, redirectURIRefusals)
+		normalized, refusal := normalizeURIList(req.RedirectURIs, redirectURIRefusals)
 		if refusal != nil {
 			writeValidationError(w, r, refusal)
 			return

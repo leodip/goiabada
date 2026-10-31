@@ -34,9 +34,9 @@ import (
 // prefix bug this fixes (#105) was duplicated across them and a single-branch table would
 // pass with half the fix.
 //
-// The loopback host decision itself is owned by urlmatch.IsLoopbackHost and its 38-row table
-// in src/authserver/internal/urlmatch/redirect_uri_test.go. What is pinned here is that this function
-// consults it, plus everything else this function decides.
+// The loopback host decision itself is owned by loopback.IsHost and its 38-row table in
+// src/core/loopback/loopback_test.go. What is pinned here is that this function consults it,
+// plus everything else this function decides.
 func TestValidateRedirectURI(t *testing.T) {
 	tests := []struct {
 		uri      string
@@ -58,7 +58,7 @@ func TestValidateRedirectURI(t *testing.T) {
 
 		// Keep these two. They REVERSE the previous behaviour: the old prefix test was
 		// case-sensitive, so an uppercase host was rejected. RFC 3986 section 6.2.2.1 makes
-		// the host case-insensitive and urlmatch.IsLoopbackHost folds it, which is the same
+		// the host case-insensitive and loopback.IsHost folds it, which is the same
 		// rule the authorization path already applies (issue #41, decision 10).
 		{"http://LOCALHOST/cb", true, true, "host case is not meaningful"},
 		{"http://LocalHost:3000/cb", true, true, "host case is not meaningful, with a port"},
@@ -121,7 +121,7 @@ func TestValidateRedirectURI(t *testing.T) {
 		// behaviour here: that branch returns without a host check, so before #122 this
 		// endpoint registered them for any confidential client, and a browser resolving the
 		// emitted Location navigates to evil.example. The public rows were already refused,
-		// by IsLoopbackHost(""), and are kept to show the two branches now agree.
+		// by loopback.IsHost(""), and are kept to show the two branches now agree.
 		{"https:///evil.example/cb", false, false, "empty authority on the confidential branch; was accepted before #122"},
 		{"https:/evil.example/cb", false, false, "path-absolute https on the confidential branch; was accepted before #122"},
 		{"https://///evil.example/cb", false, false, "more slashes, same empty host"},

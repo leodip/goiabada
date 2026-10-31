@@ -302,34 +302,35 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheEntryRules(t *testing.T) {
 	assert.ElementsMatch(t, admitted, storedPostLogoutRedirectURIs(t, client.Id))
 }
 
-// A plain-http URI stored before the rule still saves when the save carries it back; adding a second
-// is refused by name, and naming one as loaded that is not stored is answered 409 with nothing
-// written.
-func TestAPIClientPostLogoutRedirectURIsPut_AStoredPlainHTTPURIDoesNotBlockTheSave(t *testing.T) {
+// A stored plain-http sign-out redirect URI receives nothing at sign-out (#590), so a save that
+// carries it back is refused by name, as an addition is, and nothing is written. The save that
+// removes it goes through, and nothing deletes it on its own. A stored loopback http URI is no such
+// row: it is carried back without complaint.
+func TestAPIClientPostLogoutRedirectURIsPut_AStoredPlainHTTPURIBlocksTheSaveUntilRemoved(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "signout-legacy-http-")
 	legacy := "http://intranet.example.com/bye"
-	for _, uri := range []string{legacy, "https://retired.example.com/bye"} {
+	loopbackURI := "http://127.0.0.1:8765/bye"
+	for _, uri := range []string{legacy, loopbackURI, "https://retired.example.com/bye"} {
 		require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
 			&record.PostLogoutRedirectURI{ClientId: client.Id, URI: uri}))
 	}
 	loaded := readPostLogoutRedirectURIs(t, accessToken, client.Id)
 
-	kept := []string{legacy, "https://replacement.example.com/bye"}
+	// The retired entry is swapped for its replacement with the http row kept: 400 naming the http
+	// row, and the stored list untouched.
+	kept := []string{legacy, loopbackURI, "https://replacement.example.com/bye"}
 	status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id, kept, loaded)
-	require.Equal(t, http.StatusOK, status, body)
-	assert.ElementsMatch(t, kept, storedPostLogoutRedirectURIs(t, client.Id))
-
-	added := "http://other.example.com/bye"
-	status, body = savePostLogoutRedirectURIs(t, accessToken, client.Id, append([]string{added}, kept...), kept)
-	assert.Equal(t, http.StatusBadRequest, status)
-	assert.Equal(t, "Sign-out redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): "+added,
+	assert.Equal(t, http.StatusBadRequest, status, "a stored http URI carried back must block the save")
+	assert.Equal(t, "Sign-out redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): "+legacy,
 		body["error_description"])
+	assert.ElementsMatch(t, loaded, storedPostLogoutRedirectURIs(t, client.Id), "a refused save writes nothing")
 
-	status, body = savePostLogoutRedirectURIs(t, accessToken, client.Id, append([]string{added}, kept...), append([]string{added}, kept...))
-	assert.Equal(t, http.StatusConflict, status)
-	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
-	assert.ElementsMatch(t, kept, storedPostLogoutRedirectURIs(t, client.Id), "a refused save writes nothing")
+	// The same change with the http row removed saves, the loopback http row carried back with it.
+	removed := []string{loopbackURI, "https://replacement.example.com/bye"}
+	status, body = savePostLogoutRedirectURIs(t, accessToken, client.Id, removed, loaded)
+	require.Equal(t, http.StatusOK, status, body)
+	assert.ElementsMatch(t, removed, storedPostLogoutRedirectURIs(t, client.Id))
 }
 
 // A committed save leaves one updated_post_logout_redirect_uris row naming the client and the caller;

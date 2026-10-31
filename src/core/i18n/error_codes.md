@@ -171,6 +171,8 @@ key per cause, each a whole sentence.
 | `handler.account_logout.client_identifier_invalid` | (none) | Invalid client identifier |
 | `handler.account_logout.client_unresolved` | (none) | Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier. |
 | `handler.account_logout.post_logout_redirect_uri_not_registered` | (none) | postLogoutRedirectUri is not registered for the client |
+| `handler.account_logout.post_logout_redirect_uri_not_absolute` | (none) | postLogoutRedirectUri must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host) |
+| `handler.account_logout.post_logout_redirect_uri_insecure_http` | (none) | postLogoutRedirectUri must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost) |
 | `handler.settings_email.send_failed_host_not_found` | (none) | Unable to send the test email: host name not found. |
 | `handler.settings_email.send_failed_timed_out` | (none) | Unable to send the test email: connection timed out. |
 | `handler.settings_email.send_failed_refused` | (none) | Unable to send the test email: connection refused. |
@@ -369,4 +371,5 @@ these are rendered on the refusal page rather than returned to the client
 | `validator.authorize.client_disabled` | (none) | Invalid client_id parameter. The application is disabled. |
 | `validator.authorize.redirect_uri_missing` | (none) | The redirect_uri parameter is missing. |
 | `validator.authorize.redirect_uri_not_absolute` | (none) | Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host. |
+| `validator.authorize.redirect_uri_insecure_http` | (none) | Invalid redirect_uri parameter. The redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost). |
 | `validator.authorize.redirect_uri_not_registered` | (none) | Invalid redirect_uri parameter. The application does not have this redirect URI registered. |

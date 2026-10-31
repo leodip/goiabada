@@ -48,6 +48,16 @@ func TestIssuerLength_ImportsNothingButErrsAndTheStandardLibrary(t *testing.T) {
 		"with the caller that renders it, not in the bound the start, the save and the wizard share (#615).")
 }
 
+// TestLoopback_ImportsNothingButTheStandardLibrary holds core/loopback to being a leaf, for
+// core/adminpassword's reason: the setup wizard asks its loopback question of the URLs it writes,
+// and links whatever this package imports (#590).
+func TestLoopback_ImportsNothingButTheStandardLibrary(t *testing.T) {
+	AssertImportsOnly(t, "core/loopback", map[string]string{},
+		"The setup wizard links whatever this package imports. The loopback test is a comparison "+
+			"over strings and a URL parse, and needs nothing more; a refusal message, or anything "+
+			"else that needs a dependency, belongs with the caller that renders it (#590).")
+}
+
 // TestPasswordBlocklist_ImportsNothingButTheStandardLibrary holds core/passwordblocklist to being
 // a leaf, for core/adminpassword's reason: the first administrator's rule the setup wizard calls
 // reads the blocklist, so the wizard links whatever this package imports (#550 decision 7).

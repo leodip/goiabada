@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/loopback"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/securerandom"
 )
@@ -433,7 +434,7 @@ func validateRedirectURI(uri string, isPublic bool, field dcrURIField) error {
 	// two intakes cannot drift (#575). Its host comparison is exact: this used to be a
 	// strings.HasPrefix test, which accepted any host merely starting with a loopback name,
 	// localhost.attacker.com included, in both client-type branches below (#105).
-	if urlmatch.IsInsecureHTTPRedirectURI(uri) {
+	if loopback.IsPlainHTTPOff(uri) {
 		return errs.Errorf("http %s must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", field.list, uri)
 	}
 

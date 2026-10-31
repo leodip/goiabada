@@ -13,6 +13,7 @@ Your app sends the browser to `/auth/authorize`, and instead of a sign-in page t
 
 - "Invalid redirect_uri parameter. The application does not have this redirect URI registered."
 - "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host."
+- "Invalid redirect_uri parameter. The redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost)."
 - "The redirect_uri parameter is missing."
 
 Nothing is sent back to your app. The auth server can't trust an address the client hasn't registered, so it never redirects to one, not even with an error.
@@ -27,6 +28,7 @@ The usual causes:
 
 - **It was never registered,** or it was registered on another client.
 - **It differs in a detail:** `http` against `https`, a port, a trailing slash, a path's case, or a query.
+- **It's plain `http` on a host other than loopback.** The code would travel unencrypted, so the auth server sends nothing to it, even when it's registered.
 - **Your app moved.** The app now runs on a new hostname or port, and the client still holds the old address.
 - **The database was set up for other URLs.** You pointed a deployment at a database created for another one, such as a copy from staging. The clients in it hold the other deployment's addresses, the admin console's own client among them.
 
@@ -42,6 +44,8 @@ The usual causes:
 
 </Steps>
 
+For a plain-`http` address, serve your app over `https` instead: add the `https` address on the client's **Redirect URIs** tab, switch your app to it, then remove the `http` one.
+
 At the token endpoint, send the same `redirect_uri` you sent in the authorization request. The code is bound to it.
 
 ### When it's the admin console that's refused
@@ -50,8 +54,15 @@ The admin console signs in as the client `admin-console-client`, with the redire
 
 Fix it in one of these ways:
 
-- **Put the old URL back** for a moment, sign in, and add the new addresses on the client's page, then switch to the new URL: the new URL followed by `/auth/callback` on the **Redirect URIs** tab, and the bare new URL on the **Sign-out redirect URIs** tab. Without the second, the admin console's **Sign out** answers an error.
 - **Call the Admin API** with a client of your own allowed `authserver:manage`: [`PUT /api/v1/admin/clients/{id}/redirect-uris`](/reference/api/admin/operations/updateclientredirecturis/) for the callback, and [`PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris`](/reference/api/admin/operations/updateclientpostlogoutredirecturis/) for the bare URL. The admin console's client is an [administrator](/reference/api/administrators/), so a token with only `authserver:manage-clients` is refused.
+- **Add the two addresses in the database,** when you have no such client: the callback as a redirect URI, and the bare URL as a sign-out redirect URI. Replace `https://admin.example.com` with the admin console's URL. This works on SQLite, MySQL, PostgreSQL and SQL Server:
+
+  ```sql
+  INSERT INTO redirect_uris (created_at, client_id, uri)
+  SELECT CURRENT_TIMESTAMP, id, 'https://admin.example.com/auth/callback' FROM clients WHERE client_identifier = 'admin-console-client';
+  INSERT INTO post_logout_redirect_uris (created_at, client_id, uri)
+  SELECT CURRENT_TIMESTAMP, id, 'https://admin.example.com' FROM clients WHERE client_identifier = 'admin-console-client';
+  ```
 - **Start from an empty database,** when the one you have holds nothing worth keeping.
 
 ## How redirect URIs are checked
@@ -61,13 +72,16 @@ The checks run in this order, and each failure shows the page:
 1. `client_id` is missing, names no client, or names a disabled client.
 2. `redirect_uri` is missing.
 3. `redirect_uri` isn't absolute: it has no scheme, has a fragment, has a malformed percent-escape, or is `http` or `https` with no host.
-4. `redirect_uri` isn't registered on the client.
+4. `redirect_uri` is plain `http` on a host other than `127.0.0.1`, `[::1]` or `localhost`. This comes before the registration check, so it's the message you see even for an address the client doesn't have.
+5. `redirect_uri` isn't registered on the client.
 
 These pages answer `200`, not an error status. Two checks come before them and answer `400` on the same page: a request the auth server can't read, and `client_id`, `redirect_uri`, `response_type` or `response_mode` sent twice.
 
 **Loopback addresses are the one exception to the exact match.** When a registered redirect URI is `http` on `127.0.0.1`, `[::1]` or `localhost`, the port may differ, for `response_type=code` only. See [loopback redirect URIs](/concepts/clients/#loopback-redirect-uris).
 
 **Removing a redirect URI takes effect on sign-ins already under way.** A user signing in when you remove it sees "You have not been sent anywhere" and the address the app asked for, instead of being sent back, and the auth server writes an `issuance_refused_redirect_uri` [audit event](/concepts/audit-log/). A code issued before you removed it can't be redeemed any more: the token endpoint answers `invalid_grant` with "The redirect URI recorded on this authorization code is no longer registered on the client, so the code can no longer be redeemed.", and writes `redemption_refused_redirect_uri`.
+
+**A sign-in already under way to a plain-`http` address off loopback stops the same way.** The user sees "You have not been sent anywhere" before any code or token is issued, and an error such as a declined consent isn't sent there either. The auth server writes a `WARN` log record naming the client, and no audit event.
 
 ## Next steps
 

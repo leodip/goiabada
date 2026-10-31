@@ -251,6 +251,8 @@ const (
 	ErrCodeAccountLogoutClientIdentifierInvalid  = "handler.account_logout.client_identifier_invalid"
 	ErrCodeAccountLogoutClientUnresolved         = "handler.account_logout.client_unresolved"
 	ErrCodeAccountLogoutRedirectURINotRegistered = "handler.account_logout.post_logout_redirect_uri_not_registered"
+	ErrCodeAccountLogoutRedirectURINotAbsolute   = "handler.account_logout.post_logout_redirect_uri_not_absolute"
+	ErrCodeAccountLogoutRedirectURIInsecureHTTP  = "handler.account_logout.post_logout_redirect_uri_insecure_http"
 
 	// Settings: general, sessions, tokens, email, signing keys, the UI theme and audit logs. A settings
 	// refusal sentence that a client's tokens or the account already say reuses that key: the offline
@@ -366,5 +368,6 @@ const (
 	ErrCodeAuthorizeClientDisabled           = "validator.authorize.client_disabled"
 	ErrCodeAuthorizeRedirectURIMissing       = "validator.authorize.redirect_uri_missing"
 	ErrCodeAuthorizeRedirectURINotAbsolute   = "validator.authorize.redirect_uri_not_absolute"
+	ErrCodeAuthorizeRedirectURIInsecureHTTP  = "validator.authorize.redirect_uri_insecure_http"
 	ErrCodeAuthorizeRedirectURINotRegistered = "validator.authorize.redirect_uri_not_registered"
 )

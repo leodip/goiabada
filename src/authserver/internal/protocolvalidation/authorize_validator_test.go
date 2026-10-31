@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -296,8 +298,15 @@ func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
 	}{
 		{
 			name:       "exact match",
-			registered: "http://example.com",
-			requested:  "http://example.com",
+			registered: "https://example.com",
+			requested:  "https://example.com",
+		},
+		{
+			// The insecure-http gate's other side: http on a loopback host is RFC 8252 section
+			// 7.3's exception, so a stored one keeps working (#590).
+			name:       "http on localhost is accepted",
+			registered: "http://localhost:8080/callback",
+			requested:  "http://localhost:8080/callback",
 		},
 		{
 			name:         "http loopback accepts any port on a code request",
@@ -358,6 +367,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 	// not registered when it plainly is sends them looking in the wrong place (#122).
 	const notRegistered = "Invalid redirect_uri parameter. The application does not have this redirect URI registered."
 	const notAbsolute = "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host."
+	const insecureHTTP = "Invalid redirect_uri parameter. The redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost)."
 
 	tests := []struct {
 		name         string
@@ -368,8 +378,8 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 	}{
 		{
 			name:        "unregistered URI",
-			registered:  "http://example.com",
-			requested:   "http://invalid.com",
+			registered:  "https://example.com",
+			requested:   "https://invalid.com",
 			wantMessage: notRegistered,
 		},
 		{
@@ -478,6 +488,48 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			requested:   "http:/evil.example/cb",
 			wantMessage: notAbsolute,
 		},
+
+		// The insecure-http gate (#590). RFC 9700 section 2.6: authorization responses "MUST NOT
+		// be transmitted over unencrypted network connections", RFC 8252 section 7.3's loopback
+		// exception aside. As with the absolute-URI rows, each registers what it requests, so
+		// only the gate can refuse it: a row stored before intake began refusing the shape.
+		{
+			name:        "plain http off loopback, registered",
+			registered:  "http://app.example.com/callback",
+			requested:   "http://app.example.com/callback",
+			wantMessage: insecureHTTP,
+		},
+		{
+			// The parse lower-cases the scheme, so the rule cannot be dodged by its case.
+			name:        "plain http with an uppercase scheme",
+			registered:  "HTTP://app.example.com/callback",
+			requested:   "HTTP://app.example.com/callback",
+			wantMessage: insecureHTTP,
+		},
+		{
+			// The prefix-match bug the shared loopback test exists to avoid.
+			name:        "a host that only begins with localhost",
+			registered:  "http://localhost.attacker.com/callback",
+			requested:   "http://localhost.attacker.com/callback",
+			wantMessage: insecureHTTP,
+		},
+		{
+			// On a code request, where loopback port flexibility would apply: a non-loopback host
+			// gets none of it, and is still refused for its scheme.
+			name:         "plain http off loopback on a code request",
+			registered:   "http://192.168.1.50:8080/callback",
+			requested:    "http://192.168.1.50:8080/callback",
+			responseType: "code",
+			wantMessage:  insecureHTTP,
+		},
+		{
+			// The gate runs before the registered list is read, so an unregistered plain-http
+			// URI is named for its scheme rather than called unregistered.
+			name:        "plain http off loopback, not registered",
+			registered:  "https://app.example.com/callback",
+			requested:   "http://app.example.com/callback",
+			wantMessage: insecureHTTP,
+		},
 	}
 
 	for _, tc := range tests {
@@ -523,13 +575,51 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			// absolute" is the #122 diagnosis-swap this table exists to refuse, and after
 			// #213 that swap can happen in the catalog rather than in the validator.
 			wantCode := i18n.ErrCodeAuthorizeRedirectURINotRegistered
-			if tc.wantMessage == notAbsolute {
+			switch tc.wantMessage {
+			case notAbsolute:
 				wantCode = i18n.ErrCodeAuthorizeRedirectURINotAbsolute
+			case insecureHTTP:
+				wantCode = i18n.ErrCodeAuthorizeRedirectURIInsecureHTTP
 			}
 			assert.Equal(t, wantCode, locErr.Code)
 			assert.Equal(t, tc.wantMessage, locErr.EnglishFallback())
 		})
 	}
+}
+
+// The insecure-http refusal writes a Warn record naming the client and never the URI (#590, #159):
+// the identifier is a bounded stored value, and the requested URI is unbounded input the operator
+// reads off the client's page instead. It is also refused before the registered list is read, as
+// the absolute-URI gate is, so the mock carries no ClientLoadRedirectURIs expectation and a read
+// fails the case.
+func TestValidateClientAndRedirectURI_InsecureHTTPIsLoggedByClientBeforeAnyRead(t *testing.T) {
+	const requested = "http://app.example.com/callback?marker=do-not-log"
+
+	mockDB := datamocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	client := &record.Client{ClientIdentifier: "legacy-http-client", Enabled: true, AuthorizationCodeEnabled: true}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "legacy-http-client").Return(client, nil)
+
+	logs := logtest.CaptureSlog(t)
+	err := validator.ValidateClientAndRedirectURI(context.Background(), &ValidateClientAndRedirectURIInput{
+		ClientId: "legacy-http-client", RedirectURI: requested, ResponseType: "code",
+	})
+
+	var locErr *i18n.LocalizedError
+	require.ErrorAs(t, err, &locErr)
+	assert.Equal(t, i18n.ErrCodeAuthorizeRedirectURIInsecureHTTP, locErr.Code)
+
+	var warnings []logtest.CapturedRecord
+	for _, rec := range logs.Records() {
+		if rec.Level == slog.LevelWarn {
+			warnings = append(warnings, rec)
+		}
+	}
+	require.Len(t, warnings, 1, "one Warn record for the refusal")
+	assert.Contains(t, warnings[0].Message, "plain http")
+	assert.Equal(t, "legacy-http-client", warnings[0].Attrs["client_identifier"])
+	assert.NotContains(t, logs.Text(), "do-not-log", "the requested URI is never logged")
+	mockDB.AssertNotCalled(t, "ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestValidateRequest_InvalidResponseType(t *testing.T) {
@@ -923,10 +1013,10 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid-client").Return(client, nil)
 	mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Run(func(args mock.Arguments) {
 		client := args.Get(2).(*record.Client)
-		client.RedirectURIs = []record.RedirectURI{{URI: "http://example.com"}}
+		client.RedirectURIs = []record.RedirectURI{{URI: "https://example.com"}}
 	}).Return(nil)
 
-	longRedirectURI := "http://example.com/" + strings.Repeat("a", 2000)
+	longRedirectURI := "https://example.com/" + strings.Repeat("a", 2000)
 	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: longRedirectURI}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 

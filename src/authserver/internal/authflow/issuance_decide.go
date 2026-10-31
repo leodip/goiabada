@@ -5,6 +5,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
+	"github.com/leodip/goiabada/core/loopback"
 )
 
 // issuanceFact is a fact decideIssuance needs and has not been given. Issuance.Run loads it and asks
@@ -38,6 +39,9 @@ const (
 	// issuanceRefuseUnregisteredRedirect renders the refusal page: the redirect URI is no longer
 	// registered on the client.
 	issuanceRefuseUnregisteredRedirect
+	// issuanceRefuseInsecureRedirect renders the same refusal page: the redirect URI is plain http
+	// off the loopback interface, registered before intake refused the shape.
+	issuanceRefuseInsecureRedirect
 	// issuanceRefuseClientDisabled renders the refusal page /auth/authorize renders for a disabled client.
 	issuanceRefuseClientDisabled
 	// issuanceRefuseImplicitDisabled answers unauthorized_client: the ceremony is an implicit one and the
@@ -127,7 +131,10 @@ type issuanceFacts struct {
 //     harm RFC 9700 section 4.11.2 describes. A missing client has no registrations. Loopback port
 //     flexibility (RFC 8252 section 7.3) is the caller's to compute, per urlmatch's package contract
 //     (#41), and applies only to the exact response type "code" (IsCodeOnly), so a stored "code code"
-//     or "code foo" buys no arbitrary port (#244).
+//     or "code foo" buys no arbitrary port (#244). Ahead of it, the redirect URI is not plain http
+//     off the loopback interface: /auth/authorize refuses such a request, and a ceremony it validated
+//     before that refusal existed is stopped here, before anything is minted, on the same page (RFC
+//     9700 section 2.6, #590). It names the scheme, so it outranks the client's state.
 //  2. The client is still enabled and still allowed the flow the ceremony is for (#197), read as at
 //     /auth/authorize: the implicit grant through the client's override and else the global switch.
 //     A disabled client is refused on the page /auth/authorize renders for one, never by redirect,
@@ -165,6 +172,9 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 
 	if !f.registrationLoaded {
 		return issuanceAnswer{}, issuanceFactRegistration
+	}
+	if loopback.IsPlainHTTPOff(f.redirectURI) {
+		return decided(issuanceRefuseInsecureRedirect)
 	}
 	rtInfo := protocolvalidation.ParseResponseType(f.responseType)
 	allowLoopbackPortFlexibility := rtInfo.IsCodeOnly()

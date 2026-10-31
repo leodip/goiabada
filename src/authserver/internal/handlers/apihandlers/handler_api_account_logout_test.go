@@ -228,6 +228,38 @@ func TestHandleAccountLogoutRequestPost_AnUnknownClientIsStill400(t *testing.T) 
 	assertNothingAfterTheClient(t, database)
 }
 
+// The loopback exception holds here as at /auth/logout: plain http to 127.0.0.1, [::1] or
+// localhost passes the http rule and reaches the client lookup, whose missing row is what answers
+// this request (#590 decision 2).
+func TestHandleAccountLogoutRequestPost_APlainHTTPLoopbackTargetReachesTheClient(t *testing.T) {
+	for _, target := range []string{
+		"http://127.0.0.1:8080/after-logout",
+		"http://[::1]/after-logout",
+		"http://LOCALHOST/after-logout",
+	} {
+		t.Run(target, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
+				Return(nil, nil).Once()
+
+			body, err := json.Marshal(api.AccountLogoutRequest{PostLogoutRedirectUri: target, ClientIdentifier: logoutClientIdent})
+			require.NoError(t, err)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/account/logout-request", bytes.NewReader(body))
+			req = setTokenContextWithClaims(req, map[string]interface{}{"sub": "the-user", "sid": logoutSid})
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://auth.example.com"}))
+
+			rr := httptest.NewRecorder()
+			HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusBadRequest, rr.Code)
+			var out api.ErrorResponse
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &out))
+			assert.Equal(t, "Invalid client identifier", out.ErrorDescription)
+			database.AssertExpectations(t)
+		})
+	}
+}
+
 // stubResolvedClient answers the client lookup and its sign-out redirect URIs, so the handler
 // reaches the session.
 func stubResolvedClient(database *datamocks.Database) {

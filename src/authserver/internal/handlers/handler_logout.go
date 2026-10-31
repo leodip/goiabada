@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/loopback"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -925,10 +926,11 @@ func clientForPostLogoutRedirect(ctx context.Context, clientId string, database 
 // flexibility here, unlike at the authorization endpoint (decision 3).
 //
 // A registered URI that is not an absolute URI earns no redirect either, which is the third way of
-// returning "" and the only one where the request is otherwise in order. The admin API refuses such
+// returning "" and one of the two where the request is otherwise in order. The admin API refuses such
 // an entry, but this endpoint does not depend on every stored row having passed it: emitted
 // verbatim, a scheme-relative value, or one with a scheme and no authority, is a Location the user
-// agent resolves against a host nobody registered (#122).
+// agent resolves against a host nobody registered (#122). The other is a registered URI that is plain
+// http off the loopback interface, which would send the redirect in the clear (#590).
 func postLogoutRedirectLocation(
 	r *http.Request,
 	database logoutDatabase,
@@ -947,6 +949,20 @@ func postLogoutRedirectLocation(
 	// the offending row (#122).
 	if !urlmatch.IsAbsoluteRedirectURI(postLogoutRedirectURI) {
 		slog.WarnContext(r.Context(), "post_logout_redirect_uri is not an absolute URI, not redirecting",
+			"client_identifier", client.ClientIdentifier)
+		return ""
+	}
+
+	// A target that is plain http on a host other than the loopback interface would carry the
+	// redirect, and the state the RP checks it with, over an unencrypted connection, which RFC 9700
+	// section 2.6 forbids of an authorization response; RFC 8252 section 7.3's loopback exception is
+	// what keeps http to 127.0.0.1, [::1] and localhost working. Such a row can still be registered:
+	// intake refuses the shape (#575), but migration 000072 moved the admin console's bare base URL
+	// here from its redirect URIs as it stood, so this is decided here and not by the match below.
+	// Its own line for the reason the absolute-URI one is, naming the client and never the URI (#590
+	// decision 13).
+	if loopback.IsPlainHTTPOff(postLogoutRedirectURI) {
+		slog.WarnContext(r.Context(), "post_logout_redirect_uri uses plain http off the loopback interface, not redirecting",
 			"client_identifier", client.ClientIdentifier)
 		return ""
 	}

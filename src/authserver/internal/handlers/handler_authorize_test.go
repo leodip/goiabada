@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -22,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1762,7 +1764,7 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 // leave the server", and it now has two readers: the emitter, which withholds the redirect and
 // renders the interstitial, and the handler, which asks the same question earlier to decide whether
 // anything has to be authenticated first. Two call sites that must agree is exactly the shape a
-// later edit gets out of step, so the provenance, emittability and registration table lives here,
+// later edit gets out of step, so the provenance, insecure-http, emittability and registration table lives here,
 // once, and the handler-level tests stay thin on purpose. It is also why #241 decision 11 put its
 // registration check in this predicate rather than at the seven sites that answer a client from a
 // ceremony in progress: seven copies of a security gate is seven chances for one of them to be
@@ -1824,7 +1826,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			redirectURI:  "https://legit.example/cb",
 			responseType: "code",
 			want:         true,
-			why:          "a human vetted this redirect URI at registration and the client still holds it, so all three gates are answered",
+			why:          "a human vetted this redirect URI at registration and the client still holds it, so all four gates are answered",
 		},
 		{
 			name: "self-registered client",
@@ -1857,6 +1859,38 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 			want:         false,
 			why: "the emittability gate: provenance passes and the string still cannot name the host it " +
 				"appears to, which is the row an old client can hold and the gate above cannot cover (#122)",
+		},
+		{
+			name: "administrator-registered client with a registered plain-http redirect URI off loopback",
+			// No expectation: the insecure-http gate refuses above the read.
+			database:     noReadExpected,
+			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI:  "http://legit.example/cb",
+			responseType: "code",
+			want:         false,
+			why: "the insecure-http gate: RFC 9700 section 2.6 forbids an authorization response over " +
+				"cleartext, and an error response is one (RFC 6749 4.1.2.1). A row stored before intake " +
+				"refused the shape still names its host, so only this gate can withhold it (#590)",
+		},
+		{
+			name:         "an uppercase http scheme off loopback",
+			database:     noReadExpected,
+			client:       &record.Client{ClientIdentifier: "test-client", CreatedViaDCR: false},
+			redirectURI:  "HTTP://legit.example/cb",
+			responseType: "code",
+			want:         false,
+			why:          "the scheme is case-insensitive, so the rule cannot be dodged by its case (#590)",
+		},
+		{
+			name: "http on localhost is still answered",
+			database: func(t *testing.T) *datamocks.Database {
+				return registeredDatabase(t, "http://localhost:8080/cb")
+			},
+			client:       &record.Client{ClientIdentifier: "native-client", CreatedViaDCR: false},
+			redirectURI:  "http://localhost:8080/cb",
+			responseType: "token",
+			want:         true,
+			why:          "RFC 8252 section 7.3's loopback exception: the insecure-http gate refuses off loopback only (#590)",
 		},
 		{
 			name: "registered redirect URI deleted from the client",
@@ -1957,6 +1991,47 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 	}
 }
 
+// An error response from a ceremony in progress, consent declined among them, to a redirect URI
+// that is plain http off loopback is withheld for the refusal page, "You have not been sent
+// anywhere", exactly as one to a deregistered callback is (#590 decision 7). The Warn record names
+// the client and never the URI (#159), and the database is never read: the mock carries no
+// expectation.
+func TestRedirToClientWithError_WithholdsAnErrorFromAPlainHTTPRedirectURI(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	w := httptest.NewRecorder()
+	r := withResponseIssuer(httptest.NewRequest("GET", "/auth/consent", nil))
+
+	pageRenderer.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
+		mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["destination"] == "app.example.com" && data["clientName"] == "legacy-client"
+		})).Return(nil).Once()
+
+	input := testRedirectError("access_denied", "The user did not consent.", "query",
+		"http://app.example.com/cb?marker=do-not-log", "abc123", "code")
+	input.client = &record.Client{Id: 7, ClientIdentifier: "legacy-client"}
+
+	logs := logtest.CaptureSlog(t)
+	err := testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil).redirToClientWithError(w, r, input)
+
+	require.NoError(t, err)
+	assert.Empty(t, w.Header().Get("Location"), "no error response may travel to a plain-http redirect URI")
+
+	var warnings []logtest.CapturedRecord
+	for _, rec := range logs.Records() {
+		if rec.Level == slog.LevelWarn && strings.Contains(rec.Message, "plain http") {
+			warnings = append(warnings, rec)
+		}
+	}
+	require.Len(t, warnings, 1)
+	assert.Equal(t, "legacy-client", warnings[0].Attrs["client_identifier"])
+	assert.NotContains(t, logs.Text(), "do-not-log", "the redirect URI is never logged")
+	for _, rec := range logs.Records() {
+		assert.NotEqual(t, slog.LevelError, rec.Level,
+			"a ceremony from before the upgrade is expected, not a bypassed gate: %s", rec.Message)
+	}
+	pageRenderer.AssertExpectations(t)
+}
+
 // The predicate reads the database, so the two answers one authorization request gets from it need
 // not agree, and only one direction of disagreement is safe. This is the unsafe one: the pre-routing
 // reader was refused, which is what made answering the client at once safe under RFC 9700 4.11.2,
@@ -1992,7 +2067,7 @@ func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
 	pageRenderer.AssertExpectations(t)
 }
 
-// The three gates live in RedirectWillBeEmitted and TestRedirectWillBeEmitted's table owns their
+// The four gates live in RedirectWillBeEmitted and TestRedirectWillBeEmitted's table owns their
 // answers. What the table cannot see is whether the emitter actually HANDS it the ceremony's
 // response type, because it calls the predicate directly. This is that seam: the same loopback
 // rows, driven through redirToClientWithError, so an edit that stopped propagating input's

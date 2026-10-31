@@ -75,17 +75,21 @@ func NewIssuance(database issuanceDatabase, codes codeIssuer, tokens implicitTok
 		auditLogger: auditLogger, issuedTokens: issuedTokens}
 }
 
-// IssuanceResult is what Issuance.Run did. Exactly one of UnregisteredRedirect, ClientDisabled,
-// ClientError, NextStep, Code and Tokens is set.
+// IssuanceResult is what Issuance.Run did. Exactly one of UnregisteredRedirect, InsecureRedirect,
+// ClientDisabled, ClientError, NextStep, Code and Tokens is set.
 type IssuanceResult struct {
 	// UnregisteredRedirect is a redirect URI no longer registered on the client. Nothing may reach it,
 	// an error included, so the handler renders the redirect-blocked page naming Client (#241).
 	UnregisteredRedirect bool
+	// InsecureRedirect is a redirect URI that is plain http off the loopback interface, registered
+	// before intake refused the shape. Nothing may reach it either, so the handler renders the same
+	// page (#590).
+	InsecureRedirect bool
 	// ClientDisabled is a client disabled since /auth/authorize. The handler renders the refusal page
 	// /auth/authorize renders for one, never a redirect (#197).
 	ClientDisabled bool
 	// Client is the ceremony's client as loaded, nil when it no longer exists. Read for the
-	// UnregisteredRedirect page.
+	// UnregisteredRedirect and InsecureRedirect page.
 	Client *record.Client
 
 	// ClientError is the error the client is owed by redirect. The ceremony ends with it: it was
@@ -103,8 +107,8 @@ type IssuanceResult struct {
 	// Tokens is the implicit grant's tokens, signed and committed, for the handler to deliver.
 	Tokens *issuance.ImplicitGrantResponse
 
-	// ClearErr is the clear's failure, for every result but a restart. On UnregisteredRedirect and
-	// ClientDisabled the page is rendered anyway unless it is ceremony.ErrCeremonyReplaced: the page
+	// ClearErr is the clear's failure, for every result but a restart. On UnregisteredRedirect,
+	// InsecureRedirect and ClientDisabled the page is rendered anyway unless it is ceremony.ErrCeremonyReplaced: the page
 	// reaches no client, and a replay comes back to the same refusal. On ClientError any other failure
 	// answers the client server_error instead (#141). On Code and Tokens any failure withholds them:
 	// a replay is a retry, and what was issued reaches nobody.
@@ -227,6 +231,18 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 	switch answer.outcome {
 	case issuanceRefuseUnregisteredRedirect:
 		return o.refuseUnregisteredRedirect(ctx, browser, authContext, client), nil
+
+	case issuanceRefuseInsecureRedirect:
+		// No audit event, unlike the deregistered URI's: nobody acted on the client, and the record
+		// is what tells the operator which client to move to https (#590 decision 7). The URI is not
+		// logged, as at the authorization endpoint (#159).
+		slog.WarnContext(ctx, "the redirect URI this ceremony would be answered at uses plain http off the loopback interface, so nothing is issued and nothing is emitted",
+			"client_identifier", authContext.ClientId)
+		return IssuanceResult{
+			InsecureRedirect: true,
+			Client:           client,
+			ClearErr:         browser.ClearAuthContext(authContext.CeremonyId),
+		}, nil
 
 	case issuanceRefuseClientDisabled:
 		slog.WarnContext(ctx, "the client this ceremony is issuing for has been disabled, so nothing is issued and nothing is emitted",

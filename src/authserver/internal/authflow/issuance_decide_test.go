@@ -216,6 +216,78 @@ func TestDecideIssuance(t *testing.T) {
 			wantReads: []issuanceFact{registration},
 		},
 
+		// 1, still. A plain-http redirect URI off loopback, registered before intake refused it, in a
+		// ceremony validated before the upgrade: nothing is minted for it, and nothing else is read
+		// (#590). RFC 9700 section 2.6 forbids carrying the response over cleartext.
+		{
+			name: "a registered plain-http redirect URI off loopback is refused for a code ceremony",
+			world: with(func(w *issuanceWorld) {
+				w.registered = []string{"http://app.example.com/callback"}
+				w.redirectURI = "http://app.example.com/callback"
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseInsecureRedirect},
+			wantReads: []issuanceFact{registration},
+		},
+		{
+			name: "a registered plain-http redirect URI off loopback is refused for an implicit ceremony",
+			world: with(func(w *issuanceWorld) {
+				w.registered = []string{"http://app.example.com/callback"}
+				w.redirectURI = "http://app.example.com/callback"
+				w.responseType = "id_token token"
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseInsecureRedirect},
+			wantReads: []issuanceFact{registration},
+		},
+		{
+			name: "an uppercase scheme is the same plain http",
+			world: with(func(w *issuanceWorld) {
+				w.registered = []string{"HTTP://app.example.com/callback"}
+				w.redirectURI = "HTTP://app.example.com/callback"
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseInsecureRedirect},
+			wantReads: []issuanceFact{registration},
+		},
+		{
+			name: "a host that only begins with localhost is not loopback",
+			world: with(func(w *issuanceWorld) {
+				w.registered = []string{"http://localhost.attacker.com/callback"}
+				w.redirectURI = "http://localhost.attacker.com/callback"
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseInsecureRedirect},
+			wantReads: []issuanceFact{registration},
+		},
+		{
+			// The refusal names the scheme, which is what the operator must change, before the
+			// client's state: a disabled client's page would send them to the wrong switch.
+			name: "a plain-http redirect URI outranks a disabled client",
+			world: with(func(w *issuanceWorld) {
+				w.registered = []string{"http://app.example.com/callback"}
+				w.redirectURI = "http://app.example.com/callback"
+				w.clientDisabled = true
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseInsecureRedirect},
+			wantReads: []issuanceFact{registration},
+		},
+		{
+			name: "http on localhost still issues",
+			world: with(func(w *issuanceWorld) {
+				w.registered = []string{"http://localhost:8080/callback"}
+				w.redirectURI = "http://localhost:8080/callback"
+			}),
+			want:      issuanceAnswer{outcome: issuanceIssueCode},
+			wantReads: []issuanceFact{registration, flows, session, validity, user, scope},
+		},
+		{
+			name: "http on [::1] still issues for an implicit ceremony",
+			world: with(func(w *issuanceWorld) {
+				w.registered = []string{"http://[::1]/callback"}
+				w.redirectURI = "http://[::1]/callback"
+				w.responseType = "token"
+			}),
+			want:      issuanceAnswer{outcome: issuanceIssueImplicit},
+			wantReads: []issuanceFact{registration, flows, session, validity, user, scope},
+		},
+
 		// 2. The client, and the flow the ceremony is for (#197). Each reads only what it needs.
 		{
 			name:      "a client disabled since /auth/authorize is refused, reading nothing else",

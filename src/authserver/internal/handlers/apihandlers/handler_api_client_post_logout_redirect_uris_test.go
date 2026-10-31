@@ -334,57 +334,6 @@ func TestHandleClientPostLogoutRedirectURIsPut_ALoadedListEqualAsASetProceeds(t 
 	}
 }
 
-// A plain-http URI on a host other than loopback is refused when it is added, not when the save
-// carries back one the caller loaded, so the rest of the list stays editable around it. This keeps a
-// console served over plain http off loopback able to save its list (#575, #590).
-func TestHandleClientPostLogoutRedirectURIsPut_ALoadedPlainHTTPURIDoesNotBlockTheSave(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-	auditLogger := handlersmocks.NewAuditLogger(t)
-
-	expectPostLogoutRedirectURIsClient(database, codeFlowClient())
-	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
-	expectStoredPostLogoutRedirectURIs(database,
-		record.PostLogoutRedirectURI{Id: 11, ClientId: 7, URI: "http://intranet.example.com/bye"},
-		record.PostLogoutRedirectURI{Id: 12, ClientId: 7, URI: "https://retired.example.com/bye"},
-	)
-	database.On("DeletePostLogoutRedirectURI", mock.Anything, clientUpdateTx, int64(12)).Return(nil).Once()
-	database.On("CreatePostLogoutRedirectURI", mock.Anything, clientUpdateTx, mock.MatchedBy(func(row *record.PostLogoutRedirectURI) bool {
-		return row.ClientId == 7 && row.URI == "https://replacement.example.com/bye"
-	})).Return(nil).Once()
-	stubClientResponseLoads(database)
-	auditLogger.On("Log", mock.Anything, audit.EventUpdatedPostLogoutRedirectURIs, mock.Anything).Return().Once()
-
-	rr := servePostLogoutRedirectURIsSave(t, database, auditLogger, postLogoutRedirectURIsBody(t,
-		[]string{"http://intranet.example.com/bye", "https://replacement.example.com/bye"},
-		[]string{"http://intranet.example.com/bye", "https://retired.example.com/bye"}))
-
-	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	database.AssertExpectations(t)
-}
-
-// Naming a new http URI as loaded, to slip it past the gate, finds the stored rows differing from the
-// loaded list and answers 409 with nothing written.
-func TestHandleClientPostLogoutRedirectURIsPut_APlainHTTPURINamedAsLoadedButNotStoredWritesNothing(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-	auditLogger := handlersmocks.NewAuditLogger(t)
-
-	expectPostLogoutRedirectURIsClient(database, codeFlowClient())
-	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
-	expectStoredPostLogoutRedirectURIs(database, record.PostLogoutRedirectURI{Id: 11, ClientId: 7, URI: "https://a.example.com/bye"})
-
-	rr := servePostLogoutRedirectURIsSave(t, database, auditLogger, postLogoutRedirectURIsBody(t,
-		[]string{"https://a.example.com/bye", "http://new.example.com/bye"},
-		[]string{"https://a.example.com/bye", "http://new.example.com/bye"}))
-
-	assert.Equal(t, http.StatusConflict, rr.Code)
-	code, _ := decodeErrorEnvelope(t, rr)
-	assert.Equal(t, "CONCURRENT_UPDATE", code)
-	require.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
-	database.AssertExpectations(t)
-	assertNotAttemptedOnClientDatabase(t, database, "CreatePostLogoutRedirectURI", "DeletePostLogoutRedirectURI")
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-}
-
 // Every refusal is decided before the transaction opens, so a refused save writes nothing: the strict
 // mock carries the client read and nothing else. Each answers its catalog key in the sign-out list's
 // own family, and its sentence names the sign-out list.
@@ -482,14 +431,25 @@ func TestHandleClientPostLogoutRedirectURIsPut_ARefusedSaveNeverOpensTheTransact
 			wantDescription: "Sign-out redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): http://app.example.com/bye",
 		},
 		{
-			// The exemption is the loaded URI's alone: a stored http row does not let a second
-			// one in beside it.
-			name: "a plain-http URI the caller did not load, beside one it did",
+			// A stored plain-http row receives nothing at sign-out, so a save that carries it
+			// back is refused as an addition is, naming it, until the administrator removes it
+			// in the same save (#590 decision 11). Here a retired entry is swapped for its
+			// replacement with the http row kept: nothing is written.
+			name: "a stored plain-http URI, carried back by the save",
 			body: postLogoutRedirectURIsBody(t,
-				[]string{"http://legacy.example.com/bye", "http://new.example.com/bye"},
-				[]string{"http://legacy.example.com/bye"}),
+				[]string{"https://replacement.example.com/bye", "http://intranet.example.com/bye"},
+				[]string{"http://intranet.example.com/bye", "https://retired.example.com/bye"}),
 			wantCode:        "handler.client_post_logout_redirect_uris.insecure_http",
-			wantDescription: "(127.0.0.1, [::1] or localhost): http://new.example.com/bye",
+			wantDescription: "(127.0.0.1, [::1] or localhost): http://intranet.example.com/bye",
+		},
+		{
+			// Its uppercase spelling is the same cleartext http, stored or not.
+			name: "a stored plain-HTTP URI in upper case, carried back by the save",
+			body: postLogoutRedirectURIsBody(t,
+				[]string{"HTTP://intranet.example.com/bye"},
+				[]string{"HTTP://intranet.example.com/bye"}),
+			wantCode:        "handler.client_post_logout_redirect_uris.insecure_http",
+			wantDescription: "(127.0.0.1, [::1] or localhost): HTTP://intranet.example.com/bye",
 		},
 		{
 			name:            "a repeated URI, once with surrounding spaces",

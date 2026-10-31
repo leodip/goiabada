@@ -457,5 +457,51 @@ func TestAccountLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			english:    "postLogoutRedirectUri is not registered for the client",
 			portuguese: "O postLogoutRedirectUri não está registrado para o cliente",
 		},
+		// The two rules /auth/logout applies to a target before it redirects, so a caller is never
+		// handed a sign-out URL that cannot take the user back. Both run before the client is
+		// resolved, by identifier or by URI, so the expectations are nil: the strict mock fails
+		// the row on any query (#590 decision 13).
+		{
+			name:       "a plain-http redirect URI off loopback, with a client identifier",
+			serve:      logout("http://app.example.com/after-logout", logoutClientIdent, nil),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "postLogoutRedirectUri must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost)",
+			portuguese: "O postLogoutRedirectUri não pode usar http simples em um host que não seja a interface de loopback (127.0.0.1, [::1] ou localhost)",
+		},
+		{
+			name:       "a plain-HTTP redirect URI off loopback, resolved by URI",
+			serve:      logout("HTTP://localhost.attacker.example/after-logout", "", nil),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "postLogoutRedirectUri must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost)",
+			portuguese: "O postLogoutRedirectUri não pode usar http simples em um host que não seja a interface de loopback (127.0.0.1, [::1] ou localhost)",
+		},
+		{
+			name:       "a scheme-relative redirect URI, with a client identifier",
+			serve:      logout("//app.example.com/after-logout", logoutClientIdent, nil),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "postLogoutRedirectUri must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host)",
+			portuguese: "O postLogoutRedirectUri precisa ser uma URI absoluta (o esquema é obrigatório, fragmentos não são permitidos, os escapes por porcentagem precisam estar bem formados e uma URI http ou https precisa nomear um host)",
+		},
+		{
+			name:       "a redirect URI with a fragment, resolved by URI",
+			serve:      logout("https://app.example.com/after-logout#frag", "", nil),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "postLogoutRedirectUri must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host)",
+			portuguese: "O postLogoutRedirectUri precisa ser uma URI absoluta (o esquema é obrigatório, fragmentos não são permitidos, os escapes por porcentagem precisam estar bem formados e uma URI http ou https precisa nomear um host)",
+		},
+		{
+			// The http rule is the absolute-URI rule's successor, not its replacement: a hostless
+			// http URI fails the absolute-URI rule first and is named for that.
+			name:       "a hostless http redirect URI",
+			serve:      logout("http:///after-logout", logoutClientIdent, nil),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "postLogoutRedirectUri must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host)",
+			portuguese: "O postLogoutRedirectUri precisa ser uma URI absoluta (o esquema é obrigatório, fragmentos não são permitidos, os escapes por porcentagem precisam estar bem formados e uma URI http ou https precisa nomear um host)",
+		},
 	})
 }

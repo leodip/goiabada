@@ -224,12 +224,13 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 	//
 	// Each row varies only the redirect URI from the passing row above, and each names the gate that
 	// refuses it. Nothing is rendered, so no header is written and the caller's 500 owns the response.
-	t.Run("a redirect URI that is not an absolute URI is refused, in form_post too", func(t *testing.T) {
+	t.Run("a redirect URI that is not an absolute URI, or is plain http off loopback, is refused, in form_post too", func(t *testing.T) {
 		for _, redirectURI := range []string{
 			"//evil.example/cb",
 			"https:///evil.example/cb",
 			"/relative/cb",
 			"https://legit.example/cb#frag",
+			"http://legit.example/cb",
 		} {
 			t.Run(redirectURI, func(t *testing.T) {
 				w := httptest.NewRecorder()

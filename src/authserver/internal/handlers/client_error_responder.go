@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/authserver/web"
+	"github.com/leodip/goiabada/core/loopback"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -22,7 +23,7 @@ type clientErrorDatabase interface {
 }
 
 // ClientErrorResponder answers a client with an authorization error response: it decides whether
-// the response may leave this server at all (RedirectWillBeEmitted's three gates), writes it in the
+// the response may leave this server at all (RedirectWillBeEmitted's four gates), writes it in the
 // query, the fragment or a form_post, renders the refusal interstitial in its place when it may not,
 // and answers server_error when the step's clear of its auth context failed. The route table builds
 // one and hands it to every handler that answers a client with an error.
@@ -133,7 +134,7 @@ func (rsp *ClientErrorResponder) answerClientAfterClear(w http.ResponseWriter, r
 }
 
 // RedirectWillBeEmitted answers whether an error response to this client would leave the server as a
-// redirect, or would be withheld and replaced by the refusal interstitial. It is three gates asked as
+// redirect, or would be withheld and replaced by the refusal interstitial. It is four gates asked as
 // one question, so the callers that need the answer before building a response and the emitter that
 // enforces it cannot drift apart. site names the caller for the log line; the URI itself is never
 // logged (#159).
@@ -149,6 +150,13 @@ func (rsp *ClientErrorResponder) answerClientAfterClear(w http.ResponseWriter, r
 // page asks for neither authentication nor consent; the cost, accepted knowingly, is that a
 // self-registered client's silent renewal receives no readable error and falls back to an
 // interactive authorization (#108 decision 15).
+//
+// The insecure-http gate: the redirect URI is not plain http off the loopback interface. RFC 9700
+// section 2.6 forbids carrying an authorization response over cleartext, and an error response is
+// one (RFC 6749 4.1.2.1). /auth/authorize refuses a request for such a URI, so only a ceremony it
+// validated before that refusal existed reaches here, when a step in between answers with an error,
+// consent declined among them. That is expected rather than a bypassed gate, so it is asked here,
+// with a Warn record naming the client, before the emittability gate would log an Error (#590).
 //
 // The emittability gate: whether the string can name the host it appears to
 // (checkRedirectURIEmittable). An administrator-registered client passes the provenance gate and can
@@ -175,6 +183,15 @@ func (rsp *ClientErrorResponder) RedirectWillBeEmitted(ctx context.Context, clie
 	responseType string, site string) bool {
 
 	if client == nil || client.CreatedViaDCR {
+		return false
+	}
+
+	// Asked of an absolute URI only, so a non-absolute one still reaches the emittability gate's
+	// Error: that one is a bypassed gate, whatever its scheme.
+	if urlmatch.IsAbsoluteRedirectURI(redirectURI) && loopback.IsPlainHTTPOff(redirectURI) {
+		// The client identifier is a bounded stored value and is safe to log; the URI is not (#159).
+		slog.WarnContext(ctx, "the redirect URI this client would be answered at uses plain http off the loopback interface, so the redirect is withheld",
+			"client_identifier", client.ClientIdentifier, "site", site)
 		return false
 	}
 

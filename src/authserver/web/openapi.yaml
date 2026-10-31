@@ -3890,9 +3890,14 @@ paths:
     post:
       tags: [Account]
       summary: Prepare a sign-out
-      description: >-
+      description: |
         Validate the sign-out target, mint a short-lived id_token_hint and return the prepared
         sign-out operation, as either a self-submitting form's parameters or a URL to follow.
+
+        postLogoutRedirectUri must be an absolute URI, with a scheme, no fragment and, for http
+        or https, a host, and it must not use plain http on a host other than 127.0.0.1, [::1]
+        or localhost. A target that breaks either rule is refused with 400 VALIDATION_ERROR,
+        since /auth/logout wouldn't redirect to it.
       operationId: requestAccountLogout
       requestBody:
         required: true
@@ -6148,8 +6153,8 @@ components:
           description: >-
             The complete set of redirect URIs the client has after the call. More than 60, one
             longer than 2048 bytes, one listed twice, or a plain http one on a host other than
-            127.0.0.1, [::1] or localhost that expectedRedirectURIs doesn't list, is refused with
-            400 and nothing is written. error_code is the refusal's catalog key, such as
+            127.0.0.1, [::1] or localhost, is refused with 400 and nothing is written, even when
+            it is already stored. error_code is the refusal's catalog key, such as
             handler.client_redirect_uris.too_many.
           items:
             type: string
@@ -6169,9 +6174,9 @@ components:
           description: >-
             The complete set of sign-out redirect URIs the client has after the call. More than
             60, one longer than 2048 bytes, one listed twice, one that isn't an absolute URI, or a
-            plain http one on a host other than 127.0.0.1, [::1] or localhost that
-            expectedPostLogoutRedirectURIs doesn't list, is refused with 400 and nothing is
-            written. error_code is the refusal's catalog key, such as
+            plain http one on a host other than 127.0.0.1, [::1] or localhost, is refused with 400
+            and nothing is written, even when it is already stored. error_code is the refusal's
+            catalog key, such as
             handler.client_post_logout_redirect_uris.too_many.
           items:
             type: string

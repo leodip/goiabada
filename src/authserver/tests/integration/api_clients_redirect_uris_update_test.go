@@ -548,10 +548,10 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 // so an administrator could save http://app.example.com/callback and the authorization
 // code then travelled to it in the clear.
 //
-// The refusal is when saving only. The loopback http that RFC 8252 section 7.3 keeps
-// working for native and MCP clients, and a custom scheme an administrator has legitimate
-// reason to register (#122), save beside https in the same PUT: the gate must refuse
-// exactly the URIs the RFC forbids and nothing else.
+// The loopback http that RFC 8252 section 7.3 keeps working for native and MCP clients,
+// and a custom scheme an administrator has legitimate reason to register (#122), save
+// beside https in the same PUT: the gate must refuse exactly the URIs the RFC forbids and
+// nothing else.
 func TestAPIClientRedirectURIsPut_PlainHTTPOnNonLoopbackRefused(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "redir-http-")
@@ -597,54 +597,43 @@ func TestAPIClientRedirectURIsPut_PlainHTTPOnNonLoopbackRefused(t *testing.T) {
 	assert.Equal(t, http.StatusOK, respOK.StatusCode, "https, loopback http and custom schemes must still be accepted")
 }
 
-// TestAPIClientRedirectURIsPut_AStoredPlainHTTPURIDoesNotBlockTheSave is the other side of the
-// save gate above: a plain-http URI stored before it still works, so a save carrying it back is
-// not refused, and the rest of the list stays editable around it. Adding a second one is still
-// refused, and so is naming one as loaded that is not stored, which the stored-rows check answers
-// with 409 before anything is written (#575).
-func TestAPIClientRedirectURIsPut_AStoredPlainHTTPURIDoesNotBlockTheSave(t *testing.T) {
+// TestAPIClientRedirectURIsPut_AStoredPlainHTTPURIBlocksTheSaveUntilRemoved is the other side of
+// the save gate above. A plain-http URI stored before that gate receives nothing at sign-in or
+// sign-out (#590), so a save that carries it back is refused by name, as an addition is, and
+// nothing is written. The save that removes it goes through, and nothing deletes it on its own.
+// A stored loopback http URI is no such row: it is carried back without complaint.
+func TestAPIClientRedirectURIsPut_AStoredPlainHTTPURIBlocksTheSaveUntilRemoved(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "redir-legacy-http-")
 	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 
 	legacy := "http://intranet.example.com/callback"
-	for _, uri := range []string{legacy, "https://compromised.example.com/callback"} {
+	loopbackURI := "http://127.0.0.1:8765/callback"
+	for _, uri := range []string{legacy, loopbackURI, "https://compromised.example.com/callback"} {
 		require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: uri}))
 	}
 	loaded := readRedirectURIs(t, accessToken, client.Id)
 
-	// The compromised callback is removed and its replacement added, with the http row kept.
-	save := api.UpdateClientRedirectURIsRequest{
-		RedirectURIs:         []string{legacy, "https://replacement.example.com/callback"},
-		ExpectedRedirectURIs: loaded,
-	}
-	resp := makeAPIRequest(t, "PUT", baseURL, accessToken, save)
-	_ = resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode, "a stored http URI must not block the save that carries it back")
-	assert.ElementsMatch(t, save.RedirectURIs, readRedirectURIs(t, accessToken, client.Id))
-	loaded = save.RedirectURIs
-
-	// A second http URI beside the stored one is an addition, and is refused by name.
-	added := "http://other.example.com/callback"
-	resp = makeAPIRequest(t, "PUT", baseURL, accessToken, api.UpdateClientRedirectURIsRequest{
-		RedirectURIs:         append([]string{added}, loaded...),
+	// The compromised callback is removed and its replacement added, with the http row kept: 400
+	// naming the http row, and the stored list untouched.
+	resp := makeAPIRequest(t, "PUT", baseURL, accessToken, api.UpdateClientRedirectURIsRequest{
+		RedirectURIs:         []string{legacy, loopbackURI, "https://replacement.example.com/callback"},
 		ExpectedRedirectURIs: loaded,
 	})
 	var body map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&body)
 	_ = resp.Body.Close()
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	assert.Equal(t, "Redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): "+added, body["error_description"])
-
-	// Naming it as loaded, to pass the gate, is checked against the stored rows: 409, nothing written.
-	resp = makeAPIRequest(t, "PUT", baseURL, accessToken, api.UpdateClientRedirectURIsRequest{
-		RedirectURIs:         append([]string{added}, loaded...),
-		ExpectedRedirectURIs: append([]string{added}, loaded...),
-	})
-	body = nil
-	_ = json.NewDecoder(resp.Body).Decode(&body)
-	_ = resp.Body.Close()
-	assert.Equal(t, http.StatusConflict, resp.StatusCode)
-	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "a stored http URI carried back must block the save")
+	assert.Equal(t, "Redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): "+legacy, body["error_description"])
 	assert.ElementsMatch(t, loaded, readRedirectURIs(t, accessToken, client.Id), "a refused save writes nothing")
+
+	// The same change with the http row removed saves, the loopback http row carried back with it.
+	removed := []string{loopbackURI, "https://replacement.example.com/callback"}
+	resp = makeAPIRequest(t, "PUT", baseURL, accessToken, api.UpdateClientRedirectURIsRequest{
+		RedirectURIs:         removed,
+		ExpectedRedirectURIs: loaded,
+	})
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode, "the save that removes the http URI must go through")
+	assert.ElementsMatch(t, removed, readRedirectURIs(t, accessToken, client.Id))
 }
