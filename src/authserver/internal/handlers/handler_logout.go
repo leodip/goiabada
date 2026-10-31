@@ -24,8 +24,10 @@ import (
 )
 
 // logoutDatabase is what the logout ceremony needs: the session it ends, the clients it
-// must notify, and the deletes that end it.
+// must notify, the deletes that end it, and the client's sign-out redirect URIs a target is
+// matched against. Its redirect URIs are read only to describe a refused target (#147 decision 9).
 type logoutDatabase interface {
+	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
@@ -917,18 +919,16 @@ func clientForPostLogoutRedirect(ctx context.Context, clientId string, database 
 // exactly match one of the previously registered post_logout_redirect_uris values") and as RFC 9700
 // section 2.1 requires of redirect URIs generally.
 //
-// Goiabada has no separate post_logout_redirect_uris client metadata, so the set matched against is
-// the client's OAuth redirect URIs. The spec permits that: the value "MUST have been previously
-// registered with the OP, either using the post_logout_redirect_uris Registration parameter or via
-// other mechanisms". Registering the two separately is tracked as its own change.
+// The set matched against is the client's sign-out redirect URIs, its post_logout_redirect_uris,
+// and only that set: its redirect URIs are not sign-out targets, so a sign-out landing page never has
+// to be a place an authorization code can be delivered (#147 decision 1). There is no loopback port
+// flexibility here, unlike at the authorization endpoint (decision 3).
 //
 // A registered URI that is not an absolute URI earns no redirect either, which is the third way of
-// returning "" and the only one where the request is otherwise in order. Matching the same rows as
-// the authorization endpoint means inheriting the same defect: a row stored before those rules
-// existed can be scheme-relative, or can carry a scheme with no authority, and this endpoint would
-// then emit it verbatim as a Location the user agent resolves against a host nobody registered. The
-// authorization endpoint's own gate does not cover this one, because the value never passes through
-// it (#122).
+// returning "" and the only one where the request is otherwise in order. The admin API refuses such
+// an entry, but this endpoint does not depend on every stored row having passed it: emitted
+// verbatim, a scheme-relative value, or one with a scheme and no authority, is a Location the user
+// agent resolves against a host nobody registered (#122).
 func postLogoutRedirectLocation(
 	r *http.Request,
 	database logoutDatabase,
@@ -951,22 +951,21 @@ func postLogoutRedirectLocation(
 		return ""
 	}
 
-	if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-		slog.ErrorContext(r.Context(), "unable to load the client's redirect URIs, not redirecting",
+	if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+		slog.ErrorContext(r.Context(), "unable to load the client's sign-out redirect URIs, not redirecting",
 			"client_identifier", client.ClientIdentifier, "error", err)
 		return ""
 	}
 
 	registered := false
-	for _, uri := range client.RedirectURIs {
+	for _, uri := range client.PostLogoutRedirectURIs {
 		if uri.URI == postLogoutRedirectURI {
 			registered = true
 			break
 		}
 	}
 	if !registered {
-		slog.WarnContext(r.Context(), "post_logout_redirect_uri is not registered for this client, not redirecting",
-			"client_identifier", client.ClientIdentifier)
+		logUnregisteredPostLogoutRedirectURI(r.Context(), database, client, postLogoutRedirectURI)
 		return ""
 	}
 
@@ -981,6 +980,37 @@ func postLogoutRedirectLocation(
 	}
 
 	return location
+}
+
+// logUnregisteredPostLogoutRedirectURI writes the record for a target that is not one of the
+// client's sign-out redirect URIs.
+//
+// A target that is one of the client's redirect URIs is the case the rule before #147 honored, so its
+// record says so and names the URI: each such record is one address an operator adds to that
+// client's Sign-out redirect URIs tab (#147 decision 9). The URI is logged in this case only,
+// because it then equals a registered value, bounded by the column's width; every other target is
+// unbounded caller input and stays off the record, as at the authorization endpoint (#122).
+//
+// The redirect URIs are read here, on a refused target, and never on a sign-out that is honored. A
+// failure to read them loses only the precise record: the general one is written instead.
+func logUnregisteredPostLogoutRedirectURI(ctx context.Context, database logoutDatabase, client *record.Client,
+	postLogoutRedirectURI string) {
+
+	if err := database.ClientLoadRedirectURIs(ctx, nil, client); err != nil {
+		slog.ErrorContext(ctx, "unable to load the client's redirect URIs to describe a refused post_logout_redirect_uri",
+			"client_identifier", client.ClientIdentifier, "error", err)
+	} else {
+		for _, uri := range client.RedirectURIs {
+			if uri.URI == postLogoutRedirectURI {
+				slog.WarnContext(ctx, "post_logout_redirect_uri is a redirect URI of the client but not one of its sign-out redirect URIs, not redirecting",
+					"client_identifier", client.ClientIdentifier, "post_logout_redirect_uri", postLogoutRedirectURI)
+				return
+			}
+		}
+	}
+
+	slog.WarnContext(ctx, "post_logout_redirect_uri is not registered for this client, not redirecting",
+		"client_identifier", client.ClientIdentifier)
 }
 
 // finishLogout clears the OP session cookie and writes the terminal response.

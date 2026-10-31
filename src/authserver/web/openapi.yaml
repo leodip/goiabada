@@ -6793,11 +6793,19 @@ components:
         postLogoutRedirectUri:
           type: string
           format: uri
+          description: >-
+            Where the browser goes after the sign-out. It must exactly match one of the client's
+            sign-out redirect URIs; its redirect URIs don't count.
         state:
           type: string
         clientIdentifier:
           type: string
-          description: Auto-resolved if omitted
+          description: >-
+            The client whose sign-out redirect URIs postLogoutRedirectUri must be one of. When
+            omitted, the client is the one whose sign-out redirect URIs hold postLogoutRedirectUri;
+            when none or several do, the request is refused with "Unable to resolve client from
+            postLogoutRedirectUri; supply clientIdentifier.". Send it when another client may list
+            the same address.
         responseMode:
           type: string
           description: >-

@@ -140,3 +140,26 @@ test("signing out with no ID token and no client_id signs out, but leaves the us
   expect((await signInToWebApp(app, testapp.web, user)).askedForPassword).toBe(true);
   await context.close();
 });
+
+// Logout, "Where the user lands": a sign-out returns only to a sign-out redirect URI. The app's callback
+// is one of its redirect URIs and not one of its sign-out redirect URIs, so even beside the client_id it
+// is registered on, the user is signed out and stays on the auth server's page.
+test("signing out to a redirect URI that isn't a sign-out redirect URI signs out, but leaves the user on the auth server's page", async ({ browser, users }) => {
+  const user = await users.create();
+  const { context, page: app } = await userBrowser(browser);
+  await signInToWebApp(app, testapp.web, user);
+  await expectResult(app, "Signed in");
+
+  await app.goto(`${env.authUrl}/auth/logout?${new URLSearchParams({
+    post_logout_redirect_uri: `${testapp.web.url}/callback`,
+    client_id: testapp.web.clientId,
+    state: "s",
+  })}`);
+  await app.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(app.getByRole("heading", { name: "Signed out" })).toBeVisible();
+  await expect(app.getByText("We couldn't take you back to the application you signed out from.")).toBeVisible();
+  expect(new URL(app.url()).origin).toBe(env.authUrl);
+
+  expect((await signInToWebApp(app, testapp.web, user)).askedForPassword).toBe(true);
+  await context.close();
+});

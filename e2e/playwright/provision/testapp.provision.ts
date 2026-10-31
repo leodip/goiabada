@@ -8,6 +8,7 @@ import {
   addIntrospectionResource,
   addRedirectUri,
   addResourcePermission,
+  addSignOutRedirectUri,
   clientIdFromList,
   clientRow,
   clientUrl,
@@ -63,18 +64,19 @@ test("set up the test app's clients and API", async ({ page }) => {
   await saveResourcePermissions(page);
 
   // Add sign-in to a web app, steps 1 and 2, and Sign users out, step 2: a confidential client with the
-  // authorization code flow, its callback and its signed-out page.
+  // authorization code flow, its callback as a redirect URI and its signed-out page as a sign-out
+  // redirect URI.
   const secrets: Record<string, string> = {};
   for (const [key, app] of [["WEB", testapp.web], ["WEB2", testapp.web2]] as const) {
     const id = await createClient(page, { identifier: app.clientId });
     await addRedirectUri(page, id, `${app.url}/callback`);
-    await addRedirectUri(page, id, `${app.url}/signed-out`);
+    await addSignOutRedirectUri(page, id, `${app.url}/signed-out`);
     secrets[`${key}_CLIENT_ID`] = app.clientId;
     secrets[`${key}_CLIENT_SECRET`] = await readClientSecret(page, id);
   }
 
-  // Add sign-in to a SPA or mobile app, steps 1 to 4: a public client, the page as its redirect URI,
-  // and its origin.
+  // Add sign-in to a SPA or mobile app, steps 1 to 4: a public client, the page as its redirect URI
+  // and, since it signs out back to itself, as its sign-out redirect URI, and its origin.
   const spaId = await createClient(page, { identifier: testapp.spa.clientId });
   await page.goto(clientUrl(spaId, "authentication"));
   await page.getByRole("radio", { name: "Public", exact: true }).check();
@@ -82,6 +84,7 @@ test("set up the test app's clients and API", async ({ page }) => {
   await confirmDialog(page, "You're making the client public");
   await expect(page.getByText("Authentication saved.")).toBeVisible();
   await addRedirectUri(page, spaId, testapp.spa.url);
+  await addSignOutRedirectUri(page, spaId, testapp.spa.url);
   await page.goto(clientUrl(spaId, "web-origins"));
   await page.locator("#webOrigin").fill(testapp.spa.origin);
   await page.locator("#addOriginBtn").click();

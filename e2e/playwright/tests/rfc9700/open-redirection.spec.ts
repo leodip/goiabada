@@ -6,7 +6,7 @@
 // unregistered redirect URI, refused on the page, is in ../rfc6749/redirect-uri.spec.ts; a declined
 // consent answered access_denied in ../rfc6749/authorization-response.spec.ts.
 import type { BrowserContext } from "@playwright/test";
-import { addRedirectUri, setImplicitGrant } from "../../lib/admin-console";
+import { addSignOutRedirectUri, setImplicitGrant } from "../../lib/admin-console";
 import { authorizeAndLand, type BrowserSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
@@ -67,7 +67,7 @@ test("prompt=none is the exception: with no session it is answered login_require
   await anonymous.close();
 });
 
-test("logout redirects only to a URI registered for the client it names; any other leaves the user on the auth server (section 2.1)", async ({
+test("logout redirects only to a sign-out redirect URI of the client it names; any other leaves the user on the auth server (section 2.1)", async ({
   page,
   browser,
   clients,
@@ -76,9 +76,11 @@ test("logout redirects only to a URI registered for the client it names; any oth
 }) => {
   const user = await users.create();
   const { client, secret } = await browserSignInClient(page, clients);
+  const signOutUri = `${env.webtest1Url}/signed-out`;
+  await addSignOutRedirectUri(page, client.id, signOutUri);
   const { client: other } = await browserSignInClient(page, clients);
-  const othersUri = `${env.webtest2Url}/callback`;
-  await addRedirectUri(page, other.id, othersUri);
+  const othersUri = `${env.webtest2Url}/signed-out`;
+  await addSignOutRedirectUri(page, other.id, othersUri);
 
   // Signs the user in afresh, signs them out with query, confirming when asked, and returns where the
   // browser ended up and whether it shows the auth server's "Signed out" page.
@@ -104,6 +106,14 @@ test("logout redirects only to a URI registered for the client it names; any oth
   const refused: [string, LogoutQuery][] = [
     ["a URI nobody registered, beside client_id", async () => ({ client_id: client.identifier, post_logout_redirect_uri: elsewhere, state: "s" })],
     ["another client's URI, beside client_id", async () => ({ client_id: client.identifier, post_logout_redirect_uri: othersUri, state: "s" })],
+    [
+      "the client's own redirect URI, not a sign-out redirect URI, beside client_id",
+      async () => ({ client_id: client.identifier, post_logout_redirect_uri: testRedirectUri, state: "s" }),
+    ],
+    [
+      "the client's own redirect URI, not a sign-out redirect URI, beside the ID token",
+      async (signIn) => ({ id_token_hint: await idToken(signIn), post_logout_redirect_uri: testRedirectUri, state: "s" }),
+    ],
     ["a URI nobody registered, beside the ID token", async (signIn) => ({ id_token_hint: await idToken(signIn), post_logout_redirect_uri: elsewhere, state: "s" })],
   ];
   for (const [what, query] of refused) {
@@ -114,8 +124,8 @@ test("logout redirects only to a URI registered for the client it names; any oth
     });
   }
 
-  const { landed } = await signOut(async () => ({ client_id: client.identifier, post_logout_redirect_uri: testRedirectUri, state: "s" }));
-  expect(landed.href.startsWith(testRedirectUri), landed.href).toBe(true);
+  const { landed } = await signOut(async () => ({ client_id: client.identifier, post_logout_redirect_uri: signOutUri, state: "s" }));
+  expect(landed.href.startsWith(signOutUri), landed.href).toBe(true);
   expect(landed.searchParams.get("state")).toBe("s");
 });
 

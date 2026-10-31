@@ -23,11 +23,12 @@ import (
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
-// seedDatabase is the seed's port: the transaction and the nine creates its 18 writes call.
+// seedDatabase is the seed's port: the transaction and the ten creates its 18 writes call.
 type seedDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
+	CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error
 	CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 	CreateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
 	CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error
@@ -248,10 +249,19 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		return err
 	}
 
-	for _, uri := range []string{r.cfg.AdminConsoleBaseURL + "/auth/callback", r.cfg.AdminConsoleBaseURL} {
-		if err := r.db.CreateRedirectURI(ctx, tx, &record.RedirectURI{URI: uri, ClientId: client.Id}); err != nil {
-			return err
-		}
+	// The console signs in at its callback and signs out to its bare base URL, and each address goes
+	// on the one list that use reads: the bare URL is a sign-out redirect URI and not a redirect URI,
+	// so it is no place an authorization code can be sent (#147 decision 8). Migration 000072 moves
+	// an upgraded installation's rows into the same shape.
+	if err := r.db.CreateRedirectURI(ctx, tx, &record.RedirectURI{
+		URI: r.cfg.AdminConsoleBaseURL + "/auth/callback", ClientId: client.Id,
+	}); err != nil {
+		return err
+	}
+	if err := r.db.CreatePostLogoutRedirectURI(ctx, tx, &record.PostLogoutRedirectURI{
+		URI: r.cfg.AdminConsoleBaseURL, ClientId: client.Id,
+	}); err != nil {
+		return err
 	}
 
 	user := &record.User{
