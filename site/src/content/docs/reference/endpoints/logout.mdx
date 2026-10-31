@@ -45,7 +45,7 @@ It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-
 | `post_logout_redirect_uri` | No | Where to send the browser afterwards. It must exactly match one of the client's sign-out redirect URIs, and it's honoured only on the terms in [Where the user lands](#where-the-user-lands). |
 | `client_id` | Sometimes | The client's identifier. Required with an encrypted hint, to say whose secret decrypts it, and with a `post_logout_redirect_uri` sent without a hint. With a hint, it must match the hint's `aud`. |
 | `state` | No | Any value. It comes back on the redirect exactly as you sent it. |
-| `ui_locales` | No | The languages for the pages the user sees, such as `pt-BR en`. |
+| `ui_locales` | No | The languages for the pages the user sees, such as `pt-BR en`. A signed-in user's [page language](/guides/customize-and-translate-the-pages/#how-the-language-is-chosen) wins over it. |
 
 ## Whether the user is asked
 

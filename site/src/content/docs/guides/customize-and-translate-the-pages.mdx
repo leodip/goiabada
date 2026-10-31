@@ -44,7 +44,7 @@ The pages come in English, Portuguese (Brazil), Spanish, French, Italian and Ger
 
 4. Restart both servers. Each reads the catalogs once, at start, and refuses to start when one doesn't parse, naming the file.
 
-5. Users choose the language under **Account**, **Profile** in the admin console, and your app can ask for it on the sign-in pages with `ui_locales`. See [how the language is chosen](#how-the-language-is-chosen).
+5. Users choose it as their **Page language** under **Account**, **Profile** in the admin console, and your app can ask for it on the sign-in pages with `ui_locales`. See [how the language is chosen](#how-the-language-is-chosen).
 
 </Steps>
 
@@ -140,19 +140,29 @@ The colors are tokens at the top of `tailwindcss/ui.css`: the light palette in i
 
 ## How the language is chosen
 
-On the auth server's pages, the sign-in, one-time code, consent, sign-out, registration and password reset pages, the language is the first of these that names one:
+On the auth server's pages and in the admin console, the language is the first of these that names one:
 
-1. The `ui_locales` parameter of the authorization request, or of the [sign-out](/reference/endpoints/logout/): one or more language tags in your order of preference, separated by single spaces, such as `ui_locales=es pt-BR`. It's kept for the rest of that sign-in, and applies to the error page the auth server shows when it refuses the request outright.
-2. The browser's `Accept-Language` header.
-3. English.
+1. The user's **Page language**, which they choose under **Account**, **Profile** in the admin console. An administrator can set it too, on the user's **Profile** page.
+2. A `ui_locales` parameter: one or more language tags in order of preference, separated by single spaces, such as `ui_locales=es pt-BR`. On the auth server, it's the authorization request's or the [sign-out](/reference/endpoints/logout/)'s. It's kept for the rest of that sign-in, and applies to the error page the auth server shows when it refuses the request outright. In the admin console, it's `?ui_locales=` in the page's address.
+3. The browser's `Accept-Language` header.
+4. English.
 
-In the admin console, the user's own choice comes first: the **Language and region** they picked under **Account**, **Profile**, which reaches the console as the `locale` claim of their ID token. The console picks a change up the next time it refreshes the user's tokens, within five minutes with the default token lifetime. Without one, the browser's `Accept-Language` decides, then English.
+A user on **Automatic**, where everyone starts, skips the first. So does a page drawn for nobody Goiabada knows yet, which is why your app's `ui_locales` still matters:
 
-Whichever of these decides, it gets the first of its languages Goiabada has text for, or English when it has none of them: `ui_locales=sv nl` shows Dutch when you've added Dutch but not Swedish, and `ui_locales=sv` alone shows English.
+- The admin console uses the page language once the user has signed in to it.
+- The auth server uses it once the user has entered their password: on the one-time code, recovery code and consent pages, on signing out, and on every page shown to a browser that's signed in.
+- A browser that isn't signed in gets the sign-in, forgot password, registration and activation pages in the language of the other sources, since the auth server doesn't know who's there. The email address typed on the sign-in page never picks the language, so the page can't reveal an account's language to whoever types it.
+- The password reset page, opened from the email, is in the page language of the user the link is for.
+
+The auth server reads the page language each time it draws a page, so a change shows on its next page. The admin console reads it when the user signs in to it. A change they save there shows on their next page, and one made elsewhere, such as by an administrator, reaches them when they next sign in or open their profile.
+
+The **Page language** list holds the languages Goiabada has text for, yours included. A user whose language you later remove is back on **Automatic**.
+
+For `ui_locales` and `Accept-Language`, the first of their languages Goiabada has text for wins, or English when it has none of them: `ui_locales=sv nl` shows Dutch when you've added Dutch but not Swedish, and `ui_locales=sv` alone shows English.
 
 A value an admin console form won't take is refused by the auth server, in the console page's language, which is why both servers need your override catalogs.
 
-An email is written in its recipient's language: the **Language and region** on their profile, or English when they haven't picked one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
+An email to a user is written in their page language. On **Automatic**, it's the **Language and region** on their profile, or English when they haven't picked one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
 
 ## Catalogs
 
@@ -160,7 +170,7 @@ The text of every page, message and email subject is in the built-in catalogs. A
 
 `GOIABADA_I18N_OVERRIDES_DIR` names a folder whose `catalogs` subfolder holds `active.<language>.toml` files. Nothing else in the folder is read: files put in the folder itself are ignored, and the server logs `override directory has no catalogs subdirectory, skipping it` when it starts. Each file is merged over the built-in catalog of its language, key by key, and the file wins. A value left empty removes the built-in text, so the key shows in English. Every value is a plain string: a `[table]` section stops the server at start.
 
-The names of countries and phone country codes, and the country in each time zone's label, come from Unicode's CLDR data, in the page's language, and each language on the **Language and region** list is named in itself and in English, so none of them needs translating.
+The names of countries and phone country codes, and the country in each time zone's label, come from Unicode's CLDR data, in the page's language, and each language on the **Language and region** and **Page language** lists is named in itself and in English, so none of them needs translating.
 
 The durations the admin console writes in words, under a duration field and in how long to wait before asking for another verification code, come from the browser's own CLDR data in the page's language, or in English where the browser has none, so they need no translating either.
 
