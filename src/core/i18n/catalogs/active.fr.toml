@@ -321,6 +321,7 @@
 "adminconsole.client_tabs.authentication" = "Authentification"
 "adminconsole.client_tabs.oauth2_flows" = "Flux OAuth2"
 "adminconsole.client_tabs.redirect_uris" = "URI de redirection"
+"adminconsole.client_tabs.sign_out_redirect_uris" = "URI de redirection après déconnexion"
 "adminconsole.client_tabs.web_origins" = "Origines web"
 "adminconsole.client_tabs.user_sessions" = "Sessions"
 "adminconsole.client_tabs.permissions" = "Permissions"
@@ -819,6 +820,18 @@
 "adminconsole.admin_clients.redirect_uris.invalid_url" = "Cette URL est invalide. Incluez le schéma, par exemple https://."
 "adminconsole.admin_clients.redirect_uris.added" = "URI de redirection ajoutée. Enregistrez pour conserver la modification."
 "adminconsole.admin_clients.redirect_uris.removed" = "URI de redirection retirée. Enregistrez pour conserver la modification."
+"adminconsole.admin_clients.sign_out_redirect_uris.requires_redirect_flow" = "Les URI de redirection après déconnexion concernent les flux de code d’autorisation et implicite. Activez l’un d’eux dans l’onglet Flux OAuth2 pour les définir ici."
+"adminconsole.admin_clients.sign_out_redirect_uris.lead" = "Après la déconnexion, l’utilisateur n’est renvoyé qu’à une adresse de cette liste, qui doit correspondre exactement, port compris. Les URI de redirection ne servent pas à la déconnexion."
+"adminconsole.admin_clients.sign_out_redirect_uris.field.uri" = "URI de redirection après déconnexion"
+"adminconsole.admin_clients.sign_out_redirect_uris.add_button" = "Ajouter"
+"adminconsole.admin_clients.sign_out_redirect_uris.col_authorized" = "URI de redirection après déconnexion"
+"adminconsole.admin_clients.sign_out_redirect_uris.remove_label" = "Retirer"
+"adminconsole.admin_clients.sign_out_redirect_uris.none_yet" = "Aucune URI de redirection après déconnexion pour le moment."
+"adminconsole.admin_clients.sign_out_redirect_uris.saved_successfully" = "URI de redirection après déconnexion enregistrées."
+"adminconsole.admin_clients.sign_out_redirect_uris.duplicate_error" = "Cette URI de redirection après déconnexion figure déjà dans la liste."
+"adminconsole.admin_clients.sign_out_redirect_uris.invalid_url" = "Cette URL est invalide. Incluez le schéma, par exemple https://."
+"adminconsole.admin_clients.sign_out_redirect_uris.added" = "URI de redirection après déconnexion ajoutée. Enregistrez pour conserver la modification."
+"adminconsole.admin_clients.sign_out_redirect_uris.removed" = "URI de redirection après déconnexion retirée. Enregistrez pour conserver la modification."
 
 # --- Client web origins ----------------------------------------------------
 

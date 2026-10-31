@@ -86,6 +86,12 @@ func TestAdminClientHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testin
 		{"HandleRedirectURIsPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleRedirectURIsPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/redirect-uris", routed, jsonBody())},
+		{"HandleSignOutRedirectURIsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleSignOutRedirectURIsGet(h, nil, c)
+		}, handlertest.Request(http.MethodGet, "/admin/clients/3/sign-out-redirect-uris", routed)},
+		{"HandleSignOutRedirectURIsPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleSignOutRedirectURIsPost(h, nil, c)
+		}, handlertest.Request(http.MethodPost, "/admin/clients/3/sign-out-redirect-uris", routed, jsonBody())},
 		{"HandleUserSessionsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleUserSessionsGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions", routed)},

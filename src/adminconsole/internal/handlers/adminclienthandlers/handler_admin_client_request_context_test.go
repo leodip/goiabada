@@ -145,6 +145,10 @@ func (s *ctxRecordingApiClient) UpdateClientRedirectURIs(ctx context.Context, _ 
 	return nil, s.recordWrite(ctx, "UpdateClientRedirectURIs")
 }
 
+func (s *ctxRecordingApiClient) UpdateClientPostLogoutRedirectURIs(ctx context.Context, _ string, _ int64, _ *api.UpdateClientPostLogoutRedirectURIsRequest) (*api.ClientResponse, error) {
+	return nil, s.recordWrite(ctx, "UpdateClientPostLogoutRedirectURIs")
+}
+
 func (s *ctxRecordingApiClient) UpdateClientTokens(ctx context.Context, _ string, _ int64, _ *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientTokens")
 }
@@ -237,6 +241,14 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
+			name: "HandleSignOutRedirectURIsGet",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleSignOutRedirectURIsGet(h, nil, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/clients/3/sign-out-redirect-uris",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
+		},
+		{
 			name: "HandleUserSessionsGet",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleUserSessionsGet(h, c)
@@ -305,6 +317,18 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithBody(strings.NewReader(
 					`{"clientId":3,"redirectURIs":["https://app.example.test/callback"],"expectedRedirectURIs":[]}`)),
+				handlertest.WithContentType("application/json")),
+		},
+		{
+			name: "HandleSignOutRedirectURIsPost",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleSignOutRedirectURIsPost(h, newTestSessionStore(), c)
+			},
+			write: "UpdateClientPostLogoutRedirectURIs",
+			request: handlertest.Request(http.MethodPost, "/admin/clients/3/sign-out-redirect-uris",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
+				handlertest.WithBody(strings.NewReader(
+					`{"clientId":3,"signOutRedirectURIs":["https://app.example.test/signed-out"],"expectedSignOutRedirectURIs":[]}`)),
 				handlertest.WithContentType("application/json")),
 		},
 		{

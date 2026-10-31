@@ -9,10 +9,10 @@
 // Every render asserts that <html lang> carries the active locale and that no raw catalog key
 // leaks into visible HTML. The suite covers every page family: the account self-service pages
 // (phone, address, profile, OTP, sessions, consents, the logout form); admin clients (list,
-// redirect URIs, web origins, permissions, sessions); users (list and paginator, details, delete,
-// permissions, groups, sessions, consents, profile); groups and resources; settings (the audit
-// log viewer, signing keys); and the layout, the menu label and the index, 404 and sign-in error
-// pages.
+// redirect URIs, sign-out redirect URIs, web origins, permissions, sessions); users (list and
+// paginator, details, delete, permissions, groups, sessions, consents, profile); groups and
+// resources; settings (the audit log viewer, signing keys); and the layout, the menu label and the
+// index, 404 and sign-in error pages.
 //
 // It exports nothing and nothing imports it; the name says it is a suite rather than a helper,
 // which is what a -test suffix, as in handlertest, marks. The integration tier drives the auth

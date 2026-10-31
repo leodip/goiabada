@@ -10,6 +10,7 @@ export type ClientTab =
   | "authentication"
   | "oauth2-flows"
   | "redirect-uris"
+  | "sign-out-redirect-uris"
   | "web-origins"
   | "user-sessions"
   | "permissions"
@@ -240,6 +241,15 @@ export async function addRedirectUri(page: Page, id: number, uri: string) {
   await page.locator("#addURIBtn").click();
   await page.locator("#btnSave").click();
   await expect(page.getByText("Redirect URIs saved.")).toBeVisible();
+}
+
+// Registers a sign-out redirect URI on a client's Sign-out redirect URIs tab and saves.
+export async function addSignOutRedirectUri(page: Page, id: number, uri: string) {
+  await page.goto(clientUrl(id, "sign-out-redirect-uris"));
+  await page.locator("#signOutRedirectURI").fill(uri);
+  await page.locator("#addURIBtn").click();
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Sign-out redirect URIs saved.")).toBeVisible();
 }
 
 export type GroupTab = "settings" | "attributes" | "members" | "permissions" | "delete";

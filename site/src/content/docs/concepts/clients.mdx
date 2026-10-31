@@ -28,6 +28,8 @@ A client is any application that asks the auth server for tokens: a web app your
 
 6. If users sign in to your app, open **Redirect URIs**, enter the address your app receives the authorization code at, such as `https://app.example.com/callback`, click **Add**, then click **Save**.
 
+7. If your app sends users back to a page of its own after they sign out, open **Sign-out redirect URIs**, enter that page's address, such as `https://app.example.com/signed-out`, click **Add**, then click **Save**.
+
 </Steps>
 
 That's enough to sign users in. The rest of this page explains each setting, so come back when you need one.
@@ -59,7 +61,7 @@ A client you create in the admin console starts:
 - with the default ACR level `urn:goiabada:level2_optional`;
 - not allowed to request the administrative scopes.
 
-The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Web origins**, **Sessions**, **Permissions** and, for a confidential client, **Introspection**.
+The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Sign-out redirect URIs**, **Web origins**, **Sessions**, **Permissions** and, for a confidential client, **Introspection**.
 
 ## Public and confidential clients
 
@@ -112,6 +114,20 @@ The port is the only part that may differ. It applies to `http` only, never `htt
 <Aside type="caution">
 Prefer `127.0.0.1` or `[::1]` to `localhost`. Resolving `localhost` isn't guaranteed to reach the loopback interface, which is why [RFC 8252](https://datatracker.ietf.org/doc/html/rfc8252#section-8.3) recommends against it.
 </Aside>
+
+## Sign-out redirect URIs
+
+A sign-out redirect URI is an address the auth server may send the browser back to after a [sign-out](/reference/endpoints/logout/), such as your app's "You're signed out" page. Your app names one as `post_logout_redirect_uri`. The auth server sends the user there only when it matches one on the client's **Sign-out redirect URIs** tab **exactly**, port included. Redirect URIs aren't used for sign-out, and no authorization code is ever sent to a sign-out redirect URI, so a plain landing page can go here without becoming a sign-in callback.
+
+The [redirect URI rules](#redirect-uris) apply to each one, with these differences:
+
+- **The list is its own.** A client can have up to 60 sign-out redirect URIs, besides its redirect URIs.
+- **The port of a loopback address counts.** Register the exact port your app listens on: `http://127.0.0.1/signed-out` doesn't match `http://127.0.0.1:54321/signed-out`. An app that picks its port at startup needs a fixed port to be sent back.
+- **A custom scheme and a query are allowed,** such as `com.example.app:/signed-out` or `https://app.example.com/bye?state=fixed`.
+
+[OpenID Connect RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html#ClientMetadata) allows plain `http` only for a confidential client. Goiabada also accepts a loopback `http` address from a public client, as it does for redirect URIs.
+
+Through the Admin API, replace the list whole with [`PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris`](/reference/api/admin/operations/updateclientpostlogoutredirecturis/), sending the list as you read it in `expectedPostLogoutRedirectURIs`. Each save leaves an `updated_post_logout_redirect_uris` entry in the [audit log](/concepts/audit-log/).
 
 ## Web origins
 
@@ -221,7 +237,7 @@ The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, e
 
 Untick **Enabled** on the **Settings** tab to stop a client while keeping its settings. The authorization endpoint then shows an error page instead of signing users in, and the token endpoint answers 401 with `invalid_client`, so its refresh tokens stop working too. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and its Admin and Account APIs refuse the client's access tokens while it stays disabled, and accept them again if you turn it back on before they expire. An API that [introspects](/reference/endpoints/introspect/) them gets `{"active": false}` for as long. An API that checks tokens by their signature alone accepts them until they expire.
 
-**Delete** on the list of clients removes the client with its redirect URIs, web origins, permissions, introspection resources, logo, unredeemed codes, refresh tokens and users' consents to it. The auth server's own endpoints refuse its access tokens from then on, even after a new client takes its identifier; an API that checks tokens by their signature alone accepts them until they expire.
+**Delete** on the list of clients removes the client with its redirect URIs, sign-out redirect URIs, web origins, permissions, introspection resources, logo, unredeemed codes, refresh tokens and users' consents to it. The auth server's own endpoints refuse its access tokens from then on, even after a new client takes its identifier; an API that checks tokens by their signature alone accepts them until they expire.
 
 ## The admin console's client
 

@@ -1,7 +1,7 @@
-// client-uri-list.js is the behaviour of a client's redirect URIs and web origins tabs, one list
-// each: entries are added and removed in the page, and Save sends the list whole, beside the list
-// as the page drew it, so the server refuses a save from an outdated page rather than undo another
-// administrator's change (#428). The form names the save's route and fields in its data set, and
+// client-uri-list.js is the behaviour of a client's redirect URIs, sign-out redirect URIs and web
+// origins tabs, one list each: entries are added and removed in the page, and Save sends the list
+// whole, beside the list as the page drew it, so the server refuses a save from an outdated page
+// rather than undo another administrator's change (#428). The form names the save's route and fields in its data set, and
 // marks with data-origins a list that keeps of each entry only its origin.
 //
 // An entry that is no URL, or no origin, or is in the list already, is refused at its field, which

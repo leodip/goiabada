@@ -31,6 +31,8 @@ var (
 	charUpdateClientFlows = &api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true}
 	charUpdateClientRedir = &api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://app.example.com/cb"},
 		ExpectedRedirectURIs: []string{"https://old.example.com/cb"}}
+	charUpdateClientPLRU = &api.UpdateClientPostLogoutRedirectURIsRequest{PostLogoutRedirectURIs: []string{"https://app.example.com/signed-out"},
+		ExpectedPostLogoutRedirectURIs: []string{"https://old.example.com/signed-out"}}
 	charUpdateClientOrig = &api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://app.example.com"},
 		ExpectedWebOrigins: []string{"https://old.example.com"}}
 	charUpdateClientToken = &api.UpdateClientTokensRequest{TokenExpirationInSeconds: 300}
@@ -481,6 +483,19 @@ func wireCharacterization() []wireCase {
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/redirect-uris", contentType: charJSON,
 			bodyOf: charUpdateClientRedir, anySuccess2xx: true,
+			reply: `{"client":{"id":3}}`, want: int64(3),
+		},
+		{
+			name: "UpdateClientPostLogoutRedirectURIs",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.UpdateClientPostLogoutRedirectURIs(ctx, charAccessToken, 3, charUpdateClientPLRU)
+				if err != nil {
+					return nil, err
+				}
+				return got.Id, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/clients/3/post-logout-redirect-uris", contentType: charJSON,
+			bodyOf: charUpdateClientPLRU, anySuccess2xx: true,
 			reply: `{"client":{"id":3}}`, want: int64(3),
 		},
 		{

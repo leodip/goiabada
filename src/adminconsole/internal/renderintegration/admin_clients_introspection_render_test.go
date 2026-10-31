@@ -100,6 +100,10 @@ func (*clientPagesAPI) UpdateClientRedirectURIs(context.Context, string, int64, 
 	panic("unexpected call to UpdateClientRedirectURIs")
 }
 
+func (*clientPagesAPI) UpdateClientPostLogoutRedirectURIs(context.Context, string, int64, *api.UpdateClientPostLogoutRedirectURIsRequest) (*api.ClientResponse, error) {
+	panic("unexpected call to UpdateClientPostLogoutRedirectURIs")
+}
+
 func (*clientPagesAPI) UpdateClientWebOrigins(context.Context, string, int64, *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClientWebOrigins")
 }
@@ -144,16 +148,17 @@ func serveClientTab(t *testing.T, handler http.HandlerFunc, tab, locale string) 
 func clientTabs(t *testing.T, pages *clientPagesAPI) map[string]http.HandlerFunc {
 	h := render.New(web.TemplateFS(), web.StaticFS())
 	return map[string]http.HandlerFunc{
-		"settings":       adminclienthandlers.HandleSettingsGet(h, newRenderSessionStore(t), pages),
-		"logo":           adminclienthandlers.HandleLogoGet(h, pages),
-		"tokens":         adminclienthandlers.HandleTokensGet(h, newRenderSessionStore(t), pages),
-		"authentication": adminclienthandlers.HandleAuthenticationGet(h, newRenderSessionStore(t), pages),
-		"oauth2-flows":   adminclienthandlers.HandleOAuth2FlowsGet(h, newRenderSessionStore(t), pages),
-		"redirect-uris":  adminclienthandlers.HandleRedirectURIsGet(h, newRenderSessionStore(t), pages),
-		"web-origins":    adminclienthandlers.HandleWebOriginsGet(h, newRenderSessionStore(t), pages),
-		"user-sessions":  adminclienthandlers.HandleUserSessionsGet(h, pages),
-		"permissions":    adminclienthandlers.HandlePermissionsGet(h, newRenderSessionStore(t), pages),
-		"introspection":  adminclienthandlers.HandleIntrospectionGet(h, newRenderSessionStore(t), pages),
+		"settings":               adminclienthandlers.HandleSettingsGet(h, newRenderSessionStore(t), pages),
+		"logo":                   adminclienthandlers.HandleLogoGet(h, pages),
+		"tokens":                 adminclienthandlers.HandleTokensGet(h, newRenderSessionStore(t), pages),
+		"authentication":         adminclienthandlers.HandleAuthenticationGet(h, newRenderSessionStore(t), pages),
+		"oauth2-flows":           adminclienthandlers.HandleOAuth2FlowsGet(h, newRenderSessionStore(t), pages),
+		"redirect-uris":          adminclienthandlers.HandleRedirectURIsGet(h, newRenderSessionStore(t), pages),
+		"sign-out-redirect-uris": adminclienthandlers.HandleSignOutRedirectURIsGet(h, newRenderSessionStore(t), pages),
+		"web-origins":            adminclienthandlers.HandleWebOriginsGet(h, newRenderSessionStore(t), pages),
+		"user-sessions":          adminclienthandlers.HandleUserSessionsGet(h, pages),
+		"permissions":            adminclienthandlers.HandlePermissionsGet(h, newRenderSessionStore(t), pages),
+		"introspection":          adminclienthandlers.HandleIntrospectionGet(h, newRenderSessionStore(t), pages),
 	}
 }
 

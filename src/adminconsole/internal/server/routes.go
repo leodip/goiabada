@@ -172,6 +172,8 @@ func (s *Server) initRoutes(root *routing.Router) {
 		r.Post("/clients/{clientId}/oauth2-flows", adminclienthandlers.HandleOAuth2FlowsPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/clients/{clientId}/redirect-uris", adminclienthandlers.HandleRedirectURIsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/clients/{clientId}/redirect-uris", adminclienthandlers.HandleRedirectURIsPost(httpHelper, s.sessionStore, apiClient))
+		r.Get("/clients/{clientId}/sign-out-redirect-uris", adminclienthandlers.HandleSignOutRedirectURIsGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/clients/{clientId}/sign-out-redirect-uris", adminclienthandlers.HandleSignOutRedirectURIsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/clients/{clientId}/web-origins", adminclienthandlers.HandleWebOriginsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/clients/{clientId}/web-origins", adminclienthandlers.HandleWebOriginsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/clients/{clientId}/user-sessions", adminclienthandlers.HandleUserSessionsGet(httpHelper, apiClient))

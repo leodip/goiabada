@@ -198,7 +198,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateClientIntrospectionResourcesRequest` | both-apps | — |
 | `core/api` | `UpdateClientOAuth2FlowsRequest` | both-apps | — |
 | `core/api` | `UpdateClientPermissionsRequest` | both-apps | — |
-| `core/api` | `UpdateClientPostLogoutRedirectURIsRequest` | contract | Admin API request DTO of `PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris`, which is what `core/api` is for. The auth server reads it and no admin console file writes it yet; the console's Sign-out redirect URIs tab will (#147). |
+| `core/api` | `UpdateClientPostLogoutRedirectURIsRequest` | both-apps | — |
 | `core/api` | `UpdateClientRedirectURIsRequest` | both-apps | — |
 | `core/api` | `UpdateClientResponse` | both-apps | — |
 | `core/api` | `UpdateClientSettingsRequest` | both-apps | — |

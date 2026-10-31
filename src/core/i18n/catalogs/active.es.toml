@@ -323,6 +323,7 @@
 "adminconsole.client_tabs.authentication" = "Autenticación"
 "adminconsole.client_tabs.oauth2_flows" = "Flujos OAuth2"
 "adminconsole.client_tabs.redirect_uris" = "URI de redirección"
+"adminconsole.client_tabs.sign_out_redirect_uris" = "URI de redirección de cierre de sesión"
 "adminconsole.client_tabs.web_origins" = "Orígenes web"
 "adminconsole.client_tabs.user_sessions" = "Sesiones"
 "adminconsole.client_tabs.permissions" = "Permisos"
@@ -821,6 +822,18 @@
 "adminconsole.admin_clients.redirect_uris.invalid_url" = "Esa URL no es válida. Incluye el esquema, por ejemplo, https://."
 "adminconsole.admin_clients.redirect_uris.added" = "URI de redirección añadida. Guarda para conservar el cambio."
 "adminconsole.admin_clients.redirect_uris.removed" = "URI de redirección quitada. Guarda para conservar el cambio."
+"adminconsole.admin_clients.sign_out_redirect_uris.requires_redirect_flow" = "Las URI de redirección de cierre de sesión se usan en los flujos de código de autorización e implícito. Activa uno de ellos en la pestaña Flujos OAuth2 para configurarlas aquí."
+"adminconsole.admin_clients.sign_out_redirect_uris.lead" = "Tras cerrar sesión, el usuario solo vuelve a una dirección de esta lista, que debe coincidir exactamente, puerto incluido. Las URI de redirección no se usan para el cierre de sesión."
+"adminconsole.admin_clients.sign_out_redirect_uris.field.uri" = "URI de redirección de cierre de sesión"
+"adminconsole.admin_clients.sign_out_redirect_uris.add_button" = "Añadir"
+"adminconsole.admin_clients.sign_out_redirect_uris.col_authorized" = "URI de redirección de cierre de sesión"
+"adminconsole.admin_clients.sign_out_redirect_uris.remove_label" = "Quitar"
+"adminconsole.admin_clients.sign_out_redirect_uris.none_yet" = "Todavía no hay URI de redirección de cierre de sesión."
+"adminconsole.admin_clients.sign_out_redirect_uris.saved_successfully" = "URI de redirección de cierre de sesión guardadas."
+"adminconsole.admin_clients.sign_out_redirect_uris.duplicate_error" = "Esa URI de redirección de cierre de sesión ya está en la lista."
+"adminconsole.admin_clients.sign_out_redirect_uris.invalid_url" = "Esa URL no es válida. Incluye el esquema, por ejemplo, https://."
+"adminconsole.admin_clients.sign_out_redirect_uris.added" = "URI de redirección de cierre de sesión añadida. Guarda para conservar el cambio."
+"adminconsole.admin_clients.sign_out_redirect_uris.removed" = "URI de redirección de cierre de sesión quitada. Guarda para conservar el cambio."
 
 # --- Client web origins ----------------------------------------------------
 

@@ -322,6 +322,7 @@
 "adminconsole.client_tabs.authentication" = "Authentifizierung"
 "adminconsole.client_tabs.oauth2_flows" = "OAuth2-Flows"
 "adminconsole.client_tabs.redirect_uris" = "Redirect-URIs"
+"adminconsole.client_tabs.sign_out_redirect_uris" = "Abmelde-Redirect-URIs"
 "adminconsole.client_tabs.web_origins" = "Web-Origins"
 "adminconsole.client_tabs.user_sessions" = "Sitzungen"
 "adminconsole.client_tabs.permissions" = "Berechtigungen"
@@ -820,6 +821,18 @@
 "adminconsole.admin_clients.redirect_uris.invalid_url" = "Das ist keine gültige URL. Geben Sie auch das Schema an, zum Beispiel https://."
 "adminconsole.admin_clients.redirect_uris.added" = "Redirect-URI hinzugefügt. Speichern Sie, um die Änderung zu übernehmen."
 "adminconsole.admin_clients.redirect_uris.removed" = "Redirect-URI entfernt. Speichern Sie, um die Änderung zu übernehmen."
+"adminconsole.admin_clients.sign_out_redirect_uris.requires_redirect_flow" = "Abmelde-Redirect-URIs werden für den Authorization Code Flow und den Implicit Flow verwendet. Aktivieren Sie einen davon im Tab „OAuth2-Flows“, um sie hier festzulegen."
+"adminconsole.admin_clients.sign_out_redirect_uris.lead" = "Nach der Abmeldung wird der Benutzer nur zu einer hier aufgeführten Adresse zurückgeleitet, die exakt übereinstimmen muss, einschließlich des Ports. Redirect-URIs werden für die Abmeldung nicht verwendet."
+"adminconsole.admin_clients.sign_out_redirect_uris.field.uri" = "Abmelde-Redirect-URI"
+"adminconsole.admin_clients.sign_out_redirect_uris.add_button" = "Hinzufügen"
+"adminconsole.admin_clients.sign_out_redirect_uris.col_authorized" = "Abmelde-Redirect-URIs"
+"adminconsole.admin_clients.sign_out_redirect_uris.remove_label" = "Entfernen"
+"adminconsole.admin_clients.sign_out_redirect_uris.none_yet" = "Noch keine Abmelde-Redirect-URIs vorhanden."
+"adminconsole.admin_clients.sign_out_redirect_uris.saved_successfully" = "Abmelde-Redirect-URIs gespeichert."
+"adminconsole.admin_clients.sign_out_redirect_uris.duplicate_error" = "Diese Abmelde-Redirect-URI steht bereits in der Liste."
+"adminconsole.admin_clients.sign_out_redirect_uris.invalid_url" = "Das ist keine gültige URL. Geben Sie auch das Schema an, zum Beispiel https://."
+"adminconsole.admin_clients.sign_out_redirect_uris.added" = "Abmelde-Redirect-URI hinzugefügt. Speichern Sie, um die Änderung zu übernehmen."
+"adminconsole.admin_clients.sign_out_redirect_uris.removed" = "Abmelde-Redirect-URI entfernt. Speichern Sie, um die Änderung zu übernehmen."
 
 # --- Client web origins ----------------------------------------------------
 

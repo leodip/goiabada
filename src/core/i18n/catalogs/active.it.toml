@@ -325,6 +325,7 @@
 "adminconsole.client_tabs.authentication" = "Autenticazione"
 "adminconsole.client_tabs.oauth2_flows" = "Flussi OAuth2"
 "adminconsole.client_tabs.redirect_uris" = "URI di reindirizzamento"
+"adminconsole.client_tabs.sign_out_redirect_uris" = "URI di reindirizzamento dopo l'uscita"
 "adminconsole.client_tabs.web_origins" = "Origini web"
 "adminconsole.client_tabs.user_sessions" = "Sessioni"
 "adminconsole.client_tabs.permissions" = "Permessi"
@@ -823,6 +824,18 @@
 "adminconsole.admin_clients.redirect_uris.invalid_url" = "Questo URL non è valido. Includi lo schema, ad esempio https://."
 "adminconsole.admin_clients.redirect_uris.added" = "URI di reindirizzamento aggiunto. Salva per mantenere la modifica."
 "adminconsole.admin_clients.redirect_uris.removed" = "URI di reindirizzamento rimosso. Salva per mantenere la modifica."
+"adminconsole.admin_clients.sign_out_redirect_uris.requires_redirect_flow" = "Gli URI di reindirizzamento dopo l'uscita servono ai flussi codice di autorizzazione e implicito. Attivane uno nella scheda Flussi OAuth2 per configurarli qui."
+"adminconsole.admin_clients.sign_out_redirect_uris.lead" = "Dopo l'uscita, l'utente viene rimandato solo a un indirizzo di questo elenco, che deve corrispondere esattamente, porta inclusa. Gli URI di reindirizzamento non vengono usati per l'uscita."
+"adminconsole.admin_clients.sign_out_redirect_uris.field.uri" = "URI di reindirizzamento dopo l'uscita"
+"adminconsole.admin_clients.sign_out_redirect_uris.add_button" = "Aggiungi"
+"adminconsole.admin_clients.sign_out_redirect_uris.col_authorized" = "URI di reindirizzamento dopo l'uscita"
+"adminconsole.admin_clients.sign_out_redirect_uris.remove_label" = "Rimuovi"
+"adminconsole.admin_clients.sign_out_redirect_uris.none_yet" = "Non ci sono ancora URI di reindirizzamento dopo l'uscita."
+"adminconsole.admin_clients.sign_out_redirect_uris.saved_successfully" = "URI di reindirizzamento dopo l'uscita salvati."
+"adminconsole.admin_clients.sign_out_redirect_uris.duplicate_error" = "Questo URI di reindirizzamento dopo l'uscita è già nell'elenco."
+"adminconsole.admin_clients.sign_out_redirect_uris.invalid_url" = "Questo URL non è valido. Includi lo schema, ad esempio https://."
+"adminconsole.admin_clients.sign_out_redirect_uris.added" = "URI di reindirizzamento dopo l'uscita aggiunto. Salva per mantenere la modifica."
+"adminconsole.admin_clients.sign_out_redirect_uris.removed" = "URI di reindirizzamento dopo l'uscita rimosso. Salva per mantenere la modifica."
 
 # --- Client web origins ----------------------------------------------------
 

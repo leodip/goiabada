@@ -318,6 +318,7 @@
 "adminconsole.client_tabs.authentication" = "Authentication"
 "adminconsole.client_tabs.oauth2_flows" = "OAuth2 flows"
 "adminconsole.client_tabs.redirect_uris" = "Redirect URIs"
+"adminconsole.client_tabs.sign_out_redirect_uris" = "Sign-out redirect URIs"
 "adminconsole.client_tabs.web_origins" = "Web origins"
 "adminconsole.client_tabs.user_sessions" = "Sessions"
 "adminconsole.client_tabs.permissions" = "Permissions"
@@ -816,6 +817,18 @@
 "adminconsole.admin_clients.redirect_uris.invalid_url" = "That isn't a valid URL. Include the scheme, such as https://."
 "adminconsole.admin_clients.redirect_uris.added" = "Redirect URI added. Save to keep the change."
 "adminconsole.admin_clients.redirect_uris.removed" = "Redirect URI removed. Save to keep the change."
+"adminconsole.admin_clients.sign_out_redirect_uris.requires_redirect_flow" = "Sign-out redirect URIs are for the authorization code flow and the implicit flow. Turn one of them on, on the OAuth2 flows tab, to set them here."
+"adminconsole.admin_clients.sign_out_redirect_uris.lead" = "After signing out, the user is sent back only to an address listed here, matched exactly, port included. Redirect URIs aren't used for sign-out."
+"adminconsole.admin_clients.sign_out_redirect_uris.field.uri" = "Sign-out redirect URI"
+"adminconsole.admin_clients.sign_out_redirect_uris.add_button" = "Add"
+"adminconsole.admin_clients.sign_out_redirect_uris.col_authorized" = "Sign-out redirect URIs"
+"adminconsole.admin_clients.sign_out_redirect_uris.remove_label" = "Remove"
+"adminconsole.admin_clients.sign_out_redirect_uris.none_yet" = "No sign-out redirect URIs yet."
+"adminconsole.admin_clients.sign_out_redirect_uris.saved_successfully" = "Sign-out redirect URIs saved."
+"adminconsole.admin_clients.sign_out_redirect_uris.duplicate_error" = "That sign-out redirect URI is already in the list."
+"adminconsole.admin_clients.sign_out_redirect_uris.invalid_url" = "That isn't a valid URL. Include the scheme, such as https://."
+"adminconsole.admin_clients.sign_out_redirect_uris.added" = "Sign-out redirect URI added. Save to keep the change."
+"adminconsole.admin_clients.sign_out_redirect_uris.removed" = "Sign-out redirect URI removed. Save to keep the change."
 
 # --- Client web origins ----------------------------------------------------
 

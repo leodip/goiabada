@@ -1,4 +1,4 @@
-import { addRedirectUri, clientUrl, expectFieldError } from "../../../lib/admin-console";
+import { addRedirectUri, addSignOutRedirectUri, clientUrl, expectFieldError } from "../../../lib/admin-console";
 import { expect, test } from "../../../lib/fixtures";
 
 test("redirect URIs are added, saved, and one is removed again", async ({ page, clients }) => {
@@ -81,6 +81,75 @@ test("a client with only the client credentials flow has no redirect URIs to man
   await page.goto(clientUrl(client.id, "redirect-uris"));
   await expect(page.getByText(/^Redirect URIs are for the authorization code flow and the implicit flow\./)).toBeVisible();
   await expect(page.locator("#redirectURI")).toHaveCount(0);
+});
+
+test("sign-out redirect URIs are added, saved, and one is removed again, apart from the redirect URIs", async ({ page, clients }) => {
+  const client = await clients.create();
+  const table = page.locator("#signOutRedirectURIsTable");
+  await page.goto(clientUrl(client.id, "sign-out-redirect-uris"));
+  await expect(page.getByText("No sign-out redirect URIs yet.")).toBeVisible();
+  await expect(page.getByText("After signing out, the user is sent back only to an address listed here, matched exactly, port included. Redirect URIs aren't used for sign-out.")).toBeVisible();
+  await expect(table).toBeHidden();
+
+  // A custom scheme and a query carrying state are allowed.
+  for (const uri of ["https://app.example.com/signed-out", "https://app.example.com/bye?state=fixed", "com.example.app:/signed-out"]) {
+    await page.locator("#signOutRedirectURI").fill(uri);
+    await page.locator("#addURIBtn").click();
+  }
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Sign-out redirect URIs saved.")).toBeVisible();
+
+  await page.reload();
+  for (const uri of ["https://app.example.com/signed-out", "https://app.example.com/bye?state=fixed", "com.example.app:/signed-out"]) {
+    await expect(table.locator(`tr[data-value="${uri}"]`)).toHaveCount(1);
+  }
+
+  await table.getByRole("button", { name: "Remove https://app.example.com/bye?state=fixed", exact: true }).click();
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Sign-out redirect URIs saved.")).toBeVisible();
+  await page.reload();
+  await expect(table.locator("tbody tr")).toHaveCount(2);
+  await expect(table).not.toContainText("state=fixed");
+
+  // The two lists are kept apart: none of these is a redirect URI.
+  await page.goto(clientUrl(client.id, "redirect-uris"));
+  await expect(page.getByText("No redirect URIs yet.")).toBeVisible();
+});
+
+test("a sign-out redirect URI on plain http off loopback is said in the tab's status, and nothing is saved", async ({ page, clients }) => {
+  const client = await clients.create();
+  await page.goto(clientUrl(client.id, "sign-out-redirect-uris"));
+  await page.locator("#signOutRedirectURI").fill("http://app.example.com/signed-out");
+  await page.locator("#addURIBtn").click();
+  await page.locator("#btnSave").click();
+  await expect(page.locator("#uriListStatus")).toContainText("Sign-out redirect URI must not use plain http on a host other than the loopback interface");
+
+  await page.reload();
+  await expect(page.getByText("No sign-out redirect URIs yet.")).toBeVisible();
+});
+
+test("a sign-out redirect URI save from a page loaded before another save is refused, and leaves that save in place", async ({ page, context, clients }) => {
+  const client = await clients.create();
+  const stale = await context.newPage();
+  await stale.goto(clientUrl(client.id, "sign-out-redirect-uris"));
+  await addSignOutRedirectUri(page, client.id, "https://app.example.com/first");
+
+  await stale.locator("#signOutRedirectURI").fill("https://app.example.com/second");
+  await stale.locator("#addURIBtn").click();
+  await stale.locator("#btnSave").click();
+  await expect(stale.locator("#uriListStatus")).toContainText("The list was changed by another save after it was loaded. Nothing was saved");
+  await stale.close();
+
+  await page.reload();
+  await expect(page.locator('#signOutRedirectURIsTable tr[data-value="https://app.example.com/first"]')).toHaveCount(1);
+  await expect(page.locator('#signOutRedirectURIsTable tr[data-value="https://app.example.com/second"]')).toHaveCount(0);
+});
+
+test("a client with only the client credentials flow has no sign-out redirect URIs to manage", async ({ page, clients }) => {
+  const client = await clients.create({ authorizationCode: false, clientCredentials: true });
+  await page.goto(clientUrl(client.id, "sign-out-redirect-uris"));
+  await expect(page.getByText(/^Sign-out redirect URIs are for the authorization code flow and the implicit flow\./)).toBeVisible();
+  await expect(page.locator("#signOutRedirectURI")).toHaveCount(0);
 });
 
 test("a web origin is added, saved, and removed again", async ({ page, clients }) => {
