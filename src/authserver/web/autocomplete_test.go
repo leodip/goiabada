@@ -28,11 +28,14 @@ var passwordFieldTokens = map[string]bool{"current-password": true, "new-passwor
 // matters most are pinned by name.
 func TestTemplates_EveryPasswordFieldNamesItsAutocomplete(t *testing.T) {
 	pinned := map[string]map[string]string{
-		"template/auth_pwd.html":                  {"email": "username", "password": "current-password"},
-		"template/account_register.html":          {"email": "username", "password": "new-password", "passwordConfirmation": "new-password"},
-		"template/reset_password.html":            {"password": "new-password", "passwordConfirmation": "new-password"},
-		"template/auth_otp.html":                  {"otp": "one-time-code"},
-		"template/auth_otp_enrollment.html":       {"otp": "one-time-code"},
+		"template/auth_pwd.html":            {"email": "username", "password": "current-password"},
+		"template/account_register.html":    {"email": "username", "password": "new-password", "passwordConfirmation": "new-password"},
+		"template/reset_password.html":      {"password": "new-password", "passwordConfirmation": "new-password"},
+		"template/auth_otp.html":            {"otp": "one-time-code"},
+		"template/auth_otp_enrollment.html": {"otp": "one-time-code"},
+		// A recovery code is no one-time code an app or a message offers, and a saved one must not
+		// be filled in (#257).
+		"template/auth_otp_recovery_code.html":    {"recoveryCode": "off"},
 		"template/forgot_password.html":           {"email": "email"},
 		"template/account_activate_password.html": {"password": "new-password", "passwordConfirmation": "new-password"},
 	}

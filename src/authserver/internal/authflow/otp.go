@@ -142,12 +142,14 @@ func (o *OTPPrompt) Run(ctx context.Context, browser stepSaver, authContext *cer
 	}, nil
 }
 
-// otpSubmissionDatabase is what OTPSubmission reads and writes: the user and the client, and the
+// otpSubmissionDatabase is what OTPSubmission reads and writes: the user and the client, the
 // stored authenticator a code is verified against or established on (otpcredential, which owns the
-// single-use step claim as well as the write, #387). data.Database satisfies it.
+// single-use step claim as well as the write, #387), and the user's recovery codes, one of which a
+// recovery-code submission claims (#257). data.Database satisfies it.
 type otpSubmissionDatabase interface {
 	otpStepDatabase
 	otpcredential.Database
+	otpcredential.RecoveryCodeDatabase
 }
 
 // otpSubmissionBrowser is what OTPSubmission does through the handler's per-request adapter: charge
@@ -198,16 +200,22 @@ const (
 	OTPClockAhead
 	// OTPAccepted is a code accepted, and for an enrolling user the authenticator stored: the ceremony
 	// recorded it, the browser session's identifier was rotated, and the ceremony saved in
-	// authentication_completed.
+	// authentication_completed. RunRecoveryCode answers it for a recovery code accepted.
 	OTPAccepted
+	// OTPRecoveryCodeMissing is a recovery-code submission with no code. The recovery-code form is
+	// shown again asking for one.
+	OTPRecoveryCodeMissing
+	// OTPRecoveryCodeRefused is a recovery code that is wrong, of a replaced set, or already used.
+	// The recovery-code form is shown again with one message for all three (#257 decision 6).
+	OTPRecoveryCodeRefused
 )
 
 // OTPSubmissionResult is what OTPSubmission.Run did.
 type OTPSubmissionResult struct {
 	Answer OTPAnswer
 	// Display is the client block, for the form shown again beside a refusal: set on
-	// OTPAccountDisabled, OTPCodeMissing, OTPRefused and OTPClockAhead, and nil on the two answers
-	// that show no form.
+	// OTPAccountDisabled, OTPCodeMissing, OTPRefused, OTPClockAhead, OTPRecoveryCodeMissing and
+	// OTPRecoveryCodeRefused, and nil on the two answers that show no form.
 	Display *ClientDisplayInfo
 	// EnrolmentSecret is the base32 secret of the ceremony's enrolment key, "" for a user with no key
 	// on the ceremony. The form shown again beside a refusal is the enrolment form when it is set.
@@ -367,6 +375,89 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 	})
 
 	authContext.RecordOTPVerified(time.Now(), verifiedGeneration, enrolled)
+
+	result.Answer = OTPAccepted
+	result.NextStep = "/auth/completed"
+	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
+		return result, nil
+	}
+	result.SaveErr = browser.SaveAuthContext(authContext)
+	return result, nil
+}
+
+// RunRecoveryCode checks a recovery code, which the handler read from the recovery-code form's
+// field, in place of an authenticator code (#257 decisions 4, 6 and 7). In order:
+//
+//  1. Loads the user (loadOTPUser); a failure is returned as an error.
+//  2. A disabled account: audits EventUserDisabled and answers OTPAccountDisabled.
+//  3. An enrolment key on the ceremony for a user who has an authenticator now: ends the lost
+//     enrolment, as Run does.
+//  4. No code, once spaces and hyphens are taken out: OTPRecoveryCodeMissing.
+//  5. Checks and claims the code (otpcredential.UseRecoveryCode), which leaves the authenticator and
+//     its consecutive-failure count alone, so it works while the authenticator is disabled. A failed
+//     read or write is returned as an error.
+//  6. A used code of the current set: charges it to the rate limiter, audits
+//     EventRecoveryCodeReplayDetected and EventAuthFailedRecoveryCode, and answers
+//     OTPRecoveryCodeRefused. A wrong code, one of a replaced set included, and any code of a user
+//     with no authenticator: charges it, audits EventAuthFailedRecoveryCode, and answers the same.
+//     The otp tier is the budget an authenticator code spends, so alternating buys no extra guesses.
+//  7. Accepted: audits EventAuthSuccessRecoveryCode with the unused codes left, records
+//     recovery_code on the ceremony (RecordRecoveryCodeVerified) with the generation of the
+//     authenticator the user was read with, rotates the browser session's identifier, and only then
+//     saves the ceremony in authentication_completed. It goes on to /auth/completed with no extra
+//     page (decision 7).
+//
+// An answer that shows a form again loads the client block for it last, as Run's do. Neither the
+// code nor its hash reaches an audit record or a log.
+func (o *OTPSubmission) RunRecoveryCode(ctx context.Context, browser otpSubmissionBrowser,
+	authContext *ceremony.AuthContext, code string) (OTPSubmissionResult, error) {
+
+	user, err := loadOTPUser(ctx, o.database, authContext)
+	if err != nil {
+		return OTPSubmissionResult{}, err
+	}
+
+	result := OTPSubmissionResult{}
+
+	if !user.Enabled {
+		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
+			"user_id": user.Id,
+		})
+		return o.refuse(ctx, authContext, result, OTPAccountDisabled)
+	}
+
+	if authContext.OTPKeyURL != "" && user.OTPEnabled {
+		return o.endLostEnrolment(ctx, browser, result, user.Id, authContext.CeremonyId), nil
+	}
+
+	if otpcredential.IsBlankRecoveryCode(code) {
+		return o.refuse(ctx, authContext, result, OTPRecoveryCodeMissing)
+	}
+
+	used, err := otpcredential.UseRecoveryCode(ctx, o.database, user, code)
+	if err != nil {
+		return OTPSubmissionResult{}, err
+	}
+
+	if used.Outcome != otpcredential.RecoveryCodeAccepted {
+		browser.RecordCredentialFailure()
+		if used.Outcome == otpcredential.RecoveryCodeReplayed {
+			o.auditLogger.Log(ctx, audit.EventRecoveryCodeReplayDetected, map[string]interface{}{
+				"user_id": user.Id,
+			})
+		}
+		o.auditLogger.Log(ctx, audit.EventAuthFailedRecoveryCode, map[string]interface{}{
+			"user_id": user.Id,
+		})
+		return o.refuse(ctx, authContext, result, OTPRecoveryCodeRefused)
+	}
+
+	o.auditLogger.Log(ctx, audit.EventAuthSuccessRecoveryCode, map[string]interface{}{
+		"user_id":   user.Id,
+		"remaining": used.Remaining,
+	})
+
+	authContext.RecordRecoveryCodeVerified(time.Now(), user.OtpConfigGeneration)
 
 	result.Answer = OTPAccepted
 	result.NextStep = "/auth/completed"

@@ -75,6 +75,16 @@
 "auth.otp.instructions" = "Saisissez le code à 6 chiffres de votre application d’authentification."
 "auth.otp.code_label" = "Code à usage unique"
 "auth.otp.button" = "Vérifier"
+"auth.otp.use_recovery_code" = "Utiliser plutôt un code de récupération"
+
+# --- Recovery code (auth/otp, form=recovery-code) ---------------------------
+
+"auth.otp_recovery.page_title" = "Utiliser un code de récupération"
+"auth.otp_recovery.title" = "Utiliser un code de récupération"
+"auth.otp_recovery.instructions" = "Saisissez l’un des codes de récupération que vous avez enregistrés lors de la configuration de l’authentification à deux facteurs. Chaque code ne fonctionne qu’une fois."
+"auth.otp_recovery.code_label" = "Code de récupération"
+"auth.otp_recovery.button" = "Vérifier"
+"auth.otp_recovery.back" = "Utiliser plutôt l’application d’authentification"
 
 # --- OTP enrollment (auth/otp, first-time) -----------------------------------
 
@@ -1623,6 +1633,8 @@
 "handler.otp.clock_ahead" = "L’horloge de votre appareil semble avancer. Vérifiez que la date et l’heure sont réglées automatiquement, puis saisissez le code qu’affiche votre application."
 "handler.otp.code_required" = "Saisissez le code à 6 chiffres de votre application d’authentification."
 "handler.otp.incorrect_code" = "Ce code est incorrect. Les codes changent toutes les 30 secondes. Saisissez celui qu’affiche votre application maintenant."
+"handler.otp.incorrect_recovery_code" = "Ce code de récupération est incorrect ou a déjà été utilisé."
+"handler.otp.recovery_code_required" = "Saisissez l’un de vos codes de récupération."
 
 # --- Admin resource permissions handler (LocalizedError-backed) --------------
 

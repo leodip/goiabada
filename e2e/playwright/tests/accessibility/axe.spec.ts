@@ -171,6 +171,12 @@ test("the auth server's sign-in, two-factor, consent and sign-out pages", async 
       await own.locator("#otp").fill("000000");
       await verify.click();
     }),
+    titled(own, "a recovery code", "Use a recovery code", () =>
+      own.getByRole("link", { name: "Use a recovery code instead", exact: true }).click()),
+    refused(own, "a recovery code, refused", "recoveryCode", async () => {
+      await own.locator("#recoveryCode").fill("0000-0000-0000-0000-0000-0000");
+      await verify.click();
+    }),
     titled(own, "the sign-out question", "Sign out", () => own.goto(`${env.authUrl}/auth/logout`)),
     titled(own, "signed out", "Signed out", () => own.getByRole("button", { name: "Sign out", exact: true }).click()),
     titled(own, "still signed in, having declined to sign out", "Still signed in", () => own.goto(`${env.authUrl}/auth/logout/declined`)),

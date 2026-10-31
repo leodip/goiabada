@@ -113,6 +113,9 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*record.Client, *
 // extra is appended verbatim to the authorization URL, already query-escaped, matching the
 // crossUserAuthorizeUrl(b, extra) idiom used elsewhere in this suite. Every existing caller passes
 // "".
+//
+// The PKCE challenge is testCodeChallenge, so a caller driving the ceremony to a code can redeem it
+// with testCodeVerifier.
 func startOtpCeremony(t *testing.T, client *record.Client, redirectUri *record.RedirectURI,
 	user *record.User, password string, extra string) (*http.Client, *http.Response, string) {
 
@@ -132,7 +135,7 @@ func startOtpCeremonyOn(t *testing.T, httpClient *http.Client, client *record.Cl
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + testCodeChallenge +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8) +

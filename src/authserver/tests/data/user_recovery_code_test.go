@@ -269,3 +269,35 @@ func TestUserRecoveryCodes_GoWithTheirUser(t *testing.T) {
 	assert.Equal(t, 0, unusedRecoveryCodes(t, user.Id))
 	assert.False(t, useRecoveryCode(t, user.Id, hashes[0]))
 }
+
+// UserRecoveryCodeExists tells a used code of the user's current set, which the sign-in audits as
+// a replay, from a code the set never held or one of a replaced set, whose rows are gone (#257
+// decision 10). It reads the set, used codes and unused alike, and only the user's own.
+func TestUserRecoveryCodeExists(t *testing.T) {
+	ctx := context.Background()
+	user := createTestUser(t)
+	other := createTestUser(t)
+	old := recoveryCodeHashes(10)
+	replaceRecoveryCodes(t, user.Id, old)
+	current := recoveryCodeHashes(10)
+	replaceRecoveryCodes(t, user.Id, current)
+	require.True(t, useRecoveryCode(t, user.Id, current[0]))
+
+	exists := func(userId int64, hash string) bool {
+		t.Helper()
+		found, err := database.UserRecoveryCodeExists(ctx, nil, userId, hash)
+		require.NoError(t, err, "UserRecoveryCodeExists")
+		return found
+	}
+
+	assert.True(t, exists(user.Id, current[0]), "a used code of the current set")
+	assert.True(t, exists(user.Id, current[1]), "an unused code of the current set")
+	assert.False(t, exists(user.Id, old[0]), "a code of the replaced set is gone")
+	assert.False(t, exists(user.Id, recoveryCodeHashes(1)[0]), "a code the set never held")
+	assert.False(t, exists(other.Id, current[0]), "another user's set holds none of this user's codes")
+
+	_, err := database.UserRecoveryCodeExists(ctx, nil, 0, current[0])
+	require.Error(t, err, "a zero user id is a caller bug")
+	_, err = database.UserRecoveryCodeExists(ctx, nil, user.Id, "")
+	require.Error(t, err, "an empty hash is a caller bug")
+}

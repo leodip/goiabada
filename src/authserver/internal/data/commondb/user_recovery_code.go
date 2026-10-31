@@ -11,7 +11,8 @@ import (
 // A user's recovery codes (#257 decisions 2 and 3): one row per code of the user's current set,
 // holding the code's SHA-256 in lowercase hex, never the code. A row is inserted with its set and
 // deleted with it; the one write between is stamping used_at, once. There is no record type: no
-// caller reads a row back, only whether a code was claimed and how many are left.
+// caller reads a row back, only whether a code was claimed, whether one exists and how many are
+// left.
 
 var deleteUserRecoveryCodes = statement{
 	sqlite:   "DELETE FROM user_recovery_codes WHERE user_id = ?",
@@ -41,6 +42,15 @@ var countUnusedUserRecoveryCodes = statement{
 	mysql:    "SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = ? AND used_at IS NULL",
 	postgres: "SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = $1 AND used_at IS NULL",
 	mssql:    "SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = @p1 AND used_at IS NULL",
+}
+
+// countUserRecoveryCodesWithHash is UserRecoveryCodeExists's read, which the unique index on the
+// pair answers.
+var countUserRecoveryCodesWithHash = statement{
+	sqlite:   "SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = ? AND code_hash = ?",
+	mysql:    "SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = ? AND code_hash = ?",
+	postgres: "SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = $1 AND code_hash = $2",
+	mssql:    "SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = @p1 AND code_hash = @p2",
 }
 
 // ReplaceUserRecoveryCodes deletes the user's set, used codes and unused alike, and inserts one
@@ -133,4 +143,29 @@ func (d *Database) CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx,
 	}
 
 	return *count, nil
+}
+
+// UserRecoveryCodeExists reports whether the user's set holds a code with this hash, used or not.
+// The sign-in asks it only after TryUseUserRecoveryCode refused the code, to tell a used code of
+// the current set, which it audits as a replay, from a code no set of the user's holds (#257
+// decision 10). An empty hash or a zero user id is an error, as for TryUseUserRecoveryCode.
+func (d *Database) UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error) {
+
+	if userId == 0 {
+		return false, errs.New("can't look up a recovery code of a user with id 0")
+	}
+	if codeHash == "" {
+		return false, errs.New("can't look up a recovery code with an empty hash")
+	}
+
+	count, err := queryOne(ctx, d, tx, countUserRecoveryCodesWithHash.text(d.Dialect), []any{userId, codeHash},
+		func(row rowScanner, n *int) error { return row.Scan(n) }, "recovery code lookup")
+	if err != nil {
+		return false, err
+	}
+	if count == nil {
+		return false, errs.New("the recovery code lookup returned no row")
+	}
+
+	return *count > 0, nil
 }

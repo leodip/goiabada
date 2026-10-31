@@ -309,9 +309,25 @@ func (ac *AuthContext) RecordOTPVerified(now time.Time, generation int64, enroll
 		enrolledGeneration := generation
 		ac.OtpConfigGeneration = &enrolledGeneration
 	}
+	ac.recordSecondFactor(now, generation, oidc.AuthMethodOTP)
+}
+
+// RecordRecoveryCodeVerified records that this ceremony accepted a recovery code at now, in place
+// of an authenticator code. generation is the otp_config_generation of the authenticator the user
+// was read with, the one the code's set came with: the claim stands only while the user still has
+// that authenticator, so removing it lowers the session and restarts a sign-in in flight exactly
+// as for a code (#257 decision 4, #542). Everything else is RecordOTPVerified's for a code checked
+// against a stored authenticator: a recovery code never enrols one.
+func (ac *AuthContext) RecordRecoveryCodeVerified(now time.Time, generation int64) {
+	ac.recordSecondFactor(now, generation, oidc.AuthMethodRecoveryCode)
+}
+
+// recordSecondFactor is what both second factors record: the claim's generation, the method, the
+// instant, the completed state, and the spent enrolment key cleared.
+func (ac *AuthContext) recordSecondFactor(now time.Time, generation int64, method oidc.AuthMethod) {
 	claimGeneration := generation
 	ac.OtpClaimGeneration = &claimGeneration
-	ac.AddAuthMethod(oidc.AuthMethodOTP)
+	ac.AddAuthMethod(method)
 	authenticatedAt := now.UTC()
 	ac.AuthenticatedAt = &authenticatedAt
 	ac.AuthState = AuthStateAuthenticationCompleted
@@ -394,10 +410,14 @@ func (ac *AuthContext) AddAuthMethod(method oidc.AuthMethod) {
 	ac.AuthMethods = ac.AuthMethods + " " + value
 }
 
-// ClaimsOTP reports whether AuthMethods names a one-time code, verified in this ceremony or adopted
-// from the session it reuses.
+// ClaimsOTP reports whether AuthMethods names a second factor the authenticator backs, verified in
+// this ceremony or adopted from the session it reuses: a one-time code, or a recovery code, whose
+// set came with the authenticator and is counted as a code is wherever the claim is checked (#257
+// decisions 4 and 5).
 func (ac *AuthContext) ClaimsOTP() bool {
-	return slices.Contains(strings.Fields(ac.AuthMethods), oidc.AuthMethodOTP.String())
+	methods := strings.Fields(ac.AuthMethods)
+	return slices.Contains(methods, oidc.AuthMethodOTP.String()) ||
+		slices.Contains(methods, oidc.AuthMethodRecoveryCode.String())
 }
 
 // RequestedMaxAge is the client's max_age as every hop after /auth/authorize reads it: nil when

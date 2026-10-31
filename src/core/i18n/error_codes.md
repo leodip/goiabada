@@ -99,6 +99,8 @@ the validator layer.
 | `handler.otp.code_required` | (none) | Enter the 6-digit code from your authenticator app. |
 | `handler.otp.incorrect_code` | (none) | That code isn't right. Codes change every 30 seconds, so enter the one your app shows now. |
 | `handler.otp.clock_ahead` | (none) | Your device's clock seems to be ahead. Check that its date and time are set automatically, then enter the code your app shows. |
+| `handler.otp.recovery_code_required` | (none) | Enter one of your recovery codes. |
+| `handler.otp.incorrect_recovery_code` | (none) | That recovery code isn't right, or it was already used. |
 
 ## Admin resource permissions handler
 

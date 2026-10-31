@@ -22,4 +22,11 @@
 
   <button class="button button-primary button-block" type="submit">{{ T $.ctx "auth.otp.button" }}</button>
 </form>
+
+{{/* Shown to every user asked for a code, whether or not unused recovery codes remain, so the page
+     says nothing about them; never on the setup form, since a user with no authenticator has no
+     codes (#257 decision 7). */}}
+<p class="auth-footer">
+  <a class="text-link" href="/auth/otp?ceremony={{ .ceremonyId }}&amp;form=recovery-code">{{ T $.ctx "auth.otp.use_recovery_code" }}</a>
+</p>
 {{end}}

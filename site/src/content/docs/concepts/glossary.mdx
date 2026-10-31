@@ -40,7 +40,7 @@ A user, group or client holding one of the administrative permissions on the `au
 
 ### AMR
 
-Authentication Methods References: which methods the user signed in with. Goiabada uses `pwd` (password) and `otp` (one-time code). See [ACR and AMR](/concepts/acr-and-amr/).
+Authentication Methods References: which methods the user signed in with. Goiabada uses `pwd` (password), `otp` (one-time code) and `recovery_code` (a recovery code entered instead of a one-time code). See [ACR and AMR](/concepts/acr-and-amr/).
 
 ### Attribute
 
@@ -104,6 +104,10 @@ Something a resource lets you do, such as `manage` on the `authserver` resource.
 ### PKCE
 
 Proof Key for Code Exchange: a check that ties an authorization code to the client that asked for it, so a stolen code is useless. Public clients must always use it. See [PKCE](/concepts/pkce/).
+
+### Recovery code
+
+A single-use code that signs a user in instead of a one-time code from their authenticator app, when they've lost it. Each authenticator comes with ten, shown once. See [Require two-factor authentication](/guides/require-two-factor-authentication/#recovery-codes).
 
 ### Redirect URI
 

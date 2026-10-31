@@ -18,8 +18,10 @@ func TestAuthMethod_String(t *testing.T) {
 		want   string
 	}{
 		{"password is the zero value", AuthMethodPassword, "pwd"},
-		{"otp, the top of the range", AuthMethodOTP, "otp"},
-		{"one past the range", AuthMethod(2), ""},
+		{"otp", AuthMethodOTP, "otp"},
+		// A recovery code, which no IANA-registered value names (#257 decision 5).
+		{"recovery_code, the top of the range", AuthMethodRecoveryCode, "recovery_code"},
+		{"one past the range", AuthMethod(3), ""},
 		{"far past the range", AuthMethod(99), ""},
 		{"negative", AuthMethod(-1), ""},
 	}

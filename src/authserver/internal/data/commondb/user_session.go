@@ -595,8 +595,8 @@ func (d *Database) PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx
 // password was entered (#542). A session at level 1 stays at level 1.
 //
 // passwordMethods is the whole of what is kept, not what is removed: every session was created after
-// a password, and pwd and otp are the only methods there are, so a session that names anything but
-// the password alone names the code. The caller passes the password's amr value because this layer
+// a password, and every other method there is, otp and recovery_code, is a second factor the
+// authenticator backs, so a session that names anything but the password alone names one (#257). The caller passes the password's amr value because this layer
 // imports nothing that spells it.
 //
 // ONE STATEMENT, AND THAT IS THE POINT. The lowering used to read each session and write the whole

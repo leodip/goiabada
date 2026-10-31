@@ -10,6 +10,11 @@ type AuthMethod int
 const (
 	AuthMethodPassword AuthMethod = iota
 	AuthMethodOTP
+	// AuthMethodRecoveryCode is a recovery code entered in place of an authenticator code. No
+	// value in the IANA registry (RFC 8176) names one, and otp would claim an authenticator code
+	// that was never entered, so it is Goiabada's own value, documented on the ACR and AMR page as
+	// OIDC Core 1.0 section 2 asks of an unregistered one (#257 decision 5).
+	AuthMethodRecoveryCode
 )
 
 // String returns the amr value, or "" for an AuthMethod outside the declared range, rather than
@@ -17,8 +22,8 @@ const (
 // name a constant -- but the guard goes on the type so a value read back from a session row cannot
 // step on it (#385).
 func (am AuthMethod) String() string {
-	if am < AuthMethodPassword || am > AuthMethodOTP {
+	if am < AuthMethodPassword || am > AuthMethodRecoveryCode {
 		return ""
 	}
-	return []string{"pwd", "otp"}[am]
+	return []string{"pwd", "otp", "recovery_code"}[am]
 }

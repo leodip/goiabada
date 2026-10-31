@@ -68,6 +68,16 @@
 "auth.otp.instructions" = "Digite o código de 6 dígitos do seu aplicativo autenticador."
 "auth.otp.code_label" = "Código de uso único"
 "auth.otp.button" = "Verificar"
+"auth.otp.use_recovery_code" = "Usar um código de recuperação"
+
+# --- Recovery code (auth/otp, form=recovery-code) ---------------------------
+
+"auth.otp_recovery.page_title" = "Usar um código de recuperação"
+"auth.otp_recovery.title" = "Use um código de recuperação"
+"auth.otp_recovery.instructions" = "Digite um dos códigos de recuperação que você guardou ao configurar a autenticação de dois fatores. Cada código funciona uma vez."
+"auth.otp_recovery.code_label" = "Código de recuperação"
+"auth.otp_recovery.button" = "Verificar"
+"auth.otp_recovery.back" = "Usar o aplicativo autenticador"
 
 # --- Cadastro de OTP (auth/otp, primeira vez) --------------------------------
 
@@ -1538,6 +1548,8 @@
 "handler.otp.clock_ahead" = "O relógio do seu dispositivo parece estar adiantado. Verifique se a data e a hora estão definidas automaticamente e digite o código que o aplicativo mostra."
 "handler.otp.code_required" = "Digite o código de 6 dígitos do seu aplicativo autenticador."
 "handler.otp.incorrect_code" = "Esse código não está correto. Os códigos mudam a cada 30 segundos, então digite o que o aplicativo mostra agora."
+"handler.otp.incorrect_recovery_code" = "Esse código de recuperação não está correto ou já foi usado."
+"handler.otp.recovery_code_required" = "Digite um dos seus códigos de recuperação."
 
 "handler.admin_resource_permissions.description_html_not_allowed" = "A descrição contém caracteres inválidos: não permitimos uso de HTML na descrição."
 "handler.admin_resource_permissions.permission_identifier_required" = "O identificador da permissão é obrigatório."

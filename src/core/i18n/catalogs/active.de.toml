@@ -75,6 +75,16 @@
 "auth.otp.instructions" = "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein."
 "auth.otp.code_label" = "Einmalcode"
 "auth.otp.button" = "Bestätigen"
+"auth.otp.use_recovery_code" = "Stattdessen einen Wiederherstellungscode verwenden"
+
+# --- Recovery code (auth/otp, form=recovery-code) ---------------------------
+
+"auth.otp_recovery.page_title" = "Wiederherstellungscode verwenden"
+"auth.otp_recovery.title" = "Wiederherstellungscode verwenden"
+"auth.otp_recovery.instructions" = "Geben Sie einen der Wiederherstellungscodes ein, die Sie bei der Einrichtung der Zwei-Faktor-Authentifizierung gespeichert haben. Jeder Code funktioniert einmal."
+"auth.otp_recovery.code_label" = "Wiederherstellungscode"
+"auth.otp_recovery.button" = "Bestätigen"
+"auth.otp_recovery.back" = "Stattdessen die Authenticator-App verwenden"
 
 # --- OTP enrollment (auth/otp, first-time) -----------------------------------
 
@@ -1624,6 +1634,8 @@
 "handler.otp.clock_ahead" = "Die Uhr Ihres Geräts scheint vorzugehen. Prüfen Sie, ob Datum und Uhrzeit automatisch eingestellt werden, und geben Sie dann den Code ein, den Ihre App anzeigt."
 "handler.otp.code_required" = "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein."
 "handler.otp.incorrect_code" = "Dieser Code ist falsch. Codes ändern sich alle 30 Sekunden. Geben Sie den Code ein, den Ihre App jetzt anzeigt."
+"handler.otp.incorrect_recovery_code" = "Dieser Wiederherstellungscode ist falsch oder wurde bereits verwendet."
+"handler.otp.recovery_code_required" = "Geben Sie einen Ihrer Wiederherstellungscodes ein."
 
 # --- Admin resource permissions handler (LocalizedError-backed) --------------
 

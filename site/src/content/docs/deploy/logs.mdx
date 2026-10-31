@@ -82,7 +82,7 @@ The recorded target is an inventory, not a copy:
 
 `GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=true` writes the request and response bodies of every `/api/v1/admin` and `/api/v1/account` call to the auth server's log. It's off by default and meant for development.
 
-Credential values are replaced by `[redacted]` before anything is written: passwords, OTP codes and secrets, the authenticator enrollment image, client secrets, the SMTP password, email verification codes, the logout URL carrying a signed `id_token_hint`, and any field whose name contains `password`, `secret`, `otp` or `token`. Field names are kept, so the body's shape is still readable. The `Authorization` header is written as `Bearer [redacted]`, and the URL's query is redacted as in a request record.
+Credential values are replaced by `[redacted]` before anything is written: passwords, OTP codes and secrets, recovery codes, the authenticator enrollment image, client secrets, the SMTP password, email verification codes, the logout URL carrying a signed `id_token_hint`, and any field whose name contains `password`, `secret`, `otp` or `token`. Field names are kept, so the body's shape is still readable. The `Authorization` header is written as `Bearer [redacted]`, and the URL's query is redacted as in a request record.
 
 A body that isn't valid JSON, is larger than 256 KB, or nests more than 32 levels deep is replaced by a one-line note giving its size and why it wasn't logged.
 

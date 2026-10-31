@@ -1,7 +1,7 @@
 import type { Browser } from "@playwright/test";
 import { cancelDialog, confirmDialog, expectPasswordRules, expectRefusal, nistPasswordRules, userUrl } from "../../../lib/admin-console";
 import { submitPassword } from "../../../lib/browser-sign-in";
-import { signInToConsole } from "../../../lib/console-user";
+import { enterRecoveryCode, recoveryCodeRefused, signInToConsole, turnOnTwoFactor } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { passwordToken } from "../../../lib/oauth";
@@ -112,4 +112,29 @@ test("a new password and two-factor turned off in one save: the old password no 
   const again = await signInToConsole(browser, { email: user.email, password: "a-brand-new-password" });
   await expect(again.page).toHaveURL(`${env.adminUrl}/account/profile`);
   await again.context.close();
+});
+
+// Removing the authenticator deletes its recovery codes, whoever removes it: after an administrator
+// turns two-factor authentication off and the user sets up a new authenticator, an old code is
+// refused at sign-in and a code of the new set signs in.
+test("an administrator turning two-factor off leaves the user's recovery codes refused", async ({ page, browser, users }) => {
+  const user = await users.create();
+  const old = await turnOnTwoFactor(browser, user);
+
+  await page.goto(userUrl(user.id, "authentication"));
+  await page.locator("#otpEnabled").uncheck();
+  await page.locator("#btnSave").click();
+  await confirmDialog(page, "You're turning off the user's two-factor authentication");
+  await expect(page.getByText("Changes saved.")).toBeVisible();
+
+  const replacement = await turnOnTwoFactor(browser, user);
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const signIn = await context.newPage();
+  await signIn.goto(`${env.adminUrl}/account/profile`);
+  await submitPassword(signIn, user.email, user.password);
+  await enterRecoveryCode(signIn, old.recoveryCodes[0]);
+  await expect(signIn.locator("#recovery-code-error")).toHaveText(recoveryCodeRefused);
+  await enterRecoveryCode(signIn, replacement.recoveryCodes[0]);
+  await signIn.waitForURL(`${env.adminUrl}/account/profile`);
+  await context.close();
 });

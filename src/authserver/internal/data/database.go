@@ -335,6 +335,10 @@ type Database interface {
 	// one code exactly one is accepted. False means the user's set holds no such unused code: a
 	// wrong code, one of a replaced set, or one already used (#257 decision 3).
 	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
+	// UserRecoveryCodeExists reports whether the user's set holds a code with the hash codeHash,
+	// used or not. After a refused claim, true means the code is a used one of the current set,
+	// which the sign-in audits as a replay (#257 decision 10).
+	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
 	// CountUnusedUserRecoveryCodes is how many of the user's recovery codes are unused.
 	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error)
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error

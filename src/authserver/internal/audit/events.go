@@ -428,6 +428,20 @@ const (
 	// the account API, logged_in_user; never a code or its hash. Written after the commit (#257
 	// decision 10).
 	EventRecoveryCodesCreated = "recovery_codes_created"
+	// EventAuthSuccessRecoveryCode records a recovery code accepted at sign-in in place of an
+	// authenticator code, with user_id and remaining, the unused codes left after it (9 down to
+	// 0). Never the code or its hash. A recovery sign-in the user did not make means their
+	// password and one of their codes are in someone else's hands (#257 decision 10).
+	EventAuthSuccessRecoveryCode = "auth_success_recovery_code"
+	// EventAuthFailedRecoveryCode records a recovery code refused at sign-in, wrong or already
+	// used, with user_id. Its own event rather than EventAuthFailedOtp, so a filter on the
+	// authenticator's events does not count recovery codes (#257 decision 10).
+	EventAuthFailedRecoveryCode = "auth_failed_recovery_code"
+	// EventRecoveryCodeReplayDetected records a refused recovery code that belongs to the user's
+	// current set and was already used, beside and before that refusal's
+	// EventAuthFailedRecoveryCode, with user_id: someone holds a spent code. A code of a replaced
+	// set no longer exists, so it is a wrong code (#257 decision 10).
+	EventRecoveryCodeReplayDetected = "recovery_code_replay_detected"
 
 	EventEnabledOTP                     = "enabled_otp"
 	EventDisabledOTP                    = "disabled_otp"
@@ -628,8 +642,10 @@ var auditEventTypes = []string{
 	EventAuthCodeReuseDetected,
 	EventAuthFailedOtp,
 	EventAuthFailedPwd,
+	EventAuthFailedRecoveryCode,
 	EventAuthSuccessOtp,
 	EventAuthSuccessPwd,
+	EventAuthSuccessRecoveryCode,
 	EventBumpedUserSession,
 	EventChangedPassword,
 	EventCreatedAuthCode,
@@ -667,6 +683,7 @@ var auditEventTypes = []string{
 	EventOTPAuthenticatorDisabled,
 	EventOTPCodeReplayDetected,
 	EventRateLimitExceeded,
+	EventRecoveryCodeReplayDetected,
 	EventRecoveryCodesCreated,
 	EventRedemptionRefusedRedirectURI,
 	EventRefreshTokenReplayDetected,

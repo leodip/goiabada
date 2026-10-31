@@ -461,6 +461,8 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeOtpClockAhead` | contract | Catalog key of the refusal of a code from the next time step, on the auth server's sign-in pages and as the account API's `error_description` beside `OTP_CLOCK_AHEAD` (#142). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeOtpCodeRequired` | both-apps | — |
 | `core/i18n` | `ErrCodeOtpIncorrectCode` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeOtpIncorrectRecoveryCode` | contract | Catalog key of the refusal of a recovery code that is wrong, of a replaced set or already used, on the auth server's recovery-code form (#257). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeOtpRecoveryCodeRequired` | contract | Catalog key of the recovery-code form submitted with no code, on the auth server's sign-in page (#257). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodePasswordLowercaseRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordNumberRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordSpecialCharRequired` | both-apps | — |

@@ -1,10 +1,13 @@
 package otpcredential
 
 import (
+	"context"
 	"crypto/rand"
+	"database/sql"
 	"strings"
 	"unicode"
 
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 )
@@ -89,4 +92,86 @@ func newRecoveryCode() (string, error) {
 		b.WriteByte(recoveryCodeAlphabet[r&0x1f])
 	}
 	return b.String(), nil
+}
+
+// RecoveryCodeOutcome is what checking a recovery code at sign-in concluded.
+type RecoveryCodeOutcome int
+
+const (
+	// RecoveryCodeWrong is the zero value on purpose, as OutcomeWrong is: a result nobody filled
+	// in refuses. A code no set of the user's holds, one of a replaced set included.
+	RecoveryCodeWrong RecoveryCodeOutcome = iota
+	// RecoveryCodeAccepted is a code of the user's set, unused until this call claimed it. It is
+	// the only outcome a caller may treat as a verified second factor.
+	RecoveryCodeAccepted
+	// RecoveryCodeReplayed is a code of the user's current set that was already used. The
+	// submitter is told what a wrong code gets; the caller audits it as a replay (#257 decisions 6
+	// and 10).
+	RecoveryCodeReplayed
+)
+
+// RecoveryCodeResult is the outcome and, on RecoveryCodeAccepted, how many of the set's codes are
+// left unused after it, which the caller audits.
+type RecoveryCodeResult struct {
+	Outcome   RecoveryCodeOutcome
+	Remaining int
+}
+
+// RecoveryCodeDatabase is what UseRecoveryCode reads and writes. data.Database satisfies it.
+type RecoveryCodeDatabase interface {
+	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
+	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
+	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error)
+}
+
+// UseRecoveryCode checks a recovery code, as the user typed it, against user's set and claims it:
+// one conditional write, so of two submissions of one code exactly one is accepted (#257 decision
+// 3). A user with no authenticator has no codes, so their code is wrong before anything is read.
+//
+// It leaves the authenticator as it is, whatever the outcome (#257 decisions 4 and 6): the
+// consecutive-failure count is not read, not advanced by a refusal and not cleared by an
+// acceptance, so a recovery code still signs in while the authenticator is disabled, which is the
+// self-service way out of the disable, and the authenticator stays disabled until it is rebound.
+// At 120 bits a code needs no failure count of its own; the caller charges a refusal to the otp
+// rate tier, the budget an authenticator code spends.
+//
+// A refused claim is looked up once more, to tell a used code of the current set, which the caller
+// audits as a replay, from a wrong one. The submitter is told the same for both.
+//
+// The caller records the claim against the generation of the authenticator user was read with: the
+// codes are deleted in the removal's transaction and the generation moves with it, so a code
+// accepted from a set whose authenticator is removed meanwhile stands for nothing at
+// /auth/completed (OTPClaim).
+func UseRecoveryCode(ctx context.Context, db RecoveryCodeDatabase, user *record.User, code string) (RecoveryCodeResult, error) {
+	if !user.OTPEnabled {
+		return RecoveryCodeResult{Outcome: RecoveryCodeWrong}, nil
+	}
+
+	codeHash := HashRecoveryCode(code)
+	used, err := db.TryUseUserRecoveryCode(ctx, nil, user.Id, codeHash)
+	if err != nil {
+		return RecoveryCodeResult{}, err
+	}
+	if !used {
+		exists, lookupErr := db.UserRecoveryCodeExists(ctx, nil, user.Id, codeHash)
+		if lookupErr != nil {
+			return RecoveryCodeResult{}, lookupErr
+		}
+		if exists {
+			return RecoveryCodeResult{Outcome: RecoveryCodeReplayed}, nil
+		}
+		return RecoveryCodeResult{Outcome: RecoveryCodeWrong}, nil
+	}
+
+	remaining, err := db.CountUnusedUserRecoveryCodes(ctx, nil, user.Id)
+	if err != nil {
+		return RecoveryCodeResult{}, err
+	}
+	return RecoveryCodeResult{Outcome: RecoveryCodeAccepted, Remaining: remaining}, nil
+}
+
+// IsBlankRecoveryCode reports whether code holds nothing once spaces and hyphens are taken out: a
+// form submitted with no code, which is asked for one rather than refused.
+func IsBlankRecoveryCode(code string) bool {
+	return normalizeRecoveryCode(code) == ""
 }

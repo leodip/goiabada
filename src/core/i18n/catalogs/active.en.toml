@@ -71,6 +71,16 @@
 "auth.otp.instructions" = "Enter the 6-digit code from your authenticator app."
 "auth.otp.code_label" = "One-time code"
 "auth.otp.button" = "Verify"
+"auth.otp.use_recovery_code" = "Use a recovery code instead"
+
+# --- Recovery code (auth/otp, form=recovery-code) ---------------------------
+
+"auth.otp_recovery.page_title" = "Use a recovery code"
+"auth.otp_recovery.title" = "Use a recovery code"
+"auth.otp_recovery.instructions" = "Enter one of the recovery codes you saved when you set up two-factor authentication. Each code works once."
+"auth.otp_recovery.code_label" = "Recovery code"
+"auth.otp_recovery.button" = "Verify"
+"auth.otp_recovery.back" = "Use your authenticator app instead"
 
 # --- OTP enrollment (auth/otp, first-time) -----------------------------------
 
@@ -1620,6 +1630,8 @@
 "handler.otp.clock_ahead" = "Your device's clock seems to be ahead. Check that its date and time are set automatically, then enter the code your app shows."
 "handler.otp.code_required" = "Enter the 6-digit code from your authenticator app."
 "handler.otp.incorrect_code" = "That code isn't right. Codes change every 30 seconds, so enter the one your app shows now."
+"handler.otp.incorrect_recovery_code" = "That recovery code isn't right, or it was already used."
+"handler.otp.recovery_code_required" = "Enter one of your recovery codes."
 
 # --- Admin resource permissions handler (LocalizedError-backed) --------------
 

@@ -101,6 +101,10 @@ const (
 	// A code from the time step after the server's current one, which only an authenticator
 	// whose clock runs ahead shows: refused with this rather than as a wrong code (#142).
 	ErrCodeOtpClockAhead = "handler.otp.clock_ahead"
+	// The recovery-code form's refusals (#257): no code, and a code that is wrong, of a replaced
+	// set or already used, which one message answers so the submitter cannot tell them apart.
+	ErrCodeOtpRecoveryCodeRequired  = "handler.otp.recovery_code_required"
+	ErrCodeOtpIncorrectRecoveryCode = "handler.otp.incorrect_recovery_code"
 
 	// Admin resource permissions handler — in-page validation for the
 	// permission-creation form (browser-flow JSON, surface A).

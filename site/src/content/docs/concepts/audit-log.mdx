@@ -51,6 +51,8 @@ Each of these means the server caught something and refused it. One entry is wor
 | `auth_code_reuse_detected` | A client redeemed an authorization code a second time, after authenticating and passing PKCE. The server revoked any refresh tokens issued through that code's session and, if it revoked any, ended the session. When the entry's list of revoked refresh tokens is empty, nothing was left to revoke. |
 | `otp_code_replay_detected` | An authenticator code that had already been used was sent again. That usually means a phishing proxy relaying a user's sign-in in real time. |
 | `otp_authenticator_disabled` | A user's authenticator got its 100th wrong code in a row and was disabled. Someone who knew the user's password, or held one of their sessions, got that far, so treat the password as known. [A user who lost their authenticator](/guides/require-two-factor-authentication/#a-user-who-lost-their-authenticator) is the way back. |
+| `auth_success_recovery_code` | A user signed in with a recovery code instead of their authenticator. One they didn't make means someone else holds their password and one of their codes: change the password and turn two-factor authentication off, so they set up a new authenticator with new codes. |
+| `recovery_code_replay_detected` | A recovery code that had already been used was sent again. Someone holds one of the user's spent codes, and their password. |
 | `rate_limit_exceeded` | A rate limiter started refusing requests, often a password or code guessing run. Each auth server instance writes it at most once per limiter and key per window, not once per refused request. |
 
 Three more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code, and passed client authentication and PKCE, tried to redeem it after you removed its redirect URI. `token_revocation_refused` means a client held a live token issued to another client.
@@ -164,6 +166,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `refresh_token_jti` | The `jti` of the refresh token issued. |
 | `refresh_token_offline_idle_timeout_in_seconds` | Under `old` and `new`: the default idle timeout of an offline refresh token, in seconds. |
 | `refresh_token_offline_max_lifetime_in_seconds` | Under `old` and `new`: the default maximum lifetime of an offline refresh token, in seconds. |
+| `remaining` | How many of a user's recovery codes are left unused after one signed in. |
 | `removed_resource_ids` | The row ids of the resources a save of a client's introspection resources removed. |
 | `resource_id` | The resource's row id. |
 | `resource_identifier` | The identifier the resource is known by. |
@@ -227,6 +230,9 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `auth_failed_otp` | An authenticator code was refused at sign-in, because it was wrong or had already been used. With `reason` `clock_ahead`, it was the code of the next 30 seconds, which only a device whose clock runs ahead shows: this one is also written while turning on two-factor authentication, and it isn't someone guessing. |
 | `otp_code_replay_detected` | An authenticator code that had already been used was sent again, at sign-in or while turning on two-factor authentication, and was refused. |
 | `otp_authenticator_disabled` | A user's authenticator was disabled at sign-in, because 100 codes in a row were refused. Written once, beside that 100th refusal's `auth_failed_otp`. |
+| `auth_success_recovery_code` | A recovery code was accepted at sign-in in place of an authenticator code. `remaining` is how many of the user's codes are left unused. |
+| `auth_failed_recovery_code` | A recovery code was refused at sign-in, because it was wrong, from a set that was replaced, or already used. |
+| `recovery_code_replay_detected` | A recovery code from the user's current set that had already been used was sent again at sign-in, and was refused. Written beside that refusal's `auth_failed_recovery_code`. |
 | `user_disabled` | A disabled user was refused: at sign-in, when reusing a session, before a code or tokens were issued, at the token endpoint or at `/userinfo`. |
 | `rate_limit_exceeded` | A rate limiter started refusing requests from an IP address block, for an email address or for a user. Each instance writes it at most once per key per window. |
 | `auth_ceremony_mismatch` | A sign-in step was refused because its page belonged to a sign-in the browser no longer holds, or named none. Its details describe the sign-in the browser most recently moved. |

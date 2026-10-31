@@ -1,6 +1,7 @@
 // The user's recovery codes: the set of ten that comes with every new authenticator, each of which
-// signs in once in place of an authenticator code.
-import { signInToConsole } from "../../../lib/console-user";
+// signs in once in place of an authenticator code, through "Use a recovery code instead".
+import { submitPassword } from "../../../lib/browser-sign-in";
+import { enterRecoveryCode, recoveryCodeRefused, signInToConsole, turnOnTwoFactor } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { freshTotp } from "../../../lib/totp";
@@ -40,4 +41,42 @@ test("turning on two-factor authentication shows ten recovery codes, once", asyn
   await expect(own.page.getByRole("heading", { name: "Save your recovery codes" })).toHaveCount(0);
   await expect(own.page.getByText(codes[0])).toHaveCount(0);
   await own.context.close();
+});
+
+test("signing in with a recovery code: a wrong code is refused, a saved one signs in once", async ({ browser, users }) => {
+  const user = await users.create();
+  const { recoveryCodes } = await turnOnTwoFactor(browser, user);
+
+  // The console asks a user with an authenticator for its code, and links to the recovery-code form.
+  const first = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await first.newPage();
+  await page.goto(`${env.adminUrl}/account/profile`);
+  await submitPassword(page, user.email, user.password);
+  await expect(page).toHaveURL(/\/auth\/otp/);
+  await page.getByRole("link", { name: "Use a recovery code instead" }).click();
+  await expect(page.getByRole("heading", { name: "Use a recovery code" })).toBeVisible();
+
+  await enterRecoveryCode(page, "0000-0000-0000-0000-0000-0000");
+  await expect(page.locator("#recovery-code-error")).toHaveText(recoveryCodeRefused);
+  await expect(page.getByLabel("Recovery code")).toHaveAttribute("aria-invalid", "true");
+
+  // Capitals and spaces don't matter.
+  await enterRecoveryCode(page, recoveryCodes[0].toUpperCase().replaceAll("-", " "));
+  await page.waitForURL(`${env.adminUrl}/account/profile`);
+  await first.close();
+
+  // The same code is refused at the next sign-in, with the answer a wrong one gets.
+  const second = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const again = await second.newPage();
+  await again.goto(`${env.adminUrl}/account/profile`);
+  await submitPassword(again, user.email, user.password);
+  await enterRecoveryCode(again, recoveryCodes[0]);
+  await expect(again.locator("#recovery-code-error")).toHaveText(recoveryCodeRefused);
+
+  // The form links back to the code form, which still takes the app's code.
+  await again.getByRole("link", { name: "Use your authenticator app instead" }).click();
+  await expect(again.locator('input[name="otp"]')).toBeVisible();
+  await enterRecoveryCode(again, recoveryCodes[1]);
+  await again.waitForURL(`${env.adminUrl}/account/profile`);
+  await second.close();
 });
