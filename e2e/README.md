@@ -156,6 +156,13 @@ suite run again and again without a reset:
   worker's session. A run signs the administrator in about fourteen times, and the rate-limits suite
   once, under the seeded cap of 20 sessions per user, and the sessions the cap ends are the least
   recently used, those earlier runs left.
+- **It imports `test` from `lib/fixtures.ts`**, whose watcher fails a test in which a page of the auth
+  server or the admin console reported a Content-Security-Policy violation, such as an inline script
+  or an `eval` the servers' `script-src 'self'` refused, in any browser context the test or a helper
+  opens with `browser.newContext()`. The failure names the page, the directive and what was blocked.
+  Pages of the test app and Mailpit are not watched. `tests/csp-violations.spec.ts` checks the watcher
+  against pages of its own and needs no environment:
+  `npx playwright test tests/csp-violations.spec.ts --project chromium --no-deps`.
 
 ## The VPS
 

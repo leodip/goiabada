@@ -1,7 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { submitPassword } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
+import { expect, test } from "../../lib/fixtures";
 
 // These tests are about signing in, so each starts with no session, not the suite's saved one.
 test.use({ storageState: { cookies: [], origins: [] } });
