@@ -342,9 +342,9 @@ func TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing
 	assert.NotEqual(t, ceremonyA, ceremonyB,
 		"each authorization request must render its own ceremony id, or nothing is bound")
 
-	// Two codes of two steps, since a step's code is spent once: the current one, and the next,
-	// which the server's one-step window accepts.
-	now := time.Now()
+	// Two codes of two steps, since a step's code is spent once: the previous one, which the window
+	// still accepts, and the current one.
+	codes := []string{otptest.PreviousStepCode(t, otpSecret), otptest.Code(t, otpSecret, time.Now())}
 	for i, signIn := range []struct {
 		otpUrl      string
 		otpPage     *http.Response
@@ -355,7 +355,7 @@ func TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing
 		{otpUrlA, otpPageA, clientA, redirectUriA, stateA},
 		{otpUrlB, otpPageB, clientB, redirectUriB, stateB},
 	} {
-		otpCode := otptest.Code(t, otpSecret, now.Add(time.Duration(i)*30*time.Second))
+		otpCode := codes[i]
 
 		resp := authenticateWithOtp(t, httpClient, signIn.otpUrl, signIn.otpPage, otpCode)
 		defer func(r *http.Response) { _ = r.Body.Close() }(resp)

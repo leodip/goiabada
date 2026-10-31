@@ -107,11 +107,14 @@ command itself and fails on a tree it changed.
 | `core/api` | `AccountLogoutRequest` | both-apps | — |
 | `core/api` | `AccountLogoutResponseModeFormPost` | both-apps | — |
 | `core/api` | `AccountOTPEnrollmentResponse` | both-apps | — |
+| `core/api` | `AccountRecoveryCodesResponse` | both-apps | — |
 | `core/api` | `AddGroupMemberRequest` | both-apps | — |
 | `core/api` | `AuditLogResponse` | both-apps | — |
 | `core/api` | `ClientLogoInfoResponse` | both-apps | — |
 | `core/api` | `ClientLogoUploadResponse` | both-apps | — |
 | `core/api` | `ClientResponse` | both-apps | — |
+| `core/api` | `CreateAccountRecoveryCodesRequest` | both-apps | — |
+| `core/api` | `CreateAccountRecoveryCodesResponse` | both-apps | — |
 | `core/api` | `CreateClientRequest` | both-apps | — |
 | `core/api` | `CreateClientResponse` | both-apps | — |
 | `core/api` | `CreateGroupAttributeRequest` | both-apps | — |
@@ -191,6 +194,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `SuccessResponse` | both-apps | — |
 | `core/api` | `UpdateAccountEmailRequest` | both-apps | — |
 | `core/api` | `UpdateAccountOTPRequest` | both-apps | — |
+| `core/api` | `UpdateAccountOTPResponse` | both-apps | — |
 | `core/api` | `UpdateAccountPasswordRequest` | both-apps | — |
 | `core/api` | `UpdateAccountPhoneRequest` | both-apps | — |
 | `core/api` | `UpdateClientAdministrativeScopesRequest` | both-apps | — |
@@ -457,8 +461,11 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeLoginEmailRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeLoginPasswordRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeOtpAccountDisabled` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeOtpClockAhead` | contract | Catalog key of the refusal of a code from the next time step, on the auth server's sign-in pages and as the account API's `error_description` beside `OTP_CLOCK_AHEAD` (#142). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeOtpCodeRequired` | both-apps | — |
 | `core/i18n` | `ErrCodeOtpIncorrectCode` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeOtpIncorrectRecoveryCode` | contract | Catalog key of the refusal of a recovery code that is wrong, of a replaced set or already used, on the auth server's recovery-code form (#257). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeOtpRecoveryCodeRequired` | contract | Catalog key of the recovery-code form submitted with no code, on the auth server's sign-in page (#257). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodePasswordLowercaseRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordNumberRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordSpecialCharRequired` | both-apps | — |

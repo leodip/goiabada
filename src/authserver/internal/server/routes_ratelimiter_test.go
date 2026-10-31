@@ -395,12 +395,13 @@ func reachesHandler(s *Server, r *http.Request) bool {
 // ninety seconds whenever the counter reaches it, and the case would then take the success
 // path and fail for a reason that has nothing to do with what it asserts. A sweep of this
 // secret finds 000000 at 2028-04-13T15:03:30Z. Confirmed against MatchStep, which is the
-// three-step window the handler itself verifies in (#219).
+// window the handler itself verifies in, and refused by it outright rather than as a code from
+// the next step, which the handler answers without charging the limiter (#219, #142).
 func routesTestWrongOTPCode(t *testing.T) string {
 	t.Helper()
 
 	for _, candidate := range []string{"000000", "111111", "222222"} {
-		if _, matched := otp.MatchStep(candidate, routesTestOTPSecret, time.Now().UTC()); !matched {
+		if _, match := otp.MatchStep(candidate, routesTestOTPSecret, time.Now().UTC()); match == otp.NoMatch {
 			return candidate
 		}
 	}
@@ -622,6 +623,24 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		// password check.
 		assertRefused(t, serve(server, apiRequest(http.MethodPut, "/api/v1/account/email", emailBody)),
 			accountEmailChangeWindow, shapeAPI)
+	})
+
+	t.Run("POST /api/v1/account/otp/recovery-codes spends the same bucket", func(t *testing.T) {
+		// A new set of recovery codes verifies the same password (#257 decision 8). Refusing the
+		// password route after the new set spent the budget is what says the wrapper is that
+		// bucket's and not a lookalike's.
+		server := newRoutesTestServer(t)
+		recoveryCodesBody := `{"password":"` + routesTestWrongPassword + `"}`
+
+		for i := 0; i < accountPasswordBudget; i++ {
+			assert.NotEqual(t, http.StatusTooManyRequests,
+				serve(server, apiRequest(http.MethodPost, "/api/v1/account/otp/recovery-codes", recoveryCodesBody)).Code,
+				"guess %d must reach the handler", i+1)
+		}
+
+		passwordBody := `{"currentPassword":"` + routesTestWrongPassword + `","newPassword":"a new password"}`
+		assertRefused(t, serve(server, apiRequest(http.MethodPut, "/api/v1/account/password", passwordBody)),
+			accountPasswordWindow, shapeAPI)
 	})
 
 	t.Run("PUT /api/v1/account/email counts every change", func(t *testing.T) {

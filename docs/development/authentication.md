@@ -235,9 +235,11 @@ ceremony's path depends on the target ACR, the session, and `prompt`.
 | `level1_existing_session` | `authflow.Authorization` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
 | `requires_level_2` | `authflow.Level1Completion` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1, or the target is `level2_mandatory` and the user has no authenticator. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
 | `level2_otp` | `authflow.Level2Selection` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
+| `level2_recovery_codes` | `authflow.OTPSubmission` | OTP enrolled: the ceremony holds the new authenticator's recovery codes (`RecoveryCodes`) until `/auth/recovery-codes` first renders them; that render takes them off in one conditional write (`ceremony.Store.TakeRecoveryCodes`) and shows only what it took, so a reload or an overlapping load shows them no more (#257) |
 | `authentication_completed` | `authflow.Level1Completion` | no step-up needed |
 | | `authflow.Level2Selection` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
-| | `authflow.OTPSubmission` | OTP verified or enrolled |
+| | `authflow.OTPSubmission` | OTP verified against the stored authenticator, or a recovery code accepted |
+| | `authflow.ContinueAfterRecoveryCodes` | Continue on the recovery-codes page |
 | `requires_consent` | `authflow.Completion` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) |
 | `ready_to_issue_code` | `authflow.SilentAuthentication` | every silent check passed, skipping every hop between |
 | | `authflow.Completion` | no consent needed |
@@ -272,6 +274,8 @@ state it finds through `requireAuthState`, which answers 400 when it is not one 
 | `/auth/level2` | GET | ceremony id first, then `requires_level_2` | 400, 400 |
 | `/auth/otp` | GET | ceremony id first, then `level2_otp` | 400, 400 |
 | `/auth/otp` | POST | ceremony id first, then `level2_otp` | 400, 400 |
+| `/auth/recovery-codes` | GET | ceremony id first, then `level2_recovery_codes` | 400, 400 |
+| `/auth/recovery-codes` | POST | ceremony id first, then `level2_recovery_codes` | 400, 400 |
 | `/auth/completed` | GET | ceremony id first, then `authentication_completed` | 400, 400 |
 | `/auth/consent` | GET | ceremony id first, then `requires_consent` | 400, 400 |
 | `/auth/consent` | POST | ceremony id first, then `requires_consent` | 400, 400 |
@@ -285,7 +289,8 @@ state it finds through `requireAuthState`, which answers 400 when it is not one 
 | `/auth/pwd` | `handler_auth_pwd.go`, `authflow/password.go` | Password login form. Verifies the password, rotates the browser session's identifier, records level 1 on the ceremony |
 | `/auth/level1completed` | `handler_auth_level1.go`, `authflow/level1_completion.go` | Delivers a deferred authorization error if one is parked (see Deferred error redirects), else decides if level2 needed based on ACR and session state |
 | `/auth/level2` | `handler_auth_level2.go`, `authflow/level2_selection.go` | Selects level2 auth method. If `level2_optional` + no OTP → skip to completed |
-| `/auth/otp` | `handler_auth_otp.go`, `authflow/otp.go` | OTP verification (or enrollment if user doesn't have OTP yet). Rotates the browser session's identifier, records level 2 on the ceremony |
+| `/auth/otp` | `handler_auth_otp.go`, `authflow/otp.go` | OTP verification (or enrollment if user doesn't have OTP yet), or a recovery code in place of the code. Rotates the browser session's identifier, records level 2 on the ceremony. An enrolment goes on to `/auth/recovery-codes`, anything else to `/auth/completed` |
+| `/auth/recovery-codes` | `handler_auth_recovery_codes.go`, `authflow/recovery_codes_step.go` | Shows an enrolment's recovery codes once, taking them off the ceremony in a save before the page renders; a reload says they were already shown. Its Continue (POST) moves the ceremony to `authentication_completed` and answers 303 to `/auth/completed` |
 | `/auth/completed` | `handler_auth_completed.go`, `authflow/completion.go` | Final auth check (a user who is not the id_token_hint's refused, a disabled user refused, a moved-on generation restarted, all before any session is bound), session bump/create, scope filtering, consent check. The plan is one of three modes (`authflow/completion_decide.go`): reuse, which rotates the browser session's identifier before the bind when it raises the session; create, which confirms the ceremony, starts the session (`StartNewUserSession`, which writes nothing to the browser), then rotates and binds it to the browser session (`RegenerateSessionAndBind`), deletes it when that fails, and writes the device cookie only after; and restart |
 | `/auth/consent` | `handler_consent.go`, `authflow/consent.go` | User consent screen (if required), and the submission weighed against the permissions the user holds now, recorded through `userconsent` |
 | `/auth/issue` | `handler_auth_issue.go`, `authflow/issuance.go` | Final re-checks (redirect URI, client, flow, hint, session, user, scope), then issues the authorization code or the implicit tokens, redirects to client |
@@ -408,9 +413,13 @@ When user has valid session (`UserSession` in DB + session cookie):
 ## SSO and ACR/AMR Details
 
 ### AMR (Authentication Methods Reference)
-Two methods tracked (`oidc/auth_method.go`): `pwd` (password), `otp` (time-based OTP). Stored as
-space-separated string in `AuthContext.AuthMethods` and `UserSession.AuthMethods`. Output in tokens
-as JSON array per OIDC spec: `"amr": ["pwd", "otp"]`
+Three methods tracked (`oidc/auth_method.go`): `pwd` (password), `otp` (time-based OTP) and
+`recovery_code` (a recovery code entered in place of an authenticator code, Goiabada's own value,
+#257). Stored as space-separated string in `AuthContext.AuthMethods` and `UserSession.AuthMethods`.
+Output in tokens as JSON array per OIDC spec: `"amr": ["pwd", "otp"]`, or `["pwd", "recovery_code"]`
+for a recovery-code sign-in. `AuthContext.ClaimsOTP` counts either second-factor method as a claim
+the authenticator backs, tied to its `otp_config_generation`, so removing the authenticator lowers
+a recovery-code session and restarts a ceremony in flight exactly as for a code (#542).
 
 ### UserSession Model
 ```

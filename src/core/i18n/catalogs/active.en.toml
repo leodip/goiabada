@@ -71,6 +71,30 @@
 "auth.otp.instructions" = "Enter the 6-digit code from your authenticator app."
 "auth.otp.code_label" = "One-time code"
 "auth.otp.button" = "Verify"
+"auth.otp.use_recovery_code" = "Use a recovery code instead"
+
+# --- Recovery code (auth/otp, form=recovery-code) ---------------------------
+
+"auth.otp_recovery.page_title" = "Use a recovery code"
+"auth.otp_recovery.title" = "Use a recovery code"
+"auth.otp_recovery.instructions" = "Enter one of the recovery codes you saved when you set up two-factor authentication. Each code works once."
+"auth.otp_recovery.code_label" = "Recovery code"
+"auth.otp_recovery.button" = "Verify"
+"auth.otp_recovery.back" = "Use your authenticator app instead"
+
+# --- Recovery codes after the sign-in setup (auth/recovery-codes) -----------
+
+"auth.recovery_codes.page_title" = "Save your recovery codes"
+"auth.recovery_codes.title" = "Save your recovery codes"
+"auth.recovery_codes.lead" = "If you lose your phone, you can sign in with one of these codes instead of a code from your app. Each code works once. Save them somewhere safe now, such as a password manager. They are not shown again."
+"auth.recovery_codes.list_label" = "Recovery codes"
+"auth.recovery_codes.copy" = "Copy codes"
+"auth.recovery_codes.copied" = "Codes copied"
+"auth.recovery_codes.copy_failed_status" = "Couldn't copy the codes. They're selected, so you can copy them yourself."
+"auth.recovery_codes.shown_page_title" = "Recovery codes"
+"auth.recovery_codes.shown_title" = "Your recovery codes were already shown"
+"auth.recovery_codes.shown_lead" = "They're shown only once. If you didn't save them, get a new set in the admin console, under Account, Two-factor authentication."
+"auth.recovery_codes.continue" = "Continue"
 
 # --- OTP enrollment (auth/otp, first-time) -----------------------------------
 
@@ -553,6 +577,20 @@
 "adminconsole.account.otp.step3" = "Enter your password and the 6-digit code the app shows."
 "adminconsole.account.otp.field.code" = "Code from the app"
 "adminconsole.account.otp.enable_button" = "Turn on two-factor authentication"
+"adminconsole.account.otp.recovery_codes.title" = "Save your recovery codes"
+"adminconsole.account.otp.recovery_codes.lead" = "If you lose your phone, you can sign in with one of these codes instead of a code from your app. Each code works once. Save them somewhere safe now, such as a password manager. They are not shown again."
+"adminconsole.account.otp.recovery_codes.list_label" = "Recovery codes"
+"adminconsole.account.otp.recovery_codes.copy" = "Copy codes"
+"adminconsole.account.otp.recovery_codes.copied" = "Codes copied"
+"adminconsole.account.otp.recovery_codes.copy_failed_status" = "Couldn't copy the codes. They're selected, so you can copy them yourself."
+"adminconsole.account.otp.recovery_codes.section_title" = "Recovery codes"
+"adminconsole.account.otp.recovery_codes.remaining_other" = "{{.count}} of your 10 recovery codes are unused."
+"adminconsole.account.otp.recovery_codes.remaining_one" = "1 of your 10 recovery codes is unused."
+"adminconsole.account.otp.recovery_codes.remaining_none" = "You have no unused recovery codes. Get a new set, so you can still sign in if you lose your authenticator."
+"adminconsole.account.otp.recovery_codes.new_set_lead" = "If you lose your codes or use them up, get a new set. Enter your password to confirm it's you."
+"adminconsole.account.otp.recovery_codes.new_set_button" = "Get new recovery codes"
+"adminconsole.account.otp.recovery_codes.confirm_title" = "Get new recovery codes?"
+"adminconsole.account.otp.recovery_codes.confirm_body" = "Your current recovery codes stop working as soon as you get new ones, including any you saved or printed."
 
 # --- Account manage consents ------------------------------------------------
 
@@ -1611,8 +1649,11 @@
 # --- OTP handler (LocalizedError-backed) -------------------------------------
 
 "handler.otp.account_disabled" = "Your account is disabled."
+"handler.otp.clock_ahead" = "Your device's clock seems to be ahead. Check that its date and time are set automatically, then enter the code your app shows."
 "handler.otp.code_required" = "Enter the 6-digit code from your authenticator app."
 "handler.otp.incorrect_code" = "That code isn't right. Codes change every 30 seconds, so enter the one your app shows now."
+"handler.otp.incorrect_recovery_code" = "That recovery code isn't right, or it was already used."
+"handler.otp.recovery_code_required" = "Enter one of your recovery codes."
 
 # --- Admin resource permissions handler (LocalizedError-backed) --------------
 

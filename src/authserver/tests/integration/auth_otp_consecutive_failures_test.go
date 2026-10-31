@@ -87,8 +87,9 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, newPassword, "")
 	newSecret := getOtpSecretFromEnrollmentPage(t, otpPage)
 	require.NotEqual(t, otpSecret, newSecret)
-	enrolmentCode := otptest.Code(t, newSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, otpUrl, otpPage, enrolmentCode)
+	// The previous step's code, so the current step's is left unspent above it for the next sign-in.
+	enrolmentCode := otptest.PreviousStepCode(t, newSecret)
+	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, otpPage, enrolmentCode))
 	_ = otpPage.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -101,7 +102,7 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 
 	// And the new authenticator's code verifies at the next sign-in.
 	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, newPassword, "")
-	resp = authenticateWithOtp(t, httpClient, otpUrl, otpPage, nextStepCode(t, newSecret, enrolmentCode))
+	resp = authenticateWithOtp(t, httpClient, otpUrl, otpPage, currentStepCode(t, newSecret, enrolmentCode))
 	_ = otpPage.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()

@@ -3645,6 +3645,11 @@ paths:
         enrollment endpoint first. Returns 400 if no enrollment is pending or the one started has
         expired (`OTP_ENROLLMENT_NOT_PENDING`).
 
+        The code is accepted from the authenticator's current 30-second step or the one before it.
+        The code of the step after, which only a device whose clock runs ahead shows, is refused
+        with 400 (`OTP_CLOCK_AHEAD`), whose `error_description` asks the user to check the device's
+        time. Nothing is spent by it, so the next code the authenticator shows still enables.
+
         This request must not carry a `secretKey`. One that does is refused with 400
         (`SECRET_KEY_NOT_ACCEPTED`) rather than having the field ignored, because a caller sending
         one believes it is choosing which authenticator is installed, and it is not.
@@ -3654,6 +3659,12 @@ paths:
         400 (`OTP_ALREADY_ENABLED` or `OTP_NOT_ENABLED`) when OTP is already in the state asked
         for, otherwise 409 (`CONCURRENT_UPDATE`) with nothing saved. The code submitted with an
         enable is spent either way.
+
+        An enable answers with `recoveryCodes`: the ten recovery codes created with the new
+        authenticator, each of which signs the user in once in place of an authenticator code.
+        This response is the only time they are returned, since the server stores only their
+        hashes, so show them to the user now. A disable answers without the field and deletes the
+        user's recovery codes with the authenticator.
       operationId: updateAccountOTP
       requestBody:
         required: true
@@ -3667,7 +3678,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdateUserResponse'
+                $ref: '#/components/schemas/UpdateAccountOTPResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3685,6 +3696,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/account/otp/recovery-codes:
+    get:
+      tags: [Account]
+      summary: Count unused recovery codes
+      description: |
+        Returns how many of the authenticated user's recovery codes are unused. The codes
+        themselves are never returned again after their set was first shown. A user without an
+        authenticator has no recovery codes, so the count for them is 0.
+      operationId: getAccountRecoveryCodes
+      responses:
+        '200':
+          description: The number of unused recovery codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountRecoveryCodesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Account]
+      summary: Create a new set of recovery codes
+      description: |
+        Replaces the authenticated user's recovery codes with a new set of ten, and returns it.
+        Requires the user's password. The old codes, used and unused, stop working at once. The
+        authenticator is not changed, and no session ends.
+
+        This response is the only time the new codes are returned, since the server stores only
+        their hashes, so show them to the user now.
+
+        A wrong or blank password is refused with 400 (`AUTHENTICATION_FAILED`), and a user without
+        an authenticator with 400 (`OTP_NOT_ENABLED`). A wrong password counts against the
+        `account_password` rate limit, shared with the account's password, two-factor and email
+        changes.
+      operationId: createAccountRecoveryCodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRecoveryCodesRequest'
+      responses:
+        '200':
+          description: The new set of recovery codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAccountRecoveryCodesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -6784,6 +6861,59 @@ components:
           description: >-
             6-digit TOTP code (required when enabling), generated from the secret returned by
             GET /api/v1/account/otp/enrollment
+
+    UpdateAccountOTPResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        recoveryCodes:
+          type: array
+          description: >-
+            Present only when the request turned two-factor authentication on: the ten recovery
+            codes created with the authenticator, each 24 characters in six groups of four, such
+            as 7kq2-m9xh-4trw-b3np-j6vd-egac. Returned this once and never again.
+          items:
+            type: string
+          minItems: 10
+          maxItems: 10
+      required:
+        - user
+
+    AccountRecoveryCodesResponse:
+      type: object
+      properties:
+        remaining:
+          type: integer
+          minimum: 0
+          maximum: 10
+          description: How many of the user's recovery codes are unused, 0 to 10.
+      required:
+        - remaining
+
+    CreateAccountRecoveryCodesRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          description: The user's current password.
+      required:
+        - password
+
+    CreateAccountRecoveryCodesResponse:
+      type: object
+      properties:
+        recoveryCodes:
+          type: array
+          description: >-
+            The ten new recovery codes, each 24 characters in six groups of four, such as
+            7kq2-m9xh-4trw-b3np-j6vd-egac. Returned this once and never again.
+          items:
+            type: string
+          minItems: 10
+          maxItems: 10
+      required:
+        - recoveryCodes
 
     AccountLogoutRequest:
       type: object

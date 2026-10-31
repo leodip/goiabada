@@ -68,6 +68,30 @@
 "auth.otp.instructions" = "Digite o código de 6 dígitos do seu aplicativo autenticador."
 "auth.otp.code_label" = "Código de uso único"
 "auth.otp.button" = "Verificar"
+"auth.otp.use_recovery_code" = "Usar um código de recuperação"
+
+# --- Recovery code (auth/otp, form=recovery-code) ---------------------------
+
+"auth.otp_recovery.page_title" = "Usar um código de recuperação"
+"auth.otp_recovery.title" = "Use um código de recuperação"
+"auth.otp_recovery.instructions" = "Digite um dos códigos de recuperação que você guardou ao configurar a autenticação de dois fatores. Cada código funciona uma vez."
+"auth.otp_recovery.code_label" = "Código de recuperação"
+"auth.otp_recovery.button" = "Verificar"
+"auth.otp_recovery.back" = "Usar o aplicativo autenticador"
+
+# --- Recovery codes after the sign-in setup (auth/recovery-codes) -----------
+
+"auth.recovery_codes.page_title" = "Guarde seus códigos de recuperação"
+"auth.recovery_codes.title" = "Guarde seus códigos de recuperação"
+"auth.recovery_codes.lead" = "Se você perder o celular, pode entrar com um destes códigos em vez de um código do aplicativo. Cada código funciona uma vez. Guarde-os agora em um lugar seguro, como um gerenciador de senhas. Eles não são mostrados de novo."
+"auth.recovery_codes.list_label" = "Códigos de recuperação"
+"auth.recovery_codes.copy" = "Copiar códigos"
+"auth.recovery_codes.copied" = "Códigos copiados"
+"auth.recovery_codes.copy_failed_status" = "Não foi possível copiar os códigos. Eles estão selecionados para você copiar."
+"auth.recovery_codes.shown_page_title" = "Códigos de recuperação"
+"auth.recovery_codes.shown_title" = "Seus códigos de recuperação já foram mostrados"
+"auth.recovery_codes.shown_lead" = "Eles são mostrados só uma vez. Se você não os guardou, obtenha novos no console de administração, em Conta, Autenticação de 2 fatores (OTP)."
+"auth.recovery_codes.continue" = "Continuar"
 
 # --- Cadastro de OTP (auth/otp, primeira vez) --------------------------------
 
@@ -526,6 +550,20 @@
 "adminconsole.account.otp.step3" = "Digite sua senha e o código de 6 dígitos que o aplicativo mostra."
 "adminconsole.account.otp.field.code" = "Código do aplicativo"
 "adminconsole.account.otp.enable_button" = "Ativar a autenticação de dois fatores"
+"adminconsole.account.otp.recovery_codes.title" = "Guarde seus códigos de recuperação"
+"adminconsole.account.otp.recovery_codes.lead" = "Se você perder o celular, pode entrar com um destes códigos em vez de um código do aplicativo. Cada código funciona uma vez. Guarde-os agora em um lugar seguro, como um gerenciador de senhas. Eles não são mostrados de novo."
+"adminconsole.account.otp.recovery_codes.list_label" = "Códigos de recuperação"
+"adminconsole.account.otp.recovery_codes.copy" = "Copiar códigos"
+"adminconsole.account.otp.recovery_codes.copied" = "Códigos copiados"
+"adminconsole.account.otp.recovery_codes.copy_failed_status" = "Não foi possível copiar os códigos. Eles estão selecionados para você copiar."
+"adminconsole.account.otp.recovery_codes.section_title" = "Códigos de recuperação"
+"adminconsole.account.otp.recovery_codes.remaining_other" = "{{.count}} dos seus 10 códigos de recuperação ainda não foram usados."
+"adminconsole.account.otp.recovery_codes.remaining_one" = "1 dos seus 10 códigos de recuperação ainda não foi usado."
+"adminconsole.account.otp.recovery_codes.remaining_none" = "Você não tem mais códigos de recuperação sem uso. Gere um novo conjunto para conseguir entrar mesmo se perder seu autenticador."
+"adminconsole.account.otp.recovery_codes.new_set_lead" = "Se você perder seus códigos ou usar todos, gere um novo conjunto. Digite sua senha para confirmar que é você."
+"adminconsole.account.otp.recovery_codes.new_set_button" = "Gerar novos códigos"
+"adminconsole.account.otp.recovery_codes.confirm_title" = "Gerar novos códigos de recuperação?"
+"adminconsole.account.otp.recovery_codes.confirm_body" = "Seus códigos de recuperação atuais param de funcionar assim que você gerar os novos, inclusive os que você salvou ou imprimiu."
 
 # --- Gerenciar consentimentos da conta --------------------------------------
 
@@ -1529,8 +1567,11 @@
 "handler.password.confirmation_mismatch" = "As senhas não conferem."
 
 "handler.otp.account_disabled" = "Sua conta está desativada."
+"handler.otp.clock_ahead" = "O relógio do seu dispositivo parece estar adiantado. Verifique se a data e a hora estão definidas automaticamente e digite o código que o aplicativo mostra."
 "handler.otp.code_required" = "Digite o código de 6 dígitos do seu aplicativo autenticador."
 "handler.otp.incorrect_code" = "Esse código não está correto. Os códigos mudam a cada 30 segundos, então digite o que o aplicativo mostra agora."
+"handler.otp.incorrect_recovery_code" = "Esse código de recuperação não está correto ou já foi usado."
+"handler.otp.recovery_code_required" = "Digite um dos seus códigos de recuperação."
 
 "handler.admin_resource_permissions.description_html_not_allowed" = "A descrição contém caracteres inválidos: não permitimos uso de HTML na descrição."
 "handler.admin_resource_permissions.permission_identifier_required" = "O identificador da permissão é obrigatório."

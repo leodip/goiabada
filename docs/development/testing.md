@@ -35,7 +35,11 @@ a test that sends a one-time code gets it from `authserver/internal/otp/otptest`
 RFC 6238 implementation of its own, importing nothing from `otp`, so the verifier is checked against
 an answer it did not compute. A secret or key URL in the server's own shape comes from the
 production generator, `otp.KeyGenerator.GenerateKeyURL` and then `otp.SecretFromKeyURL`; `otptest`'s
-`NewSecret` is for a test that only needs a random one (#646).
+`NewSecret` is for a test that only needs a random one (#646). The server accepts the previous and
+the current step's code and refuses the next step's as a clock running ahead (#142): `NextStepCode`
+is that refused code, and `PreviousStepCode` the oldest accepted one, which a test spends to leave
+the current step's code unspent for a second sign-in. Both wait out the last two seconds of a step,
+so the step cannot turn before the server checks the code.
 
 **Settings row in the integration tier**: every integration test runs against one server and one
 settings row, which the server reads on every request, so a value a test leaves there is what every

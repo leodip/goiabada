@@ -181,8 +181,8 @@ func TestKeyURLRoundTrip(t *testing.T) {
 			// the same key. The code comes from otptest, a second implementation, so the
 			// verifier is not checked against itself.
 			now := pinnedNow()
-			step, ok := MatchStep(otptest.Code(t, secret, now), secret, now)
-			assert.True(t, ok, "a code from the URL's secret must validate against it")
+			step, match := MatchStep(otptest.Code(t, secret, now), secret, now)
+			assert.Equal(t, Matched, match, "a code from the URL's secret must validate against it")
 			assert.Equal(t, pinnedStep, step, "and name the step it was shown in")
 
 			base64Image, err := RenderQRCodeImage(keyURL)

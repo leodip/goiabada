@@ -5,11 +5,13 @@ import { submitPassword } from "../../../lib/browser-sign-in";
 import { signInToConsole } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
-import { freshTotp, totp } from "../../../lib/totp";
+import { freshTotp, nextStepTotp, totp } from "../../../lib/totp";
 
 const wrongPassword = "That password isn't right. Try again.";
 const wrongCode = "That code isn't right. Codes change every 30 seconds, so enter the one your app shows now.";
 const noCode = "Enter the 6-digit code from your authenticator app.";
+const clockAhead =
+  "Your device's clock seems to be ahead. Check that its date and time are set automatically, then enter the code your app shows.";
 
 // Turns two-factor authentication on from the account page open on page, with the key the page
 // shows, which it returns.
@@ -160,8 +162,8 @@ test("a missing or wrong code at sign-in is refused", async ({ browser, users })
 });
 
 // RFC 6238 section 5.2: the verifier must not accept a code a second time once it has signed in.
-// The code is still inside its window, one step either side of now, so only the replay check refuses
-// it, and the same sentence as a wrong code says nothing about why.
+// The code is still inside its window, its own step or the one after, so only the replay check
+// refuses it, and the same sentence as a wrong code says nothing about why.
 test("a code used to sign in is refused at the next sign-in while still in its window, and a later one signs in", async ({ browser, users }) => {
   // Three codes from three steps: the enrolment's, the sign-in's and the last.
   test.setTimeout(150_000);
@@ -195,6 +197,40 @@ test("a code used to sign in is refused at the next sign-in while still in its w
   await expectRefusal(page, "otp-error", "otp", wrongCode);
 
   // A code from a later step signs in, so the refusal was the replay and not the account.
+  await page.locator("#otp").fill(await freshTotp(secret));
+  await page.getByRole("button", { name: "Verify" }).click();
+  await page.waitForURL(`${env.adminUrl}/account/profile`);
+  await context.close();
+});
+
+// A code from the next 30 seconds is what a device whose clock runs ahead shows. It is refused with a
+// message to check the device's time, on the account page and at sign-in, and it costs nothing: the
+// code the app shows next turns two-factor authentication on and signs in (#142).
+test("a code from the next 30 seconds is refused with the clock message, on the account page and at sign-in", async ({ browser, users }) => {
+  // Three codes from three steps: the account page's, the sign-in's, and the one either waits for.
+  test.setTimeout(150_000);
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/otp");
+  const secret = (await own.page.locator("#otp-secret").innerText()).trim();
+  await own.page.locator("#password").fill(user.password);
+  await own.page.locator("#otp").fill(await nextStepTotp(secret));
+  await own.page.getByRole("button", { name: "Turn on two-factor authentication" }).click();
+  // The page puts the cursor in the password field after any refusal, so only the message and the
+  // field it marks are asserted.
+  await expectRefusal(own.page, "otp-error", "otp", clockAhead, { focused: false });
+  await expect(own.page.getByText("Two-factor authentication is off.")).toBeVisible();
+  // The same key, drawn again, and the code it shows now turns it on.
+  expect(await turnOn(own.page, user.password)).toBe(secret);
+  await own.context.close();
+
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await page.goto(`${env.adminUrl}/account/profile`);
+  await submitPassword(page, user.email, user.password);
+  await expect(page).toHaveURL(/\/auth\/otp/);
+  await page.locator("#otp").fill(await nextStepTotp(secret));
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expectRefusal(page, "otp-error", "otp", clockAhead);
   await page.locator("#otp").fill(await freshTotp(secret));
   await page.getByRole("button", { name: "Verify" }).click();
   await page.waitForURL(`${env.adminUrl}/account/profile`);

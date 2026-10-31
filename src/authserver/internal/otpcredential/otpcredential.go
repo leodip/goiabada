@@ -41,8 +41,8 @@ import (
 // Database is what the OTP credential lifecycle needs: the authenticator's two compare-and-sets on
 // the user row, the generation counter every session compares itself against, the pending enrolment an establish clears, the consumed-step
 // marker a verification claims and a removal resets, the consecutive-failure count a refused
-// verification advances and a fresh enrolment clears, the sessions a removal lowers, and the
-// transaction they share.
+// verification advances and a fresh enrolment clears, the sessions a removal lowers, the recovery
+// codes an establish creates and a removal deletes, and the transaction they share.
 //
 // Exported, unlike the per-file ports #386 left in the handler packages, because it is this
 // package's own port and the two consumer ports embed it to hand the capability on (#387).
@@ -66,12 +66,15 @@ type Database interface {
 	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
 		secretEncrypted []byte) (bool, error)
 	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)
+	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error
+	DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) error
 }
 
-// VerifyOutcome is what a passcode check concluded. The three values are the three arms every
-// verification site already had, and they are distinguished because the audit sets differ: a
+// VerifyOutcome is what a passcode check concluded. The first three values are the three arms
+// every verification site already had, and they are distinguished because the audit sets differ: a
 // replay raises an event of its own at both sites, where a wrong code raises one at the browser
-// and nothing at the account API.
+// and nothing at the account API. The fourth, a code from the next step, gets a refusal of its own
+// at every site (#142).
 type VerifyOutcome int
 
 const (
@@ -87,12 +90,18 @@ const (
 	// Indistinguishable from a wrong code to the person submitting it, by design (#111), which
 	// is why the two arms write the same body at every caller.
 	OutcomeReplayed
+	// OutcomeClockAhead means the passcode is the code of the step after the server's current
+	// one and of no accepted step, which only an authenticator whose clock runs ahead shows
+	// (#142). Nothing was claimed and nothing counted: every caller tells the user to check the
+	// device's time rather than that the code is wrong, audits it with the reason clock_ahead,
+	// and charges no rate limit for it, since nobody guessing is helped by it.
+	OutcomeClockAhead
 )
 
 // VerifyResult is the outcome and the time step it was decided on, following
 // revocation.UserAuthStateResult's shape rather than returning a bare bool the callers would each
 // interpret. Step is the matched step, which the replay audit record at both sites carries;
-// it is zero when nothing matched, since there is no step to name.
+// it is zero when no step inside the window matched, since there is no step to name.
 //
 // Disabled is true on the one refusal that moved the consecutive-failure count to
 // record.OtpConsecutiveFailureLimit, disabling the authenticator until it is rebound, so the
@@ -106,7 +115,8 @@ type VerifyResult struct {
 // Establish installs a user's authenticator: it encrypts the seed at rest and, only while OTP is
 // still off at the otp_config_generation user was read with, stores it and turns otp_enabled on,
 // advances the generation and discards any pending enrolment. It reports whether it did and, when
-// it did, the generation that landed.
+// it did, the generation that landed and the set of recovery codes created with the authenticator,
+// which the caller shows once: only their hashes are stored (#257 decision 1).
 //
 // **A compare-and-set on the authenticator, not on the flag** (#471 decision 2). The write names
 // only the seed and otp_enabled, so it cannot undo a disable or a password change made since the
@@ -138,11 +148,17 @@ type VerifyResult struct {
 // /auth/level2, and promoting that at /auth/completed would leave a session that just enrolled
 // and verified owing another second-factor prompt at once.
 func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User,
-	seed string) (generation int64, established bool, err error) {
+	seed string) (generation int64, recoveryCodes []string, established bool, err error) {
 
 	encrypted, err := encryptSecret(dataCipher, seed)
 	if err != nil {
-		return 0, false, err
+		return 0, nil, false, err
+	}
+	// Drawn before the transaction opens, so a deadlocked attempt's rerun stores the same set it
+	// returns rather than a set nobody was shown.
+	codes, codeHashes, err := newRecoveryCodes()
+	if err != nil {
+		return 0, nil, false, err
 	}
 
 	// Opened through RunInTransaction, so a deadlock reruns the writes together (#301).
@@ -182,19 +198,25 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 		// enrollment's reason: putting it here makes "a bound authenticator starts at no
 		// failed attempts against it" a property of the transaction rather than of one
 		// caller.
-		return db.ClearUserOtpConsecutiveFailures(ctx, tx, user.Id)
+		if clearErr := db.ClearUserOtpConsecutiveFailures(ctx, tx, user.Id); clearErr != nil {
+			return clearErr
+		}
+		// The new authenticator's recovery codes, replacing any set the user still had, in the
+		// same transaction: whatever the path, a committed authenticator comes with its set and a
+		// rolled back one leaves none behind (#257 decision 1). Only their hashes are stored.
+		return db.ReplaceUserRecoveryCodes(ctx, tx, user.Id, codeHashes)
 	})
 	if err != nil {
-		return 0, false, err
+		return 0, nil, false, err
 	}
 	if !established {
-		return 0, false, nil
+		return 0, nil, false, nil
 	}
 
 	user.OTPSecretEncrypted = encrypted
 	user.OTPEnabled = true
 	user.OtpConfigGeneration = generation
-	return generation, true, nil
+	return generation, codes, true, nil
 }
 
 // Remove removes a user's authenticator: only while OTP is still on at the otp_config_generation
@@ -298,6 +320,12 @@ func RemoveTx(ctx context.Context, db Database, tx *sql.Tx, user *record.User) (
 	if err = db.ResetUserOTPStep(ctx, tx, user.Id); err != nil {
 		return false, err
 	}
+	// The authenticator's recovery codes go with it, used and unused, so every path that removes
+	// one, the account page, the administrator's and the recover command's, clears them; the next
+	// authenticator comes with a set of its own (#257 decision 3).
+	if err = db.DeleteUserRecoveryCodes(ctx, tx, user.Id); err != nil {
+		return false, err
+	}
 	// The counter that tells every one of this user's sessions they owe a second factor
 	// again, advanced inside the same transaction as the removal itself. Being per user is
 	// what makes "every session" one statement: the boolean this replaced was per session
@@ -328,15 +356,17 @@ func RemoveTx(ctx context.Context, db Database, tx *sql.Tx, user *record.User) (
 // the browser handler as record.User.GetOTPSecret, which is what #387's rule about a plaintext seed
 // not leaving the minimum is about.
 //
-// VerifyStored also counts. Every attempt it refuses -- a wrong code or a replayed one
-// -- advances the consecutive-failure count that disables the authenticator at
+// VerifyStored also counts. Every attempt it refuses as a wrong code or a replayed one
+// advances the consecutive-failure count that disables the authenticator at
 // record.OtpConsecutiveFailureLimit, and an authenticator already at the limit is
 // disabled: it answers as a wrong code does, and the claim's own predicate holds the
 // row's count under the limit, so the disable answers the row rather than the caller's
 // snapshot of it (NIST SP 800-63B section 3.2.2, #489). The refusal that moved the count
 // to the limit reports Disabled, so the caller audits the disable once. The clear on a
 // success is in the claim's statement, not here, and the count a fresh enrolment clears
-// is cleared in Establish's transaction: rebinding is the one path back.
+// is cleared in Establish's transaction: rebinding is the one path back. A code from the next
+// step, OutcomeClockAhead, is not counted: only the authenticator can produce it, so it is no
+// guess against it (#142).
 //
 // One caller today, authflow.OTPSubmission's already-enrolled arm.
 func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User, code string, now time.Time) (VerifyResult, error) {
@@ -361,7 +391,7 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 	// attempt the caller audits and the otp tier charges -- against the authenticator the
 	// code was checked against, the generation read with the seed. The statement stops at
 	// the limit, so grinding a disabled authenticator moves no row.
-	if result.Outcome != OutcomeMatched {
+	if result.Outcome == OutcomeWrong || result.Outcome == OutcomeReplayed {
 		disabled, err := db.IncrementUserOtpConsecutiveFailures(ctx, nil, user.Id, user.OtpConfigGeneration)
 		if err != nil {
 			return VerifyResult{}, err
@@ -393,13 +423,17 @@ func VerifySupplied(ctx context.Context, db Database, user *record.User, seed st
 
 // verify is the arm both entry points run: match the passcode against a seed inside the acceptance
 // window, then claim the step it matched through the entry point's claim, so a passcode is
-// accepted at most once (#111).
+// accepted at most once (#111). A code from the next step claims nothing, since no step was
+// accepted (#142).
 //
 // It reports rather than decides. The caller keeps the audit records, the rate-limit accounting and
 // the response, because those three genuinely differ between the sites and must keep differing.
 func verify(secret string, code string, now time.Time, claim func(step int64) (bool, error)) (VerifyResult, error) {
-	step, matched := otp.MatchStep(code, secret, now)
-	if !matched {
+	step, match := otp.MatchStep(code, secret, now)
+	switch match {
+	case otp.ClockAhead:
+		return VerifyResult{Outcome: OutcomeClockAhead}, nil
+	case otp.NoMatch:
 		return VerifyResult{Outcome: OutcomeWrong}, nil
 	}
 

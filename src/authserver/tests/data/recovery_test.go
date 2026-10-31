@@ -83,6 +83,8 @@ func seedRecoveryFixture(t *testing.T) recoveryFixture {
 	f.user, err = database.GetUserById(ctx, nil, user.Id)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), f.user.AuthStateGeneration)
+	// The authenticator's recovery codes, which a removal deletes with it (#257 decision 3).
+	replaceRecoveryCodes(t, f.user.Id, recoveryCodeHashes(10))
 
 	f.otherPermission = createTestPermission(t, createTestResource(t))
 	require.NoError(t, database.CreateUserPermission(ctx, nil, &record.UserPermission{
@@ -232,9 +234,11 @@ func TestRecovery_EachActionAloneAndAllTogether(t *testing.T) {
 				assert.True(t, outcome.OTPRemoved)
 				assert.False(t, after.OTPEnabled, "the authenticator is removed")
 				assert.Equal(t, f.user.OtpConfigGeneration+1, after.OtpConfigGeneration)
+				assert.Equal(t, 0, unusedRecoveryCodes(t, f.user.Id), "the recovery codes go with it")
 			} else {
 				assert.False(t, outcome.OTPRemoved)
 				assert.True(t, after.OTPEnabled, "the authenticator is untouched")
+				assert.Equal(t, 10, unusedRecoveryCodes(t, f.user.Id), "and so are its recovery codes")
 				assert.Equal(t, f.user.OTPSecretEncrypted, after.OTPSecretEncrypted)
 				assert.Equal(t, f.user.OtpConfigGeneration, after.OtpConfigGeneration)
 			}
@@ -399,6 +403,7 @@ func TestRecovery_AFailedGrantRollsBackEarlierActions(t *testing.T) {
 			assert.True(t, after.OTPEnabled, "the authenticator is still enrolled")
 			assert.Equal(t, f.user.OTPSecretEncrypted, after.OTPSecretEncrypted)
 			assert.Equal(t, f.user.OtpConfigGeneration, after.OtpConfigGeneration)
+			assert.Equal(t, 10, unusedRecoveryCodes(t, f.user.Id), "and so are its recovery codes")
 			assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration, "the generation did not move")
 			assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id), "manage is not granted")
 			session, err := database.GetUserSessionById(ctx, nil, f.session.Id)

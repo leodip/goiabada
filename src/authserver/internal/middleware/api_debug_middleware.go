@@ -36,12 +36,13 @@ const (
 // folded at startup. logoutUrl is here because POST /api/v1/account/logout-request
 // returns a URL carrying a signed id_token_hint that /auth/logout accepts: the name
 // says nothing about that, so dropping the entry would log a usable token in the
-// clear (#145).
+// clear (#145). recoveryCodes is PUT /api/v1/account/otp's set of recovery codes, each a second
+// factor that signs in once, whose name the substring net below does not catch (#257).
 var sensitiveKeys = foldKeySet(
 	"password", "currentPassword", "newPassword",
 	"otpCode", "secretKey", "base64Image",
 	"smtpPassword", "clientSecret", "client_secret",
-	"verificationCode", "logoutUrl",
+	"verificationCode", "logoutUrl", "recoveryCodes",
 )
 
 // The backstop for credential fields nobody remembers to add above. It over-redacts

@@ -74,6 +74,12 @@ type CeremonyStore interface {
 	// ConfirmCeremony answers nil while the browser session, read afresh, still holds the
 	// ceremony named, and ceremony.ErrCeremonyReplaced otherwise. It writes nothing (#579).
 	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	// TakeRecoveryCodes takes the set of recovery codes off the ceremony named, as the browser
+	// session stores it now, in one conditional write, and answers the set taken: none, writing
+	// nothing, when the ceremony holds none, so of two requests only one takes a set, and
+	// ceremony.ErrCeremonyReplaced, writing nothing, when the session no longer holds the ceremony
+	// (#257 decision 14).
+	TakeRecoveryCodes(w http.ResponseWriter, r *http.Request, ceremonyId string) ([]string, error)
 }
 
 // TokenIssuer redeems a validated grant at the token endpoint, one method per grant. Each owns its

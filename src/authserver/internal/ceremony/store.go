@@ -175,6 +175,44 @@ func (s *Store) SaveAuthContext(w http.ResponseWriter, r *http.Request, authCont
 	})
 }
 
+// errNoRecoveryCodesHeld is the refusal TakeRecoveryCodes's change answers when the ceremony, as
+// stored now, holds no set, so the conditional write it is made through writes nothing.
+var errNoRecoveryCodesHeld = errors.New("the ceremony holds no recovery codes")
+
+// TakeRecoveryCodes takes the set of recovery codes off the ceremony named, as the browser session
+// stores it now, and answers the set taken: the one write the sign-in setup's codes page shows a set
+// after (#257 decision 14). The fresh read and the clearing write are one conditional write, through
+// ChangeAndSave, so of two requests that loaded the ceremony while it held the set, only the one
+// whose write lands takes it, and the other finds it gone and answers none. A step's save is
+// last-writer-wins between two requests of one ceremony (SaveAuthContext), which would let both show
+// the set they loaded.
+//
+// Only the set changes: the ceremony is kept as the fresh read found it, made the most recently
+// written. It answers no set, writing nothing, when the ceremony holds none, and
+// ErrCeremonyReplaced, writing nothing, when the session no longer holds the ceremony, or is gone.
+func (s *Store) TakeRecoveryCodes(w http.ResponseWriter, r *http.Request, ceremonyId string) ([]string, error) {
+	var taken []string
+	err := s.changeOwnCeremonyRefusable(w, r, ceremonyId, func(held []AuthContext, i int) ([]AuthContext, error) {
+		// ChangeAndSave applies the change again on each attempt, to that attempt's read, so the
+		// set is the one the attempt whose write lands found.
+		taken = nil
+		own := held[i]
+		if len(own.RecoveryCodes) == 0 {
+			return nil, errNoRecoveryCodesHeld
+		}
+		taken = own.RecoveryCodes
+		own.RecoveryCodes = nil
+		return append(without(held, i), own), nil
+	})
+	if errors.Is(err, errNoRecoveryCodesHeld) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return taken, nil
+}
+
 // changeOwnCeremony applies change to the ceremonies the browser session holds as it is stored now,
 // only while it holds the ceremony named, through ChangeAndSave: the one write SaveAuthContext and
 // ClearAuthContext are made with. change is handed the held ceremonies, least recently written
@@ -183,6 +221,16 @@ func (s *Store) SaveAuthContext(w http.ResponseWriter, r *http.Request, authCont
 // gone.
 func (s *Store) changeOwnCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string,
 	change func(held []AuthContext, i int) []AuthContext) error {
+
+	return s.changeOwnCeremonyRefusable(w, r, ceremonyId, func(held []AuthContext, i int) ([]AuthContext, error) {
+		return change(held, i), nil
+	})
+}
+
+// changeOwnCeremonyRefusable is changeOwnCeremony for a change that can refuse the write: an error
+// from change writes nothing and is returned as it is.
+func (s *Store) changeOwnCeremonyRefusable(w http.ResponseWriter, r *http.Request, ceremonyId string,
+	change func(held []AuthContext, i int) ([]AuthContext, error)) error {
 
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
@@ -198,7 +246,11 @@ func (s *Store) changeOwnCeremony(w http.ResponseWriter, r *http.Request, ceremo
 		if i < 0 {
 			return errs.WithStack(ErrCeremonyReplaced)
 		}
-		return putHeld(values, change(ceremonies, i))
+		changed, changeErr := change(ceremonies, i)
+		if changeErr != nil {
+			return changeErr
+		}
+		return putHeld(values, changed)
 	}))
 }
 

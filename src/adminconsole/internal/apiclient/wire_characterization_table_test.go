@@ -22,6 +22,7 @@ var (
 	charUpdateAccountPwd    = &api.UpdateAccountPasswordRequest{CurrentPassword: "old", NewPassword: "new"}
 	charVerifyAccountEmail  = &api.VerifyAccountEmailRequest{VerificationCode: "123456"}
 	charUpdateAccountOTP    = &api.UpdateAccountOTPRequest{Enabled: true, OtpCode: "654321"}
+	charCreateRecoveryCodes = &api.CreateAccountRecoveryCodesRequest{Password: "the-password"}
 	charAccountLogout       = &api.AccountLogoutRequest{PostLogoutRedirectUri: "https://console.example.com/"}
 	charUpdateAuditSettings = &api.UpdateSettingsAuditLogsRequest{AuditLogRetentionDays: 30}
 
@@ -201,11 +202,38 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.OTPEnabled, nil
+				return [2]any{got.User.OTPEnabled, got.RecoveryCodes[1]}, nil
 			},
 			verb: "PUT", path: "/api/v1/account/otp", contentType: charJSON,
 			bodyOf:        charUpdateAccountOTP,
-			successStatus: 200, reply: `{"user":{"otpEnabled":true}}`, want: true,
+			successStatus: 200, reply: `{"user":{"otpEnabled":true},"recoveryCodes":["aaaa-bbbb-cccc-dddd-eeee-ffff","7kq2-m9xh-4trw-b3np-j6vd-egac"]}`,
+			want: [2]any{true, "7kq2-m9xh-4trw-b3np-j6vd-egac"},
+		},
+		{
+			name: "GetAccountRecoveryCodes",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetAccountRecoveryCodes(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				return got.Remaining, nil
+			},
+			verb: "GET", path: "/api/v1/account/otp/recovery-codes", contentType: charJSON,
+			successStatus: 200, reply: `{"remaining":7}`, want: 7,
+		},
+		{
+			name: "CreateAccountRecoveryCodes",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.CreateAccountRecoveryCodes(ctx, charAccessToken, charCreateRecoveryCodes)
+				if err != nil {
+					return nil, err
+				}
+				return got.RecoveryCodes[1], nil
+			},
+			verb: "POST", path: "/api/v1/account/otp/recovery-codes", contentType: charJSON,
+			bodyOf:        charCreateRecoveryCodes,
+			successStatus: 200, reply: `{"recoveryCodes":["aaaa-bbbb-cccc-dddd-eeee-ffff","7kq2-m9xh-4trw-b3np-j6vd-egac"]}`,
+			want: "7kq2-m9xh-4trw-b3np-j6vd-egac",
 		},
 		{
 			name: "CreateAccountLogoutRequest",

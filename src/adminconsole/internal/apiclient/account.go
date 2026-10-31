@@ -137,19 +137,38 @@ func (c *AuthServerClient) GetAccountOTPEnrollment(ctx context.Context, accessTo
 	})
 }
 
-// UpdateAccountOTP enables or disables OTP for the current user
-func (c *AuthServerClient) UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
-	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+// UpdateAccountOTP enables or disables OTP for the current user. An enable answers with the set of
+// recovery codes created with the authenticator, which this response alone carries (#257).
+func (c *AuthServerClient) UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UpdateAccountOTPResponse, error) {
+	return execute[api.UpdateAccountOTPResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
 		url:           c.baseURL + "/api/v1/account/otp",
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return &response.User, nil
+}
+
+// GetAccountRecoveryCodes answers how many of the current user's recovery codes are unused.
+func (c *AuthServerClient) GetAccountRecoveryCodes(ctx context.Context, accessToken string) (*api.AccountRecoveryCodesResponse, error) {
+	return execute[api.AccountRecoveryCodesResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/account/otp/recovery-codes",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+}
+
+// CreateAccountRecoveryCodes replaces the current user's recovery codes with a new set, given their
+// password, and answers it. This response alone carries the new set (#257).
+func (c *AuthServerClient) CreateAccountRecoveryCodes(ctx context.Context, accessToken string, request *api.CreateAccountRecoveryCodesRequest) (*api.CreateAccountRecoveryCodesResponse, error) {
+	return execute[api.CreateAccountRecoveryCodesResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.baseURL + "/api/v1/account/otp/recovery-codes",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }
 
 // CreateAccountLogoutRequest asks the auth server to prepare a logout operation. Exactly one of the

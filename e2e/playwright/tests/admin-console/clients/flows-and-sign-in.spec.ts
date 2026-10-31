@@ -117,7 +117,7 @@ test("the consent screen shows the client's logo, name, description and website 
   await attempt.context.close();
 });
 
-test("a client requiring ACR level 2 mandatory makes a user without an authenticator enrol one", async ({
+test("a client requiring ACR level 2 mandatory makes a user without an authenticator enrol one, and shows its recovery codes once", async ({
   page,
   browser,
   request,
@@ -150,6 +150,18 @@ test("a client requiring ACR level 2 mandatory makes a user without an authentic
   const secretKey = (await signIn.locator("#otp-secret").innerText()).trim();
   await signIn.locator('input[name="otp"]').fill(await freshTotp(secretKey));
   await signIn.getByRole("button", { name: "Verify" }).click();
+  // The page after the code shows the ten recovery codes the authenticator came with, once: a reload
+  // says they were already shown, with the same Continue (#257 decision 14).
+  await expect(signIn).toHaveURL(/\/auth\/recovery-codes/);
+  const codes = signIn.getByRole("list", { name: "Recovery codes" }).getByRole("listitem");
+  await expect(codes).toHaveCount(10);
+  const shown = (await codes.allInnerTexts()).map((c) => c.trim());
+  for (const c of shown) expect(c).toMatch(/^[0-9a-hjkmnp-tv-z]{4}(-[0-9a-hjkmnp-tv-z]{4}){5}$/);
+  await signIn.reload();
+  await expect(signIn.getByRole("heading", { name: "Your recovery codes were already shown" })).toBeVisible();
+  await expect(signIn.getByRole("list", { name: "Recovery codes" })).toHaveCount(0);
+  for (const c of shown) await expect(signIn.getByText(c)).toHaveCount(0);
+  await signIn.getByRole("button", { name: "Continue" }).click();
   await signIn.waitForURL((url) => url.href.startsWith(testRedirectUri));
   const code = new URL(signIn.url()).searchParams.get("code")!;
   await context.close();

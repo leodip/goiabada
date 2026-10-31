@@ -101,6 +101,27 @@ func everyGatedStep() []stepUnderTest {
 					auditLogger:   al,
 				})
 			}},
+		{name: "recovery-codes GET", method: http.MethodGet, path: "/auth/recovery-codes",
+			accepted: ceremony.AuthStateLevel2RecoveryCodes,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
+				al *handlersmocks.AuditLogger) http.Handler {
+				return buildAuthRecoveryCodesGet(authRecoveryCodesGetDeps{
+					pageRenderer:  pr,
+					ceremonyStore: cs,
+					database:      datamocks.NewDatabase(t),
+					auditLogger:   al,
+				})
+			}},
+		{name: "recovery-codes POST", method: http.MethodPost, path: "/auth/recovery-codes",
+			accepted: ceremony.AuthStateLevel2RecoveryCodes,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
+				al *handlersmocks.AuditLogger) http.Handler {
+				return buildAuthRecoveryCodesPost(authRecoveryCodesPostDeps{
+					pageRenderer:  pr,
+					ceremonyStore: cs,
+					auditLogger:   al,
+				})
+			}},
 		{name: "completed", method: http.MethodGet, path: "/auth/completed",
 			accepted: ceremony.AuthStateAuthenticationCompleted,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
@@ -156,7 +177,7 @@ func everyGatedStep() []stepUnderTest {
 }
 
 // Every gated route is judged by the ceremony it names, through loadAuthContext and the real ceremony
-// store's read of it, before its state is looked at and before anything else is read: eleven
+// store's read of it, before its state is looked at and before anything else is read: thirteen
 // handlers, each in the state it accepts, so the only thing that can refuse them is the id (#246
 // decision 22). Each case varies one thing from a
 // request that passes; the passing one is the last subtest, which reaches the state gate instead.

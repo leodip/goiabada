@@ -154,6 +154,29 @@ func buildAuthOtpPost(d authOtpPostDeps) http.HandlerFunc {
 		authflow.NewOTPSubmission(d.database, d.auditLogger, testDataCipher))
 }
 
+type authRecoveryCodesGetDeps struct {
+	pageRenderer  PageRenderer
+	ceremonyStore CeremonyStore
+	database      *datamocks.Database
+	auditLogger   AuditLogger
+}
+
+func buildAuthRecoveryCodesGet(d authRecoveryCodesGetDeps) http.HandlerFunc {
+	return HandleAuthRecoveryCodesGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		d.pageRenderer, d.ceremonyStore, authflow.NewRecoveryCodesPrompt(d.database))
+}
+
+type authRecoveryCodesPostDeps struct {
+	pageRenderer  PageRenderer
+	ceremonyStore CeremonyStore
+	auditLogger   AuditLogger
+}
+
+func buildAuthRecoveryCodesPost(d authRecoveryCodesPostDeps) http.HandlerFunc {
+	return HandleAuthRecoveryCodesPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		d.ceremonyStore)
+}
+
 type authCompletedGetDeps struct {
 	pageRenderer       PageRenderer
 	ceremonyStore      CeremonyStore

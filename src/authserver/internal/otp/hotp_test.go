@@ -77,8 +77,8 @@ func TestTOTP_RFC6238AppendixB(t *testing.T) {
 
 			assert.Equal(t, code, hotpCode([]byte(rfcKey), v.counter))
 
-			step, ok := MatchStep(code, rfcKeyBase32, time.Unix(v.unix, 0).UTC())
-			require.True(t, ok, "the RFC's code must be accepted at the RFC's instant")
+			step, match := MatchStep(code, rfcKeyBase32, time.Unix(v.unix, 0).UTC())
+			require.Equal(t, Matched, match, "the RFC's code must be accepted at the RFC's instant")
 			assert.Equal(t, int64(v.counter), step, "the step must be the RFC's T")
 		})
 	}

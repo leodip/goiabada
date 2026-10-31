@@ -15,7 +15,7 @@ That's [two-factor authentication](/concepts/glossary/#two-factor-authentication
 
 1. In the admin console, open your client under **Admin**, **Clients**. On the **Settings** tab, set **Default ACR level** to **Level 3: password and a one-time code, always**, which is `urn:goiabada:level2_mandatory`, and click **Save**. Sign-ins that start after the change use it.
 
-2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. From then on, a sign-in that starts a new session asks for your password and then a code. While your session lasts, it's reused: signing in to your app again, or to another app at the same level, asks for neither. A request that asks for a fresh sign-in, with `prompt=login`, asks for both, whatever the session already gave. See [Users who are already signed in](#users-who-are-already-signed-in).
+2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. The next page shows ten [recovery codes](#recovery-codes), once: save them, then click **Continue** to reach your app. From then on, a sign-in that starts a new session asks for your password and then a code. While your session lasts, it's reused: signing in to your app again, or to another app at the same level, asks for neither. A request that asks for a fresh sign-in, with `prompt=login`, asks for both, whatever the session already gave. See [Users who are already signed in](#users-who-are-already-signed-in).
 
 3. In your app, check how the user signed in before you let them in. The ID token says it in two claims, `acr`, the level, and `amr`, the methods the user used:
 
@@ -26,7 +26,7 @@ That's [two-factor authentication](/concepts/glossary/#two-factor-authentication
    }
    ```
 
-   Accept the sign-in only when `amr` has `otp`. The client's setting already makes the auth server ask for the code, so this check is what keeps your app safe if someone lowers that setting later.
+   Accept the sign-in only when `acr` is `urn:goiabada:level2_mandatory`. The client's setting already makes the auth server ask for the code, so this check is what keeps your app safe if someone lowers that setting later. Don't check `amr` for `otp`: a user who signed in with a [recovery code](#recovery-codes) has `["pwd", "recovery_code"]` instead, at the same level.
 
 4. If your app calls an API of yours, the access token carries the same `acr` and `amr`, so the API can make the same check. See [Protect an API](/guides/protect-an-api/).
 
@@ -49,30 +49,40 @@ The admin console signs administrators in through its own client, `admin-console
 </Steps>
 
 <Aside type="danger">
-**There are no backup codes.** An administrator who loses their authenticator needs another administrator to turn it off for them, or a client of your own holding `authserver:manage`. Give `authserver:manage` to at least two people before you require a code: otherwise, once the only one loses their phone, such a client or the auth server's `recover` command are the ways back. See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in).
+**Save your recovery codes.** An administrator who loses their authenticator signs in with one of the [recovery codes](#recovery-codes) they got when they set it up. One with no codes left needs another administrator to turn two-factor authentication off for them, or a client of your own holding `authserver:manage`. Give `authserver:manage` to at least two people before you require a code: otherwise, once the only one loses their phone and their codes, such a client or the auth server's `recover` command are the ways back. See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in).
 </Aside>
 
 ## Setting up an authenticator
 
-A user can set up an authenticator before any client requires one, in the admin console under **Account**, **Two-factor authentication**: they scan the QR code, enter their password and the code the app shows, and click **Turn on two-factor authentication**. A client at level 2, the level new clients start with, then asks them for a code too.
+A user can set up an authenticator before any client requires one, in the admin console under **Account**, **Two-factor authentication**: they scan the QR code, enter their password and the code the app shows, and click **Turn on two-factor authentication**. The page then shows ten [recovery codes](#recovery-codes), once: they save them somewhere safe, such as a password manager. A client at level 2, the level new clients start with, then asks them for a code too.
 
-At level 3, a user with no authenticator sets one up during the sign-in, on the page that asks for the code. Nothing is stored if their two-factor settings changed while they were doing it, for example in another tab: the sign-in ends, and they sign in again. See [ACR and AMR](/concepts/acr-and-amr/#setting-up-two-factor-authentication-during-a-sign-in).
+At level 3, a user with no authenticator sets one up during the sign-in, on the page that asks for the code. The page after it shows their ten recovery codes, once, and **Continue** goes on to the app. Reloading that page doesn't show the codes again: a user who didn't save them gets a new set in the admin console, under **Account**, **Two-factor authentication**. Nothing is stored if their two-factor settings changed while they were doing it, for example in another tab: the sign-in ends, and they sign in again. See [ACR and AMR](/concepts/acr-and-amr/#setting-up-two-factor-authentication-during-a-sign-in).
 
 The authenticator app lists the account under the auth server's **App name** and the user's email address.
 
 ## The code
 
-The code is a time-based one-time password ([RFC 6238](https://www.rfc-editor.org/rfc/rfc6238)): six digits, a new one every 30 seconds. The auth server also accepts the code from the 30 seconds before and after, so a phone whose clock is a little off still works.
+The code is a time-based one-time password ([RFC 6238](https://www.rfc-editor.org/rfc/rfc6238)): six digits, a new one every 30 seconds. The auth server also accepts the code from the 30 seconds before, so a code that took a moment to type still works. The code from the 30 seconds after is refused: only a phone whose clock runs ahead shows it, so the user is told to check that the phone sets its time automatically, and it doesn't count as a wrong code. Keep the auth server's clock synchronized, since a server running slow makes every phone look ahead.
 
 Each code works once. Sent again, it's refused, and the [audit log](/concepts/audit-log/) records `otp_code_replay_detected`. Each user gets 5 wrong codes in 15 minutes, and then waits. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
 100 wrong codes in a row, with no right one between them, disable the user's authenticator. From then on every code is refused, the right one included, and the audit log records `otp_authenticator_disabled`. Someone who knew the user's password, or held one of their sessions, sent those codes, so treat the password as known. The user's **Authentication** tab in the admin console says the authenticator is disabled, and [A user who lost their authenticator](#a-user-who-lost-their-authenticator) is the way back.
 
+## Recovery codes
+
+Each authenticator comes with ten recovery codes, shown once when it's set up. A code is 24 characters in six groups, such as `7kq2-m9xh-4trw-b3np-j6vd-egac`, and works once. Capitals, spaces and hyphens don't matter when it's typed.
+
+On the page that asks for the code, **Use a recovery code instead** takes one in place of the app's code. It's a full second factor: it reaches the same level as a code, with `amr` `["pwd", "recovery_code"]`. A code that's wrong, from a set that was replaced, or already used is refused, and counts against the same 5 wrong codes in 15 minutes. One sent again after it was used is also recorded as `recovery_code_replay_detected` in the audit log.
+
+Recovery codes still work when the authenticator was disabled after 100 wrong codes, and they don't count toward those 100. Signing in with one leaves the authenticator as it is, disabled or not. Removing the authenticator deletes its recovery codes, and the next one comes with new ones. Administrators never see a user's codes.
+
+Under **Account**, **Two-factor authentication**, **Recovery codes** says how many of the ten are unused. To get a new set, a user enters their password and clicks **Get new recovery codes**: the page shows the ten new codes once, and the old ones stop working at once, used or not. The authenticator and the user's sessions are left as they are. An app can do the same with [`POST /api/v1/account/otp/recovery-codes`](/reference/api/account/operations/createaccountrecoverycodes/).
+
 ## Users who are already signed in
 
-A user whose session already reached the client's level isn't asked for anything: the session is reused, and the tokens say `urn:goiabada:level2_mandatory` and `["pwd", "otp"]` from the sign-in that earned it.
+A user whose session already reached the client's level isn't asked for anything: the session is reused, and the tokens say `urn:goiabada:level2_mandatory` and the methods of the sign-in that earned it: `["pwd", "otp"]`, or `["pwd", "recovery_code"]` when it was a recovery code.
 
-`prompt=login` doesn't reuse the session: the user signs in again with their password and a code, whatever their session already gave, and the tokens say `["pwd", "otp"]` and `auth_time` of this sign-in. A session that has idled out, reached its maximum lifetime or fallen outside the request's `max_age` doesn't count either, and the user is asked for both.
+`prompt=login` doesn't reuse the session: the user signs in again with their password and a code, whatever their session already gave, and the tokens say the methods and `auth_time` of this sign-in: `["pwd", "otp"]`, or `["pwd", "recovery_code"]` for a recovery code. A session that has idled out, reached its maximum lifetime or fallen outside the request's `max_age` doesn't count either, and the user is asked for both.
 
 A user who signed in to another app with a password alone isn't asked for their password again. They're asked only for the code, which is a [step-up](/concepts/acr-and-amr/#a-session-thats-already-there), and their session keeps the higher level from then on.
 
@@ -80,7 +90,9 @@ When a user sets up or removes an authenticator, each of their sessions is check
 
 ## A user who lost their authenticator
 
-An administrator opens **Admin**, **Users**, the user, and their **Authentication** tab, turns off **Enabled** under **Two-factor authentication**, clicks **Save**, and confirms. At level 3, the user sets up a new authenticator at their next sign-in.
+A user who saved their recovery codes gets back in alone. They sign in with a recovery code, turn two-factor authentication off under **Account**, **Two-factor authentication** with their password, and set up a new authenticator, which comes with new codes. If their authenticator was disabled after 100 wrong codes, whoever sent those codes knew the password, so they change it under **Account**, **Change password** first.
+
+A user with no codes left needs an administrator. The administrator opens **Admin**, **Users**, the user, and their **Authentication** tab, turns off **Enabled** under **Two-factor authentication**, clicks **Save**, and confirms. At level 3, the user sets up a new authenticator at their next sign-in.
 
 The same steps bring back a user whose authenticator was disabled after 100 wrong codes, with one more. Whoever sent the codes knew the password, so before clicking **Save**, the administrator also types a new one in **New password** on the same tab. The save sets the new password first, which signs the user out everywhere and revokes every refresh token they hold, and then turns two-factor authentication off. The user signs in with the new password and sets up a new authenticator.
 

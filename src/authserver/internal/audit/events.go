@@ -423,6 +423,26 @@ const (
 	// by ordinary session housekeeping.
 	EventCrossUserSessionReplaced = "cross_user_session_replaced"
 
+	// EventRecoveryCodesCreated records a new set of recovery codes: with a new authenticator,
+	// beside enabled_otp, at the account API or the sign-in setup. It carries user_id and, from
+	// the account API, logged_in_user; never a code or its hash. Written after the commit (#257
+	// decision 10).
+	EventRecoveryCodesCreated = "recovery_codes_created"
+	// EventAuthSuccessRecoveryCode records a recovery code accepted at sign-in in place of an
+	// authenticator code, with user_id and remaining, the unused codes left after it (9 down to
+	// 0). Never the code or its hash. A recovery sign-in the user did not make means their
+	// password and one of their codes are in someone else's hands (#257 decision 10).
+	EventAuthSuccessRecoveryCode = "auth_success_recovery_code"
+	// EventAuthFailedRecoveryCode records a recovery code refused at sign-in, wrong or already
+	// used, with user_id. Its own event rather than EventAuthFailedOtp, so a filter on the
+	// authenticator's events does not count recovery codes (#257 decision 10).
+	EventAuthFailedRecoveryCode = "auth_failed_recovery_code"
+	// EventRecoveryCodeReplayDetected records a refused recovery code that belongs to the user's
+	// current set and was already used, beside and before that refusal's
+	// EventAuthFailedRecoveryCode, with user_id: someone holds a spent code. A code of a replaced
+	// set no longer exists, so it is a wrong code (#257 decision 10).
+	EventRecoveryCodeReplayDetected = "recovery_code_replay_detected"
+
 	EventEnabledOTP                     = "enabled_otp"
 	EventDisabledOTP                    = "disabled_otp"
 	EventSentTestEmail                  = "sent_test_email"
@@ -587,6 +607,17 @@ const (
 	DeletedUserSessionEndedByAdministrator = "ended_by_administrator"
 )
 
+// The reason field of EventAuthFailedOtp, written only on a refusal that is not a wrong or a
+// replayed code, so an operator can tell a device's clock from someone guessing. Stored data like
+// the event names: a consumer filters on these strings, so a value here cannot change.
+const (
+	// AuthFailedOtpClockAhead is an authenticator code from the time step after the server's
+	// current one, which only an authenticator whose clock runs ahead shows. It is refused with a
+	// message to check the device's time, and neither charged to the otp rate tier nor counted
+	// against the authenticator (#142).
+	AuthFailedOtpClockAhead = "clock_ahead"
+)
+
 // EventTypes returns the canonical list of audit event names, which the admin console's
 // filter dropdown is built from. It returns a copy, so a caller changing the slice it got changes
 // no later answer (#433).
@@ -611,8 +642,10 @@ var auditEventTypes = []string{
 	EventAuthCodeReuseDetected,
 	EventAuthFailedOtp,
 	EventAuthFailedPwd,
+	EventAuthFailedRecoveryCode,
 	EventAuthSuccessOtp,
 	EventAuthSuccessPwd,
+	EventAuthSuccessRecoveryCode,
 	EventBumpedUserSession,
 	EventChangedPassword,
 	EventCreatedAuthCode,
@@ -650,6 +683,8 @@ var auditEventTypes = []string{
 	EventOTPAuthenticatorDisabled,
 	EventOTPCodeReplayDetected,
 	EventRateLimitExceeded,
+	EventRecoveryCodeReplayDetected,
+	EventRecoveryCodesCreated,
 	EventRedemptionRefusedRedirectURI,
 	EventRefreshTokenReplayDetected,
 	EventRequestedPasswordReset,

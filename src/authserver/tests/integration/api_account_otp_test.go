@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,7 +93,7 @@ func putAccountOTP(t *testing.T, accessToken string, reqBody api.UpdateAccountOT
 func skipIfOtpCodeOutsideWindow(t *testing.T, secret string, code string) {
 	t.Helper()
 
-	if _, matched := otp.MatchStep(code, secret, time.Now().UTC()); !matched {
+	if _, match := otp.MatchStep(code, secret, time.Now().UTC()); match != otp.Matched {
 		t.Skip("the code fell outside the acceptance window before the re-enable, so the matcher " +
 			"would refuse it for a reason unrelated to the reset")
 	}
@@ -104,15 +106,16 @@ func skipIfOtpCodeOutsideWindow(t *testing.T, secret string, code string) {
 // A fixed literal cannot do this job. TOTP emits every six-digit value eventually, so a hardcoded
 // "wrong" code is not wrong, it is one that has not come up yet: for JBSWY3DPEHPK3PXP the matcher
 // accepts 222222 from 2026-12-04T22:43:00Z, 111111 from 2027-10-31T16:26:00Z and 000000 from
-// 2028-04-13T15:03:00Z, and MatchStep accepts the step either side, so each is live for about 90
-// seconds and again at every later step that produces it. Walking the candidates and asking the
+// 2028-04-13T15:03:00Z, and MatchStep accepts the previous step and tells the next one apart, so
+// each answers as something other than a wrong code for about 90 seconds and again at every later
+// step that produces it. Walking the candidates and asking the
 // matcher is what makes the choice hold at any date. Same approach as wrongButWellFormedCode in
 // handler_api_account_otp_test.go.
 func wrongOtpCodeFor(t *testing.T, secret string) string {
 	t.Helper()
 
 	for _, candidate := range []string{"000000", "111111", "222222"} {
-		if _, matched := otp.MatchStep(candidate, secret, time.Now().UTC()); !matched {
+		if _, match := otp.MatchStep(candidate, secret, time.Now().UTC()); match == otp.NoMatch {
 			return candidate
 		}
 	}
@@ -305,6 +308,9 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
 	}
+	var enabled api.UpdateAccountOTPResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&enabled))
+	assert.True(t, enabled.User.OTPEnabled)
 
 	// Verify DB updated
 	updated, err := database.GetUserById(context.Background(), nil, userId)
@@ -313,6 +319,41 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	decrypted, err := dataCipher.Decrypt(updated.OTPSecretEncrypted)
 	require.NoError(t, err)
 	assert.Equal(t, strings.ToUpper(secret), decrypted)
+
+	// The new authenticator came with a set of ten recovery codes, answered once and stored as
+	// their hashes (#257 decisions 1 and 2).
+	require.Len(t, enabled.RecoveryCodes, 10)
+	for _, code := range enabled.RecoveryCodes {
+		assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{4}(-[0-9a-hjkmnp-tv-z]{4}){5}$`, code)
+	}
+	assert.Equal(t, 10, unusedRecoveryCodesForTest(t, userId))
+	used, err := database.TryUseUserRecoveryCode(context.Background(), nil, userId,
+		hashutil.HashString(strings.ReplaceAll(enabled.RecoveryCodes[4], "-", "")))
+	require.NoError(t, err)
+	assert.True(t, used, "a code answered is a code stored, by its SHA-256")
+	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, userId))
+}
+
+// unusedRecoveryCodesForTest is how many codes of the user's set are unused.
+func unusedRecoveryCodesForTest(t *testing.T, userId int64) int {
+	t.Helper()
+	n, err := database.CountUnusedUserRecoveryCodes(context.Background(), nil, userId)
+	require.NoError(t, err)
+	return n
+}
+
+// seedRecoveryCodesForTest gives the user a set of ten codes, as an enable would have.
+func seedRecoveryCodesForTest(t *testing.T, userId int64) {
+	t.Helper()
+	hashes := make([]string, 10)
+	for i := range hashes {
+		hashes[i] = hashutil.HashString(fake.UUID())
+	}
+	ctx := context.Background()
+	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		return database.ReplaceUserRecoveryCodes(ctx, tx, userId, hashes)
+	}))
+	require.Equal(t, 10, unusedRecoveryCodesForTest(t, userId))
 }
 
 func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
@@ -383,6 +424,7 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	u.OTPEnabled = true
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(context.Background(), nil, u)
+	seedRecoveryCodesForTest(t, userId)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
@@ -399,6 +441,7 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	// The seed itself is gone, not merely unreachable. Read through the column that carries it
 	// since migration 000048 dropped users.otp_secret (#98).
 	assert.Empty(t, updated.OTPSecretEncrypted)
+	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, userId), "the recovery codes go with the authenticator")
 }
 
 // TestAPIAccountOTPPut_Disable_ResetsConsumedStep is seam 4's pin for #111 decision 4: disabling
@@ -798,7 +841,8 @@ func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testi
 	resetOTPStateForTest(t, userId)
 
 	issued := getOTPEnrollment(t, accessToken)
-	code := otptest.Code(t, issued.SecretKey, time.Now())
+	// The previous step's code, so the current step's is left unspent above it for the sign-in below.
+	code := otptest.PreviousStepCode(t, issued.SecretKey)
 
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
 		Enabled: true, Password: "Correct1!", OtpCode: code,
@@ -811,7 +855,7 @@ func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testi
 	// level2_mandatory client put the browser at the OTP form, where the code is verified against
 	// what the enable branch stored; nothing but the right secret gets past it.
 	//
-	// nextStepCode rather than the code above: the enable branch claims its time step through
+	// currentStepCode rather than the code above: the enable branch claims its time step through
 	// TryConsumeUserOTPStep (#111), so resubmitting the spent code would be refused correctly and
 	// would read here as a broken enrollment. The helper also skips, rather than failing, when the
 	// two codes cannot be ordered.
@@ -822,7 +866,7 @@ func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testi
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, ceremonyClient, ceremonyRedirectUri,
 		user, "Correct1!", "")
 	accepted := authenticateWithOtp(t, httpClient, otpUrl, otpPage,
-		nextStepCode(t, issued.SecretKey, code))
+		currentStepCode(t, issued.SecretKey, code))
 	_ = otpPage.Body.Close()
 	assertRedirect(t, accepted, "/auth/completed")
 	_ = accepted.Body.Close()

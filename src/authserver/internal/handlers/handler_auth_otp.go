@@ -11,9 +11,21 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// recoveryCodeFormParameter and recoveryCodeFormValue are the query parameter, and its value, with
+// which GET /auth/otp renders the recovery-code form in place of the code form; the code form's
+// "Use a recovery code instead" link carries them (#257 decision 7). recoveryCodeField is the
+// recovery-code form's field, which puts a submission on its arm of POST /auth/otp.
+const (
+	recoveryCodeFormParameter = "form"
+	recoveryCodeFormValue     = "recovery-code"
+	recoveryCodeField         = "recoveryCode"
+)
+
 // HandleAuthOtpGet is GET /auth/otp, which accepts level2_otp and renders the form
-// authflow.OTPPrompt prepared: the code form for a user with an authenticator, the enrolment form,
-// with its QR code and secret, for one without.
+// authflow.OTPPrompt prepared: the code form for a user with an authenticator, or the recovery-code
+// form in its place when the request asks for it, and the enrolment form, with its QR code and
+// secret, for a user without one, whatever the request asks: a user with no authenticator has no
+// recovery codes (#257 decision 7).
 func HandleAuthOtpGet(
 	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
@@ -39,6 +51,10 @@ func HandleAuthOtpGet(
 
 		bind := otpFormBind(authContext, result.Display, nil)
 		template := "/auth_otp.html"
+		if result.Form == authflow.OTPCodeForm &&
+			r.URL.Query().Get(recoveryCodeFormParameter) == recoveryCodeFormValue {
+			template = "/auth_otp_recovery_code.html"
+		}
 		if result.Form == authflow.OTPEnrolmentForm {
 			template = "/auth_otp_enrollment.html"
 			bind["base64Image"] = result.QRCodeImage
@@ -53,7 +69,12 @@ func HandleAuthOtpGet(
 
 // HandleAuthOtpPost is POST /auth/otp, which accepts level2_otp. It reads the code from the
 // submitted body and runs authflow.OTPSubmission on it, then answers what it did: the form again
-// beside a refusal, the lost-enrolment page, or the redirect to /auth/completed.
+// beside a refusal, which for a code from the next step says to check the device's time (#142), the
+// lost-enrolment page, or the redirect to /auth/completed.
+//
+// A body carrying the recovery-code form's field is that form's submission, and runs
+// OTPSubmission.RunRecoveryCode instead: the same ceremony boundary, state gate and otp limiter
+// apply, and a refusal draws the recovery-code form again (#257 decision 7).
 //
 // The boundary refuses a submission naming another ceremony before the state gate and before the
 // code is looked at, so an OTP form left open in another tab gets the "no longer active" page and
@@ -75,6 +96,12 @@ func HandleAuthOtpPost(
 		// The body alone: a code in the request target reaches the browser's history, the Referer
 		// and every proxy's access log (#202).
 		code := r.PostFormValue("otp")
+		recoveryCode := r.PostFormValue(recoveryCodeField)
+		if _, recoveryForm := r.PostForm[recoveryCodeField]; recoveryForm {
+			answerRecoveryCode(w, r, boundary, pageRenderer, ceremonyStore, credentialFailures, submission,
+				authContext, recoveryCode)
+			return
+		}
 
 		result, err := submission.Run(r.Context(),
 			newCredentialCheckingBrowserSession(w, r, ceremonyStore, credentialFailures), authContext, code)
@@ -97,13 +124,51 @@ func HandleAuthOtpPost(
 			renderRefusal(i18n.ErrCodeOtpCodeRequired)
 		case authflow.OTPRefused:
 			renderRefusal(i18n.ErrCodeOtpIncorrectCode)
+		case authflow.OTPClockAhead:
+			renderRefusal(i18n.ErrCodeOtpClockAhead)
 		case authflow.OTPAccepted:
 			boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 		}
 	}
 }
 
-// otpFormBind is the data both OTP forms render with. The form names its ceremony, so the boundary
+// answerRecoveryCode is HandleAuthOtpPost's recovery-code arm: it runs
+// OTPSubmission.RunRecoveryCode on the code and answers what it did, drawing the recovery-code form
+// again beside a refusal.
+func answerRecoveryCode(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary,
+	pageRenderer PageRenderer, ceremonyStore CeremonyStore, credentialFailures CredentialFailureRecorder,
+	submission *authflow.OTPSubmission, authContext *ceremony.AuthContext, code string) {
+
+	result, err := submission.RunRecoveryCode(r.Context(),
+		newCredentialCheckingBrowserSession(w, r, ceremonyStore, credentialFailures), authContext, code)
+	if err != nil {
+		pageRenderer.InternalServerError(w, r, err)
+		return
+	}
+
+	renderRefusal := func(errorCode string) {
+		bind := otpFormBind(authContext, result.Display,
+			i18n.NewLocalizedError(errorCode, nil).Localize(r.Context()))
+		if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp_recovery_code.html", bind); err != nil {
+			pageRenderer.InternalServerError(w, r, err)
+		}
+	}
+
+	switch result.Answer {
+	case authflow.OTPAccountDisabled:
+		renderRefusal(i18n.ErrCodeOtpAccountDisabled)
+	case authflow.OTPEnrolmentLost:
+		answerLostEnrolment(w, r, boundary, pageRenderer, result.SaveErr)
+	case authflow.OTPRecoveryCodeMissing:
+		renderRefusal(i18n.ErrCodeOtpRecoveryCodeRequired)
+	case authflow.OTPRecoveryCodeRefused:
+		renderRefusal(i18n.ErrCodeOtpIncorrectRecoveryCode)
+	case authflow.OTPAccepted:
+		boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
+	}
+}
+
+// otpFormBind is the data every OTP form renders with. The form names its ceremony, so the boundary
 // reads the submission as that ceremony's, and refuses it once the browser no longer holds it (#79,
 // #246).
 func otpFormBind(authContext *ceremony.AuthContext, displayInfo *authflow.ClientDisplayInfo,

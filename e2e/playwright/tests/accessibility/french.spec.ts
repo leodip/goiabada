@@ -1,6 +1,6 @@
 // French uses the same responsive components as the other catalogs. Exercise the rendered
 // wording at the smallest supported phone width, including tabs, tables, dialogs and refusals.
-import { addGroupAttribute, addRedirectUri, choose, clientUrl, groupUrl, resourceUrl, userUrl } from "../../lib/admin-console";
+import { addGroupAttribute, addRedirectUri, choose, clientUrl, confirmDialog, groupUrl, resourceUrl, userUrl } from "../../lib/admin-console";
 import { linksIn, waitForMail } from "../../lib/mailpit";
 import { signInToConsole } from "../../lib/console-user";
 import { openSignIn } from "../../lib/browser-sign-in";
@@ -119,6 +119,13 @@ for (const theme of ["light", "dark"] as const) {
     await fitsInFrench(own);
     await own.locator("#otp").fill(await freshTotp((await own.locator("#otp-secret").innerText()).trim()));
     await own.getByRole("button", { name: "Vérifier", exact: true }).click();
+    // The new authenticator's recovery codes, shown once, then the page a reload draws.
+    await expect(own.getByRole("heading", { level: 1 })).toHaveText("Enregistrez vos codes de récupération");
+    await fitsInFrench(own);
+    await own.reload();
+    await expect(own.getByRole("heading", { level: 1 })).toHaveText("Vos codes de récupération ont déjà été affichés");
+    await fitsInFrench(own);
+    await own.getByRole("button", { name: "Continuer", exact: true }).click();
     await expect(own.getByRole("heading", { level: 1 })).toHaveText("Autoriser l’accès");
     await fitsInFrench(own);
     await page.goto(clientUrl(client.id, "redirect-uris"));
@@ -142,6 +149,14 @@ for (const theme of ["light", "dark"] as const) {
     await own.getByRole("button", { name: "Se connecter", exact: true }).click();
     await expect(own.getByRole("heading", { level: 1 })).toHaveText("Authentification à deux facteurs");
     await fitsInFrench(own);
+    // The recovery-code form, and its refusal of a wrong code.
+    await own.getByRole("link", { name: "Utiliser plutôt un code de récupération", exact: true }).click();
+    await expect(own.getByRole("heading", { level: 1 })).toHaveText("Utiliser un code de récupération");
+    await fitsInFrench(own);
+    await own.locator("#recoveryCode").fill("0000-0000-0000-0000-0000-0000");
+    await own.getByRole("button", { name: "Vérifier", exact: true }).click();
+    await expect(own.locator("#recovery-code-error")).toHaveText("Ce code de récupération est incorrect ou a déjà été utilisé.");
+    await fitsInFrench(own);
     for (const path of ["/forgot-password", "/reset-password?code=invalid", "/account/activate?code=invalid", "/missing-french-page", "/auth/logout", "/auth/logout/declined"]) {
       await own.goto(`${env.authUrl}${path}`);
       await fitsInFrench(own);
@@ -153,6 +168,44 @@ for (const theme of ["light", "dark"] as const) {
     await own.goto(`${env.authUrl}/auth/authorize?client_id=missing&ui_locales=fr`);
     await fitsInFrench(own);
     await signIn.context.close();
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`French account recovery codes fit a phone in ${theme}`, async ({ page, browser, users }) => {
+    test.setTimeout(90_000);
+    const user = await users.create();
+    // The account page's forms post to an address without ui_locales, so the console answers them in
+    // the profile's language, which the ID token carries.
+    await page.goto(userUrl(user.id, "profile"));
+    await choose(page, "locale", "French (Canada)", /French \(Canada\)/);
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Profile saved.", { exact: true })).toBeVisible();
+    const { context, page: own } = await signInToConsole(browser, user, "/account/otp");
+    await own.setViewportSize({ width: 320, height: 740 });
+    await own.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+    await own.goto(`${env.adminUrl}/account/otp?ui_locales=fr`);
+    // Turning on two-factor authentication shows the new authenticator's set once.
+    const secret = (await own.locator("#otp-secret").innerText()).trim();
+    await own.locator("#password").fill(user.password);
+    await own.locator("#otp").fill(await freshTotp(secret));
+    await own.locator('button[name="otpAction"]').click();
+    await expect(own.getByRole("heading", { name: "Enregistrez vos codes de récupération", exact: true })).toBeVisible();
+    await fitsInFrench(own);
+    // The count, and a new set behind the password and the confirmation.
+    await own.goto(`${env.adminUrl}/account/otp?ui_locales=fr`);
+    await expect(own.getByRole("heading", { name: "Codes de récupération", exact: true })).toBeVisible();
+    await expect(own.getByText("10 de vos 10 codes de récupération ne sont pas encore utilisés.", { exact: true })).toBeVisible();
+    await fitsInFrench(own);
+    await own.locator("#recovery-codes-password").fill(user.password);
+    await own.locator('button[name="otpAction"][value="recovery-codes"]').click();
+    await expect(own.locator("dialog[open]")).toContainText("Obtenir de nouveaux codes de récupération\u00a0?");
+    await fitsInFrench(own);
+    await confirmDialog(own);
+    await expect(own.locator("#recovery-codes")).toBeVisible();
+    await expect(own.getByRole("heading", { name: "Enregistrez vos codes de récupération", exact: true })).toBeVisible();
+    await fitsInFrench(own);
+    await context.close();
   });
 }
 

@@ -1,0 +1,32 @@
+{{define "title"}}{{ T $.ctx "auth.otp_recovery.page_title" }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<h1 class="auth-title">{{ T $.ctx "auth.otp_recovery.title" }}</h1>
+<p class="auth-lead">{{ T $.ctx "auth.otp_recovery.instructions" }}</p>
+
+{{/* The recovery-code form, on the same step as the code form (#257 decision 7): it posts to
+     POST /auth/otp under its own field, recoveryCode, so a sign-in goes on as from a code. One
+     refusal answers a wrong code, one of a replaced set and a used one alike. */}}
+<form method="post" class="stacked" novalidate data-submit-once>
+  <input type="hidden" name="ceremonyId" value="{{ .ceremonyId }}">
+
+  {{ if .error }}
+  <div class="notice notice-danger" role="alert" id="recovery-code-error">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+    <p>{{ .error }}</p>
+  </div>
+  {{ end }}
+
+  <div class="field">
+    <label class="field-label" for="recoveryCode">{{ T $.ctx "auth.otp_recovery.code_label" }}</label>
+    <input class="control control-mono" id="recoveryCode" type="text" name="recoveryCode" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{{ if .error }} aria-invalid="true" aria-describedby="recovery-code-error"{{ end }}>
+  </div>
+
+  <button class="button button-primary button-block" type="submit">{{ T $.ctx "auth.otp_recovery.button" }}</button>
+</form>
+
+<p class="auth-footer">
+  <a class="text-link" href="/auth/otp?ceremony={{ .ceremonyId }}">{{ T $.ctx "auth.otp_recovery.back" }}</a>
+</p>
+{{end}}

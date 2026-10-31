@@ -28,7 +28,8 @@ func TestTemplates_CredentialFormsSubmitOnce(t *testing.T) {
 	templates := servedFiles(t, templateFS, "template", ".html")
 	scripts := servedFiles(t, staticFS, "static", ".js")
 
-	for _, path := range []string{"template/auth_pwd.html", "template/auth_otp.html", "template/auth_otp_enrollment.html"} {
+	for _, path := range []string{"template/auth_pwd.html", "template/auth_otp.html", "template/auth_otp_enrollment.html",
+		"template/auth_otp_recovery_code.html"} {
 		src, ok := templates[path]
 		if !ok {
 			t.Errorf("%s: not served, so the form this test pins is gone", path)

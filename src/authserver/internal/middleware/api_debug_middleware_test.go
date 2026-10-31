@@ -590,6 +590,7 @@ func TestDebugLog_RedactsSensitiveKeysInBodies(t *testing.T) {
 		{"client_secret", true},
 		{"verificationCode", true},
 		{"logoutUrl", true},
+		{"recoveryCodes", true},
 
 		// Caught by the substring net, and harmless: the accepted over-redaction.
 		{"passwordPolicy", true},
@@ -734,6 +735,24 @@ func TestDebugLog_RedactsTheLogoutUrlCarryingAnIdTokenHint(t *testing.T) {
 	assert.NotContains(t, output, "JWT-SENTINEL",
 		"the signed token in the URL is a credential and must not be logged")
 	assert.Contains(t, output, "logoutUrl")
+	assert.Contains(t, output, "[redacted]")
+}
+
+// PUT /api/v1/account/otp's enable answers with the new authenticator's recovery codes, each a
+// second factor that signs in once. Nothing about the name says credential to the substring net,
+// which is why it is in the named set: remove that entry and this case is the one that fails
+// (#257 decision 8).
+func TestDebugLog_RedactsTheRecoveryCodesInAResponse(t *testing.T) {
+	logged := logtest.CaptureSlog(t)
+	req := httptest.NewRequest("PUT", "/api/v1/account/otp", nil)
+	debugLog("PUT", "/api/v1/account/otp", capturedBody{}, http.StatusOK,
+		wholeBody([]byte(`{"user":{"id":7},"recoveryCodes":["7kq2-m9xh-4trw-b3np-j6vd-egac","CODE-SENTINEL"]}`)),
+		time.Millisecond, req)
+	output := logged.Text()
+
+	assert.NotContains(t, output, "7kq2-m9xh-4trw-b3np-j6vd-egac", "a recovery code must not be logged")
+	assert.NotContains(t, output, "CODE-SENTINEL")
+	assert.Contains(t, output, "recoveryCodes")
 	assert.Contains(t, output, "[redacted]")
 }
 

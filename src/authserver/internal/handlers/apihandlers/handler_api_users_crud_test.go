@@ -283,6 +283,10 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 		Return(true, nil).Run(func(mock.Arguments) { calls = append(calls, "remove") }).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, userId).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "reset") }).Once()
+	// The authenticator's recovery codes go with it, so an administrator turning two-factor
+	// authentication off leaves none of them working (#257 decision 3).
+	database.On("DeleteUserRecoveryCodes", mock.Anything, otpDisableTx, userId).Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "delete-codes") }).Once()
 	// The counter joins the same transaction here for free, because both disable sites share
 	// otpcredential.Remove. That is what closes the hole #242 found at this endpoint specifically: it
 	// flagged no session at all, so a target user whose authenticator an administrator removed
@@ -316,7 +320,7 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "lower", "commit"}, calls,
+	assert.Equal(t, []string{"begin", "remove", "reset", "delete-codes", "increment", "lower", "commit"}, calls,
 		"every write belongs inside one transaction, otp_enabled first per #111 decision 10, "+
 			"the counter advance per #242 decision 2 and the sessions lowered per #542 decision 1")
 	assert.False(t, user.OTPEnabled)

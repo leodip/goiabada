@@ -13,6 +13,7 @@ import {
   addRedirectUri,
   clientIdFromList,
   clientUrl,
+  confirmDialog,
   expectPasswordRules,
   grantUserPermission,
   groupUrl,
@@ -136,10 +137,12 @@ test("the auth server's sign-in, two-factor, consent and sign-out pages", async 
       await own.locator("#otp").fill("000000");
       await verify.click();
     }),
-    titled(own, "consent", "Allow access", async () => {
+    titled(own, "two-factor setup, its recovery codes", "Save your recovery codes", async () => {
       await own.locator("#otp").fill(await freshTotp((await own.locator("#otp-secret").innerText()).trim()));
       await verify.click();
     }),
+    titled(own, "two-factor setup, its recovery codes already shown", "Your recovery codes were already shown", () => own.reload()),
+    titled(own, "consent", "Allow access", () => own.getByRole("button", { name: "Continue" }).click()),
     {
       // The redirect URI removed while the user was at the consent screen: the code is sent nowhere.
       name: "a sign-in stopped, its redirect URI gone",
@@ -169,6 +172,12 @@ test("the auth server's sign-in, two-factor, consent and sign-out pages", async 
     }),
     refused(own, "two-factor, the code refused", "otp", async () => {
       await own.locator("#otp").fill("000000");
+      await verify.click();
+    }),
+    titled(own, "a recovery code", "Use a recovery code", () =>
+      own.getByRole("link", { name: "Use a recovery code instead", exact: true }).click()),
+    refused(own, "a recovery code, refused", "recoveryCode", async () => {
+      await own.locator("#recoveryCode").fill("0000-0000-0000-0000-0000-0000");
       await verify.click();
     }),
     titled(own, "the sign-out question", "Sign out", () => own.goto(`${env.authUrl}/auth/logout`)),
@@ -450,6 +459,25 @@ test("a user's account pages", async ({ page, browser, clients, users }) => {
         await own.locator('button[name="otpAction"]').click();
         await expect(own.locator('button[name="otpAction"][value="disable"]')).toBeVisible();
         await expect(own.locator(".panel-body > .notice-positive")).toBeVisible();
+      },
+    },
+    at(own, "two-factor authentication on, the count of recovery codes", account("otp")),
+    asks(own, "two-factor authentication, a new set of recovery codes asking first", async () => {
+      await own.locator("#recovery-codes-password").fill(user.password);
+      await own.locator('button[name="otpAction"][value="recovery-codes"]').click();
+    }),
+    refused(own, "two-factor authentication, a new set of recovery codes refused", "recovery-codes-password", async () => {
+      await own.locator("#recovery-codes-password").fill("not-the-password");
+      await own.locator('button[name="otpAction"][value="recovery-codes"]').click();
+      await confirmDialog(own);
+    }),
+    {
+      name: "two-factor authentication, a new set of recovery codes",
+      reach: async () => {
+        await own.locator("#recovery-codes-password").fill(user.password);
+        await own.locator('button[name="otpAction"][value="recovery-codes"]').click();
+        await confirmDialog(own);
+        await expect(own.locator("#recovery-codes")).toBeVisible();
       },
     },
     titled(own, "the sign-out question", "Sign out", () => own.goto(`${env.adminUrl}/auth/logout`)),

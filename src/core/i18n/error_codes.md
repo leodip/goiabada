@@ -98,6 +98,9 @@ the validator layer.
 | `handler.otp.account_disabled` | (none) | Your account is disabled. |
 | `handler.otp.code_required` | (none) | Enter the 6-digit code from your authenticator app. |
 | `handler.otp.incorrect_code` | (none) | That code isn't right. Codes change every 30 seconds, so enter the one your app shows now. |
+| `handler.otp.clock_ahead` | (none) | Your device's clock seems to be ahead. Check that its date and time are set automatically, then enter the code your app shows. |
+| `handler.otp.recovery_code_required` | (none) | Enter one of your recovery codes. |
+| `handler.otp.incorrect_recovery_code` | (none) | That recovery code isn't right, or it was already used. |
 
 ## Admin resource permissions handler
 
@@ -129,12 +132,13 @@ status (`VALIDATION_ERROR`, `CONCURRENT_UPDATE`,
 `VALUE_TOO_LONG`, `EMAIL_TOO_LONG`, `OTP_NOT_ENABLED`, `AUTHENTICATION_FAILED`,
 `SMTP_NOT_ENABLED`, `INVALID_OR_EXPIRED_VERIFICATION_CODE`, `OTP_ALREADY_ENABLED`,
 `SECRET_KEY_NOT_ACCEPTED`, `OTP_CODE_REQUIRED`, `INVALID_OTP_CODE`,
-`OTP_ENROLLMENT_NOT_PENDING`, `SEND_FAILED`, `ROTATION_IN_PROGRESS`,
+`OTP_ENROLLMENT_NOT_PENDING`, `OTP_CLOCK_AHEAD`, `SEND_FAILED`, `ROTATION_IN_PROGRESS`,
 `ROTATION_OUTCOME_UNKNOWN`), so the key is not on the wire: only
 `error_description` comes from here, in the request's language.
 The account API's
 disable of an authenticator it does not have reuses `handler.user.otp_not_enabled`,
-its wrong code on enabling one `handler.otp.incorrect_code`, its email
+its wrong code on enabling one `handler.otp.incorrect_code` and a code from the
+next time step `handler.otp.clock_ahead`, its email
 verification send's conflict `handler.email_verification.account_changed`, and
 its phone country refusal `validator.phone.country_invalid`. The test email's
 SMTP being off reuses `handler.smtp.not_enabled`. The SMTP send failures are one

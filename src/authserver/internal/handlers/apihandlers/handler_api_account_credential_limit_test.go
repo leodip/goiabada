@@ -41,7 +41,10 @@ type credentialEnv struct {
 	password http.Handler
 	otp      http.Handler
 	email    http.Handler
-	database *datamocks.Database
+	// recoveryCodes is POST /api/v1/account/otp/recovery-codes, a new set behind the same
+	// password (#257 decision 8).
+	recoveryCodes http.Handler
+	database      *datamocks.Database
 }
 
 const (
@@ -83,6 +86,8 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 		email: rateLimiter.LimitAccountPassword(
 			HandleAccountEmailPut(handlersmocks.NewPageRenderer(t), database, accountvalidation.NewEmailValidator(database),
 				accounthandlersmocks.NewEmailSender(t), auditLogger, rateLimiter, &heldJobs{})),
+		recoveryCodes: rateLimiter.LimitAccountPassword(
+			HandleAccountRecoveryCodesPost(database, auditLogger, rateLimiter)),
 		database: database,
 	}
 }
@@ -147,6 +152,67 @@ func (e *credentialEnv) putEmail(t *testing.T, password, email string) *httptest
 	rr := httptest.NewRecorder()
 	e.email.ServeHTTP(rr, req)
 	return rr
+}
+
+// postRecoveryCodes asks for one new set of recovery codes and reports the response. The env's user
+// has no authenticator, so a right password is answered OTP_NOT_ENABLED with nothing written.
+func (e *credentialEnv) postRecoveryCodes(t *testing.T, password string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(map[string]string{"password": password})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/otp/recovery-codes", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = "203.0.113.7:5000"
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": credentialSubject})
+
+	rr := httptest.NewRecorder()
+	e.recoveryCodes.ServeHTTP(rr, req)
+	return rr
+}
+
+// TestAccountCredentialBudget_TheNewSetOfRecoveryCodesSpendsTheSameBudget is #257 decision 8: a
+// new set verifies the account password, so it spends the budget the password, two-factor and
+// email changes share, and only a wrong password spends it.
+func TestAccountCredentialBudget_TheNewSetOfRecoveryCodesSpendsTheSameBudget(t *testing.T) {
+	const budget = 5 // password failures per 15 minutes per token subject
+
+	t.Run("five failures at the new set refuse the password change", func(t *testing.T) {
+		env := newCredentialEnv(t)
+
+		for i := 0; i < budget; i++ {
+			rr := env.postRecoveryCodes(t, "wrong-password")
+			require.Equal(t, http.StatusBadRequest, rr.Code, "failure %d should reach the handler", i+1)
+			assert.Equal(t, "AUTHENTICATION_FAILED", errorCodeOf(t, rr))
+		}
+
+		rr := env.postRecoveryCodes(t, "wrong-password")
+		assert.Equal(t, http.StatusTooManyRequests, rr.Code, "attempt %d should be refused", budget+1)
+		assert.Equal(t, http.StatusTooManyRequests,
+			env.putPassword(t, "wrong-password", "N3wP4ss!word").Code,
+			"the password route should be refused by the bucket the new set helped exhaust")
+	})
+
+	t.Run("failures elsewhere refuse the new set", func(t *testing.T) {
+		env := newCredentialEnv(t)
+
+		for i := 0; i < budget; i++ {
+			require.Equal(t, http.StatusBadRequest,
+				env.putPassword(t, "wrong-password", "N3wP4ss!word").Code, "failure %d", i+1)
+		}
+
+		assert.Equal(t, http.StatusTooManyRequests, env.postRecoveryCodes(t, credentialPassword).Code)
+	})
+
+	t.Run("a right password spends nothing", func(t *testing.T) {
+		env := newCredentialEnv(t)
+
+		for i := 0; i < budget*2; i++ {
+			rr := env.postRecoveryCodes(t, credentialPassword)
+			require.Equal(t, http.StatusBadRequest, rr.Code, "attempt %d", i+1)
+			assert.Equal(t, "OTP_NOT_ENABLED", errorCodeOf(t, rr))
+		}
+	})
 }
 
 // TestAccountCredentialBudget_SharedAcrossPasswordAndOTP is seam 2 for decision 10's one

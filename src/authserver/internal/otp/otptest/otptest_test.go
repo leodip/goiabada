@@ -81,3 +81,20 @@ func TestNewSecret(t *testing.T) {
 
 	assert.NotEqual(t, secret, otptest.NewSecret(t), "two secrets must differ")
 }
+
+// The two neighbouring steps' codes are Code's at an instant one step either side of now. Each
+// helper returns away from the end of a step, so the step cannot turn between its answer and the
+// one computed here.
+func TestNeighbouringStepCodes(t *testing.T) {
+	const secret = "JBSWY3DPEHPK3PXP"
+
+	t.Run("NextStepCode is the code of the step after the current one", func(t *testing.T) {
+		code := otptest.NextStepCode(t, secret)
+		assert.Equal(t, otptest.Code(t, secret, time.Now().Add(30*time.Second)), code)
+	})
+
+	t.Run("PreviousStepCode is the code of the step before the current one", func(t *testing.T) {
+		code := otptest.PreviousStepCode(t, secret)
+		assert.Equal(t, otptest.Code(t, secret, time.Now().Add(-30*time.Second)), code)
+	})
+}

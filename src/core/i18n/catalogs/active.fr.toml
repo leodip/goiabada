@@ -75,6 +75,30 @@
 "auth.otp.instructions" = "Saisissez le code à 6 chiffres de votre application d’authentification."
 "auth.otp.code_label" = "Code à usage unique"
 "auth.otp.button" = "Vérifier"
+"auth.otp.use_recovery_code" = "Utiliser plutôt un code de récupération"
+
+# --- Recovery code (auth/otp, form=recovery-code) ---------------------------
+
+"auth.otp_recovery.page_title" = "Utiliser un code de récupération"
+"auth.otp_recovery.title" = "Utiliser un code de récupération"
+"auth.otp_recovery.instructions" = "Saisissez l’un des codes de récupération que vous avez enregistrés lors de la configuration de l’authentification à deux facteurs. Chaque code ne fonctionne qu’une fois."
+"auth.otp_recovery.code_label" = "Code de récupération"
+"auth.otp_recovery.button" = "Vérifier"
+"auth.otp_recovery.back" = "Utiliser plutôt l’application d’authentification"
+
+# --- Recovery codes after the sign-in setup (auth/recovery-codes) -----------
+
+"auth.recovery_codes.page_title" = "Enregistrez vos codes de récupération"
+"auth.recovery_codes.title" = "Enregistrez vos codes de récupération"
+"auth.recovery_codes.lead" = "Si vous perdez votre téléphone, vous pouvez vous connecter avec l’un de ces codes au lieu d’un code de l’application. Chaque code ne fonctionne qu’une fois. Enregistrez-les dès maintenant en lieu sûr, par exemple dans un gestionnaire de mots de passe. Ils ne seront plus affichés."
+"auth.recovery_codes.list_label" = "Codes de récupération"
+"auth.recovery_codes.copy" = "Copier les codes"
+"auth.recovery_codes.copied" = "Codes copiés"
+"auth.recovery_codes.copy_failed_status" = "Impossible de copier les codes. Ils sont sélectionnés pour que vous puissiez les copier vous-même."
+"auth.recovery_codes.shown_page_title" = "Codes de récupération"
+"auth.recovery_codes.shown_title" = "Vos codes de récupération ont déjà été affichés"
+"auth.recovery_codes.shown_lead" = "Ils ne sont affichés qu’une fois. Si vous ne les avez pas enregistrés, obtenez-en de nouveaux dans la console d’administration, sous Compte, Authentification à deux facteurs."
+"auth.recovery_codes.continue" = "Continuer"
 
 # --- OTP enrollment (auth/otp, first-time) -----------------------------------
 
@@ -556,6 +580,20 @@
 "adminconsole.account.otp.step3" = "Saisissez votre mot de passe et le code à 6 chiffres affiché par l’application."
 "adminconsole.account.otp.field.code" = "Code de l’application"
 "adminconsole.account.otp.enable_button" = "Activer les deux facteurs"
+"adminconsole.account.otp.recovery_codes.title" = "Enregistrez vos codes de récupération"
+"adminconsole.account.otp.recovery_codes.lead" = "Si vous perdez votre téléphone, vous pouvez vous connecter avec l’un de ces codes au lieu d’un code de l’application. Chaque code ne fonctionne qu’une fois. Enregistrez-les dès maintenant en lieu sûr, par exemple dans un gestionnaire de mots de passe. Ils ne seront plus affichés."
+"adminconsole.account.otp.recovery_codes.list_label" = "Codes de récupération"
+"adminconsole.account.otp.recovery_codes.copy" = "Copier les codes"
+"adminconsole.account.otp.recovery_codes.copied" = "Codes copiés"
+"adminconsole.account.otp.recovery_codes.copy_failed_status" = "Impossible de copier les codes. Ils sont sélectionnés pour que vous puissiez les copier vous-même."
+"adminconsole.account.otp.recovery_codes.section_title" = "Codes de récupération"
+"adminconsole.account.otp.recovery_codes.remaining_other" = "{{.count}} de vos 10 codes de récupération ne sont pas encore utilisés."
+"adminconsole.account.otp.recovery_codes.remaining_one" = "1 de vos 10 codes de récupération n’est pas encore utilisé."
+"adminconsole.account.otp.recovery_codes.remaining_none" = "Vous n’avez plus de code de récupération inutilisé. Obtenez-en de nouveaux pour pouvoir vous connecter même si vous perdez votre authentificateur."
+"adminconsole.account.otp.recovery_codes.new_set_lead" = "Si vous perdez vos codes ou les avez tous utilisés, obtenez-en de nouveaux. Saisissez votre mot de passe pour confirmer que c’est bien vous."
+"adminconsole.account.otp.recovery_codes.new_set_button" = "Obtenir de nouveaux codes"
+"adminconsole.account.otp.recovery_codes.confirm_title" = "Obtenir de nouveaux codes de récupération ?"
+"adminconsole.account.otp.recovery_codes.confirm_body" = "Vos codes de récupération actuels cessent de fonctionner dès que vous en obtenez de nouveaux, y compris ceux que vous avez enregistrés ou imprimés."
 
 # --- Account manage consents ------------------------------------------------
 
@@ -1614,8 +1652,11 @@
 # --- OTP handler (LocalizedError-backed) -------------------------------------
 
 "handler.otp.account_disabled" = "Votre compte est désactivé."
+"handler.otp.clock_ahead" = "L’horloge de votre appareil semble avancer. Vérifiez que la date et l’heure sont réglées automatiquement, puis saisissez le code qu’affiche votre application."
 "handler.otp.code_required" = "Saisissez le code à 6 chiffres de votre application d’authentification."
 "handler.otp.incorrect_code" = "Ce code est incorrect. Les codes changent toutes les 30 secondes. Saisissez celui qu’affiche votre application maintenant."
+"handler.otp.incorrect_recovery_code" = "Ce code de récupération est incorrect ou a déjà été utilisé."
+"handler.otp.recovery_code_required" = "Saisissez l’un de vos codes de récupération."
 
 # --- Admin resource permissions handler (LocalizedError-backed) --------------
 

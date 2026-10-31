@@ -91,6 +91,9 @@ func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 		// OIDC Core 1.0 section 5.3.1 allows the UserInfo endpoint to take the token from a
 		// form-encoded body. The query is what is refused, not the body.
 		`"access_token"`,
+		// A recovery code (#257), read through its constant: a code that signs in as a second
+		// factor, which no request target may carry.
+		"recoveryCodeField",
 		// The form-binding markers, read through their constants rather than a literal.
 		// They authorize nothing alone, but a marker supplied by a URL is not a submission,
 		// and reading one from a URL reintroduces the shape #201 removed from the reset

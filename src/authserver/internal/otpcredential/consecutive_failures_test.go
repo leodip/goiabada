@@ -164,8 +164,9 @@ func TestEstablish_ClearsTheConsecutiveFailuresCountInTheRebind(t *testing.T) {
 			calls = append(calls, "clear-count")
 			return nil
 		}).Once()
+	database.EXPECT().ReplaceUserRecoveryCodes(mock.Anything, otpTx, otpUserId, mock.Anything).Return(nil).Once()
 
-	_, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
+	_, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
 
 	require.NoError(t, err)
 	assert.True(t, established)
@@ -189,7 +190,7 @@ func TestEstablish_AFailedCountClearEstablishesNothing(t *testing.T) {
 	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserId).Return(nil).Once()
 	database.EXPECT().ClearUserOtpConsecutiveFailures(mock.Anything, otpTx, otpUserId).Return(clearErr).Once()
 
-	generation, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
+	generation, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
 
 	require.ErrorIs(t, err, clearErr)
 	require.ErrorIs(t, stub.BodyErr, clearErr, "the body hands the error to the helper, which rolls back")

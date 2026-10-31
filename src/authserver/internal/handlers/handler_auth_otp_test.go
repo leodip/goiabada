@@ -1271,8 +1271,21 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 		// The rebind's clear, in the enrolment's own transaction (#489).
 		database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpEnrolTx, int64(1)).Return(nil).Once()
+		// The new authenticator's recovery codes, in the same transaction: the sign-in setup
+		// creates a set as the account page does (#257 decision 1).
+		var storedHashes []string
+		database.On("ReplaceUserRecoveryCodes", mock.Anything, otpEnrolTx, int64(1),
+			mock.MatchedBy(func(hashes []string) bool { return len(hashes) == 10 })).Return(nil).
+			Run(func(args mock.Arguments) {
+				calls = append(calls, "recovery-codes")
+				storedHashes = args.Get(3).([]string)
+			}).Once()
 
 		auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return()
+		// The set is audited beside the enable, naming the user and nothing of the codes.
+		auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, map[string]interface{}{
+			"user_id": int64(1),
+		}).Return().Once()
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return()
 
 		// Rotation joins the ordering this case already tracks, which is what makes the
@@ -1281,8 +1294,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once().
 			Run(func(mock.Arguments) { calls = append(calls, "rotate") })
 
+		var savedRecoveryCodes []string
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted &&
+			savedRecoveryCodes = append([]string(nil), ac.RecoveryCodes...)
+			// The set the new authenticator came with waits on the ceremony for the page that shows
+			// it, the step after this one (#257 decision 14); /auth/completed comes after that.
+			return ac.AuthState == ceremony.AuthStateLevel2RecoveryCodes &&
 				ac.AuthMethods == oidc.AuthMethodOTP.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 				// The value the increment returned, not the pre-enrollment value /auth/level2
@@ -1306,9 +1323,20 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusSeeOther, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/recovery-codes?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
-		assert.Equal(t, []string{"begin", "establish", "increment", "clear", "commit", "rotate", "save"}, calls,
+		// The codes the ceremony holds are the ones whose hashes were stored, one for one: the set
+		// the page shows is the set that signs in.
+		if assert.Len(t, savedRecoveryCodes, 10) {
+			shownHashes := make([]string, 0, len(savedRecoveryCodes))
+			for _, code := range savedRecoveryCodes {
+				assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{4}(-[0-9a-hjkmnp-tv-z]{4}){5}$`, code)
+				shownHashes = append(shownHashes, recoveryCodeHashForTest(strings.ReplaceAll(code, "-", "")))
+			}
+			assert.ElementsMatch(t, storedHashes, shownHashes)
+		}
+
+		assert.Equal(t, []string{"begin", "establish", "increment", "clear", "recovery-codes", "commit", "rotate", "save"}, calls,
 			"the enable write, the counter advance and the pending-enrolment clear belong inside "+
 				"one transaction, commit last. The clear is handed otpEnrolTx rather than nil: on "+
 				"a nil transaction it would commit on its own, and a rolled back enrolment would "+
@@ -2042,15 +2070,15 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	}
 
 	// wrongCode is six digits this secret refuses at this instant. A literal cannot be
-	// assumed wrong: TOTP emits every six-digit value, and MatchStep accepts the current
-	// step plus one either side, so a fixed "000000" is the right answer about three runs
-	// in a million and the case then takes the success or replay path instead of the
-	// rejection it claims to drive. Confirmed against the matcher the handler itself
+	// assumed wrong: TOTP emits every six-digit value, and MatchStep accepts the previous and
+	// the current step and tells the next one apart, so a fixed "000000" is the right answer
+	// about three runs in a million and the case then takes the success, replay or clock-ahead
+	// path instead of the rejection it claims to drive. Confirmed against the matcher the handler itself
 	// uses, which is the only thing that can establish it (#219).
 	wrongCode := func(t *testing.T) string {
 		t.Helper()
 		for _, candidate := range []string{"000000", "111111", "222222"} {
-			if _, matched := otp.MatchStep(candidate, otpSecret, time.Now().UTC()); !matched {
+			if _, match := otp.MatchStep(candidate, otpSecret, time.Now().UTC()); match == otp.NoMatch {
 				return candidate
 			}
 		}
@@ -2100,6 +2128,25 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			"attempt %d should be refused by the limiter", budget+1)
 	})
 
+	// A code from the next step is what an authenticator whose clock runs ahead shows, not a
+	// guess, so neither half charges it: well past the budget, every one still reaches the
+	// handler (#142).
+	t.Run("a code from the next step spends nothing", func(t *testing.T) {
+		handler, _ := newHandler(t, true, true)
+		for i := 0; i < budget*2; i++ {
+			assert.Equal(t, http.StatusOK, post(handler, otptest.NextStepCode(t, otpSecret)),
+				"attempt %d should reach the handler", i+1)
+		}
+	})
+
+	t.Run("an enrollment code from the next step spends nothing", func(t *testing.T) {
+		handler, _ := newHandler(t, false, true)
+		for i := 0; i < budget*2; i++ {
+			assert.Equal(t, http.StatusOK, post(handler, otptest.NextStepCode(t, otpSecret)),
+				"attempt %d should reach the handler", i+1)
+		}
+	})
+
 	t.Run("a correct code spends nothing", func(t *testing.T) {
 		handler, authContext := newHandler(t, true, true)
 		// Well past the budget. The same limiter covers enrollment, where a user pointing
@@ -2110,4 +2157,92 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			assert.Equal(t, http.StatusSeeOther, post(handler, otpCode), "verification %d should succeed", i+1)
 		}
 	})
+}
+
+// TestHandleAuthOtpPost_ANextStepCodeIsRefusedAsAClockRunningAhead is #142 at the sign-in prompt and
+// at the sign-in setup form. A code from the step after the server's current one is what an
+// authenticator whose clock runs ahead shows: it is refused with a message to check the device's
+// time rather than as a wrong code, audited as auth_failed_otp with reason clock_ahead, and costs
+// the user nothing. The mocks carry no claim and no count, so a step claimed or a failure counted
+// fails the case; the limiter's half is TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly.
+func TestHandleAuthOtpPost_ANextStepCodeIsRefusedAsAClockRunningAhead(t *testing.T) {
+	const clockAhead = "Your device's clock seems to be ahead. Check that its date and time are set " +
+		"automatically, then enter the code your app shows."
+
+	for _, arm := range []struct {
+		name     string
+		enrolled bool
+		template string
+	}{
+		{name: "at the sign-in prompt", enrolled: true, template: "/auth_otp.html"},
+		{name: "on the sign-in setup form", enrolled: false, template: "/auth_otp_enrollment.html"},
+	} {
+		t.Run(arm.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			handler := buildAuthOtpPost(authOtpPostDeps{
+				pageRenderer:  pageRenderer,
+				ceremonyStore: ceremonyStore,
+				database:      database,
+				auditLogger:   auditLogger,
+			})
+
+			otpSecret := otpTestMintedSecret(t)
+			authContext := &ceremony.AuthContext{
+				AuthState:  ceremony.AuthStateLevel2OTP,
+				CeremonyId: testCeremonyId,
+				UserId:     1,
+				ClientId:   "test-client",
+			}
+			user := &record.User{Id: 1, Enabled: true, OtpConfigGeneration: 3}
+			if arm.enrolled {
+				user.OTPEnabled = true
+				user.OTPSecretEncrypted = encryptOTPForTest(t, otpSecret)
+			} else {
+				authContext.OTPKeyURL = otpTestKeyURL(otpSecret)
+			}
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+				Return(&record.Client{ClientIdentifier: "test-client"}, nil)
+
+			auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, map[string]interface{}{
+				"user_id": int64(1),
+				"reason":  "clock_ahead",
+			}).Return().Once()
+
+			form := url.Values{}
+			form.Add(ceremony.IdField, testCeremonyId)
+			form.Add("otp", otptest.NextStepCode(t, otpSecret))
+			req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
+			rr := httptest.NewRecorder()
+
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", arm.template,
+				mock.MatchedBy(func(bind map[string]interface{}) bool {
+					return bind["error"] == clockAhead && bind["ceremonyId"] == testCeremonyId
+				})).Return(nil).Once()
+
+			handler.ServeHTTP(rr, req)
+
+			// Nothing claimed, nothing counted, nothing established, and no session saved.
+			database.AssertNotCalled(t, "TryConsumeEnrolledUserOTPStep",
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "TryConsumeUserOTPStep",
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "IncrementUserOtpConsecutiveFailures",
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventOTPCodeReplayDetected, mock.Anything)
+
+			pageRenderer.AssertExpectations(t)
+			database.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+		})
+	}
 }

@@ -24,6 +24,7 @@ const (
 	AuthStateLevel1PasswordCompleted AuthState = "level1_password_completed"
 	AuthStateLevel1ExistingSession   AuthState = "level1_existing_session"
 	AuthStateLevel2OTP               AuthState = "level2_otp"
+	AuthStateLevel2RecoveryCodes     AuthState = "level2_recovery_codes"
 	AuthStateAuthenticationCompleted AuthState = "authentication_completed"
 	AuthStateRequiresConsent         AuthState = "requires_consent"
 	AuthStateReadyToIssueCode        AuthState = "ready_to_issue_code"
@@ -230,6 +231,17 @@ type AuthContext struct {
 	// Absent from a context written by an older binary it unmarshals as nil, and the comparison does
 	// not run: a ceremony in flight across the deploy binds as it did before #538.
 	AdoptedSessionAuthTime *time.Time
+	// RecoveryCodes is the set of recovery codes the authenticator this ceremony set up came with,
+	// as shown, held only until the page that shows them first renders: written by
+	// authflow.OTPSubmission when it stores the authenticator, and cleared by
+	// authflow.RecoveryCodesPrompt through Store.TakeRecoveryCodes, the one conditional write that
+	// comes before that page renders, so a reload or an overlapping load shows them no more (#257
+	// decisions 1 and 14). The browser-session row the ceremony is stored in is sealed, and the
+	// codes are nowhere else: the database keeps only their hashes.
+	//
+	// Absent from a context written by an older binary it unmarshals as nil, which reads as "the
+	// codes were already shown", the page a reload draws.
+	RecoveryCodes []string
 }
 
 func (ac *AuthContext) SetScope(scope string) {
@@ -309,9 +321,25 @@ func (ac *AuthContext) RecordOTPVerified(now time.Time, generation int64, enroll
 		enrolledGeneration := generation
 		ac.OtpConfigGeneration = &enrolledGeneration
 	}
+	ac.recordSecondFactor(now, generation, oidc.AuthMethodOTP)
+}
+
+// RecordRecoveryCodeVerified records that this ceremony accepted a recovery code at now, in place
+// of an authenticator code. generation is the otp_config_generation of the authenticator the user
+// was read with, the one the code's set came with: the claim stands only while the user still has
+// that authenticator, so removing it lowers the session and restarts a sign-in in flight exactly
+// as for a code (#257 decision 4, #542). Everything else is RecordOTPVerified's for a code checked
+// against a stored authenticator: a recovery code never enrols one.
+func (ac *AuthContext) RecordRecoveryCodeVerified(now time.Time, generation int64) {
+	ac.recordSecondFactor(now, generation, oidc.AuthMethodRecoveryCode)
+}
+
+// recordSecondFactor is what both second factors record: the claim's generation, the method, the
+// instant, the completed state, and the spent enrolment key cleared.
+func (ac *AuthContext) recordSecondFactor(now time.Time, generation int64, method oidc.AuthMethod) {
 	claimGeneration := generation
 	ac.OtpClaimGeneration = &claimGeneration
-	ac.AddAuthMethod(oidc.AuthMethodOTP)
+	ac.AddAuthMethod(method)
 	authenticatedAt := now.UTC()
 	ac.AuthenticatedAt = &authenticatedAt
 	ac.AuthState = AuthStateAuthenticationCompleted
@@ -370,6 +398,7 @@ func (ac *AuthContext) Restart() {
 	ac.PasswordVerifiedAt = nil
 	ac.OtpClaimGeneration = nil
 	ac.AdoptedSessionAuthTime = nil
+	ac.RecoveryCodes = nil
 }
 
 // AddAuthMethod records a completed factor on AuthMethods, the space-separated list that becomes
@@ -394,10 +423,14 @@ func (ac *AuthContext) AddAuthMethod(method oidc.AuthMethod) {
 	ac.AuthMethods = ac.AuthMethods + " " + value
 }
 
-// ClaimsOTP reports whether AuthMethods names a one-time code, verified in this ceremony or adopted
-// from the session it reuses.
+// ClaimsOTP reports whether AuthMethods names a second factor the authenticator backs, verified in
+// this ceremony or adopted from the session it reuses: a one-time code, or a recovery code, whose
+// set came with the authenticator and is counted as a code is wherever the claim is checked (#257
+// decisions 4 and 5).
 func (ac *AuthContext) ClaimsOTP() bool {
-	return slices.Contains(strings.Fields(ac.AuthMethods), oidc.AuthMethodOTP.String())
+	methods := strings.Fields(ac.AuthMethods)
+	return slices.Contains(methods, oidc.AuthMethodOTP.String()) ||
+		slices.Contains(methods, oidc.AuthMethodRecoveryCode.String())
 }
 
 // RequestedMaxAge is the client's max_age as every hop after /auth/authorize reads it: nil when

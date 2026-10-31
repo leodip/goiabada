@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -229,6 +230,43 @@ func TestHandleAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
+// TestHandleAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead is #142 at the account
+// API's enable. A code from the step after the server's current one is what an authenticator whose
+// clock runs ahead shows, so it gets an error code of its own and a message to check the device's
+// time, and is audited as auth_failed_otp with reason clock_ahead, where a wrong code here audits
+// nothing: the event is how an operator tells a device's clock from guessing. Nothing is claimed, so
+// the user's next code, from the right step, still enables.
+func TestHandleAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, map[string]interface{}{
+		"user_id":        user.Id,
+		"logged_in_user": subject,
+		"reason":         "clock_ahead",
+	}).Return().Once()
+
+	rr := httptest.NewRecorder()
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, otptest.NextStepCode(t, otpTestSecret)))
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, "OTP_CLOCK_AHEAD", errorCodeOf(t, rr))
+	assert.Equal(t, "Your device's clock seems to be ahead. Check that its date and time are set "+
+		"automatically, then enter the code your app shows.", descriptionOf(t, rr))
+	database.AssertNotCalled(t, "TryConsumeUserOTPStep",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "TryEstablishUserOTP",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	assert.False(t, user.OTPEnabled)
+	auditLogger.AssertExpectations(t)
+}
+
 // TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically is the enable half of #242
 // decision 2, and the counterpart of the disable case below. Establishing the authenticator and
 // advancing the OTP configuration generation have to land as one commit.
@@ -264,19 +302,23 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 		Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 	// The rebind's clear, in the enable's own transaction (#489).
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
+	// And the authenticator's recovery codes (#257 decision 1).
+	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id, mock.Anything).Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "recovery-codes") }).Once()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, map[string]interface{}{
 		"user_id":        user.Id,
 		"logged_in_user": subject,
 	}).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "establish", "increment", "clear", "commit"}, calls,
+	assert.Equal(t, []string{"begin", "establish", "increment", "clear", "recovery-codes", "commit"}, calls,
 		"the enable write, the counter advance and the pending-enrolment clear belong inside one "+
 			"transaction, commit last. The clear is handed otpDisableTx rather than nil: committed "+
 			"on its own it would discard the pending seed even when the enable rolls back, and the "+
@@ -375,6 +417,9 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 		Return(true, nil).Run(func(mock.Arguments) { calls = append(calls, "remove") }).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "reset") }).Once()
+	// The authenticator's recovery codes go with it (#257 decision 3).
+	database.On("DeleteUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id).Return(nil).
+		Run(func(mock.Arguments) { calls = append(calls, "delete-codes") }).Once()
 	// The counter that tells every session of this user they owe a second factor again, inside the
 	// same transaction for the reason #242 decision 2 gives: a removal that commits without the
 	// counter moving leaves every live session asserting amr ["pwd","otp"] for an authenticator
@@ -397,7 +442,7 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, []string{"begin", "remove", "reset", "increment", "lower", "commit"}, calls,
+	assert.Equal(t, []string{"begin", "remove", "reset", "delete-codes", "increment", "lower", "commit"}, calls,
 		"every write belongs inside one transaction, otp_enabled first per #111 decision 10, "+
 			"the counter advance per #242 decision 2 and the sessions lowered per #542 decision 1")
 	assert.False(t, user.OTPEnabled)
@@ -444,7 +489,7 @@ func wrongButWellFormedCode(t *testing.T) string {
 	current := currentOtpCode(t)
 	for _, candidate := range []string{"000000", "111111", "222222"} {
 		if candidate != current {
-			if _, matched := otp.MatchStep(candidate, otpTestSecret, time.Now().UTC()); !matched {
+			if _, match := otp.MatchStep(candidate, otpTestSecret, time.Now().UTC()); match == otp.NoMatch {
 				return candidate
 			}
 		}
@@ -854,8 +899,10 @@ func TestHandleAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	database.On("ClearPendingOTPEnrollment", mock.Anything, tx, user.Id).Return(nil).Once()
 	// The rebind's clear, in the enable's own transaction (#489).
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, tx, user.Id).Return(nil).Once()
+	database.On("ReplaceUserRecoveryCodes", mock.Anything, tx, user.Id, mock.Anything).Return(nil).Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
@@ -1008,4 +1055,88 @@ func TestHandleAccountOTPPut_Disable_ALostCompareAndSetIsAnsweredFromARead(t *te
 			database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
+}
+
+// The enable answers with the set of recovery codes created with the authenticator, beside the user,
+// for the console to show once (#257 decisions 1 and 8); the set is audited after the enable,
+// naming the user and the caller and nothing of the codes (decision 10).
+func TestHandleAccountOTPPut_Enable_AnswersWithTheSetOfRecoveryCodes(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything).
+		Return(true, nil).Once()
+
+	datamocks.ExpectRunInTransaction(database, otpDisableTx)
+	database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration, mock.Anything).
+		Return(true, nil).Once()
+	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).Once()
+	database.On("ClearPendingOTPEnrollment", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
+	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
+	var stored []string
+	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id, mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) { stored = args.Get(3).([]string) }).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+
+	var events []string
+	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().
+		Run(func(mock.Arguments) { events = append(events, audit.EventEnabledOTP) }).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, map[string]interface{}{
+		"user_id":        user.Id,
+		"logged_in_user": subject,
+	}).Return().Run(func(mock.Arguments) { events = append(events, audit.EventRecoveryCodesCreated) }).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var body api.UpdateAccountOTPResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	assert.Equal(t, user.Id, body.User.Id, "the user is answered as before")
+	require.Len(t, body.RecoveryCodes, 10, "the set is ten codes")
+	require.Len(t, stored, 10)
+	for i, code := range body.RecoveryCodes {
+		assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{4}(-[0-9a-hjkmnp-tv-z]{4}){5}$`, code)
+		assert.Equal(t, hashutil.HashString(strings.ReplaceAll(code, "-", "")), stored[i],
+			"the codes answered are the ones stored")
+	}
+	assert.Equal(t, []string{audit.EventEnabledOTP, audit.EventRecoveryCodesCreated}, events,
+		"the set is recorded beside the enable that created it")
+}
+
+// A disable answers with the user alone: there is no set to show, and the key is left out rather
+// than sent empty.
+func TestHandleAccountOTPPut_Disable_AnswersWithNoRecoveryCodes(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+	user.OTPEnabled = true
+
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	datamocks.ExpectRunInTransaction(database, otpDisableTx)
+	database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).Return(true, nil).Once()
+	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
+	database.On("DeleteUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
+	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).Once()
+	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, user.Id, "pwd").Return(nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	assert.Contains(t, body, "user")
+	assert.NotContains(t, body, "recoveryCodes")
 }

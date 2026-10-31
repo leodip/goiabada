@@ -232,6 +232,78 @@ func TestRender_AccountOtp_Enabled(t *testing.T) {
 	assert.NotContains(t, out, `value="enable"`)
 }
 
+// Right after two-factor authentication is turned on, the page shows the set of recovery codes,
+// each on its own line, with the instruction to save them and the Copy button that copies the list
+// (#257 decision 8). The codes are text only: none of them is in a form, so nothing posts them back.
+func TestRender_AccountOtp_TheNewSetOfRecoveryCodes(t *testing.T) {
+	codes := []string{"7kq2-m9xh-4trw-b3np-j6vd-egac", "0123-4567-89ab-cdef-ghjk-mnpq"}
+
+	out := renderMenuPageIn(t, "/account_otp.html", map[string]interface{}{
+		"otpEnabled":    true,
+		"recoveryCodes": codes,
+	}, "en", true)
+
+	assert.Contains(t, out, "Save your recovery codes")
+	assert.Contains(t, out, "They are not shown again.")
+	assert.Contains(t, out, `<li>7kq2-m9xh-4trw-b3np-j6vd-egac</li>`)
+	assert.Contains(t, out, `<li>0123-4567-89ab-cdef-ghjk-mnpq</li>`)
+	assert.Contains(t, out, `data-copy-target="recovery-codes"`, "the Copy button copies the list")
+	assert.Contains(t, out, `id="recovery-codes"`)
+	assert.Contains(t, out, `name="otpAction" value="disable"`, "the page is still the account's own")
+	assert.NotContains(t, out, `value="7kq2`, "no code is a form value")
+
+	without := renderMenuPageIn(t, "/account_otp.html", map[string]interface{}{"otpEnabled": true}, "en", true)
+	assert.NotContains(t, without, "Save your recovery codes", "drawn afresh, the page shows no set")
+	assert.NotContains(t, without, `id="recovery-codes"`)
+}
+
+// The page of an account with two-factor authentication has a Recovery codes section: how many of
+// the set's ten codes are unused, or that none are and a new set is needed, and a form taking the
+// password that asks, before it is sent, to confirm that the old codes stop working (#257 decisions
+// 8 and 9).
+func TestRender_AccountOtp_TheRecoveryCodesSection(t *testing.T) {
+	counts := []struct {
+		remaining int
+		want      string
+	}{
+		{7, "7 of your 10 recovery codes are unused."},
+		{1, "1 of your 10 recovery codes is unused."},
+		{0, "You have no unused recovery codes. Get a new set, so you can still sign in if you lose your authenticator."},
+	}
+	for _, tc := range counts {
+		out := renderMenuPageIn(t, "/account_otp.html", map[string]interface{}{
+			"otpEnabled":             true,
+			"recoveryCodesRemaining": tc.remaining,
+		}, "en", true)
+		assert.Contains(t, out, tc.want)
+	}
+
+	out := renderMenuPageIn(t, "/account_otp.html", map[string]interface{}{
+		"otpEnabled":             true,
+		"recoveryCodesRemaining": 4,
+	}, "en", true)
+	assert.Contains(t, out, `<h2 class="panel-title" id="recovery-codes-section-title">Recovery codes</h2>`)
+	assert.Contains(t, out, `name="otpAction" value="recovery-codes"`)
+	assert.Contains(t, out, ">Get new recovery codes<")
+	assert.Contains(t, out, `id="recovery-codes-password" type="password" name="password" autocomplete="current-password"`)
+	assert.Contains(t, out, `data-confirm-dialog="confirmRecoveryCodes"`)
+	assert.Contains(t, out, `data-confirm-always="Your current recovery codes stop working as soon as you get new ones, including any you saved or printed."`)
+	assert.Contains(t, out, `id="confirmRecoveryCodes_modalDialog"`)
+	assert.NotContains(t, out, `id="recovery-codes-error"`)
+
+	refused := renderMenuPageIn(t, "/account_otp.html", map[string]interface{}{
+		"otpEnabled":             true,
+		"recoveryCodesRemaining": 4,
+		"recoveryCodesError":     "That password isn't right. Try again.",
+	}, "en", true)
+	assert.Contains(t, refused, `id="recovery-codes-error"`)
+	assert.Contains(t, refused, `id="recovery-codes-password" type="password" name="password" autocomplete="current-password" aria-invalid="true" aria-describedby="recovery-codes-error" autofocus`)
+	assert.NotContains(t, refused, `id="otp-error"`, "the disable form was not the one refused")
+
+	disabled := renderMenuPageIn(t, "/account_otp.html", map[string]interface{}{"otpEnabled": false}, "en", true)
+	assert.NotContains(t, disabled, `value="recovery-codes"`, "an account without an authenticator has no codes")
+}
+
 // The Device cell's tooltip, on all three session pages at once.
 //
 // The raw User-Agent is attacker-chosen: it is a request header copied into the row verbatim, so

@@ -30,8 +30,8 @@ import (
 // methods cut to "pwd", so every later SSO token contradicted itself (#239 finding F4).
 //
 // Each test uses its own user, because a TOTP step can be spent once per user and only a step
-// later than the last one is accepted: the first code is the current step and the second the next,
-// which the server's one-step window accepts.
+// later than the last one is accepted: the first code is the previous step's, which the server's
+// window still accepts, and the second the current step's.
 
 // reauthFixture is a user with an authenticator, and a client at each end of the ACR range.
 type reauthFixture struct {
@@ -81,12 +81,17 @@ func newReauthFixture(t *testing.T) *reauthFixture {
 	return fx
 }
 
-// nextOtpCode is a code for a step later than any this user has spent: the current step first, then
-// the next one. A third would fall outside the server's window, so no test asks for one.
+// nextOtpCode is a code for a step later than any this user has spent: the previous step first, then
+// the current one. The window accepts no later step, so no test asks for a third.
 func (fx *reauthFixture) nextOtpCode(t *testing.T) string {
 	t.Helper()
-	require.Less(t, fx.otpStepsTaken, 2, "a third code would be outside the one-step window")
-	code := otptest.Code(t, fx.otpSecret, time.Now().Add(time.Duration(fx.otpStepsTaken)*30*time.Second))
+	require.Less(t, fx.otpStepsTaken, 2, "a third code would be outside the window")
+	var code string
+	if fx.otpStepsTaken == 0 {
+		code = otptest.PreviousStepCode(t, fx.otpSecret)
+	} else {
+		code = otptest.Code(t, fx.otpSecret, time.Now())
+	}
 	fx.otpStepsTaken++
 	return code
 }

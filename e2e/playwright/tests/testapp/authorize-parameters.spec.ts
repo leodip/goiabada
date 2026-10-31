@@ -2,6 +2,8 @@
 // from the test app's web app sign-in form: prompt, max_age, id_token_hint and acr_values (Require
 // two-factor authentication). The consent screen prompt=consent shows is answered every way a user
 // can: allowed, not allowed, and allowed with a scope unticked.
+import { continuePastRecoveryCodes } from "../../lib/browser-sign-in";
+import { enterRecoveryCode, turnOnTwoFactor } from "../../lib/console-user";
 import { expect, test } from "../../lib/fixtures";
 import { freshTotp } from "../../lib/totp";
 import { expectResult, resultBody, shownClaims, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
@@ -110,11 +112,13 @@ test("acr_values level 2 mandatory makes a user enrol an authenticator, and the 
   const user = await users.create();
   const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user, { acr_values: "urn:goiabada:level2_mandatory" });
-  // The enrolment page: a QR code and its key, then a code from it.
+  // The enrolment page: a QR code and its key, then a code from it, then the page showing the new
+  // authenticator's recovery codes, whose Continue goes on to the app.
   await expect(app).toHaveURL(/\/auth\/otp/);
   const secret = (await app.locator("#otp-secret").innerText()).trim();
   await app.locator('input[name="otp"]').fill(await freshTotp(secret));
   await app.getByRole("button", { name: "Verify" }).click();
+  await continuePastRecoveryCodes(app);
   await app.waitForURL(testapp.web.url);
   await expectResult(app, "Signed in");
   const id = await shownClaims(app, "ID token claims");
@@ -135,5 +139,21 @@ test("acr_values level 2 mandatory makes a user enrol an authenticator, and the 
   const stepped = await shownClaims(app, "ID token claims");
   expect(stepped.acr).toBe("urn:goiabada:level2_optional");
   expect(stepped.amr).toEqual(["pwd", "otp"]);
+  await context.close();
+});
+
+test("a level 2 mandatory sign-in with a recovery code says so in amr, at the level a code reaches", async ({ browser, users }) => {
+  const user = await users.create();
+  const { recoveryCodes } = await turnOnTwoFactor(browser, user);
+  const { context, page: app } = await userBrowser(browser);
+  await signInToWebApp(app, testapp.web, user, { acr_values: "urn:goiabada:level2_mandatory" });
+  await enterRecoveryCode(app, recoveryCodes[3]);
+  await app.waitForURL(testapp.web.url);
+  await expectResult(app, "Signed in");
+  for (const heading of ["ID token claims", "Access token claims"] as const) {
+    const claims = await shownClaims(app, heading);
+    expect(claims.acr).toBe("urn:goiabada:level2_mandatory");
+    expect(claims.amr).toEqual(["pwd", "recovery_code"]);
+  }
   await context.close();
 });

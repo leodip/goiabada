@@ -50,6 +50,7 @@ This is every `UPPER_SNAKE` code the two APIs answer.
 | `AUTHENTICATION_FAILED` | `400` | The password sent to confirm a password change, an email change, or turning two-factor authentication on or off is wrong. For two-factor authentication, a missing password answers it too. |
 | `OTP_CODE_REQUIRED` | `400` | Two-factor authentication was turned on without a code. |
 | `INVALID_OTP_CODE` | `400` | The code isn't six digits, or it doesn't match the authenticator. |
+| `OTP_CLOCK_AHEAD` | `400` | The code is the authenticator's next one, from 30 seconds ahead: the device's clock runs ahead of the auth server's. Nothing was spent, so ask the user to check that the device sets its time automatically and send the code it shows. |
 | `OTP_ENROLLMENT_NOT_PENDING` | `400` | No enrollment is pending, or it expired. Start a new one with `GET /api/v1/account/otp/enrollment`. |
 | `SECRET_KEY_NOT_ACCEPTED` | `400` | The request sent a `secretKey`. Start an enrollment and send only the code from the authenticator. |
 | `OTP_ALREADY_ENABLED` | `400` | Two-factor authentication is already on. |

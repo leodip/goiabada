@@ -755,7 +755,8 @@ func TestAddAuthMethod(t *testing.T) {
 		{"a method listed inside another's name is not a duplicate", "xotp", []oidc.AuthMethod{oidc.AuthMethodOTP}, "xotp otp"},
 		{"repeated calls stay idempotent", "", []oidc.AuthMethod{oidc.AuthMethodPassword, oidc.AuthMethodOTP,
 			oidc.AuthMethodPassword, oidc.AuthMethodOTP, oidc.AuthMethodOTP}, "pwd otp"},
-		{"an out-of-range value adds nothing to an empty list", "", []oidc.AuthMethod{oidc.AuthMethodOTP + 1}, ""},
+		{"a recovery code appended after password", "pwd", []oidc.AuthMethod{oidc.AuthMethodRecoveryCode}, "pwd recovery_code"},
+		{"an out-of-range value adds nothing to an empty list", "", []oidc.AuthMethod{oidc.AuthMethodRecoveryCode + 1}, ""},
 		{"an out-of-range value adds nothing to a list", "pwd", []oidc.AuthMethod{oidc.AuthMethod(-1)}, "pwd"},
 	}
 
@@ -773,7 +774,8 @@ func TestAddAuthMethod(t *testing.T) {
 }
 
 // ClaimsOTP reads the method list as AddAuthMethod writes it: whole values, so a name that merely
-// contains otp is not one (#542 decision 1).
+// contains otp is not one (#542 decision 1). A recovery code is a claim the authenticator backs as
+// much as a code is, so it counts too (#257 decisions 4 and 5).
 func TestClaimsOTP(t *testing.T) {
 	testCases := []struct {
 		methods string
@@ -786,6 +788,9 @@ func TestClaimsOTP(t *testing.T) {
 		{"otp pwd", true},
 		{"xotp", false},
 		{"pwd otpx", false},
+		{"pwd recovery_code", true},
+		{"recovery_code", true},
+		{"pwd recovery_codex", false},
 	}
 
 	for _, tc := range testCases {
@@ -1170,4 +1175,39 @@ func TestRecordOTPVerified(t *testing.T) {
 			assert.Equal(t, "openid", ac.Scope, "OTP writes no request field")
 		})
 	}
+}
+
+// RecordRecoveryCodeVerified records a recovery code as RecordOTPVerified records an authenticator
+// code, under its own method: the claim is tied to the generation of the authenticator the code's
+// set came with, so removing that authenticator restarts the sign-in as for a code (#257 decisions
+// 4 and 5, #542). It never enrols, so what /auth/level2 captured stays.
+func TestRecordRecoveryCodeVerified(t *testing.T) {
+	now := time.Date(2026, 10, 31, 9, 15, 0, 0, time.FixedZone("UTC-3", -3*60*60))
+	captured := int64(4)
+	adopted := int64(2)
+	ac := &AuthContext{
+		AuthState:           AuthStateLevel2OTP,
+		AuthMethods:         "pwd",
+		OtpConfigGeneration: &captured,
+		OtpClaimGeneration:  &adopted,
+		Level1AuthCompleted: true,
+		OTPKeyURL:           "otpauth://totp/spent",
+		UserId:              42,
+	}
+
+	ac.RecordRecoveryCodeVerified(now, 4)
+
+	assert.Equal(t, "pwd recovery_code", ac.AuthMethods)
+	assert.True(t, ac.ClaimsOTP())
+	require.NotNil(t, ac.OtpClaimGeneration)
+	assert.Equal(t, int64(4), *ac.OtpClaimGeneration)
+	require.NotNil(t, ac.OtpConfigGeneration)
+	assert.Equal(t, int64(4), *ac.OtpConfigGeneration, "what level 2 captured is kept")
+	require.NotNil(t, ac.AuthenticatedAt)
+	assert.True(t, now.Equal(*ac.AuthenticatedAt))
+	assert.Equal(t, time.UTC, ac.AuthenticatedAt.Location())
+	assert.True(t, ac.Level1AuthCompleted, "left as it was")
+	assert.Equal(t, AuthStateAuthenticationCompleted, ac.AuthState)
+	assert.Empty(t, ac.OTPKeyURL)
+	assert.Equal(t, int64(42), ac.UserId)
 }
