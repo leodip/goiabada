@@ -1041,6 +1041,9 @@
 "adminconsole.admin_users.profile.field.locale" = "Lingua e area geografica"
 "adminconsole.admin_users.profile.locale_tooltip" = "La lingua e l'area geografica dell'utente, che i client ricevono nel claim locale."
 "adminconsole.admin_users.profile.locale_blank" = "Non specificata"
+"adminconsole.admin_users.profile.field.page_language" = "Lingua delle pagine"
+"adminconsole.admin_users.profile.page_language_automatic" = "Automatica"
+"adminconsole.admin_users.profile.page_language_tooltip" = "La lingua della console, delle pagine di accesso dopo che l'utente ha inserito la password e delle email che gli vengono inviate. Automatica usa la lingua richiesta dal client o dal browser e, per le email, la lingua e area geografica."
 "adminconsole.admin_users.profile.saved_successfully" = "Profilo salvato."
 
 "adminconsole.admin_users.email.field.email" = "Email"

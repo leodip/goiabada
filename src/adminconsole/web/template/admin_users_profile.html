@@ -94,6 +94,18 @@
         </select>
         <p class="field-hint" id="localeHint">{{ T $.ctx "adminconsole.admin_users.profile.locale_tooltip" }}</p>
       </div>
+
+      <div class="field">
+        <label class="field-label" for="pageLanguage">{{ T $.ctx "adminconsole.admin_users.profile.field.page_language" }}</label>
+        <select class="control" id="pageLanguage" name="pageLanguage"
+          {{- if .error }}{{ if eq .errorField "pageLanguage" }} aria-invalid="true" autofocus{{ end }}{{ end }} aria-describedby="{{ if .error }}{{ if eq .errorField "pageLanguage" }}profile-error {{ end }}{{ end }}pageLanguageHint">
+          <option value=""{{ if eq .pageLanguage "" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_users.profile.page_language_automatic" }}</option>
+          {{ range .pageLanguages }}
+          <option value="{{ .Tag }}"{{ if eq $.pageLanguage .Tag }} selected{{ end }}>{{ .Tag }} – {{ LocaleLabel .Tag .Name }}</option>
+          {{ end }}
+        </select>
+        <p class="field-hint" id="pageLanguageHint">{{ T $.ctx "adminconsole.admin_users.profile.page_language_tooltip" }}</p>
+      </div>
     </div>
   </div>
   <div class="panel-footer">

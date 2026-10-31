@@ -1034,6 +1034,9 @@
 "adminconsole.admin_users.profile.field.locale" = "Language and region"
 "adminconsole.admin_users.profile.locale_tooltip" = "The user's language and region, which clients receive in the locale claim."
 "adminconsole.admin_users.profile.locale_blank" = "Not set"
+"adminconsole.admin_users.profile.field.page_language" = "Page language"
+"adminconsole.admin_users.profile.page_language_automatic" = "Automatic"
+"adminconsole.admin_users.profile.page_language_tooltip" = "The language of the console, of the sign-in pages once the user has entered their password, and of the emails sent to the user. Automatic uses the language the client or the browser asks for, and the language and region for emails."
 "adminconsole.admin_users.profile.saved_successfully" = "Profile saved."
 
 "adminconsole.admin_users.email.field.email" = "Email"
