@@ -219,3 +219,25 @@ test.describe("closing straight after a violation", () => {
     expect(failureOf(watcher)).toBe("");
   });
 });
+
+// A context that runs no script runs no listener either, and its pages never answer the watcher's
+// settle, so closing one or its pages, or ending the test with one open, must not wait on them.
+test("a context that runs no script closes at once", async ({ browser, watchedOrigin }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto(`${watchedOrigin}/clean`);
+  await expect(page.getByRole("heading", { name: "Clean" })).toBeVisible();
+  await page.close();
+  const open = await context.newPage();
+  await open.goto(`${watchedOrigin}/clean`);
+  await context.close();
+});
+
+test.describe("a test whose own context runs no script", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test("ends at once with its page open", async ({ page, watchedOrigin }) => {
+    await page.goto(`${watchedOrigin}/clean`);
+    await expect(page.getByRole("heading", { name: "Clean" })).toBeVisible();
+  });
+});

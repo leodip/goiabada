@@ -36,8 +36,12 @@ export class CspViolationWatcher {
   // Watches every page the context has from now on, in every frame, across navigations. Closing the
   // context or one of its pages, by a test or a helper, first lets its pages hand over what they
   // have queued, as settle() does: a closed page's queued violation is lost.
-  async watch(context: BrowserContext): Promise<void> {
-    if (this.watched.has(context)) return;
+  //
+  // javaScriptEnabled: as the context was made. A context that runs no script runs no listener and
+  // refuses no script, so it has nothing to report, and its pages never answer an evaluate: it is
+  // left unwatched, or settling it would wait for ever.
+  async watch(context: BrowserContext, { javaScriptEnabled = true }: { javaScriptEnabled?: boolean } = {}): Promise<void> {
+    if (!javaScriptEnabled || this.watched.has(context)) return;
     this.watched.add(context);
     context.on("close", () => this.watched.delete(context));
     const closeContext = context.close.bind(context);
@@ -109,12 +113,13 @@ function settleBeforeClose(page: Page): void {
 }
 
 // Watches each context browser.newContext() makes until the returned function is called. Playwright's
-// own context fixture makes the test's context through it as well.
-function watchNewContexts(browser: Browser, watcher: CspViolationWatcher): () => void {
+// own context fixture makes the test's context through it as well. javaScriptEnabled: the test's
+// option, which Playwright applies to every context the test makes without passing it in the options.
+function watchNewContexts(browser: Browser, watcher: CspViolationWatcher, javaScriptEnabled: boolean): () => void {
   const newContext = browser.newContext;
   browser.newContext = async (options) => {
     const context = await newContext.call(browser, options);
-    await watcher.watch(context);
+    await watcher.watch(context, { javaScriptEnabled: options?.javaScriptEnabled ?? javaScriptEnabled });
     return context;
   };
   return () => {
@@ -126,9 +131,9 @@ export const test = base.extend<{ cspWatcher: CspViolationWatcher }, { cspWatche
   // The origins whose pages must report no violation: none unless a test object says.
   cspWatchedOrigins: [[], { option: true, scope: "worker" }],
   cspWatcher: [
-    async ({ browser, cspWatchedOrigins }, use) => {
+    async ({ browser, cspWatchedOrigins, javaScriptEnabled }, use) => {
       const watcher = new CspViolationWatcher(cspWatchedOrigins);
-      const stop = watchNewContexts(browser, watcher);
+      const stop = watchNewContexts(browser, watcher, javaScriptEnabled);
       try {
         await use(watcher);
       } finally {
@@ -142,8 +147,8 @@ export const test = base.extend<{ cspWatcher: CspViolationWatcher }, { cspWatche
   ],
   // The test's own context: Playwright makes it through browser.newContext(), which the watcher
   // already watches; watched here as well, whatever order the two fixtures are set up in.
-  context: async ({ context, cspWatcher }, use) => {
-    await cspWatcher.watch(context);
+  context: async ({ context, cspWatcher, javaScriptEnabled }, use) => {
+    await cspWatcher.watch(context, { javaScriptEnabled });
     await use(context);
     await cspWatcher.settle();
   },
