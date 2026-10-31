@@ -16,10 +16,12 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/loopback"
 )
 
 // accountLogoutDatabase is what the account logout endpoint needs: the client whose sign-out
@@ -59,6 +61,21 @@ func HandleAccountLogoutRequestPost(
 		postLogout := req.PostLogoutRedirectUri
 		if postLogout == "" {
 			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURIRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// The two rules /auth/logout applies to a target before it redirects, so this endpoint never
+		// hands out a sign-out URL that cannot take the user back. Both run before the client is
+		// resolved, as /auth/authorize tests a URI before loading anything: an unusable value costs
+		// no query, and resolving by URI would otherwise answer it "client unresolved" rather than
+		// naming what is wrong with it. The absolute-URI rule comes first because a hostless http
+		// URI fails it and is named for that (#590 decision 13).
+		if !urlmatch.IsAbsoluteRedirectURI(postLogout) {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURINotAbsolute, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+		if loopback.IsPlainHTTPOff(postLogout) {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURIInsecureHTTP, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

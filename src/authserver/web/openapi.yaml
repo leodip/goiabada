@@ -3813,9 +3813,14 @@ paths:
     post:
       tags: [Account]
       summary: Prepare a sign-out
-      description: >-
+      description: |
         Validate the sign-out target, mint a short-lived id_token_hint and return the prepared
         sign-out operation, as either a self-submitting form's parameters or a URL to follow.
+
+        postLogoutRedirectUri must be an absolute URI, with a scheme, no fragment and, for http
+        or https, a host, and it must not use plain http on a host other than 127.0.0.1, [::1]
+        or localhost. A target that breaks either rule is refused with 400 VALIDATION_ERROR,
+        since /auth/logout wouldn't redirect to it.
       operationId: requestAccountLogout
       requestBody:
         required: true

@@ -1283,6 +1283,50 @@ func TestHandleLogoutPost(t *testing.T) {
 		httpSession.AssertExpectations(t)
 	})
 
+	// The loopback exception of RFC 8252 section 7.3 holds at sign-out too: plain http to
+	// 127.0.0.1, [::1] or localhost never leaves the machine, so a registered one still earns its
+	// redirect while plain http to any other host is declined (#590 decision 2).
+	t.Run("A registered plain-http loopback URI still redirects", func(t *testing.T) {
+		for _, target := range []string{
+			"http://127.0.0.1:8080/out",
+			"http://[::1]/out",
+			"http://LOCALHOST:3000/out",
+		} {
+			t.Run(target, func(t *testing.T) {
+				pageRenderer := handlersmocks.NewPageRenderer(t)
+				httpSession := sessionstoremocks.NewStore(t)
+				database := datamocks.NewDatabase(t)
+				tokenParser := handlersmocks.NewTokenParser(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
+
+				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+
+				req := withSessionIdentifier(logoutPostRequest(t, url.Values{
+					"post_logout_redirect_uri": {target},
+					"client_id":                {"test_client"},
+					"state":                    {"abc"},
+				}), "test-session")
+				rr := httptest.NewRecorder()
+
+				client := &record.Client{ClientIdentifier: "test_client"}
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
+				stubSignOutRedirectURI(database, client, target)
+
+				userSession := &record.UserSession{Id: 42, UserId: 123}
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
+				database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
+				auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
+				expectCookieWipedBeforeSave(t, httpSession)
+
+				handler.ServeHTTP(rr, req)
+
+				assert.Equal(t, http.StatusFound, rr.Code)
+				assert.Equal(t, target+"?state=abc", rr.Header().Get("Location"))
+				database.AssertExpectations(t)
+			})
+		}
+	})
+
 	// Every way a target fails to authorize. Each one still tears the session down and lands on the
 	// signed-out page with the note, because whether a redirect can be honoured is a question about
 	// the response and never about whether the logout happens (#109).
@@ -1294,9 +1338,10 @@ func TestHandleLogoutPost(t *testing.T) {
 	// misses, where the requested URI differs from a registered one in a way exact string comparison
 	// catches and a looser one does not; they exist because no plain refusal can tell those apart,
 	// so every loose comparison listed below passed this table before its row was added. Rows 15 to
-	// 17 are the opposite case, a requested URI that matches a registered one byte for byte and is
-	// refused anyway because the value cannot name the host it appears to; no comparison can catch
-	// those, and they are the rows the absolute-URI gate owns (#122). Rows 18 to 20 are faults, a
+	// 20 are the opposite case, a requested URI that matches a registered one byte for byte and is
+	// refused anyway; no comparison can catch those. Rows 15 to 17 cannot name the host they appear
+	// to, and are the rows the absolute-URI gate owns (#122); rows 18 to 20 are plain http off the
+	// loopback interface, and are the plain-http gate's (#590). Rows 21 to 23 are faults, a
 	// database that will not answer and a registered URI that will not parse, and those are the
 	// shapes where a plausible future edit turns "lose the redirect" into "return a 500", which
 	// would put a user who is still signed in on a terminal page. Every row asserts the whole
@@ -1468,11 +1513,13 @@ func TestHandleLogoutPost(t *testing.T) {
 			{
 				// Omitting the scheme is the same family and the worst member of it: it turns a
 				// registered https target into a cleartext one, so the state the RP relies on for
-				// its own CSRF check travels in the clear.
+				// its own CSRF check travels in the clear. The host is loopback so that the
+				// plain-http gate, which refuses http to any other host before the match (#590),
+				// lets the pair through and the comparison is what refuses it.
 				name:        "the requested URI differs from a registered one only in its scheme",
 				clientId:    "test_client",
-				redirectURI: "http://example.com/out",
-				stubDB:      registers("https://example.com/out"),
+				redirectURI: "http://localhost/out",
+				stubDB:      registers("https://localhost/out"),
 			},
 			{
 				// "Exact string matching" leaves no room for the tidying a canonicalizer does, and a
@@ -1549,6 +1596,49 @@ func TestHandleLogoutPost(t *testing.T) {
 				clientId:    "test_client",
 				redirectURI: "https://example.com/out#frag",
 				stubDB:      registersLoadOptional("https://example.com/out#frag"),
+			},
+			{
+				// Registered byte for byte as well, by a row intake refuses and migration 000072
+				// can carry over from the redirect URIs, and refused for what it would carry: RFC
+				// 9700 section 2.6 forbids sending a response over an unencrypted connection, and
+				// the state the RP relies on for its own CSRF check would travel in the clear. The
+				// Warn names the client and never the URI, as the absolute-URI refusal's does (#590
+				// decision 13).
+				name:        "the registered URI is plain http off the loopback interface",
+				clientId:    "test_client",
+				redirectURI: "http://example.com/out",
+				stubDB:      registersLoadOptional("http://example.com/out"),
+				checkLogs: func(t *testing.T, logs *logtest.SlogCapture) {
+					var refusals []logtest.CapturedRecord
+					for _, record := range logs.Records() {
+						if record.Message == "post_logout_redirect_uri uses plain http off the loopback interface, not redirecting" {
+							refusals = append(refusals, record)
+						}
+						assert.NotContains(t, record.Message, "example.com", "no record names the target")
+						for key, value := range record.Attrs {
+							assert.NotContains(t, fmt.Sprint(value), "example.com", "attribute %q names the target", key)
+						}
+					}
+					require.Len(t, refusals, 1, "one record says why the redirect was declined")
+					assert.Equal(t, slog.LevelWarn, refusals[0].Level)
+					assert.Equal(t, "test_client", refusals[0].Attrs["client_identifier"])
+				},
+			},
+			{
+				// The scheme is case-insensitive (RFC 3986 section 3.1), so an uppercase one is the
+				// same cleartext target and must not slip past a comparison against "http".
+				name:        "the registered URI is plain HTTP in uppercase off the loopback interface",
+				clientId:    "test_client",
+				redirectURI: "HTTP://example.com/out",
+				stubDB:      registersLoadOptional("HTTP://example.com/out"),
+			},
+			{
+				// A prefix match on "localhost" is the mistake the shared loopback test exists to
+				// avoid: this host is the attacker's, not the loopback interface.
+				name:        "the registered URI is plain http on a host that only starts with localhost",
+				clientId:    "test_client",
+				redirectURI: "http://localhost.attacker.example/out",
+				stubDB:      registersLoadOptional("http://localhost.attacker.example/out"),
 			},
 			{
 				name:     "the client lookup fails",

@@ -1640,6 +1640,8 @@
 "handler.account_logout.client_identifier_invalid" = "Identificador de cliente inválido"
 "handler.account_logout.client_unresolved" = "Não foi possível identificar o cliente a partir do postLogoutRedirectUri; informe o clientIdentifier."
 "handler.account_logout.post_logout_redirect_uri_not_registered" = "O postLogoutRedirectUri não está registrado para o cliente"
+"handler.account_logout.post_logout_redirect_uri_not_absolute" = "O postLogoutRedirectUri precisa ser uma URI absoluta (o esquema é obrigatório, fragmentos não são permitidos, os escapes por porcentagem precisam estar bem formados e uma URI http ou https precisa nomear um host)"
+"handler.account_logout.post_logout_redirect_uri_insecure_http" = "O postLogoutRedirectUri não pode usar http simples em um host que não seja a interface de loopback (127.0.0.1, [::1] ou localhost)"
 "handler.settings_general.app_name_required" = "O nome do aplicativo é obrigatório."
 "handler.settings_general.app_name_too_long" = "O nome do aplicativo é longo demais. O tamanho máximo é de {{.max}} caracteres."
 "handler.settings_general.issuer_uri_invalid" = "Issuer inválido. Informe uma URL https sem query, fragmento ou informações de usuário, ou a URL base do servidor de autenticação."

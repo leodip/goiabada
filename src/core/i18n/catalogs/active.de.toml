@@ -1734,6 +1734,8 @@
 "handler.account_logout.client_identifier_invalid" = "Ungültige Client-Kennung."
 "handler.account_logout.client_unresolved" = "Der Client konnte anhand von postLogoutRedirectUri nicht ermittelt werden. Geben Sie clientIdentifier an."
 "handler.account_logout.post_logout_redirect_uri_not_registered" = "postLogoutRedirectUri ist für diesen Client nicht registriert."
+"handler.account_logout.post_logout_redirect_uri_not_absolute" = "postLogoutRedirectUri muss eine absolute URI sein: Ein Schema ist erforderlich, ein Fragment ist nicht erlaubt, Prozentcodierungen müssen korrekt sein und HTTP- oder HTTPS-URIs müssen einen Host enthalten."
+"handler.account_logout.post_logout_redirect_uri_insecure_http" = "postLogoutRedirectUri darf unverschlüsseltes HTTP nur auf der Loopback-Schnittstelle (127.0.0.1, [::1] oder localhost) verwenden."
 "handler.settings_general.app_name_required" = "Geben Sie einen Namen für die Anwendung ein."
 "handler.settings_general.app_name_too_long" = "Der Name der Anwendung ist zu lang. Er darf höchstens {{.max}} Zeichen lang sein."
 "handler.settings_general.issuer_uri_invalid" = "Ungültiger Issuer. Geben Sie eine HTTPS-URL ohne Query, Fragment oder Benutzerinformationen oder die Basis-URL des Authentifizierungsservers ein."

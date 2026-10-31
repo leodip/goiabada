@@ -1733,6 +1733,8 @@
 "handler.account_logout.client_identifier_invalid" = "Identifiant du client invalide."
 "handler.account_logout.client_unresolved" = "Impossible de déterminer le client à partir de postLogoutRedirectUri. Fournissez clientIdentifier."
 "handler.account_logout.post_logout_redirect_uri_not_registered" = "postLogoutRedirectUri n’est pas enregistré pour ce client."
+"handler.account_logout.post_logout_redirect_uri_not_absolute" = "postLogoutRedirectUri doit être une URI absolue (un schéma est requis, les fragments sont interdits, les séquences d’échappement en pourcentage doivent être valides et une URI http ou https doit indiquer un hôte)."
+"handler.account_logout.post_logout_redirect_uri_insecure_http" = "postLogoutRedirectUri ne peut utiliser http sans chiffrement que sur l’interface de bouclage (127.0.0.1, [::1] ou localhost)."
 "handler.settings_general.app_name_required" = "Le nom de l’application est obligatoire."
 "handler.settings_general.app_name_too_long" = "Le nom de l’application est trop long. Il ne doit pas dépasser {{.max}} caractères."
 "handler.settings_general.issuer_uri_invalid" = "Émetteur invalide. Saisissez une URL https sans paramètres de requête, fragment ni informations utilisateur, ou l’URL de base du serveur d’authentification."
