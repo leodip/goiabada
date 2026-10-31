@@ -285,7 +285,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.IntVar(&c.AuthServer.ListenPortHttps, "authserver-listen-port-https", c.AuthServer.ListenPortHttps, "Auth server https port")
 	fs.StringVar(&c.AuthServer.ListenHostHttp, "authserver-listen-host-http", c.AuthServer.ListenHostHttp, "Auth server http host")
 	fs.IntVar(&c.AuthServer.ListenPortHttp, "authserver-listen-port-http", c.AuthServer.ListenPortHttp, "Auth server http port")
-	fs.BoolVar(&c.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", c.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
+	fs.BoolVar(&c.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", c.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (X-Forwarded-For, or X-Real-IP when it has no address)")
 	authServerTrustedProxies := strings.Join(c.AuthServer.TrustedProxies, ",")
 	fs.StringVar(&authServerTrustedProxies, "authserver-trusted-proxies", authServerTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (auth server)")
 	fs.BoolVar(&c.AuthServer.LogHttpRequests, "authserver-log-http-requests", c.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
