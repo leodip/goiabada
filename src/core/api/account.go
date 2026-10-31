@@ -26,6 +26,14 @@ type UpdateAccountOTPRequest struct {
 	OtpCode  string `json:"otpCode,omitempty"`
 }
 
+// UpdateAccountOTPResponse is the account API's answer to PUT /api/v1/account/otp: the user and,
+// when the request turned two-factor authentication on, the set of recovery codes created with the
+// authenticator. The set is in this response only, so a caller shows it now or never (#257).
+type UpdateAccountOTPResponse struct {
+	User          UserResponse `json:"user"`
+	RecoveryCodes []string     `json:"recoveryCodes,omitempty"`
+}
+
 // AccountOTPEnrollmentResponse contains the enrollment QR code image (base64)
 // and the secret key to set up TOTP in an authenticator app.
 type AccountOTPEnrollmentResponse struct {

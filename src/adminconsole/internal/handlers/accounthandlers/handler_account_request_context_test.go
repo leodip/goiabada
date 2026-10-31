@@ -82,7 +82,7 @@ func (s *ctxRecordingApiClient) GetAccountOTPEnrollment(ctx context.Context, _ s
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateAccountOTP(ctx context.Context, _ string, _ *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
+func (s *ctxRecordingApiClient) UpdateAccountOTP(ctx context.Context, _ string, _ *api.UpdateAccountOTPRequest) (*api.UpdateAccountOTPResponse, error) {
 	return nil, s.record(ctx)
 }
 

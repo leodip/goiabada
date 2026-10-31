@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -306,6 +308,9 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
 	}
+	var enabled api.UpdateAccountOTPResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&enabled))
+	assert.True(t, enabled.User.OTPEnabled)
 
 	// Verify DB updated
 	updated, err := database.GetUserById(context.Background(), nil, userId)
@@ -314,6 +319,41 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	decrypted, err := dataCipher.Decrypt(updated.OTPSecretEncrypted)
 	require.NoError(t, err)
 	assert.Equal(t, strings.ToUpper(secret), decrypted)
+
+	// The new authenticator came with a set of ten recovery codes, answered once and stored as
+	// their hashes (#257 decisions 1 and 2).
+	require.Len(t, enabled.RecoveryCodes, 10)
+	for _, code := range enabled.RecoveryCodes {
+		assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{4}(-[0-9a-hjkmnp-tv-z]{4}){5}$`, code)
+	}
+	assert.Equal(t, 10, unusedRecoveryCodesForTest(t, userId))
+	used, err := database.TryUseUserRecoveryCode(context.Background(), nil, userId,
+		hashutil.HashString(strings.ReplaceAll(enabled.RecoveryCodes[4], "-", "")))
+	require.NoError(t, err)
+	assert.True(t, used, "a code answered is a code stored, by its SHA-256")
+	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, userId))
+}
+
+// unusedRecoveryCodesForTest is how many codes of the user's set are unused.
+func unusedRecoveryCodesForTest(t *testing.T, userId int64) int {
+	t.Helper()
+	n, err := database.CountUnusedUserRecoveryCodes(context.Background(), nil, userId)
+	require.NoError(t, err)
+	return n
+}
+
+// seedRecoveryCodesForTest gives the user a set of ten codes, as an enable would have.
+func seedRecoveryCodesForTest(t *testing.T, userId int64) {
+	t.Helper()
+	hashes := make([]string, 10)
+	for i := range hashes {
+		hashes[i] = hashutil.HashString(fake.UUID())
+	}
+	ctx := context.Background()
+	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		return database.ReplaceUserRecoveryCodes(ctx, tx, userId, hashes)
+	}))
+	require.Equal(t, 10, unusedRecoveryCodesForTest(t, userId))
 }
 
 func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
@@ -384,6 +424,7 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	u.OTPEnabled = true
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(context.Background(), nil, u)
+	seedRecoveryCodesForTest(t, userId)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
@@ -400,6 +441,7 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	// The seed itself is gone, not merely unreachable. Read through the column that carries it
 	// since migration 000048 dropped users.otp_secret (#98).
 	assert.Empty(t, updated.OTPSecretEncrypted)
+	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, userId), "the recovery codes go with the authenticator")
 }
 
 // TestAPIAccountOTPPut_Disable_ResetsConsumedStep is seam 4's pin for #111 decision 4: disabling

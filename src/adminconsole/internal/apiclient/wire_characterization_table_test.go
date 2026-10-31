@@ -201,11 +201,12 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.OTPEnabled, nil
+				return [2]any{got.User.OTPEnabled, got.RecoveryCodes[1]}, nil
 			},
 			verb: "PUT", path: "/api/v1/account/otp", contentType: charJSON,
 			bodyOf:        charUpdateAccountOTP,
-			successStatus: 200, reply: `{"user":{"otpEnabled":true}}`, want: true,
+			successStatus: 200, reply: `{"user":{"otpEnabled":true},"recoveryCodes":["aaaa-bbbb-cccc-dddd-eeee-ffff","7kq2-m9xh-4trw-b3np-j6vd-egac"]}`,
+			want: [2]any{true, "7kq2-m9xh-4trw-b3np-j6vd-egac"},
 		},
 		{
 			name: "CreateAccountLogoutRequest",

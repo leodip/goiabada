@@ -48,6 +48,9 @@ type stubApiClient struct {
 
 	updateErr error
 	updateReq *api.UpdateAccountOTPRequest
+
+	// recoveryCodes is what an enable answers with beside the user (#257 decision 8).
+	recoveryCodes []string
 }
 
 func (s *stubApiClient) GetAccountProfile(_ context.Context, accessToken string) (*api.UserResponse, error) {
@@ -70,7 +73,7 @@ func (s *stubApiClient) GetAccountOTPEnrollment(_ context.Context, accessToken s
 // /api/v1/account/otp does, with the 400 that names it, so a case about a stale form can assert
 // what the console asked for and what it did with the refusal.
 func (s *stubApiClient) UpdateAccountOTP(_ context.Context, accessToken string,
-	request *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
+	request *api.UpdateAccountOTPRequest) (*api.UpdateAccountOTPResponse, error) {
 
 	s.updateReq = request
 	if s.updateErr != nil {
@@ -83,7 +86,11 @@ func (s *stubApiClient) UpdateAccountOTP(_ context.Context, accessToken string,
 		return nil, &apiclient.APIError{Code: "OTP_NOT_ENABLED", Message: "User does not have OTP enabled",
 			StatusCode: http.StatusBadRequest}
 	}
-	return s.profile, nil
+	response := &api.UpdateAccountOTPResponse{User: *s.profile}
+	if request.Enabled {
+		response.RecoveryCodes = s.recoveryCodes
+	}
+	return response, nil
 }
 
 func otpAlreadyEnabled() error {
@@ -227,7 +234,8 @@ func TestHandleOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 	assert.Zero(t, client.enrollmentGET)
 }
 
-// A successful enable redirects, and the request it sent carries only the password and the code.
+// A successful enable with no set to show redirects, and the request it sent carries only the
+// password and the code.
 func TestHandleOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
 	httpHelper := handlersmocks.NewHttpHelper(t)
 
@@ -480,4 +488,41 @@ func TestHandleOtpPost_AClockAheadRefusalIsShownOnTheCodeField(t *testing.T) {
 	assert.Equal(t, false, bind["otpEnabled"])
 	assert.Equal(t, testBase64Image, bind["base64Image"])
 	assert.Equal(t, testSecretKey, bind["secretKey"])
+}
+
+// Turning two-factor authentication on shows the set of recovery codes it created, once: in the
+// response to the console's own POST, stored nowhere, so a reload of the page draws it without them
+// (#257 decisions 1 and 14).
+func TestHandleOtpPost_TurningOnShowsTheRecoveryCodesOnce(t *testing.T) {
+	codes := []string{
+		"7kq2-m9xh-4trw-b3np-j6vd-egac", "0123-4567-89ab-cdef-ghjk-mnpq",
+		"rstv-wxyz-0123-4567-89ab-cdef", "ghjk-mnpq-rstv-wxyz-0123-4567",
+		"89ab-cdef-ghjk-mnpq-rstv-wxyz", "aaaa-bbbb-cccc-dddd-eeee-ffff",
+		"gggg-hhhh-jjjj-kkkk-mmmm-nnnn", "pppp-qqqq-rrrr-ssss-tttt-vvvv",
+		"wwww-xxxx-yyyy-zzzz-0000-1111", "2222-3333-4444-5555-6666-7777",
+	}
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
+
+	client := newStubApiClient(false)
+	client.recoveryCodes = codes
+
+	rr := httptest.NewRecorder()
+	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+		otpPostRequest(url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}}))
+
+	assert.Empty(t, rr.Header().Get("Location"), "the page is the answer, not a redirect to one")
+	bind := handlertest.Bind(t, httpHelper)
+	assert.Equal(t, codes, bind["recoveryCodes"], "the set the API created, in its order")
+	assert.Equal(t, true, bind["otpEnabled"], "drawn on the page of an account that now has two-factor authentication")
+	assert.NotContains(t, bind, "error")
+	assert.Zero(t, client.enrollmentGET, "an enrolled user is not offered another enrolment")
+
+	// The page drawn afresh shows no codes: they were shown once.
+	reload := handlersmocks.NewHttpHelper(t)
+	handlertest.ExpectRender(reload, "/layouts/menu_layout.html", "/account_otp.html").Once()
+	client.profile.OTPEnabled = true
+	HandleOtpGet(reload, client).ServeHTTP(httptest.NewRecorder(),
+		handlertest.Request(http.MethodGet, accountOTPPath, handlertest.WithAccessToken()))
+	assert.NotContains(t, handlertest.Bind(t, reload), "recoveryCodes")
 }

@@ -3,6 +3,7 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -276,7 +277,7 @@ func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
 	// including the clear must roll back with it.
 	broken := reloadUser(t, user.Id)
 	broken.Id = 0
-	_, _, err = otpcredential.Establish(context.Background(), database, dataCipher, broken, enrolledSeed)
+	_, _, _, err = otpcredential.Establish(context.Background(), database, dataCipher, broken, enrolledSeed)
 	require.Error(t, err, "Establish must fail on a user with id 0")
 
 	assert.Equal(t, ciphertext, reloadUser(t, user.Id).OtpEnrollmentSecretEncrypted,
@@ -284,10 +285,17 @@ func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
 			"code and is about to retry with the next passcode")
 
 	enrolling := reloadUser(t, user.Id)
-	generation, established, err := otpcredential.Establish(context.Background(), database, dataCipher, enrolling, enrolledSeed)
+	assert.Equal(t, 0, unusedRecoveryCodes(t, user.Id), "the failed enable stored no recovery codes")
+	generation, codes, established, err := otpcredential.Establish(context.Background(), database, dataCipher, enrolling, enrolledSeed)
 	require.NoError(t, err, "Establish")
 	require.True(t, established, "Establish from a fresh read must land")
 	assert.EqualValues(t, 1, generation, "the counter advance still happens")
+
+	// The authenticator came with its set of recovery codes, stored by their hashes (#257).
+	require.Len(t, codes, 10)
+	assert.Equal(t, 10, unusedRecoveryCodes(t, user.Id))
+	assert.True(t, useRecoveryCode(t, user.Id, otpcredential.HashRecoveryCode(strings.ToUpper(codes[0]))),
+		"a code shown is a code stored, however it is typed")
 
 	after := reloadUser(t, user.Id)
 	assert.True(t, after.OTPEnabled, "the authenticator must be established")

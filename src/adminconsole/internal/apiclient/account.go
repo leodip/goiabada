@@ -137,19 +137,16 @@ func (c *AuthServerClient) GetAccountOTPEnrollment(ctx context.Context, accessTo
 	})
 }
 
-// UpdateAccountOTP enables or disables OTP for the current user
-func (c *AuthServerClient) UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
-	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+// UpdateAccountOTP enables or disables OTP for the current user. An enable answers with the set of
+// recovery codes created with the authenticator, which this response alone carries (#257).
+func (c *AuthServerClient) UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UpdateAccountOTPResponse, error) {
+	return execute[api.UpdateAccountOTPResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
 		url:           c.baseURL + "/api/v1/account/otp",
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return &response.User, nil
 }
 
 // CreateAccountLogoutRequest asks the auth server to prepare a logout operation. Exactly one of the

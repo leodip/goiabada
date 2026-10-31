@@ -191,6 +191,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `SuccessResponse` | both-apps | — |
 | `core/api` | `UpdateAccountEmailRequest` | both-apps | — |
 | `core/api` | `UpdateAccountOTPRequest` | both-apps | — |
+| `core/api` | `UpdateAccountOTPResponse` | both-apps | — |
 | `core/api` | `UpdateAccountPasswordRequest` | both-apps | — |
 | `core/api` | `UpdateAccountPhoneRequest` | both-apps | — |
 | `core/api` | `UpdateClientAdministrativeScopesRequest` | both-apps | — |

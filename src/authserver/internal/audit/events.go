@@ -423,6 +423,12 @@ const (
 	// by ordinary session housekeeping.
 	EventCrossUserSessionReplaced = "cross_user_session_replaced"
 
+	// EventRecoveryCodesCreated records a new set of recovery codes: with a new authenticator,
+	// beside enabled_otp, at the account API or the sign-in setup. It carries user_id and, from
+	// the account API, logged_in_user; never a code or its hash. Written after the commit (#257
+	// decision 10).
+	EventRecoveryCodesCreated = "recovery_codes_created"
+
 	EventEnabledOTP                     = "enabled_otp"
 	EventDisabledOTP                    = "disabled_otp"
 	EventSentTestEmail                  = "sent_test_email"
@@ -661,6 +667,7 @@ var auditEventTypes = []string{
 	EventOTPAuthenticatorDisabled,
 	EventOTPCodeReplayDetected,
 	EventRateLimitExceeded,
+	EventRecoveryCodesCreated,
 	EventRedemptionRefusedRedirectURI,
 	EventRefreshTokenReplayDetected,
 	EventRequestedPasswordReset,

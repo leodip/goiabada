@@ -321,6 +321,22 @@ type Database interface {
 	// inside the transaction that establishes the authenticator, so no committed
 	// state has OTP enabled with a live pending seed still installed (#247).
 	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error
+	// ReplaceUserRecoveryCodes makes codeHashes the user's set of recovery codes, each unused: it
+	// deletes every code the user had, used or not, and inserts one row per hash. tx is required,
+	// so the old set goes only if the whole new one lands. The hashes are the codes' SHA-256 in
+	// lowercase hex; the data tier never sees a code (#257 decisions 2 and 3).
+	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error
+	// DeleteUserRecoveryCodes deletes every recovery code the user has. Called in the transaction
+	// that removes the authenticator (otpcredential.RemoveTx), so every path that removes one
+	// clears its codes (#257 decision 3).
+	DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) error
+	// TryUseUserRecoveryCode marks the user's code with the hash codeHash used, only while it is
+	// unused, and reports whether this call did: one conditional write, so of two submissions of
+	// one code exactly one is accepted. False means the user's set holds no such unused code: a
+	// wrong code, one of a replaced set, or one already used (#257 decision 3).
+	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
+	// CountUnusedUserRecoveryCodes is how many of the user's recovery codes are unused.
+	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error)
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
 	UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []record.User) error
 	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error

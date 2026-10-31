@@ -333,6 +333,9 @@ func HandleAccountOTPPut(
 			return
 		}
 
+		// The set of recovery codes an enable created, answered once; a disable answers none.
+		var recoveryCodes []string
+
 		// Branch by operation
 		if req.Enabled {
 			// Enable OTP
@@ -437,8 +440,10 @@ func HandleAccountOTPPut(
 			// generation's advance commit together, so there is no state in which the
 			// authenticator is on and no session knows (#242 decision 2). The returned
 			// generation is discarded here: only the browser ceremony, which captured the
-			// pre-enrollment value earlier in the same ceremony, has a use for it.
-			_, established, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, pendingSecret)
+			// pre-enrollment value earlier in the same ceremony, has a use for it. The recovery
+			// codes created with the authenticator are answered below and nowhere else: this
+			// response is the one time they are shown (#257 decisions 1 and 8).
+			_, codes, established, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, pendingSecret)
 			if establishErr != nil {
 				writeInternalServerError(w, r, establishErr)
 				return
@@ -454,6 +459,12 @@ func HandleAccountOTPPut(
 				"user_id":        user.Id,
 				"logged_in_user": subject,
 			})
+			// Beside the enable, after the commit, and naming nothing of the codes (#257 decision 10).
+			auditLogger.Log(r.Context(), audit.EventRecoveryCodesCreated, map[string]interface{}{
+				"user_id":        user.Id,
+				"logged_in_user": subject,
+			})
+			recoveryCodes = codes
 		} else {
 			// Disable OTP
 			if !user.OTPEnabled {
@@ -495,7 +506,7 @@ func HandleAccountOTPPut(
 			return
 		}
 
-		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(updated)}
+		resp := api.UpdateAccountOTPResponse{User: *apimapping.ToUserResponse(updated), RecoveryCodes: recoveryCodes}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

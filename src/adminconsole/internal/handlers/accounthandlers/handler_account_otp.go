@@ -17,7 +17,7 @@ import (
 type accountOTPAPI interface {
 	GetAccountOTPEnrollment(ctx context.Context, accessToken string) (*api.AccountOTPEnrollmentResponse, error)
 	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
-	UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error)
+	UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UpdateAccountOTPResponse, error)
 }
 
 func HandleOtpGet(
@@ -202,7 +202,8 @@ func HandleOtpPost(
 				Password: password,
 				OtpCode:  otpCode,
 			}
-			if _, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
+			enabled, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
+			if err != nil {
 				if render.IsRateLimited(err) {
 					renderEnrollmentError(render.RateLimitedMessage(r.Context()), "")
 					return
@@ -223,6 +224,21 @@ func HandleOtpPost(
 					}
 				}
 				render.HandleAPIError(httpHelper, w, r, err)
+				return
+			}
+
+			// The set of recovery codes created with the authenticator is shown here, in the
+			// response to this POST, and stored nowhere: the auth server answers it once, so this
+			// page is the one time the user sees it, and a reload draws the page without it (#257
+			// decisions 1 and 14).
+			if len(enabled.RecoveryCodes) > 0 {
+				bind := map[string]interface{}{
+					"otpEnabled":    true,
+					"recoveryCodes": enabled.RecoveryCodes,
+				}
+				if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind); err != nil {
+					httpHelper.InternalServerError(w, r, err)
+				}
 				return
 			}
 		}

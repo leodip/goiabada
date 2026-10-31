@@ -560,6 +560,12 @@
 "adminconsole.account.otp.step3" = "Inserisci la password e il codice a 6 cifre mostrato dall'app."
 "adminconsole.account.otp.field.code" = "Codice dell'app"
 "adminconsole.account.otp.enable_button" = "Attiva l'autenticazione a due fattori"
+"adminconsole.account.otp.recovery_codes.title" = "Salva i codici di recupero"
+"adminconsole.account.otp.recovery_codes.lead" = "Se perdi il telefono, puoi accedere con uno di questi codici al posto di un codice dell'app. Ogni codice funziona una sola volta. Salvali ora in un posto sicuro, come un gestore di password. Non vengono mostrati di nuovo."
+"adminconsole.account.otp.recovery_codes.list_label" = "Codici di recupero"
+"adminconsole.account.otp.recovery_codes.copy" = "Copia codici"
+"adminconsole.account.otp.recovery_codes.copied" = "Codici copiati"
+"adminconsole.account.otp.recovery_codes.copy_failed_status" = "Non è stato possibile copiare i codici. Sono selezionati: puoi copiarli manualmente."
 
 # --- Account manage consents ------------------------------------------------
 

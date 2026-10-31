@@ -1271,8 +1271,17 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 		// The rebind's clear, in the enrolment's own transaction (#489).
 		database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpEnrolTx, int64(1)).Return(nil).Once()
+		// The new authenticator's recovery codes, in the same transaction: the sign-in setup
+		// creates a set as the account page does (#257 decision 1).
+		database.On("ReplaceUserRecoveryCodes", mock.Anything, otpEnrolTx, int64(1),
+			mock.MatchedBy(func(hashes []string) bool { return len(hashes) == 10 })).Return(nil).
+			Run(func(mock.Arguments) { calls = append(calls, "recovery-codes") }).Once()
 
 		auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return()
+		// The set is audited beside the enable, naming the user and nothing of the codes.
+		auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, map[string]interface{}{
+			"user_id": int64(1),
+		}).Return().Once()
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return()
 
 		// Rotation joins the ordering this case already tracks, which is what makes the
@@ -1308,7 +1317,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
-		assert.Equal(t, []string{"begin", "establish", "increment", "clear", "commit", "rotate", "save"}, calls,
+		assert.Equal(t, []string{"begin", "establish", "increment", "clear", "recovery-codes", "commit", "rotate", "save"}, calls,
 			"the enable write, the counter advance and the pending-enrolment clear belong inside "+
 				"one transaction, commit last. The clear is handed otpEnrolTx rather than nil: on "+
 				"a nil transaction it would commit on its own, and a rolled back enrolment would "+

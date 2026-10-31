@@ -340,7 +340,7 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 	verifiedGeneration := user.OtpConfigGeneration
 	enrolled := false
 	if !user.OTPEnabled {
-		generation, established, establishErr := otpcredential.Establish(ctx, o.database, o.dataCipher, user, secret)
+		generation, _, established, establishErr := otpcredential.Establish(ctx, o.database, o.dataCipher, user, secret)
 		if establishErr != nil {
 			return OTPSubmissionResult{}, establishErr
 		}
@@ -351,6 +351,13 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		enrolled = true
 
 		o.auditLogger.Log(ctx, audit.EventEnabledOTP, map[string]interface{}{
+			"user_id": user.Id,
+		})
+		// The new authenticator came with a set of recovery codes, created in Establish's
+		// transaction as on the account page (#257 decisions 1 and 10). The codes returned are not
+		// carried further yet: the step that shows them after the accepted setup code is decision
+		// 14's.
+		o.auditLogger.Log(ctx, audit.EventRecoveryCodesCreated, map[string]interface{}{
 			"user_id": user.Id,
 		})
 	}

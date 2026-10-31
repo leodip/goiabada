@@ -1336,6 +1336,78 @@ func (_c *Database_CountGroupMembers_Call) RunAndReturn(run func(ctx context.Con
 	return _c
 }
 
+// CountUnusedUserRecoveryCodes provides a mock function for the type Database
+func (_mock *Database) CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error) {
+	ret := _mock.Called(ctx, tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountUnusedUserRecoveryCodes")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (int, error)); ok {
+		return returnFunc(ctx, tx, userId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) int); ok {
+		r0 = returnFunc(ctx, tx, userId)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_CountUnusedUserRecoveryCodes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountUnusedUserRecoveryCodes'
+type Database_CountUnusedUserRecoveryCodes_Call struct {
+	*mock.Call
+}
+
+// CountUnusedUserRecoveryCodes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) CountUnusedUserRecoveryCodes(ctx any, tx any, userId any) *Database_CountUnusedUserRecoveryCodes_Call {
+	return &Database_CountUnusedUserRecoveryCodes_Call{Call: _e.mock.On("CountUnusedUserRecoveryCodes", ctx, tx, userId)}
+}
+
+func (_c *Database_CountUnusedUserRecoveryCodes_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64)) *Database_CountUnusedUserRecoveryCodes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CountUnusedUserRecoveryCodes_Call) Return(n int, err error) *Database_CountUnusedUserRecoveryCodes_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_CountUnusedUserRecoveryCodes_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) (int, error)) *Database_CountUnusedUserRecoveryCodes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateAuditLog provides a mock function for the type Database
 func (_mock *Database) CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *record.AuditLog) error {
 	ret := _mock.Called(ctx, tx, auditLog)
@@ -5535,6 +5607,69 @@ func (_c *Database_DeleteUserProfilePicture_Call) Return(err error) *Database_De
 }
 
 func (_c *Database_DeleteUserProfilePicture_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) error) *Database_DeleteUserProfilePicture_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteUserRecoveryCodes provides a mock function for the type Database
+func (_mock *Database) DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) error {
+	ret := _mock.Called(ctx, tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteUserRecoveryCodes")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, userId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteUserRecoveryCodes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteUserRecoveryCodes'
+type Database_DeleteUserRecoveryCodes_Call struct {
+	*mock.Call
+}
+
+// DeleteUserRecoveryCodes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) DeleteUserRecoveryCodes(ctx any, tx any, userId any) *Database_DeleteUserRecoveryCodes_Call {
+	return &Database_DeleteUserRecoveryCodes_Call{Call: _e.mock.On("DeleteUserRecoveryCodes", ctx, tx, userId)}
+}
+
+func (_c *Database_DeleteUserRecoveryCodes_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64)) *Database_DeleteUserRecoveryCodes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteUserRecoveryCodes_Call) Return(err error) *Database_DeleteUserRecoveryCodes_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteUserRecoveryCodes_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) error) *Database_DeleteUserRecoveryCodes_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -14129,6 +14264,75 @@ func (_c *Database_RefundRateLimitHit_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
+// ReplaceUserRecoveryCodes provides a mock function for the type Database
+func (_mock *Database) ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error {
+	ret := _mock.Called(ctx, tx, userId, codeHashes)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReplaceUserRecoveryCodes")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, []string) error); ok {
+		r0 = returnFunc(ctx, tx, userId, codeHashes)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_ReplaceUserRecoveryCodes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReplaceUserRecoveryCodes'
+type Database_ReplaceUserRecoveryCodes_Call struct {
+	*mock.Call
+}
+
+// ReplaceUserRecoveryCodes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - codeHashes []string
+func (_e *Database_Expecter) ReplaceUserRecoveryCodes(ctx any, tx any, userId any, codeHashes any) *Database_ReplaceUserRecoveryCodes_Call {
+	return &Database_ReplaceUserRecoveryCodes_Call{Call: _e.mock.On("ReplaceUserRecoveryCodes", ctx, tx, userId, codeHashes)}
+}
+
+func (_c *Database_ReplaceUserRecoveryCodes_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string)) *Database_ReplaceUserRecoveryCodes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 []string
+		if args[3] != nil {
+			arg3 = args[3].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_ReplaceUserRecoveryCodes_Call) Return(err error) *Database_ReplaceUserRecoveryCodes_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_ReplaceUserRecoveryCodes_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error) *Database_ReplaceUserRecoveryCodes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ReserveRateLimitHit provides a mock function for the type Database
 func (_mock *Database) ReserveRateLimitHit(ctx context.Context, keyHash string, current time.Time, previous time.Time, expiresAt time.Time, admit func(curr int, prev int) bool) (bool, error) {
 	ret := _mock.Called(ctx, keyHash, current, previous, expiresAt, admit)
@@ -16520,6 +16724,84 @@ func (_c *Database_TryStoreForgotPasswordCode_Call) Return(b bool, err error) *D
 }
 
 func (_c *Database_TryStoreForgotPasswordCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error)) *Database_TryStoreForgotPasswordCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TryUseUserRecoveryCode provides a mock function for the type Database
+func (_mock *Database) TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error) {
+	ret := _mock.Called(ctx, tx, userId, codeHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TryUseUserRecoveryCode")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string) (bool, error)); ok {
+		return returnFunc(ctx, tx, userId, codeHash)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string) bool); ok {
+		r0 = returnFunc(ctx, tx, userId, codeHash)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, string) error); ok {
+		r1 = returnFunc(ctx, tx, userId, codeHash)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_TryUseUserRecoveryCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TryUseUserRecoveryCode'
+type Database_TryUseUserRecoveryCode_Call struct {
+	*mock.Call
+}
+
+// TryUseUserRecoveryCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - codeHash string
+func (_e *Database_Expecter) TryUseUserRecoveryCode(ctx any, tx any, userId any, codeHash any) *Database_TryUseUserRecoveryCode_Call {
+	return &Database_TryUseUserRecoveryCode_Call{Call: _e.mock.On("TryUseUserRecoveryCode", ctx, tx, userId, codeHash)}
+}
+
+func (_c *Database_TryUseUserRecoveryCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, codeHash string)) *Database_TryUseUserRecoveryCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_TryUseUserRecoveryCode_Call) Return(b bool, err error) *Database_TryUseUserRecoveryCode_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_TryUseUserRecoveryCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)) *Database_TryUseUserRecoveryCode_Call {
 	_c.Call.Return(run)
 	return _c
 }

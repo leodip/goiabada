@@ -553,6 +553,12 @@
 "adminconsole.account.otp.step3" = "Enter your password and the 6-digit code the app shows."
 "adminconsole.account.otp.field.code" = "Code from the app"
 "adminconsole.account.otp.enable_button" = "Turn on two-factor authentication"
+"adminconsole.account.otp.recovery_codes.title" = "Save your recovery codes"
+"adminconsole.account.otp.recovery_codes.lead" = "If you lose your phone, you can sign in with one of these codes instead of a code from your app. Each code works once. Save them somewhere safe now, such as a password manager. They are not shown again."
+"adminconsole.account.otp.recovery_codes.list_label" = "Recovery codes"
+"adminconsole.account.otp.recovery_codes.copy" = "Copy codes"
+"adminconsole.account.otp.recovery_codes.copied" = "Codes copied"
+"adminconsole.account.otp.recovery_codes.copy_failed_status" = "Couldn't copy the codes. They're selected, so you can copy them yourself."
 
 # --- Account manage consents ------------------------------------------------
 

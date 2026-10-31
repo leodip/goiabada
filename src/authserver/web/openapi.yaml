@@ -3659,6 +3659,12 @@ paths:
         400 (`OTP_ALREADY_ENABLED` or `OTP_NOT_ENABLED`) when OTP is already in the state asked
         for, otherwise 409 (`CONCURRENT_UPDATE`) with nothing saved. The code submitted with an
         enable is spent either way.
+
+        An enable answers with `recoveryCodes`: the ten recovery codes created with the new
+        authenticator, each of which signs the user in once in place of an authenticator code.
+        This response is the only time they are returned, since the server stores only their
+        hashes, so show them to the user now. A disable answers without the field and deletes the
+        user's recovery codes with the authenticator.
       operationId: updateAccountOTP
       requestBody:
         required: true
@@ -3672,7 +3678,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdateUserResponse'
+                $ref: '#/components/schemas/UpdateAccountOTPResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -6789,6 +6795,24 @@ components:
           description: >-
             6-digit TOTP code (required when enabling), generated from the secret returned by
             GET /api/v1/account/otp/enrollment
+
+    UpdateAccountOTPResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        recoveryCodes:
+          type: array
+          description: >-
+            Present only when the request turned two-factor authentication on: the ten recovery
+            codes created with the authenticator, each 24 characters in six groups of four, such
+            as 7kq2-m9xh-4trw-b3np-j6vd-egac. Returned this once and never again.
+          items:
+            type: string
+          minItems: 10
+          maxItems: 10
+      required:
+        - user
 
     AccountLogoutRequest:
       type: object

@@ -41,8 +41,8 @@ import (
 // Database is what the OTP credential lifecycle needs: the authenticator's two compare-and-sets on
 // the user row, the generation counter every session compares itself against, the pending enrolment an establish clears, the consumed-step
 // marker a verification claims and a removal resets, the consecutive-failure count a refused
-// verification advances and a fresh enrolment clears, the sessions a removal lowers, and the
-// transaction they share.
+// verification advances and a fresh enrolment clears, the sessions a removal lowers, the recovery
+// codes an establish creates and a removal deletes, and the transaction they share.
 //
 // Exported, unlike the per-file ports #386 left in the handler packages, because it is this
 // package's own port and the two consumer ports embed it to hand the capability on (#387).
@@ -66,6 +66,8 @@ type Database interface {
 	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
 		secretEncrypted []byte) (bool, error)
 	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)
+	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error
+	DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) error
 }
 
 // VerifyOutcome is what a passcode check concluded. The first three values are the three arms
@@ -113,7 +115,8 @@ type VerifyResult struct {
 // Establish installs a user's authenticator: it encrypts the seed at rest and, only while OTP is
 // still off at the otp_config_generation user was read with, stores it and turns otp_enabled on,
 // advances the generation and discards any pending enrolment. It reports whether it did and, when
-// it did, the generation that landed.
+// it did, the generation that landed and the set of recovery codes created with the authenticator,
+// which the caller shows once: only their hashes are stored (#257 decision 1).
 //
 // **A compare-and-set on the authenticator, not on the flag** (#471 decision 2). The write names
 // only the seed and otp_enabled, so it cannot undo a disable or a password change made since the
@@ -145,11 +148,17 @@ type VerifyResult struct {
 // /auth/level2, and promoting that at /auth/completed would leave a session that just enrolled
 // and verified owing another second-factor prompt at once.
 func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User,
-	seed string) (generation int64, established bool, err error) {
+	seed string) (generation int64, recoveryCodes []string, established bool, err error) {
 
 	encrypted, err := encryptSecret(dataCipher, seed)
 	if err != nil {
-		return 0, false, err
+		return 0, nil, false, err
+	}
+	// Drawn before the transaction opens, so a deadlocked attempt's rerun stores the same set it
+	// returns rather than a set nobody was shown.
+	codes, codeHashes, err := newRecoveryCodes()
+	if err != nil {
+		return 0, nil, false, err
 	}
 
 	// Opened through RunInTransaction, so a deadlock reruns the writes together (#301).
@@ -189,19 +198,25 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 		// enrollment's reason: putting it here makes "a bound authenticator starts at no
 		// failed attempts against it" a property of the transaction rather than of one
 		// caller.
-		return db.ClearUserOtpConsecutiveFailures(ctx, tx, user.Id)
+		if clearErr := db.ClearUserOtpConsecutiveFailures(ctx, tx, user.Id); clearErr != nil {
+			return clearErr
+		}
+		// The new authenticator's recovery codes, replacing any set the user still had, in the
+		// same transaction: whatever the path, a committed authenticator comes with its set and a
+		// rolled back one leaves none behind (#257 decision 1). Only their hashes are stored.
+		return db.ReplaceUserRecoveryCodes(ctx, tx, user.Id, codeHashes)
 	})
 	if err != nil {
-		return 0, false, err
+		return 0, nil, false, err
 	}
 	if !established {
-		return 0, false, nil
+		return 0, nil, false, nil
 	}
 
 	user.OTPSecretEncrypted = encrypted
 	user.OTPEnabled = true
 	user.OtpConfigGeneration = generation
-	return generation, true, nil
+	return generation, codes, true, nil
 }
 
 // Remove removes a user's authenticator: only while OTP is still on at the otp_config_generation
@@ -303,6 +318,12 @@ func RemoveTx(ctx context.Context, db Database, tx *sql.Tx, user *record.User) (
 		return false, nil
 	}
 	if err = db.ResetUserOTPStep(ctx, tx, user.Id); err != nil {
+		return false, err
+	}
+	// The authenticator's recovery codes go with it, used and unused, so every path that removes
+	// one, the account page, the administrator's and the recover command's, clears them; the next
+	// authenticator comes with a set of its own (#257 decision 3).
+	if err = db.DeleteUserRecoveryCodes(ctx, tx, user.Id); err != nil {
 		return false, err
 	}
 	// The counter that tells every one of this user's sessions they owe a second factor

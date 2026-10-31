@@ -208,6 +208,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
+	seedRecoveryCodesForTest(t, testUser.Id)
 
 	// Test: Disable OTP
 	updateReq := api.UpdateUserOTPRequest{
@@ -236,6 +237,9 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	assert.False(t, updatedUser.OTPEnabled)
 	// The seed itself is gone, not merely unreachable (#98).
 	assert.Empty(t, updatedUser.OTPSecretEncrypted)
+	// And so are the user's recovery codes: an administrator turning two-factor authentication off
+	// leaves none of them working (#257 decision 3).
+	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, testUser.Id))
 }
 
 // TestAPIUserOTPPut_DisableResetsConsumedStep pins the second of the two disable sites #111
