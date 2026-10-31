@@ -64,6 +64,7 @@ func registrationAnswer(t *testing.T, body string) (string, []string) {
 	datamocks.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(nil).Maybe()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Maybe()
+	database.On("CreatePostLogoutRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Maybe()
 	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).Return().Maybe()
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", strings.NewReader(body))

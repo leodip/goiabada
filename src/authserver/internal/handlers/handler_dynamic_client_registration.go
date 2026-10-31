@@ -26,11 +26,12 @@ import (
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
-// dynamicClientRegistrationDatabase is what RFC 7591 registration needs: the client and redirect
-// URIs it creates, and the transaction that makes them one write.
+// dynamicClientRegistrationDatabase is what RFC 7591 registration needs: the client, redirect URIs
+// and sign-out redirect URIs it creates, and the transaction that makes them one write.
 type dynamicClientRegistrationDatabase interface {
 	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
+	CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -79,6 +80,15 @@ func HandleDynamicClientRegistrationPost(
 		// 5. Validate redirect URIs (RFC 7591 §5)
 		if err := validateDCRRedirectURIs(&req); err != nil {
 			refuseDCR(w, r, oidc.DCRErrorInvalidRedirectURI, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// 5b. Validate the sign-out redirect URIs under the same rules (#147 decision 7). A refusal is
+		// invalid_client_metadata, not invalid_redirect_uri: OpenID Connect Dynamic Client
+		// Registration 1.0 section 3.3 keeps that code for redirect_uris, and a registrant's library
+		// would point its developer at the wrong field.
+		if err := validateDCRPostLogoutRedirectURIs(&req); err != nil {
+			refuseDCR(w, r, oidc.DCRErrorInvalidClientMetadata, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -151,12 +161,13 @@ func HandleDynamicClientRegistrationPost(
 		// PKCE (#428).
 		client.ApplyPublicClientInvariants()
 
-		// 10. Save the client and its redirect URIs as one write (#428). Everything the request
-		// can be refused for was decided above, so a failure here is the server's, and the
-		// transaction is what leaves no half-registered client behind: a client row whose redirect
-		// URIs were not all written, holding a secret its requester never received. The body is
-		// safe to rerun after a deadlock: CreateClient reassigns the id and timestamps on each
-		// attempt, each redirect URI row is built inside it, and it writes nothing to the response.
+		// 10. Save the client, its redirect URIs and its sign-out redirect URIs as one write (#428,
+		// #147). Everything the request can be refused for was decided above, so a failure here is
+		// the server's, and the transaction is what leaves no half-registered client behind: a
+		// client row whose URIs were not all written, holding a secret its requester never
+		// received. The body is safe to rerun after a deadlock: CreateClient reassigns the id and
+		// timestamps on each attempt, each URI row is built inside it, and it writes nothing to the
+		// response.
 		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			if err := database.CreateClient(r.Context(), tx, client); err != nil {
 				return errs.Wrap(err, "DCR: unable to create the client")
@@ -168,6 +179,15 @@ func HandleDynamicClientRegistrationPost(
 				}
 				if err := database.CreateRedirectURI(r.Context(), tx, redirectURI); err != nil {
 					return errs.Wrap(err, "DCR: unable to create a redirect URI")
+				}
+			}
+			for _, uri := range req.PostLogoutRedirectURIs {
+				postLogoutRedirectURI := &record.PostLogoutRedirectURI{
+					ClientId: client.Id,
+					URI:      uri,
+				}
+				if err := database.CreatePostLogoutRedirectURI(r.Context(), tx, postLogoutRedirectURI); err != nil {
+					return errs.Wrap(err, "DCR: unable to create a sign-out redirect URI")
 				}
 			}
 			return nil
@@ -194,6 +214,7 @@ func HandleDynamicClientRegistrationPost(
 			ClientIDIssuedAt:        time.Now().Unix(),
 			ClientSecretExpiresAt:   0, // Never expires
 			RedirectURIs:            req.RedirectURIs,
+			PostLogoutRedirectURIs:  req.PostLogoutRedirectURIs,
 			TokenEndpointAuthMethod: req.TokenEndpointAuthMethod,
 			GrantTypes:              req.GrantTypes,
 			ClientName:              req.ClientName,
@@ -282,31 +303,57 @@ func validateDCRRedirectURIs(req *oidc.DynamicClientRegistrationRequest) error {
 		return errs.Errorf("redirect_uris required for authorization_code grant type")
 	}
 
+	return validateDCRURIList(req.RedirectURIs, req.TokenEndpointAuthMethod == "none", redirectURIField)
+}
+
+// validateDCRPostLogoutRedirectURIs validates a registration's sign-out redirect URIs under every
+// rule its redirect URIs get, client-type table included (#147 decision 7). The field is optional
+// whatever the grant types, as redirect_uris is when the authorization code flow isn't asked for.
+func validateDCRPostLogoutRedirectURIs(req *oidc.DynamicClientRegistrationRequest) error {
+	return validateDCRURIList(req.PostLogoutRedirectURIs, req.TokenEndpointAuthMethod == "none", postLogoutRedirectURIField)
+}
+
+// dcrURIField names the registration field a list of URIs came in, the way a refusal names it, so
+// a registrant learns which of the two lists to change.
+type dcrURIField struct {
+	// entry is one value of the list, such as "redirect_uri".
+	entry string
+	// list is the field itself, such as "redirect_uris".
+	list string
+}
+
+var (
+	redirectURIField = dcrURIField{entry: "redirect_uri", list: "redirect_uris"}
+	// The entry spelling carries the field's own name, so every refusal of a sign-out redirect URI
+	// names post_logout_redirect_uris, as decision 7 asks.
+	postLogoutRedirectURIField = dcrURIField{entry: "post_logout_redirect_uris entry", list: "post_logout_redirect_uris"}
+)
+
+// validateDCRURIList applies the bounds and the per-URI rules to one of a registration's URI lists.
+// Each list is bounded on its own: the sign-out list's 60 are counted apart from the redirect URIs.
+func validateDCRURIList(uris []string, isPublic bool, field dcrURIField) error {
 	// The bounds are the admin API's too, since they are facts about storage rather than about
-	// the door, and every refusal here is invalid_redirect_uri, so an integrator learns the one
-	// thing to change is redirect_uris (#428). RFC 7591 sets no bound of its own.
-	if len(req.RedirectURIs) > record.RedirectURIsMaxPerClient {
-		return errs.Errorf("redirect_uris cannot hold more than %d entries", record.RedirectURIsMaxPerClient)
+	// the door, and every refusal names the field, so an integrator learns the one thing to change
+	// (#428). RFC 7591 sets no bound of its own.
+	if len(uris) > record.RedirectURIsMaxPerClient {
+		return errs.Errorf("%s cannot hold more than %d entries", field.list, record.RedirectURIsMaxPerClient)
 	}
 
-	// Validate each redirect URI
-	isPublic := req.TokenEndpointAuthMethod == "none"
-
-	seen := make(map[string]bool, len(req.RedirectURIs))
-	for _, uri := range req.RedirectURIs {
+	seen := make(map[string]bool, len(uris))
+	for _, uri := range uris {
 		// Bytes, before parsing, so an overlong value is never parsed, and not echoed: the
 		// refusal names the bound instead of repeating a value that broke it.
 		if len(uri) > record.RedirectURIMaxBytes {
-			return errs.Errorf("a redirect_uri cannot exceed %d bytes", record.RedirectURIMaxBytes)
+			return errs.Errorf("a %s cannot exceed %d bytes", field.entry, record.RedirectURIMaxBytes)
 		}
 		// A repeat would be stored as a second row, and a save removing the URI would then
-		// leave the other copy live at sign-in. Matching at the authorization endpoint is
+		// leave the other copy live. Matching at the authorization endpoint and at sign-out is
 		// exact, so the comparison here is too.
 		if seen[uri] {
-			return errs.Errorf("redirect_uri is listed more than once: %s", uri)
+			return errs.Errorf("%s is listed more than once: %s", field.entry, uri)
 		}
 		seen[uri] = true
-		if err := validateRedirectURI(uri, isPublic); err != nil {
+		if err := validateRedirectURI(uri, isPublic, field); err != nil {
 			return err
 		}
 	}
@@ -336,11 +383,13 @@ var deniedRedirectURISchemes = map[string]bool{
 	"gopher": true, "telnet": true,
 }
 
-// validateRedirectURI validates a single redirect URI per RFC 7591 §5
-func validateRedirectURI(uri string, isPublic bool) error {
+// validateRedirectURI validates a single redirect URI per RFC 7591 §5, or a single sign-out
+// redirect URI, which gets every one of the same checks (#147 decision 7); field names which in the
+// refusal.
+func validateRedirectURI(uri string, isPublic bool, field dcrURIField) error {
 	parsed, err := url.ParseRequestURI(uri)
 	if err != nil {
-		return errs.Errorf("invalid redirect_uri format: %s", uri)
+		return errs.Errorf("invalid %s format: %s", field.entry, uri)
 	}
 
 	// RFC 6749 section 3.1.2 requires an absolute-URI (RFC 3986 section 4.3) and forbids a
@@ -355,7 +404,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// matching, which is what covers rows stored before any of these rules existed. Keep the
 	// rule in the predicate rather than here, so the three cannot drift (#122).
 	if !urlmatch.IsAbsoluteRedirectURI(uri) {
-		return errs.Errorf("redirect_uri must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host: %s", uri)
+		return errs.Errorf("%s must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host: %s", field.entry, uri)
 	}
 
 	// Characters RFC 3986 excludes from URIs entirely. A redirect URI carrying them is
@@ -366,7 +415,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// client reaches the same place, so gating this inside the custom-scheme branch would
 	// miss it.
 	if strings.ContainsAny(uri, excludedURIChars) {
-		return errs.Errorf("redirect_uri contains characters that are not permitted in a URI: %s", uri)
+		return errs.Errorf("%s contains characters that are not permitted in a URI: %s", field.entry, uri)
 	}
 
 	// Schemes that cannot receive an authorization response, or that execute script.
@@ -376,7 +425,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// above is what stops that class. This gate stops the schemes that carry no excluded
 	// characters at all, such as javascript: and ftp:.
 	if deniedRedirectURISchemes[strings.ToLower(parsed.Scheme)] {
-		return errs.Errorf("redirect_uri scheme %q is not permitted: %s", parsed.Scheme, uri)
+		return errs.Errorf("%s scheme %q is not permitted: %s", field.entry, parsed.Scheme, uri)
 	}
 
 	// RFC 9700 section 2.6: http only on the loopback interface (RFC 8252 section 7.3),
@@ -385,7 +434,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 	// strings.HasPrefix test, which accepted any host merely starting with a loopback name,
 	// localhost.attacker.com included, in both client-type branches below (#105).
 	if urlmatch.IsInsecureHTTPRedirectURI(uri) {
-		return errs.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
+		return errs.Errorf("http %s must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", field.list, uri)
 	}
 
 	// For public clients (MCP use case), only allow loopback http or custom schemes.
@@ -401,7 +450,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 		}
 
 		// Reject HTTPS for public clients registered via DCR
-		return errs.Errorf("public clients registered via DCR cannot use https redirect_uris (security restriction): %s", uri)
+		return errs.Errorf("public clients registered via DCR cannot use https %s (security restriction): %s", field.list, uri)
 	}
 
 	// For confidential clients, allow HTTPS or loopback http.
@@ -411,7 +460,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 
 	// Custom schemes are for public clients only, which is what this branch not accepting
 	// them means. The message used to offer "custom scheme" here, which was never true.
-	return errs.Errorf("confidential clients must use an https redirect_uri, or http on a loopback host: %s", uri)
+	return errs.Errorf("confidential clients must use an https %s, or http on a loopback host: %s", field.entry, uri)
 }
 
 // generateDCRClientIdentifier generates unique client identifier (RFC 7591 §3.2.1)

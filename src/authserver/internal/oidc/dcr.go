@@ -10,6 +10,7 @@ package oidc
 type DynamicClientRegistrationRequest struct {
 	// OAuth 2.0 core metadata (RFC 7591 §2)
 	RedirectURIs            []string `json:"redirect_uris,omitempty"`
+	PostLogoutRedirectURIs  []string `json:"post_logout_redirect_uris,omitempty"`  // sign-out redirect URIs (RP-Initiated Logout 1.0 section 3.1), never read at sign-in (#147)
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method,omitempty"` // "none", "client_secret_basic", "client_secret_post"
 	GrantTypes              []string `json:"grant_types,omitempty"`                // ["authorization_code", "client_credentials", "refresh_token"]
 
@@ -35,6 +36,7 @@ type DynamicClientRegistrationResponse struct {
 
 	// Echo back registered metadata (RFC 7591 §3.2.1)
 	RedirectURIs            []string `json:"redirect_uris,omitempty"`
+	PostLogoutRedirectURIs  []string `json:"post_logout_redirect_uris,omitempty"`
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 	GrantTypes              []string `json:"grant_types"`
 	ClientName              string   `json:"client_name,omitempty"`

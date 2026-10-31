@@ -28,12 +28,14 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 			name: "DynamicClientRegistrationRequest",
 			want: &DynamicClientRegistrationRequest{
 				RedirectURIs:            []string{"https://client.example.org/callback"},
+				PostLogoutRedirectURIs:  []string{"https://client.example.org/signed-out"},
 				TokenEndpointAuthMethod: "client_secret_basic",
 				GrantTypes:              []string{"authorization_code", "refresh_token"},
 				ClientName:              "Example Client",
 			},
 			newValue: func() any { return &DynamicClientRegistrationRequest{} },
 			literal: `{"redirect_uris":["https://client.example.org/callback"],` +
+				`"post_logout_redirect_uris":["https://client.example.org/signed-out"],` +
 				`"token_endpoint_auth_method":"client_secret_basic",` +
 				`"grant_types":["authorization_code","refresh_token"],` +
 				`"client_name":"Example Client"}`,
@@ -55,6 +57,7 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				ClientIDIssuedAt:        1758326400,
 				ClientSecretExpiresAt:   0,
 				RedirectURIs:            []string{"https://client.example.org/callback"},
+				PostLogoutRedirectURIs:  []string{"https://client.example.org/signed-out"},
 				TokenEndpointAuthMethod: "client_secret_basic",
 				GrantTypes:              []string{"authorization_code", "refresh_token"},
 				ClientName:              "Example Client",
@@ -65,6 +68,7 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				`"client_id_issued_at":1758326400,` +
 				`"client_secret_expires_at":0,` +
 				`"redirect_uris":["https://client.example.org/callback"],` +
+				`"post_logout_redirect_uris":["https://client.example.org/signed-out"],` +
 				`"token_endpoint_auth_method":"client_secret_basic",` +
 				`"grant_types":["authorization_code","refresh_token"],` +
 				`"client_name":"Example Client"}`,

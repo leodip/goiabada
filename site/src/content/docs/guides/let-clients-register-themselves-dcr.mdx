@@ -86,7 +86,7 @@ If you're writing the tool, this is what it does the first time it runs.
 <Aside type="caution">
 A self-registered client is never sent an error. When a sign-in fails, the user sees a page on the auth server and nothing comes back to your app, so give up waiting for the callback after a while and let the user start over. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
 
-Sign-out, unlike sign-in, compares a loopback port. So if your app listens on a port it picks each time, the browser can't be sent back to it after a sign-out: leave out `post_logout_redirect_uri`, and the user [stays on the auth server's "Signed out" page](/guides/sign-users-out/#where-the-user-lands). To get the browser back, register a redirect URI on a port your app will be listening on, such as `http://127.0.0.1:53682/callback`, and send it with `id_token_hint` exactly as registered.
+Sign-out, unlike sign-in, compares a loopback port. So if your app listens on a port it picks each time, the browser can't be sent back to it after a sign-out: leave out `post_logout_redirect_uri`, and the user [stays on the auth server's "Signed out" page](/guides/sign-users-out/#where-the-user-lands). To get the browser back, register a sign-out redirect URI on a port your app will be listening on, such as `"post_logout_redirect_uris": ["http://127.0.0.1:53682/signed-out"]`. Then sign out with it as `post_logout_redirect_uri`, exactly as registered, and with `id_token_hint`. A redirect URI doesn't work for sign-out.
 </Aside>
 
 ## Review what registered
@@ -105,7 +105,7 @@ Every registration leaves a `dynamic_client_registration` entry in the [audit lo
 
 ## What a registration may ask for
 
-The auth server reads four fields, `redirect_uris`, `token_endpoint_auth_method`, `grant_types` and `client_name`, and ignores the rest. A registration can't ask for the [legacy flows](/legacy-flows/implicit/), and a public client can't ask for `client_credentials`. Redirect URIs follow stricter rules than for clients you create, since nobody has checked who's asking: a public client gets loopback `http` and custom schemes such as `myapp://callback`, and a confidential one `https` and loopback `http`. So a single-page app can't register itself: create it in the admin console. [Dynamic client registration](/reference/endpoints/dynamic-client-registration/) has every field, rule and error.
+The auth server reads five fields, `redirect_uris`, `post_logout_redirect_uris`, `token_endpoint_auth_method`, `grant_types` and `client_name`, and ignores the rest. A registration can't ask for the [legacy flows](/legacy-flows/implicit/), and a public client can't ask for `client_credentials`. Redirect URIs follow stricter rules than for clients you create, since nobody has checked who's asking: a public client gets loopback `http` and custom schemes such as `myapp://callback`, and a confidential one `https` and loopback `http`. Sign-out redirect URIs, in `post_logout_redirect_uris`, follow the same rules. So a single-page app can't register itself: create it in the admin console. [Dynamic client registration](/reference/endpoints/dynamic-client-registration/) has every field, rule and error.
 
 ## What a self-registered client gets
 

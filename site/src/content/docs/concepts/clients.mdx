@@ -264,14 +264,15 @@ curl -X POST https://auth.example.com/connect/register \
   }'
 ```
 
-The auth server reads four fields and ignores the rest:
+The auth server reads five fields and ignores the rest:
 
 - `redirect_uris`, required when the client uses the authorization code flow.
+- `post_logout_redirect_uris`, the client's [sign-out redirect URIs](#sign-out-redirect-uris), optional.
 - `token_endpoint_auth_method`: `none` for a public client, or `client_secret_basic` (the default) or `client_secret_post` for a confidential one.
 - `grant_types`: `authorization_code` (the default), `refresh_token` and `client_credentials`. A public client can't ask for `client_credentials`, and the legacy flows can't be asked for at all: both are off on the client, whatever the global settings, until an administrator turns one on for it.
 - `client_name`: the name the consent screen shows, up to 100 characters, which becomes the client's **Description**.
 
-It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Metadata it refuses gets a 400 with `invalid_client_metadata`, or `invalid_redirect_uri` for a redirect URI. Every field, answer and error is on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
+It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Metadata it refuses gets a 400 with `invalid_client_metadata`, or `invalid_redirect_uri` for a redirect URI. A refused sign-out redirect URI gets `invalid_client_metadata`. Every field, answer and error is on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
 
 Because nobody has reviewed them, self-registered clients are treated more carefully:
 
@@ -289,7 +290,7 @@ Once you've reviewed a self-registered client, you can change its settings like 
 
 ### Redirect URIs for self-registered clients
 
-The [redirect URI rules](#redirect-uris) apply, plus stricter ones, since the caller is anonymous. A client is public when it registers with `token_endpoint_auth_method` set to `none`, and confidential otherwise.
+The [redirect URI rules](#redirect-uris) apply, plus stricter ones, since the caller is anonymous. A client is public when it registers with `token_endpoint_auth_method` set to `none`, and confidential otherwise. The same rules apply to the sign-out redirect URIs it registers.
 
 | Client | Allowed | Refused |
 |---|---|---|
