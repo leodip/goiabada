@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -63,9 +65,33 @@ type turnstileSave struct {
 	audited map[string]interface{}
 }
 
+// fakeSecretKeyChecker stands in for Cloudflare's check of a secret key: it answers every check with
+// answer, and records each secret key it was asked about.
+type fakeSecretKeyChecker struct {
+	answer  turnstile.SecretKeyCheck
+	checked []string
+}
+
+func (f *fakeSecretKeyChecker) CheckSecretKey(_ context.Context, secretKey string) turnstile.SecretKeyCheck {
+	f.checked = append(f.checked, secretKey)
+	return f.answer
+}
+
+// acceptingSecretKeyChecker is a check Cloudflare accepts every secret key in.
+func acceptingSecretKeyChecker() *fakeSecretKeyChecker {
+	return &fakeSecretKeyChecker{answer: turnstile.SecretKeyAccepted}
+}
+
 // serveTurnstileSave runs PUT /api/v1/admin/settings/turnstile as a manage-settings caller, starting
-// from settings. A refused save is held to writing nothing and recording nothing.
+// from settings, with every secret key Cloudflare is asked about accepted. A refused save is held to
+// writing nothing and recording nothing.
 func serveTurnstileSave(t *testing.T, settings *record.Settings, body string) turnstileSave {
+	t.Helper()
+	return serveTurnstileSaveCheckedBy(t, settings, body, acceptingSecretKeyChecker())
+}
+
+// serveTurnstileSaveCheckedBy is serveTurnstileSave with checker answering for Cloudflare.
+func serveTurnstileSaveCheckedBy(t *testing.T, settings *record.Settings, body string, checker *fakeSecretKeyChecker) turnstileSave {
 	t.Helper()
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -84,7 +110,7 @@ func serveTurnstileSave(t *testing.T, settings *record.Settings, body string) tu
 	r = r.WithContext(reqctx.WithSettings(r.Context(), settings))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage-settings", "sub": grantCaller})
 	result.rr = httptest.NewRecorder()
-	HandleSettingsTurnstilePut(database, auditLogger, testDataCipher).ServeHTTP(result.rr, r)
+	HandleSettingsTurnstilePut(database, auditLogger, testDataCipher, checker).ServeHTTP(result.rr, r)
 
 	if result.rr.Code != http.StatusOK {
 		database.AssertNotCalled(t, "UpdateSettings", mock.Anything, mock.Anything, mock.Anything)
@@ -405,4 +431,181 @@ func TestHandleSettingsTurnstilePut_ABodyThatWillNotParseIsRefused(t *testing.T)
 	code, _ := decodeErrorEnvelope(t, save.rr)
 	assert.Equal(t, "INVALID_REQUEST_BODY", code)
 	assert.Nil(t, save.written)
+}
+
+// A save that stores a new secret key, or turns the challenge on, asks Cloudflare about the secret key
+// it leaves stored: the one entered, or the one already stored (#642 decision 11). Cloudflare's
+// acceptance lets the save go on.
+func TestHandleSettingsTurnstilePut_ANewSecretKeyOrTurningTheChallengeOnChecksTheSecretKey(t *testing.T) {
+	cases := []struct {
+		name          string
+		storedEnabled bool
+		storedSecret  bool
+		body          func(t *testing.T) string
+		wantChecked   string
+	}{
+		{
+			name: "a new secret key, challenge off",
+			body: func(t *testing.T) string {
+				return turnstileSaveBody(t, false, turnstileTestSiteKey, map[string]interface{}{"turnstileSecretKey": turnstileEnteredSecretKey})
+			},
+			wantChecked: turnstileEnteredSecretKey,
+		},
+		{
+			name: "a new secret key, challenge kept on", storedEnabled: true, storedSecret: true,
+			body: func(t *testing.T) string {
+				return turnstileSaveBody(t, true, turnstileTestSiteKey, map[string]interface{}{"turnstileSecretKey": turnstileEnteredSecretKey})
+			},
+			wantChecked: turnstileEnteredSecretKey,
+		},
+		{
+			name: "a new secret key, pasted with space around it", storedSecret: true,
+			body: func(t *testing.T) string {
+				return turnstileSaveBody(t, false, turnstileTestSiteKey, map[string]interface{}{"turnstileSecretKey": " " + turnstileEnteredSecretKey + "\t"})
+			},
+			wantChecked: turnstileEnteredSecretKey,
+		},
+		{
+			name: "turning the challenge on with a new secret key", storedSecret: true,
+			body: func(t *testing.T) string {
+				return turnstileSaveBody(t, true, turnstileTestSiteKey, map[string]interface{}{"turnstileSecretKey": turnstileEnteredSecretKey})
+			},
+			wantChecked: turnstileEnteredSecretKey,
+		},
+		{
+			name: "turning the challenge on with the stored secret key", storedSecret: true,
+			body:        func(t *testing.T) string { return turnstileSaveBody(t, true, turnstileTestSiteKey, nil) },
+			wantChecked: turnstileStoredSecretKey,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			checker := acceptingSecretKeyChecker()
+
+			save := serveTurnstileSaveCheckedBy(t, turnstileSaveSettings(t, c.storedEnabled, c.storedSecret), c.body(t), checker)
+
+			require.Equal(t, http.StatusOK, save.rr.Code, save.rr.Body.String())
+			assert.Equal(t, []string{c.wantChecked}, checker.checked, "Cloudflare is asked once, about the secret key left stored")
+			require.NotNil(t, save.written)
+			assert.Equal(t, c.wantChecked, decryptedSecretKey(t, save.written))
+		})
+	}
+}
+
+// Turning the challenge off, removing the secret key, and a save that keeps the challenge on with the
+// stored secret key never ask Cloudflare: none of them puts a secret key in use that was not.
+func TestHandleSettingsTurnstilePut_SavesThatPutNoSecretKeyInUseNeverCallCloudflare(t *testing.T) {
+	cases := []struct {
+		name          string
+		storedEnabled bool
+		body          func(t *testing.T) string
+		wantSecret    bool
+	}{
+		{
+			name: "turning the challenge off", storedEnabled: true,
+			body:       func(t *testing.T) string { return turnstileSaveBody(t, false, turnstileTestSiteKey, nil) },
+			wantSecret: true,
+		},
+		{
+			name: "turning the challenge off and removing the secret key", storedEnabled: true,
+			body: func(t *testing.T) string {
+				return turnstileSaveBody(t, false, turnstileTestSiteKey, map[string]interface{}{"clearTurnstileSecretKey": true})
+			},
+		},
+		{
+			name: "removing the secret key, challenge off",
+			body: func(t *testing.T) string {
+				return turnstileSaveBody(t, false, turnstileOtherSiteKey, map[string]interface{}{"clearTurnstileSecretKey": true})
+			},
+		},
+		{
+			name: "keeping the challenge on with the stored secret key", storedEnabled: true,
+			body:       func(t *testing.T) string { return turnstileSaveBody(t, true, turnstileTestSiteKey, nil) },
+			wantSecret: true,
+		},
+		{
+			name:       "keeping the challenge off with the stored secret key",
+			body:       func(t *testing.T) string { return turnstileSaveBody(t, false, turnstileTestSiteKey, nil) },
+			wantSecret: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// Cloudflare would reject every secret key: a call would refuse the save.
+			checker := &fakeSecretKeyChecker{answer: turnstile.SecretKeyRejected}
+
+			save := serveTurnstileSaveCheckedBy(t, turnstileSaveSettings(t, c.storedEnabled, true), c.body(t), checker)
+
+			require.Equal(t, http.StatusOK, save.rr.Code, save.rr.Body.String())
+			assert.Empty(t, checker.checked, "Cloudflare is not called")
+			require.NotNil(t, save.written)
+			assert.Equal(t, c.wantSecret, len(save.written.TurnstileSecretKeyEncrypted) > 0)
+		})
+	}
+}
+
+// A secret key Cloudflare rejects, or cannot be reached to check, refuses the save, which writes and
+// records nothing: a new secret key, or turning the challenge on with the stored one.
+func TestHandleSettingsTurnstilePut_ASecretKeyCloudflareDoesNotAcceptRefusesTheSave(t *testing.T) {
+	answers := []struct {
+		answer          turnstile.SecretKeyCheck
+		wantCode        string
+		wantDescription string
+	}{
+		{turnstile.SecretKeyRejected, "handler.settings_turnstile.secret_key_rejected",
+			"Cloudflare doesn't accept the secret key. Copy it again from the widget in the Cloudflare dashboard."},
+		{turnstile.SecretKeyUnchecked, "handler.settings_turnstile.secret_key_unchecked",
+			"Cloudflare couldn't be reached to check the secret key. Try again in a moment."},
+	}
+	saves := []struct {
+		name          string
+		storedEnabled bool
+		storedSecret  bool
+		body          func(t *testing.T) string
+	}{
+		{
+			name: "a new secret key, challenge off",
+			body: func(t *testing.T) string {
+				return turnstileSaveBody(t, false, turnstileTestSiteKey, map[string]interface{}{"turnstileSecretKey": turnstileEnteredSecretKey})
+			},
+		},
+		{
+			name: "a new secret key, challenge on", storedEnabled: true, storedSecret: true,
+			body: func(t *testing.T) string {
+				return turnstileSaveBody(t, true, turnstileTestSiteKey, map[string]interface{}{"turnstileSecretKey": turnstileEnteredSecretKey})
+			},
+		},
+		{
+			name: "turning the challenge on with the stored secret key", storedSecret: true,
+			body: func(t *testing.T) string { return turnstileSaveBody(t, true, turnstileTestSiteKey, nil) },
+		},
+	}
+	for _, a := range answers {
+		for _, c := range saves {
+			t.Run(string(a.answer)+", "+c.name, func(t *testing.T) {
+				checker := &fakeSecretKeyChecker{answer: a.answer}
+
+				save := serveTurnstileSaveCheckedBy(t, turnstileSaveSettings(t, c.storedEnabled, c.storedSecret), c.body(t), checker)
+
+				assert.Equal(t, http.StatusBadRequest, save.rr.Code, save.rr.Body.String())
+				code, description := decodeErrorEnvelope(t, save.rr)
+				assert.Equal(t, a.wantCode, code)
+				assert.Equal(t, a.wantDescription, description)
+				assert.Len(t, checker.checked, 1)
+				assert.Nil(t, save.written)
+				assert.Nil(t, save.audited)
+			})
+		}
+	}
+}
+
+// A save another refusal answers is refused without asking Cloudflare.
+func TestHandleSettingsTurnstilePut_ARefusedSaveDoesNotCallCloudflare(t *testing.T) {
+	checker := acceptingSecretKeyChecker()
+
+	save := serveTurnstileSaveCheckedBy(t, turnstileSaveSettings(t, true, true), turnstileSaveBody(t, true, turnstileOtherSiteKey,
+		map[string]interface{}{"turnstileSecretKey": turnstileEnteredSecretKey, "clearTurnstileSecretKey": true}), checker)
+
+	assert.Equal(t, http.StatusBadRequest, save.rr.Code, save.rr.Body.String())
+	assert.Empty(t, checker.checked)
 }

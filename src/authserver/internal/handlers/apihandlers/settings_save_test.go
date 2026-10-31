@@ -159,7 +159,7 @@ func settingsSectionSaves() []settingsSectionSave {
 				return `{"turnstileEnabled":true,"turnstileSiteKey":"saved-site-key","turnstileSecretKey":"saved-secret-key"}`
 			},
 			handler: func(database settingsSaveDatabase, auditLogger AuditLogger) http.Handler {
-				return HandleSettingsTurnstilePut(database, auditLogger, testDataCipher)
+				return HandleSettingsTurnstilePut(database, auditLogger, testDataCipher, acceptingSecretKeyChecker())
 			},
 			owns: []string{"TurnstileEnabled", "TurnstileSiteKey", "TurnstileSecretKeyEncrypted"},
 		},
@@ -388,13 +388,14 @@ func TestSettingsTurnstilePut_AKeptSecretKeyIsTheOneTheSiteKeyCheckRead(t *testi
 		Run(func(_ context.Context, _ *sql.Tx, settings *record.Settings) { saved = *settings }).Return(nil).Once()
 
 	loaded := settingsAsTheRequestLoadedThem()
+	loaded.TurnstileEnabled = true
 	loaded.TurnstileSiteKey = "this-widget-site-key"
 	loaded.TurnstileSecretKeyEncrypted = []byte("this-widget-secret-key")
 	save := settingsSectionSave{
 		name: "turnstile, keeping the secret key",
 		path: "/api/v1/admin/settings/turnstile",
 		handler: func(database settingsSaveDatabase, auditLogger AuditLogger) http.Handler {
-			return HandleSettingsTurnstilePut(database, auditLogger, testDataCipher)
+			return HandleSettingsTurnstilePut(database, auditLogger, testDataCipher, acceptingSecretKeyChecker())
 		},
 	}
 	rr := serveSectionSave(save, database, auditLogger,

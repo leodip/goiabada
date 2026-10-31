@@ -73,6 +73,8 @@ var turnstileErrorFields = map[string]string{
 	i18n.ErrCodeSettingsTurnstileSecretKeyTooLong:           "turnstileSecretKey",
 	i18n.ErrCodeSettingsTurnstileSecretKeyAndClear:          "turnstileSecretKey",
 	i18n.ErrCodeSettingsTurnstileSiteKeyChanged:             "turnstileSecretKey",
+	i18n.ErrCodeSettingsTurnstileSecretKeyRejected:          "turnstileSecretKey",
+	i18n.ErrCodeSettingsTurnstileSecretKeyUnchecked:         "turnstileSecretKey",
 	i18n.ErrCodeSettingsTurnstileSecretKeyClearWhileEnabled: "clearTurnstileSecretKey",
 }
 

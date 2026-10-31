@@ -502,3 +502,115 @@ func TestNewVerifier_RegistersTheCounterWithItsClosedLabelSets(t *testing.T) {
 	assert.ElementsMatch(t, []string{"login", "forgot_password", "register"}, values["form"])
 	assert.ElementsMatch(t, []string{"passed", "refused", "missing", "unavailable", "misconfigured"}, values["outcome"])
 }
+
+// The secret key a save offers is checked with siteverify, through the same stand-in (#642 decision
+// 11): Cloudflare's answer about the secret key, not about the token, decides it. A real secret key
+// answers Cloudflare's dummy token with a verdict on the token, which accepts the key; a test key
+// passes the token, which accepts it too.
+
+const offeredSecretKey = "0x4AAAAAAAoffered-secret-key"
+
+func (h *harness) checkSecretKey() turnstile.SecretKeyCheck {
+	return h.verifier.CheckSecretKey(context.Background(), offeredSecretKey)
+}
+
+// assertNoFormCounted holds the secret key's check to counting nothing: the counter counts the
+// forms' checks, and a save is none of them.
+func (h *harness) assertNoFormCounted(t *testing.T) {
+	t.Helper()
+	for _, form := range []string{"login", "forgot_password", "register"} {
+		for _, outcome := range []string{"passed", "refused", "missing", "unavailable", "misconfigured"} {
+			assert.Equal(t, "0", h.count(t, form, outcome), "%s %s", form, outcome)
+		}
+	}
+}
+
+func TestCheckSecretKey_ASecretKeyCloudflareAnswersAboutTheTokenIsAccepted(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"a verdict on the dummy token", http.StatusOK, `{"success":false,"error-codes":["invalid-input-response"],"messages":[]}`},
+		{"a spent token", http.StatusOK, `{"success":false,"error-codes":["timeout-or-duplicate"],"messages":[]}`},
+		{"a test key passing every token", http.StatusOK,
+			`{"challenge_ts":"2026-10-31T19:54:09.112Z","error-codes":[],"hostname":"example.com","metadata":{"result_with_testing_key":true},"success":true}`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.standIn.answer(c.status, c.body)
+
+			assert.Equal(t, turnstile.SecretKeyAccepted, h.checkSecretKey())
+
+			require.Equal(t, 1, h.standIn.callCount(), "one attempt, no retry")
+			got := h.standIn.calls[0]
+			assert.Equal(t, http.MethodPost, got.method)
+			assert.Equal(t, "application/x-www-form-urlencoded", got.contentType)
+			assert.Equal(t, url.Values{"secret": {offeredSecretKey}, "response": {"XXXX.DUMMY.TOKEN.XXXX"}}, got.form,
+				"the offered secret key and Cloudflare's dummy token, and nothing else")
+			h.assertNoFormCounted(t)
+			assert.Empty(t, h.recordsAt(slog.LevelError))
+			assert.NotContains(t, h.logs.Text(), offeredSecretKey, "the secret key is never logged")
+		})
+	}
+}
+
+// Cloudflare's fault in the secret key rejects it, whatever the status it comes with: it answers
+// these with 400.
+func TestCheckSecretKey_AFaultInTheSecretKeyRejectsIt(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusOK} {
+		for _, code := range []string{"invalid-input-secret", "missing-input-secret"} {
+			t.Run(code+" "+strconv.Itoa(status), func(t *testing.T) {
+				h := newHarness(t)
+				h.standIn.answer(status, `{"success":false,"error-codes":["`+code+`"],"messages":[]}`)
+
+				assert.Equal(t, turnstile.SecretKeyRejected, h.checkSecretKey())
+				assert.Equal(t, 1, h.standIn.callCount())
+				h.assertNoFormCounted(t)
+				assert.NotContains(t, h.logs.Text(), offeredSecretKey, "the secret key is never logged")
+			})
+		}
+	}
+}
+
+// No usable answer leaves the secret key unchecked, and logs why, never with the secret key.
+func TestCheckSecretKey_NoUsableAnswerLeavesItUnchecked(t *testing.T) {
+	cases := []struct {
+		name       string
+		status     int
+		body       string
+		wantReason string
+	}{
+		{"a status other than 200", http.StatusInternalServerError, `{"success":false,"error-codes":["internal-error"]}`, "status"},
+		{"a verdict under another status", http.StatusBadRequest, `{"success":false,"error-codes":["invalid-input-response"]}`, "status"},
+		{"internal-error", http.StatusOK, `{"success":false,"error-codes":["internal-error"],"messages":[]}`, "error_codes"},
+		{"bad-request", http.StatusOK, `{"success":false,"error-codes":["bad-request"],"messages":[]}`, "error_codes"},
+		{"an unreadable body", http.StatusOK, `<html>not json</html>`, "unreadable"},
+		{"an oversized body", http.StatusOK, `{"success":false,"error-codes":["invalid-input-response"],"pad":"` + strings.Repeat("x", 9<<10) + `"}`, "unreadable"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.standIn.answer(c.status, c.body)
+
+			assert.Equal(t, turnstile.SecretKeyUnchecked, h.checkSecretKey())
+			h.assertNoFormCounted(t)
+			warnings := h.recordsAt(slog.LevelWarn)
+			require.Len(t, warnings, 1)
+			assert.Equal(t, c.wantReason, warnings[0].Attrs["reason"])
+			assert.NotContains(t, h.logs.Text(), offeredSecretKey, "the secret key is never logged")
+		})
+	}
+}
+
+func TestCheckSecretKey_AnUnreachableSiteverifyLeavesItUnchecked(t *testing.T) {
+	h := newHarness(t)
+	h.standIn.server.Close()
+
+	assert.Equal(t, turnstile.SecretKeyUnchecked, h.checkSecretKey())
+	warnings := h.recordsAt(slog.LevelWarn)
+	require.Len(t, warnings, 1)
+	assert.Equal(t, "unreachable", warnings[0].Attrs["reason"])
+	assert.NotContains(t, h.logs.Text(), offeredSecretKey, "the secret key is never logged")
+}

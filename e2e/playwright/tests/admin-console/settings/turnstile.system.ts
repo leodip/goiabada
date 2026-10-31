@@ -12,6 +12,8 @@ const turnstile = "/admin/settings/turnstile";
 const siteKey = "1x00000000000000000000AA";
 const otherSiteKey = "2x00000000000000000000AB";
 const secretKey = "1x0000000000000000000000000000000AA";
+// A secret key Cloudflare's siteverify answers invalid-input-secret to.
+const unknownSecretKey = "0x0000000000000000000000000000000AA";
 
 // The question asked before the challenge is turned on names the way back from it.
 const turnOnQuestion = /recover --disable-turnstile/;
@@ -140,6 +142,18 @@ test("the auth server's refusals are shown at their fields, and nothing refused 
   await fillSettingsForm(page, { turnstileSiteKey: "x".repeat(129) });
   await page.locator("#btnSave").click();
   await expectRefusal(page, "turnstile-error", "turnstileSiteKey", "The site key can't be longer than 128 characters.");
+
+  // A secret key Cloudflare doesn't know, checked with it on save: the typed key comes back in its box.
+  await page.goto(`${env.adminUrl}${turnstile}`);
+  await fillSettingsForm(page, { turnstileSiteKey: siteKey, turnstileSecretKey: unknownSecretKey });
+  await page.locator("#btnSave").click();
+  await expectRefusal(
+    page,
+    "turnstile-error",
+    "turnstileSecretKey",
+    "Cloudflare doesn't accept the secret key. Copy it again from the widget in the Cloudflare dashboard.",
+  );
+  await expect(page.locator("#turnstileSecretKey")).toHaveValue(unknownSecretKey);
 
   // Nothing refused was saved.
   await page.goto(`${env.adminUrl}${turnstile}`);

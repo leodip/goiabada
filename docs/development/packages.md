@@ -301,7 +301,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `goiabada_challenge_verifications_total`. `BindWidget` puts the widget, and Cloudflare's origin
   in that response's `script-src`, on each render of a form the challenge is on. The forms'
   middleware reads the token and draws the refusal: the sign-in form's in `internal/handlers`, the
-  forgot-password and registration forms' in `internal/handlers/accounthandlers` (#642)
+  forgot-password and registration forms' in `internal/handlers/accounthandlers`.
+  `Verifier.CheckSecretKey` asks siteverify about a secret key with Cloudflare's dummy token, and
+  counts nothing: the admin API's Turnstile save calls it before storing a new secret key or turning
+  the challenge on (#642)
 - `internal/recovery/` - The `recover` subcommand's operation, `Run`: for one named, enabled user, a
   manage grant, a password held to the stored policy and the authenticator's removal, each only as
   asked, in one transaction with the #106 revocation sweep, the user, the authenticator and the

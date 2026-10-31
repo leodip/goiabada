@@ -333,6 +333,8 @@ const (
 	ErrCodeSettingsTurnstileSecretKeyAndClear          = "handler.settings_turnstile.secret_key_and_clear"
 	ErrCodeSettingsTurnstileSiteKeyTooLong             = "handler.settings_turnstile.site_key_too_long"   // Args: {"max": int}
 	ErrCodeSettingsTurnstileSecretKeyTooLong           = "handler.settings_turnstile.secret_key_too_long" // Args: {"max": int}
+	ErrCodeSettingsTurnstileSecretKeyRejected          = "handler.settings_turnstile.secret_key_rejected"
+	ErrCodeSettingsTurnstileSecretKeyUnchecked         = "handler.settings_turnstile.secret_key_unchecked"
 
 	ErrCodeSettingsEmailConnectFailedHostNotFound = "handler.settings_email.connect_failed_host_not_found"
 	ErrCodeSettingsEmailConnectFailedTimedOut     = "handler.settings_email.connect_failed_timed_out"

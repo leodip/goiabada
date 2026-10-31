@@ -320,3 +320,116 @@ func TestAPISettingsTurnstile_TakesTheSettingsScopes(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, noToken.StatusCode, method)
 	}
 }
+
+// assertTurnstileRefusal holds resp to a 400 with code and its English sentence, and the stored row
+// to before's switch, site key and secret key.
+func assertTurnstileRefusal(t *testing.T, resp *http.Response, before *record.Settings, wantCode, wantDescription string) {
+	t.Helper()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errBody api.ErrorResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errBody))
+	assert.Equal(t, wantCode, errBody.ErrorCode)
+	assert.Equal(t, wantDescription, errBody.ErrorDescription)
+	after := storedTurnstile(t)
+	assert.Equal(t, before.TurnstileEnabled, after.TurnstileEnabled, "the switch is unchanged")
+	assert.Equal(t, before.TurnstileSiteKey, after.TurnstileSiteKey, "the site key is unchanged")
+	assert.Equal(t, string(before.TurnstileSecretKeyEncrypted), string(after.TurnstileSecretKeyEncrypted),
+		"the secret key is unchanged")
+}
+
+// A secret key Cloudflare's real siteverify answers invalid-input-secret to is refused, and nothing is
+// written: entered new, with the challenge off or turning it on, or stored and the challenge turned on
+// with it (#642 decision 11).
+func TestAPISettingsTurnstilePut_ASecretKeyCloudflareRejectsIsRefused(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	sealedUnknown, err := dataCipher.Encrypt(turnstileUnknownSecretKey)
+	require.NoError(t, err)
+	sealedPassing, err := dataCipher.Encrypt(turnstilePassingSecretKey)
+	require.NoError(t, err)
+
+	cases := []struct {
+		name   string
+		stored func(settings *record.Settings)
+		body   api.UpdateSettingsTurnstileRequest
+	}{
+		{
+			name:   "a new secret key, the challenge off",
+			stored: func(settings *record.Settings) { settings.TurnstileSecretKeyEncrypted = sealedPassing },
+			body:   api.UpdateSettingsTurnstileRequest{TurnstileSiteKey: turnstilePassingSiteKey, TurnstileSecretKey: turnstileUnknownSecretKey},
+		},
+		{
+			name:   "a new secret key, turning the challenge on",
+			stored: func(*record.Settings) {},
+			body: api.UpdateSettingsTurnstileRequest{
+				TurnstileEnabled: true, TurnstileSiteKey: turnstilePassingSiteKey, TurnstileSecretKey: turnstileUnknownSecretKey,
+			},
+		},
+		{
+			name:   "turning the challenge on with the stored secret key",
+			stored: func(settings *record.Settings) { settings.TurnstileSecretKeyEncrypted = sealedUnknown },
+			body:   api.UpdateSettingsTurnstileRequest{TurnstileEnabled: true, TurnstileSiteKey: turnstilePassingSiteKey},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			before := changeSettings(t, func(settings *record.Settings) {
+				settings.TurnstileEnabled = false
+				settings.TurnstileSiteKey = turnstilePassingSiteKey
+				settings.TurnstileSecretKeyEncrypted = nil
+				c.stored(settings)
+			})
+
+			resp, _ := putTurnstile(t, accessToken, c.body)
+
+			assertTurnstileRefusal(t, resp, before, "handler.settings_turnstile.secret_key_rejected",
+				"Cloudflare doesn't accept the secret key. Copy it again from the widget in the Cloudflare dashboard.")
+		})
+	}
+}
+
+// Cloudflare's test secret keys are secret keys its real siteverify knows, whatever they answer of a
+// token: each is saved, and the challenge turned on with one stored (#642 decision 11).
+func TestAPISettingsTurnstilePut_CloudflaresTestSecretKeysAreAccepted(t *testing.T) {
+	restoreSettings(t)
+	accessToken, _ := createAdminClientWithToken(t)
+
+	for _, secretKey := range []string{turnstilePassingSecretKey, turnstileFailingSecretKey, turnstileSpentSecretKey} {
+		resp, _ := putTurnstile(t, accessToken, api.UpdateSettingsTurnstileRequest{
+			TurnstileSiteKey: turnstilePassingSiteKey, TurnstileSecretKey: secretKey,
+		})
+		assert.True(t, turnstileSettingsAnswer(t, resp).HasTurnstileSecretKey, secretKey)
+		plaintext, err := dataCipher.Decrypt(storedTurnstile(t).TurnstileSecretKeyEncrypted)
+		require.NoError(t, err)
+		assert.Equal(t, secretKey, plaintext)
+	}
+
+	resp, _ := putTurnstile(t, accessToken, api.UpdateSettingsTurnstileRequest{TurnstileEnabled: true, TurnstileSiteKey: turnstilePassingSiteKey})
+	assert.True(t, turnstileSettingsAnswer(t, resp).TurnstileEnabled)
+	assert.True(t, storedTurnstile(t).TurnstileEnabled)
+}
+
+// Turning the challenge off and removing the secret key put no secret key in use, so they save even
+// with a secret key stored that Cloudflare would reject (#642 decision 11): a challenge on with a
+// wrong secret key can always be turned off.
+func TestAPISettingsTurnstilePut_TurningOffAndRemovingTheSecretKeySaveWithoutTheCheck(t *testing.T) {
+	sealedUnknown, err := dataCipher.Encrypt(turnstileUnknownSecretKey)
+	require.NoError(t, err)
+	changeSettings(t, func(settings *record.Settings) {
+		settings.TurnstileEnabled = true
+		settings.TurnstileSiteKey = turnstilePassingSiteKey
+		settings.TurnstileSecretKeyEncrypted = sealedUnknown
+	})
+	accessToken, _ := createAdminClientWithToken(t)
+
+	resp, _ := putTurnstile(t, accessToken, api.UpdateSettingsTurnstileRequest{TurnstileSiteKey: turnstilePassingSiteKey})
+	assert.Equal(t, api.SettingsTurnstileResponse{
+		TurnstileEnabled: false, TurnstileSiteKey: turnstilePassingSiteKey, HasTurnstileSecretKey: true,
+	}, turnstileSettingsAnswer(t, resp))
+	assert.Equal(t, sealedUnknown, storedTurnstile(t).TurnstileSecretKeyEncrypted, "turned off, the secret key stays")
+
+	resp, _ = putTurnstile(t, accessToken, api.UpdateSettingsTurnstileRequest{
+		TurnstileSiteKey: turnstilePassingSiteKey, ClearTurnstileSecretKey: true,
+	})
+	assert.False(t, turnstileSettingsAnswer(t, resp).HasTurnstileSecretKey)
+	assert.Empty(t, storedTurnstile(t).TurnstileSecretKeyEncrypted)
+}

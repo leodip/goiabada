@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/inputvalidation"
@@ -39,6 +41,12 @@ type settingsTurnstileDatabase interface {
 	settingsSaveDatabase
 }
 
+// turnstileSecretKeyChecker asks Cloudflare whether it knows a secret key. *turnstile.Verifier
+// satisfies it.
+type turnstileSecretKeyChecker interface {
+	CheckSecretKey(ctx context.Context, secretKey string) turnstile.SecretKeyCheck
+}
+
 // HandleSettingsTurnstilePut - PUT /api/v1/admin/settings/turnstile
 //
 // It saves the Cloudflare Turnstile challenge's switch, site key and secret key (#642 decision 11).
@@ -46,11 +54,14 @@ type settingsTurnstileDatabase interface {
 // stored, a new one replaces it, and only clearTurnstileSecretKey removes it. A save is refused
 // when it would turn the challenge on without both keys, remove the secret key while the challenge
 // is on, or change the site key without the secret key entered again, since the two come from one
-// widget. Turning the challenge off keeps the keys.
+// widget. It is refused too when it stores a new secret key, or turns the challenge on, and
+// Cloudflare rejects the secret key or cannot be reached to check it. Turning the challenge off keeps
+// the keys.
 func HandleSettingsTurnstilePut(
 	database settingsTurnstileDatabase,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
+	secretKeyChecker turnstileSecretKeyChecker,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		currentSettings, ok := reqctx.SettingsFrom(r.Context())
@@ -111,6 +122,32 @@ func HandleSettingsTurnstilePut(
 			siteKey != strings.TrimSpace(currentSettings.TurnstileSiteKey) {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSiteKeyChanged, nil))
 			return
+		}
+
+		// A save that puts a secret key in use asks Cloudflare about it first, outside the save's
+		// transaction: a new secret key, or the stored one when the challenge is turned on. Turning the
+		// challenge off and removing the secret key put none in use, and never call Cloudflare
+		// (#642 decision 11). A key Cloudflare rejects would let every form through as misconfigured;
+		// one it cannot be reached to check is refused too, to be saved once it can be.
+		checkedSecretKey := secretKey
+		if checkedSecretKey == "" && req.TurnstileEnabled && !currentSettings.TurnstileEnabled {
+			stored, decryptErr := dataCipher.Decrypt(currentSettings.TurnstileSecretKeyEncrypted)
+			if decryptErr != nil {
+				writeInternalServerError(w, r, decryptErr)
+				return
+			}
+			checkedSecretKey = stored
+		}
+		if checkedSecretKey != "" {
+			switch secretKeyChecker.CheckSecretKey(r.Context(), checkedSecretKey) {
+			case turnstile.SecretKeyAccepted:
+			case turnstile.SecretKeyRejected:
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSecretKeyRejected, nil))
+				return
+			default:
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSecretKeyUnchecked, nil))
+				return
+			}
 		}
 
 		// The secret key written is decided here, against the row the site key check above read: a

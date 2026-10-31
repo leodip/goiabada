@@ -2003,6 +2003,8 @@
 "handler.settings_turnstile.secret_key_and_clear" = "Envoyez soit une nouvelle clé secrète, soit clearTurnstileSecretKey, mais pas les deux."
 "handler.settings_turnstile.site_key_too_long" = "La clé de site ne peut pas dépasser {{.max}} caractères."
 "handler.settings_turnstile.secret_key_too_long" = "La clé secrète ne peut pas dépasser {{.max}} caractères."
+"handler.settings_turnstile.secret_key_rejected" = "Cloudflare n'accepte pas la clé secrète. Copiez-la à nouveau depuis le widget dans le tableau de bord Cloudflare."
+"handler.settings_turnstile.secret_key_unchecked" = "Impossible de joindre Cloudflare pour vérifier la clé secrète. Réessayez dans un instant."
 
 "handler.settings_email.connect_failed_host_not_found" = "Impossible de se connecter au serveur SMTP : nom d’hôte introuvable."
 "handler.settings_email.connect_failed_timed_out" = "Impossible de se connecter au serveur SMTP : délai de connexion dépassé."

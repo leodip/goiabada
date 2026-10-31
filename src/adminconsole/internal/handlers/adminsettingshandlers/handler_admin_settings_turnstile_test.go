@@ -233,6 +233,27 @@ func TestHandleTurnstilePost_ARefusedSaveIsRedrawnWithTheRefusalAtItsField(t *te
 				TurnstileSecretKey: "a-long-secret", HasTurnstileSecretKey: true, SavedTurnstileEnabled: true},
 		},
 		{
+			name:      "a secret key Cloudflare rejects",
+			code:      "handler.settings_turnstile.secret_key_rejected",
+			message:   "Cloudflare doesn't accept the secret key. Copy it again from the widget in the Cloudflare dashboard.",
+			edit:      func(f url.Values) { f.Set("turnstileSecretKey", "a-mistyped-secret") },
+			wantField: "turnstileSecretKey",
+			want: SettingsTurnstile{TurnstileEnabled: true, TurnstileSiteKey: "1x00000000000000000000AA",
+				TurnstileSecretKey: "a-mistyped-secret", HasTurnstileSecretKey: true, SavedTurnstileEnabled: true},
+		},
+		{
+			name:    "the challenge turned on while Cloudflare cannot be reached",
+			code:    "handler.settings_turnstile.secret_key_unchecked",
+			message: "Cloudflare couldn't be reached to check the secret key. Try again in a moment.",
+			edit: func(f url.Values) {
+				f.Del("turnstileSecretKey")
+				f.Set("savedTurnstileEnabled", "")
+			},
+			wantField: "turnstileSecretKey",
+			want: SettingsTurnstile{TurnstileEnabled: true, TurnstileSiteKey: "1x00000000000000000000AA",
+				HasTurnstileSecretKey: true},
+		},
+		{
 			name:    "the secret key removed while the challenge stays on",
 			code:    "handler.settings_turnstile.secret_key_clear_while_enabled",
 			message: "The secret key can't be removed while the Turnstile challenge is on.",

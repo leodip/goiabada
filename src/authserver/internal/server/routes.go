@@ -403,7 +403,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 		// Settings - Turnstile
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/turnstile", apihandlers.HandleSettingsTurnstileGet())
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/turnstile", apihandlers.HandleSettingsTurnstilePut(s.database, auditLogger, s.dataCipher))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/turnstile", apihandlers.HandleSettingsTurnstilePut(s.database, auditLogger, s.dataCipher, s.secretKeyChecker))
 
 		// Settings - Sessions
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/sessions", apihandlers.HandleSettingsSessionsGet())

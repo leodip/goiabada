@@ -180,33 +180,45 @@ type siteverifyAnswer struct {
 	} `json:"metadata"`
 }
 
-// verify asks siteverify about token under secretKey, once, sending those two and nothing else
-// (decision 3), and decides the outcome from its answer, read whatever its status under the
-// bound. No usable answer is logged at error with its reason, and what shows it: the timeout, the
-// status, the error codes or the error.
+// verify asks siteverify about token under secretKey, and decides the outcome from its answer. No
+// usable answer is logged at error with its reason, and what shows it: the timeout, the status or
+// the error.
 func (v *Verifier) verify(ctx context.Context, form Form, secretKey, token string) Outcome {
+	answer, unusable := v.ask(ctx, secretKey, token)
+	if unusable != nil {
+		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
+			slog.String("form", form.label()), slog.String("reason", unusable.reason), unusable.detail)
+		return Unavailable
+	}
+	return v.judge(ctx, form, answer)
+}
+
+// noAnswer is why siteverify gave no usable answer: the reason, and the attribute that shows it.
+type noAnswer struct {
+	reason string
+	detail slog.Attr
+}
+
+// ask posts token under secretKey to siteverify, once, sending those two and nothing else (decision
+// 3), and reads its answer whatever its status, under the bound. It answers the answer, or why
+// there is none to use.
+func (v *Verifier) ask(ctx context.Context, secretKey, token string) (*siteverifyAnswer, *noAnswer) {
 	ctx, cancel := context.WithTimeout(ctx, verifyTimeout)
 	defer cancel()
 
 	body := url.Values{"secret": {secretKey}, "response": {token}}.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, v.siteverifyURL, strings.NewReader(body))
 	if err != nil {
-		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
-			"form", form.label(), "reason", "unreachable", "error", err)
-		return Unavailable
+		return nil, &noAnswer{reason: "unreachable", detail: slog.Any("error", err)}
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := v.client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
-				"form", form.label(), "reason", "timeout", "timeout", verifyTimeout.String())
-			return Unavailable
+			return nil, &noAnswer{reason: "timeout", detail: slog.String("timeout", verifyTimeout.String())}
 		}
-		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
-			"form", form.label(), "reason", "unreachable", "error", err)
-		return Unavailable
+		return nil, &noAnswer{reason: "unreachable", detail: slog.Any("error", err)}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -222,23 +234,17 @@ func (v *Verifier) verify(ctx context.Context, form Form, secretKey, token strin
 	// no usable answer, a verdict included.
 	if resp.StatusCode != http.StatusOK {
 		if parseErr == nil && !answer.Success && containsAny(answer.ErrorCodes, secretKeyFaultCodes) {
-			return v.judge(ctx, form, &answer)
+			return &answer, nil
 		}
-		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
-			"form", form.label(), "reason", "status", "status", resp.StatusCode)
-		return Unavailable
+		return nil, &noAnswer{reason: "status", detail: slog.Int("status", resp.StatusCode)}
 	}
 	if errors.Is(readErr, context.DeadlineExceeded) {
-		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
-			"form", form.label(), "reason", "timeout", "timeout", verifyTimeout.String())
-		return Unavailable
+		return nil, &noAnswer{reason: "timeout", detail: slog.String("timeout", verifyTimeout.String())}
 	}
 	if parseErr != nil {
-		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
-			"form", form.label(), "reason", "unreadable", "error", parseErr)
-		return Unavailable
+		return nil, &noAnswer{reason: "unreadable", detail: slog.Any("error", parseErr)}
 	}
-	return v.judge(ctx, form, &answer)
+	return &answer, nil
 }
 
 // judge decides the outcome of a usable answer: a verdict refuses, a fault in the secret key and
@@ -286,4 +292,49 @@ func containsAny(codes, wanted []string) bool {
 		}
 	}
 	return false
+}
+
+// SecretKeyCheck is what Cloudflare said of a secret key a save of the settings would put in use
+// (#642 decision 11).
+type SecretKeyCheck string
+
+const (
+	// SecretKeyAccepted is a secret key Cloudflare judged the token under, so it knows the key.
+	SecretKeyAccepted SecretKeyCheck = "accepted"
+	// SecretKeyRejected is a secret key Cloudflare answered invalid-input-secret or
+	// missing-input-secret to.
+	SecretKeyRejected SecretKeyCheck = "rejected"
+	// SecretKeyUnchecked is no usable answer from Cloudflare, so nothing is known of the key.
+	SecretKeyUnchecked SecretKeyCheck = "unchecked"
+)
+
+// dummyToken is Cloudflare's dummy token, the one its test widgets write. A real secret key answers
+// it with a verdict on the token, and a test key with its own answer, so either way Cloudflare's
+// answer tells whether it knows the secret key.
+const dummyToken = "XXXX.DUMMY.TOKEN.XXXX"
+
+// CheckSecretKey asks siteverify whether Cloudflare knows secretKey, with its dummy token: one call
+// under the same deadline and bound as a form's check. A fault in the secret key rejects it; an
+// answer about the token, whether it passes the token or not, accepts it; anything else leaves it
+// unchecked, and is logged with why, never with the secret key. It is not a form's check, so the
+// counter does not count it.
+func (v *Verifier) CheckSecretKey(ctx context.Context, secretKey string) SecretKeyCheck {
+	answer, unusable := v.ask(ctx, secretKey, dummyToken)
+	if unusable != nil {
+		slog.WarnContext(ctx, "could not check a turnstile secret key with cloudflare",
+			slog.String("reason", unusable.reason), unusable.detail)
+		return SecretKeyUnchecked
+	}
+	switch {
+	case answer.Success:
+		return SecretKeyAccepted
+	case containsAny(answer.ErrorCodes, secretKeyFaultCodes):
+		return SecretKeyRejected
+	case containsAny(answer.ErrorCodes, verdictCodes):
+		return SecretKeyAccepted
+	default:
+		slog.WarnContext(ctx, "could not check a turnstile secret key with cloudflare",
+			slog.String("reason", "error_codes"), slog.String("error_codes", strings.Join(answer.ErrorCodes, ",")))
+		return SecretKeyUnchecked
+	}
 }
