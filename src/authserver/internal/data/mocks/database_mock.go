@@ -776,6 +776,69 @@ func (_c *Database_ClientLoadPermissions_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
+// ClientLoadPostLogoutRedirectURIs provides a mock function for the type Database
+func (_mock *Database) ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error {
+	ret := _mock.Called(ctx, tx, client)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClientLoadPostLogoutRedirectURIs")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.Client) error); ok {
+		r0 = returnFunc(ctx, tx, client)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_ClientLoadPostLogoutRedirectURIs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClientLoadPostLogoutRedirectURIs'
+type Database_ClientLoadPostLogoutRedirectURIs_Call struct {
+	*mock.Call
+}
+
+// ClientLoadPostLogoutRedirectURIs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - client *record.Client
+func (_e *Database_Expecter) ClientLoadPostLogoutRedirectURIs(ctx any, tx any, client any) *Database_ClientLoadPostLogoutRedirectURIs_Call {
+	return &Database_ClientLoadPostLogoutRedirectURIs_Call{Call: _e.mock.On("ClientLoadPostLogoutRedirectURIs", ctx, tx, client)}
+}
+
+func (_c *Database_ClientLoadPostLogoutRedirectURIs_Call) Run(run func(ctx context.Context, tx *sql.Tx, client *record.Client)) *Database_ClientLoadPostLogoutRedirectURIs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.Client
+		if args[2] != nil {
+			arg2 = args[2].(*record.Client)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_ClientLoadPostLogoutRedirectURIs_Call) Return(err error) *Database_ClientLoadPostLogoutRedirectURIs_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_ClientLoadPostLogoutRedirectURIs_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, client *record.Client) error) *Database_ClientLoadPostLogoutRedirectURIs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ClientLoadRedirectURIs provides a mock function for the type Database
 func (_mock *Database) ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 	ret := _mock.Called(ctx, tx, client)
@@ -2151,6 +2214,69 @@ func (_c *Database_CreatePermission_Call) Return(err error) *Database_CreatePerm
 }
 
 func (_c *Database_CreatePermission_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, permission *record.Permission) error) *Database_CreatePermission_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreatePostLogoutRedirectURI provides a mock function for the type Database
+func (_mock *Database) CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error {
+	ret := _mock.Called(ctx, tx, postLogoutRedirectURI)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreatePostLogoutRedirectURI")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.PostLogoutRedirectURI) error); ok {
+		r0 = returnFunc(ctx, tx, postLogoutRedirectURI)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreatePostLogoutRedirectURI_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreatePostLogoutRedirectURI'
+type Database_CreatePostLogoutRedirectURI_Call struct {
+	*mock.Call
+}
+
+// CreatePostLogoutRedirectURI is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - postLogoutRedirectURI *record.PostLogoutRedirectURI
+func (_e *Database_Expecter) CreatePostLogoutRedirectURI(ctx any, tx any, postLogoutRedirectURI any) *Database_CreatePostLogoutRedirectURI_Call {
+	return &Database_CreatePostLogoutRedirectURI_Call{Call: _e.mock.On("CreatePostLogoutRedirectURI", ctx, tx, postLogoutRedirectURI)}
+}
+
+func (_c *Database_CreatePostLogoutRedirectURI_Call) Run(run func(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI)) *Database_CreatePostLogoutRedirectURI_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.PostLogoutRedirectURI
+		if args[2] != nil {
+			arg2 = args[2].(*record.PostLogoutRedirectURI)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreatePostLogoutRedirectURI_Call) Return(err error) *Database_CreatePostLogoutRedirectURI_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreatePostLogoutRedirectURI_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error) *Database_CreatePostLogoutRedirectURI_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -4642,6 +4768,69 @@ func (_c *Database_DeletePermission_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// DeletePostLogoutRedirectURI provides a mock function for the type Database
+func (_mock *Database) DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIId int64) error {
+	ret := _mock.Called(ctx, tx, postLogoutRedirectURIId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePostLogoutRedirectURI")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, postLogoutRedirectURIId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeletePostLogoutRedirectURI_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeletePostLogoutRedirectURI'
+type Database_DeletePostLogoutRedirectURI_Call struct {
+	*mock.Call
+}
+
+// DeletePostLogoutRedirectURI is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - postLogoutRedirectURIId int64
+func (_e *Database_Expecter) DeletePostLogoutRedirectURI(ctx any, tx any, postLogoutRedirectURIId any) *Database_DeletePostLogoutRedirectURI_Call {
+	return &Database_DeletePostLogoutRedirectURI_Call{Call: _e.mock.On("DeletePostLogoutRedirectURI", ctx, tx, postLogoutRedirectURIId)}
+}
+
+func (_c *Database_DeletePostLogoutRedirectURI_Call) Run(run func(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIId int64)) *Database_DeletePostLogoutRedirectURI_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeletePostLogoutRedirectURI_Call) Return(err error) *Database_DeletePostLogoutRedirectURI_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeletePostLogoutRedirectURI_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIId int64) error) *Database_DeletePostLogoutRedirectURI_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeletePreRegistration provides a mock function for the type Database
 func (_mock *Database) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error {
 	ret := _mock.Called(ctx, tx, preRegistrationId)
@@ -6827,6 +7016,80 @@ func (_c *Database_GetClientsByIds_Call) RunAndReturn(run func(ctx context.Conte
 	return _c
 }
 
+// GetClientsByPostLogoutRedirectURI provides a mock function for the type Database
+func (_mock *Database) GetClientsByPostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, uri string) ([]record.Client, error) {
+	ret := _mock.Called(ctx, tx, uri)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClientsByPostLogoutRedirectURI")
+	}
+
+	var r0 []record.Client
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) ([]record.Client, error)); ok {
+		return returnFunc(ctx, tx, uri)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) []record.Client); ok {
+		r0 = returnFunc(ctx, tx, uri)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.Client)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, uri)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetClientsByPostLogoutRedirectURI_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClientsByPostLogoutRedirectURI'
+type Database_GetClientsByPostLogoutRedirectURI_Call struct {
+	*mock.Call
+}
+
+// GetClientsByPostLogoutRedirectURI is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - uri string
+func (_e *Database_Expecter) GetClientsByPostLogoutRedirectURI(ctx any, tx any, uri any) *Database_GetClientsByPostLogoutRedirectURI_Call {
+	return &Database_GetClientsByPostLogoutRedirectURI_Call{Call: _e.mock.On("GetClientsByPostLogoutRedirectURI", ctx, tx, uri)}
+}
+
+func (_c *Database_GetClientsByPostLogoutRedirectURI_Call) Run(run func(ctx context.Context, tx *sql.Tx, uri string)) *Database_GetClientsByPostLogoutRedirectURI_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetClientsByPostLogoutRedirectURI_Call) Return(clients []record.Client, err error) *Database_GetClientsByPostLogoutRedirectURI_Call {
+	_c.Call.Return(clients, err)
+	return _c
+}
+
+func (_c *Database_GetClientsByPostLogoutRedirectURI_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, uri string) ([]record.Client, error)) *Database_GetClientsByPostLogoutRedirectURI_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCodeByCodeHash provides a mock function for the type Database
 func (_mock *Database) GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error) {
 	ret := _mock.Called(ctx, tx, codeHash, used)
@@ -8475,6 +8738,80 @@ func (_c *Database_GetPermissionsByResourceId_Call) Return(permissions []record.
 }
 
 func (_c *Database_GetPermissionsByResourceId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)) *Database_GetPermissionsByResourceId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPostLogoutRedirectURIsByClientId provides a mock function for the type Database
+func (_mock *Database) GetPostLogoutRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.PostLogoutRedirectURI, error) {
+	ret := _mock.Called(ctx, tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPostLogoutRedirectURIsByClientId")
+	}
+
+	var r0 []record.PostLogoutRedirectURI
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]record.PostLogoutRedirectURI, error)); ok {
+		return returnFunc(ctx, tx, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []record.PostLogoutRedirectURI); ok {
+		r0 = returnFunc(ctx, tx, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.PostLogoutRedirectURI)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetPostLogoutRedirectURIsByClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPostLogoutRedirectURIsByClientId'
+type Database_GetPostLogoutRedirectURIsByClientId_Call struct {
+	*mock.Call
+}
+
+// GetPostLogoutRedirectURIsByClientId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) GetPostLogoutRedirectURIsByClientId(ctx any, tx any, clientId any) *Database_GetPostLogoutRedirectURIsByClientId_Call {
+	return &Database_GetPostLogoutRedirectURIsByClientId_Call{Call: _e.mock.On("GetPostLogoutRedirectURIsByClientId", ctx, tx, clientId)}
+}
+
+func (_c *Database_GetPostLogoutRedirectURIsByClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64)) *Database_GetPostLogoutRedirectURIsByClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetPostLogoutRedirectURIsByClientId_Call) Return(postLogoutRedirectURIs []record.PostLogoutRedirectURI, err error) *Database_GetPostLogoutRedirectURIsByClientId_Call {
+	_c.Call.Return(postLogoutRedirectURIs, err)
+	return _c
+}
+
+func (_c *Database_GetPostLogoutRedirectURIsByClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.PostLogoutRedirectURI, error)) *Database_GetPostLogoutRedirectURIsByClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }

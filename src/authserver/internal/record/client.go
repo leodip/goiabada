@@ -55,7 +55,9 @@ type Client struct {
 	DefaultAcrLevel                         AcrLevel      `db:"default_acr_level"`
 	Permissions                             []Permission  `db:"-"`
 	RedirectURIs                            []RedirectURI `db:"-"`
-	WebOrigins                              []WebOrigin   `db:"-"`
+	// PostLogoutRedirectURIs are the client's sign-out redirect URIs, never read at sign-in (#147).
+	PostLogoutRedirectURIs []PostLogoutRedirectURI `db:"-"`
+	WebOrigins             []WebOrigin             `db:"-"`
 }
 
 func (c *Client) IsSystemLevelClient() bool {
