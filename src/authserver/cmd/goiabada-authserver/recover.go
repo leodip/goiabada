@@ -30,9 +30,10 @@ import (
 // flags are spelled out.
 const recoverUsage = `usage:
   goiabada-authserver recover --email <address> [flags]
+  goiabada-authserver recover --disable-turnstile
 
---email names the user to recover by their stored address, and is required. Each action is its
-own flag, applied only as asked, and at least one is required:
+--email names the user to recover by their stored address. Each action for the user is its own
+flag, applied only as asked, and at least one is required with --email:
   --grant-manage         grant the authserver:manage permission
   --password-stdin       set a new password, read from the first line of stdin
   --password <password>  set a new password given on the command line, where the shell's history
@@ -42,9 +43,15 @@ own flag, applied only as asked, and at least one is required:
 A new password is held to the stored password policy, and one that is empty, or holds only
 whitespace, is refused.
 
-Whatever is asked, the user's sessions end and their authentication generation advances, so
-nothing signed in before the recovery survives it. An unknown or disabled user is refused, and so
-is a database whose schema is not the one this binary carries.
+Whatever is asked for the user, their sessions end and their authentication generation advances,
+so nothing signed in before the recovery survives it. An unknown or disabled user is refused, and
+so is a database whose schema is not the one this binary carries.
+
+One action names no user, and needs no --email:
+  --disable-turnstile    turn the Turnstile challenge off, keeping its site key and secret key
+
+Given alone, it touches no user and ends no sessions. Given with --email and a user action, both
+are done in one transaction, or neither is.
 
 Connection details come from the GOIABADA_DB_* environment variables or the --db-* flags
 (--db-type, --db-username, --db-password, --db-host, --db-port, --db-name, --db-dsn, --db-create,
@@ -157,13 +164,14 @@ func runRecoverCommand(inv recoverInvocation, open recoverDatabaseOpener, stdout
 
 // recoverInvocation is what parseRecoverArgs made of the arguments after `recover`.
 type recoverInvocation struct {
-	email         string                // the stored address of the user to recover, required
-	password      string                // a new password for the user, empty when not asked
-	passwordStdin bool                  // read the new password from stdin into password
-	grantManage   bool                  // grant authserver:manage
-	removeOTP     bool                  // remove the user's OTP authenticator
-	database      config.DatabaseConfig // base, with every --db-* flag given after `recover` applied
-	help          bool                  // -h or --help was given
+	email            string                // the stored address of the user to recover, required
+	password         string                // a new password for the user, empty when not asked
+	passwordStdin    bool                  // read the new password from stdin into password
+	grantManage      bool                  // grant authserver:manage
+	removeOTP        bool                  // remove the user's OTP authenticator
+	disableTurnstile bool                  // turn the Turnstile challenge off, which names no user
+	database         config.DatabaseConfig // base, with every --db-* flag given after `recover` applied
+	help             bool                  // -h or --help was given
 }
 
 // parseRecoverArgs reads the arguments after `recover`: the --db-* flags anywhere among them and
@@ -188,10 +196,11 @@ func parseRecoverArgs(args []string, db config.DatabaseConfig) (recoverInvocatio
 	fs.BoolVar(&inv.passwordStdin, "password-stdin", false, "read the new password from stdin")
 	fs.BoolVar(&inv.grantManage, "grant-manage", false, "grant authserver:manage")
 	fs.BoolVar(&inv.removeOTP, "remove-otp", false, "remove the user's OTP authenticator")
+	fs.BoolVar(&inv.disableTurnstile, "disable-turnstile", false, "turn the Turnstile challenge off")
 
 	positionals, help, err := walkFlagTokens(fs, "recover",
-		"only the --db-* flags and --email, --password, --password-stdin, --grant-manage and "+
-			"--remove-otp can follow recover", args)
+		"only the --db-* flags and --email, --password, --password-stdin, --grant-manage, "+
+			"--remove-otp and --disable-turnstile can follow recover", args)
 	if err != nil {
 		return recoverInvocation{}, err
 	}
@@ -212,16 +221,18 @@ func parseRecoverArgs(args []string, db config.DatabaseConfig) (recoverInvocatio
 		return inv, nil
 	}
 
-	if strings.TrimSpace(inv.email) == "" {
-		return recoverInvocation{}, errs.New("--email is required: it names the user to recover " +
-			"by their stored address")
-	}
-
-	// A --password given empty is refused rather than read as "no password asked": an unset
+	// A --password or --email given empty is refused rather than read as "not asked": an unset
 	// variable expands to nothing, and the recovery would commit its other actions and leave the
-	// forgotten password in place while it reported success.
-	passwordGiven := false
-	fs.Visit(func(f *flag.Flag) { passwordGiven = passwordGiven || f.Name == "password" })
+	// forgotten password in place, or skip the user the operator meant, while it reported success.
+	passwordGiven, emailGiven := false, false
+	fs.Visit(func(f *flag.Flag) {
+		passwordGiven = passwordGiven || f.Name == "password"
+		emailGiven = emailGiven || f.Name == "email"
+	})
+	if emailGiven && strings.TrimSpace(inv.email) == "" {
+		return recoverInvocation{}, errs.New("--email is empty: give the stored address of the " +
+			"user to recover, or leave the flag out when the run only turns off the Turnstile challenge")
+	}
 	if passwordGiven && inv.passwordStdin {
 		return recoverInvocation{}, errs.New("--password and --password-stdin both give the new " +
 			"password: give one of them")
@@ -232,10 +243,21 @@ func parseRecoverArgs(args []string, db config.DatabaseConfig) (recoverInvocatio
 	}
 
 	// One action at least: a recovery that does nothing is a typo wearing the command's
-	// authority, and the usage says what the flags are.
-	if !inv.grantManage && !passwordGiven && !inv.passwordStdin && !inv.removeOTP {
-		return recoverInvocation{}, errs.New("nothing to do: give at least one of " +
-			"--grant-manage, --password-stdin, --password or --remove-otp")
+	// authority, and the usage says what the flags are. A user named needs an action for that
+	// user: --disable-turnstile beside --email alone would end the user's sessions to flip an
+	// instance-wide switch, which is why that flag needs no --email (#642 decision 11).
+	userAction := inv.grantManage || passwordGiven || inv.passwordStdin || inv.removeOTP
+	switch {
+	case !emailGiven && !userAction && !inv.disableTurnstile:
+		return recoverInvocation{}, errs.New("nothing to do: give --disable-turnstile, or --email " +
+			"with at least one of --grant-manage, --password-stdin, --password or --remove-otp")
+	case !emailGiven && userAction:
+		return recoverInvocation{}, errs.New("--email is required: it names the user to recover " +
+			"by their stored address")
+	case emailGiven && !userAction:
+		return recoverInvocation{}, errs.New("nothing to do for the user --email names: give at " +
+			"least one of --grant-manage, --password-stdin, --password or --remove-otp, or leave " +
+			"--email out when the run only turns off the Turnstile challenge")
 	}
 	return inv, nil
 }
@@ -257,17 +279,18 @@ func runRecover(ctx context.Context, database recovery.Database, m schemaVersion
 	// The schema must be the one this binary's data tier writes, as the server's start requires
 	// before it serves: a database a newer release migrated holds columns and rules this binary
 	// does not know, and a dirty one a migration that did not finish. The recovery writes
-	// credentials and a permission, which is no place to guess.
+	// credentials, a permission and a setting, which is no place to guess.
 	if refusal := checkRecoverSchema(ctx, m); refusal != "" {
 		outf(stderr, "refusing to recover: %s\n", refusal)
 		return migrateExitError
 	}
 
 	outcome, err := recovery.Run(ctx, database, auditLogger, recovery.Request{
-		Email:       inv.email,
-		Password:    inv.password,
-		GrantManage: inv.grantManage,
-		RemoveOTP:   inv.removeOTP,
+		Email:            inv.email,
+		Password:         inv.password,
+		GrantManage:      inv.grantManage,
+		RemoveOTP:        inv.removeOTP,
+		DisableTurnstile: inv.disableTurnstile,
 	})
 	var refusal *recovery.RefusedError
 	if errors.As(err, &refusal) {
@@ -275,8 +298,19 @@ func runRecover(ctx context.Context, database recovery.Database, m schemaVersion
 		return migrateExitError
 	}
 	if err != nil {
-		outf(stderr, "unable to recover the user: %+v\n", err)
+		outf(stderr, "unable to recover: %+v\n", err)
 		return migrateExitError
+	}
+
+	if inv.disableTurnstile {
+		if outcome.TurnstileDisabled {
+			outf(stdout, "turnstile challenge turned off; its site key and secret key are kept\n")
+		} else {
+			outf(stdout, "the turnstile challenge was already off, so nothing was changed\n")
+		}
+	}
+	if inv.email == "" {
+		return migrateExitOK
 	}
 
 	outf(stdout, "recovered %s (user %d)\n", outcome.Email, outcome.UserId)

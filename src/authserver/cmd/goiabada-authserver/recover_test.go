@@ -180,7 +180,8 @@ func TestParseRecoverArgs(t *testing.T) {
 			config.DatabaseConfig{Type: "sqlite"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--grant is not a flag recover accepts")
-		assert.Contains(t, err.Error(), "--email, --password, --password-stdin, --grant-manage and --remove-otp")
+		assert.Contains(t, err.Error(),
+			"--email, --password, --password-stdin, --grant-manage, --remove-otp and --disable-turnstile")
 	})
 
 	t.Run("a positional argument is refused", func(t *testing.T) {
@@ -221,6 +222,57 @@ func TestParseRecoverArgs(t *testing.T) {
 				assert.Contains(t, err.Error(), "--password is empty")
 			})
 		}
+	}
+
+	// --disable-turnstile turns an instance-wide switch off, so it names no user: alone, it is
+	// accepted without --email, and nobody's sessions end for it (#642 decision 11).
+	t.Run("--disable-turnstile alone needs no email", func(t *testing.T) {
+		base := config.DatabaseConfig{Type: "sqlite"}
+		inv, err := parseRecoverArgs([]string{"--disable-turnstile"}, base)
+		require.NoError(t, err)
+		assert.Equal(t, recoverInvocation{disableTurnstile: true, database: base}, inv)
+	})
+
+	t.Run("--disable-turnstile combines with the user actions", func(t *testing.T) {
+		base := config.DatabaseConfig{Type: "sqlite"}
+		inv, err := parseRecoverArgs([]string{"--disable-turnstile", "--email", "admin@example.com",
+			"--grant-manage", "--remove-otp"}, base)
+		require.NoError(t, err)
+		assert.Equal(t, recoverInvocation{
+			email: "admin@example.com", grantManage: true, removeOTP: true, disableTurnstile: true,
+			database: base,
+		}, inv)
+	})
+
+	// A user named beside --disable-turnstile with nothing to do for them is refused, as --email
+	// alone is: accepted, the recovery would end that user's sessions to flip an instance-wide
+	// switch, which is what the flag needing no --email avoids (#642 decision 11).
+	t.Run("--email with --disable-turnstile and no user action is refused", func(t *testing.T) {
+		_, err := parseRecoverArgs([]string{"--email", "admin@example.com", "--disable-turnstile"},
+			config.DatabaseConfig{Type: "sqlite"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nothing to do for the user --email names")
+		assert.Contains(t, err.Error(), "leave --email out")
+	})
+
+	t.Run("no action at all names every action", func(t *testing.T) {
+		_, err := parseRecoverArgs(nil, config.DatabaseConfig{Type: "sqlite"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nothing to do")
+		assert.Contains(t, err.Error(), "--disable-turnstile")
+		assert.Contains(t, err.Error(), "--grant-manage, --password-stdin, --password or --remove-otp")
+	})
+
+	// An --email given empty, as `--email "$ADDR"` with ADDR unset gives, is refused rather than
+	// read as "no user": beside --disable-turnstile, the run would otherwise skip the user the
+	// operator meant to recover and report success.
+	for _, spelling := range [][]string{{"--email="}, {"--email", " "}} {
+		args := append(spelling, "--disable-turnstile", "--grant-manage")
+		t.Run("an empty email is refused: "+strings.Join(args, " "), func(t *testing.T) {
+			_, err := parseRecoverArgs(args, config.DatabaseConfig{Type: "sqlite"})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--email is empty")
+		})
 	}
 
 	t.Run("the two password flags together are refused", func(t *testing.T) {
@@ -759,4 +811,116 @@ func TestRecover_ReportsManageAlreadyHeldAndGrantsNothing(t *testing.T) {
 	assert.Equal(t, manage.Id, grants[0].PermissionId)
 	assert.Equal(t, []string{audit.EventRevokedUserAuthState}, recorder.events,
 		"no permission event for a grant that did not happen")
+}
+
+// TestRecoverUsage_NamesDisableTurnstile: the usage spells the flag, on a line of its own as the
+// user actions are, and says it needs no --email (#642 decision 11).
+func TestRecoverUsage_NamesDisableTurnstile(t *testing.T) {
+	assert.Regexp(t, regexp.MustCompile(`(?m)^  --disable-turnstile\s`), recoverUsage)
+	assert.Contains(t, recoverUsage, "goiabada-authserver recover --disable-turnstile")
+}
+
+// turnTurnstileOn stores the challenge on with a site key and a sealed secret key, as a save on the
+// console's Turnstile page leaves it.
+func turnTurnstileOn(t *testing.T, db data.Database) {
+	t.Helper()
+	ctx := context.Background()
+	settings, err := db.GetSettingsById(ctx, nil, 1)
+	require.NoError(t, err)
+	settings.TurnstileEnabled = true
+	settings.TurnstileSiteKey = "1x00000000000000000000AA"
+	settings.TurnstileSecretKeyEncrypted = []byte("the-sealed-secret-key")
+	require.NoError(t, db.UpdateSettings(ctx, nil, settings))
+}
+
+// TestRecover_DisableTurnstileAloneTouchesNoUser: with no --email, the command turns the challenge
+// off, keeps both keys, records the change with the command as the actor, and leaves every user
+// as it was: no generation advances and no revocation is recorded (#642 decision 11).
+func TestRecover_DisableTurnstileAloneTouchesNoUser(t *testing.T) {
+	db, _ := newRecoverDatabase(t)
+	turnTurnstileOn(t, db)
+	recorder := &recoverAuditRecorder{}
+	ctx := context.Background()
+
+	code, stdout, stderr := runRecoverOn(t, db, recorder, recoverInvocation{disableTurnstile: true})
+
+	require.Equal(t, migrateExitOK, code, stderr)
+	assert.Contains(t, stdout, "turnstile challenge turned off")
+	assert.NotContains(t, stdout, "recovered", "no user was recovered")
+	assert.NotContains(t, stdout, "sessions ended")
+
+	settings, err := db.GetSettingsById(ctx, nil, 1)
+	require.NoError(t, err)
+	assert.False(t, settings.TurnstileEnabled, "the challenge is off")
+	assert.Equal(t, "1x00000000000000000000AA", settings.TurnstileSiteKey, "the site key is kept")
+	assert.Equal(t, []byte("the-sealed-secret-key"), settings.TurnstileSecretKeyEncrypted,
+		"the secret key is kept")
+
+	user, err := db.GetUserByEmail(ctx, nil, "admin@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), user.AuthStateGeneration, "no user's sessions ended")
+
+	assert.Equal(t, []string{audit.EventUpdatedTurnstileSettings}, recorder.events)
+	assert.Equal(t, map[string]interface{}{
+		"command": recovery.Actor,
+		"old": map[string]interface{}{
+			"turnstile_enabled":        true,
+			"turnstile_site_key":       "1x00000000000000000000AA",
+			"has_turnstile_secret_key": true,
+		},
+		"new": map[string]interface{}{
+			"turnstile_enabled":        false,
+			"turnstile_site_key":       "1x00000000000000000000AA",
+			"has_turnstile_secret_key": true,
+		},
+	}, recorder.details[0])
+}
+
+// TestRecover_DisableTurnstileAlreadyOffWritesNothing: with the challenge already off, the command
+// says so and records nothing, as a grant of a permission already held does.
+func TestRecover_DisableTurnstileAlreadyOffWritesNothing(t *testing.T) {
+	db, _ := newRecoverDatabase(t)
+	recorder := &recoverAuditRecorder{}
+
+	code, stdout, stderr := runRecoverOn(t, db, recorder, recoverInvocation{disableTurnstile: true})
+
+	require.Equal(t, migrateExitOK, code, stderr)
+	assert.Contains(t, stdout, "turnstile challenge was already off, so nothing was changed")
+	assert.Empty(t, recorder.events)
+}
+
+// TestRecover_DisableTurnstileWithAUserAction: one run turns the challenge off and recovers the
+// user, recording both, the revocation last.
+func TestRecover_DisableTurnstileWithAUserAction(t *testing.T) {
+	db, manage := newRecoverDatabase(t)
+	turnTurnstileOn(t, db)
+	recorder := &recoverAuditRecorder{}
+	ctx := context.Background()
+
+	code, stdout, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
+		email: "admin@example.com", grantManage: true, disableTurnstile: true,
+	})
+
+	require.Equal(t, migrateExitOK, code, stderr)
+	assert.Contains(t, stdout, "turnstile challenge turned off")
+	assert.Contains(t, stdout, "recovered admin@example.com")
+	assert.Contains(t, stdout, "authentication generation 0 to 1")
+
+	settings, err := db.GetSettingsById(ctx, nil, 1)
+	require.NoError(t, err)
+	assert.False(t, settings.TurnstileEnabled)
+	user, err := db.GetUserByEmail(ctx, nil, "admin@example.com")
+	require.NoError(t, err)
+	grants, err := db.GetUserPermissionsByUserId(ctx, nil, user.Id)
+	require.NoError(t, err)
+	require.Len(t, grants, 1)
+	assert.Equal(t, manage.Id, grants[0].PermissionId)
+
+	assert.Equal(t, []string{
+		audit.EventAddedUserPermission,
+		audit.EventAdministrativePermissionChanged,
+		audit.EventUpdatedTurnstileSettings,
+		audit.EventRevokedUserAuthState,
+	}, recorder.events)
+	assert.Equal(t, recovery.Actor, recorder.details[2]["command"])
 }

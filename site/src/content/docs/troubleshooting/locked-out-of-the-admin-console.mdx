@@ -140,6 +140,7 @@ When none of these is left, the auth server's `recover` subcommand restores sign
 | `--password-stdin` | Sets a new password, read from the first line of the command's input. It must meet your [password policy](/concepts/password-policy/). |
 | `--password <password>` | Sets a new password given on the command line. Use `--password-stdin` instead, as below. |
 | `--remove-otp` | Turns off the user's two-factor authentication and removes their authenticator |
+| `--disable-turnstile` | Turns off the Turnstile challenge and keeps its keys. It names no user, so it needs no `--email`, and given alone it ends no sessions. |
 
 One run can combine several flags. Type the new password at the first line, where nothing you type is shown. The second line hands it to the command's input, and since `printf` is built into the shell, the password never appears in a command line:
 

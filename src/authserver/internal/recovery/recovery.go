@@ -2,7 +2,8 @@
 // instance whose last administrator cannot sign in: the OTP device is lost, or the password is
 // forgotten and SMTP is not configured, or every holder of authserver:manage has left. Bootstrap
 // seeds only an empty database, and editing the users rows by hand bypasses the authentication
-// generation and writes no audit record (#498).
+// generation and writes no audit record (#498). It also turns the Turnstile challenge off, the way
+// back from a challenge that refuses every sign-in, the administrators' included (#642 decision 11).
 //
 // The command's authority is the database credentials it is run with, which is what makes it
 // trustworthy: whoever holds them already controls the instance. Run refuses an unknown or
@@ -41,6 +42,7 @@ type Database interface {
 	revocation.Database
 	otpcredential.Database
 	AcquireManagePermissionRow(ctx context.Context, tx *sql.Tx) (int64, error)
+	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error
 	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
@@ -50,6 +52,7 @@ type Database interface {
 	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
 // AuditLogger records what a recovery did, after it committed.
@@ -59,21 +62,27 @@ type AuditLogger interface {
 
 // Request is what the command was asked to do. Each action is applied only as asked.
 type Request struct {
-	Email       string // the stored address of the user to recover
+	Email       string // the stored address of the user to recover, empty when no user is
 	Password    string // a new password for the user, empty when none is asked
 	GrantManage bool   // grant authserver:manage
 	RemoveOTP   bool   // remove the user's OTP authenticator
+	// DisableTurnstile turns the Turnstile challenge off, keeping its keys. It is the one action
+	// that names no user: asked alone, with no Email, no user is read or written and nobody's
+	// sessions end.
+	DisableTurnstile bool
 }
 
 // Outcome is what a committed recovery did: each action's result as the committing attempt
-// produced it, and the revocation sweep's.
+// produced it, and the revocation sweep's. UserId and Email are zero, and Revocation empty, when no
+// user was named.
 type Outcome struct {
-	UserId        int64
-	Email         string // the address as Run looked it up, trimmed and lowercased
-	PasswordSet   bool
-	OTPRemoved    bool // false when no authenticator was enrolled
-	ManageGranted bool // false when the user already held it
-	Revocation    revocation.UserAuthStateResult
+	UserId            int64
+	Email             string // the address as Run looked it up, trimmed and lowercased
+	PasswordSet       bool
+	OTPRemoved        bool // false when no authenticator was enrolled
+	ManageGranted     bool // false when the user already held it
+	TurnstileDisabled bool // false when the challenge was already off
+	Revocation        revocation.UserAuthStateResult
 }
 
 // RefusedError is a recovery Run would not make, for a reason the operator can act on: an
@@ -92,6 +101,10 @@ func refused(format string, a ...any) error {
 // Run applies req to the user it names. On any error nothing is written and no audit event is
 // recorded; a *RefusedError among them is a refusal rather than a failure.
 func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Request) (Outcome, error) {
+	if strings.TrimSpace(req.Email) == "" {
+		return runWithoutUser(ctx, database, auditLogger, req)
+	}
+
 	// The address is trimmed and lowercased for the same reason the credential paths do it
 	// before GetUserByEmail: every write path stores one, and the engine-fold check in that
 	// read refuses an address that differs in anything the engine resolved away.
@@ -189,8 +202,10 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// whose absence was just read, and the outcome is reset first, so it is whatever the
 	// committing attempt produced (#301).
 	outcome := Outcome{Email: email, UserId: user.Id}
+	var turnstile turnstileChange
 	result, err := revocation.RevokeUserAuthStateTx(ctx, database, user.Id, "", func(tx *sql.Tx) error {
 		outcome.PasswordSet, outcome.OTPRemoved, outcome.ManageGranted = false, false, false
+		outcome.TurnstileDisabled, turnstile = false, turnstileChange{}
 
 		if acquireErr := database.AcquireUserRow(ctx, tx, user.Id); acquireErr != nil {
 			return acquireErr
@@ -209,6 +224,17 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 		}
 		if !current.Enabled {
 			return refused("the user holding %s was disabled while the command ran", email)
+		}
+
+		// The settings row is taken after the user's and the manage permission's: the user's row
+		// stays the transaction's first statement, for the reason above, and a settings save holds
+		// the settings row alone, so neither waits on the other while holding what it needs.
+		if req.DisableTurnstile {
+			var turnstileErr error
+			if turnstile, turnstileErr = disableTurnstile(ctx, database, tx); turnstileErr != nil {
+				return turnstileErr
+			}
+			outcome.TurnstileDisabled = turnstile.done
 		}
 
 		if passwordHash != "" {
@@ -291,6 +317,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 			"command": Actor,
 		})
 	}
+	logTurnstileChange(ctx, auditLogger, turnstile)
 	revocation.LogRevokedUserAuthStateByCommand(ctx, auditLogger, user.Id, revocation.ReasonRecoveryCommand,
 		Actor, result)
 
@@ -319,4 +346,86 @@ func managePermission(ctx context.Context, database Database) (int64, error) {
 	}
 	return 0, refused("the %s resource holds no %s permission",
 		builtin.AuthServerResourceIdentifier, builtin.ManagePermissionIdentifier)
+}
+
+// runWithoutUser is a recovery that names no user, which only turning the Turnstile challenge off
+// is: an instance-wide switch, so no user is read and nobody's sessions end for it (#642 decision
+// 11). It is its own transaction, through the same write the console's Turnstile page saves with.
+func runWithoutUser(ctx context.Context, database Database, auditLogger AuditLogger, req Request) (Outcome, error) {
+	if !req.DisableTurnstile {
+		return Outcome{}, refused("nothing to do: no user is named and the Turnstile challenge is " +
+			"not asked to be turned off")
+	}
+	var change turnstileChange
+	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		var turnstileErr error
+		change, turnstileErr = disableTurnstile(ctx, database, tx)
+		return turnstileErr
+	})
+	if err != nil {
+		return Outcome{}, err
+	}
+	logTurnstileChange(ctx, auditLogger, change)
+	return Outcome{TurnstileDisabled: change.done}, nil
+}
+
+// turnstileChange is what disableTurnstile did: whether it turned the challenge off, and the
+// settings row before and after, which updated_turnstile_settings records the Turnstile values of.
+type turnstileChange struct {
+	done          bool
+	before, after record.Settings
+}
+
+// disableTurnstile turns the Turnstile challenge off inside tx, keeping its site key and secret
+// key, through the write a save on the console's Turnstile page makes: the settings row taken, read
+// again under that lock, and written whole from what was read, so a save of another section
+// committed meanwhile is not written back over (#407). A challenge already off is left unwritten.
+// It is safe to rerun on a deadlock: it reads afresh and writes one column from a constant.
+func disableTurnstile(ctx context.Context, database Database, tx *sql.Tx) (turnstileChange, error) {
+	if err := database.AcquireSettingsRow(ctx, tx, 1); err != nil {
+		return turnstileChange{}, errs.Wrap(err, "unable to acquire the settings row")
+	}
+	settings, err := database.GetSettingsById(ctx, tx, 1)
+	if err != nil {
+		return turnstileChange{}, errs.Wrap(err, "unable to read the settings")
+	}
+	if settings == nil {
+		return turnstileChange{}, refused("the database holds no settings row, so there is no " +
+			"Turnstile challenge to turn off")
+	}
+	if !settings.TurnstileEnabled {
+		return turnstileChange{}, nil
+	}
+	change := turnstileChange{done: true, before: *settings}
+	settings.TurnstileEnabled = false
+	if err := database.UpdateSettings(ctx, tx, settings); err != nil {
+		return turnstileChange{}, errs.Wrap(err, "unable to save the settings")
+	}
+	change.after = *settings
+	return change, nil
+}
+
+// logTurnstileChange records a challenge turned off as updated_turnstile_settings, the event a save
+// on the console's Turnstile page writes, with the command as the actor. Nothing is recorded when
+// the challenge was already off.
+func logTurnstileChange(ctx context.Context, auditLogger AuditLogger, change turnstileChange) {
+	if !change.done {
+		return
+	}
+	auditLogger.Log(ctx, audit.EventUpdatedTurnstileSettings, map[string]interface{}{
+		"old":     turnstileAuditValues(&change.before),
+		"new":     turnstileAuditValues(&change.after),
+		"command": Actor,
+	})
+}
+
+// turnstileAuditValues is what updated_turnstile_settings records of one side of a change, under
+// the keys the Admin API's save records: the switch, the site key, which is public, and whether a
+// secret key is stored, never the secret key.
+func turnstileAuditValues(settings *record.Settings) map[string]interface{} {
+	return map[string]interface{}{
+		"turnstile_enabled":        settings.TurnstileEnabled,
+		"turnstile_site_key":       settings.TurnstileSiteKey,
+		"has_turnstile_secret_key": len(settings.TurnstileSecretKeyEncrypted) > 0,
+	}
 }

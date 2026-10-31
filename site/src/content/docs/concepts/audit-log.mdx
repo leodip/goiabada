@@ -415,7 +415,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_tokens_settings` | An administrator changed the default token settings. The entry holds the old and the new values. |
 | `updated_smtp_settings` | An administrator changed the **Email** settings, including turning email on or off. |
 | `sent_test_email` | An administrator sent a test email, and the mail server accepted it. |
-| `updated_turnstile_settings` | An administrator changed the **Turnstile** settings. The entry holds the old and the new values, the secret key only as whether one is stored. |
+| `updated_turnstile_settings` | An administrator changed the **Turnstile** settings, or the `recover` command turned the challenge off. The entry holds the old and the new values, the secret key only as whether one is stored. |
 | `updated_audit_logs_settings` | An administrator changed where audit events go or how long they're kept. It holds the new values, and is recorded under the old ones, so turning logging off is recorded too. |
 | `rotated_keys` | An administrator rotated the signing keys: the next key became the current one, and a new next key was generated. |
 | `revoked_key` | An administrator deleted a previous signing key. |
