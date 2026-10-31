@@ -548,10 +548,10 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 // so an administrator could save http://app.example.com/callback and the authorization
 // code then travelled to it in the clear.
 //
-// The refusal is when saving only. The loopback http that RFC 8252 section 7.3 keeps
-// working for native and MCP clients, and a custom scheme an administrator has legitimate
-// reason to register (#122), save beside https in the same PUT: the gate must refuse
-// exactly the URIs the RFC forbids and nothing else.
+// The loopback http that RFC 8252 section 7.3 keeps working for native and MCP clients,
+// and a custom scheme an administrator has legitimate reason to register (#122), save
+// beside https in the same PUT: the gate must refuse exactly the URIs the RFC forbids and
+// nothing else.
 func TestAPIClientRedirectURIsPut_PlainHTTPOnNonLoopbackRefused(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "redir-http-")
