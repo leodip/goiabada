@@ -529,13 +529,32 @@ var (
 	// response, and a meta http-equiv in the document head. Those two are the whole of it, so an
 	// allowlist over the directives closes the question rather than sampling it.
 	//
-	// frame-ancestors is what the deployment sends today and it governs framing, not submission. The
-	// two that would refuse this POST outright are form-action, which names where a form may submit,
-	// and sandbox, which forbids submission entirely unless it carries allow-forms. Both would leave
-	// every case below green while no browser could log out, because this helper builds the POST
+	// The deployment sends four (#518). This helper reads the directives' names, not their sources, so
+	// each is taught for a reason that holds whatever it lists, and none governs submission:
+	//
+	//   - frame-ancestors governs which pages may frame this one, not what it submits.
+	//   - script-src governs which scripts run, and submitting the form needs none: its action and
+	//     the declining link's href work with script unavailable (#152). Under the 'self' sent, the
+	//     one script these pages load, /static/utils.js, still runs, and the javascript: URL it
+	//     refuses could only sit in the action or that href, which the helper below holds to
+	//     /auth/logout and to the declined page (assertDeclineHref).
+	//   - object-src governs plugin content, <object> and <embed>, which the form neither is nor
+	//     contains.
+	//   - base-uri governs the URL a <base> may set, and only ever narrows it. This helper already
+	//     refuses a <base> outright, so a browser's action resolves against the response's own URL
+	//     whatever base-uri lists, exactly as this helper's does.
+	//
+	// The two that would refuse this POST outright are form-action, which names where a form may
+	// submit, and sandbox, which forbids submission entirely unless it carries allow-forms. Both would
+	// leave every case below green while no browser could log out, because this helper builds the POST
 	// itself and no policy applies to a Go http.Client. Hardening the deployment means deciding here
 	// whether the new directive permits this form's submission.
-	consentCSPDirectives = map[string]bool{"frame-ancestors": true}
+	consentCSPDirectives = map[string]bool{
+		"frame-ancestors": true,
+		"script-src":      true,
+		"object-src":      true,
+		"base-uri":        true,
+	}
 
 	// The http-equiv values the document head may carry, an allowlist for the same reason
 	// consentCSPDirectives is one: a meta http-equiv is an instruction to the browser and the set of

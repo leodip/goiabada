@@ -8,16 +8,33 @@ import "net/http"
 // reverse.
 const strictTransportSecurityValue = "max-age=31536000; includeSubDomains"
 
+// contentSecurityPolicyValue is the Content-Security-Policy value. What each directive does,
+// and why it is not more or less, is on SecurityHeaders.
+const contentSecurityPolicyValue = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+
 // SecurityHeaders sets baseline security response headers on every
 // response. It is installed early in the chain (before Recoverer) so that even
 // panic (500) responses carry the headers.
 //
 // Headers set:
 //
-//   - X-Frame-Options: DENY and Content-Security-Policy: frame-ancestors 'none'
-//     block clickjacking (the login/consent/OTP pages are never meant to be
-//     framed). The CSP carries only the frame-ancestors directive, so it does
-//     not restrict scripts/styles and cannot break inline template content.
+//   - X-Frame-Options: DENY blocks clickjacking (the login/consent/OTP pages are
+//     never meant to be framed).
+//
+//   - Content-Security-Policy: script-src 'self'; object-src 'none';
+//     base-uri 'none'; frame-ancestors 'none' (#518). A browser runs only the
+//     script files this origin serves, and refuses every inline <script>, on…
+//     attribute, javascript: URL and eval, so markup that reaches a page through
+//     a missed sink or an operator's template cannot run code. Every built-in
+//     page keeps its scripts in static files and hands them data in JSON data
+//     blocks, which a browser never runs (core/guard.AssertWellFormedTemplates
+//     holds the templates to that), so the policy needs no nonce or hash and
+//     stays one constant. object-src 'none' refuses <object> and <embed>, which
+//     nothing else restricts with no default-src sent; base-uri 'none' refuses
+//     a <base> that would move every relative form action to another origin;
+//     frame-ancestors 'none' refuses framing, as X-Frame-Options does. None of
+//     the four governs form submission, so the form_post page and every other
+//     form submit as before. Styles, images and fetches are not restricted.
 //
 //   - X-Content-Type-Options: nosniff stops MIME sniffing (this also protects
 //     the image-serving endpoints).
@@ -51,7 +68,7 @@ func SecurityHeaders(secure bool) func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()
 			h.Set("X-Frame-Options", "DENY")
-			h.Set("Content-Security-Policy", "frame-ancestors 'none'")
+			h.Set("Content-Security-Policy", contentSecurityPolicyValue)
 			h.Set("X-Content-Type-Options", "nosniff")
 			// same-origin, not no-referrer. See the note above: no-referrer makes
 			// browsers send "Origin: null" on form POSTs, which fails the CSRF

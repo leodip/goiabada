@@ -77,7 +77,7 @@ To change the layout of a page, or an email's body, you give a server its own co
 
    `tailwindcss` isn't served: it's what [regenerating the CSS](#regenerate-the-css) reads.
 
-2. Edit the templates. They're Go [`html/template`](https://pkg.go.dev/html/template) files. Keep the element IDs and the scripts the pages use, or the forms stop working.
+2. Edit the templates. They're Go [`html/template`](https://pkg.go.dev/html/template) files. Keep the element IDs and the scripts the pages use, or the forms stop working. Put a script of your own in a file in the `static` directory and load it with `<script src="{{ asset "/static/your-file.js" }}" defer></script>`, since the servers' [`Content-Security-Policy`](/reference/security/#response-headers) makes the browser refuse an inline `<script>`, an `on…` attribute such as `onclick`, a `javascript:` URL and a `<base>` element (a `<script type="application/json">` data block is fine).
 
 3. Make the files readable by the containers. Both images run as uid 10001 and gid 10001 (see [the user the images run as](/deploy/docker-compose/#the-user-the-images-run-as)), and a page whose template the server can't read fails with a 500:
 
