@@ -125,6 +125,7 @@ func HandleAppsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentAppsAPI,
+	settingsCache publicSettingsCache,
 	baseURL string,
 ) http.HandlerFunc {
 
@@ -164,6 +165,7 @@ func HandleAppsPost(
 			})
 			return
 		}
+		settingsCache.Invalidate()
 
 		if !setFlash(httpHelper, httpSession, w, r, flashAppsSaved, "true") {
 			return

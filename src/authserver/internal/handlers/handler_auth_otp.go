@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -183,6 +184,9 @@ func otpFormBind(authContext *ceremony.AuthContext, displayInfo *authflow.Client
 		"layoutClientLogoUrl":     displayInfo.LogoURL,
 		"layoutClientDescription": displayInfo.Description,
 		"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
+		// The page belongs to a sign-in for this app, so its footer links the app's own legal
+		// documents as well (#622).
+		render.LegalFooterClient: authContext.ClientId,
 	}
 }
 

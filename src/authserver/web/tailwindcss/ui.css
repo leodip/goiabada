@@ -1059,6 +1059,12 @@
     max-width: 26.5rem;
   }
 
+  /* A card for reading, such as a legal document's public page. */
+
+  .auth-card-wide {
+    max-width: 48rem;
+  }
+
   .auth-card > .panel-body {
     padding: 1.75rem 1.25rem;
     overflow-wrap: anywhere;
@@ -1119,6 +1125,31 @@
     color: var(--color-ink-muted);
     font-size: 0.9375rem;
     text-align: center;
+  }
+
+  /* The legal documents a page links, at its foot: the auth server's card and My Account. */
+
+  .legal-footer {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-line);
+    font-size: 0.875rem;
+  }
+
+  .legal-footer .legal-links {
+    justify-content: center;
+  }
+
+  .legal-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+  }
+
+  .legal-links a {
+    display: inline-block;
+    min-height: 1.5rem;
+    padding-block: 0.125rem;
   }
 
   /* A sentence under the title saying what the page asks for. */

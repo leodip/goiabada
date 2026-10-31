@@ -109,6 +109,7 @@ func HandlePublishPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentPublishAPI,
+	settingsCache publicSettingsCache,
 	baseURL string,
 ) http.HandlerFunc {
 
@@ -133,6 +134,7 @@ func HandlePublishPost(
 			})
 			return
 		}
+		settingsCache.Invalidate()
 
 		if !setFlash(httpHelper, httpSession, w, r, flashPublished, strconv.Itoa(published.LegalDocument.CurrentVersion)) {
 			return

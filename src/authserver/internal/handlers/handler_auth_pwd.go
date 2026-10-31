@@ -7,6 +7,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -142,6 +143,9 @@ func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer Pag
 		"layoutClientLogoUrl":     displayInfo.LogoURL,
 		"layoutClientDescription": displayInfo.Description,
 		"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
+		// The page belongs to a sign-in for this app, so its footer links the app's own legal
+		// documents as well (#622).
+		render.LegalFooterClient: authContext.ClientId,
 	}
 	if refusal != nil {
 		bind["error"] = refusal.Localize(r.Context())

@@ -95,6 +95,7 @@ var nilTx = (*sql.Tx)(nil)
 const testProfilePictureMaxSizeBytes = 100 << 10
 
 func newStaticBranchTestServer(database *datamocks.Database) *Server {
+	expectNoLegalDocuments(database)
 	cfg := &config.Config{}
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 
@@ -149,4 +150,13 @@ func newTestSessionStoreOver(backend sessionstore.ConditionalBackend) *sessionst
 		panic(err)
 	}
 	return conditional
+}
+
+// expectNoLegalDocuments answers, to every page's legal footer that asks, that no legal document is
+// in effect: the sign-in pages' two layouts read them on every render (#622), and the tests in this
+// package are not about them.
+func expectNoLegalDocuments(database *datamocks.Database) {
+	database.EXPECT().GetAllLegalDocuments(mock.Anything, mock.Anything).Return([]record.LegalDocument{}, nil).Maybe()
+	database.EXPECT().GetLegalDocumentClientsByClientId(mock.Anything, mock.Anything, mock.Anything).
+		Return([]record.LegalDocumentClient{}, nil).Maybe()
 }

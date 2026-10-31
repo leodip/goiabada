@@ -1261,6 +1261,8 @@ var apiStructsWithNoSchema = map[string]string{
 	"PublicSettingsResponse": "the unauthenticated /api/public/settings, outside the Admin and Account API scope this document declares",
 	// Carried by PublicSettingsResponse alone, as its passwordRules (#550 decision 11).
 	"PasswordRulesResponse": "the password rules the unauthenticated /api/public/settings carries, outside the Admin and Account API scope this document declares",
+	// Carried by PublicSettingsResponse alone, as its legalDocuments (#622).
+	"PublicLegalDocumentResponse": "the legal documents the unauthenticated /api/public/settings carries, outside the Admin and Account API scope this document declares",
 }
 
 func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {

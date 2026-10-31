@@ -75,7 +75,7 @@ func TestHandleRegisterGet_TheFormAsksForThePasswordOnlyWithoutVerification(t *t
 				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
 				Return(nil).Once()
 
-			HandleRegisterGet(pageRenderer).ServeHTTP(httptest.NewRecorder(), req)
+			HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, rendered)
 			assert.Equal(t, tc.wantRequiresVerification, rendered["requiresEmailVerification"])
@@ -103,7 +103,7 @@ func TestHandleRegisterPost_TheRedrawnFormKeepsItsMode(t *testing.T) {
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator,
+			handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator,
 				passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			req := httptest.NewRequest("POST", "/account/register", strings.NewReader(url.Values{"email": {""}}.Encode()))
@@ -130,7 +130,7 @@ func TestHandleRegisterPost_TheRedrawnFormKeepsItsMode(t *testing.T) {
 func TestHandleRegisterGet(t *testing.T) {
 	t.Run("Self registration enabled", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
-		handler := HandleRegisterGet(pageRenderer)
+		handler := HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{})
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
@@ -152,7 +152,7 @@ func TestHandleRegisterGet(t *testing.T) {
 
 	t.Run("Self registration disabled", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
-		handler := RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer))
+		handler := RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}))
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
@@ -198,7 +198,7 @@ func TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testi
 
 	newPost := func(pageRenderer *handlersmocks.PageRenderer, database *datamocks.Database,
 		auditLogger *handlersmocks.AuditLogger) http.Handler {
-		return RefuseUnavailableRegistration(pageRenderer)(HandleRegisterPost(pageRenderer, database,
+		return RefuseUnavailableRegistration(pageRenderer)(HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database,
 			accounthandlersmocks.NewUserCreator(t), accounthandlersmocks.NewEmailValidator(t),
 			accounthandlersmocks.NewPasswordValidator(t), accounthandlersmocks.NewEmailSender(t), auditLogger,
 			&heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL))
@@ -218,7 +218,7 @@ func TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testi
 		pageRenderer.On("NotFound", rr, req).Return().Once()
 		logs := logtest.CaptureSlog(t)
 
-		RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer)).ServeHTTP(rr, req)
+		RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{})).ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
 		assertRegistrationWithoutEmailLogged(t, logs)
@@ -259,7 +259,7 @@ func TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testi
 				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
 				Return(nil).Once()
 
-			RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer)).ServeHTTP(httptest.NewRecorder(), req)
+			RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{})).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, rendered)
 			assert.Equal(t, tc.wantRequiresVerification, rendered["requiresEmailVerification"])
@@ -299,7 +299,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("POST", "/register", nil)
 		rr := httptest.NewRecorder()
@@ -330,7 +330,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "invalid-email")
@@ -365,7 +365,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "existing@example.com")
@@ -401,7 +401,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "preregistered@example.com")
@@ -440,7 +440,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -484,7 +484,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		// The email stays in the body, so the handler reaches the credential read the same
 		// way the neighbouring case does.
@@ -537,7 +537,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -582,7 +582,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -620,7 +620,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -659,7 +659,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -699,7 +699,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := RefuseUnavailableRegistration(pageRenderer)(HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL))
+		handler := RefuseUnavailableRegistration(pageRenderer)(HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL))
 
 		form := url.Values{}
 		form.Add("email", "valid@example.com")
@@ -745,7 +745,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "test@example.com")
@@ -808,7 +808,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "test@example.com")
@@ -914,7 +914,7 @@ func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator,
+			handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator,
 				emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			form := url.Values{}
@@ -1014,7 +1014,7 @@ func TestHandleRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing.T) {
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator,
+			handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator,
 				passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			form := url.Values{}
@@ -1095,7 +1095,7 @@ func TestHandleRegisterPost_RefusesAnAddressOverTheLimit(t *testing.T) {
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator,
+			handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator,
 				passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			form := url.Values{}
@@ -1151,7 +1151,7 @@ func TestHandleRegisterPost_AcceptsAnAddressAtTheLimit(t *testing.T) {
 	emailSender := accounthandlersmocks.NewEmailSender(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator,
+	handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator,
 		passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 	form := url.Values{}

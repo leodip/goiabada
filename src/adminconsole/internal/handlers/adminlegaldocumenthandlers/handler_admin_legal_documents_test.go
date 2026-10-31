@@ -363,15 +363,17 @@ func TestHandleDraftPost_ARefusalKeepsTheTextAsTyped(t *testing.T) {
 func TestHandlePublishPost_PublishesAndOpensTheVersions(t *testing.T) {
 	store := newSessionStore(t)
 	fake := &fakeLegalDocumentsAPI{detail: publishedTerms()}
+	cache := &settingsCacheSpy{}
 	rec := httptest.NewRecorder()
 
-	HandlePublishPost(render.New(nil, nil), store, fake, consoleBaseURL).ServeHTTP(rec,
+	HandlePublishPost(render.New(nil, nil), store, fake, cache, consoleBaseURL).ServeHTTP(rec,
 		handlertest.Request(http.MethodPost, "/admin/legal-documents/7/publish", handlertest.WithAccessToken(),
 			handlertest.WithPathValue("legalDocumentId", "7")))
 
 	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
 	assert.Equal(t, consoleBaseURL+"/admin/legal-documents/7/versions", rec.Header().Get("Location"))
 	assert.Equal(t, []int64{7}, fake.published)
+	assert.Equal(t, 1, cache.invalidated, "My Account's footer shows the new version at once")
 
 	httpHelper := pageHelper(t, "/admin_legal_documents_versions.html")
 	HandleVersionsGet(httpHelper, store, fake).ServeHTTP(httptest.NewRecorder(), withCookies(
@@ -387,10 +389,12 @@ func TestHandlePublishPost_ARefusalIsShownOnTheDraft(t *testing.T) {
 	httpHelper := pageHelper(t, "/admin_legal_documents_draft.html")
 	fake := &fakeLegalDocumentsAPI{detail: draftPrivacy(),
 		writeErr: refusal(i18n.ErrCodeLegalDocumentDraftEmpty, "The draft has no text to publish.")}
+	cache := &settingsCacheSpy{}
 
-	HandlePublishPost(httpHelper, newSessionStore(t), fake, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+	HandlePublishPost(httpHelper, newSessionStore(t), fake, cache, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodPost, "/admin/legal-documents/7/publish", handlertest.WithAccessToken(),
 			handlertest.WithPathValue("legalDocumentId", "7")))
+	assert.Zero(t, cache.invalidated, "nothing changed")
 
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, "The draft has no text to publish.", bind["error"])
@@ -435,28 +439,30 @@ func TestHandlePreviewPost_ARefusalIsAnsweredAsJSON(t *testing.T) {
 func TestHandleRetireAndRestorePost_ActOnTheDocumentAndSaySo(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		build  func(sessionstore.Store, *fakeLegalDocumentsAPI) http.HandlerFunc
+		build  func(sessionstore.Store, *fakeLegalDocumentsAPI, *settingsCacheSpy) http.HandlerFunc
 		called func(*fakeLegalDocumentsAPI) []int64
 		flash  string
 	}{
-		{"retire", func(s sessionstore.Store, f *fakeLegalDocumentsAPI) http.HandlerFunc {
-			return HandleRetirePost(render.New(nil, nil), s, f, consoleBaseURL)
+		{"retire", func(s sessionstore.Store, f *fakeLegalDocumentsAPI, c *settingsCacheSpy) http.HandlerFunc {
+			return HandleRetirePost(render.New(nil, nil), s, f, c, consoleBaseURL)
 		}, func(f *fakeLegalDocumentsAPI) []int64 { return f.retired }, "retired"},
-		{"restore", func(s sessionstore.Store, f *fakeLegalDocumentsAPI) http.HandlerFunc {
-			return HandleRestorePost(render.New(nil, nil), s, f, consoleBaseURL)
+		{"restore", func(s sessionstore.Store, f *fakeLegalDocumentsAPI, c *settingsCacheSpy) http.HandlerFunc {
+			return HandleRestorePost(render.New(nil, nil), s, f, c, consoleBaseURL)
 		}, func(f *fakeLegalDocumentsAPI) []int64 { return f.restored }, "restored"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			store := newSessionStore(t)
 			fake := &fakeLegalDocumentsAPI{detail: publishedTerms()}
+			cache := &settingsCacheSpy{}
 			rec := httptest.NewRecorder()
 
-			tc.build(store, fake).ServeHTTP(rec, handlertest.Request(http.MethodPost, "/admin/legal-documents/7/"+tc.name,
+			tc.build(store, fake, cache).ServeHTTP(rec, handlertest.Request(http.MethodPost, "/admin/legal-documents/7/"+tc.name,
 				handlertest.WithAccessToken(), handlertest.WithPathValue("legalDocumentId", "7")))
 
 			require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
 			assert.Equal(t, consoleBaseURL+"/admin/legal-documents/7/versions", rec.Header().Get("Location"))
 			assert.Equal(t, []int64{7}, tc.called(fake))
+			assert.Equal(t, 1, cache.invalidated, "My Account's footer follows at once")
 
 			httpHelper := pageHelper(t, "/admin_legal_documents_versions.html")
 			HandleVersionsGet(httpHelper, store, fake).ServeHTTP(httptest.NewRecorder(), withCookies(
@@ -473,7 +479,7 @@ func TestHandleRetirePost_ARefusalIsShownOnTheVersions(t *testing.T) {
 	fake := &fakeLegalDocumentsAPI{detail: draftPrivacy(),
 		writeErr: refusal(i18n.ErrCodeLegalDocumentNotPublished, "Only a published document can be retired.")}
 
-	HandleRetirePost(httpHelper, newSessionStore(t), fake, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+	HandleRetirePost(httpHelper, newSessionStore(t), fake, &settingsCacheSpy{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodPost, "/admin/legal-documents/7/retire", handlertest.WithAccessToken(),
 			handlertest.WithPathValue("legalDocumentId", "7")))
 
@@ -592,3 +598,10 @@ func TestHandleDeleteGet_APublishedDocumentIsNotOfferedForDeletion(t *testing.T)
 		})
 	}
 }
+
+// settingsCacheSpy counts the empties of the public settings cache a handler asks for.
+type settingsCacheSpy struct {
+	invalidated int
+}
+
+func (s *settingsCacheSpy) Invalidate() { s.invalidated++ }

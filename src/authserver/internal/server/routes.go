@@ -11,11 +11,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -59,8 +59,9 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
-	httpHelper := render.New(s.templateFS, s.staticFS)
+	httpHelper := s.newRenderer()
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
+	legalDocuments := legaldocuments.NewReader(s.database)
 
 	// Two bearer guard sets, one per surface, because the two surfaces promise different refusal
 	// bodies: the admin and account APIs their {error_code, error_description} envelope, /userinfo
@@ -93,6 +94,11 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	pages.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	pages.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
+	// A legal document's public pages, which need no sign-in: its current version, and each
+	// version by number (#622 decision 5).
+	legalDocumentPage := handlers.HandleLegalDocumentGet(httpHelper, s.database)
+	pages.Get("/legal/{shortName}", legalDocumentPage)
+	pages.Get("/legal/{shortName}/versions/{version}", legalDocumentPage)
 	// The email check runs ahead of the limiter, so a request refused for email being off spends
 	// no budget and is never answered 429 (#542).
 	pages.With(accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper))
@@ -129,7 +135,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
-	publicSettingsHandler := handlers.NewPublicSettings(s.database)
+	publicSettingsHandler := handlers.NewPublicSettings(s.database, legalDocuments, baseURL)
 	api.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
 	// One route boundary and one client-error responder, shared by every ceremony route: the
@@ -191,8 +197,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		// submission spends no budget (#526 decision 2). The POST alone is limited: the GET renders
 		// a static form, while the POST probes whether an address already has an account, sends
 		// mail to it and writes a row.
-		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper)).Get("/register", accounthandlers.HandleRegisterGet(httpHelper))
-		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
+		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper)).Get("/register", accounthandlers.HandleRegisterGet(httpHelper, ceremonyStore, legalDocuments))
+		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, ceremonyStore, legalDocuments, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	})
 	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
 	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))

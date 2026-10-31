@@ -505,7 +505,12 @@ export async function setLegalDocumentApps(page: Page, id: number, apps: "all" |
     const boxes = page.locator('#appsList input[type="checkbox"]');
     for (const box of await boxes.all()) await box.uncheck();
     for (const identifier of apps) {
-      await page.locator("#appsList label.check-row").filter({ hasText: identifier }).locator("input").check();
+      // The identifier exactly: testapp-web is a prefix of testapp-web2.
+      await page
+        .locator("#appsList label.check-row")
+        .filter({ has: page.getByText(identifier, { exact: true }) })
+        .locator("input")
+        .check();
     }
   }
   await page.locator("#btnSaveApps").click();

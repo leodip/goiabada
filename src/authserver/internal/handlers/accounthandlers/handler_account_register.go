@@ -17,8 +17,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -92,6 +94,51 @@ func registrationCeremonyId(r *http.Request) string {
 	return id
 }
 
+// registrationCeremonies is what the registration form needs of the browser's sign-ins: the one its
+// Create an account link named, while the browser still holds it.
+type registrationCeremonies interface {
+	HeldAuthContext(r *http.Request, ceremonyId string) (*ceremony.AuthContext, error)
+}
+
+// registrationLegalDocuments is what the registration form needs of the legal documents: those in
+// effect for all apps and for the app it was reached from.
+type registrationLegalDocuments interface {
+	ForClient(ctx context.Context, clientIdentifier string) ([]legaldocuments.InEffect, error)
+}
+
+// bindRegistrationLegalDocuments adds to bind the legal documents the registration form links where
+// it collects the data (#622): those in effect for all apps, plus the app's own when registration
+// came from a sign-in for that app. It came from one when the browser holds the sign-in the password
+// page's Create an account link named; a link naming one it does not hold, in another browser or
+// after the sign-in ended, names no app. The page's footer links the same documents, so the app is
+// named to the renderer too.
+func bindRegistrationLegalDocuments(r *http.Request, ceremonies registrationCeremonies,
+	legalDocuments registrationLegalDocuments, bind map[string]interface{}) error {
+
+	clientIdentifier := ""
+	if ceremonyId := registrationCeremonyId(r); ceremonyId != "" {
+		authContext, err := ceremonies.HeldAuthContext(r, ceremonyId)
+		notHeld := errors.Is(err, ceremony.ErrNoAuthContext) || errors.Is(err, ceremony.ErrCeremonyNotHeld)
+		if err != nil && !notHeld {
+			return err
+		}
+		if err == nil {
+			clientIdentifier = authContext.ClientId
+		}
+	}
+	inEffect, err := legalDocuments.ForClient(r.Context(), clientIdentifier)
+	if err != nil {
+		return err
+	}
+	links := make([]render.LegalDocumentLink, len(inEffect))
+	for i, d := range inEffect {
+		links[i] = render.LegalDocumentLink{Title: d.Current.Title, ShortName: d.Document.ShortName}
+	}
+	bind["legalDocuments"] = links
+	bind[render.LegalFooterClient] = clientIdentifier
+	return nil
+}
+
 // registrationRequiresEmailVerification is the mode in which an account comes from the emailed
 // link: "requires email verification" on, which RefuseUnavailableRegistration lets through only
 // with SMTP on. In it the register form asks for the address alone, and the password is chosen on
@@ -106,6 +153,8 @@ func registrationRequiresEmailVerification(settings *record.Settings) bool {
 
 func HandleRegisterGet(
 	pageRenderer PageRenderer,
+	ceremonies registrationCeremonies,
+	legalDocuments registrationLegalDocuments,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -120,6 +169,10 @@ func HandleRegisterGet(
 			"ceremonyId":                registrationCeremonyId(r),
 			"requiresEmailVerification": registrationRequiresEmailVerification(settings),
 			"passwordRules":             passwordRulesHint(r),
+		}
+		if err := bindRegistrationLegalDocuments(r, ceremonies, legalDocuments, bind); err != nil {
+			pageRenderer.InternalServerError(w, r, err)
+			return
 		}
 
 		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -227,6 +280,8 @@ func auditRequestedRegistration(ctx context.Context, auditLogger AuditLogger, cl
 // hidden, and a taken address is told so (#207 decision 3).
 func HandleRegisterPost(
 	pageRenderer PageRenderer,
+	ceremonies registrationCeremonies,
+	legalDocuments registrationLegalDocuments,
 	database accountRegisterDatabase,
 	userCreator UserCreator,
 	emailValidator EmailValidator,
@@ -271,6 +326,10 @@ func HandleRegisterPost(
 				"ceremonyId":                registrationCeremonyId(r),
 				"requiresEmailVerification": requiresEmailVerification,
 				"passwordRules":             passwordRulesHint(r),
+			}
+			if err := bindRegistrationLegalDocuments(r, ceremonies, legalDocuments, bind); err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+				return
 			}
 
 			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)

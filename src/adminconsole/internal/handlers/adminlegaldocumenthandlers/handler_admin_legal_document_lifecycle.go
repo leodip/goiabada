@@ -29,9 +29,10 @@ func HandleRetirePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentRetireAPI,
+	settingsCache publicSettingsCache,
 	baseURL string,
 ) http.HandlerFunc {
-	return lifecycleAction(httpHelper, httpSession, apiClient, baseURL, flashRetired, apiClient.RetireLegalDocument)
+	return lifecycleAction(httpHelper, httpSession, apiClient, settingsCache, baseURL, flashRetired, apiClient.RetireLegalDocument)
 }
 
 // HandleRestorePost restores a retired document as it was, its current version included.
@@ -39,9 +40,10 @@ func HandleRestorePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentRestoreAPI,
+	settingsCache publicSettingsCache,
 	baseURL string,
 ) http.HandlerFunc {
-	return lifecycleAction(httpHelper, httpSession, apiClient, baseURL, flashRestored, apiClient.RestoreLegalDocument)
+	return lifecycleAction(httpHelper, httpSession, apiClient, settingsCache, baseURL, flashRestored, apiClient.RestoreLegalDocument)
 }
 
 // lifecycleAction asks the API to act on the document the path names and opens its versions,
@@ -50,6 +52,7 @@ func lifecycleAction(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentReader,
+	settingsCache publicSettingsCache,
 	baseURL string,
 	flash string,
 	act func(ctx context.Context, accessToken string, legalDocumentId int64) (*api.LegalDocumentDetailResponse, error),
@@ -72,6 +75,7 @@ func lifecycleAction(
 			})
 			return
 		}
+		settingsCache.Invalidate()
 
 		if !setFlash(httpHelper, httpSession, w, r, flash, "true") {
 			return

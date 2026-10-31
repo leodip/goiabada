@@ -211,6 +211,7 @@
 "account.register.have_account_prompt" = "Already have an account?"
 "account.register.login_link" = "Sign in"
 "account.register.verification_hint" = "We'll email you a link to choose your password."
+"account.register.legal_documents" = "Before you create your account, read:"
 
 "account.register_success.page_title" = "Account created"
 "account.register_success.title" = "Account created"
@@ -274,6 +275,14 @@
 "not_found.title" = "Page not found"
 "not_found.body" = "The address may be mistyped, or the page may have moved."
 
+# --- Legal documents: public pages and footer (#622) ---------------------------
+"legal_documents.footer.label" = "Legal documents"
+"legal_documents.page.version" = "Version {{.version}}"
+"legal_documents.page.published" = "Published"
+"legal_documents.page.superseded" = "This version is no longer in effect. Version {{.version}} is the current one."
+"legal_documents.page.read_current" = "Read the current version"
+"legal_documents.page.versions" = "Versions"
+
 # === Adminconsole foundation =================================================
 
 # --- Adminconsole top-bar / drawer ------------------------------------------
@@ -284,6 +293,7 @@
 "adminconsole.menu.logout" = "Sign out"
 "adminconsole.menu.version_label" = "Version"
 "adminconsole.layout.skip_to_content" = "Skip to main content"
+"adminconsole.layout.legal_documents" = "Legal documents"
 "adminconsole.layout.open_menu" = "Open menu"
 "adminconsole.layout.close_menu" = "Close menu"
 "adminconsole.layout.user_menu" = "Account menu"

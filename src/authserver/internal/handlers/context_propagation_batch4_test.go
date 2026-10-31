@@ -45,7 +45,7 @@ func TestPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
 
 	rr := httptest.NewRecorder()
-	NewPublicSettings(database).ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/api/v1/public/settings"))
+	NewPublicSettings(database, fixedLegalDocuments{}, "https://auth.example").ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/api/v1/public/settings"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)

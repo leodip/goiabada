@@ -147,6 +147,12 @@ func (h *Renderer) RenderTemplate(w http.ResponseWriter, r *http.Request, layout
 	return nil
 }
 
+// isMyAccountPage reports whether urlPath is one of My Account's pages, which the console serves
+// under /account/.
+func isMyAccountPage(urlPath string) bool {
+	return strings.HasPrefix(urlPath, "/account/")
+}
+
 // renderToBuffer renders a page without touching the response, which is what lets RenderTemplate
 // leave a failed render's response untouched. It is unexported because a page is the only thing
 // this binary renders: the auth server's twin exports its own for email bodies, and the console
@@ -174,6 +180,11 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled
 	data["goiabadaVersion"] = buildinfo.Version + " (" + buildinfo.BuildDate + ")"
+	// My Account's footer links the legal documents in effect for all apps, which the auth server's
+	// public settings carry (#622 decision 10). The admin pages draw no footer.
+	if isMyAccountPage(r.URL.Path) {
+		data["legalFooter"] = settings.LegalDocuments
+	}
 	// Inject the request context so templates can call {{ T $.ctx "..." }}
 	// and every other locale-reading template function. This is this
 	// application's one injection point; the auth server's renderer has its

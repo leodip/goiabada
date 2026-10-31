@@ -68,6 +68,31 @@ A document's short name is its public address: lowercase letters, digits and hyp
 
 You can change it on the draft until the document is first published. From then on it's fixed, so links to the document keep working.
 
+## The public page
+
+Once published, a document has a page on the auth server, which anyone can read without signing in:
+
+| Address | Shows |
+|---|---|
+| `/legal/<short-name>` | The version in effect, with its number and the date it was published. |
+| `/legal/<short-name>/versions/<n>` | Version `<n>`, as it was published. An earlier version says it's no longer in effect, and links the current one. |
+
+For example, a privacy notice with the short name `privacy` on `https://auth.example.com` is at `https://auth.example.com/legal/privacy`. Link to it from your website, your emails and your apps.
+
+Each page lists every version, so users can read exactly what they accepted. A draft is never public. A document that was never published, or is [retired](#retiring-a-document), has no page: its addresses answer "Page not found".
+
+## Where documents show
+
+Every document in effect is linked at the foot of the pages where people sign in, and nowhere until it's published:
+
+| Where | Documents linked |
+|---|---|
+| The auth server's pages: sign-in, registration, two-factor authentication, consent, password reset, sign-out and error pages | Those for all apps. A page that's part of a sign-in to a client also links that client's own documents. |
+| The registration form, beside the fields it asks for | Those for all apps, plus the client's own when the user came from that client's sign-in page. |
+| My Account, in the admin console | Those for all apps. |
+
+A document for selected apps shows only on the sign-ins to the clients it lists.
+
 ## Which clients a document applies to
 
 A document applies to every client until you choose otherwise. On its **Applies to** tab, pick one:

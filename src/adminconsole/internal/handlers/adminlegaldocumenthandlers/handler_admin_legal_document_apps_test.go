@@ -95,9 +95,10 @@ func TestHandleAppsPost_SavesTheAppsTickedAndSaysSo(t *testing.T) {
 	detail.LegalDocument.AppliesTo = "selected_apps"
 	detail.LegalDocument.ClientIds = []int64{4}
 	fake := &fakeLegalDocumentsAPI{detail: detail, clients: threeClients()}
+	cache := &settingsCacheSpy{}
 	rec := httptest.NewRecorder()
 
-	HandleAppsPost(render.New(nil, nil), store, fake, consoleBaseURL).ServeHTTP(rec, appsRequest(http.MethodPost, url.Values{
+	HandleAppsPost(render.New(nil, nil), store, fake, cache, consoleBaseURL).ServeHTTP(rec, appsRequest(http.MethodPost, url.Values{
 		"appliesTo": {"selected_apps"}, "clientId": {"6", "4"}, "expectedClientId": {"4"},
 	}))
 
@@ -107,6 +108,7 @@ func TestHandleAppsPost_SavesTheAppsTickedAndSaysSo(t *testing.T) {
 	require.NotNil(t, fake.appsSaved)
 	assert.Equal(t, api.UpdateLegalDocumentAppsRequest{AppliesTo: "selected_apps", ClientIds: []int64{6, 4},
 		ExpectedClientIds: []int64{4}}, *fake.appsSaved)
+	assert.Equal(t, 1, cache.invalidated, "My Account's footer follows the change at once")
 
 	httpHelper := pageHelper(t, "/admin_legal_documents_apps.html")
 	HandleAppsGet(httpHelper, store, fake).ServeHTTP(httptest.NewRecorder(), withCookies(appsRequest(http.MethodGet, nil), rec))
@@ -119,7 +121,7 @@ func TestHandleAppsPost_AllAppsSendsNoAppAndAnEmptyLoadedListAsEmpty(t *testing.
 	fake := &fakeLegalDocumentsAPI{detail: publishedTerms(), clients: threeClients()}
 	rec := httptest.NewRecorder()
 
-	HandleAppsPost(render.New(nil, nil), newSessionStore(t), fake, consoleBaseURL).ServeHTTP(rec, appsRequest(http.MethodPost, url.Values{
+	HandleAppsPost(render.New(nil, nil), newSessionStore(t), fake, &settingsCacheSpy{}, consoleBaseURL).ServeHTTP(rec, appsRequest(http.MethodPost, url.Values{
 		"appliesTo": {"all_apps"}, "clientId": {"6"},
 	}))
 
@@ -142,10 +144,12 @@ func TestHandleAppsPost_ARefusalKeepsWhatWasChosen(t *testing.T) {
 			detail.LegalDocument.AppliesTo = "all_apps"
 			detail.LegalDocument.ClientIds = []int64{}
 			fake := &fakeLegalDocumentsAPI{detail: detail, clients: threeClients(), writeErr: err}
+			cache := &settingsCacheSpy{}
 
-			HandleAppsPost(httpHelper, newSessionStore(t), fake, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+			HandleAppsPost(httpHelper, newSessionStore(t), fake, cache, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 				appsRequest(http.MethodPost, url.Values{"appliesTo": {"selected_apps"}, "clientId": {"6"}, "expectedClientId": {}}))
 
+			assert.Zero(t, cache.invalidated, "nothing changed")
 			bind := handlertest.Bind(t, httpHelper)
 			assert.Equal(t, "the API's sentence", bind["error"])
 			assert.Equal(t, false, bind["allApps"], "the choice made is kept")

@@ -67,6 +67,14 @@ func (s *Store) GetAuthContext(r *http.Request) (*AuthContext, error) {
 	return s.authContextNamed(r, RequestedId(r))
 }
 
+// HeldAuthContext reads the ceremony the browser session holds under ceremonyId, whatever the
+// request names, with GetAuthContext's two refusals. The registration page reads through it the
+// sign-in its Create an account link named, which travels in the page's URL on its GET and its POST
+// alike.
+func (s *Store) HeldAuthContext(r *http.Request, ceremonyId string) (*AuthContext, error) {
+	return s.authContextNamed(r, ceremonyId)
+}
+
 // authContextNamed reads the ceremony the browser session holds under ceremonyId: ErrNoAuthContext
 // when it holds none, and ErrCeremonyNotHeld when it holds others, or contexts naming none, since an
 // empty id is never held (idMatches).
