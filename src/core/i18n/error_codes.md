@@ -365,4 +365,5 @@ these are rendered on the refusal page rather than returned to the client
 | `validator.authorize.client_disabled` | (none) | Invalid client_id parameter. The application is disabled. |
 | `validator.authorize.redirect_uri_missing` | (none) | The redirect_uri parameter is missing. |
 | `validator.authorize.redirect_uri_not_absolute` | (none) | Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host. |
+| `validator.authorize.redirect_uri_insecure_http` | (none) | Invalid redirect_uri parameter. The redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost). |
 | `validator.authorize.redirect_uri_not_registered` | (none) | Invalid redirect_uri parameter. The application does not have this redirect URI registered. |

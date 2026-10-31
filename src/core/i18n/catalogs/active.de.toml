@@ -1845,6 +1845,7 @@
 "validator.authorize.client_disabled" = "Ungültiger Parameter client_id. Die Anwendung ist deaktiviert."
 "validator.authorize.redirect_uri_missing" = "Der Parameter redirect_uri fehlt."
 "validator.authorize.redirect_uri_not_absolute" = "Ungültiger Parameter redirect_uri. Die Redirect-URI muss absolut sein: Ein Schema ist erforderlich, ein Fragment ist nicht erlaubt, Prozentcodierungen müssen korrekt sein und HTTP- oder HTTPS-URIs müssen einen Host enthalten."
+"validator.authorize.redirect_uri_insecure_http" = "Ungültiger Parameter redirect_uri. Die Redirect-URI darf unverschlüsseltes HTTP nur auf der Loopback-Schnittstelle (127.0.0.1, [::1] oder localhost) verwenden."
 "validator.authorize.redirect_uri_not_registered" = "Ungültiger Parameter redirect_uri. Diese Redirect-URI ist für die Anwendung nicht registriert."
 
 # --- Email subjects ----------------------------------------------------------

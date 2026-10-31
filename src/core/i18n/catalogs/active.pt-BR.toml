@@ -1739,6 +1739,7 @@
 "validator.authorize.client_disabled" = "Parâmetro client_id inválido. O aplicativo está desativado."
 "validator.authorize.redirect_uri_missing" = "O parâmetro redirect_uri está ausente."
 "validator.authorize.redirect_uri_not_absolute" = "Parâmetro redirect_uri inválido. A URI de redirecionamento precisa ser absoluta: o esquema é obrigatório, fragmentos não são permitidos, os escapes por porcentagem precisam estar bem formados e uma URI http ou https precisa nomear um host."
+"validator.authorize.redirect_uri_insecure_http" = "Parâmetro redirect_uri inválido. A URI de redirecionamento não pode usar http simples em um host que não seja a interface de loopback (127.0.0.1, [::1] ou localhost)."
 "validator.authorize.redirect_uri_not_registered" = "Parâmetro redirect_uri inválido. O aplicativo não tem esta URI de redirecionamento registrada."
 
 # --- Assuntos de e-mail -----------------------------------------------------

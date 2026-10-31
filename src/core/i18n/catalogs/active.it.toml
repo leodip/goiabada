@@ -1848,6 +1848,7 @@
 "validator.authorize.client_disabled" = "Parametro client_id non valido. L'applicazione è disabilitata."
 "validator.authorize.redirect_uri_missing" = "Il parametro redirect_uri è mancante."
 "validator.authorize.redirect_uri_not_absolute" = "Parametro redirect_uri non valido. L'URI di reindirizzamento deve essere assoluto: lo schema è obbligatorio, i frammenti non sono ammessi, le sequenze con percentuale devono essere valide e un URI http o https deve indicare un host."
+"validator.authorize.redirect_uri_insecure_http" = "Parametro redirect_uri non valido. L'URI di reindirizzamento non deve usare http non cifrato su un host diverso dall'interfaccia di loopback (127.0.0.1, [::1] o localhost)."
 "validator.authorize.redirect_uri_not_registered" = "Parametro redirect_uri non valido. Questo URI di reindirizzamento non è registrato per l'applicazione."
 
 # --- Email subjects ----------------------------------------------------------

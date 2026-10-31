@@ -118,19 +118,14 @@ func normalizeURIList(wanted []string, loaded map[string]struct{}, refusals uriL
 		// (#122). A sign-out redirect URI is held to the same rule, as the #702 decision on #147
 		// records.
 		//
-		// Refused when saving only, not re-checked where the URI is used: a stored http URI
-		// belongs to an integration that works today, and a use-time gate would stop it at
-		// upgrade with no warning. The worst case is the admin console's own client, whose URIs
-		// bootstrap seeds from GOIABADA_ADMINCONSOLE_BASEURL: an installation serving the console
-		// over http on a non-loopback host would lock its administrators out (#590).
+		// Sign-in refuses a stored redirect URI of this shape too, so such a row receives
+		// nothing (#590).
 		//
-		// For the same reason, a URI the caller loaded passes when the save carries it back. A
-		// legacy non-absolute row above does not, but that row is already refused where it is
-		// used; this one still works, and refusing it would block every other change to the
-		// list, removing a compromised entry included. Adding an http URI is what is refused, and
-		// the caller's word for what it loaded is checked: the save's transaction answers 409
-		// when the stored rows differ from it, so naming a new http URI there writes nothing
-		// (#575).
+		// A URI the caller loaded still passes when the save carries it back, so the row does
+		// not block every other change to the list, removing a compromised entry included.
+		// Adding an http URI is what is refused, and the caller's word for what it loaded is
+		// checked: the save's transaction answers 409 when the stored rows differ from it, so
+		// naming a new http URI there writes nothing (#575).
 		if _, wasLoaded := loaded[uri]; !wasLoaded && loopback.IsPlainHTTPOff(uri) {
 			return nil, i18n.NewLocalizedError(refusals.insecureHTTP, map[string]any{"uri": uri})
 		}

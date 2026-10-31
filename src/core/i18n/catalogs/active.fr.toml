@@ -1844,6 +1844,7 @@
 "validator.authorize.client_disabled" = "Paramètre client_id invalide. L’application est désactivée."
 "validator.authorize.redirect_uri_missing" = "Le paramètre redirect_uri est manquant."
 "validator.authorize.redirect_uri_not_absolute" = "Paramètre redirect_uri invalide. L’URI de redirection doit être absolue : un schéma est requis, les fragments sont interdits, les séquences d’échappement en pourcentage doivent être valides et une URI http ou https doit indiquer un hôte."
+"validator.authorize.redirect_uri_insecure_http" = "Paramètre redirect_uri invalide. L’URI de redirection ne peut utiliser http sans chiffrement que sur l’interface de bouclage (127.0.0.1, [::1] ou localhost)."
 "validator.authorize.redirect_uri_not_registered" = "Paramètre redirect_uri invalide. Cette URI de redirection n’est pas enregistrée pour l’application."
 
 # --- Email subjects ----------------------------------------------------------

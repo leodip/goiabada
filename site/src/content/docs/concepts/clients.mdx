@@ -97,7 +97,7 @@ Every redirect URI must:
 - **have well-formed percent-escapes.** `https://example.com/a%zz` is refused.
 - **fit the limits:** at most 2048 bytes each, at most 60 per client, and no duplicates.
 
-The scheme, host and fragment rules are checked again on every authorization request, so a stored redirect URI that breaks them gets an error page instead of a redirect. The `http` rule applies only when you add a redirect URI. One the client already has keeps working, but once you remove it, you can't add it back.
+The scheme, host, `http` and fragment rules are checked again on every authorization request, so a stored redirect URI that breaks them gets an error page instead of a redirect, and nothing is sent to it.
 
 **A query is allowed and comes back as you registered it.** The auth server adds its response to it rather than rewriting it. The one exception is a parameter the response owns: `code`, `state`, `error`, `error_description` and `iss` are removed from the registered query in the default `query` response mode, even when the response doesn't set them. So a `state` in the callback is always the one your app sent, and no `state` comes back if your app sent none. With `response_mode=fragment` or `form_post`, the response doesn't travel in the query, and the registered query is left exactly as it is.
 

@@ -358,5 +358,6 @@ const (
 	ErrCodeAuthorizeClientDisabled           = "validator.authorize.client_disabled"
 	ErrCodeAuthorizeRedirectURIMissing       = "validator.authorize.redirect_uri_missing"
 	ErrCodeAuthorizeRedirectURINotAbsolute   = "validator.authorize.redirect_uri_not_absolute"
+	ErrCodeAuthorizeRedirectURIInsecureHTTP  = "validator.authorize.redirect_uri_insecure_http"
 	ErrCodeAuthorizeRedirectURINotRegistered = "validator.authorize.redirect_uri_not_registered"
 )

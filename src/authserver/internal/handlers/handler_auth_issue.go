@@ -17,8 +17,9 @@ import (
 
 // HandleIssueGet is GET /auth/issue, which accepts ready_to_issue_code and runs authflow.Issuance,
 // then answers what it did: the code or the implicit tokens to the client, an error to the client,
-// the redirect to /auth/level1 on a restart, or one of the two refusal pages that reach no client, a
-// redirect URI no longer registered and a client disabled since /auth/authorize.
+// the redirect to /auth/level1 on a restart, or one of the two refusal pages that reach no client: the
+// redirect-blocked page, for a redirect URI no longer registered or one that is plain http off the
+// loopback interface, and the page for a client disabled since /auth/authorize.
 func HandleIssueGet(
 	boundary *CeremonyBoundary,
 	responder *ClientErrorResponder,
@@ -41,17 +42,18 @@ func HandleIssueGet(
 		}
 
 		switch {
-		case result.UnregisteredRedirect:
+		case result.UnregisteredRedirect, result.InsecureRedirect:
 			if errors.Is(result.ClearErr, ceremony.ErrCeremonyReplaced) {
 				boundary.answerCeremonyReplaced(w, r)
 				return
 			}
 			if result.ClearErr != nil {
-				slog.ErrorContext(r.Context(), "unable to clear the auth context while withholding a redirect to a deregistered URI, rendering the refusal anyway",
+				slog.ErrorContext(r.Context(), "unable to clear the auth context while withholding a redirect, rendering the refusal anyway",
 					"error", result.ClearErr)
 			}
-			// Rendered here, never redirected: the URI must receive nothing (#241 decision 4). The page
-			// reads only the client's name, none for a client that no longer exists, and the URI.
+			// Rendered here, never redirected: the URI must receive nothing, an error included (#241
+			// decision 4, #590 decision 7). The page reads only the client's name, none for a client
+			// that no longer exists, and the URI.
 			err = responder.renderRedirectBlocked(w, r, redirectErrorInput{
 				client:      result.Client,
 				redirectURI: authContext.RedirectURI,
@@ -83,7 +85,6 @@ func HandleIssueGet(
 				boundary.answerStepSaveFailure(w, r, result.ClearErr)
 				return
 			}
-			warnInsecureHTTPRedirect(r.Context(), "issueAuthCode", authContext.ClientId, result.Code.RedirectURI)
 			// A failure here leaves the code unredeemed rather than delivered; it expires in 60 seconds.
 			err = issueAuthCode(w, r, responder.formPostFS, result.Code, authContext.ResponseMode)
 			if err != nil {
@@ -95,7 +96,6 @@ func HandleIssueGet(
 				boundary.answerStepSaveFailure(w, r, result.ClearErr)
 				return
 			}
-			warnInsecureHTTPRedirect(r.Context(), "issueImplicitTokens", authContext.ClientId, authContext.RedirectURI)
 			err = issueImplicitTokens(w, r, responder.formPostFS, authContext.ResponseMode, authContext.RedirectURI,
 				authContext.State, result.Tokens)
 			if err != nil {

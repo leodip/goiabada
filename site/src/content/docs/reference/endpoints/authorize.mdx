@@ -71,7 +71,7 @@ The auth server checks the request before it shows the user anything. A check it
 | The parameters can be read | 400 | "The authorization request could not be read: one of its parameters is not correctly encoded." |
 | `client_id`, `redirect_uri`, `response_type` and `response_mode` are each sent once | 400 | "The *name* parameter was included more than once." |
 | `client_id` names a client that exists and is enabled | 200 | "Invalid client_id parameter." and why |
-| `redirect_uri` is absolute and registered on the client | 200 | "Invalid redirect_uri parameter." and why. See [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/). |
+| `redirect_uri` is absolute, isn't plain `http` on a host other than loopback, and is registered on the client | 200 | "Invalid redirect_uri parameter." and why. See [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/). |
 | `response_mode` is `query`, `fragment` or `form_post` | 400 | "Invalid response_mode parameter. Supported values are: query, fragment, form_post." |
 | `response_mode=form_post` names an `http` or `https` redirect URI | 400 | "response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive." and the modes to use instead: `fragment` for the implicit flow, `query` or `fragment` otherwise |
 

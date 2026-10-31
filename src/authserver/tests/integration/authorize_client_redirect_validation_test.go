@@ -298,74 +298,131 @@ func TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale(t *t
 		"the refusal page message did not render in pt-BR; the handler is rendering the English fallback rather than the request locale")
 }
 
-// TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillReceivesTheCode pins the
-// other half of the RFC 9700 section 2.6 fix: the http rule is a save gate, not an authorize
-// gate. A redirect URI stored before the rule keeps working, which is what keeps an upgrade
-// from locking out an integration that already runs over plain http - including, in the worst
-// case, the admin console's own client, whose redirect URIs bootstrap seeds from
-// GOIABADA_ADMINCONSOLE_BASEURL. So the whole ceremony runs and the code arrives at the stored
-// URI: a refusal page, an error page or a deferred error would each stop it short of /auth/issue
-// (#575).
-func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillReceivesTheCode(t *testing.T) {
-	client := &record.Client{
-		ClientIdentifier:         "test-client-" + fake.LetterN(8),
-		Enabled:                  true,
-		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel1,
+// TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPIsRefused pins RFC 9700 section 2.6
+// at the authorization endpoint: authorization responses "MUST NOT be transmitted over unencrypted
+// network connections". A redirect URI that is plain http off the loopback interface, stored before
+// intake began refusing the shape (#575), is refused on the "Unable to authorize" page, and nothing
+// is sent to it: no Location, so neither a code nor an error reaches the client (#590). The row is
+// inserted directly, since no intake accepts one. It is a complete, valid request otherwise, so the
+// refusal is the redirect URI's alone.
+func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPIsRefused(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		stored       string
+		responseType string
+	}{
+		{"the authorization code flow", "http://app.example.com/callback", "code"},
+		{"an uppercase scheme", "HTTP://app.example.com/callback", "code"},
+		{"the implicit flow", "http://app.example.com/callback", "id_token token"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			implicitAllowed := true
+			client := &record.Client{
+				ClientIdentifier:         "test-client-" + fake.LetterN(8),
+				Enabled:                  true,
+				AuthorizationCodeEnabled: true,
+				ImplicitGrantEnabled:     &implicitAllowed,
+				DefaultAcrLevel:          record.AcrLevel1,
+			}
+			require.NoError(t, database.CreateClient(context.Background(), nil, client))
+			require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
+				&record.RedirectURI{ClientId: client.Id, URI: tc.stored}))
+
+			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+				"&redirect_uri=" + url.QueryEscape(tc.stored) +
+				"&response_type=" + url.QueryEscape(tc.responseType) +
+				"&code_challenge_method=S256" +
+				"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
+				"&scope=openid" +
+				"&state=" + fake.LetterN(8) +
+				"&nonce=" + fake.LetterN(8)
+
+			httpClient := createHttpClient(t)
+			resp, err := httpClient.Get(destUrl)
+			require.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Empty(t, resp.Header.Get("Location"), "nothing may be sent to a plain-http redirect URI off loopback")
+
+			doc, err := goquery.NewDocumentFromReader(resp.Body)
+			require.NoError(t, err)
+			assert.Equal(t, "Unable to authorize", strings.TrimSpace(doc.Find("h1").First().Text()))
+			assert.Equal(t, "Invalid redirect_uri parameter. The redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost).",
+				doc.Find("p#errorMsg").Text())
+		})
 	}
-	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	stored := "http://app.example.com/callback"
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: stored}))
+}
 
-	password := fake.Password(8)
-	passwordHashed, err := passwordhash.Hash(password)
-	require.NoError(t, err)
-	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
-	require.NoError(t, database.CreateUser(context.Background(), nil, user))
+// TestAuthorize_ValidateClientAndRedirectURI_StoredLoopbackHTTPStillReceivesTheCode is the other
+// side of that refusal: RFC 8252 section 7.3's loopback exception. A plain-http redirect URI on
+// localhost or [::1] runs the whole ceremony and the code arrives at it, so a refusal page, an error
+// page or a deferred error would each stop it short of /auth/issue (#590). The port flexibility
+// on 127.0.0.1 is TestToken_AuthCode_LoopbackEphemeralPort's.
+func TestAuthorize_ValidateClientAndRedirectURI_StoredLoopbackHTTPStillReceivesTheCode(t *testing.T) {
+	for _, stored := range []string{"http://localhost:7777/callback", "http://[::1]/callback"} {
+		t.Run(stored, func(t *testing.T) {
+			client := &record.Client{
+				ClientIdentifier:         "test-client-" + fake.LetterN(8),
+				Enabled:                  true,
+				AuthorizationCodeEnabled: true,
+				DefaultAcrLevel:          record.AcrLevel1,
+			}
+			require.NoError(t, database.CreateClient(context.Background(), nil, client))
+			require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: stored}))
 
-	requestState := fake.LetterN(8)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(stored) +
-		"&response_type=code" +
-		"&code_challenge_method=S256" +
-		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
-		"&scope=openid" +
-		"&state=" + requestState +
-		"&nonce=" + fake.LetterN(8)
+			password := fake.Password(8)
+			passwordHashed, err := passwordhash.Hash(password)
+			require.NoError(t, err)
+			user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
+			require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
-	httpClient := createHttpClient(t)
-	resp, err := httpClient.Get(destUrl)
-	require.NoError(t, err)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+			requestState := fake.LetterN(8)
+			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+				"&redirect_uri=" + url.QueryEscape(stored) +
+				"&response_type=code" +
+				"&code_challenge_method=S256" +
+				"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
+				"&scope=openid" +
+				"&state=" + requestState +
+				"&nonce=" + fake.LetterN(8)
 
-	redirectLocation := assertRedirect(t, resp, "/auth/level1")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+			httpClient := createHttpClient(t)
+			resp, err := httpClient.Get(destUrl)
+			require.NoError(t, err)
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+			redirectLocation := assertRedirect(t, resp, "/auth/level1")
+			resp = loadPage(t, httpClient, redirectLocation)
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+			redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+			resp = loadPage(t, httpClient, redirectLocation)
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+			resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	redirectLocation = assertRedirect(t, resp, "/auth/completed")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+			redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+			resp = loadPage(t, httpClient, redirectLocation)
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	redirectLocation = assertRedirect(t, resp, "/auth/issue")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+			redirectLocation = assertRedirect(t, resp, "/auth/completed")
+			resp = loadPage(t, httpClient, redirectLocation)
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	require.Equal(t, http.StatusFound, resp.StatusCode)
-	location, err := url.Parse(resp.Header.Get("Location"))
-	require.NoError(t, err)
-	assert.Equal(t, stored, location.Scheme+"://"+location.Host+location.Path,
-		"the code goes to the stored http redirect URI; the rule is a save gate only")
-	_, stateVal := getCodeAndStateFromUrl(t, resp)
-	assert.Equal(t, requestState, stateVal)
+			redirectLocation = assertRedirect(t, resp, "/auth/issue")
+			resp = loadPage(t, httpClient, redirectLocation)
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+			require.Equal(t, http.StatusFound, resp.StatusCode)
+			location, err := url.Parse(resp.Header.Get("Location"))
+			require.NoError(t, err)
+			assert.Equal(t, stored, location.Scheme+"://"+location.Host+location.Path,
+				"the code goes to the stored loopback http redirect URI")
+			code, stateVal := getCodeAndStateFromUrl(t, resp)
+			assert.NotEmpty(t, code)
+			assert.Equal(t, requestState, stateVal)
+		})
+	}
 }
