@@ -16,7 +16,7 @@
 //     Accept-Language, then English.
 //   - WithLocale is the one locale-setting primitive, and which refinement a
 //     process wants is its own: adminconsole from the JWT locale claim,
-//     authserver from the user's stored locale, both from an RP's ui_locales.
+//     authserver from an RP's ui_locales and an email's from its recipient.
 //     A non-explicit call defers to explicit intent already on the context.
 //   - WithPageLanguage attaches a user's page language, the catalog they chose
 //     for Goiabada's own pages. It wins over every source above, and no later

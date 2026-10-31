@@ -232,13 +232,14 @@ func TestHandleAuthPwdPost_ARefusalThatCannotRenderAnswers500(t *testing.T) {
 	m.post().ServeHTTP(rr, req)
 }
 
-// armAcceptedPassword arms a user whose password "testpassword" is right, with the stored locale
-// given, and the success audit record.
-func (m pwdStepMocks) armAcceptedPassword(t *testing.T, locale string) {
+// armAcceptedPassword arms a user whose password "testpassword" is right, with the page language
+// given and a Language and region of fr, and the success audit record.
+func (m pwdStepMocks) armAcceptedPassword(t *testing.T, pageLanguage string) {
 	passwordHash, err := passwordhash.Hash("testpassword")
 	require.NoError(t, err)
 	m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: locale,
+		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
+		PageLanguage: pageLanguage,
 	}, nil)
 	m.auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, map[string]interface{}{"user_id": int64(1)}).
 		Return().Once()
@@ -276,11 +277,12 @@ func TestHandleAuthPwdPost_ASaveFailingAnswers500(t *testing.T) {
 	assert.Empty(t, rr.Header().Get("Location"))
 }
 
-// Once the password is verified the step answers in the user's stored locale, and not before:
+// Once the password is verified the step answers in the user's page language, and not before:
 // "Authentication failed." stays in the request's, so its wording does not disclose that the
 // address names an account. The request here carries no locale of its own, so it answers in
-// English until the step switches.
-func TestHandleAuthPwdPost_AnswersInTheUsersLocaleOnlyOnceThePasswordIsVerified(t *testing.T) {
+// English until the step switches. Language and region (fr here) steers none of it (#631 decision
+// 2): a user on Automatic is answered in the request's language.
+func TestHandleAuthPwdPost_AnswersInTheUsersPageLanguageOnlyOnceThePasswordIsVerified(t *testing.T) {
 	portuguese := i18n.WithLocale(httptest.NewRequest(http.MethodGet, "/", nil).Context(), true, "pt-BR")
 
 	t.Run("a wrong password is refused in the request's locale", func(t *testing.T) {
@@ -292,7 +294,8 @@ func TestHandleAuthPwdPost_AnswersInTheUsersLocaleOnlyOnceThePasswordIsVerified(
 		passwordHash, err := passwordhash.Hash("testpassword")
 		require.NoError(t, err)
 		m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "pt-BR",
+			Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
+			PageLanguage: "pt-BR",
 		}, nil)
 		m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, mock.Anything).Return().Once()
 		m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html",
@@ -303,7 +306,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersLocaleOnlyOnceThePasswordIsVerified(
 		m.post().ServeHTTP(rr, req)
 	})
 
-	t.Run("a disabled account is answered in the user's locale", func(t *testing.T) {
+	t.Run("a disabled account is answered in the user's page language", func(t *testing.T) {
 		m := newPwdStepMocks(t)
 		req := pwdPostRequest("test@example.com", "testpassword")
 		rr := httptest.NewRecorder()
@@ -312,7 +315,8 @@ func TestHandleAuthPwdPost_AnswersInTheUsersLocaleOnlyOnceThePasswordIsVerified(
 		passwordHash, err := passwordhash.Hash("testpassword")
 		require.NoError(t, err)
 		m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "pt-BR",
+			Id: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
+			PageLanguage: "pt-BR",
 		}, nil)
 		m.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{"user_id": int64(2)}).
 			Return().Once()
@@ -327,7 +331,28 @@ func TestHandleAuthPwdPost_AnswersInTheUsersLocaleOnlyOnceThePasswordIsVerified(
 		m.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 	})
 
-	t.Run("a ceremony replaced after the password is answered in the user's locale", func(t *testing.T) {
+	t.Run("a disabled account on Automatic is answered in the request's locale", func(t *testing.T) {
+		m := newPwdStepMocks(t)
+		req := pwdPostRequest("test@example.com", "testpassword")
+		rr := httptest.NewRecorder()
+		m.armPasswordCeremony()
+		m.armClient()
+		passwordHash, err := passwordhash.Hash("testpassword")
+		require.NoError(t, err)
+		m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
+			Id: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
+		}, nil)
+		m.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{"user_id": int64(2)}).
+			Return().Once()
+		m.pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/auth_pwd.html",
+			mock.MatchedBy(func(data map[string]interface{}) bool {
+				return data["error"] == "Your user account is disabled."
+			})).Return(nil).Once()
+
+		m.post().ServeHTTP(rr, req)
+	})
+
+	t.Run("a ceremony replaced after the password is answered in the user's page language", func(t *testing.T) {
 		m := newPwdStepMocks(t)
 		req := pwdPostRequest("test@example.com", "testpassword")
 		rr := httptest.NewRecorder()

@@ -77,7 +77,9 @@ const logoutDeclinedPath = "/auth/logout/declined"
 //
 // Without this, a consent page rendered in the locale the RP asked for would be followed by a
 // signed-out page in a different one, because the confirming POST carries the parameter in its body
-// (#109). Same pattern as HandleAuthorizeGet, and the return value must be assigned.
+// (#109). Same pattern as HandleAuthorizeGet, and the return value must be assigned. The page
+// language of the browser's signed-in user, which the page-language middleware applied, wins over it
+// (#631 decision 4): i18n.WithLocale leaves a page language alone.
 func refineLogoutLocale(r *http.Request) *http.Request {
 	if uiLocales := i18n.SanitizeUILocales(r.FormValue("ui_locales")); len(uiLocales) > 0 {
 		return r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...))

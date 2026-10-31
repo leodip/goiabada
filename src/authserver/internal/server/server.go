@@ -541,7 +541,7 @@ func (s *Server) initMiddleware() appBranches {
 	// Everything below is on the application branch, not the root.
 
 	branches := appBranches{
-		pages:      s.router.With(s.applicationChain(middleware.PageFaults())...),
+		pages:      s.router.With(s.pageChain()...),
 		protocol:   s.router.With(s.applicationChain(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)))...),
 		token:      s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))))...),
 		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS), s.revocationMetrics)))...),
@@ -564,10 +564,8 @@ func (s *Server) applicationChain(faults middleware.ServerFaults) []func(http.Ha
 	// ?ui_locales, UI locales from an in-flight authorize flow,
 	// Accept-Language, or English. Must run AFTER middleware.SessionIdentifier
 	// so the session is decoded — the reader gets UI locales from session-backed
-	// authorize state. User-locale refinement happens per-handler in authserver
-	// (an i18n.WithLocale call once a password has been checked), since
-	// identity is established at handler scope rather than at middleware
-	// scope.
+	// authorize state. A known user's page language goes over it on the page
+	// branch alone (pageChain).
 	i18nCeremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 
 	return []func(http.Handler) http.Handler{
@@ -587,6 +585,15 @@ func (s *Server) applicationChain(faults middleware.ServerFaults) []func(http.Ha
 
 		i18n.Locale(i18nCeremonyStore),
 	}
+}
+
+// pageChain is the page branch's middleware: the application chain, then the page language of the
+// user a page is drawn for, over what the locale middleware resolved (#631 decision 5). The other
+// branches answer protocol clients and the APIs, whose refusals keep the language the request asks
+// for.
+func (s *Server) pageChain() []func(http.Handler) http.Handler {
+	return append(s.applicationChain(middleware.PageFaults()),
+		middleware.PageLanguage(ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName), s.database))
 }
 
 // appBranches is the application branch in its three answering formats, which initMiddleware returns
@@ -769,7 +776,7 @@ func (s *Server) serveStaticFiles() {
 	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
 	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS))
 	directory := http.Handler(notFound)
-	chain := s.applicationChain(middleware.PageFaults())
+	chain := s.pageChain()
 	for i := len(chain) - 1; i >= 0; i-- {
 		directory = chain[i](directory)
 	}

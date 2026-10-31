@@ -87,8 +87,8 @@ func (s *Store) authContextNamed(r *http.Request, ceremonyId string) (*AuthConte
 
 // LatestAuthContext reads the ceremony the browser most recently wrote, whichever one the request
 // names. It answers ErrNoAuthContext when the session holds none. The ceremony mismatch audit event
-// records it, and the page language falls back to it when the URL names no ceremony the browser
-// holds.
+// records it, and a page's ui_locales and sign-in user fall back to it when the URL names no ceremony
+// the browser holds.
 func (s *Store) LatestAuthContext(r *http.Request) (*AuthContext, error) {
 	held, err := s.heldNow(r)
 	if err != nil {
@@ -450,17 +450,40 @@ func (s *Store) ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremony
 	return err
 }
 
-// UILocales is the ui_locales of the ceremony the request's URL names, which the locale middleware
-// renders every page in, and of the ceremony the browser most recently wrote when the URL names none
-// it holds. It reads the URL's parameter whatever the method and never a form body: the middleware
-// runs ahead of every handler, and a step's form posts to the URL its page was loaded with.
+// UILocales is the ui_locales of the ceremony the page belongs to (pageAuthContext), which the locale
+// middleware renders every page in.
 func (s *Store) UILocales(r *http.Request) []string {
+	authContext := s.pageAuthContext(r)
+	if authContext == nil || len(authContext.UILocales) == 0 {
+		return nil
+	}
+	return authContext.UILocales
+}
+
+// SignInUserId is the user of the sign-in the page belongs to (pageAuthContext) once it knows one:
+// once it has verified the password (RecordPasswordVerified) or adopted a session (AdoptSession).
+// It is zero before then, and when the page belongs to no sign-in. A user's page language then wins
+// over the ceremony's ui_locales on that page (#631 decision 5), being the person signing in now.
+func (s *Store) SignInUserId(r *http.Request) int64 {
+	authContext := s.pageAuthContext(r)
+	if authContext == nil {
+		return 0
+	}
+	return authContext.UserId
+}
+
+// pageAuthContext is the ceremony a page belongs to: the one the request's URL names, and the one the
+// browser most recently wrote when the URL names none it holds. It reads the URL's parameter
+// whatever the method and never a form body: the page-language middleware runs ahead of every
+// handler, and a step's form posts to the URL its page was loaded with. Nil when the browser holds no
+// ceremony, or its session cannot be read.
+func (s *Store) pageAuthContext(r *http.Request) *AuthContext {
 	authContext, err := s.authContextNamed(r, r.URL.Query().Get(QueryParameter))
 	if errors.Is(err, ErrCeremonyNotHeld) {
 		authContext, err = s.LatestAuthContext(r)
 	}
-	if err != nil || authContext == nil || len(authContext.UILocales) == 0 {
+	if err != nil {
 		return nil
 	}
-	return authContext.UILocales
+	return authContext
 }

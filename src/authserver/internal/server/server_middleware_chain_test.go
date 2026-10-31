@@ -65,7 +65,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1",
 		"github.com/leodip/goiabada/core/httpmw.CSRF.func1",
 	}
-	// The same chain on all four branches, which differ only in how its faults are answered.
+	// The same chain on all the branches, which differ only in how its faults are answered.
 	wantApp := append(append([]string{}, wantRoot...),
 		"github.com/leodip/goiabada/authserver/internal/middleware.ServerFaults.Recoverer-fm",
 		"github.com/leodip/goiabada/authserver/internal/middleware.Settings.func1",
@@ -74,9 +74,18 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/i18n.Locale.func1",
 	)
 
+	// The page branch alone then applies a known user's page language, over what the locale
+	// middleware resolved; the protocol endpoints and the APIs answer in the language asked for
+	// (#631 decision 5).
+	wantPages := append(append([]string{}, wantApp...),
+		"github.com/leodip/goiabada/authserver/internal/middleware.PageLanguage.func1",
+	)
+
 	require.Contains(t, chains, "/static/*", "the static route must have been walked")
 	assert.Equal(t, wantRoot, chains["/static/*"])
-	for _, route := range []string{"/auth/authorize", "/certs", "/auth/token", "/api/public/settings"} {
+	require.Contains(t, chains, "/auth/authorize", "the page route must have been walked")
+	assert.Equal(t, wantPages, chains["/auth/authorize"])
+	for _, route := range []string{"/certs", "/auth/token", "/api/public/settings"} {
 		require.Contains(t, chains, route, "the application route must have been walked")
 		assert.Equal(t, wantApp, chains[route], route)
 	}

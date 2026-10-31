@@ -282,6 +282,15 @@ func resolveResetPasswordMarker(pageRenderer PageRenderer, httpSession linkMarke
 	return marker, user
 }
 
+// withResetUsersPageLanguage draws the reset page in the page language of the user the link names,
+// over the browser's and over the signed-in session's user the page-language middleware applied
+// (#631 decision 5): the link's holder received an email in that user's language, so it discloses
+// nothing new. Applied only once the marker has resolved to an enabled account, so a refused link
+// keeps the one indistinguishable response, in the request's language.
+func withResetUsersPageLanguage(r *http.Request, user *record.User) *http.Request {
+	return r.WithContext(i18n.WithPageLanguage(r.Context(), user.PageLanguage))
+}
+
 // HandleResetPasswordGet serves both halves of the reset link's journey.
 //
 // A request carrying ?code= is the emailed link being followed: it validates the code, marks
@@ -313,6 +322,7 @@ func HandleResetPasswordGet(
 		if user == nil {
 			return
 		}
+		r = withResetUsersPageLanguage(r, user)
 
 		// The form carries the continuation id back, which is what ties this rendering to
 		// the marker that produced it once the session moves on.
@@ -433,6 +443,7 @@ func HandleResetPasswordPost(
 		if user == nil {
 			return
 		}
+		r = withResetUsersPageLanguage(r, user)
 
 		// renderError redraws the form with message, marking the field it names, by its form name,
 		// invalid.

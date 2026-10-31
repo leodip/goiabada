@@ -188,7 +188,7 @@ func TestPasswordSubmission_AcceptedWithTheConstructorsVerifier(t *testing.T) {
 	require.NoError(t, err)
 
 	database := &fakePasswordSubmissionDatabase{
-		user: &record.User{Id: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "pt-BR"},
+		user: &record.User{Id: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr", PageLanguage: "pt-BR"},
 	}
 	auditLogger := &fakeAuditLogger{}
 	browser := &fakePasswordSubmissionBrowser{}
@@ -203,9 +203,9 @@ func TestPasswordSubmission_AcceptedWithTheConstructorsVerifier(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, PasswordSubmissionResult{
-		Answer:     PasswordAccepted,
-		UserLocale: "pt-BR",
-		NextStep:   "/auth/level1completed",
+		Answer:           PasswordAccepted,
+		UserPageLanguage: "pt-BR",
+		NextStep:         "/auth/level1completed",
 	}, result)
 	assert.Zero(t, browser.credentialFailures)
 	require.Len(t, auditLogger.entries, 1)

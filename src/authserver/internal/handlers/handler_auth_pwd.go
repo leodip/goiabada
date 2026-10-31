@@ -68,7 +68,7 @@ func HandleAuthPwdPost(
 		password := r.PostFormValue("password")
 
 		// renderRefusal reads r when it is called, so a refusal after the password was verified is
-		// worded in the locale the user switched r to. It loads the client block then and only then:
+		// worded in the page language the user switched r to. It loads the client block then and only then:
 		// an accepted submission redirects, and has no form to show it in. A failed read, or a client
 		// not found, answers 500, as it does on the GET. field names the one field the refusal is
 		// about, by its form name, and is empty for a refusal of the pair.
@@ -107,8 +107,10 @@ func HandleAuthPwdPost(
 			return
 		}
 
-		// The password is verified, so the user's own locale discloses nothing any more.
-		r = r.WithContext(i18n.WithLocale(r.Context(), false, result.UserLocale))
+		// The password is verified, so the user's page language discloses nothing any more. It wins
+		// over the browser session's user the page-language middleware applied, being the person
+		// signing in now; on Automatic the page keeps the language it was drawn in (#631 decision 5).
+		r = r.WithContext(i18n.WithPageLanguage(r.Context(), result.UserPageLanguage))
 
 		if result.Answer == authflow.PasswordAccountDisabled {
 			renderRefusal(i18n.ErrCodeLoginAccountDisabled, "")
