@@ -151,8 +151,9 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 // usable, ctx is returned unchanged.
 //
 // explicit marks the locale as a stated per-request preference: an RP's
-// ui_locales, or an email rendered in its recipient's language rather than in
-// the language of whoever triggered the send. A call with explicit false leaves
+// ui_locales, or an email to an address with no account rendered in the
+// language of the page it was asked for from (an email to a user takes
+// WithRecipientLanguage instead). A call with explicit false leaves
 // an explicit locale already on ctx untouched, which is what stops user-locale
 // refinement clobbering what the request asked for; a call with explicit true
 // always wins over a request's own preferences.

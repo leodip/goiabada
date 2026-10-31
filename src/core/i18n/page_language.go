@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"context"
+	"strings"
 
 	"golang.org/x/text/language"
 )
@@ -66,4 +67,27 @@ func (b *bundle) catalogTag(s string) (language.Tag, bool) {
 		}
 	}
 	return language.Tag{}, false
+}
+
+// WithRecipientLanguage attaches the language an email to an existing user is written in, subject
+// and body alike: their page language when it names a loaded catalog, else their language and
+// region (locale, the OIDC locale claim), else English (#631). An email has no browser to follow, so
+// Automatic falls back to the locale rather than to the request.
+//
+// It replaces whatever ctx carries, a page language included. The request that sends an email may be
+// drawn for someone else, the user of a signed-in browser asking to reset another account, or an
+// administrator creating a user, and its language is the reader's of that page, never the
+// recipient's. The locale is matched as WithLocale matches it and recorded as asked for, so a
+// regional tag still picks its own copy of the body (LocaleTag) and a tag with no catalog falls back
+// to English.
+func WithRecipientLanguage(ctx context.Context, pageLanguage, locale string) context.Context {
+	b := current()
+	if tag, ok := b.catalogTag(pageLanguage); ok {
+		return attachLocale(ctx, &translator{bundle: b, tag: tag}, pageLanguage, true, false)
+	}
+	tags := []string{"en"}
+	if locale = strings.TrimSpace(locale); locale != "" {
+		tags = []string{locale, "en"}
+	}
+	return attachLocale(ctx, b.localizerFor(tags), tags[0], true, false)
 }

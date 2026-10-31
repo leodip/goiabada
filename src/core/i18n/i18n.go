@@ -16,12 +16,16 @@
 //     Accept-Language, then English.
 //   - WithLocale is the one locale-setting primitive, and which refinement a
 //     process wants is its own: adminconsole from the JWT locale claim,
-//     authserver from an RP's ui_locales and an email's from its recipient.
+//     authserver from an RP's ui_locales and a registration email's from the
+//     page it was asked for from.
 //     A non-explicit call defers to explicit intent already on the context.
 //   - WithPageLanguage attaches a user's page language, the catalog they chose
 //     for Goiabada's own pages. It wins over every source above, and no later
 //     WithLocale call moves it; a tag naming no loaded catalog (CatalogTags,
 //     IsCatalogTag) is Automatic and changes nothing.
+//   - WithRecipientLanguage attaches the language of an email to a user: their
+//     page language, else their locale, else English, over whatever the
+//     sending request carries.
 //   - T reads the localizer off context.Context.
 package i18n
 

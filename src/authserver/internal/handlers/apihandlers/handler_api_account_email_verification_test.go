@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -245,6 +246,66 @@ func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHande
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, "https://admin.test/account/email-verification", emailedLink)
+}
+
+// The verification email is written in the user's page language, else their Language and region,
+// else English, subject and body alike: the request's own language, the console's page, plays no
+// part (#631).
+func TestHandleAccountEmailVerificationSendPost_IsWrittenInTheRecipientsLanguage(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		pageLanguage  string
+		locale        string
+		renderLocale  string
+		subjectPrefix string
+	}{
+		{"a user who chose Portuguese, over a French locale", "pt-BR", "fr", "pt-BR", "Verificação de e-mail - código "},
+		{"a user on Automatic, with a French locale", "", "fr", "fr", "Vérification de l’adresse e-mail - code "},
+		{"a user on Automatic with no locale", "", "", "en", "Email verification - code "},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			handler := HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
+				testDataCipher, testAdminConsoleBaseURL)
+
+			user := &record.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com",
+				PageLanguage: tc.pageLanguage, Locale: tc.locale}
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
+			database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
+				mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+			var renderLocale string
+			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+				"/emails/email_verification.html", mock.Anything).
+				Run(func(args mock.Arguments) {
+					renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
+				}).Return(&bytes.Buffer{}, nil)
+			var sent *emaildelivery.SendEmailInput
+			emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
+				Run(func(args mock.Arguments) {
+					sent = args.Get(2).(*emaildelivery.SendEmailInput)
+				}).Return(nil)
+			auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return()
+
+			// The console asks in its page's language, German here, which loses to the recipient's.
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
+			req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
+			ctx := i18n.WithLocale(req.Context(), true, "de")
+			ctx = reqctx.WithSettings(ctx, &record.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"})
+			req = req.WithContext(ctx)
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.NotNil(t, sent)
+			assert.True(t, strings.HasPrefix(sent.Subject, tc.subjectPrefix), "subject %q", sent.Subject)
+			assert.Equal(t, tc.renderLocale, renderLocale, "the body is rendered in the recipient's language")
+		})
+	}
 }
 
 // TestHandleAccountEmailVerificationPost_KeepsTheIssuedAt is the verify's half of the resend

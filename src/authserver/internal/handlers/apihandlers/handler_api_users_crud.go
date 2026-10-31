@@ -516,10 +516,11 @@ func HandleUserCreatePost(
 				"link": emaillinks.ResetPasswordLink(baseURL, verificationCode),
 			}
 
-			// Newly-created user has no stored Locale yet; render the
-			// "set your password" email in English. Once the user logs in
-			// and chooses a locale, subsequent emails honor it.
-			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, createdUser.Locale, "en"))
+			// The email is the new user's, in their language by the rule every email to a user
+			// follows, not the administrator's: a user created here has chosen no page language
+			// and has no Language and region yet, so it is in English. Once they choose,
+			// subsequent emails honor it.
+			emailReq := r.WithContext(i18n.WithRecipientLanguage(r.Context(), createdUser.PageLanguage, createdUser.Locale))
 			buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
 			if err != nil {
 				writeInternalServerError(w, r, err)

@@ -589,6 +589,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `UILocalesReader` | reachable | — |
 | `core/i18n` | `WithLocale` | both-apps | — |
 | `core/i18n` | `WithPageLanguage` | contract | The rule that a user's page language wins over `?ui_locales`, an RP's `ui_locales` and `Accept-Language` on both servers, and that no later `WithLocale` moves it, defined once where `WithLocale` defers to it (#631 decision 4). It writes the context keys this package keeps private, as `WithLocale` does. Its callers arrive in that change's later slices. |
+| `core/i18n` | `WithRecipientLanguage` | contract | The rule for the language of an email to a user: their page language when `IsCatalogTag` names it, else their language and region, else English, over whatever the sending request carries, a page language included (#631). Only the auth server sends email, so only it names this; it stays here because replacing a page language means writing the context keys this package keeps private, which `WithLocale` deliberately refuses to do once a page language is on the context, and because the catalog check is the one `WithPageLanguage` and both servers apply, as `LocaleTag` stays for the context key it reads. |
 | `core/inputvalidation` | `ContainsAngleBrackets` | both-apps | — |
 | `core/inputvalidation` | `IdentifierValidator` | own-package | — |
 | `core/inputvalidation` | `NewIdentifierValidator` | both-apps | — |

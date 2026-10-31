@@ -363,19 +363,22 @@ func changeToNewAddress(t *testing.T) *http.Request {
 
 // TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse is #404 decisions 9 and
 // 11: once the change is saved and answered, a job sends the previous address a notice, rendered
-// in the user's stored locale with English as the fallback, whose subject is the catalog's and
-// which names neither the new address nor carries a link. Nothing is sent before the response,
-// and the job carries the request's id.
+// in the user's page language, else their stored locale, else English (#631), whose subject is the
+// catalog's and which names neither the new address nor carries a link. Nothing is sent before the
+// response, and the job carries the request's id.
 func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
+		pageLanguage  string
 		locale        string
 		renderLocale  string
 		expectSubject string
 	}{
-		{"an English user", "en", "en", "Your email address was changed"},
-		{"a Brazilian Portuguese user", "pt-BR", "pt-BR", "Seu endereço de e-mail foi alterado"},
-		{"a user with no stored locale", "", "en", "Your email address was changed"},
+		{"an English user", "", "en", "en", "Your email address was changed"},
+		{"a Brazilian Portuguese user", "", "pt-BR", "pt-BR", "Seu endereço de e-mail foi alterado"},
+		{"a user with no stored locale", "", "", "en", "Your email address was changed"},
+		{"a user who chose Portuguese, over a French locale", "pt-BR", "fr", "pt-BR", "Seu endereço de e-mail foi alterado"},
+		{"a user on Automatic, with a French locale", "", "fr", "fr", "Votre adresse e-mail a été modifiée"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -383,7 +386,9 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			jobs := &heldJobs{}
-			stubSuccessfulChange(t, database, auditLogger, changingUser(t, tc.locale))
+			user := changingUser(t, tc.locale)
+			user.PageLanguage = tc.pageLanguage
+			stubSuccessfulChange(t, database, auditLogger, user)
 
 			rr := httptest.NewRecorder()
 			accountEmailHandlerWith(database, auditLogger, &countingCredentials{}, jobs, pageRenderer, emailSender).

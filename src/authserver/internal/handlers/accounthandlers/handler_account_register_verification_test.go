@@ -426,23 +426,42 @@ func installSpanishOverrideCatalog(t *testing.T) {
 }
 
 // A verified, enabled account is sent the notice: no code, a pointer to the forgot-password page,
-// rendered in the account's stored locale and falling back to English (#207 decisions 5 and 13).
+// rendered in the account's page language, else its stored locale, else English (#207 decisions 5
+// and 13, #631). The registration page's language, and the page language of a user the browser is
+// signed in as, reach the page and never the notice.
 func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNotice(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		locale      string
-		wantLocale  string
-		wantSubject string
+		name         string
+		signedIn     string
+		pageLanguage string
+		locale       string
+		wantLocale   string
+		wantSubject  string
 	}{
 		{name: "in the account's stored locale", locale: "pt-BR", wantLocale: "pt-BR", wantSubject: "Você já tem uma conta"},
 		{name: "in English when the account stores none", locale: "", wantLocale: "en", wantSubject: "You already have an account"},
+		{name: "in the account's page language, over its locale", pageLanguage: "pt-BR", locale: "fr", wantLocale: "pt-BR", wantSubject: "Você já tem uma conta"},
+		{name: "in the account's locale, on Automatic", locale: "fr", wantLocale: "fr", wantSubject: "Vous avez déjà un compte"},
+		{name: "from a browser signed in as a user who chose German: the account's page language",
+			signedIn: "de", pageLanguage: "pt-BR", locale: "fr", wantLocale: "pt-BR", wantSubject: "Você já tem uma conta"},
+		{name: "from a browser signed in as a user who chose German: the account's locale",
+			signedIn: "de", locale: "fr", wantLocale: "fr", wantSubject: "Vous avez déjà un compte"},
+		{name: "from a browser signed in as a user who chose German: English",
+			signedIn: "de", wantLocale: "en", wantSubject: "You already have an account"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newRegisterHarness(t)
 			req := registrationRequest(registerSomeoneEmail)
+			// The registration page asks for Italian.
+			ctx := i18n.WithLocale(req.Context(), false, "it")
+			if tc.signedIn != "" {
+				ctx = i18n.WithPageLanguage(ctx, tc.signedIn)
+			}
+			req = req.WithContext(ctx)
 			rr := httptest.NewRecorder()
 
-			user := &record.User{Id: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail, Locale: tc.locale}
+			user := &record.User{Id: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail,
+				PageLanguage: tc.pageLanguage, Locale: tc.locale}
 			h.expectLookups(registerSomeoneEmail, user, nil)
 			h.expectCheckEmailPage(rr, req)
 

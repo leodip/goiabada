@@ -151,8 +151,8 @@ func HandleAccountEmailPut(
 // audit entry of its own.
 //
 // The notice names neither the new address, which whoever reads the old mailbox has no business
-// learning, nor carries a link. It is rendered in the user's stored locale, falling back to
-// English, as the reset mail is.
+// learning, nor carries a link. It is rendered in the user's page language, else their stored
+// locale, else English, as every email to a user is (i18n.WithRecipientLanguage).
 func notifyPreviousAddress(r *http.Request, pageRenderer PageRenderer, emailSender EmailSender,
 	afterResponse AfterResponse, previousEmail string, user *record.User) {
 
@@ -169,13 +169,13 @@ func notifyPreviousAddress(r *http.Request, pageRenderer PageRenderer, emailSend
 	bind := map[string]interface{}{
 		"name": user.FullName(),
 	}
-	locale := user.Locale
+	pageLanguage, locale := user.PageLanguage, user.Locale
 	smtpConfig := emaildelivery.SMTPConfigFromSettings(settings)
 
 	afterResponse.Go(r.Context(), afterresponse.ClassAccountNotice, func(ctx context.Context) {
 		// The request is read for nothing but the renderer's inputs, under the job's context:
 		// the request's own is cancelled once the response has gone.
-		emailReq := r.WithContext(i18n.WithLocale(ctx, true, locale, "en"))
+		emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, pageLanguage, locale))
 		buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_address_changed.html", bind)
 		if err != nil {
 			slog.ErrorContext(ctx, "unable to render the email address change notice", "user_id", userId, "error", err)

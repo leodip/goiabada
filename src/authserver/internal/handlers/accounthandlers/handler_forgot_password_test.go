@@ -24,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -265,9 +266,9 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 				storedIssuedAt = args.Get(6).(time.Time)
 			}).Return(true, nil).Once()
 
-		// The job renders the mail in the recipient's locale (i18n.WithLocale), so the request
-		// it renders with is not the handler's. mock.Anything keeps the expectation focused on
-		// the layout / template / bind args.
+		// The job renders the mail in the recipient's language (i18n.WithRecipientLanguage), so
+		// the request it renders with is not the handler's. mock.Anything keeps the expectation
+		// focused on the layout / template / bind args.
 		var emailedLink string
 		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -430,6 +431,73 @@ func assertOneErrorRecordOnTheRequest(t *testing.T, capture *logtest.SlogCapture
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, forgotPasswordRequestId, records[0].Attrs["request_id"])
 	assert.NotNil(t, records[0].Attrs["error"])
+}
+
+// The reset email is written in its recipient's page language, else their Language and region,
+// else English, subject and body alike (#631). The page it is requested from may be drawn for
+// someone else, the user of a signed-in browser, in their page language: that language reaches the
+// page, never the email.
+func TestHandleForgotPasswordPost_WritesTheEmailInTheRecipientsLanguage(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		signedIn      string
+		pageLanguage  string
+		locale        string
+		renderLocale  string
+		expectSubject string
+	}{
+		{"a recipient who chose Portuguese, over a French locale", "", "pt-BR", "fr", "pt-BR", "Redefinição de senha"},
+		{"a recipient on Automatic, with a French locale", "", "", "fr", "fr", "Réinitialisation du mot de passe"},
+		{"a recipient on Automatic with no locale", "", "", "", "en", "Password reset"},
+		{"from a browser signed in as a user who chose German: the recipient's choice", "de", "pt-BR", "fr", "pt-BR", "Redefinição de senha"},
+		{"from a browser signed in as a user who chose German: the recipient's locale", "de", "", "fr", "fr", "Réinitialisation du mot de passe"},
+		{"from a browser signed in as a user who chose German: English", "de", "", "", "en", "Password reset"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			jobs := &heldJobs{}
+
+			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+			req := forgotPasswordRequest("existing@example.com")
+			// The browser asks for Italian, which every case's email ignores.
+			ctx := i18n.WithLocale(req.Context(), false, "it")
+			if tc.signedIn != "" {
+				ctx = i18n.WithPageLanguage(ctx, tc.signedIn)
+			}
+			req = req.WithContext(ctx)
+			rr := httptest.NewRecorder()
+
+			user := &record.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true,
+				PageLanguage: tc.pageLanguage, Locale: tc.locale}
+			database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(user, nil)
+			expectLinkSentPage(pageRenderer, rr, req)
+			handler.ServeHTTP(rr, req)
+			require.Equal(t, http.StatusOK, rr.Code)
+
+			database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(1), "existing@example.com",
+				mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
+			var renderLocale string
+			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).
+				Run(func(args mock.Arguments) {
+					renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
+				}).Return(&bytes.Buffer{}, nil).Once()
+			var sent *emaildelivery.SendEmailInput
+			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) {
+					sent = args.Get(2).(*emaildelivery.SendEmailInput)
+				}).Return(nil).Once()
+			auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.Anything).Return().Once()
+
+			jobs.runAll(t, afterresponse.ClassRecovery)
+
+			require.NotNil(t, sent)
+			assert.Equal(t, tc.expectSubject, sent.Subject)
+			assert.Equal(t, tc.renderLocale, renderLocale, "the body is rendered in the recipient's language")
+		})
+	}
 }
 
 // Recovery goes only to a verified address on an enabled account. Every other account is
