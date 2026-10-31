@@ -52,6 +52,7 @@ func TestPackageFiles_OneFilePerResource(t *testing.T) {
 		"settings_keys.go",
 		"settings_sessions.go",
 		"settings_tokens.go",
+		"settings_turnstile.go",
 		"settings_ui_theme.go",
 		"user_attributes.go",
 		"user_consents.go",

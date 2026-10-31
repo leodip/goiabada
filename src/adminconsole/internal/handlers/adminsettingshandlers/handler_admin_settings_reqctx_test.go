@@ -76,6 +76,12 @@ func TestAdminSettingsHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 		{"HandleTokensPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleTokensPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/tokens", handlertest.WithForm(url.Values{}))},
+		{"HandleTurnstileGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleTurnstileGet(h, nil, c)
+		}, handlertest.Request(http.MethodGet, "/admin/settings/turnstile")},
+		{"HandleTurnstilePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleTurnstilePost(h, nil, c, consoleBaseURL)
+		}, handlertest.Request(http.MethodPost, "/admin/settings/turnstile", handlertest.WithForm(url.Values{}))},
 		{"HandleUIThemeGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleUIThemeGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/ui-theme")},

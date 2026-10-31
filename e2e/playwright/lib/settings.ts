@@ -81,8 +81,9 @@ export async function withSettingsRestored(page: Page, path: string, body: () =>
 // The settings every run starts from, page by page, for the fields the tests change: those the
 // instance was seeded with (src/authserver/internal/bootstrap/seed.go), and email sent through the
 // environment's Mailpit (e2e/infra/remote-prepare.sh), which the auth server reaches as mailpit:1025.
-// The app name and the issuer are left alone: the tests restore what they change of those, and the
-// issuer is the deployment's own.
+// The Turnstile challenge is off, as the migration leaves it: on, it would refuse every sign-in a
+// test makes without solving it. The app name and the issuer are left alone: the tests restore what
+// they change of those, and the issuer is the deployment's own.
 const baseline: Record<string, FormValues> = {
   "/admin/settings/general": {
     passwordPolicy: "nist",
@@ -112,6 +113,7 @@ const baseline: Record<string, FormValues> = {
     fromName: "Goiabada e2e",
     fromEmail: "noreply@goiabada.dev",
   },
+  "/admin/settings/turnstile": { turnstileEnabled: false },
 };
 
 // Puts every page's baseline values back where they differ, and returns what it had to change: a run

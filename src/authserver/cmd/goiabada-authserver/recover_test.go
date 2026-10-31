@@ -267,7 +267,7 @@ func TestParseRecoverArgs(t *testing.T) {
 	// read as "no user": beside --disable-turnstile, the run would otherwise skip the user the
 	// operator meant to recover and report success.
 	for _, spelling := range [][]string{{"--email="}, {"--email", " "}} {
-		args := append(spelling, "--disable-turnstile", "--grant-manage")
+		args := append(append([]string{}, spelling...), "--disable-turnstile", "--grant-manage")
 		t.Run("an empty email is refused: "+strings.Join(args, " "), func(t *testing.T) {
 			_, err := parseRecoverArgs(args, config.DatabaseConfig{Type: "sqlite"})
 			require.Error(t, err)
@@ -816,7 +816,7 @@ func TestRecover_ReportsManageAlreadyHeldAndGrantsNothing(t *testing.T) {
 // TestRecoverUsage_NamesDisableTurnstile: the usage spells the flag, on a line of its own as the
 // user actions are, and says it needs no --email (#642 decision 11).
 func TestRecoverUsage_NamesDisableTurnstile(t *testing.T) {
-	assert.Regexp(t, regexp.MustCompile(`(?m)^  --disable-turnstile\s`), recoverUsage)
+	assert.Regexp(t, `(?m)^  --disable-turnstile\s`, recoverUsage)
 	assert.Contains(t, recoverUsage, "goiabada-authserver recover --disable-turnstile")
 }
 

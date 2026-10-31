@@ -103,6 +103,14 @@ func (s *ctxRecordingApiClient) UpdateSettingsTokens(ctx context.Context, _ stri
 	return nil, s.record(ctx)
 }
 
+func (s *ctxRecordingApiClient) GetSettingsTurnstile(ctx context.Context, _ string) (*api.SettingsTurnstileResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) UpdateSettingsTurnstile(ctx context.Context, _ string, _ *api.UpdateSettingsTurnstileRequest) (*api.SettingsTurnstileResponse, error) {
+	return nil, s.record(ctx)
+}
+
 func (s *ctxRecordingApiClient) GetSettingsUITheme(ctx context.Context, _ string) (*api.SettingsUIThemeResponse, error) {
 	return nil, s.record(ctx)
 }
@@ -269,6 +277,23 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 					"tokenExpirationInSeconds":                {"300"},
 					"refreshTokenOfflineIdleTimeoutInSeconds": {"2592000"},
 					"refreshTokenOfflineMaxLifetimeInSeconds": {"31536000"},
+				})),
+		},
+		{
+			name: "HandleTurnstileGet",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleTurnstileGet(h, newSettingsTestStore(), c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/settings/turnstile", handlertest.WithAccessToken()),
+		},
+		{
+			name: "HandleTurnstilePost",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleTurnstilePost(h, newSettingsTestStore(), c, consoleBaseURL)
+			},
+			request: handlertest.Request(http.MethodPost, "/admin/settings/turnstile",
+				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
+					"turnstileEnabled": {"on"}, "turnstileSiteKey": {"1x00000000000000000000AA"},
 				})),
 		},
 		{

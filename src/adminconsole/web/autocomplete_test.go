@@ -29,6 +29,7 @@ var passwordFieldTokens = map[string]bool{"current-password": true, "new-passwor
 func TestTemplates_EveryPasswordFieldNamesItsAutocomplete(t *testing.T) {
 	pinned := map[string]map[string]string{
 		"template/admin_settings_email.html":         {"password": "new-password"},
+		"template/admin_settings_turnstile.html":     {"turnstileSiteKey": "off", "turnstileSecretKey": "new-password"},
 		"template/admin_users_new.html":              {"email": "off", "password": "new-password"},
 		"template/admin_users_authentication.html":   {"newPassword": "new-password"},
 		"template/account_change_password.html":      {"currentPassword": "current-password", "newPassword": "new-password", "newPasswordConfirmation": "new-password"},
