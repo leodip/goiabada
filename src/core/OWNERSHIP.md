@@ -617,6 +617,8 @@ command itself and fails on a tree it changed.
 | `core/logging/logtest` | `CaptureSlog` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/logging/logtest` | `CapturedRecord` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/logging/logtest` | `SlogCapture` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
+| `core/loopback` | `IsHost` | contract | The one answer to which hosts are the loopback interface: `127.0.0.1`, `::1` and `localhost`, exact after case folding. The auth server grants loopback port flexibility by it, and the setup wizard, which is not one of the two applications, asks it of the URLs it writes, so the two cannot disagree on which URLs are loopback (#590). |
+| `core/loopback` | `IsPlainHTTPOff` | contract | RFC 9700 section 2.6's rule, plain `http` only to a loopback host. The auth server refuses a redirect URI by it, and the setup wizard holds the URLs it writes to it, so a URL one accepts is one the other accepts (#590). |
 | `core/metrics` | `Counter` | both-apps | — |
 | `core/metrics` | `Described` | own-package | — |
 | `core/metrics` | `DurationBuckets` | own-package | — |

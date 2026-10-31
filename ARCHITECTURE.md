@@ -115,6 +115,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/locales` | kernel | — |
 | `core/localzone` | kernel | — |
 | `core/logging` | kernel | — |
+| `core/loopback` | kernel | — |
 | `core/metrics` | kernel | — |
 | `core/oauth` | kernel | — |
 | `core/passwordblocklist` | kernel | — |
@@ -203,6 +204,11 @@ Notes on rows that are not self-evident:
   URL the wizard writes is one the start accepts and the save keeps. `inputvalidation.TextLength`
   counts the same unit, but the wizard cannot link that package, so the leaf counts it itself, and
   `core/guard`'s `imports_only_lint_test.go` holds it to `core/errs` and the standard library (#615).
+- `core/loopback` is kernel for `core/adminpassword`'s reason: it answers which hosts are the
+  loopback interface, and whether a URL is plain `http` off it, once for the auth server's
+  redirect-URI matching and intakes and for the setup wizard's URL checks, so the two cannot
+  disagree on which URLs are loopback. `core/guard`'s `imports_only_lint_test.go` holds it to the
+  standard library (#590).
 - `core/passwordblocklist` is kernel because it is written for the two places the `nist` password
   policy is applied, which must agree: the auth server's account validator, on every path that sets
   a password, and `core/adminpassword`, the first administrator's rule the setup wizard shares. It

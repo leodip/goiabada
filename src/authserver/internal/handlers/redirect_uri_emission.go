@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/loopback"
 )
 
 // checkRedirectURIEmittable is the last-resort assertion in front of every place this package
@@ -52,7 +53,7 @@ func checkRedirectURIEmittable(ctx context.Context, site string, redirectURI str
 
 // warnInsecureHTTPRedirect writes the record #590 asks for when an authorization response is about
 // to travel to a redirect URI that is plain http off the loopback interface, which
-// urlmatch.IsInsecureHTTPRedirectURI decides: the same rule the admin API and dynamic registration
+// loopback.IsPlainHTTPOff decides: the same rule the admin API and dynamic registration
 // refuse at intake, so the URIs this warns about are exactly those intake would no longer accept.
 // Such a URI still reaches /auth/issue by design, either stored before intake began refusing the
 // shape, so a running integration survives an upgrade, or seeded for the admin console's own client
@@ -77,7 +78,7 @@ func checkRedirectURIEmittable(ctx context.Context, site string, redirectURI str
 // is in the act of issuing, and a refusal or a failure upstream of the call sites never reaches
 // it.
 func warnInsecureHTTPRedirect(ctx context.Context, site, clientIdentifier, redirectURI string) {
-	if !urlmatch.IsInsecureHTTPRedirectURI(redirectURI) {
+	if !loopback.IsPlainHTTPOff(redirectURI) {
 		return
 	}
 

@@ -134,6 +134,13 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `FieldForLog`, the one rendering of a request target for a record: the path escaped, every query
   value redacted but those an allowlist names, and the whole bounded. The request logger and the
   CSRF refusal in `httpmw/` and the auth server's API debug middleware call it (#159, #442)
+- `loopback/` - The one answer to "is this the loopback interface", `IsHost`: `127.0.0.1`, `::1`
+  and `localhost`, exact after case folding, with a numeric port or IPv6 brackets accepted, so
+  `localhost.attacker.com` is not loopback. `IsPlainHTTPOff` builds RFC 9700 section 2.6's rule on
+  it: an `http` URI on any other host. The auth server's redirect-URI matching grants loopback port
+  flexibility by `IsHost`, and its redirect-URI intakes refuse by `IsPlainHTTPOff`. A
+  standard-library leaf, for `adminpassword/`'s reason, held there by `AssertImportsOnly` from
+  `core/guard`'s `imports_only_lint_test.go` (#590)
 - `metrics/` - The Prometheus metrics both servers expose, written here with no third-party
   dependency: counters, gauges and fixed-bucket histograms in a `Registry`, the text exposition
   format 0.0.4 its `Handler` writes under `Content-Type: text/plain; version=0.0.4; charset=utf-8`,

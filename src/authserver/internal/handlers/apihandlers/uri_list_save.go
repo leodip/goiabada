@@ -7,6 +7,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/loopback"
 )
 
 // A client holds two lists of URIs a browser is sent to: its redirect URIs, where an authorization
@@ -130,7 +131,7 @@ func normalizeURIList(wanted []string, loaded map[string]struct{}, refusals uriL
 		// the caller's word for what it loaded is checked: the save's transaction answers 409
 		// when the stored rows differ from it, so naming a new http URI there writes nothing
 		// (#575).
-		if _, wasLoaded := loaded[uri]; !wasLoaded && urlmatch.IsInsecureHTTPRedirectURI(uri) {
+		if _, wasLoaded := loaded[uri]; !wasLoaded && loopback.IsPlainHTTPOff(uri) {
 			return nil, i18n.NewLocalizedError(refusals.insecureHTTP, map[string]any{"uri": uri})
 		}
 		if _, exists := seen[uri]; exists {
