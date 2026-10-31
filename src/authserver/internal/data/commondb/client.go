@@ -470,6 +470,23 @@ func (d *Database) ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, clien
 	return nil
 }
 
+// ClientLoadPostLogoutRedirectURIs loads the client's sign-out redirect URIs, which nothing at
+// sign-in reads (#147).
+func (d *Database) ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error {
+
+	if client == nil {
+		return nil
+	}
+
+	var err error
+	client.PostLogoutRedirectURIs, err = d.GetPostLogoutRedirectURIsByClientId(ctx, tx, client.Id)
+	if err != nil {
+		return errs.Wrap(err, "unable to get sign-out redirect URIs")
+	}
+
+	return nil
+}
+
 func (d *Database) ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 
 	if client == nil {

@@ -31,11 +31,11 @@ import (
 
 // seededTables are the tables the seed's 18 writes land in.
 var seededTables = []string{
-	"clients", "redirect_uris", "users", "resources", "permissions",
+	"clients", "redirect_uris", "post_logout_redirect_uris", "users", "resources", "permissions",
 	"clients_permissions", "users_permissions", "key_pairs", "settings",
 }
 
-// seedWrites is how many writes a seed makes, each through one of the port's nine creates.
+// seedWrites is how many writes a seed makes, each through one of the port's ten creates.
 const seedWrites = 18
 
 type seedDB struct {
@@ -143,12 +143,33 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	secret, err := testDataCipher.Decrypt(client.ClientSecretEncrypted)
 	require.NoError(t, err)
 
+	// The console signs in at its callback and signs out to its bare base URL, and each address is
+	// on the one list that use reads: the bare URL is no place an authorization code can be sent
+	// (#147 decision 8).
+	redirectURIs, err := db.GetRedirectURIsByClientId(ctx, nil, client.Id)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://admin.example.com/auth/callback"}, storedURIs(redirectURIs, func(u record.RedirectURI) string { return u.URI }),
+		"the console's one redirect URI is its callback")
+	signOutURIs, err := db.GetPostLogoutRedirectURIsByClientId(ctx, nil, client.Id)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://admin.example.com"}, storedURIs(signOutURIs, func(u record.PostLogoutRedirectURI) string { return u.URI }),
+		"the console's one sign-out redirect URI is its bare base URL")
+
 	counts := db.counts(t)
 	assert.Equal(t, map[string]int{
-		"clients": 1, "redirect_uris": 2, "users": 1, "resources": 1, "permissions": 7,
+		"clients": 1, "redirect_uris": 1, "post_logout_redirect_uris": 1, "users": 1, "resources": 1, "permissions": 7,
 		"clients_permissions": 1, "users_permissions": 2, "key_pairs": 2, "settings": 1,
 	}, counts, "eighteen rows, one per write")
 	return secret
+}
+
+// storedURIs answers the uri of each stored row, in the order read.
+func storedURIs[T any](rows []T, uri func(T) string) []string {
+	uris := []string{}
+	for _, row := range rows {
+		uris = append(uris, uri(row))
+	}
+	return uris
 }
 
 // envFileValue reads one variable out of the bootstrap file's content.
@@ -595,7 +616,7 @@ func TestRun_SeedsTheAppNameTrimmed(t *testing.T) {
 
 var errInjected = errors.New("injected failure")
 
-// faultDB wraps the real database and fails one of the seed's writes, counted across the nine
+// faultDB wraps the real database and fails one of the seed's writes, counted across the ten
 // creates, either before the write reaches the engine or after the engine has executed it, or
 // lets every write through and fails the commit. onWrite, when set, runs as each write begins,
 // inside the transaction.
@@ -655,6 +676,10 @@ func (f *faultDB) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI
 	return f.write(func() error { return f.runDatabase.CreateRedirectURI(ctx, tx, redirectURI) })
 }
 
+func (f *faultDB) CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error {
+	return f.write(func() error { return f.runDatabase.CreatePostLogoutRedirectURI(ctx, tx, postLogoutRedirectURI) })
+}
+
 func (f *faultDB) CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error {
 	return f.write(func() error { return f.runDatabase.CreateUser(ctx, tx, user) })
 }
@@ -683,7 +708,7 @@ func (f *faultDB) CreateInitialSettings(ctx context.Context, tx *sql.Tx, setting
 	return f.write(func() error { return f.runDatabase.CreateInitialSettings(ctx, tx, settings) })
 }
 
-// Every write goes through the port's nine creates, and there are eighteen of them: the count the
+// Every write goes through the port's ten creates, and there are eighteen of them: the count the
 // failure table below is written against.
 func TestRun_MakesEighteenWrites(t *testing.T) {
 	db := newSeedDB(t)

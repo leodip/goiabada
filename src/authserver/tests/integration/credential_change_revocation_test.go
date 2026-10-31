@@ -47,8 +47,11 @@ type offlineGrant struct {
 	user         *record.User
 	password     string
 	redirectURI  string
-	accessToken  string
-	refreshToken string
+	// signOutRedirectURI is the client's one sign-out redirect URI, apart from redirectURI: a
+	// sign-out returns only to an address on that list (#147 decision 1).
+	signOutRedirectURI string
+	accessToken        string
+	refreshToken       string
 	// sessionIdentifier is the browser session the ceremony created. An offline refresh token's
 	// own session_identifier column is empty, so this comes from the codes row.
 	sessionIdentifier string
@@ -252,15 +255,16 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 	require.True(t, ok, "offline_access must yield a refresh token: %v", data)
 
 	return &offlineGrant{
-		client:            base.client,
-		clientSecret:      base.clientSecret,
-		user:              base.user,
-		password:          password,
-		redirectURI:       base.redirectURI,
-		accessToken:       accessToken,
-		refreshToken:      refreshToken,
-		sessionIdentifier: codeEntity.SessionIdentifier,
-		httpClient:        httpClient,
+		client:             base.client,
+		clientSecret:       base.clientSecret,
+		user:               base.user,
+		password:           password,
+		redirectURI:        base.redirectURI,
+		signOutRedirectURI: base.signOutRedirectURI,
+		accessToken:        accessToken,
+		refreshToken:       refreshToken,
+		sessionIdentifier:  codeEntity.SessionIdentifier,
+		httpClient:         httpClient,
 	}
 }
 
@@ -309,6 +313,8 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 
 	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: "https://example.com/callback"}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
+	signOutRedirectURI := &record.PostLogoutRedirectURI{ClientId: client.Id, URI: "https://example.com/signed-out"}
+	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil, signOutRedirectURI))
 
 	password := fake.Password(12)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -414,15 +420,16 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	require.True(t, ok, "offline_access must yield a refresh token: %v", data)
 
 	return &offlineGrant{
-		client:            client,
-		clientSecret:      clientSecret,
-		user:              user,
-		password:          password,
-		redirectURI:       redirectURI.URI,
-		accessToken:       accessToken,
-		refreshToken:      refreshToken,
-		sessionIdentifier: sessionIdentifier,
-		httpClient:        httpClient,
+		client:             client,
+		clientSecret:       clientSecret,
+		user:               user,
+		password:           password,
+		redirectURI:        redirectURI.URI,
+		signOutRedirectURI: signOutRedirectURI.URI,
+		accessToken:        accessToken,
+		refreshToken:       refreshToken,
+		sessionIdentifier:  sessionIdentifier,
+		httpClient:         httpClient,
 	}
 }
 

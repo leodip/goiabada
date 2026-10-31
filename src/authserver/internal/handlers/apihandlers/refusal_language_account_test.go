@@ -435,9 +435,10 @@ func TestAccountLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			portuguese: "Identificador de cliente inválido",
 		},
 		{
-			name: "a redirect URI no client holds",
+			name: "a sign-out redirect URI no client holds",
 			serve: logout(logoutPostLogoutUri, "", func(database *datamocks.Database) {
-				database.On("GetAllClients", mock.Anything, (*sql.Tx)(nil)).Return([]record.Client{}, nil).Once()
+				database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, (*sql.Tx)(nil), logoutPostLogoutUri).
+					Return([]record.Client{}, nil).Once()
 			}),
 			status:     http.StatusBadRequest,
 			code:       "VALIDATION_ERROR",
@@ -445,11 +446,11 @@ func TestAccountLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			portuguese: "Não foi possível identificar o cliente a partir do postLogoutRedirectUri; informe o clientIdentifier.",
 		},
 		{
-			name: "a redirect URI the client does not hold",
+			name: "a sign-out redirect URI the client does not hold",
 			serve: logout(logoutPostLogoutUri, logoutClientIdent, func(database *datamocks.Database) {
 				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), logoutClientIdent).
 					Return(&record.Client{Id: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
-				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 			}),
 			status:     http.StatusBadRequest,
 			code:       "VALIDATION_ERROR",

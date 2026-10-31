@@ -76,7 +76,7 @@ This is every `UPPER_SNAKE` code the two APIs answer.
 
 ## Saving a whole list
 
-An operation that replaces a whole list, such as a client's redirect URIs or a user's groups, also takes the list as you last read it, in a field named `expected` and the list's name, such as `expectedRedirectURIs`. When the stored list is no longer that one, because someone else saved it in between, the save is answered `409` with `CONCURRENT_UPDATE` and changes nothing. Read the list again, apply your change to it, and save again.
+An operation that replaces a whole list, such as a client's redirect URIs, its sign-out redirect URIs or a user's groups, also takes the list as you last read it, in a field named `expected` and the list's name, such as `expectedRedirectURIs` or `expectedPostLogoutRedirectURIs`. When the stored list is no longer that one, because someone else saved it in between, the save is answered `409` with `CONCURRENT_UPDATE` and changes nothing. Read the list again, apply your change to it, and save again.
 
 ## Next steps
 

@@ -191,7 +191,7 @@ func TestValidateRedirectURI(t *testing.T) {
 			name += " [confidential]"
 		}
 		t.Run(name, func(t *testing.T) {
-			err := validateRedirectURI(tc.uri, tc.isPublic)
+			err := validateRedirectURI(tc.uri, tc.isPublic, redirectURIField)
 			if tc.want {
 				assert.NoError(t, err, "expected accepted (%s)", tc.reason)
 			} else {

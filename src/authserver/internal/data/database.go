@@ -106,6 +106,7 @@ type Database interface {
 	// identifier, or nil when none was deleted. An empty identifier is an error.
 	GetDeletedClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
 
@@ -437,6 +438,13 @@ type Database interface {
 	GetRedirectURIById(ctx context.Context, tx *sql.Tx, redirectURIId int64) (*record.RedirectURI, error)
 	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error)
 	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
+
+	CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error
+	GetPostLogoutRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.PostLogoutRedirectURI, error)
+	// GetClientsByPostLogoutRedirectURI answers the clients whose sign-out redirect URIs hold uri,
+	// matched exactly on every engine, each client once (#147 decision 10).
+	GetClientsByPostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, uri string) ([]record.Client, error)
+	DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIId int64) error
 
 	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error
 	GetWebOriginById(ctx context.Context, tx *sql.Tx, webOriginId int64) (*record.WebOrigin, error)

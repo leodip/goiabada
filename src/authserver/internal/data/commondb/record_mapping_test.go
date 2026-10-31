@@ -230,6 +230,24 @@ func redirectURIMapping() mappingCase {
 	}
 }
 
+// postLogoutRedirectURIMapping has no update: a sign-out redirect URI is created and deleted, never
+// rewritten.
+func postLogoutRedirectURIMapping() mappingCase {
+	return mappingCase{
+		name:   "post-logout redirect URI",
+		table:  "post_logout_redirect_uris",
+		record: reflect.TypeOf(record.PostLogoutRedirectURI{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetPostLogoutRedirectURIsByClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetPostLogoutRedirectURIsByClientId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreatePostLogoutRedirectURI(ctx, nil, rec.(*record.PostLogoutRedirectURI))
+		},
+	}
+}
+
 // webOriginMapping has no update: a web origin is created and deleted, never rewritten.
 func webOriginMapping() mappingCase {
 	return mappingCase{
@@ -819,7 +837,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 	for _, c := range []mappingCase{
 		permissionMapping(), resourceMapping(),
 		clientMapping(), clientLogoMapping(), clientPermissionMapping(), clientIntrospectionResourceMapping(),
-		redirectURIMapping(), webOriginMapping(),
+		redirectURIMapping(), postLogoutRedirectURIMapping(), webOriginMapping(),
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
 		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),

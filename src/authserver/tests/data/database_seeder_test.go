@@ -173,7 +173,7 @@ func (f *seedFaultDB) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) 
 func seededRowCounts(t *testing.T, h *isolatedDB) map[string]int {
 	t.Helper()
 	counts := map[string]int{}
-	for _, table := range []string{"clients", "redirect_uris", "users", "resources", "permissions",
+	for _, table := range []string{"clients", "redirect_uris", "post_logout_redirect_uris", "users", "resources", "permissions",
 		"clients_permissions", "users_permissions", "key_pairs", "settings"} {
 		var n int
 		require.NoError(t, h.SQL.QueryRow("SELECT COUNT(*) FROM "+table).Scan(&n), table)

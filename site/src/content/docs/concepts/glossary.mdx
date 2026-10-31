@@ -141,6 +141,10 @@ A user creating their own account from the sign-in page's **Create an account** 
 
 What lets a user sign in once and use several clients. After the user signs in, the auth server keeps a session for their browser, so the next client they use doesn't ask for the password again. A session ends when it has been idle too long, when it reaches its maximum lifetime, or when it's ended: by the user or an administrator, by signing out, or by a change to the user's credentials. See [Sessions](/concepts/sessions/) and [Ending sessions](/concepts/ending-sessions/).
 
+### Sign-out redirect URI
+
+An address the auth server may send the browser back to after a sign-out, such as an app's "You're signed out" page. It must exactly match one of the sign-out redirect URIs registered on the client, a list kept apart from its redirect URIs. The protocol calls it `post_logout_redirect_uri`. See [Sign-out redirect URIs](/concepts/clients/#sign-out-redirect-uris).
+
 ### Signing-key rotation
 
 What **Rotate keys** under **Admin**, **Signing keys** does: the next signing key starts signing tokens, the current one becomes the previous one, and the old previous one is deleted, so a token it signed no longer verifies. See [The key set](/reference/endpoints/discovery-and-jwks/#the-key-set).

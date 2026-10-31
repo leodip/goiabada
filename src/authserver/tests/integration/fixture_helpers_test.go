@@ -607,6 +607,17 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 	return httpClient, code
 }
 
+// registerSignOutRedirectURI adds a fresh address to the client's sign-out redirect URIs and
+// returns it. A sign-out returns only to an address on that list, never to one of the client's
+// redirect URIs (#147 decision 1), so a test that signs out to an address registers it here.
+func registerSignOutRedirectURI(t *testing.T, clientId int64) string {
+	t.Helper()
+	uri := "https://" + strings.ToLower(fake.LetterN(10)) + ".example.com/signed-out"
+	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
+		&record.PostLogoutRedirectURI{ClientId: clientId, URI: uri}))
+	return uri
+}
+
 // createAuthCodeEnsuringUserScope creates a confidential client and a user, grants the user
 // all custom resource:permission scopes contained in the provided scope string, then runs the
 // authorization code flow to issue a code for that user and returns (httpClient, code).

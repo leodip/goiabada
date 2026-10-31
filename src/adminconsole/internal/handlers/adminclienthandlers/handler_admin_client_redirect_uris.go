@@ -23,6 +23,17 @@ type clientRedirectURIsAPI interface {
 	UpdateClientRedirectURIs(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error)
 }
 
+// usesARedirectFlow says whether the client signs users in through a redirect: the authorization
+// code flow, or the implicit flow, a per-client override over the global default. The Redirect URIs
+// and Sign-out redirect URIs tabs are gated on it, as the auth server's saves of both lists are.
+func usesARedirectFlow(client *api.ClientResponse, settings *api.SettingsGeneralResponse) bool {
+	implicitEnabled := settings.ImplicitFlowEnabled
+	if client.ImplicitGrantEnabled != nil {
+		implicitEnabled = *client.ImplicitGrantEnabled
+	}
+	return client.AuthorizationCodeEnabled || implicitEnabled
+}
+
 func HandleRedirectURIsGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -71,11 +82,6 @@ func HandleRedirectURIsGet(
 			return
 		}
 
-		implicitEnabled := settingsResp.ImplicitFlowEnabled
-		if clientResp.ImplicitGrantEnabled != nil {
-			implicitEnabled = *clientResp.ImplicitGrantEnabled
-		}
-
 		adminClientRedirectURIs := struct {
 			ClientId              int64
 			ClientIdentifier      string
@@ -86,7 +92,7 @@ func HandleRedirectURIsGet(
 		}{
 			ClientId:              clientResp.Id,
 			ClientIdentifier:      clientResp.ClientIdentifier,
-			CanManageRedirectURIs: clientResp.AuthorizationCodeEnabled || implicitEnabled,
+			CanManageRedirectURIs: usesARedirectFlow(clientResp, settingsResp),
 			IsSystemLevelClient:   clientResp.IsSystemLevelClient,
 			IsPublic:              clientResp.IsPublic,
 		}

@@ -213,6 +213,19 @@ var clientTargetWrites = []clientTargetWrite{
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 	{
+		name: "PUT /clients/{id}/post-logout-redirect-uris",
+		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string, client *record.Client) *httptest.ResponseRecorder {
+			r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/post-logout-redirect-uris",
+				`{"postLogoutRedirectURIs":["https://attacker.example/bye"],"expectedPostLogoutRedirectURIs":[]}`, scope)
+			r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{}))
+			rr := httptest.NewRecorder()
+			HandleClientPostLogoutRedirectURIsPut(database, auditLogger).ServeHTTP(rr, r)
+			return rr
+		},
+		writes:           []string{"RunInTransaction", "CreatePostLogoutRedirectURI", "DeletePostLogoutRedirectURI"},
+		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
+	},
+	{
 		name: "PUT /clients/{id}/web-origins",
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string, client *record.Client) *httptest.ResponseRecorder {
 			r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/web-origins",
@@ -559,6 +572,22 @@ func TestClientTargetCeiling_TheRoutesAnswerTheirOwnFourHundredsFirst(t *testing
 		r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 		HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, r)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assertNoClientPolicyRead(t, database)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("a sign-out redirect URI that is not absolute", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		expectTheTargetClient(targetClient(t, clientHoldingManage))(database)
+
+		r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/post-logout-redirect-uris",
+			`{"postLogoutRedirectURIs":["/relative/bye"],"expectedPostLogoutRedirectURIs":[]}`, granularScopeOfClients)
+		r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{}))
+		rr := httptest.NewRecorder()
+		HandleClientPostLogoutRedirectURIsPut(database, auditLogger).ServeHTTP(rr, r)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		assertNoClientPolicyRead(t, database)

@@ -105,10 +105,15 @@ func HandleLogoutPost(
 			return
 		}
 
-		// Ask for the form binding, for the reason the function's own comment records.
+		// Ask for the form binding, for the reason the function's own comment records. The console
+		// names its own client by the built-in identifier no setting changes, so the auth server
+		// checks the base URL against the console's sign-out redirect URIs only: another client
+		// listing the same URL can't make the lookup ambiguous and break this sign-out (#147
+		// decision 11).
 		accessToken := jwtInfo.TokenResponse.AccessToken
 		req := &api.AccountLogoutRequest{
 			PostLogoutRedirectUri: baseURL,
+			ClientIdentifier:      builtin.AdminConsoleClientIdentifier,
 			State:                 securerandom.String(32),
 			ResponseMode:          api.AccountLogoutResponseModeFormPost,
 		}

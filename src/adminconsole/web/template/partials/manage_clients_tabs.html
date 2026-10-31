@@ -10,6 +10,7 @@
   <a class="tab-item" href="/admin/clients/{{$id}}/authentication"{{ if eq $type "authentication" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.authentication" }}</a>
   <a class="tab-item" href="/admin/clients/{{$id}}/oauth2-flows"{{ if eq $type "oauth2-flows" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.oauth2_flows" }}</a>
   <a class="tab-item" href="/admin/clients/{{$id}}/redirect-uris"{{ if eq $type "redirect-uris" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.redirect_uris" }}</a>
+  <a class="tab-item" href="/admin/clients/{{$id}}/sign-out-redirect-uris"{{ if eq $type "sign-out-redirect-uris" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.sign_out_redirect_uris" }}</a>
   <a class="tab-item" href="/admin/clients/{{$id}}/web-origins"{{ if eq $type "web-origins" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.web_origins" }}</a>
   <a class="tab-item" href="/admin/clients/{{$id}}/user-sessions"{{ if eq $type "user-sessions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.user_sessions" }}</a>
   <a class="tab-item" href="/admin/clients/{{$id}}/permissions"{{ if eq $type "permissions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.permissions" }}</a>

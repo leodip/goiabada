@@ -970,3 +970,76 @@ func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *
 	require.Nil(t, tokens["error"], "the redemption was refused: %v", tokens["error_description"])
 	assert.NotEmpty(t, tokens["access_token"])
 }
+
+// A registration's post_logout_redirect_uris are stored on the new client as its sign-out redirect
+// URIs, apart from its redirect URIs, and echoed in the answer (#147 decision 7). Read back through
+// the admin API, which is where an administrator sees them.
+func TestDCR_SignOutRedirectURIsAreStoredAndEchoed(t *testing.T) {
+	enableDCR(t)
+
+	adminToken, _ := createAdminClientWithToken(t)
+
+	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
+		ClientName:             "Sign-out Registration",
+		RedirectURIs:           []string{"https://dcr-sign-out.example.com/callback"},
+		PostLogoutRedirectURIs: []string{"https://dcr-sign-out.example.com/signed-out", "https://dcr-sign-out.example.com/bye?state=fixed"},
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var registered oidc.DynamicClientRegistrationResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&registered))
+	assert.Equal(t, []string{"https://dcr-sign-out.example.com/signed-out", "https://dcr-sign-out.example.com/bye?state=fixed"},
+		registered.PostLogoutRedirectURIs)
+	assert.Equal(t, []string{"https://dcr-sign-out.example.com/callback"}, registered.RedirectURIs)
+
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+
+	detail := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+
+		strconv.FormatInt(client.Id, 10), adminToken, nil)
+	defer func() { _ = detail.Body.Close() }()
+	require.Equal(t, http.StatusOK, detail.StatusCode)
+
+	var body api.GetClientResponse
+	require.NoError(t, json.NewDecoder(detail.Body).Decode(&body))
+	signOut := make([]string, 0, len(body.Client.PostLogoutRedirectURIs))
+	for _, uri := range body.Client.PostLogoutRedirectURIs {
+		signOut = append(signOut, uri.URI)
+	}
+	assert.ElementsMatch(t, []string{"https://dcr-sign-out.example.com/signed-out", "https://dcr-sign-out.example.com/bye?state=fixed"}, signOut)
+	redirect := make([]string, 0, len(body.Client.RedirectURIs))
+	for _, uri := range body.Client.RedirectURIs {
+		redirect = append(redirect, uri.URI)
+	}
+	assert.Equal(t, []string{"https://dcr-sign-out.example.com/callback"}, redirect, "a sign-out redirect URI never becomes a redirect URI")
+}
+
+// A sign-out redirect URI the registration refuses is invalid_client_metadata, naming the field and
+// the value, and leaves the client list as it was. A public client's https entry is the case
+// decision 7 singles out: it is refused here as it is in redirect_uris.
+func TestDCR_ARefusedSignOutRedirectURICreatesNothing(t *testing.T) {
+	enableDCR(t)
+
+	adminToken, _ := createAdminClientWithToken(t)
+	before := countClientsThroughTheAdminAPI(t, adminToken)
+
+	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
+		ClientName:              "Refused Sign-out Registration",
+		RedirectURIs:            []string{"http://127.0.0.1:8765/callback"},
+		PostLogoutRedirectURIs:  []string{"https://dcr-sign-out.example.com/signed-out"},
+		TokenEndpointAuthMethod: "none",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errorResp oidc.DynamicClientRegistrationError
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errorResp))
+	assert.Equal(t, "invalid_client_metadata", errorResp.Error)
+	assert.Contains(t, errorResp.ErrorDescription, "post_logout_redirect_uris")
+	assert.Contains(t, errorResp.ErrorDescription, "https://dcr-sign-out.example.com/signed-out")
+
+	assert.Equal(t, before, countClientsThroughTheAdminAPI(t, adminToken), "a refused registration creates no client")
+}

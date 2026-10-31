@@ -2147,6 +2147,56 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/clients/{id}/post-logout-redirect-uris:
+    put:
+      tags: [Clients]
+      summary: Update sign-out redirect URIs
+      description: |
+        Replace a client's sign-out redirect URIs, the addresses a sign-out may send the browser
+        back to as `post_logout_redirect_uri`. The list is apart from the redirect URIs: this call
+        never changes them, and the 60-entry limit counts each list on its own.
+
+        Each entry follows the redirect URI rules: an absolute URI with no fragment, at most 2048
+        bytes, listed once, and plain `http` only on 127.0.0.1, [::1] or localhost. A custom
+        scheme and a query, `state` included, are accepted. The client needs the authorization
+        code flow or the implicit flow. On a client that may act as an administrator, only
+        `authserver:manage` may save it.
+      operationId: updateClientPostLogoutRedirectURIs
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientPostLogoutRedirectURIsRequest'
+      responses:
+        '200':
+          description: Sign-out redirect URIs updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateClientResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            The stored list differs from expectedPostLogoutRedirectURIs: another save changed it
+            after it was read. error_code is CONCURRENT_UPDATE; nothing was saved. Read it again
+            and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/clients/{id}/web-origins:
     put:
       tags: [Clients]
@@ -5701,6 +5751,30 @@ components:
         - uri
         - clientId
 
+    PostLogoutRedirectURIResponse:
+      type: object
+      description: >-
+        The `postLogoutRedirectURIs` entries of ClientResponse: one of the client's sign-out
+        redirect URIs, in the shape of a redirect URI.
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        uri:
+          type: string
+        clientId:
+          type: integer
+          format: int64
+      required:
+        - id
+        - createdAt
+        - uri
+        - clientId
+
     WebOrigin:
       type: object
       description: |
@@ -5817,6 +5891,14 @@ components:
           description: Null when this collection was not loaded for the response.
           items:
             $ref: '#/components/schemas/RedirectURI'
+        postLogoutRedirectURIs:
+          type: array
+          nullable: true
+          description: >-
+            The client's sign-out redirect URIs, the addresses a sign-out may return to. Null when
+            this collection was not loaded for the response.
+          items:
+            $ref: '#/components/schemas/PostLogoutRedirectURIResponse'
         webOrigins:
           type: array
           nullable: true
@@ -5853,6 +5935,7 @@ components:
         - includeOpenIDConnectClaimsInIdToken
         - defaultAcrLevel
         - redirectURIs
+        - postLogoutRedirectURIs
         - webOrigins
 
     GetClientsResponse:
@@ -5996,6 +6079,28 @@ components:
         expectedRedirectURIs:
           type: array
           description: The redirect URIs as last read; [] if there were none.
+          items:
+            type: string
+
+    UpdateClientPostLogoutRedirectURIsRequest:
+      type: object
+      required: [expectedPostLogoutRedirectURIs]
+      properties:
+        postLogoutRedirectURIs:
+          type: array
+          maxItems: 60
+          description: >-
+            The complete set of sign-out redirect URIs the client has after the call. More than
+            60, one longer than 2048 bytes, one listed twice, one that isn't an absolute URI, or a
+            plain http one on a host other than 127.0.0.1, [::1] or localhost that
+            expectedPostLogoutRedirectURIs doesn't list, is refused with 400 and nothing is
+            written. error_code is the refusal's catalog key, such as
+            handler.client_post_logout_redirect_uris.too_many.
+          items:
+            type: string
+        expectedPostLogoutRedirectURIs:
+          type: array
+          description: The sign-out redirect URIs as last read; [] if there were none.
           items:
             type: string
 
@@ -6688,11 +6793,19 @@ components:
         postLogoutRedirectUri:
           type: string
           format: uri
+          description: >-
+            Where the browser goes after the sign-out. It must exactly match one of the client's
+            sign-out redirect URIs; its redirect URIs don't count.
         state:
           type: string
         clientIdentifier:
           type: string
-          description: Auto-resolved if omitted
+          description: >-
+            The client whose sign-out redirect URIs postLogoutRedirectUri must be one of. When
+            omitted, the client is the one whose sign-out redirect URIs hold postLogoutRedirectUri;
+            when none or several do, the request is refused with "Unable to resolve client from
+            postLogoutRedirectUri; supply clientIdentifier.". Send it when another client may list
+            the same address.
         responseMode:
           type: string
           description: >-

@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -176,6 +177,20 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 				}
 			}
 			return false
+		},
+	},
+	{
+		name: "PUT clients post-logout redirect uris", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/post-logout-redirect-uris",
+		prepare: func(t *testing.T, f *clientTargetFixture) {
+			f.before = "https://attacker-" + strings.ToLower(fake.LetterN(8)) + ".example/bye"
+		},
+		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
+			current := storedPostLogoutRedirectURIs(t, f.clientId)
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/post-logout-redirect-uris", f.clientId),
+				map[string]any{"postLogoutRedirectURIs": append(append([]string{}, current...), f.before), "expectedPostLogoutRedirectURIs": current})
+		},
+		changed: func(t *testing.T, f *clientTargetFixture) bool {
+			return slices.Contains(storedPostLogoutRedirectURIs(t, f.clientId), f.before)
 		},
 	},
 	{

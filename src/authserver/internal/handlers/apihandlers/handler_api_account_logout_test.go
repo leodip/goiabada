@@ -71,22 +71,132 @@ func assertNothingAfterTheClient(t *testing.T, database *datamocks.Database) {
 	database.AssertNotCalled(t, "GetCurrentSigningKey", mock.Anything, mock.Anything)
 }
 
-// logout/nil-err: resolving the client by its redirect URI, one client's URIs fail to load. The
-// record used to carry a nil error, so the 500 named no cause at all.
-func TestHandleAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(t *testing.T) {
+// logout/nil-err: resolving the client by its sign-out redirect URI, the one lookup fails. The
+// record carries the failure, so the 500 names its cause (#414 item 2).
+func TestHandleAccountLogoutRequestPost_ASignOutLookupFailureIsOnTheRecord(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetAllClients", mock.Anything, mock.Anything).
-		Return([]record.Client{{Id: 7, ClientIdentifier: logoutClientIdent}}, nil).Once()
-	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
-		Return(errLogoutLookupFailed).Once()
+	database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutUri).
+		Return(nil, errLogoutLookupFailed).Once()
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, ""))
 
 	requireErrorOnTheRecord(t, rr, capture, errLogoutLookupFailed)
-	assert.Equal(t, int64(7), capture.Records()[0].Attrs["client_id"])
 	assertNothingAfterTheClient(t, database)
+}
+
+// requireRefusedSaying asserts a 400 the caller owns, with the English description a caller reads.
+func requireRefusedSaying(t *testing.T, rr *httptest.ResponseRecorder, capture *logtest.SlogCapture, description string) {
+	t.Helper()
+	requireRefused(t, rr, capture, http.StatusBadRequest, "VALIDATION_ERROR")
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	assert.Equal(t, description, body["error_description"])
+}
+
+// #147 decision 10, closing #148: with no clientIdentifier, one query finds the clients whose
+// sign-out redirect URIs hold the URI, and exactly one of them is the client. None or several asks
+// the caller for clientIdentifier, as before. The redirect URIs are never read: a mock that is not
+// told about ClientLoadRedirectURIs or GetAllClients fails the case that calls either.
+func TestHandleAccountLogoutRequestPost_ResolvesTheClientFromItsSignOutList(t *testing.T) {
+	const unresolved = "Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier."
+
+	t.Run("no client holds the URI", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutUri).
+			Return([]record.Client{}, nil).Once()
+
+		capture := logtest.CaptureSlog(t)
+		rr := httptest.NewRecorder()
+		HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, ""))
+
+		requireRefusedSaying(t, rr, capture, unresolved)
+		assertNothingAfterTheClient(t, database)
+	})
+
+	t.Run("two clients hold the URI", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutUri).
+			Return([]record.Client{{Id: 7, ClientIdentifier: logoutClientIdent}, {Id: 8, ClientIdentifier: "another-app"}}, nil).Once()
+
+		capture := logtest.CaptureSlog(t)
+		rr := httptest.NewRecorder()
+		HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, ""))
+
+		requireRefusedSaying(t, rr, capture, unresolved)
+		assertNothingAfterTheClient(t, database)
+	})
+
+	// The one client goes on to the session check, which a sid naming no session answers 401: the
+	// resolution passed, and the session row is what the request stopped at.
+	t.Run("one client holds the URI", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutUri).
+			Return([]record.Client{{Id: 7, ClientIdentifier: logoutClientIdent}}, nil).Once()
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
+			Return(nil, nil).Once()
+
+		capture := logtest.CaptureSlog(t)
+		rr := httptest.NewRecorder()
+		HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, ""))
+
+		requireRefused(t, rr, capture, http.StatusUnauthorized, "INVALID_SESSION")
+	})
+}
+
+// #147 decision 1: a named client's sign-out redirect URIs are the only list its URI is checked
+// against. One of its redirect URIs that isn't on that list answers the 400 a stranger's URI gets,
+// and the lookup across clients isn't made, since the caller named one.
+func TestHandleAccountLogoutRequestPost_ChecksTheNamedClientsSignOutList(t *testing.T) {
+	t.Run("the URI is one of the client's sign-out redirect URIs", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		stubResolvedClient(database)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
+			Return(nil, nil).Once()
+
+		capture := logtest.CaptureSlog(t)
+		rr := httptest.NewRecorder()
+		HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+
+		requireRefused(t, rr, capture, http.StatusUnauthorized, "INVALID_SESSION")
+		database.AssertNotCalled(t, "GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("the URI is one of the client's redirect URIs only", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
+			Return(&record.Client{
+				Id: 7, ClientIdentifier: logoutClientIdent,
+				RedirectURIs: []record.RedirectURI{{URI: logoutPostLogoutUri}},
+			}, nil).Once()
+		database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				args.Get(2).(*record.Client).PostLogoutRedirectURIs = []record.PostLogoutRedirectURI{{URI: "https://app.example.com/bye"}}
+			}).Return(nil).Once()
+
+		capture := logtest.CaptureSlog(t)
+		rr := httptest.NewRecorder()
+		HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+
+		requireRefusedSaying(t, rr, capture, "postLogoutRedirectUri is not registered for the client")
+		assertNothingAfterTheClient(t, database)
+	})
+
+	t.Run("the client's sign-out redirect URIs fail to load", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
+			Return(&record.Client{Id: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
+		database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
+			Return(errLogoutLookupFailed).Once()
+
+		capture := logtest.CaptureSlog(t)
+		rr := httptest.NewRecorder()
+		HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
+
+		requireErrorOnTheRecord(t, rr, capture, errLogoutLookupFailed)
+		assertNothingAfterTheClient(t, database)
+	})
 }
 
 // logout/client-400, failure arm: a database error is not a bad client identifier.
@@ -118,14 +228,14 @@ func TestHandleAccountLogoutRequestPost_AnUnknownClientIsStill400(t *testing.T) 
 	assertNothingAfterTheClient(t, database)
 }
 
-// stubResolvedClient answers the client lookup and its redirect URIs, so the handler reaches the
-// session.
+// stubResolvedClient answers the client lookup and its sign-out redirect URIs, so the handler
+// reaches the session.
 func stubResolvedClient(database *datamocks.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 		Return(&record.Client{Id: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
-	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
+	database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: logoutPostLogoutUri}}
+			args.Get(2).(*record.Client).PostLogoutRedirectURIs = []record.PostLogoutRedirectURI{{URI: logoutPostLogoutUri}}
 		}).Return(nil).Once()
 }
 

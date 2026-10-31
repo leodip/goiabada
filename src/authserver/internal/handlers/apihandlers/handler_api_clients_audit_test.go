@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Four client writes answer with the client's redirect URIs and web origins, loaded after the write
-// has committed. Either load failing answers 500, but the change has taken effect, so its event is
+// Four client writes answer with the client's redirect URIs, sign-out redirect URIs and web origins,
+// loaded after the write has committed. Any load failing answers 500, but the change has taken effect, so its event is
 // recorded before those loads run, as HandleClientAdministrativeScopesPut's is (#499 decision 9).
 
 // committedClientWrite is one of the four writes and what it records.
@@ -136,6 +136,7 @@ func TestClientWrites_ACommittedWriteIsAuditedWhateverTheAnswerReadsDo(t *testin
 			name: "the answer is built",
 			expect: func(database *datamocks.Database) {
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 				database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 			},
 			status: http.StatusOK,
@@ -148,9 +149,18 @@ func TestClientWrites_ACommittedWriteIsAuditedWhateverTheAnswerReadsDo(t *testin
 			status: http.StatusInternalServerError,
 		},
 		{
+			name: "loading the sign-out redirect URIs fails",
+			expect: func(database *datamocks.Database) {
+				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(readFailure).Once()
+			},
+			status: http.StatusInternalServerError,
+		},
+		{
 			name: "loading the web origins fails",
 			expect: func(database *datamocks.Database) {
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 				database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(readFailure).Once()
 			},
 			status: http.StatusInternalServerError,

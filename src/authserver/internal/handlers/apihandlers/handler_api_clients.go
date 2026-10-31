@@ -24,9 +24,9 @@ import (
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
-// clientsDatabase is what the client endpoints need: the client row, its redirect URIs and web
-// origins, the resource row an identifier may not name (#151), and the transaction that changes
-// them together.
+// clientsDatabase is what the client endpoints need: the client row, its redirect URIs, sign-out
+// redirect URIs and web origins, the resource row an identifier may not name (#151), and the
+// transaction that changes them together.
 //
 // It embeds the revocation port because making a confidential client public revokes the grants it
 // held while it still had to authenticate, and what the administrative policy reads to judge whether
@@ -37,12 +37,15 @@ type clientsDatabase interface {
 
 	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
 	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error
 	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
 	DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error
+	DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIId int64) error
 	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
 	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
@@ -134,11 +137,17 @@ func HandleClientsGet(
 			return
 		}
 
-		// Load RedirectURIs and WebOrigins for each client
+		// Load the redirect URIs, sign-out redirect URIs and web origins of each client
 		for i := range clients {
 			err = database.ClientLoadRedirectURIs(r.Context(), nil, &clients[i])
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs"), "client_id", clients[i].Id)
+				return
+			}
+
+			err = database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, &clients[i])
+			if err != nil {
+				writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs"), "client_id", clients[i].Id)
 				return
 			}
 
@@ -192,10 +201,16 @@ func HandleClientGet(
 			return
 		}
 
-		// Load RedirectURIs and WebOrigins
+		// Load the redirect URIs, sign-out redirect URIs and web origins
 		err = database.ClientLoadRedirectURIs(r.Context(), nil, client)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs"), "client_id", client.Id)
+			return
+		}
+
+		err = database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client)
+		if err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs"), "client_id", client.Id)
 			return
 		}
 
@@ -450,6 +465,10 @@ func HandleClientCreatePost(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after create"), "client_id", client.Id)
 			return
 		}
+		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after create"), "client_id", client.Id)
+			return
+		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after create"), "client_id", client.Id)
 			return
@@ -677,6 +696,10 @@ func HandleClientUpdatePut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after update"), "client_id", client.Id)
 			return
 		}
+		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after update"), "client_id", client.Id)
+			return
+		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after update"), "client_id", client.Id)
 			return
@@ -824,6 +847,10 @@ func HandleClientAuthenticationPut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after auth update"), "client_id", client.Id)
 			return
 		}
+		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after auth update"), "client_id", client.Id)
+			return
+		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after auth update"), "client_id", client.Id)
 			return
@@ -916,6 +943,10 @@ func HandleClientAdministrativeScopesPut(
 		}
 		if err = database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after administrative scopes update"), "client_id", client.Id)
+			return
+		}
+		if err = database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after administrative scopes update"), "client_id", client.Id)
 			return
 		}
 		if err = database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
@@ -1014,6 +1045,10 @@ func HandleClientOAuth2FlowsPut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after oauth2 flows update"), "client_id", client.Id)
 			return
 		}
+		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after oauth2 flows update"), "client_id", client.Id)
+			return
+		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after oauth2 flows update"), "client_id", client.Id)
 			return
@@ -1089,95 +1124,12 @@ func HandleClientRedirectURIsPut(
 			writeJSONError(w, "expectedRedirectURIs is required: send the redirect URIs as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		expected := make([]string, 0, len(req.ExpectedRedirectURIs))
-		loaded := make(map[string]struct{}, len(req.ExpectedRedirectURIs))
-		for _, raw := range req.ExpectedRedirectURIs {
-			uri := strings.TrimSpace(raw)
-			expected = append(expected, uri)
-			loaded[uri] = struct{}{}
-		}
+		expected, loaded := loadedURIList(req.ExpectedRedirectURIs)
 
-		// The bounds are the model's, the same at dynamic client registration: at most
-		// RedirectURIsMaxPerClient per client, each at most RedirectURIMaxBytes, which the columns
-		// hold on every engine. This PUT replaces the whole set, so a client already over either
-		// bound cannot be saved until the administrator trims it in the same save, which is #122's
-		// precedent for a legacy row below (#428).
-		if len(req.RedirectURIs) > record.RedirectURIsMaxPerClient {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsTooMany, map[string]any{"max": record.RedirectURIsMaxPerClient, "count": len(req.RedirectURIs)}))
+		normalized, refusal := normalizeURIList(req.RedirectURIs, loaded, redirectURIRefusals)
+		if refusal != nil {
+			writeValidationError(w, r, refusal)
 			return
-		}
-
-		// Validate list and entries
-		seen := make(map[string]struct{})
-		normalized := make([]string, 0, len(req.RedirectURIs))
-		for _, raw := range req.RedirectURIs {
-			uri := strings.TrimSpace(raw)
-			if uri == "" {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIEmpty, nil))
-				return
-			}
-			// Before the parse, so an overlong value is never parsed. The message names the
-			// value by its beginning rather than echoing up to the whole body back.
-			if len(uri) > record.RedirectURIMaxBytes {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURITooLong, map[string]any{"length": len(uri), "max": record.RedirectURIMaxBytes, "prefix": strings.ToValidUTF8(uri[:80], "")}))
-				return
-			}
-			if _, parseErr := url.ParseRequestURI(uri); parseErr != nil {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIInvalid, map[string]any{"uri": uri}))
-				return
-			}
-			// url.ParseRequestURI above accepts "//evil.example/cb", "/relative/cb",
-			// "http://host/cb#frag" and "https:///evil.example/cb", every one of which is
-			// later emitted verbatim into a Location header. RFC 6749 section 3.1.2 is what
-			// refuses them, through the same predicate dynamic registration and the
-			// authorization endpoint use. Ordered after the parse and before the duplicate
-			// check, mirroring the dynamic registration gate.
-			//
-			// Only the absolute-URI rule crosses over from dynamic registration, not that
-			// endpoint's scheme denylist or excluded-character set. The absolute-URI rule is
-			// a protocol requirement and binds an administrator exactly as it binds an
-			// anonymous registrant; the other two exist because that caller is anonymous,
-			// and an administrator has legitimate reasons to register a custom scheme (#122).
-			//
-			// Accepted cost: this PUT replaces the whole set, so a deployment still holding a
-			// legacy non-absolute row cannot save this page until the administrator removes
-			// that URI from the list. The message names the offending value, and taking that
-			// remediation also deletes the row.
-			if !urlmatch.IsAbsoluteRedirectURI(uri) {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURINotAbsolute, map[string]any{"uri": uri}))
-				return
-			}
-			// RFC 9700 section 2.6: an authorization response MUST NOT travel over an
-			// unencrypted connection, so a redirect URI may use http only on the loopback
-			// interface (RFC 8252 section 7.3). Dynamic registration already refuses this
-			// shape; the admin API did not, and a saved http URI then received the code in
-			// the clear. The MUST binds an administrator as it binds a registrant, exactly
-			// as the absolute-URI rule above does (#122).
-			//
-			// Refused when saving only, not re-checked at /auth/authorize: a stored http URI
-			// belongs to an integration that works today, and an authorize-time gate would
-			// stop it at upgrade with no warning. The worst case is the admin console's own
-			// client, whose redirect URIs bootstrap seeds from GOIABADA_ADMINCONSOLE_BASEURL:
-			// an installation serving the console over http on a non-loopback host would
-			// lock its administrators out.
-			//
-			// For the same reason, a URI the caller loaded passes when the save carries it
-			// back. A legacy non-absolute row above does not, but that row is already refused
-			// at /auth/authorize; this one still works, and refusing it would block every
-			// other change to the list, removing a compromised callback included. Adding an
-			// http URI is what is refused, and the caller's word for what it loaded is
-			// checked: the transaction below answers 409 when the stored rows differ from it,
-			// so naming a new http URI there writes nothing (#575).
-			if _, wasLoaded := loaded[uri]; !wasLoaded && urlmatch.IsInsecureHTTPRedirectURI(uri) {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIInsecureHTTP, map[string]any{"uri": uri}))
-				return
-			}
-			if _, exists := seen[uri]; exists {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsDuplicate, nil))
-				return
-			}
-			seen[uri] = struct{}{}
-			normalized = append(normalized, uri)
 		}
 
 		// Only authserver:manage writes to an administrator client (#402 decision 1).
@@ -1234,6 +1186,10 @@ func HandleClientRedirectURIsPut(
 		// Reload related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after update"), "client_id", client.Id)
+			return
+		}
+		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after update"), "client_id", client.Id)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
@@ -1410,6 +1366,10 @@ func HandleClientWebOriginsPut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after web origins update"), "client_id", client.Id)
 			return
 		}
+		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after web origins update"), "client_id", client.Id)
+			return
+		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after update"), "client_id", client.Id)
 			return
@@ -1517,6 +1477,10 @@ func HandleClientTokensPut(
 		// Reload related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after tokens update"), "client_id", client.Id)
+			return
+		}
+		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after tokens update"), "client_id", client.Id)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {

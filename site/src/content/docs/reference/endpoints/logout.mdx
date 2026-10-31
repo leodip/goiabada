@@ -22,7 +22,7 @@ It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-
    Host: auth.example.com
    ```
 
-   The return address must be one of the client's registered [redirect URIs](/concepts/clients/#redirect-uris), exactly.
+   The return address must be one of the client's [sign-out redirect URIs](/concepts/clients/#sign-out-redirect-uris), exactly, port included. Its redirect URIs don't count.
 
 3. The auth server signs the user out and sends the browser back, with your `state`:
 
@@ -42,12 +42,10 @@ It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-
 | Parameter | Required | What it does |
 |---|---|---|
 | `id_token_hint` | Recommended | An ID token the auth server issued to your app, signed or [encrypted](#encrypting-the-hint). One it can confirm signs the user out with no question asked. It may have expired. |
-| `post_logout_redirect_uri` | No | Where to send the browser afterwards. It must exactly match one of the client's redirect URIs, and it's honoured only on the terms in [Where the user lands](#where-the-user-lands). |
+| `post_logout_redirect_uri` | No | Where to send the browser afterwards. It must exactly match one of the client's sign-out redirect URIs, and it's honoured only on the terms in [Where the user lands](#where-the-user-lands). |
 | `client_id` | Sometimes | The client's identifier. Required with an encrypted hint, to say whose secret decrypts it, and with a `post_logout_redirect_uri` sent without a hint. With a hint, it must match the hint's `aud`. |
 | `state` | No | Any value. It comes back on the redirect exactly as you sent it. |
 | `ui_locales` | No | The languages for the pages the user sees, such as `pt-BR en`. |
-
-There's no separate list of post-logout redirect URIs: the client's redirect URIs are the list.
 
 ## Whether the user is asked
 
@@ -92,12 +90,14 @@ Either way, the browser's session cookie is cleared, so its next sign-in starts 
 
 The browser goes to your `post_logout_redirect_uri` with a `302 Found` when:
 
-- the request carries a hint the auth server confirmed, and the URI is a redirect URI of the client the hint's `aud` names; or
-- the request carries no hint, and the URI is a redirect URI of the client `client_id` names, which didn't [register itself](/concepts/clients/#self-registered-clients).
+- the request carries a hint the auth server confirmed, and the URI is a sign-out redirect URI of the client the hint's `aud` names; or
+- the request carries no hint, and the URI is a sign-out redirect URI of the client `client_id` names, which didn't [register itself](/concepts/clients/#self-registered-clients).
+
+The match is exact, port included: a loopback address on another port doesn't match. A URI that's only one of the client's redirect URIs isn't honoured either.
 
 The auth server adds `state` and nothing else. It comes back byte for byte, `+`, `/`, `=`, `#` and `&` included; sent empty, it comes back empty, and not sent, there's none. A query the registered URI already has is kept.
 
-Otherwise the user lands on the auth server's "Signed out" page, "You're signed out." When you sent a `post_logout_redirect_uri` that wasn't honoured, it adds "We couldn't take you back to the application you signed out from." That's the case for a URI that isn't registered, a `client_id` that's missing, names no client or names a self-registered client, and a hint that couldn't be confirmed, even beside a valid `client_id`.
+Otherwise the user lands on the auth server's "Signed out" page, "You're signed out." When you sent a `post_logout_redirect_uri` that wasn't honoured, it adds "We couldn't take you back to the application you signed out from." That's the case for a URI that isn't one of the client's sign-out redirect URIs, a `client_id` that's missing, names no client or names a self-registered client, and a hint that couldn't be confirmed, even beside a valid `client_id`.
 
 The sign-out has already happened by then: a request the auth server can't honour in full still signs the user out.
 

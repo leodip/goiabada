@@ -4,7 +4,7 @@
 // inside its own region; dialogs, menus and forms stay within the screen, and no page scrolls
 // sideways. Only the test's own tab is resized, so the fixtures work at the default size.
 import type { Locator, Page } from "@playwright/test";
-import { addRedirectUri, cancelDialog, clientUrl, userUrl } from "../../lib/admin-console";
+import { addRedirectUri, addSignOutRedirectUri, cancelDialog, clientUrl, userUrl } from "../../lib/admin-console";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 
@@ -151,6 +151,7 @@ for (const viewport of viewports) {
       const client = await clients.create();
       // A long redirect URI, which its list wraps rather than widen the page with.
       await addRedirectUri(page, client.id, `${env.webtest1Url}/callback/${"a-long-path-segment-".repeat(6)}end?state=${"x".repeat(40)}`);
+      await addSignOutRedirectUri(page, client.id, `${env.webtest1Url}/signed-out/${"a-long-path-segment-".repeat(6)}end?state=${"x".repeat(40)}`);
       const user = await users.create();
       await page.setViewportSize(size);
 
@@ -159,6 +160,7 @@ for (const viewport of viewports) {
         { url: `${env.adminUrl}/admin/clients` },
         { url: clientUrl(client.id, "settings"), form: "#formClientSettings" },
         { url: clientUrl(client.id, "redirect-uris") },
+        { url: clientUrl(client.id, "sign-out-redirect-uris") },
         { url: `${env.adminUrl}/admin/users` },
         { url: userUrl(user.id, "profile"), form: "main form.panel" },
         { url: `${env.adminUrl}/admin/groups` },

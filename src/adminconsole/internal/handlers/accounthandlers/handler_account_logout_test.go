@@ -79,6 +79,11 @@ func TestHandleLogoutPost_AsksForTheFormPostModeAndRendersTheForm(t *testing.T) 
 	assert.NotEmpty(t, apiClient.got.State, "the console still sends a state")
 	assert.Equal(t, "https://console.example.test", apiClient.got.PostLogoutRedirectUri,
 		"the auth server sends the browser back to the base URL the handler was built with")
+	// The built-in identifier, which no setting changes: the auth server then checks the base URL
+	// against the console's own sign-out redirect URIs only, so another client listing the same
+	// URL can't make the lookup ambiguous (#147 decision 11).
+	assert.Equal(t, "admin-console-client", apiClient.got.ClientIdentifier,
+		"the console names its own client when it signs out")
 
 	// The session cookie is cleared whichever arm is taken, so a 302 here would be a redirect the
 	// handler wrote rather than the cookie write.

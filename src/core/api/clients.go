@@ -21,6 +21,17 @@ type RedirectURIResponse struct {
 	ClientId  int64      `json:"clientId"`
 }
 
+// PostLogoutRedirectURIResponse is one of a client's sign-out redirect URIs as this API publishes
+// it: an address a sign-out may send the browser back to, the post_logout_redirect_uri of OpenID
+// Connect RP-Initiated Logout 1.0. Its shape is RedirectURIResponse's, so a consumer reads both
+// lists alike, and the type is its own so that neither list's shape can change the other's (#147).
+type PostLogoutRedirectURIResponse struct {
+	Id        int64      `json:"id"`
+	CreatedAt *time.Time `json:"createdAt"`
+	URI       string     `json:"uri"`
+	ClientId  int64      `json:"clientId"`
+}
+
 // WebOriginResponse is a client's allowed web origin as this API publishes it, and is here for the
 // same reason as RedirectURIResponse above (#350).
 type WebOriginResponse struct {
@@ -75,7 +86,10 @@ type ClientResponse struct {
 	IncludeOpenIDConnectClaimsInIdToken     string                `json:"includeOpenIDConnectClaimsInIdToken"`
 	DefaultAcrLevel                         string                `json:"defaultAcrLevel"`
 	RedirectURIs                            []RedirectURIResponse `json:"redirectURIs"`
-	WebOrigins                              []WebOriginResponse   `json:"webOrigins"`
+	// PostLogoutRedirectURIs is the client's sign-out list, null when the answer did not load it
+	// and [] when it is empty, as RedirectURIs is (#147).
+	PostLogoutRedirectURIs []PostLogoutRedirectURIResponse `json:"postLogoutRedirectURIs"`
+	WebOrigins             []WebOriginResponse             `json:"webOrigins"`
 }
 
 type GetClientsResponse struct {
@@ -155,6 +169,17 @@ type UpdateClientOAuth2FlowsRequest struct {
 type UpdateClientRedirectURIsRequest struct {
 	RedirectURIs         []string `json:"redirectURIs"`
 	ExpectedRedirectURIs []string `json:"expectedRedirectURIs"`
+}
+
+// UpdateClientPostLogoutRedirectURIsRequest replaces the full set of a client's sign-out redirect
+// URIs, on PUT /clients/{id}/post-logout-redirect-uris, under the rules of the redirect URI save.
+//
+// ExpectedPostLogoutRedirectURIs is the list as the caller last read it, required and compared as
+// ExpectedRedirectURIs is: absent or null is refused, [] means the caller read an empty list, and
+// the save answers 409 CONCURRENT_UPDATE when the stored list differs from it (#147).
+type UpdateClientPostLogoutRedirectURIsRequest struct {
+	PostLogoutRedirectURIs         []string `json:"postLogoutRedirectURIs"`
+	ExpectedPostLogoutRedirectURIs []string `json:"expectedPostLogoutRedirectURIs"`
 }
 
 // UpdateClientWebOriginsRequest is used to replace the full set of

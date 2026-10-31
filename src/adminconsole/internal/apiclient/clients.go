@@ -110,6 +110,21 @@ func (c *AuthServerClient) UpdateClientRedirectURIs(ctx context.Context, accessT
 	return &response.Client, nil
 }
 
+// UpdateClientPostLogoutRedirectURIs updates the full set of sign-out redirect URIs for a client.
+func (c *AuthServerClient) UpdateClientPostLogoutRedirectURIs(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientPostLogoutRedirectURIsRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/post-logout-redirect-uris",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &response.Client, nil
+}
+
 // UpdateClientWebOrigins updates the full set of web origins for a client.
 func (c *AuthServerClient) UpdateClientWebOrigins(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
 	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{

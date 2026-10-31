@@ -343,8 +343,8 @@ type registrationRefusal struct {
 }
 
 // registrationRefusals is every branch on which HandleDynamicClientRegistrationPost answers an
-// error: registration turned off, a body that is not JSON, metadata it refuses, a redirect URI it
-// refuses, missing settings, and a write the database refuses.
+// error: registration turned off, a body that is not JSON, metadata it refuses, a redirect URI or
+// sign-out redirect URI it refuses, missing settings, and a write the database refuses.
 func registrationRefusals() []registrationRefusal {
 	on := &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}
 	valid := `{"redirect_uris":["http://127.0.0.1/callback"],"token_endpoint_auth_method":"none"}`
@@ -353,6 +353,8 @@ func registrationRefusals() []registrationRefusal {
 		{name: "a body that is not JSON", settings: on, body: `{`},
 		{name: "an unsupported grant", settings: on, body: `{"grant_types":["password"]}`},
 		{name: "a refused redirect URI", settings: on, body: `{"redirect_uris":["ftp://example.com/cb"]}`},
+		{name: "a refused sign-out redirect URI", settings: on,
+			body: `{"redirect_uris":["https://example.com/cb"],"post_logout_redirect_uris":["myapp://signed-out"]}`},
 		{name: "no settings", body: valid},
 		{name: "a refused write", settings: on, body: valid, database: func(database *datamocks.Database) {
 			datamocks.ExpectRunInTransactionRefused(database, errs.New("the database is unavailable"))

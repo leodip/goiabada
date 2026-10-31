@@ -2,8 +2,9 @@
 // loopback, for any client. Section 4.15.1: a client does not choose its own client_id, which could
 // pass for a user's subject in a client credentials token. Section 4.11.2: a client anyone could
 // register is not where a declined authorization sends the user, nor where a sign-out without a hint
-// does (#682). A system test because registration is a global switch, put back afterwards; the
-// clients it registers are deleted.
+// does (#682). A registration's post_logout_redirect_uris take the redirect URI rules, and are the
+// only addresses a sign-out returns to (#147). A system test because registration is a global switch,
+// put back afterwards; the clients it registers are deleted.
 import { randomUUID } from "node:crypto";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { clientIdFromList, deleteClient } from "../../lib/admin-console";
@@ -49,6 +50,37 @@ test("an http redirect URI is registered only on loopback, for a confidential cl
         registered.push(loopback.body.client_id as string);
       });
     }
+  });
+});
+
+// A sign-out redirect URI gets the redirect URI rules for its kind of client, so a public client
+// can't register through post_logout_redirect_uris an https address it can't register as a redirect
+// URI. The refusal names the field, as invalid_client_metadata: invalid_redirect_uri is for
+// redirect_uris (OpenID Connect Dynamic Client Registration 1.0 section 3.3).
+test("a sign-out redirect URI is registered under the redirect URI rules: a public client's https one is refused as invalid_client_metadata", async ({
+  page,
+  request,
+}) => {
+  await withRegistration(page, async (registered) => {
+    const refused = await register(request, {
+      redirect_uris: ["http://127.0.0.1:8765/callback"],
+      post_logout_redirect_uris: ["https://app.example.com/signed-out"],
+      token_endpoint_auth_method: "none",
+    });
+    expect(refused.status, refused.text).toBe(400);
+    expect(refused.body.error).toBe("invalid_client_metadata");
+    expect(refused.body.error_description).toContain("post_logout_redirect_uris");
+    expect(refused.body.error_description).toContain("https://app.example.com/signed-out");
+    expect(refused.body.client_id).toBeUndefined();
+
+    const loopback = await register(request, {
+      redirect_uris: ["http://127.0.0.1:8765/callback"],
+      post_logout_redirect_uris: ["http://127.0.0.1:8765/signed-out"],
+      token_endpoint_auth_method: "none",
+    });
+    expect(loopback.status, loopback.text).toBe(201);
+    registered.push(loopback.body.client_id as string);
+    expect(loopback.body.post_logout_redirect_uris).toEqual(["http://127.0.0.1:8765/signed-out"]);
   });
 });
 
@@ -105,8 +137,9 @@ test("declining a client that registered itself sends the user nowhere: the page
 // naming it and that URI, with no id_token_hint, would make the auth server's own Sign out button
 // deliver the browser there. A self-registered client's URIs confirm nothing about where the user
 // should go, so without a hint the sign-out ends on the auth server's page, session or none. A hint
-// the auth server confirms proves the user signed in to the client, and still sends them back.
-test("a sign-out without a hint never sends the user to a client that registered itself; one with a confirmed hint does (section 4.11.2)", async ({
+// the auth server confirms proves the user signed in to the client, and still sends them back, to a
+// sign-out redirect URI it registered and never to one of its redirect URIs.
+test("a sign-out without a hint never sends the user to a client that registered itself; one with a confirmed hint does, to its sign-out redirect URI (section 4.11.2)", async ({
   page,
   browser,
   request,
@@ -114,11 +147,17 @@ test("a sign-out without a hint never sends the user to a client that registered
 }) => {
   const user = await users.create();
   await withRegistration(page, async (registered) => {
-    const answer = await register(request, { redirect_uris: [testRedirectUri], token_endpoint_auth_method: "client_secret_basic" });
+    const signOutUri = `${env.webtest1Url}/signed-out`;
+    const answer = await register(request, {
+      redirect_uris: [testRedirectUri],
+      post_logout_redirect_uris: [signOutUri],
+      token_endpoint_auth_method: "client_secret_basic",
+    });
     expect(answer.status, answer.text).toBe(201);
     const clientId = answer.body.client_id as string;
     const secret = answer.body.client_secret as string;
     registered.push(clientId);
+    expect(answer.body.post_logout_redirect_uris).toEqual([signOutUri]);
 
     // Opens the logout endpoint with query in a tab of context, confirms when asked, and returns the tab.
     const signOut = async (context: BrowserContext, query: Record<string, string>) => {
@@ -131,7 +170,7 @@ test("a sign-out without a hint never sends the user to a client that registered
       }
       return tab;
     };
-    const hintless = { client_id: clientId, post_logout_redirect_uri: testRedirectUri, state: "s" };
+    const hintless = { client_id: clientId, post_logout_redirect_uri: signOutUri, state: "s" };
     const expectSignedOutHere = async (tab: Page) => {
       expect(new URL(tab.url()).origin).toBe(env.authUrl);
       await expect(tab.getByRole("heading", { name: "Signed out" })).toBeVisible();
@@ -161,19 +200,27 @@ test("a sign-out without a hint never sends the user to a client that registered
       await signIn.context.close();
     });
 
-    await test.step("with the ID token the client was issued as the hint, the browser goes back to the client", async () => {
+    // Signs the user in through the client and answers the context with the ID token it was issued.
+    const signInWithIdToken = async () => {
       const signIn = await signInThroughClient(browser, { clientId, email: user.email, password: user.password, scope: "openid" });
       const token = await codeToken(request, clientId, secret, signIn.code, signIn.codeVerifier, testRedirectUri);
       expect(token.status, JSON.stringify(token.body)).toBe(200);
-      const tab = await signOut(signIn.context, {
-        id_token_hint: token.body.id_token as string,
-        post_logout_redirect_uri: testRedirectUri,
-        state: "s",
-      });
+      return { context: signIn.context, idToken: token.body.id_token as string };
+    };
+
+    await test.step("with the hint, the client's redirect URI isn't a sign-out target: the user stays on the auth server", async () => {
+      const { context, idToken } = await signInWithIdToken();
+      await expectSignedOutHere(await signOut(context, { id_token_hint: idToken, post_logout_redirect_uri: testRedirectUri, state: "s" }));
+      await context.close();
+    });
+
+    await test.step("with the ID token the client was issued as the hint, the browser goes back to its sign-out redirect URI", async () => {
+      const { context, idToken } = await signInWithIdToken();
+      const tab = await signOut(context, { id_token_hint: idToken, post_logout_redirect_uri: signOutUri, state: "s" });
       const landed = new URL(tab.url());
-      expect(landed.href.startsWith(testRedirectUri), landed.href).toBe(true);
+      expect(landed.href.startsWith(signOutUri), landed.href).toBe(true);
       expect(landed.searchParams.get("state")).toBe("s");
-      await signIn.context.close();
+      await context.close();
     });
   });
 });

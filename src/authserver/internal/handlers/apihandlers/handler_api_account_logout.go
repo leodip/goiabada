@@ -22,12 +22,13 @@ import (
 	"github.com/leodip/goiabada/core/logging"
 )
 
-// accountLogoutDatabase is what the account logout endpoint needs: the session being ended, the
-// clients it authorized, and the key that signs the logout token.
+// accountLogoutDatabase is what the account logout endpoint needs: the client whose sign-out
+// redirect URIs hold the target, the session being ended, the clients it authorized, and the key
+// that signs the logout token.
 type accountLogoutDatabase interface {
-	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
-	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
+	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetClientsByPostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, uri string) ([]record.Client, error)
 	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*record.KeyPair, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
@@ -67,7 +68,9 @@ func HandleAccountLogoutRequestPost(
 			return
 		}
 
-		// Resolve client
+		// Resolve the client, and check the target is one of its sign-out redirect URIs: a sign-out
+		// returns only to an address on that list, matched exactly, never to one of the client's
+		// redirect URIs (#147 decision 1).
 		var client *record.Client
 		var err error
 		if req.ClientIdentifier != "" {
@@ -84,52 +87,37 @@ func HandleAccountLogoutRequestPost(
 				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutClientIdentifierInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-		} else {
-			// Automatic resolution by post_logout_redirect_uri
-			clients, clientsErr := database.GetAllClients(r.Context(), nil)
-			if clientsErr != nil {
-				writeInternalServerError(w, r, clientsErr)
+			if err = database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
+				writeInternalServerError(w, r, errs.Wrap(err, "unable to load the client's sign-out redirect URIs"))
 				return
 			}
-			var matches []*record.Client
-			for i := range clients {
-				c := &clients[i]
-				// derr, not err: err is the function's, and nil here. Passing it logged a 500
-				// with no error on the record (#414 item 2).
-				if derr := database.ClientLoadRedirectURIs(r.Context(), nil, c); derr != nil {
-					writeInternalServerError(w, r, errs.Wrap(derr, "unable to load a client's redirect URIs"),
-						"client_id", c.Id)
-					return
+			found := false
+			for _, uri := range client.PostLogoutRedirectURIs {
+				if uri.URI == postLogout {
+					found = true
+					break
 				}
-				for _, uri := range c.RedirectURIs {
-					if uri.URI == postLogout {
-						matches = append(matches, c)
-						break
-					}
-				}
+			}
+			if !found {
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURINotRegistered, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+		} else {
+			// One query finds the clients whose sign-out redirect URIs hold the target, matched
+			// exactly, and exactly one of them is the client; none or several asks the caller to
+			// name it. It replaced a read of every client's list, one query per client (#147
+			// decision 10, #148). The match is the lookup itself, so the client's list needs no
+			// second read here.
+			matches, lookupErr := database.GetClientsByPostLogoutRedirectURI(r.Context(), nil, postLogout)
+			if lookupErr != nil {
+				writeInternalServerError(w, r, errs.Wrap(lookupErr, "unable to find the clients holding a sign-out redirect URI"))
+				return
 			}
 			if len(matches) != 1 {
 				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutClientUnresolved, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			client = matches[0]
-		}
-
-		// Validate redirect URI belongs to client
-		if err = database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, err)
-			return
-		}
-		found := false
-		for _, uri := range client.RedirectURIs {
-			if uri.URI == postLogout {
-				found = true
-				break
-			}
-		}
-		if !found {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURINotRegistered, nil), "VALIDATION_ERROR", http.StatusBadRequest)
-			return
+			client = &matches[0]
 		}
 
 		// Strict session check: current sid must belong to a live session and be associated with this client

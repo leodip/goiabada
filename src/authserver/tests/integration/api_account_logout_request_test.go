@@ -49,10 +49,11 @@ func getUserAccessTokenAndCodeForAccountScope(t *testing.T) (*http.Client, strin
 func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *testing.T) {
 	// Arrange: create session and token with account scope
 	httpClientWithCookies, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
+	signOutURI := registerSignOutRedirectURI(t, code.Client.Id)
 
 	// Request logout URL
 	reqBody := api.AccountLogoutRequest{
-		PostLogoutRedirectUri: code.RedirectURI,
+		PostLogoutRedirectUri: signOutURI,
 		State:                 fake.LetterN(12),
 		ResponseMode:          "redirect",
 	}
@@ -72,7 +73,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	assert.Equal(t, "/auth/logout", u.Path)
 	q := u.Query()
 	assert.NotEmpty(t, q.Get("id_token_hint"))
-	assert.Equal(t, code.RedirectURI, q.Get("post_logout_redirect_uri"))
+	assert.Equal(t, signOutURI, q.Get("post_logout_redirect_uri"))
 	assert.Equal(t, reqBody.State, q.Get("state"))
 
 	// 1) Call /auth/logout with cookies: expect 302 to post_logout_redirect, carrying state and
@@ -84,7 +85,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	assert.Equal(t, http.StatusFound, resp1.StatusCode)
 	loc1, err := url.Parse(resp1.Header.Get("Location"))
 	require.NoError(t, err)
-	assert.Equal(t, code.RedirectURI, loc1.Scheme+"://"+loc1.Host+loc1.Path)
+	assert.Equal(t, signOutURI, loc1.Scheme+"://"+loc1.Host+loc1.Path)
 	assert.Equal(t, reqBody.State, loc1.Query().Get("state"))
 	// RP-Initiated Logout 1.0 defines exactly one parameter on the way back to the RP. sid belongs to
 	// Front-Channel Logout, a different endpoint travelling the other direction, and no RP is told to
@@ -102,7 +103,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	assert.Equal(t, http.StatusFound, resp2.StatusCode)
 	loc2, err := url.Parse(resp2.Header.Get("Location"))
 	require.NoError(t, err)
-	assert.Equal(t, code.RedirectURI, loc2.Scheme+"://"+loc2.Host+loc2.Path)
+	assert.Equal(t, signOutURI, loc2.Scheme+"://"+loc2.Host+loc2.Path)
 	assert.Equal(t, reqBody.State, loc2.Query().Get("state"))
 	assert.NotContains(t, loc2.RawQuery, "sid=", "sid is not a parameter RP-initiated logout defines")
 }
@@ -202,7 +203,7 @@ func TestLogout_EncryptedIdTokenHint_WrongSecret_AsksTheEndUserAndRefusesTheRedi
 
 	resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
 		"id_token_hint":            {hint},
-		"post_logout_redirect_uri": {grant.redirectURI},
+		"post_logout_redirect_uri": {grant.signOutRedirectURI},
 		"client_id":                {grant.client.ClientIdentifier},
 		"state":                    {fake.LetterN(8)},
 	})
@@ -236,7 +237,7 @@ func TestLogout_RejectedHint_AsksTheEndUserAndRefusesTheRedirect(t *testing.T) {
 	// adds is that a rejected hint reaches a consent page a browser can actually submit.
 	resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
 		"id_token_hint":            {"not.a.token"},
-		"post_logout_redirect_uri": {grant.redirectURI},
+		"post_logout_redirect_uri": {grant.signOutRedirectURI},
 		"client_id":                {grant.client.ClientIdentifier},
 		"state":                    {fake.LetterN(8)},
 	})
@@ -274,7 +275,7 @@ func logoutWithHint(t *testing.T, grant *offlineGrant, idToken string) {
 
 	state := fake.LetterN(10)
 	logoutURL := appConfig.AuthServer.BaseURL + "/auth/logout?id_token_hint=" + url.QueryEscape(idToken) +
-		"&post_logout_redirect_uri=" + url.QueryEscape(grant.redirectURI) +
+		"&post_logout_redirect_uri=" + url.QueryEscape(grant.signOutRedirectURI) +
 		"&state=" + state
 
 	resp, err := grant.httpClient.Get(logoutURL)
@@ -284,7 +285,7 @@ func logoutWithHint(t *testing.T, grant *offlineGrant, idToken string) {
 
 	location, err := url.Parse(resp.Header.Get("Location"))
 	require.NoError(t, err)
-	require.Equal(t, grant.redirectURI, location.Scheme+"://"+location.Host+location.Path,
+	require.Equal(t, grant.signOutRedirectURI, location.Scheme+"://"+location.Host+location.Path,
 		"the teardown must have run to completion, not stopped at an error page")
 	require.Equal(t, state, location.Query().Get("state"))
 }
@@ -998,7 +999,7 @@ func TestLogout_Hintless_ClientIdAuthorizesTheRedirect(t *testing.T) {
 	const state = "aB+cd/efgh==#&injected=1"
 
 	resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
-		"post_logout_redirect_uri": {grant.redirectURI},
+		"post_logout_redirect_uri": {grant.signOutRedirectURI},
 		"client_id":                {grant.client.ClientIdentifier},
 		"state":                    {state},
 	})
@@ -1007,7 +1008,7 @@ func TestLogout_Hintless_ClientIdAuthorizesTheRedirect(t *testing.T) {
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	location, err := url.Parse(resp.Header.Get("Location"))
 	require.NoError(t, err)
-	assert.Equal(t, grant.redirectURI, location.Scheme+"://"+location.Host+location.Path)
+	assert.Equal(t, grant.signOutRedirectURI, location.Scheme+"://"+location.Host+location.Path)
 	assert.Equal(t, []string{state}, location.Query()["state"],
 		"exactly one state reaches the RP, byte-identical to what it sent")
 	assert.Empty(t, location.Fragment, `the "#" in state must stay in the query, not become a fragment`)
@@ -1035,7 +1036,7 @@ func TestLogout_Hintless_AbsentAndEmptyStateAreDifferentRedirects(t *testing.T) 
 		grant := createOfflineGrant(t)
 
 		resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
-			"post_logout_redirect_uri": {grant.redirectURI},
+			"post_logout_redirect_uri": {grant.signOutRedirectURI},
 			"client_id":                {grant.client.ClientIdentifier},
 		})
 		defer func() { _ = resp.Body.Close() }()
@@ -1053,7 +1054,7 @@ func TestLogout_Hintless_AbsentAndEmptyStateAreDifferentRedirects(t *testing.T) 
 		grant := createOfflineGrant(t)
 
 		resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
-			"post_logout_redirect_uri": {grant.redirectURI},
+			"post_logout_redirect_uri": {grant.signOutRedirectURI},
 			"client_id":                {grant.client.ClientIdentifier},
 			"state":                    {""},
 		})
@@ -1136,7 +1137,7 @@ func TestLogout_Hintless_TheDecliningControlDeclinesWithoutScript(t *testing.T) 
 			query := url.Values{
 				"ui_locales":               {"pt-BR"},
 				"state":                    {"s"},
-				"post_logout_redirect_uri": {grant.redirectURI},
+				"post_logout_redirect_uri": {grant.signOutRedirectURI},
 				"client_id":                {grant.client.ClientIdentifier},
 			}
 			if len(tc.hint) > 0 {
@@ -1344,7 +1345,7 @@ func TestLogout_CrossOriginPost_WithHintInTheBody_LogsTheUserOut(t *testing.T) {
 
 	resp := crossOriginLogoutPost(t, grant.httpClient, url.Values{
 		"id_token_hint":            {idToken},
-		"post_logout_redirect_uri": {grant.redirectURI},
+		"post_logout_redirect_uri": {grant.signOutRedirectURI},
 		"state":                    {state},
 	})
 	defer func() { _ = resp.Body.Close() }()
@@ -1356,7 +1357,7 @@ func TestLogout_CrossOriginPost_WithHintInTheBody_LogsTheUserOut(t *testing.T) {
 
 	location, err := url.Parse(resp.Header.Get("Location"))
 	require.NoError(t, err)
-	assert.Equal(t, grant.redirectURI, location.Scheme+"://"+location.Host+location.Path)
+	assert.Equal(t, grant.signOutRedirectURI, location.Scheme+"://"+location.Host+location.Path)
 	assert.Equal(t, state, location.Query().Get("state"),
 		"state travelled in the body too, so it is the second reading of the same property")
 
@@ -1426,7 +1427,7 @@ func TestLogout_CrossOriginPost_WithoutHint_IsRefused(t *testing.T) {
 	grant := createOfflineGrant(t)
 
 	resp := crossOriginLogoutPost(t, grant.httpClient, url.Values{
-		"post_logout_redirect_uri": {grant.redirectURI},
+		"post_logout_redirect_uri": {grant.signOutRedirectURI},
 		"client_id":                {grant.client.ClientIdentifier},
 		"state":                    {fake.LetterN(8)},
 	})
@@ -1476,7 +1477,7 @@ func TestLogout_CrossOriginPost_RejectedHint_ReachesASubmittableConsentPage(t *t
 	// redirect, which is what TestLogout_Hintless_ClientIdAuthorizesTheRedirect establishes.
 	resp := crossOriginLogoutPost(t, grant.httpClient, url.Values{
 		"id_token_hint":            {"not.a.token"},
-		"post_logout_redirect_uri": {grant.redirectURI},
+		"post_logout_redirect_uri": {grant.signOutRedirectURI},
 		"client_id":                {grant.client.ClientIdentifier},
 		"state":                    {state},
 	})
@@ -1487,7 +1488,7 @@ func TestLogout_CrossOriginPost_RejectedHint_ReachesASubmittableConsentPage(t *t
 	location, err := url.Parse(resp.Header.Get("Location"))
 	require.NoError(t, err)
 	assert.Equal(t, "/auth/logout", location.Path)
-	assert.Equal(t, grant.redirectURI, location.Query().Get("post_logout_redirect_uri"),
+	assert.Equal(t, grant.signOutRedirectURI, location.Query().Get("post_logout_redirect_uri"),
 		"the target survives the hop, so the declined note can be shown for the right reason")
 	assert.Equal(t, state, location.Query().Get("state"))
 	assert.NotContains(t, location.RawQuery, "id_token_hint",
@@ -1577,11 +1578,12 @@ func TestLogout_CrossOriginPost_EmptyHint_ExemptsAndIsStillRejected(t *testing.T
 // These cases are what makes the claim true.
 func TestAPIAccountLogoutRequest_FormPostMode_AnswersAFormInstruction(t *testing.T) {
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
+	signOutURI := registerSignOutRedirectURI(t, code.Client.Id)
 
 	state := fake.LetterN(12)
 	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
 	resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
-		PostLogoutRedirectUri: code.RedirectURI,
+		PostLogoutRedirectUri: signOutURI,
 		State:                 state,
 		ResponseMode:          api.AccountLogoutResponseModeFormPost,
 	})
@@ -1600,7 +1602,7 @@ func TestAPIAccountLogoutRequest_FormPostMode_AnswersAFormInstruction(t *testing
 	assert.NotContains(t, out.Endpoint, "id_token_hint")
 
 	assert.NotEmpty(t, out.Params["id_token_hint"])
-	assert.Equal(t, code.RedirectURI, out.Params["post_logout_redirect_uri"])
+	assert.Equal(t, signOutURI, out.Params["post_logout_redirect_uri"])
 	assert.Equal(t, state, out.Params["state"])
 }
 
@@ -1614,6 +1616,7 @@ func TestAPIAccountLogoutRequest_FormPostMode_AnswersAFormInstruction(t *testing
 // able to send an empty one, so neither may the form.
 func TestAPIAccountLogoutRequest_BothModesCarryTheSameParameters(t *testing.T) {
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
+	signOutURI := registerSignOutRedirectURI(t, code.Client.Id)
 	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
 
 	for _, state := range []string{fake.LetterN(12), ""} {
@@ -1623,7 +1626,7 @@ func TestAPIAccountLogoutRequest_BothModesCarryTheSameParameters(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			formReq := api.AccountLogoutRequest{
-				PostLogoutRedirectUri: code.RedirectURI,
+				PostLogoutRedirectUri: signOutURI,
 				State:                 state,
 				ResponseMode:          api.AccountLogoutResponseModeFormPost,
 			}
@@ -1678,12 +1681,13 @@ func TestAPIAccountLogoutRequest_BothModesCarryTheSameParameters(t *testing.T) {
 // gets exactly what it got before rather than a shape it cannot decode.
 func TestAPIAccountLogoutRequest_AbsentAndUnknownResponseModeStillRedirect(t *testing.T) {
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
+	signOutURI := registerSignOutRedirectURI(t, code.Client.Id)
 	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
 
 	for _, mode := range []string{"", "redirect", "form-post", "FORM_POST", "fragment"} {
 		t.Run("responseMode "+strconv.Quote(mode), func(t *testing.T) {
 			resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
-				PostLogoutRedirectUri: code.RedirectURI,
+				PostLogoutRedirectUri: signOutURI,
 				ResponseMode:          mode,
 			})
 			defer func() { _ = resp.Body.Close() }()
@@ -1696,4 +1700,109 @@ func TestAPIAccountLogoutRequest_AbsentAndUnknownResponseModeStillRedirect(t *te
 				"only the exact value form_post selects the form binding")
 		})
 	}
+}
+
+// TestLogout_ConfirmedHint_ReturnsOnlyToASignOutRedirectURI is #147 decision 1 through the real
+// stack, with a confirmed hint: the client's sign-out redirect URI is honored, and its redirect URI,
+// which the old rule honored, is not. The user is signed out either way, and a refused target lands
+// on the "Signed out" page with its note.
+func TestLogout_ConfirmedHint_ReturnsOnlyToASignOutRedirectURI(t *testing.T) {
+	logout := func(t *testing.T, grant *offlineGrant, idToken, target string) *http.Response {
+		t.Helper()
+		resp, err := grant.httpClient.Get(appConfig.AuthServer.BaseURL + "/auth/logout?" + url.Values{
+			"id_token_hint":            {idToken},
+			"post_logout_redirect_uri": {target},
+		}.Encode())
+		require.NoError(t, err)
+		return resp
+	}
+
+	t.Run("a sign-out redirect URI is honored", func(t *testing.T) {
+		grant := createOfflineGrant(t)
+		idToken, _ := sessionBoundGrantOnSameSession(t, grant)
+
+		resp := logout(t, grant, idToken, "https://example.com/signed-out")
+		defer func() { _ = resp.Body.Close() }()
+
+		require.Equal(t, http.StatusFound, resp.StatusCode)
+		assert.Equal(t, "https://example.com/signed-out", resp.Header.Get("Location"))
+	})
+
+	t.Run("a redirect URI that isn't a sign-out redirect URI is refused", func(t *testing.T) {
+		grant := createOfflineGrant(t)
+		idToken, _ := sessionBoundGrantOnSameSession(t, grant)
+
+		resp := logout(t, grant, idToken, "https://example.com/callback")
+		defer func() { _ = resp.Body.Close() }()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Empty(t, resp.Header.Get("Location"), "a redirect URI is no longer a sign-out target")
+		assertSignedOutPage(t, resp, signedOutEnglish, true)
+
+		gone, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
+		require.NoError(t, err)
+		assert.Nil(t, gone, "the refused target costs the redirect, never the sign-out")
+	})
+}
+
+// TestAPIAccountLogoutRequest_MatchesOnlyTheSignOutList is #147 decisions 1 and 10 at the prepared
+// sign-out. A client's redirect URI is refused whether or not the caller names the client. Without
+// clientIdentifier, one query finds the clients whose sign-out list holds the URI, exactly: a URI
+// differing by a trailing space matches none, and a URI two clients hold asks for clientIdentifier,
+// which then picks the client named.
+func TestAPIAccountLogoutRequest_MatchesOnlyTheSignOutList(t *testing.T) {
+	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
+	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
+	const unresolved = "Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier."
+	const notRegistered = "postLogoutRedirectUri is not registered for the client"
+
+	refused := func(t *testing.T, uri, clientIdentifier, description string) {
+		t.Helper()
+		resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
+			PostLogoutRedirectUri: uri,
+			ClientIdentifier:      clientIdentifier,
+		})
+		defer func() { _ = resp.Body.Close() }()
+		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		var body api.ErrorResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+		assert.Equal(t, description, body.ErrorDescription)
+	}
+
+	t.Run("the client's redirect URI, with no clientIdentifier", func(t *testing.T) {
+		refused(t, code.RedirectURI, "", unresolved)
+	})
+	t.Run("the client's redirect URI, with its clientIdentifier", func(t *testing.T) {
+		refused(t, code.RedirectURI, code.Client.ClientIdentifier, notRegistered)
+	})
+
+	signOutURI := registerSignOutRedirectURI(t, code.Client.Id)
+
+	t.Run("a URI differing from a sign-out redirect URI by a trailing space", func(t *testing.T) {
+		refused(t, signOutURI+" ", "", unresolved)
+	})
+
+	twin := &record.Client{ClientIdentifier: "signout-twin-" + fake.LetterN(8), Enabled: true, AuthorizationCodeEnabled: true}
+	require.NoError(t, database.CreateClient(context.Background(), nil, twin))
+	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
+		&record.PostLogoutRedirectURI{ClientId: twin.Id, URI: signOutURI}))
+
+	t.Run("a URI two clients hold, with no clientIdentifier", func(t *testing.T) {
+		refused(t, signOutURI, "", unresolved)
+	})
+	t.Run("a URI two clients hold, with the caller's clientIdentifier", func(t *testing.T) {
+		resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
+			PostLogoutRedirectUri: signOutURI,
+			ClientIdentifier:      code.Client.ClientIdentifier,
+		})
+		defer func() { _ = resp.Body.Close() }()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		var out api.AccountLogoutRedirectResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		logoutUrl, err := url.Parse(out.LogoutUrl)
+		require.NoError(t, err)
+		assert.Equal(t, signOutURI, logoutUrl.Query().Get("post_logout_redirect_uri"))
+		assert.Equal(t, code.Client.ClientIdentifier, decodeJWTPayload(t, logoutUrl.Query().Get("id_token_hint"))["aud"],
+			"the hint names the client the caller named")
+	})
 }

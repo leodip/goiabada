@@ -24,7 +24,7 @@ The first three run the [Docker Compose](/deploy/docker-compose/) files the setu
 - **Two hostnames,** one for the auth server and one for the admin console, such as `auth.example.com` and `admin.example.com`. Each server answers on its own.
 - **One registrable domain for both.** `auth.example.com` and `admin.example.com` work; `auth.example.com` and `admin.example.net` don't. The admin console's sign-in ends with the auth server posting the answer back to the admin console, and a browser sends the admin console's sign-in cookie on that post only when both are on the same site. On two sites, every sign-in to the admin console stops at "This sign-in can't be finished".
 - **HTTPS on both public URLs.** Each server marks its cookies `Secure` only when its URL is `https://`.
-- **An empty database on the first start,** which the auth server seeds with the administrator and the admin console's client, for the URLs you gave. Changing the URLs later means changing that client's redirect URIs too: see [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/).
+- **An empty database on the first start,** which the auth server seeds with the administrator and the admin console's client, for the URLs you gave. Changing the admin console's URL later means changing that client's redirect URIs and sign-out redirect URIs too: see [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/#when-its-the-admin-console-thats-refused).
 
 ## What changes between methods
 

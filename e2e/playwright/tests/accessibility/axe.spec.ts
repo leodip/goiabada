@@ -547,6 +547,18 @@ test("the clients' pages", async ({ page, clients, resources }) => {
       await page.locator("#btnSave").click();
     }),
     at(page, "the redirect URIs of a client with no flow that redirects", clientUrl(machine.id, "redirect-uris")),
+    at(page, "a client's sign-out redirect URIs, none yet", tab("sign-out-redirect-uris")),
+    refused(page, "a client's sign-out redirect URIs, an entry refused", "signOutRedirectURI", async () => {
+      await page.locator("#signOutRedirectURI").fill("not a url");
+      await page.locator("#addURIBtn").click();
+    }),
+    saved(page, "a client's sign-out redirect URIs saved", async () => {
+      await page.goto(tab("sign-out-redirect-uris"));
+      await page.locator("#signOutRedirectURI").fill(`${env.webtest1Url}/signed-out`);
+      await page.locator("#addURIBtn").click();
+      await page.locator("#btnSave").click();
+    }),
+    at(page, "the sign-out redirect URIs of a client with no flow that redirects", clientUrl(machine.id, "sign-out-redirect-uris")),
     at(page, "a client's web origins, none yet", tab("web-origins")),
     saved(page, "a client's web origins saved", async () => {
       await page.locator("#webOrigin").fill(env.webtest1Url);
