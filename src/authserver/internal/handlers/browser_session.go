@@ -55,6 +55,12 @@ func (b *browserSession) ClearAuthContext(ceremonyId string) error {
 	return b.ceremonyStore.ClearAuthContext(b.w, b.r, ceremonyId)
 }
 
+// TakeRecoveryCodes is CeremonyStore.TakeRecoveryCodes, which takes the set of recovery codes off
+// the ceremony in one conditional write.
+func (b *browserSession) TakeRecoveryCodes(ceremonyId string) ([]string, error) {
+	return b.ceremonyStore.TakeRecoveryCodes(b.w, b.r, ceremonyId)
+}
+
 // AddAuthContext is CeremonyStore.AddAuthContext, /auth/authorize's save, which starts a ceremony
 // beside the ones the browser session holds.
 func (b *browserSession) AddAuthContext(authContext *ceremony.AuthContext) error {

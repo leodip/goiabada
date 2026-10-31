@@ -13,8 +13,9 @@ import (
 // ceremony on to authentication_completed.
 //
 // The set rides on the ceremony, in the sealed browser-session row, only until that page first
-// renders: the prompt takes it off in the save before the page is drawn, so a reload, a second tab
-// or a failure after the save shows it no more. The step is its own state rather than the setup
+// renders: the prompt takes it off in one conditional write before the page is drawn, reading the
+// ceremony as stored then rather than as its request loaded it, so of two overlapping loads only one
+// shows it, and a reload, a second tab or a failure after the write shows it no more. The step is its own state rather than the setup
 // POST's answer, so the POST answers 303 as every sign-in POST does (RFC 9700 section 4.12), and a
 // reload of the page draws it again without a "resubmit the form?" prompt.
 
@@ -46,9 +47,9 @@ type RecoveryCodesPromptResult struct {
 	// already shown, and the page says so.
 	RecoveryCodes []string
 
-	// SaveErr is the failure of the save that took the set off the ceremony:
+	// SaveErr is the failure of the write that took the set off the ceremony:
 	// ceremony.ErrCeremonyReplaced when the browser session no longer holds the ceremony. The
-	// handler renders the page only when it is nil, so a set is never shown without that save
+	// handler renders the page only when it is nil, so a set is never shown without that write
 	// having landed.
 	SaveErr error
 }
@@ -57,10 +58,13 @@ type RecoveryCodesPromptResult struct {
 //
 //  1. Loads the client block (loadClientDisplay); a failure is returned as an error, and the set
 //     stays on the ceremony for the next render.
-//  2. A ceremony holding no set: the page that says the codes were already shown. Nothing is saved.
-//  3. Otherwise takes the set off the ceremony and saves it, still in level2_recovery_codes, so the
-//     page's Continue still works; the set is returned for the page.
-func (p *RecoveryCodesPrompt) Run(ctx context.Context, browser stepSaver,
+//  2. A ceremony its request loaded holding no set: the page that says the codes were already
+//     shown. Nothing is written.
+//  3. Otherwise takes the set off the ceremony as the browser session stores it now
+//     (recoveryCodesTaker), leaving it in level2_recovery_codes, so the page's Continue still works,
+//     and returns the set that write took. A request that loaded the set but whose write finds it
+//     taken by another meanwhile returns none, and draws the already-shown page.
+func (p *RecoveryCodesPrompt) Run(ctx context.Context, browser recoveryCodesTaker,
 	authContext *ceremony.AuthContext) (RecoveryCodesPromptResult, error) {
 
 	display, err := loadClientDisplay(ctx, p.database, authContext)
@@ -72,13 +76,12 @@ func (p *RecoveryCodesPrompt) Run(ctx context.Context, browser stepSaver,
 		return RecoveryCodesPromptResult{Display: display}, nil
 	}
 
-	codes := authContext.RecoveryCodes
+	codes, takeErr := browser.TakeRecoveryCodes(authContext.CeremonyId)
 	authContext.RecoveryCodes = nil
-	return RecoveryCodesPromptResult{
-		Display:       display,
-		RecoveryCodes: codes,
-		SaveErr:       browser.SaveAuthContext(authContext),
-	}, nil
+	if takeErr != nil {
+		return RecoveryCodesPromptResult{Display: display, SaveErr: takeErr}, nil
+	}
+	return RecoveryCodesPromptResult{Display: display, RecoveryCodes: codes}, nil
 }
 
 // RecoveryCodesContinuation is what ContinueAfterRecoveryCodes did: the step it saved the ceremony

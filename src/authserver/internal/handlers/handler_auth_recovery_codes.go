@@ -12,8 +12,9 @@ import (
 // authenticator set up during this sign-in came with, the first time, and the page saying they were
 // already shown on every render after it. Both carry the Continue form (#257 decision 14).
 //
-// The page is drawn only once the save taking the set off the ceremony has landed, so a set is
-// shown at most once; a save that failed is answered as any step's is.
+// The page is drawn only once the conditional write taking the set off the ceremony has landed, and
+// shows only the set that write took, so a set is shown at most once, overlapping loads included; a
+// write that failed is answered as any step's save is.
 func HandleAuthRecoveryCodesGet(
 	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,

@@ -1512,6 +1512,105 @@ func TestStepWrites_ReplacedAtTheLastAttemptAnswerReplaced(t *testing.T) {
 	}
 }
 
+// TakeRecoveryCodes takes the set of recovery codes off the ceremony as the browser session stores it
+// now, in one conditional write, and answers the set that write took (#257 decision 14). Each case
+// stores ceremony A holding a set, and has one or two requests that loaded it take the set: what the
+// take answers, and what the session then holds, is the whole of the rule.
+func TestTakeRecoveryCodes(t *testing.T) {
+	set := []string{"7kq2-m9xh-4trw-b3np-j6vd-egac", "0123-4567-89ab-cdef-ghjk-mnpq"}
+
+	// holdingSet stores ceremony A, at the codes step, holding the set, with ceremony B written after
+	// it, and answers the cookies and a request of ceremony A's step that has loaded it.
+	holdingSet := func(t *testing.T, ceremonyStore *Store) ([]*http.Cookie, *http.Request) {
+		t.Helper()
+		seedRR := httptest.NewRecorder()
+		require.NoError(t, ceremonyStore.AddAuthContext(seedRR, browserRequest(nil),
+			&AuthContext{CeremonyId: ceremonyA, ClientId: "client-a", UserId: userA,
+				AuthState: AuthStateLevel2RecoveryCodes, AuthMethods: "pwd otp", RecoveryCodes: set}))
+		cookies := seedRR.Result().Cookies()
+		require.Len(t, cookies, 1)
+		addCeremony(t, ceremonyStore, cookies, ceremonyB)
+
+		stepReq := namingRequest(http.MethodGet, cookies, ceremonyA, "")
+		loaded, err := ceremonyStore.GetAuthContext(stepReq)
+		require.NoError(t, err)
+		require.Equal(t, set, loaded.RecoveryCodes)
+		return cookies, stepReq
+	}
+
+	t.Run("TakesTheSetAndChangesNothingElse", func(t *testing.T) {
+		ceremonyStore, _, _ := newRealStore(t)
+		cookies, stepReq := holdingSet(t, ceremonyStore)
+
+		rr := httptest.NewRecorder()
+		taken, err := ceremonyStore.TakeRecoveryCodes(rr, stepReq, ceremonyA)
+
+		require.NoError(t, err)
+		assert.Equal(t, set, taken)
+		assert.NotEmpty(t, rr.Result().Cookies(), "the write names the session, as a step's save does")
+		stored, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
+		require.NoError(t, err)
+		assert.Equal(t, ceremonyA, stored.CeremonyId, "the ceremony becomes the most recently written")
+		assert.Empty(t, stored.RecoveryCodes)
+		assert.Equal(t, AuthStateLevel2RecoveryCodes, stored.AuthState)
+		assert.Equal(t, "pwd otp", stored.AuthMethods)
+		assert.Equal(t, userA, stored.UserId)
+		storedB, err := ceremonyStore.GetAuthContext(namingRequest(http.MethodGet, cookies, ceremonyB, ""))
+		require.NoError(t, err, "the other ceremony is kept")
+		assert.Equal(t, "client-ceremony-b", storedB.ClientId)
+	})
+
+	t.Run("ASecondRequestThatLoadedTheSetTakesNone", func(t *testing.T) {
+		// Two loads of the page read ceremony A while it held the set; the first one's take lands.
+		ceremonyStore, _, _ := newRealStore(t)
+		cookies, firstReq := holdingSet(t, ceremonyStore)
+		secondReq := namingRequest(http.MethodGet, cookies, ceremonyA, "")
+		loaded, err := ceremonyStore.GetAuthContext(secondReq)
+		require.NoError(t, err)
+		require.Equal(t, set, loaded.RecoveryCodes, "the second request loaded the set too")
+
+		first, err := ceremonyStore.TakeRecoveryCodes(httptest.NewRecorder(), firstReq, ceremonyA)
+		require.NoError(t, err)
+		require.Equal(t, set, first)
+
+		rr := httptest.NewRecorder()
+		second, err := ceremonyStore.TakeRecoveryCodes(rr, secondReq, ceremonyA)
+
+		require.NoError(t, err)
+		assert.Empty(t, second, "the set is taken once")
+		assert.Empty(t, rr.Result().Cookies(), "a take that took nothing writes nothing")
+	})
+
+	t.Run("ACeremonyNoLongerHeldIsReplaced", func(t *testing.T) {
+		ceremonyStore, _, _ := newRealStore(t)
+		cookies, stepReq := holdingSet(t, ceremonyStore)
+		require.NoError(t, ceremonyStore.ClearAuthContext(httptest.NewRecorder(), browserRequest(cookies), ceremonyA))
+
+		rr := httptest.NewRecorder()
+		taken, err := ceremonyStore.TakeRecoveryCodes(rr, stepReq, ceremonyA)
+
+		require.ErrorIs(t, err, ErrCeremonyReplaced)
+		assert.Empty(t, taken)
+		assert.Empty(t, rr.Result().Cookies())
+	})
+
+	t.Run("ASessionGoneIsReplacedAndNotRecreated", func(t *testing.T) {
+		ceremonyStore, store, backend := newRealStore(t)
+		cookies, stepReq := holdingSet(t, ceremonyStore)
+		id := sessionIdentifier(t, store, cookies[0])
+		require.NoError(t, backend.Delete(context.Background(), id))
+
+		rr := httptest.NewRecorder()
+		taken, err := ceremonyStore.TakeRecoveryCodes(rr, stepReq, ceremonyA)
+
+		require.ErrorIs(t, err, ErrCeremonyReplaced)
+		assert.Empty(t, taken)
+		assert.Empty(t, rr.Result().Cookies())
+		_, err = backend.Load(context.Background(), id)
+		require.ErrorIs(t, err, sessionstore.ErrNotFound)
+	})
+}
+
 // RegenerateSessionAndBind is /auth/completed's create arm's rotation, which binds the user session
 // the arm has just committed to the browser session (#266), only while the browser session still
 // holds the ceremony completing (#579 decision 4). Each case loads ceremony A as the step's request

@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -16,13 +18,15 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // The sign-in setup's recovery-codes step (#257 decision 14). An accepted setup code leaves the set
 // the new authenticator came with on the ceremony, in level2_recovery_codes, and GET
-// /auth/recovery-codes shows it: the save that takes the codes off the ceremony lands before the
-// page renders, so the set is shown once, and a reload draws the page that says they were already
-// shown. Both pages carry the same Continue, POST /auth/recovery-codes, which moves the ceremony to
+// /auth/recovery-codes shows it: the one conditional write that takes the codes off the ceremony,
+// as the browser session stores it then, lands before the page renders and the page shows only the
+// set that write took, so the set is shown once, overlapping loads included, and a reload draws the
+// page that says they were already shown. Both pages carry the same Continue, POST /auth/recovery-codes, which moves the ceremony to
 // authentication_completed and answers 303 to /auth/completed.
 
 // setupRecoveryCodes is a set as the setup step holds it, as shown.
@@ -94,10 +98,10 @@ func recoveryCodesContinueRequest() *http.Request {
 	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 }
 
-// The first render shows the ten codes the ceremony holds, in the order they were drawn, beside the
-// client block, naming the ceremony for the Continue form. The codes leave the ceremony in a save
-// that lands before the page renders, and the ceremony stays in level2_recovery_codes, so the
-// reload's page is this step's and its Continue still works. No log record carries a code.
+// The first render shows the ten codes the take answered, in the order they were drawn, beside the
+// client block, naming the ceremony for the Continue form. The codes leave the ceremony in the take,
+// which lands before the page renders and leaves the ceremony's state alone, so the reload's page is
+// this step's and its Continue still works. No log record carries a code.
 func TestHandleAuthRecoveryCodesGet_TheFirstRenderShowsTheSetOnce(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 	m := newRecoveryCodesStepMocks(t)
@@ -107,10 +111,9 @@ func TestHandleAuthRecoveryCodesGet_TheFirstRenderShowsTheSetOnce(t *testing.T) 
 	req := recoveryCodesGetRequest()
 	rr := httptest.NewRecorder()
 
-	saved := false
-	m.ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-		return len(ac.RecoveryCodes) == 0 && ac.AuthState == ceremony.AuthStateLevel2RecoveryCodes
-	})).Return(nil).Once().Run(func(mock.Arguments) { saved = true })
+	taken := false
+	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyId).Return(setupRecoveryCodes, nil).Once().
+		Run(func(mock.Arguments) { taken = true })
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_recovery_codes.html",
 		mock.MatchedBy(func(bind map[string]interface{}) bool {
 			return assert.Equal(t, setupRecoveryCodes, bind["recoveryCodes"]) &&
@@ -118,7 +121,7 @@ func TestHandleAuthRecoveryCodesGet_TheFirstRenderShowsTheSetOnce(t *testing.T) 
 				bind["layoutShowClientSection"] == true &&
 				bind["layoutClientName"] == "Test Client"
 		})).Return(nil).Once().Run(func(mock.Arguments) {
-		assert.True(t, saved, "the codes must leave the ceremony before the page that shows them renders")
+		assert.True(t, taken, "the codes must leave the ceremony before the page that shows them renders")
 	})
 
 	m.get().ServeHTTP(rr, req)
@@ -150,10 +153,34 @@ func TestHandleAuthRecoveryCodesGet_AReloadDoesNotShowTheCodesAgain(t *testing.T
 	m.get().ServeHTTP(rr, req)
 
 	m.pageRenderer.AssertExpectations(t)
+	m.ceremonyStore.AssertNotCalled(t, "TakeRecoveryCodes", mock.Anything, mock.Anything, mock.Anything)
 	m.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// A save that finds the ceremony no longer held shows nothing: the codes are drawn only once the
+// A load that found the codes on the ceremony as its request read it, but whose take finds them
+// already taken by another load of the page, draws the page that says they were already shown: the
+// page shows what the take answered, never the request's own copy.
+func TestHandleAuthRecoveryCodesGet_ALoadWhoseTakeFindsNoCodesShowsNone(t *testing.T) {
+	m := newRecoveryCodesStepMocks(t)
+	m.armRecoveryCodesCeremony(setupRecoveryCodes)
+	m.armClient()
+
+	req := recoveryCodesGetRequest()
+	rr := httptest.NewRecorder()
+	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyId).Return(nil, nil).Once()
+	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_recovery_codes.html",
+		mock.MatchedBy(func(bind map[string]interface{}) bool {
+			codes, _ := bind["recoveryCodes"].([]string)
+			return len(codes) == 0 && bind["ceremonyId"] == testCeremonyId
+		})).Return(nil).Once()
+
+	m.get().ServeHTTP(rr, req)
+
+	m.pageRenderer.AssertExpectations(t)
+	m.ceremonyStore.AssertExpectations(t)
+}
+
+// A take that finds the ceremony no longer held shows nothing: the codes are drawn only once the
 // write taking them off the ceremony has landed, so no failure can show a set twice.
 func TestHandleAuthRecoveryCodesGet_AReplacedCeremonyShowsNoCodes(t *testing.T) {
 	m := newRecoveryCodesStepMocks(t)
@@ -162,7 +189,8 @@ func TestHandleAuthRecoveryCodesGet_AReplacedCeremonyShowsNoCodes(t *testing.T) 
 
 	req := recoveryCodesGetRequest()
 	rr := httptest.NewRecorder()
-	expectStepSaveReplaced(t, m.ceremonyStore, m.pageRenderer, rr, req)
+	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyId).Return(nil, ceremony.ErrCeremonyReplaced).Once()
+	expectCeremonyNoLongerActive(t, m.pageRenderer, rr, req)
 
 	m.get().ServeHTTP(rr, req)
 
@@ -171,7 +199,7 @@ func TestHandleAuthRecoveryCodesGet_AReplacedCeremonyShowsNoCodes(t *testing.T) 
 		"/layouts/auth_layout.html", "/auth_recovery_codes.html", mock.Anything)
 }
 
-// A save that fails otherwise is the 500 page, and shows no codes either.
+// A take that fails otherwise is the 500 page, and shows no codes either.
 func TestHandleAuthRecoveryCodesGet_AFailedSaveShowsNoCodes(t *testing.T) {
 	m := newRecoveryCodesStepMocks(t)
 	m.armRecoveryCodesCeremony(setupRecoveryCodes)
@@ -180,7 +208,7 @@ func TestHandleAuthRecoveryCodesGet_AFailedSaveShowsNoCodes(t *testing.T) {
 	req := recoveryCodesGetRequest()
 	rr := httptest.NewRecorder()
 	saveErr := errors.New("session store down")
-	m.ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(saveErr).Once()
+	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyId).Return(nil, saveErr).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, saveErr).Return().Once()
 
 	m.get().ServeHTTP(rr, req)
@@ -206,7 +234,7 @@ func TestHandleAuthRecoveryCodesGet_AFailedClientReadKeepsTheCodes(t *testing.T)
 	m.get().ServeHTTP(rr, req)
 
 	m.pageRenderer.AssertExpectations(t)
-	m.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+	m.ceremonyStore.AssertNotCalled(t, "TakeRecoveryCodes", mock.Anything, mock.Anything, mock.Anything)
 	assert.Equal(t, setupRecoveryCodes, authContext.RecoveryCodes)
 }
 
@@ -268,8 +296,86 @@ func TestHandleAuthRecoveryCodes_OnlyLevel2RecoveryCodesIsAccepted(t *testing.T)
 
 				m.pageRenderer.AssertExpectations(t)
 				m.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+				m.ceremonyStore.AssertNotCalled(t, "TakeRecoveryCodes", mock.Anything, mock.Anything, mock.Anything)
 				assert.Equal(t, setupRecoveryCodes, authContext.RecoveryCodes)
 			})
 		}
 	}
+}
+
+// Two loads of the page overlap in one browser: each has loaded the ceremony holding the set, and is
+// held inside its read of the client, before either takes it. With the real ceremony and session
+// stores, exactly one response shows the set, the other draws the page that says it was already
+// shown, and a later load finds none on the ceremony, still in level2_recovery_codes (#257
+// decision 14). A step's save, last-writer-wins between two requests of one ceremony, would let both
+// show it.
+func TestHandleAuthRecoveryCodesGet_OverlappingLoadsShowTheSetOnce(t *testing.T) {
+	ceremonyStore, _ := newRealCeremonyStore(t)
+	seed := httptest.NewRecorder()
+	require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
+		&ceremony.AuthContext{CeremonyId: testCeremonyId, ClientId: "test-client", UserId: 1,
+			AuthState: ceremony.AuthStateLevel2RecoveryCodes, AuthMethods: "pwd otp",
+			RecoveryCodes: setupRecoveryCodes}))
+	cookies := seed.Result().Cookies()
+	require.NotEmpty(t, cookies)
+
+	const loads = 2
+	arrived := make(chan struct{}, loads)
+	release := make(chan struct{})
+	database := datamocks.NewDatabase(t)
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+		Return(&record.Client{ClientIdentifier: "test-client"}, nil).Times(loads).
+		Run(func(mock.Arguments) { arrived <- struct{}{}; <-release })
+
+	var mu sync.Mutex
+	var shown [][]string
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
+		"/auth_recovery_codes.html", mock.Anything).Return(nil).Times(loads).
+		Run(func(args mock.Arguments) {
+			codes, _ := args.Get(4).(map[string]interface{})["recoveryCodes"].([]string)
+			mu.Lock()
+			defer mu.Unlock()
+			shown = append(shown, codes)
+		})
+
+	handler := buildAuthRecoveryCodesGet(authRecoveryCodesGetDeps{pageRenderer: pageRenderer,
+		ceremonyStore: ceremonyStore, database: database, auditLogger: handlersmocks.NewAuditLogger(t)})
+
+	var wg sync.WaitGroup
+	for range loads {
+		req := withCookies(recoveryCodesGetRequest(), cookies)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+		}()
+	}
+	for range loads {
+		select {
+		case <-arrived:
+		case <-time.After(5 * time.Second):
+			close(release)
+			wg.Wait()
+			t.Fatal("both loads must have read the ceremony before either takes the set")
+		}
+	}
+	close(release)
+	wg.Wait()
+
+	require.Len(t, shown, loads)
+	withCodes := 0
+	for _, codes := range shown {
+		if len(codes) > 0 {
+			withCodes++
+			assert.Equal(t, setupRecoveryCodes, codes)
+		}
+	}
+	assert.Equal(t, 1, withCodes, "exactly one of the overlapping loads shows the set")
+
+	stored, err := heldCeremony(ceremonyStore, cookies, testCeremonyId)
+	require.NoError(t, err)
+	assert.Empty(t, stored.RecoveryCodes, "the set is off the ceremony")
+	assert.Equal(t, ceremony.AuthStateLevel2RecoveryCodes, stored.AuthState)
+	assert.Equal(t, "pwd otp", stored.AuthMethods, "the take changes nothing else")
 }

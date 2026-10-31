@@ -234,9 +234,10 @@ type AuthContext struct {
 	// RecoveryCodes is the set of recovery codes the authenticator this ceremony set up came with,
 	// as shown, held only until the page that shows them first renders: written by
 	// authflow.OTPSubmission when it stores the authenticator, and cleared by
-	// authflow.RecoveryCodesPrompt in the save that comes before that page renders, so a reload
-	// shows them no more (#257 decisions 1 and 14). The browser-session row the ceremony is stored
-	// in is sealed, and the codes are nowhere else: the database keeps only their hashes.
+	// authflow.RecoveryCodesPrompt through Store.TakeRecoveryCodes, the one conditional write that
+	// comes before that page renders, so a reload or an overlapping load shows them no more (#257
+	// decisions 1 and 14). The browser-session row the ceremony is stored in is sealed, and the
+	// codes are nowhere else: the database keeps only their hashes.
 	//
 	// Absent from a context written by an older binary it unmarshals as nil, which reads as "the
 	// codes were already shown", the page a reload draws.

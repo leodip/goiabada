@@ -1,6 +1,6 @@
 // German uses the same responsive components as the other catalogs. Exercise the rendered
 // wording at the smallest supported phone width, including tabs, tables, dialogs and refusals.
-import { addGroupAttribute, addRedirectUri, choose, clientUrl, groupUrl, resourceUrl, userUrl } from "../../lib/admin-console";
+import { addGroupAttribute, addRedirectUri, choose, clientUrl, confirmDialog, groupUrl, resourceUrl, userUrl } from "../../lib/admin-console";
 import { linksIn, waitForMail } from "../../lib/mailpit";
 import { signInToConsole } from "../../lib/console-user";
 import { openSignIn } from "../../lib/browser-sign-in";
@@ -149,6 +149,14 @@ for (const theme of ["light", "dark"] as const) {
     await own.getByRole("button", { name: "Anmelden", exact: true }).click();
     await expect(own.getByRole("heading", { level: 1 })).toHaveText("Zwei-Faktor-Authentifizierung");
     await fitsInGerman(own);
+    // The recovery-code form, and its refusal of a wrong code.
+    await own.getByRole("link", { name: "Stattdessen einen Wiederherstellungscode verwenden", exact: true }).click();
+    await expect(own.getByRole("heading", { level: 1 })).toHaveText("Wiederherstellungscode verwenden");
+    await fitsInGerman(own);
+    await own.locator("#recoveryCode").fill("0000-0000-0000-0000-0000-0000");
+    await own.getByRole("button", { name: "Bestätigen", exact: true }).click();
+    await expect(own.locator("#recovery-code-error")).toHaveText("Dieser Wiederherstellungscode ist falsch oder wurde bereits verwendet.");
+    await fitsInGerman(own);
     for (const path of ["/forgot-password", "/reset-password?code=invalid", "/account/activate?code=invalid", "/missing-german-page", "/auth/logout", "/auth/logout/declined"]) {
       await own.goto(`${env.authUrl}${path}`);
       await fitsInGerman(own);
@@ -160,6 +168,39 @@ for (const theme of ["light", "dark"] as const) {
     await own.goto(`${env.authUrl}/auth/authorize?client_id=missing&ui_locales=de`);
     await fitsInGerman(own);
     await signIn.context.close();
+  });
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`German account recovery codes fit a phone in ${theme}`, async ({ browser, users }) => {
+    test.setTimeout(90_000);
+    const user = await users.create();
+    const { context, page: own } = await signInToConsole(browser, user, "/account/otp");
+    await own.setViewportSize({ width: 320, height: 740 });
+    await own.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+    await own.setExtraHTTPHeaders({ "Accept-Language": "de-AT" });
+    await own.goto(`${env.adminUrl}/account/otp?ui_locales=de`);
+    // Turning on two-factor authentication shows the new authenticator's set once.
+    const secret = (await own.locator("#otp-secret").innerText()).trim();
+    await own.locator("#password").fill(user.password);
+    await own.locator("#otp").fill(await freshTotp(secret));
+    await own.locator('button[name="otpAction"]').click();
+    await expect(own.getByRole("heading", { name: "Speichern Sie Ihre Wiederherstellungscodes", exact: true })).toBeVisible();
+    await fitsInGerman(own);
+    // The count, and a new set behind the password and the confirmation.
+    await own.goto(`${env.adminUrl}/account/otp?ui_locales=de`);
+    await expect(own.getByRole("heading", { name: "Wiederherstellungscodes", exact: true })).toBeVisible();
+    await expect(own.getByText("10 Ihrer 10 Wiederherstellungscodes sind noch unbenutzt.", { exact: true })).toBeVisible();
+    await fitsInGerman(own);
+    await own.locator("#recovery-codes-password").fill(user.password);
+    await own.locator('button[name="otpAction"][value="recovery-codes"]').click();
+    await expect(own.locator("dialog[open]")).toContainText("Neue Wiederherstellungscodes anfordern?");
+    await fitsInGerman(own);
+    await confirmDialog(own);
+    await expect(own.locator("#recovery-codes")).toBeVisible();
+    await expect(own.getByRole("heading", { name: "Speichern Sie Ihre Wiederherstellungscodes", exact: true })).toBeVisible();
+    await fitsInGerman(own);
+    await context.close();
   });
 }
 

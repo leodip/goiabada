@@ -235,7 +235,7 @@ ceremony's path depends on the target ACR, the session, and `prompt`.
 | `level1_existing_session` | `authflow.Authorization` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
 | `requires_level_2` | `authflow.Level1Completion` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1, or the target is `level2_mandatory` and the user has no authenticator. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
 | `level2_otp` | `authflow.Level2Selection` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
-| `level2_recovery_codes` | `authflow.OTPSubmission` | OTP enrolled: the ceremony holds the new authenticator's recovery codes (`RecoveryCodes`) until `/auth/recovery-codes` first renders them, and that render's save clears them, so a reload shows them no more (#257) |
+| `level2_recovery_codes` | `authflow.OTPSubmission` | OTP enrolled: the ceremony holds the new authenticator's recovery codes (`RecoveryCodes`) until `/auth/recovery-codes` first renders them; that render takes them off in one conditional write (`ceremony.Store.TakeRecoveryCodes`) and shows only what it took, so a reload or an overlapping load shows them no more (#257) |
 | `authentication_completed` | `authflow.Level1Completion` | no step-up needed |
 | | `authflow.Level2Selection` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
 | | `authflow.OTPSubmission` | OTP verified against the stored authenticator, or a recovery code accepted |
@@ -413,9 +413,13 @@ When user has valid session (`UserSession` in DB + session cookie):
 ## SSO and ACR/AMR Details
 
 ### AMR (Authentication Methods Reference)
-Two methods tracked (`oidc/auth_method.go`): `pwd` (password), `otp` (time-based OTP). Stored as
-space-separated string in `AuthContext.AuthMethods` and `UserSession.AuthMethods`. Output in tokens
-as JSON array per OIDC spec: `"amr": ["pwd", "otp"]`
+Three methods tracked (`oidc/auth_method.go`): `pwd` (password), `otp` (time-based OTP) and
+`recovery_code` (a recovery code entered in place of an authenticator code, Goiabada's own value,
+#257). Stored as space-separated string in `AuthContext.AuthMethods` and `UserSession.AuthMethods`.
+Output in tokens as JSON array per OIDC spec: `"amr": ["pwd", "otp"]`, or `["pwd", "recovery_code"]`
+for a recovery-code sign-in. `AuthContext.ClaimsOTP` counts either second-factor method as a claim
+the authenticator backs, tied to its `otp_config_generation`, so removing the authenticator lowers
+a recovery-code session and restarts a ceremony in flight exactly as for a code (#542).
 
 ### UserSession Model
 ```

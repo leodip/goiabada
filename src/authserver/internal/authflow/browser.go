@@ -10,6 +10,15 @@ type stepSaver interface {
 	SaveAuthContext(authContext *ceremony.AuthContext) error
 }
 
+// recoveryCodesTaker is the browser-session write that takes the set of recovery codes off a
+// ceremony: read afresh and cleared in one conditional write, answering the set the write took, none
+// when the ceremony as stored holds none, and ceremony.ErrCeremonyReplaced, with nothing written,
+// when the browser session no longer holds it (#257 decision 14). The handler's per-request adapter
+// satisfies it, over ceremony.Store.
+type recoveryCodesTaker interface {
+	TakeRecoveryCodes(ceremonyId string) ([]string, error)
+}
+
 // ceremonyClearer is the browser-session write that ends a ceremony: its auth context cleared, only
 // while the browser session still holds it, and otherwise ceremony.ErrCeremonyReplaced with nothing
 // written (#579). The handler's per-request adapter satisfies it, over ceremony.Store.

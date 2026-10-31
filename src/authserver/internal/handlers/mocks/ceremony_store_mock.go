@@ -571,3 +571,77 @@ func (_c *CeremonyStore_SaveAuthContext_Call) RunAndReturn(run func(w http.Respo
 	_c.Call.Return(run)
 	return _c
 }
+
+// TakeRecoveryCodes provides a mock function for the type CeremonyStore
+func (_mock *CeremonyStore) TakeRecoveryCodes(w http.ResponseWriter, r *http.Request, ceremonyId string) ([]string, error) {
+	ret := _mock.Called(w, r, ceremonyId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TakeRecoveryCodes")
+	}
+
+	var r0 []string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string) ([]string, error)); ok {
+		return returnFunc(w, r, ceremonyId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string) []string); ok {
+		r0 = returnFunc(w, r, ceremonyId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(http.ResponseWriter, *http.Request, string) error); ok {
+		r1 = returnFunc(w, r, ceremonyId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// CeremonyStore_TakeRecoveryCodes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TakeRecoveryCodes'
+type CeremonyStore_TakeRecoveryCodes_Call struct {
+	*mock.Call
+}
+
+// TakeRecoveryCodes is a helper method to define mock.On call
+//   - w http.ResponseWriter
+//   - r *http.Request
+//   - ceremonyId string
+func (_e *CeremonyStore_Expecter) TakeRecoveryCodes(w any, r any, ceremonyId any) *CeremonyStore_TakeRecoveryCodes_Call {
+	return &CeremonyStore_TakeRecoveryCodes_Call{Call: _e.mock.On("TakeRecoveryCodes", w, r, ceremonyId)}
+}
+
+func (_c *CeremonyStore_TakeRecoveryCodes_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string)) *CeremonyStore_TakeRecoveryCodes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 http.ResponseWriter
+		if args[0] != nil {
+			arg0 = args[0].(http.ResponseWriter)
+		}
+		var arg1 *http.Request
+		if args[1] != nil {
+			arg1 = args[1].(*http.Request)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *CeremonyStore_TakeRecoveryCodes_Call) Return(strings []string, err error) *CeremonyStore_TakeRecoveryCodes_Call {
+	_c.Call.Return(strings, err)
+	return _c
+}
+
+func (_c *CeremonyStore_TakeRecoveryCodes_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string) ([]string, error)) *CeremonyStore_TakeRecoveryCodes_Call {
+	_c.Call.Return(run)
+	return _c
+}
