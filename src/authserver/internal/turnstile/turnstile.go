@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/boundedread"
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/metrics"
 )
 
@@ -34,6 +35,20 @@ const (
 	// ResponseField is the form field the widget writes its token into, inside the form it is in.
 	ResponseField = "cf-turnstile-response"
 )
+
+// BindWidget puts the widget on a render of a form the challenge is on, while it is on: the site
+// key its template renders the widget with, and Cloudflare's script admitted to this response's
+// script-src alone (#642 decision 9). Every render of such a form calls it, its first and each one
+// beside a refusal, so each carries a fresh widget (decision 2). With the challenge off it does
+// nothing, and the page is sent today's policy.
+func BindWidget(w http.ResponseWriter, settings *record.Settings, bind map[string]interface{}) {
+	if !settings.TurnstileEnabled {
+		return
+	}
+	bind["turnstileSiteKey"] = settings.TurnstileSiteKey
+	bind["turnstileScriptURL"] = ScriptURL
+	httpmw.SetContentSecurityPolicy(w.Header(), ScriptOrigin)
+}
 
 // Form is a form the challenge is on, spelled as its widget's action.
 type Form string

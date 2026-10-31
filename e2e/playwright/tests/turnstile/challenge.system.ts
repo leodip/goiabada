@@ -3,16 +3,20 @@
 // solves itself and the form goes on, the always-block one's leaves no token and the form is
 // refused with the address typed kept. The fixtures' watcher fails a test on any
 // Content-Security-Policy violation, so the widget's script and frame load under the policy the
-// forms are sent. Runs alone, since on the challenge refuses every other test's sign-in, and every
+// forms are sent. The sign-in, forgot-password and registration forms each carry it. Runs alone, since on the challenge refuses every other test's sign-in, and every
 // test starts and ends with it off and no keys stored, as the baseline has it (lib/settings.ts).
-import type { Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
 import { openSignIn, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
-import { fillSettingsForm, saveSettings } from "../../lib/settings";
+import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 import { browserSignInClient } from "../../lib/test-clients";
+import { uniqueIdentifier } from "../../lib/unique";
 
 const turnstile = "/admin/settings/turnstile";
+const general = "/admin/settings/general";
+const forgotPasswordUrl = `${env.authUrl}/forgot-password`;
+const registerUrl = `${env.authUrl}/account/register`;
 const alwaysPassSiteKey = "1x00000000000000000000AA";
 const alwaysBlockSiteKey = "2x00000000000000000000AB";
 const alwaysPassSecretKey = "1x0000000000000000000000000000000AA";
@@ -40,6 +44,14 @@ async function turnOff(page: Page) {
     ...(hasSecretKey ? { clearTurnstileSecretKey: true } : {}),
   });
   await saveSettings(page);
+}
+
+// Opens url in a browser of its own, signed in nowhere, as a visitor would.
+async function openAsVisitor(browser: Browser, url: string) {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const visitor = await context.newPage();
+  await visitor.goto(url);
+  return { context, visitor };
 }
 
 // The widget, inside the form so its token is submitted with it, and the hidden field it writes
@@ -98,5 +110,87 @@ test("sign-in: with the challenge off, the form loads nothing from Cloudflare", 
   await expect(signIn.locator('input[name="email"]')).toBeVisible();
   await expect(signIn.locator(".cf-turnstile")).toHaveCount(0);
   await expect(signIn.locator('script[src^="https://challenges.cloudflare.com"]')).toHaveCount(0);
+  await context.close();
+});
+
+test("forgot-password: the always-pass widget solves itself and the request is answered", async ({ page, browser }) => {
+  await turnOn(page, alwaysPassSiteKey);
+  const address = `${uniqueIdentifier("t")}@example.com`;
+
+  const { context, visitor } = await openAsVisitor(browser, forgotPasswordUrl);
+  await expect(widget(visitor, "forgot-password")).toHaveAttribute("data-sitekey", alwaysPassSiteKey);
+  await expect(token(visitor)).toHaveValue(/.+/);
+
+  await visitor.locator("#email").fill(address);
+  await visitor.getByRole("button", { name: "Send reset link", exact: true }).click();
+  await expect(visitor.getByRole("heading", { name: "Check your email" })).toBeVisible();
+  await expect(visitor.locator("code.auth-address")).toHaveText(address);
+  await context.close();
+});
+
+test("forgot-password: the always-block widget leaves no token, and the refusal keeps the address typed", async ({ page, browser }) => {
+  await turnOn(page, alwaysBlockSiteKey);
+  const address = `${uniqueIdentifier("t")}@example.com`;
+
+  const { context, visitor } = await openAsVisitor(browser, forgotPasswordUrl);
+  await expect(widget(visitor, "forgot-password")).toHaveAttribute("data-sitekey", alwaysBlockSiteKey);
+  await expect(token(visitor)).toBeAttached();
+
+  await visitor.locator("#email").fill(address);
+  await visitor.getByRole("button", { name: "Send reset link", exact: true }).click();
+  await expect(visitor.getByRole("alert")).toHaveText(refusal);
+  expect(new URL(visitor.url()).pathname).toBe("/forgot-password");
+  await expect(visitor.locator("#email")).toHaveValue(address);
+  // The form is drawn again with a fresh widget.
+  await expect(widget(visitor, "forgot-password")).toHaveAttribute("data-sitekey", alwaysBlockSiteKey);
+  await context.close();
+});
+
+test("registration: the always-pass widget solves itself and the address is registered", async ({ page, browser }) => {
+  await withSettingsRestored(page, general, async () => {
+    // Self-registration on, with email verification as seeded: the address alone is asked for.
+    await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: true });
+    await saveSettings(page);
+    await turnOn(page, alwaysPassSiteKey);
+    const address = `${uniqueIdentifier("t")}@example.com`;
+
+    const { context, visitor } = await openAsVisitor(browser, registerUrl);
+    await expect(widget(visitor, "register")).toHaveAttribute("data-sitekey", alwaysPassSiteKey);
+    await expect(token(visitor)).toHaveValue(/.+/);
+
+    await visitor.locator("#email").fill(address);
+    await visitor.getByRole("button", { name: "Create account", exact: true }).click();
+    await expect(visitor.getByRole("heading", { name: "Check your email" })).toBeVisible();
+    await expect(visitor.locator("code.auth-address")).toHaveText(address);
+    await context.close();
+  });
+});
+
+test("registration: the always-block widget leaves no token, and the refusal keeps the address typed", async ({ page, browser }) => {
+  await withSettingsRestored(page, general, async () => {
+    await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: true });
+    await saveSettings(page);
+    await turnOn(page, alwaysBlockSiteKey);
+    const address = `${uniqueIdentifier("t")}@example.com`;
+
+    const { context, visitor } = await openAsVisitor(browser, registerUrl);
+    await expect(widget(visitor, "register")).toHaveAttribute("data-sitekey", alwaysBlockSiteKey);
+    await expect(token(visitor)).toBeAttached();
+
+    await visitor.locator("#email").fill(address);
+    await visitor.getByRole("button", { name: "Create account", exact: true }).click();
+    await expect(visitor.getByRole("alert")).toHaveText(refusal);
+    expect(new URL(visitor.url()).pathname).toBe("/account/register");
+    await expect(visitor.locator("#email")).toHaveValue(address);
+    await expect(widget(visitor, "register")).toHaveAttribute("data-sitekey", alwaysBlockSiteKey);
+    await context.close();
+  });
+});
+
+test("forgot-password: with the challenge off, the form loads nothing from Cloudflare", async ({ browser }) => {
+  const { context, visitor } = await openAsVisitor(browser, forgotPasswordUrl);
+  await expect(visitor.locator("#email")).toBeVisible();
+  await expect(visitor.locator(".cf-turnstile")).toHaveCount(0);
+  await expect(visitor.locator('script[src^="https://challenges.cloudflare.com"]')).toHaveCount(0);
   await context.close();
 });

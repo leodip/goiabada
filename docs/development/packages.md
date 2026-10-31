@@ -298,8 +298,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   secret key and the token alone, and decides pass, refuse or fail open from the answer, checking the
   token's hostname against the base URL's host and its action against the form's. It logs what an
   operator must see, never the token or the secret key, and counts every check in
-  `goiabada_challenge_verifications_total`. The forms' middleware in `internal/handlers` reads the
-  token and draws the refusal (#642)
+  `goiabada_challenge_verifications_total`. `BindWidget` puts the widget, and Cloudflare's origin
+  in that response's `script-src`, on each render of a form the challenge is on. The forms'
+  middleware reads the token and draws the refusal: the sign-in form's in `internal/handlers`, the
+  forgot-password and registration forms' in `internal/handlers/accounthandlers` (#642)
 - `internal/recovery/` - The `recover` subcommand's operation, `Run`: for one named, enabled user, a
   manage grant, a password held to the stored policy and the authenticator's removal, each only as
   asked, in one transaction with the #106 revocation sweep, the user, the authenticator and the

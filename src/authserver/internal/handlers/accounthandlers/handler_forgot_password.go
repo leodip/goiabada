@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/securerandom"
@@ -52,17 +53,30 @@ func HandleForgotPasswordGet(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		bind := map[string]interface{}{
-			"error": nil,
-		}
-
-		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
+		renderForgotPasswordForm(w, r, pageRenderer, settings, "", "")
+	}
+}
 
+// renderForgotPasswordForm draws the forgot-password form, beside refusal and with email in its
+// field when there is one. Every render of the form, its first and each beside a refusal, carries a
+// fresh Turnstile widget while the challenge is on (#642 decision 2); the page answering a request,
+// which has no form, carries none.
+func renderForgotPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
+	settings *record.Settings, email, refusal string) {
+
+	bind := map[string]interface{}{
+		"email": email,
+		"error": refusal,
+	}
+	turnstile.BindWidget(w, settings, bind)
+
+	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }
 
@@ -173,17 +187,15 @@ func HandleForgotPasswordPost(
 		if len(email) == 0 || strings.Count(email, "@") != 1 {
 			auditRequestedPasswordReset(r.Context(), auditLogger, clientIP, email, 0, recoveryOutcomeInvalidAddress)
 
+			settings, ok := reqctx.SettingsFrom(r.Context())
+			if !ok {
+				pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+				return
+			}
 			// i18n surface: A — browser-flow form rerender. The address is drawn back as typed, so a
 			// typo is corrected rather than typed again.
-			bind := map[string]interface{}{
-				"email": r.FormValue("email"),
-				"error": i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()),
-			}
-
-			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-			}
+			renderForgotPasswordForm(w, r, pageRenderer, settings, r.FormValue("email"),
+				i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()))
 			return
 		}
 

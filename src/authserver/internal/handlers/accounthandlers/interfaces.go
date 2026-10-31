@@ -10,6 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -100,4 +101,11 @@ type TransactionalUserCreator interface {
 // neither can fill the budget of the authenticated account notice (#394 review).
 type AfterResponse interface {
 	Go(ctx context.Context, class afterresponse.Class, job func(ctx context.Context))
+}
+
+// ChallengeVerifier checks the Turnstile token a form's submission carries, under the secret key
+// the settings store, and counts the check. *turnstile.Verifier satisfies it, as it satisfies the
+// sign-in form's port of the same name (#642).
+type ChallengeVerifier interface {
+	Check(ctx context.Context, settings *record.Settings, form turnstile.Form, token string) turnstile.Outcome
 }

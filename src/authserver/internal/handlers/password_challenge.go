@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/turnstile"
-	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -63,17 +62,4 @@ func RequirePasswordChallenge(boundary *CeremonyBoundary, pageRenderer PageRende
 				i18n.NewLocalizedError(i18n.ErrCodeChallengeFailed, nil), "", email)
 		})
 	}
-}
-
-// bindTurnstileWidget puts the Turnstile widget on a form's render while the challenge is on: the
-// site key its template renders the widget with, and Cloudflare's script admitted to this
-// response's script-src (#642 decision 9). With the challenge off it does nothing, and the page is
-// sent today's policy.
-func bindTurnstileWidget(w http.ResponseWriter, settings *record.Settings, bind map[string]interface{}) {
-	if !settings.TurnstileEnabled {
-		return
-	}
-	bind["turnstileSiteKey"] = settings.TurnstileSiteKey
-	bind["turnstileScriptURL"] = turnstile.ScriptURL
-	httpmw.SetContentSecurityPolicy(w.Header(), turnstile.ScriptOrigin)
 }
