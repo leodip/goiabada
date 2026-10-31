@@ -76,9 +76,9 @@ func HandleClientPostLogoutRedirectURIsPut(
 			writeJSONError(w, "expectedPostLogoutRedirectURIs is required: send the sign-out redirect URIs as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		expected, loaded := loadedURIList(req.ExpectedPostLogoutRedirectURIs)
+		expected := expectedURIList(req.ExpectedPostLogoutRedirectURIs)
 
-		normalized, refusal := normalizeURIList(req.PostLogoutRedirectURIs, loaded, postLogoutRedirectURIRefusals)
+		normalized, refusal := normalizeURIList(req.PostLogoutRedirectURIs, postLogoutRedirectURIRefusals)
 		if refusal != nil {
 			writeValidationError(w, r, refusal)
 			return

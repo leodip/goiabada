@@ -1,9 +1,10 @@
 // RFC 9700 sections 2.1, 4.1 and 2.6 on redirect URIs. A requested redirect URI is compared with the
 // registered ones by simple string comparison (RFC 3986 section 6.2.1), with no patterns, and the only
 // exception is the port of a loopback redirect URI (RFC 8252 section 7.3). And an http redirect URI
-// added on a host other than loopback is refused; one stored before that rule keeps working, and the
-// list holding it stays saveable (#575). A redirect URI the client stops registering while a user
-// signs in is checked again before anything is sent to it. The near misses
+// on a host other than loopback is refused when added; one stored before that rule receives nothing,
+// and the list holding it can't be saved until it is removed (#590), which no spec here can show,
+// since no intake stores one. A redirect URI the client stops registering while a user signs in is
+// checked again before anything is sent to it. The near misses
 // ../rfc6749/redirect-uri.spec.ts tries are not repeated here; dynamic registration is in
 // client-registration.system.ts.
 import type { Page } from "@playwright/test";

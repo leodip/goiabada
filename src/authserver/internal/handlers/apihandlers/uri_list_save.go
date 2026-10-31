@@ -49,23 +49,20 @@ var postLogoutRedirectURIRefusals = uriListRefusals{
 	duplicate:    i18n.ErrCodeClientPostLogoutRedirectURIsDuplicate,
 }
 
-// loadedURIList reads a save's expected list, the list as the caller loaded it: each value trimmed,
-// in order, and the same values as a set, which the plain-http rule below reads.
-func loadedURIList(raw []string) (expected []string, loaded map[string]struct{}) {
-	expected = make([]string, 0, len(raw))
-	loaded = make(map[string]struct{}, len(raw))
+// expectedURIList reads a save's expected list, the list as the caller loaded it: each value trimmed,
+// in order, the form the rows are stored in.
+func expectedURIList(raw []string) []string {
+	expected := make([]string, 0, len(raw))
 	for _, value := range raw {
-		uri := strings.TrimSpace(value)
-		expected = append(expected, uri)
-		loaded[uri] = struct{}{}
+		expected = append(expected, strings.TrimSpace(value))
 	}
-	return expected, loaded
+	return expected
 }
 
 // normalizeURIList checks a whole list a save is about to store and answers it trimmed, in order, or
 // the first refusal, in the list's own words. Nothing is read or written: every refusal is decided
 // before the save opens its transaction.
-func normalizeURIList(wanted []string, loaded map[string]struct{}, refusals uriListRefusals) ([]string, *i18n.LocalizedError) {
+func normalizeURIList(wanted []string, refusals uriListRefusals) ([]string, *i18n.LocalizedError) {
 	// The bounds are the model's, the same at dynamic client registration: at most
 	// RedirectURIsMaxPerClient per list, each at most RedirectURIMaxBytes, which the columns hold
 	// on every engine. A save replaces the whole set, so a client already over either bound cannot
@@ -118,15 +115,11 @@ func normalizeURIList(wanted []string, loaded map[string]struct{}, refusals uriL
 		// (#122). A sign-out redirect URI is held to the same rule, as the #702 decision on #147
 		// records.
 		//
-		// Sign-in refuses a stored redirect URI of this shape too, so such a row receives
-		// nothing (#590).
-		//
-		// A URI the caller loaded still passes when the save carries it back, so the row does
-		// not block every other change to the list, removing a compromised entry included.
-		// Adding an http URI is what is refused, and the caller's word for what it loaded is
-		// checked: the save's transaction answers 409 when the stored rows differ from it, so
-		// naming a new http URI there writes nothing (#575).
-		if _, wasLoaded := loaded[uri]; !wasLoaded && loopback.IsPlainHTTPOff(uri) {
+		// Sign-in and sign-out refuse a stored one too, so such a row receives nothing (#590). A
+		// save carrying one back is therefore refused like an addition, as a legacy non-absolute
+		// row above is: the message names it, and removing it from the list in the same save
+		// deletes the row. Nothing deletes it on its own.
+		if loopback.IsPlainHTTPOff(uri) {
 			return nil, i18n.NewLocalizedError(refusals.insecureHTTP, map[string]any{"uri": uri})
 		}
 		if _, exists := seen[uri]; exists {

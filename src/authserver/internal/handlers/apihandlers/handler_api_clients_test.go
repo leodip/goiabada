@@ -1159,63 +1159,6 @@ func TestHandleClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testing.T
 	}
 }
 
-// A plain-http URI on a host other than loopback is refused when it is added, not when the save
-// carries back one the caller loaded: a stored one still works at /auth/authorize, so the rest of
-// the list stays editable around it. Here the compromised callback is removed and its replacement
-// added, and the http row is neither deleted nor created again (#575).
-func TestHandleClientRedirectURIsPut_ALoadedPlainHTTPURIDoesNotBlockTheSave(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-	auditLogger := handlersmocks.NewAuditLogger(t)
-
-	expectRedirectURIsClient(database)
-	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
-	expectStoredRedirectURIs(database,
-		record.RedirectURI{Id: 11, ClientId: 7, URI: "http://intranet.example.com/cb"},
-		record.RedirectURI{Id: 12, ClientId: 7, URI: "https://compromised.example.com/cb"},
-	)
-	database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, int64(12)).Return(nil).Once()
-	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.MatchedBy(func(ru *record.RedirectURI) bool {
-		return ru.ClientId == 7 && ru.URI == "https://replacement.example.com/cb"
-	})).Return(nil).Once()
-	stubClientResponseLoads(database)
-	auditLogger.On("Log", mock.Anything, audit.EventUpdatedRedirectURIs, mock.Anything).Return().Once()
-
-	rr := httptest.NewRecorder()
-	HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
-		redirectURIsBody(t,
-			[]string{"http://intranet.example.com/cb", "https://replacement.example.com/cb"},
-			[]string{"http://intranet.example.com/cb", "https://compromised.example.com/cb"})))
-
-	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	database.AssertExpectations(t)
-}
-
-// The exemption takes the caller's word for what it loaded, and the transaction checks that word:
-// naming a new http URI as loaded, to slip it past the gate, finds the stored rows differing from
-// the loaded list and answers 409 with nothing written (#575).
-func TestHandleClientRedirectURIsPut_APlainHTTPURINamedAsLoadedButNotStoredWritesNothing(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-	auditLogger := handlersmocks.NewAuditLogger(t)
-
-	expectRedirectURIsClient(database)
-	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
-	expectStoredRedirectURIs(database, record.RedirectURI{Id: 11, ClientId: 7, URI: "https://a.example.com/cb"})
-
-	rr := httptest.NewRecorder()
-	HandleClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
-		redirectURIsBody(t,
-			[]string{"https://a.example.com/cb", "http://new.example.com/cb"},
-			[]string{"https://a.example.com/cb", "http://new.example.com/cb"})))
-
-	assert.Equal(t, http.StatusConflict, rr.Code)
-	code, _ := decodeErrorEnvelope(t, rr)
-	assert.Equal(t, "CONCURRENT_UPDATE", code)
-	require.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
-	database.AssertExpectations(t)
-	assertNotAttemptedOnClientDatabase(t, database, "CreateRedirectURI", "DeleteRedirectURI")
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-}
-
 // Every refusal is decided before the transaction opens, so a refused save writes nothing: the
 // strict mock carries the client read and nothing else, and reaching RunInTransaction fails the
 // case. The bounds are the model's, the same at dynamic client registration (#428): at most 60
@@ -1282,13 +1225,23 @@ func TestHandleClientRedirectURIsPut_ARefusedSaveNeverOpensTheTransaction(t *tes
 			wantDescription: "must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): http://app.example.com/cb",
 		},
 		{
-			// The exemption is the loaded URI's alone: a stored http row does not let a second
-			// one in beside it.
-			name: "a plain-http URI the caller did not load, beside one it did",
+			// A stored plain-http row receives nothing at sign-in or sign-out, so a save that
+			// carries it back is refused as an addition is, naming it, until the administrator
+			// removes it in the same save (#590 decision 11). Here the compromised callback is
+			// swapped for its replacement with the http row kept: nothing is written.
+			name: "a stored plain-http URI, carried back by the save",
 			body: redirectURIsBody(t,
-				[]string{"http://legacy.example.com/cb", "http://new.example.com/cb"},
-				[]string{"http://legacy.example.com/cb"}),
-			wantDescription: "loopback interface (127.0.0.1, [::1] or localhost): http://new.example.com/cb",
+				[]string{"https://replacement.example.com/cb", "http://intranet.example.com/cb"},
+				[]string{"http://intranet.example.com/cb", "https://compromised.example.com/cb"}),
+			wantDescription: "must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): http://intranet.example.com/cb",
+		},
+		{
+			// Its uppercase spelling is the same cleartext http, stored or not.
+			name: "a stored plain-HTTP URI in upper case, carried back by the save",
+			body: redirectURIsBody(t,
+				[]string{"HTTP://intranet.example.com/cb"},
+				[]string{"HTTP://intranet.example.com/cb"}),
+			wantDescription: "loopback interface (127.0.0.1, [::1] or localhost): HTTP://intranet.example.com/cb",
 		},
 		{
 			name:            "a repeated URI",
