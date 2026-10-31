@@ -200,3 +200,33 @@ func TestSecurityHeaders_ScriptPolicyRunsOnlyTheServersOwnScriptFiles(t *testing
 		}
 	}
 }
+
+// TestSetContentSecurityPolicy_WidensScriptSrcForOneResponse is the way a handler admits another
+// script origin on its own response (#642 decision 9): script-src gains the origin beside 'self',
+// every other directive stays as SecurityHeaders sends it, the policy is still sent once, and the
+// next response the same middleware answers carries the policy unwidened.
+func TestSetContentSecurityPolicy_WidensScriptSrcForOneResponse(t *testing.T) {
+	const widened = "script-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+	const unwidened = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+
+	handler := SecurityHeaders(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/widened" {
+			SetContentSecurityPolicy(w.Header(), "https://challenges.cloudflare.com")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for _, tt := range []struct{ path, want string }{
+		{"/widened", widened},
+		{"/plain", unwidened},
+		{"/widened", widened},
+		{"/plain", unwidened},
+	} {
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, tt.path, nil))
+
+		if got := rr.Header().Values("Content-Security-Policy"); len(got) != 1 || got[0] != tt.want {
+			t.Errorf("GET %s: Content-Security-Policy = %q, want once %q", tt.path, got, tt.want)
+		}
+	}
+}

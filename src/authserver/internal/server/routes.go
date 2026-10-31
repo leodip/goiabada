@@ -160,7 +160,10 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewIssuance(s.database, codeIssuer, tokenIssuer, userSessionManager, permissionChecker, auditLogger, tokenMetrics)))
 		passwordPrompt := authflow.NewPasswordPrompt(s.database)
 		r.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, passwordPrompt))
-		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, passwordPrompt, authflow.NewPasswordSubmission(s.database, auditLogger)))
+		// The Turnstile challenge ahead of the limiter, while it is on: a submission without a
+		// verified token is refused before any tier counts it and before any password is compared
+		// (#642 decision 5).
+		r.With(handlers.RequirePasswordChallenge(ceremonyBoundary, httpHelper, passwordPrompt, s.challengeVerifier), rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, passwordPrompt, authflow.NewPasswordSubmission(s.database, auditLogger)))
 		r.Get("/otp", handlers.HandleAuthOtpGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewOTPPrompt(s.database, otpSecretGenerator)))
 		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher)))
 		// The set of recovery codes an authenticator set up during this sign-in came with, shown once

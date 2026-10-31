@@ -1120,6 +1120,14 @@
     text-align: center;
   }
 
+  /* The Turnstile challenge's widget, on the auth server's forms that carry it (#642). Cloudflare's
+     script draws it in a frame 65 pixels tall; the space is held before the script has run, so the
+     button below does not move when the widget appears. */
+
+  .cf-turnstile {
+    min-height: 65px;
+  }
+
   .auth-footer {
     margin-top: 1.5rem;
     color: var(--color-ink-muted);

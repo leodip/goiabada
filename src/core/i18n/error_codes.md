@@ -14,6 +14,15 @@ and add the same key to every `active.*.toml` catalog.
 | `handler.login.auth_failed` | (none) | Authentication failed. |
 | `handler.login.account_disabled` | (none) | Your user account is disabled. |
 
+## Turnstile challenge
+
+The refusal of a submission whose token Cloudflare did not verify, or that carried none, on each
+form the Turnstile challenge is on.
+
+| Code | Args | English message |
+|---|---|---|
+| `handler.challenge.failed` | (none) | Complete the security check, then try again. The check needs JavaScript. |
+
 ## Email validator
 
 Used outside the OAuth protocol path (account self-service, admin user CRUD,

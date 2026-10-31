@@ -130,7 +130,8 @@ Tests sit under `playwright/tests/`, one folder per area: the admin console (`ad
 `account/` and `settings/`), the test app (`testapp/`: a user signing in to its web apps, its SPA and its API, single
 sign-on across its two sites, signing out, the authorization parameters, and the auth server's own
 pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), the protocol
-itself where no page reaches it (`oauth/`), and accessibility (`accessibility/`: axe over every page and
+itself where no page reaches it (`oauth/`), the Turnstile challenge on the auth server's forms with
+Cloudflare's test keys (`turnstile/`), and accessibility (`accessibility/`: axe over every page and
 state of both applications in the light and the dark scheme, the layout at phone and tablet widths,
 and the main journeys by keyboard). They run eight at a time against an
 environment that stays up between runs, so every test keeps to these rules, which is what lets the

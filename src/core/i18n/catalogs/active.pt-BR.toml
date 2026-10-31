@@ -1685,6 +1685,7 @@
 "validator.login.password_required" = "A senha é obrigatória."
 "handler.login.auth_failed" = "Falha na autenticação."
 "handler.login.account_disabled" = "Sua conta de usuário está desativada."
+"handler.challenge.failed" = "Conclua a verificação de segurança e tente novamente. A verificação precisa de JavaScript."
 
 "validator.email.required" = "Informe um endereço de e-mail."
 "validator.email.invalid_format" = "Informe um endereço de e-mail válido."

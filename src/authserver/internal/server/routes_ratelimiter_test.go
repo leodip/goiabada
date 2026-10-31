@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/introspectionmetrics"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -166,6 +167,14 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 // newRoutesTestServerOver is newRoutesTestServerWith over a session store the caller holds.
 func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessionStore *sessionstore.ConditionalStore) *Server {
 	t.Helper()
+	return newRoutesTestServerVerifying(t, configure, sessionStore, nil)
+}
+
+// newRoutesTestServerVerifying is newRoutesTestServerOver with the Turnstile challenge's check
+// doubled by verifier, which only a request whose settings turn the challenge on reaches.
+func newRoutesTestServerVerifying(t *testing.T, configure func(*config.Config), sessionStore *sessionstore.ConditionalStore,
+	verifier handlers.ChallengeVerifier) *Server {
+	t.Helper()
 
 	passwordHash, err := passwordhash.Hash("the account's real password")
 	require.NoError(t, err)
@@ -223,6 +232,7 @@ func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessi
 		tokenMetrics:         tokenmetrics.Register(registry),
 		revocationMetrics:    revocationmetrics.Register(registry),
 		introspectionMetrics: introspectionmetrics.Register(registry),
+		challengeVerifier:    verifier,
 	}
 	// What a forgot-password request hands off runs against this test's mocks, so it is waited
 	// for before they are torn down, as the server waits for it on shutdown.

@@ -8,9 +8,27 @@ import "net/http"
 // reverse.
 const strictTransportSecurityValue = "max-age=31536000; includeSubDomains"
 
-// contentSecurityPolicyValue is the Content-Security-Policy value. What each directive does,
-// and why it is not more or less, is on SecurityHeaders.
-const contentSecurityPolicyValue = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+// The Content-Security-Policy, in two parts: the script-src directive's sources, and the directives
+// after it. What each directive does, and why it is not more or less, is on SecurityHeaders.
+const (
+	scriptSrcSelf        = "script-src 'self'"
+	policyAfterScriptSrc = "; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+)
+
+// SetContentSecurityPolicy sets h's Content-Security-Policy to the one SecurityHeaders sends, with
+// scriptOrigins admitted to script-src beside 'self'. SecurityHeaders sets it with none. A handler
+// calls it, before it writes the response, to widen script-src for that one response: an origin
+// in script-src runs with the page's authority, over its forms and what the user types, so it
+// belongs only on the pages its scripts run on. The auth server admits Cloudflare's on the forms
+// carrying the Turnstile challenge, while it is on (#642 decision 9). Each origin is a constant
+// of the caller's, never a value a request carries.
+func SetContentSecurityPolicy(h http.Header, scriptOrigins ...string) {
+	scriptSrc := scriptSrcSelf
+	for _, origin := range scriptOrigins {
+		scriptSrc += " " + origin
+	}
+	h.Set("Content-Security-Policy", scriptSrc+policyAfterScriptSrc)
+}
 
 // SecurityHeaders sets baseline security response headers on every
 // response. It is installed early in the chain (before Recoverer) so that even
@@ -29,12 +47,13 @@ const contentSecurityPolicyValue = "script-src 'self'; object-src 'none'; base-u
 //     page keeps its scripts in static files and hands them data in JSON data
 //     blocks, which a browser never runs (core/guard.AssertWellFormedTemplates
 //     holds the templates to that), so the policy needs no nonce or hash and
-//     stays one constant. object-src 'none' refuses <object> and <embed>, which
-//     nothing else restricts with no default-src sent; base-uri 'none' refuses
-//     a <base> that would move every relative form action to another origin;
-//     frame-ancestors 'none' refuses framing, as X-Frame-Options does. None of
-//     the four governs form submission, so the form_post page and every other
-//     form submit as before. Styles, images and fetches are not restricted.
+//     stays one constant. A page that loads a script from elsewhere admits
+//     that origin on its own responses (SetContentSecurityPolicy). object-src
+//     'none' refuses <object> and <embed>, which nothing else restricts with no
+//     default-src sent; base-uri 'none' refuses a <base> that would move every
+//     relative form action to another origin; frame-ancestors 'none' refuses
+//     framing, as X-Frame-Options does. None of the four governs form
+//     submission, so the form_post page and every other form submit as before. Styles, images and fetches are not restricted.
 //
 //   - X-Content-Type-Options: nosniff stops MIME sniffing (this also protects
 //     the image-serving endpoints).
@@ -68,7 +87,7 @@ func SecurityHeaders(secure bool) func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()
 			h.Set("X-Frame-Options", "DENY")
-			h.Set("Content-Security-Policy", contentSecurityPolicyValue)
+			SetContentSecurityPolicy(h)
 			h.Set("X-Content-Type-Options", "nosniff")
 			// same-origin, not no-referrer. See the note above: no-referrer makes
 			// browsers send "Origin: null" on form POSTs, which fails the CSRF

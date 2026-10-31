@@ -21,6 +21,10 @@ const (
 	ErrCodeLoginAuthFailed       = "handler.login.auth_failed"
 	ErrCodeLoginAccountDisabled  = "handler.login.account_disabled"
 
+	// Turnstile challenge — the refusal of a submission whose token Cloudflare did not verify,
+	// or that carried none, on each form the challenge is on (#642).
+	ErrCodeChallengeFailed = "handler.challenge.failed"
+
 	// Email validator — used wherever an email address is validated outside
 	// the OAuth protocol path (account self-service, admin user CRUD, SMTP
 	// settings, registration). Errors that become an RFC 6749

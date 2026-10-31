@@ -293,6 +293,13 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   (#676). No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/revocationmetrics/` - `goiabada_revocation_requests_total`, the revocation endpoint's
   answers by outcome, a closed set (#676)
+- `internal/turnstile/` - The Cloudflare Turnstile challenge's check: `Verifier.Check` refuses an
+  empty or oversized token without a call, asks siteverify once under a 3-second deadline with the
+  secret key and the token alone, and decides pass, refuse or fail open from the answer, checking the
+  token's hostname against the base URL's host and its action against the form's. It logs what an
+  operator must see, never the token or the secret key, and counts every check in
+  `goiabada_challenge_verifications_total`. The forms' middleware in `internal/handlers` reads the
+  token and draws the refusal (#642)
 - `internal/recovery/` - The `recover` subcommand's operation, `Run`: for one named, enabled user, a
   manage grant, a password held to the stored policy and the authenticator's removal, each only as
   asked, in one transaction with the #106 revocation sweep, the user, the authenticator and the

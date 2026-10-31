@@ -1755,6 +1755,7 @@
 "validator.login.password_required" = "Geben Sie ein Passwort ein."
 "handler.login.auth_failed" = "Anmeldung fehlgeschlagen."
 "handler.login.account_disabled" = "Ihr Benutzerkonto ist deaktiviert."
+"handler.challenge.failed" = "Schließen Sie die Sicherheitsprüfung ab und versuchen Sie es dann erneut. Die Prüfung benötigt JavaScript."
 
 # --- Email validator (LocalizedError-backed) ---------------------------------
 

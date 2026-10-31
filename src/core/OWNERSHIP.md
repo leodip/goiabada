@@ -358,6 +358,7 @@ command itself and fails on a tree it changed.
 | `core/httpmw` | `Recoverer` | both-apps | — |
 | `core/httpmw` | `RequestLogger` | both-apps | — |
 | `core/httpmw` | `SecurityHeaders` | both-apps | — |
+| `core/httpmw` | `SetContentSecurityPolicy` | own-package | — |
 | `core/httpmw` | `SkipCSRF` | both-apps | — |
 | `core/httpmw` | `StripTrailingSlash` | both-apps | — |
 | `core/httpmw/statuswriter` | `Wrap` | kernel | — |
@@ -400,6 +401,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeAuthorizeRedirectURIMissing` | contract | Catalog key of the refusal page `/auth/authorize` renders for a request with no `redirect_uri` (#213). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAuthorizeRedirectURINotAbsolute` | contract | Catalog key of the refusal page `/auth/authorize` renders for a `redirect_uri` that is not an absolute URI (#122). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAuthorizeRedirectURINotRegistered` | contract | Catalog key of the refusal page `/auth/authorize` renders for a `redirect_uri` that is not one of the client's redirect URIs (#213). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeChallengeFailed` | contract | Catalog key of the Turnstile challenge's refusal on the auth server's forms (#642). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientAdministrativeScopesAllowedRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientAdministrativeScopesConsoleAlwaysAllowed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientDefaultAcrInvalid` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |

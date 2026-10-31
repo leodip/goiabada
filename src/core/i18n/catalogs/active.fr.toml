@@ -1754,6 +1754,7 @@
 "validator.login.password_required" = "Le mot de passe est obligatoire."
 "handler.login.auth_failed" = "Échec de l’authentification."
 "handler.login.account_disabled" = "Votre compte utilisateur est désactivé."
+"handler.challenge.failed" = "Effectuez la vérification de sécurité, puis réessayez. La vérification nécessite JavaScript."
 
 # --- Email validator (LocalizedError-backed) ---------------------------------
 
