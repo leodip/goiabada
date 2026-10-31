@@ -51,6 +51,7 @@ func columnGroupWrites() []columnGroupWrite {
 				user.ZoneInfoCountryName = "United Kingdom"
 				user.ZoneInfo = "Europe/London"
 				user.Locale = "en-GB"
+				user.PageLanguage = "fr"
 			},
 			write: func(ctx context.Context, user *record.User) error { return database.SetUserProfile(ctx, nil, user) },
 		},
@@ -68,6 +69,7 @@ func columnGroupWrites() []columnGroupWrite {
 				user.ZoneInfoCountryName = ""
 				user.ZoneInfo = ""
 				user.Locale = ""
+				user.PageLanguage = ""
 			},
 			write: func(ctx context.Context, user *record.User) error { return database.SetUserProfile(ctx, nil, user) },
 		},

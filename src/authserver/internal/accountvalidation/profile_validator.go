@@ -50,6 +50,7 @@ type ValidateProfileInput struct {
 	ZoneInfoCountryName string
 	ZoneInfo            string
 	Locale              string
+	PageLanguage        *string
 	Subject             string
 }
 
@@ -351,6 +352,14 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		if _, found := locales.ByID(input.Locale); !found {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileLocaleInvalid, nil)
 		}
+	}
+
+	// The page language is Automatic, "", or exactly the tag of a catalog this server has loaded,
+	// built in or an operator's: every value accepted then changes something, where a tag with no
+	// catalog would be stored and do nothing (#631 decision 3). Left out of the request, nil, it is
+	// not checked, because the save leaves the stored value as it is.
+	if input.PageLanguage != nil && *input.PageLanguage != "" && !i18n.IsCatalogTag(*input.PageLanguage) {
+		return i18n.NewLocalizedError(i18n.ErrCodeProfilePageLanguageInvalid, nil)
 	}
 
 	return nil

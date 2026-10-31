@@ -344,6 +344,7 @@ cause, each a whole sentence.
 | `validator.profile.dob_in_future` | (none) | The date of birth can't be in the future. |
 | `validator.profile.zone_info_invalid` | (none) | Unknown time zone. |
 | `validator.profile.locale_invalid` | (none) | Unknown language and region. |
+| `validator.profile.page_language_invalid` | (none) | Choose a language from the list. |
 
 ## Image validator
 

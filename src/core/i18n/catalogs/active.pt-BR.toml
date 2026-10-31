@@ -1765,6 +1765,7 @@
 "validator.profile.dob_in_future" = "A data de nascimento não pode estar no futuro."
 "validator.profile.zone_info_invalid" = "Fuso horário desconhecido."
 "validator.profile.locale_invalid" = "Idioma e região desconhecidos."
+"validator.profile.page_language_invalid" = "Escolha um idioma da lista."
 
 "validator.image.too_large" = "A imagem pode ter no máximo {{.max}} bytes."
 "validator.image.empty" = "O arquivo de imagem está vazio."

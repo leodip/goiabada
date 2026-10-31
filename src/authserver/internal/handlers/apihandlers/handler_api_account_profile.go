@@ -90,6 +90,7 @@ func HandleAccountProfilePut(
 			ZoneInfoCountryName: req.ZoneInfoCountryName,
 			ZoneInfo:            req.ZoneInfo,
 			Locale:              req.Locale,
+			PageLanguage:        req.PageLanguage,
 			Subject:             user.Subject,
 		}
 
@@ -126,6 +127,11 @@ func HandleAccountProfilePut(
 		user.ZoneInfoCountryName = input.ZoneInfoCountryName
 		user.ZoneInfo = input.ZoneInfo
 		user.Locale = input.Locale
+		// Left out, the page language keeps the value read above, so an application that does not
+		// know the field does not reset the user to Automatic (#631 decision 8).
+		if input.PageLanguage != nil {
+			user.PageLanguage = *input.PageLanguage
+		}
 
 		// Only the profile columns: writing back the row read above would undo a disable, a
 		// password change or an OTP change made since (#471).

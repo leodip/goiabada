@@ -59,8 +59,9 @@ func dbType() data.Dialect {
 
 // scaffoldHeadUsersColumns adds to a users table pinned below head the users columns the head
 // record names that the pinned schema does not carry: one ALTER per column, in the configured
-// dialect, mirroring the migration that added it. #489's otp_consecutive_failures is the first
-// entry; the next migration that adds a users column joins it here.
+// dialect, mirroring the migration that added it, and none for a column the pinned version already
+// has. #489's otp_consecutive_failures is the first entry and #631's page_language the second; the
+// next migration that adds a users column joins them here.
 //
 // What it is for: the migration tests read their fixtures back through the ORM, at the version
 // the migration under test needs, and that read stays the ORM's because its scan is what those
@@ -73,23 +74,41 @@ func dbType() data.Dialect {
 func scaffoldHeadUsersColumns(t *testing.T, h *isolatedDB) {
 	t.Helper()
 
-	var q string
-	switch dbType() {
-	case data.MySQL:
-		q = "ALTER TABLE `users` ADD COLUMN `otp_consecutive_failures` bigint NOT NULL DEFAULT 0"
-	case data.Postgres:
-		q = "ALTER TABLE users ADD COLUMN otp_consecutive_failures bigint NOT NULL DEFAULT 0"
-	case data.MSSQL:
-		// The constraint named as the migration names it, so the scaffolded shape is the one
-		// that ships: nothing here drops the column, but a reader comparing the pinned table
-		// to 000066's up sees the same table either way.
-		q = "ALTER TABLE [users] ADD [otp_consecutive_failures] BIGINT NOT NULL " +
-			"CONSTRAINT [df_users_otp_consecutive_failures] DEFAULT 0"
-	default: // SQLite
-		q = "ALTER TABLE users ADD COLUMN otp_consecutive_failures INTEGER NOT NULL DEFAULT 0"
+	headOnly := []struct {
+		column string
+		ddl    map[data.Dialect]string
+	}{
+		{"otp_consecutive_failures", map[data.Dialect]string{
+			data.MySQL:    "ALTER TABLE `users` ADD COLUMN `otp_consecutive_failures` bigint NOT NULL DEFAULT 0",
+			data.Postgres: "ALTER TABLE users ADD COLUMN otp_consecutive_failures bigint NOT NULL DEFAULT 0",
+			// The constraint named as the migration names it, so the scaffolded shape is the one
+			// that ships: nothing here drops the column, but a reader comparing the pinned table
+			// to 000066's up sees the same table either way.
+			data.MSSQL: "ALTER TABLE [users] ADD [otp_consecutive_failures] BIGINT NOT NULL " +
+				"CONSTRAINT [df_users_otp_consecutive_failures] DEFAULT 0",
+			data.SQLite: "ALTER TABLE users ADD COLUMN otp_consecutive_failures INTEGER NOT NULL DEFAULT 0",
+		}},
+		{"page_language", map[data.Dialect]string{
+			data.MySQL:    "ALTER TABLE `users` ADD COLUMN `page_language` varchar(32) NOT NULL DEFAULT ''",
+			data.Postgres: "ALTER TABLE users ADD COLUMN page_language varchar(32) NOT NULL DEFAULT ''",
+			// Named and collated as 000074 does, for the reason the entry above gives.
+			data.MSSQL: "ALTER TABLE [users] ADD [page_language] NVARCHAR(32) " +
+				"COLLATE Latin1_General_100_CS_AS_KS_WS_SC_UTF8 NOT NULL CONSTRAINT [df_users_page_language] DEFAULT ''",
+			data.SQLite: "ALTER TABLE users ADD COLUMN page_language TEXT NOT NULL DEFAULT ''",
+		}},
 	}
-	_, err := h.SQL.ExecContext(context.Background(), q)
-	require.NoError(t, err, "scaffold the head-only users columns onto the pinned schema")
+
+	pinned := map[string]bool{}
+	for _, c := range dumpTable(t, h, "users").Columns {
+		pinned[c.Name] = true
+	}
+	for _, c := range headOnly {
+		if pinned[c.column] {
+			continue
+		}
+		_, err := h.SQL.ExecContext(context.Background(), c.ddl[dbType()])
+		require.NoErrorf(t, err, "scaffold users.%s onto the pinned schema", c.column)
+	}
 }
 
 // newIsolatedDB creates a fresh, empty database of the configured dialect and a

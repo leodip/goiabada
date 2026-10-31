@@ -31,6 +31,7 @@ func ToUserResponse(user *record.User) *api.UserResponse {
 		ZoneInfoCountryName:           user.ZoneInfoCountryName,
 		ZoneInfo:                      user.ZoneInfo,
 		Locale:                        user.Locale,
+		PageLanguage:                  user.PageLanguage,
 		PhoneNumberCountryUniqueId:    user.PhoneNumberCountryUniqueId,
 		PhoneNumberCountryCallingCode: user.PhoneNumberCountryCallingCode,
 		PhoneNumber:                   user.PhoneNumber,

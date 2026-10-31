@@ -59,6 +59,7 @@ func TestUpdateUser(t *testing.T) {
 	user.ZoneInfoCountryName = "Country" + fake.LetterN(6)
 	user.ZoneInfo = "tz" + fake.LetterN(6)
 	user.Locale = "lang" + fake.LetterN(4)
+	user.PageLanguage = "page" + fake.LetterN(4)
 	user.BirthDate = sql.NullTime{Time: fake.Date().Truncate(time.Microsecond), Valid: true}
 	user.PhoneNumberCountryUniqueId = strings.ToUpper(fake.LetterN(2))
 	user.PhoneNumberCountryCallingCode = fmt.Sprintf("+%s", fake.DigitN(2))
@@ -453,6 +454,7 @@ func createTestUserOn(t *testing.T, db data.Database) *record.User {
 		ZoneInfoCountryName:            "Country" + fake.LetterN(6),
 		ZoneInfo:                       "tz" + fake.LetterN(6),
 		Locale:                         "lang" + fake.LetterN(4),
+		PageLanguage:                   "page" + fake.LetterN(4),
 		BirthDate:                      sql.NullTime{Time: fake.Date().Truncate(time.Microsecond), Valid: true},
 		PhoneNumberCountryUniqueId:     strings.ToUpper(fake.LetterN(2)),
 		PhoneNumberCountryCallingCode:  fmt.Sprintf("+%s", fake.DigitN(2)),
@@ -529,6 +531,9 @@ func compareUsers(t *testing.T, expected, actual *record.User) {
 	}
 	if actual.Locale != expected.Locale {
 		t.Errorf("Locale mismatch: expected %s, got %s", expected.Locale, actual.Locale)
+	}
+	if actual.PageLanguage != expected.PageLanguage {
+		t.Errorf("PageLanguage mismatch: expected %s, got %s", expected.PageLanguage, actual.PageLanguage)
 	}
 	if !actual.BirthDate.Time.Equal(expected.BirthDate.Time) {
 		t.Errorf("BirthDate mismatch: expected %v, got %v", expected.BirthDate, actual.BirthDate)

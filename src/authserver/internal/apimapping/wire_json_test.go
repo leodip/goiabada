@@ -169,6 +169,7 @@ func wireUserModel() *record.User {
 		ZoneInfoCountryName:           "Brazil",
 		ZoneInfo:                      "America/Sao_Paulo",
 		Locale:                        "pt-BR",
+		PageLanguage:                  "es",
 		BirthDate:                     wireNullTime(wireBorn),
 		PhoneNumberCountryUniqueId:    "BRA_55",
 		PhoneNumberCountryCallingCode: "55",
@@ -193,7 +194,7 @@ const wirePopulatedUserJSON = `{"id":7,"createdAt":"2026-09-16T10:00:00Z","updat
 	`"enabled":true,"subject":"3b9f1a2c-0000-4000-8000-000000000001","username":"alice","givenName":"Alice",` +
 	`"middleName":"Q","familyName":"Smith","nickname":"al","website":"https://alice.example","gender":"female",` +
 	`"email":"alice@example.com","emailVerified":true,"zoneInfoCountryName":"Brazil",` +
-	`"zoneInfo":"America/Sao_Paulo","locale":"pt-BR","birthDate":"1990-01-02T00:00:00Z",` +
+	`"zoneInfo":"America/Sao_Paulo","locale":"pt-BR","pageLanguage":"es","birthDate":"1990-01-02T00:00:00Z",` +
 	`"phoneNumberCountryUniqueId":"BRA_55","phoneNumberCountryCallingCode":"55","phoneNumber":"11 99999-0000",` +
 	`"phoneNumberVerified":true,"addressLine1":"Rua Um, 100","addressLine2":"apto 2",` +
 	`"addressLocality":"Sao Paulo","addressRegion":"SP","addressPostalCode":"01000-000","addressCountry":"BRA",` +
@@ -205,7 +206,7 @@ const wirePopulatedUserJSON = `{"id":7,"createdAt":"2026-09-16T10:00:00Z","updat
 func wireBareUserFields() string {
 	return `"id":7,"createdAt":null,"updatedAt":null,"enabled":false,"subject":"","username":"",` +
 		`"givenName":"","middleName":"","familyName":"","nickname":"","website":"","gender":"","email":"",` +
-		`"emailVerified":false,"zoneInfoCountryName":"","zoneInfo":"","locale":"","birthDate":null,` +
+		`"emailVerified":false,"zoneInfoCountryName":"","zoneInfo":"","locale":"","pageLanguage":"","birthDate":null,` +
 		`"phoneNumberCountryUniqueId":"","phoneNumberCountryCallingCode":"","phoneNumber":"",` +
 		`"phoneNumberVerified":false,"addressLine1":"","addressLine2":"","addressLocality":"",` +
 		`"addressRegion":"","addressPostalCode":"","addressCountry":"","otpEnabled":false,` +

@@ -1859,6 +1859,7 @@
 "validator.profile.dob_in_future" = "The date of birth can't be in the future."
 "validator.profile.zone_info_invalid" = "Unknown time zone."
 "validator.profile.locale_invalid" = "Unknown language and region."
+"validator.profile.page_language_invalid" = "Choose a language from the list."
 
 # --- Image validator (LocalizedError-backed) ---------------------------------
 

@@ -1866,6 +1866,7 @@
 "validator.profile.dob_in_future" = "La data di nascita non può essere futura."
 "validator.profile.zone_info_invalid" = "Fuso orario sconosciuto."
 "validator.profile.locale_invalid" = "Lingua e area geografica sconosciute."
+"validator.profile.page_language_invalid" = "Scegli una lingua dall'elenco."
 
 # --- Image validator (LocalizedError-backed) ---------------------------------
 

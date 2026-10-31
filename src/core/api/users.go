@@ -22,6 +22,7 @@ type UserResponse struct {
 	ZoneInfoCountryName           string     `json:"zoneInfoCountryName"`
 	ZoneInfo                      string     `json:"zoneInfo"`
 	Locale                        string     `json:"locale"`
+	PageLanguage                  string     `json:"pageLanguage"`
 	BirthDate                     *time.Time `json:"birthDate"`
 	PhoneNumberCountryUniqueId    string     `json:"phoneNumberCountryUniqueId"`
 	PhoneNumberCountryCallingCode string     `json:"phoneNumberCountryCallingCode"`
@@ -104,6 +105,11 @@ type UpdateUserProfileRequest struct {
 	ZoneInfoCountryName string `json:"zoneInfoCountryName"`
 	ZoneInfo            string `json:"zoneInfo"`
 	Locale              string `json:"locale"`
+	// PageLanguage is optional, unlike every other field here: nil leaves the stored page language
+	// as it is, so a client written before the field existed does not reset its users to
+	// Automatic; "" sets Automatic; any other value must be the tag of one of the auth server's
+	// loaded catalogs (#631 decision 8).
+	PageLanguage *string `json:"pageLanguage,omitempty"`
 }
 
 type UpdateUserAddressRequest struct {
