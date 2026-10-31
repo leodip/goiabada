@@ -117,7 +117,7 @@ Prefer `127.0.0.1` or `[::1]` to `localhost`. Resolving `localhost` isn't guaran
 
 ## Sign-out redirect URIs
 
-A sign-out redirect URI is an address the auth server may send the browser back to after a [sign-out](/reference/endpoints/logout/), such as your app's "You're signed out" page. Your app names one as `post_logout_redirect_uri`. The auth server sends the user there only when it matches one on the client's **Sign-out redirect URIs** tab **exactly**, port included. Redirect URIs aren't used for sign-out, and no authorization code is ever sent to a sign-out redirect URI, so a plain landing page can go here without becoming a sign-in callback.
+A sign-out redirect URI is an address the auth server may send the browser back to after a [sign-out](/reference/endpoints/logout/), such as your app's "You're signed out" page. Your app names one as `post_logout_redirect_uri`. The auth server sends the user there only when it matches one on the client's **Sign-out redirect URIs** tab **exactly**, port included. Redirect URIs aren't used for sign-out, and an address on this list doesn't become a sign-in callback: authorization codes go only to addresses on **Redirect URIs**. So a plain landing page can go here alone, and an address that serves both purposes goes on both lists.
 
 The [redirect URI rules](#redirect-uris) apply to each one, with these differences:
 

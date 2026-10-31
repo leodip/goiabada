@@ -74,25 +74,26 @@ A request that writes more than one row validates the whole request first, bound
 included, so a refusal writes nothing; then writes in one `RunInTransaction` whose body reads what
 it needs on the transaction, returns each failure through `errs.Wrap` and writes no response, since
 a deadlock victim's body is rerun; then answers, audit events after the commit. A save replacing a
-whole list is the common case, and there are eight: a client's redirect URIs, web origins and
-introspection resources, user, group, client and resource permissions, and a user's groups. Each
-requires the list as its caller loaded it (`expectedRedirectURIs` and its siblings; absent or `null`
-is a 400, `[]` means an empty list was loaded), reads the stored rows on the transaction, and
-answers 409 `CONCURRENT_UPDATE` with nothing written when they differ from it as a set; otherwise it
-applies `replaceSet`'s plan, which deletes every row whose key is not wanted and every extra copy of
-one that is, so a duplicate left by an overlap is repaired by the next save. A unique-key race
-answers the same 409, through the one failure writer `writeListSaveFailure`. No list save locks its
-list: overlapping saves merge item by item, and the data tier's `list_save_test.go` shows it on
-MySQL, PostgreSQL and SQL Server. A row lock is for one row read, decided on and written back with a
-security consequence, which today means #245's public/confidential switch (`AcquireClientRow`),
-#139's issuance (`AcquireUserSessionRow`), #131's refresh rotation (`AcquireUserRow`), #542's
-session writes (`AcquireUserSessionRow`) and one-time code claims (`AcquireUserRow`), and #407's
-settings section saves (`AcquireSettingsRow`), each of which reads the settings row again under it
-and writes its own section onto what it read, through `apihandlers.saveSettingsSection`, so a save
-of another section committed meanwhile is not written back over (#428). One list save also takes a
-row for that reason: a save adding to a client's introspection resources takes the client's row
-(`AcquireClientRow`) and refuses a client it then finds public, because making a client public takes
-that row first and clears the list in the same transaction (#676)
+whole list is the common case, and there are nine: a client's redirect URIs, sign-out redirect URIs,
+web origins and introspection resources, user, group, client and resource permissions, and a user's
+groups. Each requires the list as its caller loaded it (`expectedRedirectURIs` and its siblings;
+absent or `null` is a 400, `[]` means an empty list was loaded), reads the stored rows on the
+transaction, and answers 409 `CONCURRENT_UPDATE` with nothing written when they differ from it as a
+set; otherwise it applies `replaceSet`'s plan, which deletes every row whose key is not wanted and
+every extra copy of one that is, so a duplicate left by an overlap is repaired by the next save. A
+unique-key race answers the same 409, through the one failure writer `writeListSaveFailure`. No list
+save locks its list: overlapping saves merge item by item, and the data tier's `list_save_test.go`
+shows it on MySQL, PostgreSQL and SQL Server. A row lock is for one row read, decided on and written
+back with a security consequence, which today means #245's public/confidential switch
+(`AcquireClientRow`), #139's issuance (`AcquireUserSessionRow`), #131's refresh rotation
+(`AcquireUserRow`), #542's session writes (`AcquireUserSessionRow`) and one-time code claims
+(`AcquireUserRow`), and #407's settings section saves (`AcquireSettingsRow`), each of which reads
+the settings row again under it and writes its own section onto what it read, through
+`apihandlers.saveSettingsSection`, so a save of another section committed meanwhile is not written
+back over (#428). One list save also takes a row for that reason: a save adding to a client's
+introspection resources takes the client's row (`AcquireClientRow`) and refuses a client it then
+finds public, because making a client public takes that row first and clears the list in the same
+transaction (#676)
 
 ## Schema golden files
 
