@@ -161,17 +161,27 @@ const (
 	//
 	// Payload: user_session_id, logged_in_user, and reason, one of the DeletedUserSession values
 	// below, which every row carries whatever site wrote it (#564 decision 7).
-	EventDeletedUserSession           = "deleted_user_session"
-	EventUpdatedRedirectURIs          = "updated_redirect_uris"
-	EventUpdatedClientPermissions     = "updated_client_permissions"
-	EventDeletedClient                = "deleted_client"
-	EventCreatedClient                = "created_client"
-	EventDynamicClientRegistration    = "dynamic_client_registration"
-	EventUpdatedResourcePermissions   = "updated_resource_permissions"
-	EventDeletedResource              = "deleted_resource"
-	EventUpdatedResource              = "updated_resource"
-	EventCreatedResource              = "created_resource"
-	EventUserAddedToGroup             = "user_added_to_group"
+	EventDeletedUserSession         = "deleted_user_session"
+	EventUpdatedRedirectURIs        = "updated_redirect_uris"
+	EventUpdatedClientPermissions   = "updated_client_permissions"
+	EventDeletedClient              = "deleted_client"
+	EventCreatedClient              = "created_client"
+	EventDynamicClientRegistration  = "dynamic_client_registration"
+	EventUpdatedResourcePermissions = "updated_resource_permissions"
+	EventDeletedResource            = "deleted_resource"
+	EventUpdatedResource            = "updated_resource"
+	EventCreatedResource            = "created_resource"
+	EventUserAddedToGroup           = "user_added_to_group"
+	// The legal documents (#622), written by the admin API after each committed change, every row
+	// with legal_document_id, short_name and logged_in_user. created_legal_document adds kind and
+	// published_legal_document the version number it published. A draft save that only changed
+	// the draft writes updated_legal_document_draft; publishing writes no draft event.
+	EventCreatedLegalDocument         = "created_legal_document"
+	EventUpdatedLegalDocumentDraft    = "updated_legal_document_draft"
+	EventPublishedLegalDocument       = "published_legal_document"
+	EventRetiredLegalDocument         = "retired_legal_document"
+	EventRestoredLegalDocument        = "restored_legal_document"
+	EventDeletedLegalDocument         = "deleted_legal_document"
 	EventUserRemovedFromGroup         = "user_removed_from_group"
 	EventCreatedGroup                 = "created_group"
 	EventUpdatedGroup                 = "updated_group"
@@ -651,6 +661,7 @@ var auditEventTypes = []string{
 	EventCreatedAuthCode,
 	EventCreatedClient,
 	EventCreatedGroup,
+	EventCreatedLegalDocument,
 	EventCreatedResource,
 	EventCreatedUser,
 	EventCrossUserSessionReplaced,
@@ -659,6 +670,7 @@ var auditEventTypes = []string{
 	EventDeletedGroup,
 	EventDeleteGroupAttribute,
 	EventDeletedGroupPermission,
+	EventDeletedLegalDocument,
 	EventDeletedOwnProfilePicture,
 	EventDeletedOwnUserConsent,
 	EventDeletedResource,
@@ -682,6 +694,7 @@ var auditEventTypes = []string{
 	EventLogout,
 	EventOTPAuthenticatorDisabled,
 	EventOTPCodeReplayDetected,
+	EventPublishedLegalDocument,
 	EventRateLimitExceeded,
 	EventRecoveryCodeReplayDetected,
 	EventRecoveryCodesCreated,
@@ -689,6 +702,8 @@ var auditEventTypes = []string{
 	EventRefreshTokenReplayDetected,
 	EventRequestedPasswordReset,
 	EventRequestedRegistration,
+	EventRestoredLegalDocument,
+	EventRetiredLegalDocument,
 	EventRevokedAccessToken,
 	EventRevokedClientGrants,
 	EventRevokedConsentGrants,
@@ -721,6 +736,7 @@ var auditEventTypes = []string{
 	EventUpdatedGeneralSettings,
 	EventUpdatedGroup,
 	EventUpdatedGroupAttribute,
+	EventUpdatedLegalDocumentDraft,
 	EventUpdatedOwnAddress,
 	EventUpdatedOwnEmail,
 	EventUpdatedOwnPhone,

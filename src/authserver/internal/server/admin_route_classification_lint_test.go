@@ -163,6 +163,22 @@ var adminRouteClassification = map[string]adminRouteClass{
 		"other resource's permissions confer power in this server"),
 	"PUT /api/v1/admin/resources/{resourceId}/permissions": appliesCeilings(adminCeilingTarget),
 
+	// Legal documents (#622). None writes to an administrator or reaches a setting the settings
+	// ceiling reserves.
+	"POST /api/v1/admin/legal-documents": outsideCeilings("creates a legal document's draft, which applies to " +
+		"no one until it is published, and gives the caller no authority it lacks"),
+	"POST /api/v1/admin/legal-documents/preview": outsideCeilings("renders Markdown and changes nothing"),
+	"DELETE /api/v1/admin/legal-documents/{id}": outsideCeilings("deletes a document that was never published " +
+		"and gives the caller no authority it lacks"),
+	"PUT /api/v1/admin/legal-documents/{id}/draft": outsideCeilings("saves a draft, which applies to no one, " +
+		"and gives the caller no authority it lacks"),
+	"POST /api/v1/admin/legal-documents/{id}/publish": outsideCeilings("changes what users read and accept " +
+		"and gives the caller no authority it lacks"),
+	"POST /api/v1/admin/legal-documents/{id}/retire": outsideCeilings("changes what users read and accept " +
+		"and gives the caller no authority it lacks"),
+	"POST /api/v1/admin/legal-documents/{id}/restore": outsideCeilings("changes what users read and accept " +
+		"and gives the caller no authority it lacks"),
+
 	// Settings.
 	"PUT /api/v1/admin/settings/email":      appliesCeilings(adminCeilingSettings),
 	"PUT /api/v1/admin/settings/audit-logs": appliesCeilings(adminCeilingSettings),

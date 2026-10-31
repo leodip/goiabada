@@ -551,3 +551,68 @@ func ToClientResponses(clients []record.Client) []api.ClientResponse {
 	}
 	return responses
 }
+
+// ToLegalDocumentResponse maps a legal document and its current version, nil when it has never been
+// published, in which case the document is named by its draft's title (#622).
+func ToLegalDocumentResponse(doc *record.LegalDocument, current *record.LegalDocumentVersion) api.LegalDocumentResponse {
+	resp := api.LegalDocumentResponse{
+		Id:        doc.Id,
+		ShortName: doc.ShortName,
+		Kind:      doc.Kind,
+		Title:     doc.DraftTitle.String,
+		HasDraft:  doc.HasDraft(),
+		Retired:   doc.IsRetired(),
+	}
+	if doc.CreatedAt.Valid {
+		resp.CreatedAt = &doc.CreatedAt.Time
+	}
+	if doc.UpdatedAt.Valid {
+		resp.UpdatedAt = &doc.UpdatedAt.Time
+	}
+	if doc.RetiredAt.Valid {
+		resp.RetiredAt = &doc.RetiredAt.Time
+	}
+	if current != nil {
+		resp.Title = current.Title
+		resp.CurrentVersion = current.VersionNumber
+		publishedAt := current.PublishedAt
+		resp.PublishedAt = &publishedAt
+	}
+	return resp
+}
+
+// ToLegalDocumentDetailResponse maps a legal document with its draft and its versions, the first
+// first, which are what the admin console's editor and versions list draw.
+func ToLegalDocumentDetailResponse(doc *record.LegalDocument, versions []record.LegalDocumentVersion) api.LegalDocumentDetailResponse {
+	var current *record.LegalDocumentVersion
+	if len(versions) > 0 {
+		current = &versions[len(versions)-1]
+	}
+	resp := api.LegalDocumentDetailResponse{
+		LegalDocument: ToLegalDocumentResponse(doc, current),
+		Versions:      make([]api.LegalDocumentVersionSummaryResponse, 0, len(versions)),
+	}
+	if doc.HasDraft() {
+		resp.Draft = &api.LegalDocumentDraftResponse{Title: doc.DraftTitle.String, Markdown: doc.DraftMarkdown.String}
+	}
+	for _, version := range versions {
+		publishedAt := version.PublishedAt
+		resp.Versions = append(resp.Versions, api.LegalDocumentVersionSummaryResponse{
+			Version:     version.VersionNumber,
+			Title:       version.Title,
+			PublishedAt: &publishedAt,
+		})
+	}
+	return resp
+}
+
+// ToLegalDocumentVersionResponse maps one published version with its text.
+func ToLegalDocumentVersionResponse(version *record.LegalDocumentVersion) api.LegalDocumentVersionResponse {
+	publishedAt := version.PublishedAt
+	return api.LegalDocumentVersionResponse{
+		Version:     version.VersionNumber,
+		Title:       version.Title,
+		Markdown:    version.Markdown,
+		PublishedAt: &publishedAt,
+	}
+}

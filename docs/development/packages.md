@@ -341,6 +341,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   (#485, #394 review)
 - `internal/emaillinks/` - The emailed-link round trip for password reset and activation: build the
   link, mark it followed, redeem it once. Beside `emaildelivery`, which sends it (#387)
+- `internal/legalmarkdown/` - A legal document's Markdown rendered to HTML through goldmark, for the
+  admin API's preview and the public pages alike: CommonMark and tables, raw HTML left out,
+  dangerous addresses dropped, images drawn as links. Its output is the auth server's one
+  `template.HTML` built from data, which its `trusted_html_lint_test.go` holds (#622 decision 4)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlmatch,uuid}/` - The authserver-only utilities
   #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and
   origin predicates, UUIDs (#360); `oidc` also holds the grant type list every grant-type reader

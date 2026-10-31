@@ -905,6 +905,26 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 					out[409] = true
 					out[500] = true
 				}
+				// The legal document handlers' four readers answer their own refusals (#622):
+				// legalDocumentId 400 for a path id that is not one, loadLegalDocument that 400,
+				// 404 for no such document and 500 for a failed read, legalDocumentVersions 500
+				// for a failed read, and shortNameIsFree 400 for a short name another document
+				// holds and 500 for a failed read. writeLegalDocumentNotFound is the 404.
+				switch f.Name {
+				case "legalDocumentId":
+					out[400] = true
+				case "loadLegalDocument":
+					out[400] = true
+					out[404] = true
+					out[500] = true
+				case "legalDocumentVersions":
+					out[500] = true
+				case "shortNameIsFree":
+					out[400] = true
+					out[500] = true
+				case "writeLegalDocumentNotFound":
+					out[404] = true
+				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {
 				case "InternalServerError", "JSONError":
@@ -1978,6 +1998,9 @@ func TestOpenAPI_APIFiveHundredsAreTheJSONEnvelope(t *testing.T) {
 // the line. A gap left recorded is a burn-down item; an enforced site left recorded is what stops
 // the next person having to re-derive that it is enforced.
 var publishedRequestEnums = map[string]string{
+	"CreateLegalDocumentRequest.kind": "enforced: handler_api_legal_documents.go refuses any kind but " +
+		"[must_accept, for_information], an absent one included, with 400 before writing. Covered by " +
+		"TestLegalDocumentCreate_Refusals' unknown and missing kind cases. Published in #622",
 	"CreateUserRequest.setPasswordType": "enforced: handler_api_users_crud.go refuses a present " +
 		"value outside [now, email] with 400 before either arm is chosen, and treats absent as " +
 		"\"now\" per the schema's default. Covered by " +

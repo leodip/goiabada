@@ -143,6 +143,8 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `issue_id_token` | Whether the implicit flow issued an ID token. |
 | `jti` | The `jti` of an access token a client revoked. |
 | `key_id` | The key id (`kid`) of a deleted signing key. |
+| `kind` | A legal document's kind: `must_accept` for terms users must accept, `for_information` for a privacy notice. |
+| `legal_document_id` | The legal document's row id. |
 | `limiter` | The name of the rate limiter that refused. |
 | `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. |
 | `max_user_sessions_per_user` | Under `old` and `new`: the most sessions one user can hold, 0 for no limit. |
@@ -180,6 +182,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `scope` | The scope issued, or the scope a token request asked for and was refused. |
 | `scopes` | The administrative scopes a client asked for and was refused. |
 | `session_identifier` | The identifier of a user's session. |
+| `short_name` | A legal document's short name, the address of its public page. |
 | `step` | The time step of an authenticator code that was sent again. |
 | `target_id` | The row id of the user, group, client or resource a request acted on. |
 | `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
@@ -193,6 +196,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `user_session_id` | The row id of a user's session. |
 | `user_session_idle_timeout_in_seconds` | Under `old` and `new`: the session idle timeout, in seconds. |
 | `user_session_max_lifetime_in_seconds` | Under `old` and `new`: the session maximum lifetime, in seconds. |
+| `version` | The number of the legal document version published. |
 
 ## Why a session was deleted
 
@@ -380,6 +384,17 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_resource` | An administrator changed a resource's identifier or description. |
 | `updated_resource_permissions` | An administrator changed the permissions a resource defines: added, renamed, described or deleted them. Granting a permission writes a different event. |
 | `deleted_resource` | An administrator deleted a resource. |
+
+### Legal documents
+
+| Event | Meaning |
+|---|---|
+| `created_legal_document` | An administrator created a legal document, with its first draft. |
+| `updated_legal_document_draft` | An administrator saved a legal document's draft, and its short name when it was never published. |
+| `published_legal_document` | An administrator published a legal document's draft as its next version. |
+| `retired_legal_document` | An administrator retired a legal document. |
+| `restored_legal_document` | An administrator restored a retired legal document. |
+| `deleted_legal_document` | An administrator deleted a legal document that was never published. |
 
 ### Settings and keys
 

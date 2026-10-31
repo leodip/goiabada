@@ -140,6 +140,25 @@ const (
 	ErrCodeResourceSystemLevelIdentifierFixed  = "handler.resource.system_level_identifier_fixed"
 	ErrCodeResourceSystemLevelDeleteNotAllowed = "handler.resource.system_level_delete_not_allowed"
 
+	// Legal documents (#622).
+	ErrCodeLegalDocumentKindInvalid           = "handler.legal_document.kind_invalid"
+	ErrCodeLegalDocumentShortNameRequired     = "handler.legal_document.short_name_required"
+	ErrCodeLegalDocumentShortNameInvalid      = "handler.legal_document.short_name_invalid"
+	ErrCodeLegalDocumentShortNameTooLong      = "handler.legal_document.short_name_too_long" // Args: {"max": int}
+	ErrCodeLegalDocumentShortNameInUse        = "handler.legal_document.short_name_in_use"
+	ErrCodeLegalDocumentShortNameFixed        = "handler.legal_document.short_name_fixed"
+	ErrCodeLegalDocumentTitleRequired         = "handler.legal_document.title_required"
+	ErrCodeLegalDocumentTitleTooLong          = "handler.legal_document.title_too_long"    // Args: {"max": int}
+	ErrCodeLegalDocumentMarkdownTooLong       = "handler.legal_document.markdown_too_long" // Args: {"max": int}
+	ErrCodeLegalDocumentNoDraft               = "handler.legal_document.no_draft"
+	ErrCodeLegalDocumentDraftEmpty            = "handler.legal_document.draft_empty"
+	ErrCodeLegalDocumentRetired               = "handler.legal_document.retired"
+	ErrCodeLegalDocumentNotPublished          = "handler.legal_document.not_published"
+	ErrCodeLegalDocumentAlreadyRetired        = "handler.legal_document.already_retired"
+	ErrCodeLegalDocumentNotRetired            = "handler.legal_document.not_retired"
+	ErrCodeLegalDocumentPublishedNotDeleted   = "handler.legal_document.published_not_deleted"
+	ErrCodeLegalDocumentPublishedConcurrently = "handler.legal_document.published_concurrently"
+
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"

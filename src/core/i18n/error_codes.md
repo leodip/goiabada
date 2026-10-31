@@ -255,6 +255,23 @@ cause, each a whole sentence.
 | `handler.resource.identifier_names_client` | (none) | The resource identifier is already in use by a client |
 | `handler.resource.system_level_identifier_fixed` | (none) | The identifier of a system-level resource cannot be changed. |
 | `handler.resource.system_level_delete_not_allowed` | (none) | Trying to delete a system level resource |
+| `handler.legal_document.kind_invalid` | (none) | Choose whether users must accept the document or it is for information. |
+| `handler.legal_document.short_name_required` | (none) | Short name is required. |
+| `handler.legal_document.short_name_invalid` | (none) | The short name can hold only lowercase letters, digits and hyphens, and must start and end with a letter or a digit. |
+| `handler.legal_document.short_name_too_long` | `max` (int) | The short name cannot exceed a maximum length of {{.max}} characters. |
+| `handler.legal_document.short_name_in_use` | (none) | Another document already uses this short name. |
+| `handler.legal_document.short_name_fixed` | (none) | The short name cannot be changed once the document has been published, so links to it keep working. |
+| `handler.legal_document.title_required` | (none) | Title is required. |
+| `handler.legal_document.title_too_long` | `max` (int) | The title cannot exceed a maximum length of {{.max}} characters. |
+| `handler.legal_document.markdown_too_long` | `max` (int) | The text cannot exceed a maximum length of {{.max}} characters. |
+| `handler.legal_document.no_draft` | (none) | The document has no draft to publish. |
+| `handler.legal_document.draft_empty` | (none) | The draft has no text to publish. |
+| `handler.legal_document.retired` | (none) | The document is retired. Restore it before changing it. |
+| `handler.legal_document.not_published` | (none) | Only a published document can be retired. A document that was never published can be deleted instead. |
+| `handler.legal_document.already_retired` | (none) | The document is already retired. |
+| `handler.legal_document.not_retired` | (none) | The document is not retired. |
+| `handler.legal_document.published_not_deleted` | (none) | A published document cannot be deleted, so the record of what users accepted is kept. Retire it instead. |
+| `handler.legal_document.published_concurrently` | (none) | Another version of the document was published at the same moment, so nothing was published. Load the document again and retry. |
 | `handler.permission.duplicate_ids` | (none) | Duplicate permission IDs in request are not allowed |
 | `handler.permission.identifier_required` | (none) | Permission identifier is required |
 | `handler.permission.duplicated` | `identifier` (string) | Permission {{.identifier}} is duplicated. |

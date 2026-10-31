@@ -248,6 +248,55 @@ func postLogoutRedirectURIMapping() mappingCase {
 	}
 }
 
+// legalDocumentMapping holds the document's whole-row writes, kind left out of the UPDATE: a
+// document's kind is fixed at creation (#622 decision 2).
+func legalDocumentMapping() mappingCase {
+	return mappingCase{
+		name:   "legal document",
+		table:  "legal_documents",
+		record: reflect.TypeOf(record.LegalDocument{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetLegalDocumentById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetLegalDocumentById(ctx, nil, 1)
+			},
+			"GetLegalDocumentByShortName": func(ctx context.Context, d *Database) (any, error) {
+				// The distinct value the row carries, so the exact-match check keeps it.
+				return d.GetLegalDocumentByShortName(ctx, nil, distinctString("short_name"))
+			},
+			"GetAllLegalDocuments": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAllLegalDocuments(ctx, nil))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateLegalDocument(ctx, nil, rec.(*record.LegalDocument))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateLegalDocument(ctx, nil, rec.(*record.LegalDocument))
+		},
+	}
+}
+
+// legalDocumentVersionMapping has no update: a published version is never rewritten (#622
+// decision 1).
+func legalDocumentVersionMapping() mappingCase {
+	return mappingCase{
+		name:   "legal document version",
+		table:  "legal_document_versions",
+		record: reflect.TypeOf(record.LegalDocumentVersion{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetLegalDocumentVersionsByLegalDocumentId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentVersionsByLegalDocumentId(ctx, nil, 1))
+			},
+			"GetLegalDocumentVersion": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetLegalDocumentVersion(ctx, nil, 1, 1)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateLegalDocumentVersion(ctx, nil, rec.(*record.LegalDocumentVersion))
+		},
+	}
+}
+
 // webOriginMapping has no update: a web origin is created and deleted, never rewritten.
 func webOriginMapping() mappingCase {
 	return mappingCase{
@@ -838,6 +887,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		permissionMapping(), resourceMapping(),
 		clientMapping(), clientLogoMapping(), clientPermissionMapping(), clientIntrospectionResourceMapping(),
 		redirectURIMapping(), postLogoutRedirectURIMapping(), webOriginMapping(),
+		legalDocumentMapping(), legalDocumentVersionMapping(),
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
 		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),

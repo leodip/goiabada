@@ -333,6 +333,20 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/resources/{resourceId}/permissions", apihandlers.HandlePermissionsByResourceGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/resources/{resourceId}/permissions", apihandlers.HandleResourcePermissionsPut(s.database, identifierValidator, auditLogger))
 
+		// Legal documents (settings domain: a document sets rules for the whole instance, #622
+		// decision 6). Reading also accepts admin-read; every change, the preview included, needs
+		// manage-settings or manage.
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/legal-documents", apihandlers.HandleLegalDocumentsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents", apihandlers.HandleLegalDocumentCreatePost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/preview", apihandlers.HandleLegalDocumentPreviewPost())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/legal-documents/{id}", apihandlers.HandleLegalDocumentGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/legal-documents/{id}", apihandlers.HandleLegalDocumentDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/legal-documents/{id}/draft", apihandlers.HandleLegalDocumentDraftPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/{id}/publish", apihandlers.HandleLegalDocumentPublishPost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/{id}/retire", apihandlers.HandleLegalDocumentRetirePost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/{id}/restore", apihandlers.HandleLegalDocumentRestorePost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/legal-documents/{id}/versions/{version}", apihandlers.HandleLegalDocumentVersionGet(s.database))
+
 		// Client management routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients", apihandlers.HandleClientsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}", apihandlers.HandleClientGet(s.database))

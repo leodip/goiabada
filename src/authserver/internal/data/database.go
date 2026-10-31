@@ -565,6 +565,25 @@ type Database interface {
 	// so it never introspects.
 	DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error
 
+	// Legal documents and their published versions (#622). A second document with a short name
+	// already taken, or a second version of one number in a document, is a unique violation.
+	// UpdateLegalDocument writes the whole row but its kind, which is fixed at creation. A version
+	// has no update: once published it is never rewritten. DeleteLegalDocument is refused by the
+	// engine for a document that has a published version, which is retired instead.
+	CreateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
+	UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
+	GetLegalDocumentById(ctx context.Context, tx *sql.Tx, legalDocumentId int64) (*record.LegalDocument, error)
+	// GetLegalDocumentByShortName answers the document whose short name is exactly shortName.
+	GetLegalDocumentByShortName(ctx context.Context, tx *sql.Tx, shortName string) (*record.LegalDocument, error)
+	// GetAllLegalDocuments answers every document, retired ones included, in id order.
+	GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]record.LegalDocument, error)
+	DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
+	CreateLegalDocumentVersion(ctx context.Context, tx *sql.Tx, version *record.LegalDocumentVersion) error
+	// GetLegalDocumentVersionsByLegalDocumentId answers a document's versions, the first first.
+	GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
+	// GetLegalDocumentVersion answers one version of a document by its number, or nil.
+	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentId int64, versionNumber int) (*record.LegalDocumentVersion, error)
+
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)

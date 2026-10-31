@@ -421,6 +421,7 @@ A row may name a package inside a module the admin console otherwise compiles le
 | `github.com/huandu/go-sqlbuilder` | SQL construction | no | — |
 | `github.com/boombuler/barcode` | QR rendering of the enrolment key | no | — |
 | `golang.org/x/crypto/bcrypt` | provider-only password hashing | no | — |
+| `github.com/yuin/goldmark` | Markdown rendering of legal documents, the auth server's alone (#622) | no | — |
 
 Every driver used to arrive the same way, through one edge:
 
