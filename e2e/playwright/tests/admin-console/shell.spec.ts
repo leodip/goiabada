@@ -7,6 +7,10 @@ import { expect, test } from "../../lib/fixtures";
 
 const home = `${env.adminUrl}/`;
 
+// The console runs only its own script files, refuses plugins and a <base>, and refuses framing
+// (#518).
+const contentSecurityPolicy = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+
 test("the home page names the signed-in administrator and links to what they can open", async ({ page }) => {
   await page.goto(home);
   await expect(page).toHaveTitle(/^Admin console – /);
@@ -106,6 +110,20 @@ test("the sidebar marks the page open, and the section a page belongs to", async
   const account = page.getByRole("navigation", { name: "Account", exact: true });
   await expect(account.getByRole("link", { name: "Consents", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(account.locator('[aria-current="page"]')).toHaveCount(1);
+});
+
+test("every page of the console sends the content security policy and the other security headers", async ({ page }) => {
+  for (const path of ["/", "/admin/clients", "/admin/settings/general", "/account/profile", "/auth/logout", "/no-such-page-e2e"]) {
+    await test.step(path, async () => {
+      const response = await page.goto(`${env.adminUrl}${path}`);
+      expect(new URL(page.url()).pathname, "the page itself, not a redirect elsewhere").toBe(path);
+      const headers = response!.headers();
+      expect(headers["content-security-policy"]).toBe(contentSecurityPolicy);
+      expect(headers["x-frame-options"]).toBe("DENY");
+      expect(headers["x-content-type-options"]).toBe("nosniff");
+      expect(headers["referrer-policy"]).toBe("same-origin");
+    });
+  }
 });
 
 test("an address the console doesn't have says so, and its one action leads home", async ({ page }) => {

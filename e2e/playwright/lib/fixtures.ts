@@ -1,7 +1,8 @@
 // The suite's test object: Playwright's, plus fixtures that create what a test needs and remove it
-// afterwards, pass or fail, so the shared environment stays as it was.
+// afterwards, pass or fail, so the shared environment stays as it was. A test fails when a page of the
+// auth server or the admin console reports a Content-Security-Policy violation, in any browser context
+// it opens (lib/csp-violations.ts).
 import { randomBytes } from "node:crypto";
-import { test as base, expect } from "@playwright/test";
 import {
   addResourcePermission,
   clientIdFromList,
@@ -20,6 +21,7 @@ import {
   type NewClient,
   type NewGroup,
 } from "./admin-console";
+import { CspViolationWatcher, expect, test as base } from "./csp-violations";
 import { env } from "./environment";
 import { adminStorageState } from "./paths";
 import { uniqueIdentifier } from "./unique";
@@ -80,13 +82,20 @@ interface WorkerFixtures {
 }
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
+  cspWatchedOrigins: [[new URL(env.authUrl).origin, new URL(env.adminUrl).origin], { scope: "worker" }],
+
   adminSession: [
-    async ({ browser }, use, workerInfo) => {
+    async ({ browser, cspWatchedOrigins }, use, workerInfo) => {
       const path = adminStorageState(workerInfo.parallelIndex);
+      // Made before any test, so watched here rather than by the test's watcher.
+      const watcher = new CspViolationWatcher(cspWatchedOrigins);
       const context = await browser.newContext();
+      await watcher.watch(context);
       await signInAsAdmin(await context.newPage());
       await context.storageState({ path });
+      await watcher.settle();
       await context.close();
+      watcher.expectNone();
       await use(path);
     },
     { scope: "worker" },

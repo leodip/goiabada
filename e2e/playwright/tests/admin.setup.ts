@@ -1,5 +1,5 @@
 // Runs before every other test: sweeps what earlier runs that stopped half way may have left behind.
-import { test as setup, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import {
   deleteClient,
   deleteGroup,
@@ -9,8 +9,12 @@ import {
   signInAsAdmin,
 } from "../lib/admin-console";
 import { env } from "../lib/environment";
+import { test as setup } from "../lib/fixtures";
 import { restoreBaselineSettings } from "../lib/settings";
 import { testPrefix } from "../lib/unique";
+
+// The setup signs the administrator in for itself, from an empty browser, not with a worker's session.
+setup.use({ storageState: { cookies: [], origins: [] } });
 
 // The names a list page links to that the tests made: each row's identifier or email is a link.
 async function leftoversOn(page: Page, listUrl: string): Promise<string[]> {

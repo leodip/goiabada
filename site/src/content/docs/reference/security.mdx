@@ -78,7 +78,7 @@ Both servers add these headers to every answer:
 | Header | Value | What it does |
 |---|---|---|
 | `X-Frame-Options` | `DENY` | No other site can show a page in a frame, so it can't trick a user into clicking. |
-| `Content-Security-Policy` | `frame-ancestors 'none'` | The same, for browsers that read the policy. It sets nothing else. |
+| `Content-Security-Policy` | `script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'` | The browser runs only script files the server serves itself, never an inline script, an `on…` attribute or a `javascript:` URL. It also refuses plugins, a `<base>` element and framing. Styles, images and requests aren't restricted. |
 | `X-Content-Type-Options` | `nosniff` | The browser takes each answer, an uploaded image included, as the type it's labelled with. |
 | `Referrer-Policy` | `same-origin` | A URL carrying a code or a `state` never reaches another site in the `Referer` header. |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | The browser uses only `https` for a year, subdomains included. Only when the server's base URL is `https`. |

@@ -37,7 +37,11 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   branch opens closed in it, quoted attributes, no nesting a browser repairs, a label for every
   control, alt on every image, a name on every link and button, one `<h1>`, no skipped heading
   level.
-- **Scripts**: no executable script in a template, no `on…` attribute, no `javascript:` URL. Page
+- **Scripts**: no executable script in a template, no `on…` attribute, no `javascript:` URL. The
+  browser enforces it: both servers send `Content-Security-Policy: script-src 'self'; object-src
+  'none'; base-uri 'none'; frame-ancestors 'none'` (`core/httpmw.SecurityHeaders`), which refuses
+  inline code, `eval`, `<object>`/`<embed>` and `<base>`, so a page needing any of them breaks
+  rather than being given a nonce, a hash or an exception. Page
   behaviour lives in static files, `static/utils.js`, the console's `static/shell.js` and
   `static/pages/<page>.js`, attached with `addEventListener`. A template hands a script data in a
   JSON data block, `<script type="application/json" id="…">{{ . }}</script>`, or in `data-`

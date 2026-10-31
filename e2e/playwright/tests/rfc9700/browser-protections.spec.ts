@@ -30,6 +30,10 @@ import { freshTotp } from "../../lib/totp";
 
 const authOrigin = new URL(env.authUrl).origin;
 
+// The whole policy, not only its frame-ancestors: the auth server runs only its own script files,
+// refuses plugins and a <base>, and refuses framing (#518).
+const contentSecurityPolicy = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+
 test("every page of the sign-in, its error pages included, refuses framing and loads nothing from another site (sections 4.16, 4.2.4)", async ({
   page,
   browser,
@@ -91,7 +95,7 @@ test("every page of the sign-in, its error pages included, refuses framing and l
   for (const [path, headers] of pages) {
     await test.step(path, async () => {
       expect(headers["x-frame-options"]).toBe("DENY");
-      expect(headers["content-security-policy"]).toMatch(/frame-ancestors 'none'/);
+      expect(headers["content-security-policy"]).toBe(contentSecurityPolicy);
       // Either keeps the page's address from every other site.
       expect(["same-origin", "no-referrer"]).toContain(headers["referrer-policy"]);
     });
