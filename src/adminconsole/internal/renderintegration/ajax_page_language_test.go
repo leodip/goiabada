@@ -18,18 +18,22 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
 // A request a page sends without a reload is a request of its own, and the console resolves its
 // language again from what that request carries. A page opened with ?ui_locales=pt-BR in a browser
-// and a profile both in English would then show its dialog's refusals in English, the API's and the
-// console's own alike. So each layout publishes the catalog its page rendered from, and every
-// request a page script sends names it back as ui_locales, which the locale middleware reads as
-// explicit intent the profile's locale does not override (#559 decisions 3 and 7).
+// in English would then show its dialog's refusals in English, the API's and the console's own
+// alike. So each layout publishes the catalog its page rendered from, and every request a page
+// script sends names it back as ui_locales, which the locale middleware reads as explicit intent the
+// browser's Accept-Language does not override (#559 decisions 3 and 7). A user's page language wins
+// over both, and drew the page too, so a script naming back a language the page no longer has, a tab
+// left open across a change of choice, still gets the user's choice (#631 decision 4).
 
 // TestRender_LayoutsPublishTheCatalogLanguage holds both layouts to naming the catalog the page
 // rendered from, not the first preference asked for: a browser asking for nl-BE first and pt-BR
@@ -75,28 +79,33 @@ func TestRender_LayoutsPublishTheCatalogLanguage(t *testing.T) {
 	}
 }
 
-// TestAjax_ThePagesLanguageOutranksTheBrowserAndTheProfile drives a dialog's save through the
-// console's real locale chain, its API client and the permissions handler, in a browser and a
-// profile both in English. Named back as ui_locales, the page's pt-BR reaches the API as its
-// Accept-Language and the dialog's sentence is Portuguese, the API's refusal and the console's own
-// alike; without it, the profile's English wins, which is what the page scripts must not leave to
-// chance.
-func TestAjax_ThePagesLanguageOutranksTheBrowserAndTheProfile(t *testing.T) {
+// TestAjax_ThePagesLanguageOutranksTheBrowser drives a dialog's save through the console's real
+// locale chain, its API client and the permissions handler, in a browser in English, with an ID
+// token whose locale claim is English too, which no console page follows any more. Named back as
+// ui_locales, the page's pt-BR reaches the API as its Accept-Language and the dialog's sentence is
+// Portuguese, the API's refusal and the console's own alike; without it, the browser's English
+// wins, which is what the page scripts must not leave to chance. A user's page language of pt-BR
+// wins over a page naming Spanish back.
+func TestAjax_ThePagesLanguageOutranksTheBrowser(t *testing.T) {
 	for _, tc := range []struct {
 		name, target, wantAPILanguage string
+		pageLanguage                  string
 		gone                          bool
 		status                        int
 		code, want                    string
 	}{
-		{"an API refusal, the page's language named", "/admin/resources/7/permissions?ui_locales=pt-BR", "pt-BR",
+		{"an API refusal, the page's language named", "/admin/resources/7/permissions?ui_locales=pt-BR", "pt-BR", "",
 			false, http.StatusConflict, "CONCURRENT_UPDATE",
 			"A lista foi alterada por outro salvamento depois de ser carregada. Nada foi salvo: recarregue a lista e faça a alteração novamente."},
-		{"a console refusal, the page's language named", "/admin/resources/7/permissions?ui_locales=pt-BR", "pt-BR",
+		{"a console refusal, the page's language named", "/admin/resources/7/permissions?ui_locales=pt-BR", "pt-BR", "",
 			true, http.StatusNotFound, "not_found",
 			"Desculpe, não foi possível encontrar o item solicitado. Ele pode ter sido excluído, ou o endereço pode estar incorreto."},
-		{"an API refusal, no language named", "/admin/resources/7/permissions", "en",
+		{"an API refusal, no language named", "/admin/resources/7/permissions", "en", "",
 			false, http.StatusConflict, "CONCURRENT_UPDATE",
 			"The list was changed by another save after it was loaded. Nothing was saved: reload it and make the change again."},
+		{"an API refusal, the user's page language over the one named", "/admin/resources/7/permissions?ui_locales=es", "pt-BR", "pt-BR",
+			false, http.StatusConflict, "CONCURRENT_UPDATE",
+			"A lista foi alterada por outro salvamento depois de ser carregada. Nada foi salvo: recarregue a lista e faça a alteração novamente."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var apiLanguage string
@@ -127,10 +136,22 @@ func TestAjax_ThePagesLanguageOutranksTheBrowserAndTheProfile(t *testing.T) {
 				handlertest.WithPathValue("resourceId", "7"),
 				handlertest.WithBody(strings.NewReader(`{"resourceId":7,"permissions":[],"expectedPermissions":[]}`)))
 			req.Header.Set("Accept-Language", "en")
+			store := newPageLanguageStore(t)
+			if tc.pageLanguage != "" {
+				seed := httptest.NewRequest(http.MethodGet, "/", nil)
+				sess, err := store.Get(seed, builtin.AdminConsoleSessionName)
+				require.NoError(t, err)
+				sess.Values[sessionkeys.PageLanguage] = tc.pageLanguage
+				seeded := httptest.NewRecorder()
+				require.NoError(t, store.Save(seed, seeded, sess))
+				for _, c := range seeded.Result().Cookies() {
+					req.AddCookie(c)
+				}
+			}
 			w := httptest.NewRecorder()
 			handler := adminresourcehandlers.HandlePermissionsPost(render.New(nil, nil), nil,
 				apiclient.NewAuthServerClient(upstream.URL, nil, nil))
-			i18n.Locale(nil)(middleware.LocaleFromJWT()(handler)).ServeHTTP(w, req)
+			i18n.Locale(nil)(middleware.PageLanguage(store, builtin.AdminConsoleSessionName)(handler)).ServeHTTP(w, req)
 
 			require.Equal(t, tc.status, w.Code)
 			var response map[string]string

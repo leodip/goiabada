@@ -487,6 +487,9 @@
 "adminconsole.account.profile.field.locale" = "Langue et région"
 "adminconsole.account.profile.locale_tooltip" = "Les applications s’en servent pour choisir la langue et le format des dates et des nombres."
 "adminconsole.account.profile.locale_blank" = "Non renseignée"
+"adminconsole.account.profile.field.page_language" = "Langue des pages"
+"adminconsole.account.profile.page_language_automatic" = "Automatique"
+"adminconsole.account.profile.page_language_tooltip" = "La langue de ces pages, des pages de connexion une fois votre mot de passe saisi, et des e-mails qui vous sont envoyés. Automatique utilise la langue que demande l’application ou votre navigateur et, pour les e-mails, votre langue et région."
 "adminconsole.account.profile.saved_successfully" = "Profil enregistré."
 "adminconsole.account.profile.update_button" = "Enregistrer"
 

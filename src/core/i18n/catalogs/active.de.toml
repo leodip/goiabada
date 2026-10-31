@@ -488,6 +488,9 @@
 "adminconsole.account.profile.field.locale" = "Sprache und Region"
 "adminconsole.account.profile.locale_tooltip" = "Anwendungen verwenden diese Angabe für Ihre Sprache sowie für die Darstellung von Datum und Zahlen."
 "adminconsole.account.profile.locale_blank" = "Nicht angegeben"
+"adminconsole.account.profile.field.page_language" = "Seitensprache"
+"adminconsole.account.profile.page_language_automatic" = "Automatisch"
+"adminconsole.account.profile.page_language_tooltip" = "Die Sprache dieser Seiten, der Anmeldeseiten, sobald Sie Ihr Passwort eingegeben haben, und der E-Mails, die Sie erhalten. Automatisch verwendet die Sprache, die die Anwendung oder Ihr Browser anfordert, und für E-Mails Ihre Sprache und Region."
 "adminconsole.account.profile.saved_successfully" = "Profil gespeichert."
 "adminconsole.account.profile.update_button" = "Speichern"
 

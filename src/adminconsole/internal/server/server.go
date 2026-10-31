@@ -492,10 +492,10 @@ func (s *Server) applicationChain() []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
 		// Global locale middleware: resolves a tentative localizer from
 		// ?ui_locales, Accept-Language, or English. Adminconsole has no
-		// AuthContext concept (identity comes from the JWT later in the chain),
-		// so authHelper is nil. Per-route user-locale refinement lives in
-		// routes.go inside baseAuth/accountAuth/adminAuth, immediately after
-		// JWT validation.
+		// AuthContext concept (identity comes from the session later in the
+		// chain), so authHelper is nil. The signed-in user's page language,
+		// which wins over all three, is applied per route in routes.go inside
+		// baseAuth/accountAuth/adminAuth, right after SessionHandler.
 		//
 		// It goes first so that everything below it can answer a request in the
 		// caller's language. It used to go last, which left both of

@@ -172,19 +172,18 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`Italian account recovery codes fit a phone in ${theme}`, async ({ page, browser, users }) => {
+  test(`Italian account recovery codes fit a phone in ${theme}`, async ({ browser, users }) => {
     test.setTimeout(90_000);
     const user = await users.create();
-    // The account page's forms post to an address without ui_locales, so the console answers them in
-    // the profile's language, which the ID token carries.
-    await page.goto(userUrl(user.id, "profile"));
-    await choose(page, "locale", "Italian (Switzerland)", /Italian \(Switzerland\)/);
-    await page.locator("#btnSave").click();
-    await expect(page.getByText("Profile saved.", { exact: true })).toBeVisible();
-    const { context, page: own } = await signInToConsole(browser, user, "/account/otp");
+    // The account page's forms post to an address without ui_locales, so the user chooses the page
+    // language in My Account, which every console page they open from then on is drawn in.
+    const { context, page: own } = await signInToConsole(browser, user);
+    await own.locator("#pageLanguage").selectOption("it");
+    await own.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(own.getByText("Profilo salvato.", { exact: true })).toBeVisible();
     await own.setViewportSize({ width: 320, height: 740 });
     await own.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
-    await own.goto(`${env.adminUrl}/account/otp?ui_locales=it`);
+    await own.goto(`${env.adminUrl}/account/otp`);
     // Turning on two-factor authentication shows the new authenticator's set once.
     const secret = (await own.locator("#otp-secret").innerText()).trim();
     await own.locator("#password").fill(user.password);
@@ -193,7 +192,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(own.getByRole("heading", { name: "Salva i codici di recupero", exact: true })).toBeVisible();
     await fitsInItalian(own);
     // The count, and a new set behind the password and the confirmation.
-    await own.goto(`${env.adminUrl}/account/otp?ui_locales=it`);
+    await own.goto(`${env.adminUrl}/account/otp`);
     await expect(own.getByRole("heading", { name: "Codici di recupero", exact: true })).toBeVisible();
     await expect(own.getByText("10 dei tuoi 10 codici di recupero non sono ancora stati usati.", { exact: true })).toBeVisible();
     await fitsInItalian(own);

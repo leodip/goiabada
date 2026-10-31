@@ -19,11 +19,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -100,6 +102,25 @@ func (e *recordingExchanger) ExchangeCode(ctx context.Context, code, redirectURI
 	return e.response, e.err
 }
 
+// recordingProfiles is the Account API's profile read the callback copies the page language from:
+// it answers the configured page language or error, and records the access token it was sent.
+type recordingProfiles struct {
+	pageLanguage string
+	err          error
+
+	called      bool
+	accessToken string
+}
+
+func (p *recordingProfiles) GetAccountProfile(_ context.Context, accessToken string) (*api.UserResponse, error) {
+	p.called = true
+	p.accessToken = accessToken
+	if p.err != nil {
+		return nil, p.err
+	}
+	return &api.UserResponse{Id: 7, Locale: "de", PageLanguage: p.pageLanguage}, nil
+}
+
 type callbackHarness struct {
 	t          *testing.T
 	backend    *armableBackend
@@ -107,6 +128,7 @@ type callbackHarness struct {
 	parser     *oauthclient.JWKSTokenParser
 	httpHelper *handlersmocks.HttpHelper
 	logs       *logtest.SlogCapture
+	profiles   *recordingProfiles
 }
 
 func newCallbackHarness(t *testing.T) *callbackHarness {
@@ -133,6 +155,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 		parser:     parser,
 		httpHelper: handlersmocks.NewHttpHelper(t),
 		logs:       logtest.CaptureSlog(t),
+		profiles:   &recordingProfiles{},
 	}
 }
 
@@ -225,7 +248,7 @@ func (h *callbackHarness) serve(exchanger codeExchanger, cookies []*http.Cookie,
 		req.AddCookie(c)
 	}
 	w := httptest.NewRecorder()
-	requestid.Middleware(HandleAuthCallbackPost(h.httpHelper, h.store, h.parser, exchanger)).ServeHTTP(w, req)
+	requestid.Middleware(HandleAuthCallbackPost(h.httpHelper, h.store, h.parser, exchanger, h.profiles)).ServeHTTP(w, req)
 	return w
 }
 
@@ -290,6 +313,7 @@ func (h *callbackHarness) assertRefused(w *httptest.ResponseRecorder, removed bo
 
 	h.assertHandshakeRemoved(w, removed, false)
 	assert.Zero(h.t, h.backend.creates, "a refusal writes no row")
+	assert.False(h.t, h.profiles.called, "a refused sign-in reads no profile")
 	return bind
 }
 
@@ -615,8 +639,15 @@ func TestHandleAuthCallbackPost_ARotationThatFails(t *testing.T) {
 }
 
 // assertSignedIn asserts what a completed sign-in stores: the token response with the effective
-// grant, the access token's expiry recorded from expires_in, and none of the six handshake values.
+// grant, the access token's expiry recorded from expires_in, the page language copy (Automatic
+// unless a row says otherwise), and none of the six handshake values.
 func assertSignedIn(t *testing.T, sess *sessionstore.Session, want oauth.TokenResponse, before, after time.Time) {
+	t.Helper()
+	assertSignedInWithPageLanguage(t, sess, want, before, after, "")
+}
+
+func assertSignedInWithPageLanguage(t *testing.T, sess *sessionstore.Session, want oauth.TokenResponse,
+	before, after time.Time, wantPageLanguage string) {
 	t.Helper()
 	require.False(t, sess.IsNew, "a session is stored")
 	stored, ok := sess.Values[sessionkeys.JWT].(oauth.TokenResponse)
@@ -631,7 +662,8 @@ func assertSignedIn(t *testing.T, sess *sessionstore.Session, want oauth.TokenRe
 	for _, key := range signInHandshakeKeys {
 		assert.NotContainsf(t, sess.Values, key, "the handshake's %s is deleted", key)
 	}
-	assert.Len(t, sess.Values, 2, "the token response and its expiry, and nothing else")
+	assert.Equal(t, wantPageLanguage, sess.Values[sessionkeys.PageLanguage], "the page language copy")
+	assert.Len(t, sess.Values, 3, "the token response, its expiry and the page language, and nothing else")
 }
 
 // A sign-in that passes every check is stored in one row, the console's first for this browser,
@@ -752,4 +784,52 @@ func TestHandleAuthCallbackPost_ARefusedTabLeavesAnotherTabsSignIn(t *testing.T)
 	assert.Equal(t, handshakeB[sessionkeys.CodeVerifier], exchanger.codeVerifier)
 	h.assertHandshakeRemoved(wB, true, true)
 	assert.Equal(t, 1, h.backend.creates, "one row, tab B's signed-in administrator's")
+}
+
+// The sign-in copies the user's page language into the new session from the Account API, read with
+// the access token the sign-in has just been granted, so the console's first page after it is drawn
+// in the user's choice, whatever ?ui_locales or the browser ask for; the ID token's locale claim
+// ("de" on the profile here, Language and region) plays no part (#631 decision 7).
+func TestHandleAuthCallbackPost_CopiesThePageLanguageIntoTheSession(t *testing.T) {
+	h := newCallbackHarness(t)
+	handlertest.RefuseInternalServerError(t, h.httpHelper)
+	h.profiles.pageLanguage = "pt-BR"
+	response := h.tokenResponse()
+	exchanger := &recordingExchanger{response: response}
+
+	before := time.Now()
+	w := h.serve(exchanger, []*http.Cookie{h.handshakeCookie(handshake())}, callbackForm())
+	after := time.Now()
+
+	require.Equal(t, http.StatusFound, w.Code)
+	assert.Equal(t, callbackRedirectBack, w.Header().Get("Location"))
+	assert.True(t, h.profiles.called)
+	assert.Equal(t, "the-access-token", h.profiles.accessToken)
+	assertSignedInWithPageLanguage(t, h.readBack(h.assertHandshakeRemoved(w, true, true)),
+		*response, before, after, "pt-BR")
+}
+
+// A profile read that fails, as for a user whose account permission was removed, does not fail the
+// sign-in: the session is stored on Automatic, and the failure is logged at Warn (#631 decision 7).
+func TestHandleAuthCallbackPost_AFailedProfileReadSignsInOnAutomatic(t *testing.T) {
+	h := newCallbackHarness(t)
+	handlertest.RefuseInternalServerError(t, h.httpHelper)
+	h.profiles.err = &apiclient.APIError{Code: "FORBIDDEN", Message: "Forbidden", StatusCode: http.StatusForbidden}
+	response := h.tokenResponse()
+	exchanger := &recordingExchanger{response: response}
+
+	before := time.Now()
+	w := h.serve(exchanger, []*http.Cookie{h.handshakeCookie(handshake())}, callbackForm())
+	after := time.Now()
+
+	require.Equal(t, http.StatusFound, w.Code)
+	assert.Equal(t, callbackRedirectBack, w.Header().Get("Location"))
+	assert.Equal(t, 1, h.backend.creates, "one row, the signed-in administrator's")
+	assertSignedIn(t, h.readBack(h.assertHandshakeRemoved(w, true, true)), *response, before, after)
+
+	records := h.logs.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, slog.LevelWarn, records[0].Level)
+	assert.Equal(t, "unable to read the page language at sign-in, the session stays on automatic", records[0].Message)
+	assert.NotNil(t, records[0].Attrs["error"])
 }

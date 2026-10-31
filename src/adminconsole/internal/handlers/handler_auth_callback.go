@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -75,6 +76,12 @@ type codeExchanger interface {
 	ExchangeCode(ctx context.Context, code, redirectURI, codeVerifier string) (*oauth.TokenResponse, error)
 }
 
+// accountProfileReader is the callback's one call to the Account API: the signed-in user's profile,
+// read with the access token the sign-in has just been granted, for the page language it carries.
+type accountProfileReader interface {
+	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
+}
+
 // HandleAuthCallbackPost completes the admin console's sign-in: the authorization response comes
 // back here, form-posted, and the handshake that sent the browser away is checked against it.
 //
@@ -82,8 +89,9 @@ type codeExchanger interface {
 // request alone is refused before the code is exchanged, because the exchange spends the code: a
 // session missing its redirect-back value used to be noticed only once the code was burned, and
 // one missing its nonce skipped the nonce check altogether and signed the administrator in. Then
-// the exchange, then the ID token's checks, and only then is anything written. Every refusal
-// leaves the session exactly as it was.
+// the exchange, then the ID token's checks, then the read of the user's page language, which only a
+// verified sign-in's access token can make and whose failure refuses nothing, and only then is
+// anything written. Every refusal leaves the session exactly as it was.
 //
 // The handshake arrives in its own sealed cookie rather than in the session, so the session row
 // this handler writes is the console's first, created when there is a signed-in administrator to
@@ -100,6 +108,7 @@ func HandleAuthCallbackPost(
 	httpSession callbackSessionStore,
 	tokenParser TokenParser,
 	exchanger codeExchanger,
+	accountProfiles accountProfileReader,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		handshakeCookieName := httpSession.CookieName(oauthclient.SignInHandshakeCookie)
@@ -212,6 +221,7 @@ func HandleAuthCallbackPost(
 		for _, key := range signInHandshakeKeys {
 			delete(sess.Values, key)
 		}
+		sess.Values[sessionkeys.PageLanguage] = signedInPageLanguage(r.Context(), accountProfiles, stored.AccessToken)
 		// The identifier rotates here, and this is the admin console's one privilege
 		// transition: the lines above turn a session that was holding nothing, usually one the
 		// store made up on this request, into one holding an administrator's access, id and
@@ -239,6 +249,21 @@ func HandleAuthCallbackPost(
 		//nolint:gosec // G710: the console's base URL and path, sealed by this console and opened above
 		http.Redirect(w, r, handshake[sessionkeys.RedirectBack], http.StatusFound)
 	}
+}
+
+// signedInPageLanguage is the page language the new session starts with, read from the Account API
+// (#631 decision 7): every signed-in console page reads the session's copy rather than asking the
+// auth server per page. A read that fails, for a user whose account permission was removed, say, or
+// an auth server that cannot answer just now, starts the session on Automatic rather than failing a
+// sign-in whose tokens are good: its pages are then drawn in the language the request asks for,
+// until the user opens their profile or signs in again.
+func signedInPageLanguage(ctx context.Context, profiles accountProfileReader, accessToken string) string {
+	profile, err := profiles.GetAccountProfile(ctx, accessToken)
+	if err != nil {
+		slog.WarnContext(ctx, "unable to read the page language at sign-in, the session stays on automatic", "error", err)
+		return ""
+	}
+	return profile.PageLanguage
 }
 
 // HandleAuthCallbackWrongMethod answers every method but POST at the callback, above all a browser
