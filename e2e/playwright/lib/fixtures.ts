@@ -11,13 +11,19 @@ import {
   deleteResource,
   deleteUser,
   idFromListLink,
+  legalDocumentIdFrom,
+  publishLegalDocument,
+  putAwayLegalDocument,
   resourceUrl,
+  saveLegalDocumentDraft,
   saveResourcePermissions,
   signInAsAdmin,
   submitNewClient,
   submitNewGroup,
+  submitNewLegalDocument,
   submitNewResource,
   submitNewUser,
+  type LegalDocumentKind,
   type NewClient,
   type NewGroup,
 } from "./admin-console";
@@ -47,6 +53,12 @@ export interface TestGroup {
   markDeleted(): void;
 }
 
+export interface TestLegalDocument {
+  id: number;
+  shortName: string;
+  title: string;
+}
+
 export interface TestUser {
   id: number;
   email: string;
@@ -66,6 +78,11 @@ interface Fixtures {
   groups: {
     // Creates a group under a fresh identifier; both include switches on unless said otherwise.
     create(options?: Omit<NewGroup, "identifier">): Promise<TestGroup>;
+  };
+  legalDocuments: {
+    // Creates a legal document under a fresh short name, a notice for information unless said
+    // otherwise, holding this text as its saved draft, and published as version 1 when asked.
+    create(options?: { kind?: LegalDocumentKind; markdown?: string; publish?: boolean }): Promise<TestLegalDocument>;
   };
   users: {
     // Creates a user with a password set now, so no link is mailed: a random one unless given; with the
@@ -169,6 +186,30 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     });
 
     for (const group of created.filter((g) => !g.deleted)) await deleteGroup(page, group.id);
+    await page.close();
+  },
+
+  // A published document is never deleted, so what a test published is retired afterwards and stays
+  // in the list, retired; one never published is deleted (putAwayLegalDocument).
+  legalDocuments: async ({ context }, use) => {
+    const created: number[] = [];
+    const page = await context.newPage();
+
+    await use({
+      async create({ kind = "for_information", markdown = "", publish = false } = {}) {
+        const shortName = uniqueIdentifier("ld");
+        const title = `${shortName} document`;
+        await submitNewLegalDocument(page, { kind, title, shortName });
+        await expect(page).toHaveURL(/\/admin\/legal-documents\/\d+\/draft$/);
+        const id = legalDocumentIdFrom(page.url());
+        created.push(id);
+        if (markdown !== "") await saveLegalDocumentDraft(page, id, { markdown });
+        if (publish) await publishLegalDocument(page, id);
+        return { id, shortName, title };
+      },
+    });
+
+    for (const id of created) await putAwayLegalDocument(page, id);
     await page.close();
   },
 

@@ -56,12 +56,13 @@ var mutatingVerbs = []string{
 var getVerbExemptions = map[string]string{
 	"accounthandlers.HandleLogoutConfirmGet": "renders the sign-out confirmation; it is handed no " +
 		"session store, and the POST beside it signs out (#411)",
-	"adminclienthandlers.HandleDeleteGet":       "renders the delete confirmation; the POST deletes",
-	"adminresourcehandlers.HandleDeleteGet":     "renders the delete confirmation; the POST deletes",
-	"admingrouphandlers.HandleDeleteGet":        "renders the delete confirmation; the POST deletes",
-	"adminuserhandlers.HandleDeleteGet":         "renders the delete confirmation; the POST deletes",
-	"admingrouphandlers.HandleAttributesAddGet": "renders the add-attribute form; the POST adds",
-	"adminuserhandlers.HandleAttributesAddGet":  "renders the add-attribute form; the POST adds",
+	"adminclienthandlers.HandleDeleteGet":        "renders the delete confirmation; the POST deletes",
+	"adminresourcehandlers.HandleDeleteGet":      "renders the delete confirmation; the POST deletes",
+	"admingrouphandlers.HandleDeleteGet":         "renders the delete confirmation; the POST deletes",
+	"adminuserhandlers.HandleDeleteGet":          "renders the delete confirmation; the POST deletes",
+	"adminlegaldocumenthandlers.HandleDeleteGet": "renders the delete confirmation; the POST deletes",
+	"admingrouphandlers.HandleAttributesAddGet":  "renders the add-attribute form; the POST adds",
+	"adminuserhandlers.HandleAttributesAddGet":   "renders the add-attribute form; the POST adds",
 	"admingrouphandlers.HandleAttributesEditGet": "renders the edit-attribute form; the POST " +
 		"saves",
 	"adminuserhandlers.HandleAttributesEditGet": "renders the edit-attribute form; the POST saves",

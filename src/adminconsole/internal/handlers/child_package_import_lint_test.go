@@ -1,6 +1,6 @@
 package handlers
 
-// The one place the admin console's six child handler packages are held to "a child does not
+// The one place the admin console's seven child handler packages are held to "a child does not
 // import the parent". Each declares the ports it calls in its own interfaces.go since #440; the
 // rule, its reasoning and its rule tests are core/guard.AssertNoParentImport's, written once for
 // both applications' handler children.
@@ -18,6 +18,7 @@ func TestHandlers_ChildPackagesDoNotImportTheParent(t *testing.T) {
 		"adminconsole/internal/handlers/accounthandlers",
 		"adminconsole/internal/handlers/adminclienthandlers",
 		"adminconsole/internal/handlers/admingrouphandlers",
+		"adminconsole/internal/handlers/adminlegaldocumenthandlers",
 		"adminconsole/internal/handlers/adminresourcehandlers",
 		"adminconsole/internal/handlers/adminsettingshandlers",
 		"adminconsole/internal/handlers/adminuserhandlers",

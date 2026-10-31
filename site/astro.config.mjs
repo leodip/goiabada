@@ -108,6 +108,7 @@ export default defineConfig({
 						{ label: 'Require two-factor authentication', slug: 'guides/require-two-factor-authentication' },
 						{ label: 'Single sign-on across clients', slug: 'guides/single-sign-on-across-clients' },
 						{ label: 'Let clients register themselves (DCR)', slug: 'guides/let-clients-register-themselves-dcr' },
+						{ label: 'Publish legal documents', slug: 'guides/publish-legal-documents' },
 						{ label: 'Customize and translate the pages', slug: 'guides/customize-and-translate-the-pages' },
 					],
 				},

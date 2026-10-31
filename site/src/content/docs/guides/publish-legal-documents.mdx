@@ -1,0 +1,88 @@
+---
+title: Publish legal documents
+description: Write your privacy notice and terms of use in the admin console, and publish them as numbered versions that never change.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide puts your organization's privacy notice and terms of use in Goiabada, as [legal documents](/concepts/glossary/#legal-document) you write in the admin console and publish as numbered versions.
+
+## Publish a document
+
+<Steps>
+
+1. In the admin console, open **Admin**, **Legal documents**, and click **New legal document**.
+
+2. Choose the document's kind: **Users must accept** for terms of use, or **For information** for a privacy notice. See [Kinds of document](#kinds-of-document).
+
+3. Give it a title. The console suggests a short name from the title as you type it; change it if you like. Click **Create document**.
+
+4. The document opens on its draft. Write its text under **Text**, in Markdown. The **Preview** beside it shows the text as the document's page will, and follows as you type. Click **Save draft** whenever you like.
+
+5. When the draft is ready, click **Publish version 1**, and confirm. The saved draft becomes version 1, and the **Versions** tab lists it.
+
+</Steps>
+
+To change a published document, edit its draft and publish again: the next version is number 2, and so on.
+
+## Kinds of document
+
+| Kind | For | Users |
+|---|---|---|
+| **Users must accept** | Terms of use | Accept each published version. |
+| **For information** | A privacy notice | Read it. It's shown and linked, and never accepted. |
+
+A privacy notice tells people what you do with their data. It isn't something they agree to, so Goiabada never asks them to accept one.
+
+A document's kind is fixed when you create it, so a version always means the same thing to the users who saw it. To change the kind, [retire](#retiring-a-document) the document and create a new one.
+
+## Writing the text
+
+A document is written in Markdown ([CommonMark](https://commonmark.org/)) with tables: headings, paragraphs, lists, links, emphasis, quotations, code and tables. Its title holds at most 200 characters, and its text at most 100,000.
+
+What the text can't do, so it never runs code or calls another site from a reader's browser:
+
+- HTML in the text isn't shown.
+- A link to a `javascript:`, `vbscript:` or `file:` address, or to a `data:` address that isn't an image, is left out.
+- An image is never loaded. It's shown as a link to the image, named by its alternative text.
+
+A document has one text, in whatever language you write it. If you serve people in several languages, put each language's text in the same document.
+
+## Drafts
+
+A document has at most one draft. **Save draft** replaces it, as often as you like: nobody but administrators sees a draft.
+
+**Publish** publishes the draft as last saved. Changes you haven't saved yet aren't part of it. Once published, the draft is gone, and the editor opens on the current version's text: saving it starts the next draft.
+
+## Versions
+
+A published version never changes. The **Versions** tab lists every version, first to last, with the date it was published, and marks the one in effect, the latest. Click a version to read its text as it was published, and the Markdown it was written in.
+
+<Aside type="caution">
+Every version of a **Users must accept** document is a new set of terms, and users are asked to accept it again. Fix typos in the draft before you publish: there's no way to publish a correction without asking everyone again.
+</Aside>
+
+## Short names
+
+A document's short name is its public address: lowercase letters, digits and hyphens, starting and ending with a letter or a digit, at most 64 characters. No two documents share one.
+
+You can change it on the draft until the document is first published. From then on it's fixed, so links to the document keep working.
+
+## Retiring a document
+
+A published document can't be deleted, since that would destroy the record of which version users accepted. Retire it instead: on its page, click **Retire** and confirm.
+
+A retired document is no longer in effect. Its versions stay, and the admin console still shows each one's text. It can't be edited or published while it's retired.
+
+To bring it back, click **Restore**. It's in effect again as it was, at the same version, so users who had accepted that version aren't asked again.
+
+## Deleting a document
+
+A document that was never published can be deleted, since nobody has seen it. On its page, or on the list, click **Delete**, type its short name, and click **Delete document**. Its draft goes with it.
+
+## Next steps
+
+<CardGrid>
+	<LinkCard title="Audit log" description="The events an administrator's changes to a legal document record." href="/concepts/audit-log/" />
+	<LinkCard title="API scopes" description="The admin API scopes that read and manage legal documents." href="/reference/api/scopes/" />
+</CardGrid>

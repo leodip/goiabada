@@ -1,0 +1,40 @@
+{{define "title"}}{{ T $.ctx "adminconsole.admin_legal_documents.common.status_version" "version" .version.Version }} – {{ .doc.Title }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}
+<script src="{{ asset "/static/pages/legal-document-preview.js" }}" defer></script>
+{{end}}
+
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/legal-documents/{{ .doc.Id }}/versions"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ .doc.Title }}</a></p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_legal_documents.common.status_version" "version" .version.Version }}</h1>
+  </div>
+</div>
+
+{{/* One published version as it was published, which never changes: its text rendered as the
+     document's public page renders it, by legal-document-preview.js from the Markdown in the data
+     block, and the Markdown it was written in. */}}
+<div class="panel">
+  <div class="panel-body stacked">
+    <dl class="detail-list">
+      <dt>{{ T $.ctx "adminconsole.admin_legal_documents.common.field_title" }}</dt>
+      <dd>{{ .version.Title }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_legal_documents.common.field_short_name" }}</dt>
+      <dd class="font-mono text-sm">{{ .doc.ShortName }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_legal_documents.versions.col_published" }}</dt>
+      <dd>{{ DateTime $.ctx .version.PublishedAt }}</dd>
+    </dl>
+  </div>
+  <section class="panel-body stacked" aria-labelledby="text-title">
+    <h2 class="panel-title" id="text-title">{{ T $.ctx "adminconsole.admin_legal_documents.version.text_title" }}</h2>
+    <div class="not-empty:block hidden" id="previewStatus" role="status"></div>
+    <div class="legal-text" id="legalDocumentPreview" data-preview-url="/admin/legal-documents/preview" data-preview-source="version-markdown"></div>
+    <script type="application/json" id="version-markdown">{{ .version.Markdown }}</script>
+  </section>
+  <section class="panel-body stacked" aria-labelledby="markdown-title">
+    <h2 class="panel-title" id="markdown-title">{{ T $.ctx "adminconsole.admin_legal_documents.version.markdown_title" }}</h2>
+    <pre class="legal-source" id="versionMarkdown">{{ .version.Markdown }}</pre>
+  </section>
+</div>
+{{end}}

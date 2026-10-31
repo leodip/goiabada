@@ -69,6 +69,9 @@ var (
 	charUpdateUserMail = &api.UpdateUserEmailRequest{Email: "jane@example.com"}
 	charUpdateUserPwd  = &api.UpdateUserPasswordRequest{NewPassword: "a-new-password"}
 	charUpdateUserOTP  = &api.UpdateUserOTPRequest{Enabled: false}
+
+	charCreateLegalDocument = &api.CreateLegalDocumentRequest{Kind: "must_accept", ShortName: "terms", Title: "Terms"}
+	charSaveLegalDocDraft   = &api.SaveLegalDocumentDraftRequest{Title: "Terms", Markdown: "Be kind."}
 )
 
 const (
@@ -1451,6 +1454,124 @@ func wireCharacterization() []wireCase {
 			},
 			verb: "DELETE", path: "/api/v1/admin/users/42", contentType: charJSON,
 			successStatus: 200, reply: `{}`,
+		},
+		// --- legal_documents.go -----------------------------------------------------------
+		{
+			name: "GetAllLegalDocuments",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetAllLegalDocuments(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				return got[0].Id, nil
+			},
+			verb: "GET", path: "/api/v1/admin/legal-documents",
+			successStatus: 200, reply: `{"legalDocuments":[{"id":7}]}`, want: int64(7),
+		},
+		{
+			name: "CreateLegalDocument",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.CreateLegalDocument(ctx, charAccessToken, charCreateLegalDocument)
+				if err != nil {
+					return nil, err
+				}
+				return got.LegalDocument.Id, nil
+			},
+			verb: "POST", path: "/api/v1/admin/legal-documents", contentType: charJSON,
+			bodyOf:        charCreateLegalDocument,
+			successStatus: 201, reply: `{"legalDocument":{"id":8}}`, want: int64(8),
+		},
+		{
+			name: "PreviewLegalDocument",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return c.PreviewLegalDocument(ctx, charAccessToken, "# Terms")
+			},
+			verb: "POST", path: "/api/v1/admin/legal-documents/preview", contentType: charJSON,
+			body:          `{"markdown":"# Terms"}`,
+			successStatus: 200, reply: `{"html":"<h1>Terms</h1>"}`, want: "<h1>Terms</h1>",
+		},
+		{
+			name: "GetLegalDocumentById",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetLegalDocumentById(ctx, charAccessToken, 7)
+				if err != nil {
+					return nil, err
+				}
+				return got.LegalDocument.ShortName, nil
+			},
+			verb: "GET", path: "/api/v1/admin/legal-documents/7",
+			successStatus: 200, reply: `{"legalDocument":{"id":7,"shortName":"terms"}}`, want: "terms",
+		},
+		{
+			name: "SaveLegalDocumentDraft",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.SaveLegalDocumentDraft(ctx, charAccessToken, 7, charSaveLegalDocDraft)
+				if err != nil {
+					return nil, err
+				}
+				return got.Draft.Markdown, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/legal-documents/7/draft", contentType: charJSON,
+			bodyOf:        charSaveLegalDocDraft,
+			successStatus: 200, reply: `{"legalDocument":{"id":7},"draft":{"title":"Terms","markdown":"Be kind."}}`,
+			want: "Be kind.",
+		},
+		{
+			name: "PublishLegalDocument",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.PublishLegalDocument(ctx, charAccessToken, 7)
+				if err != nil {
+					return nil, err
+				}
+				return got.LegalDocument.CurrentVersion, nil
+			},
+			verb: "POST", path: "/api/v1/admin/legal-documents/7/publish",
+			successStatus: 200, reply: `{"legalDocument":{"id":7,"currentVersion":3}}`, want: 3,
+		},
+		{
+			name: "RetireLegalDocument",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.RetireLegalDocument(ctx, charAccessToken, 7)
+				if err != nil {
+					return nil, err
+				}
+				return got.LegalDocument.Retired, nil
+			},
+			verb: "POST", path: "/api/v1/admin/legal-documents/7/retire",
+			successStatus: 200, reply: `{"legalDocument":{"id":7,"retired":true}}`, want: true,
+		},
+		{
+			name: "RestoreLegalDocument",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.RestoreLegalDocument(ctx, charAccessToken, 7)
+				if err != nil {
+					return nil, err
+				}
+				return got.LegalDocument.ShortName, nil
+			},
+			verb: "POST", path: "/api/v1/admin/legal-documents/7/restore",
+			successStatus: 200, reply: `{"legalDocument":{"id":7,"shortName":"terms"}}`, want: "terms",
+		},
+		{
+			name: "DeleteLegalDocument",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.DeleteLegalDocument(ctx, charAccessToken, 7)
+			},
+			verb: "DELETE", path: "/api/v1/admin/legal-documents/7",
+			successStatus: 200, reply: `{"success":true}`,
+		},
+		{
+			name: "GetLegalDocumentVersion",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetLegalDocumentVersion(ctx, charAccessToken, 7, 2)
+				if err != nil {
+					return nil, err
+				}
+				return got.Version.Markdown, nil
+			},
+			verb: "GET", path: "/api/v1/admin/legal-documents/7/versions/2",
+			successStatus: 200, reply: `{"legalDocument":{"id":7},"version":{"version":2,"markdown":"Be kind."}}`,
+			want: "Be kind.",
 		},
 	}
 }

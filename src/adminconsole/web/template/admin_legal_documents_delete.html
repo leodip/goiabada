@@ -1,0 +1,58 @@
+{{define "title"}}{{ T $.ctx "adminconsole.admin_legal_documents.delete.page_title" }} – {{ .doc.Title }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/legal-documents"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $.ctx "adminconsole.admin_menu.legal_documents" }}</a></p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_legal_documents.delete.page_title" }}</h1>
+    {{ if not .published }}<p class="page-lead">{{ T $.ctx "adminconsole.admin_legal_documents.delete.lead" }}</p>{{ end }}
+  </div>
+</div>
+
+{{/* A published document is never deleted, so the record of what users accepted is kept: its page
+     says to retire it instead and offers no deletion. */}}
+{{ if .published }}
+<div class="panel">
+  <div class="panel-body stacked">
+    <div class="notice notice-caution">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "handler.legal_document.published_not_deleted" }}</p>
+    </div>
+  </div>
+  <div class="panel-footer">
+    <a class="button button-quiet" href="/admin/legal-documents/{{ .doc.Id }}/versions">{{ T $.ctx "adminconsole.admin_legal_documents.delete.back_button" }}</a>
+  </div>
+</div>
+{{ else }}
+<form class="panel" method="post" novalidate>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="delete-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
+
+    <dl class="detail-list">
+      <dt>{{ T $.ctx "adminconsole.admin_legal_documents.common.field_short_name" }}</dt>
+      <dd class="font-mono text-sm break-words">{{ .doc.ShortName }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_legal_documents.common.field_title" }}</dt>
+      <dd>{{ .doc.Title }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_legal_documents.delete.field_kind" }}</dt>
+      <dd>{{ if .mustAccept }}{{ T $.ctx "adminconsole.admin_legal_documents.common.kind_must_accept" }}{{ else }}{{ T $.ctx "adminconsole.admin_legal_documents.common.kind_for_information" }}{{ end }}</dd>
+    </dl>
+
+    <div class="field max-w-md">
+      <label class="field-label" for="shortName">{{ T $.ctx "adminconsole.admin_legal_documents.delete.confirm_field_label" }}</label>
+      <input class="control control-mono" id="shortName" type="text" name="shortName" value="" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{{ if .error }} aria-invalid="true" aria-describedby="delete-error"{{ end }}>
+    </div>
+  </div>
+  <div class="panel-footer">
+    <a class="button button-quiet" href="/admin/legal-documents">{{ T $.ctx "common.button.cancel" }}</a>
+    <button id="btnDelete" class="button button-danger" type="submit">{{ T $.ctx "adminconsole.admin_legal_documents.delete.delete_button" }}</button>
+  </div>
+</form>
+{{ end }}
+{{end}}

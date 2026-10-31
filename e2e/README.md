@@ -126,8 +126,8 @@ The rate-limits suite is `playwright/rate-limits/`, run by `rate-limits.config.t
 below is about the e2e suite.
 
 Tests sit under `playwright/tests/`, one folder per area: the admin console (`admin-console/sign-in`,
-`admin-console/shell`, `admin-console/clients/`, `resources/`, `groups/`, `users/`, `account/` and
-`settings/`), the test app (`testapp/`: a user signing in to its web apps, its SPA and its API, single
+`admin-console/shell`, `admin-console/clients/`, `resources/`, `groups/`, `users/`, `legal-documents/`,
+`account/` and `settings/`), the test app (`testapp/`: a user signing in to its web apps, its SPA and its API, single
 sign-on across its two sites, signing out, the authorization parameters, and the auth server's own
 pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), the protocol
 itself where no page reaches it (`oauth/`), and accessibility (`accessibility/`: axe over every page and
@@ -137,9 +137,10 @@ environment that stays up between runs, so every test keeps to these rules, whic
 suite run again and again without a reset:
 
 - **It creates what it needs under a unique name** (`e2e-<kind>-<random>`, `lib/unique.ts`) through a
-  fixture that removes it afterwards, pass or fail (`clients`, `resources`, `groups` and `users` in
-  `lib/fixtures.ts`). The setup step (`tests/admin.setup.ts`) sweeps anything left with that prefix by
-  a run that crashed.
+  fixture that removes it afterwards, pass or fail (`clients`, `resources`, `groups`, `legalDocuments`
+  and `users` in `lib/fixtures.ts`). A legal document that was published can't be deleted, so the
+  fixture retires it, and it stays in the list, retired. The setup step (`tests/admin.setup.ts`)
+  sweeps anything left with that prefix by a run that crashed.
 - **It changes nothing global**: no settings, and the system client and the system resource
   (`authserver`) are only read; a test reaching their save answers Cancel to the confirmation. The
   exceptions are the tests whose subject is global, the settings pages, the signing keys and the

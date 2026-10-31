@@ -43,6 +43,7 @@ func TestPackageFiles_OneFilePerResource(t *testing.T) {
 		"group_attributes.go",
 		"group_permissions.go",
 		"groups.go",
+		"legal_documents.go",
 		"permissions.go",
 		"resources.go",
 		"sessions.go",

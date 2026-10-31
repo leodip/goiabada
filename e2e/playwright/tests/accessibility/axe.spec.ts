@@ -18,6 +18,7 @@ import {
   grantUserPermission,
   groupUrl,
   idFromListLink,
+  legalDocumentUrl,
   resourceUrl,
   userUrl,
   type ClientTab,
@@ -773,6 +774,66 @@ test("the groups' pages", async ({ page, groups, users, resources }) => {
       await addPermissionRow(page, resource.identifier, "read");
       await page.locator("#btnSave").click();
     }),
+  ]);
+});
+
+// The documents here are notices for information: one never published, deleted afterwards, and
+// one published, retired afterwards, by the fixture.
+test("the legal documents' pages", async ({ page, legalDocuments }) => {
+  const draft = await legalDocuments.create({ markdown: "# Draft\n\nNot published yet." });
+  const published = await legalDocuments.create({
+    markdown: "# Notice\n\nWe keep **your email**.\n\n| Data | Kept for |\n|---|---|\n| Email | A year |\n\n![logo](https://example.com/logo.png)",
+    publish: true,
+  });
+  const list = `${env.adminUrl}/admin/legal-documents`;
+
+  await checkStates(page, [
+    at(page, "the legal documents list", list),
+    at(page, "a new legal document", `${list}/new`),
+    refused(page, "a new legal document with no kind chosen", "kindMustAccept", () => page.locator("#btnCreate").click()),
+    {
+      name: "a draft beside its preview",
+      reach: async () => {
+        await page.goto(legalDocumentUrl(draft.id, "draft"));
+        await expect(page.locator("#legalDocumentPreview").getByRole("heading", { name: "Draft" })).toBeVisible();
+      },
+    },
+    saved(page, "a draft saved", () => page.locator("#btnSave").click()),
+    asks(page, "a draft, publishing it asking first", () => page.locator("#btnPublish").click()),
+    refused(page, "a draft, the short name refused", "shortName", async () => {
+      await page.goto(legalDocumentUrl(draft.id, "draft"));
+      await page.locator("#shortName").fill("Not Valid");
+      await page.locator("#btnSave").click();
+    }),
+    at(page, "a document never published, its versions", legalDocumentUrl(draft.id, "versions")),
+    at(page, "deleting a legal document", legalDocumentUrl(draft.id, "delete")),
+    refused(page, "deleting a legal document, the short name mistyped", "shortName", async () => {
+      await page.locator("#shortName").fill("not-this-one");
+      await page.locator("#btnDelete").click();
+    }),
+    {
+      name: "a published document's versions",
+      reach: async () => {
+        await page.goto(legalDocumentUrl(published.id, "versions"));
+        await expect(page.locator("#versionsTable")).toBeVisible();
+      },
+    },
+    asks(page, "a published document, retiring it asking first", () => page.locator("#btnRetire").click()),
+    {
+      name: "a published version's text",
+      reach: async () => {
+        await page.goto(`${legalDocumentUrl(published.id, "versions")}/1`);
+        await expect(page.locator("#legalDocumentPreview").getByRole("cell", { name: "A year" })).toBeVisible();
+      },
+    },
+    {
+      name: "a published document's draft, with no draft",
+      reach: async () => {
+        await page.goto(legalDocumentUrl(published.id, "draft"));
+        await expect(page.locator("#legalDocumentPreview").getByRole("heading", { name: "Notice" })).toBeVisible();
+      },
+    },
+    at(page, "a published document's delete page", legalDocumentUrl(published.id, "delete")),
   ]);
 });
 
