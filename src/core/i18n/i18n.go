@@ -18,6 +18,10 @@
 //     process wants is its own: adminconsole from the JWT locale claim,
 //     authserver from the user's stored locale, both from an RP's ui_locales.
 //     A non-explicit call defers to explicit intent already on the context.
+//   - WithPageLanguage attaches a user's page language, the catalog they chose
+//     for Goiabada's own pages. It wins over every source above, and no later
+//     WithLocale call moves it; a tag naming no loaded catalog (CatalogTags,
+//     IsCatalogTag) is Automatic and changes nothing.
 //   - T reads the localizer off context.Context.
 package i18n
 
@@ -46,6 +50,7 @@ const (
 	ctxKeyLocalizer ctxKey = iota
 	ctxKeyExplicitIntent
 	ctxKeyLocaleTag
+	ctxKeyPageLanguage
 )
 
 // message is one catalog entry. raw is the verbatim catalog string, which

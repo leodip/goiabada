@@ -114,7 +114,7 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 	// own form parsing on POST.
 	if raw := r.URL.Query().Get("ui_locales"); raw != "" {
 		if tags := SanitizeUILocales(raw); len(tags) > 0 {
-			return attachLocale(ctx, b.localizerFor(tags), tags[0], true)
+			return attachLocale(ctx, b.localizerFor(tags), tags[0], true, false)
 		}
 	}
 
@@ -123,18 +123,18 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 	// effectively a map lookup, not a fresh load.
 	if uiLocalesReader != nil {
 		if tags := uiLocalesReader.UILocales(r); len(tags) > 0 {
-			return attachLocale(ctx, b.localizerFor(tags), tags[0], true)
+			return attachLocale(ctx, b.localizerFor(tags), tags[0], true, false)
 		}
 	}
 
 	// (3) Accept-Language, parsed per RFC 9110 section 12.5.4 and matched
 	// against the loaded catalogs (see bundle.localizerFor).
 	if al := r.Header.Get("Accept-Language"); al != "" {
-		return attachLocale(ctx, b.localizerFor([]string{al}), al, false)
+		return attachLocale(ctx, b.localizerFor([]string{al}), al, false, false)
 	}
 
 	// (4) English fallback.
-	return attachLocale(ctx, b.english, "en", false)
+	return attachLocale(ctx, b.english, "en", false, false)
 }
 
 // WithLocale attaches the translator for the locale the caller is asking for, and
@@ -155,7 +155,10 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 // the language of whoever triggered the send. A call with explicit false leaves
 // an explicit locale already on ctx untouched, which is what stops user-locale
 // refinement clobbering what the request asked for; a call with explicit true
-// always wins.
+// always wins over a request's own preferences.
+//
+// Neither kind of call moves a user's page language (WithPageLanguage) already on ctx: the
+// user's own choice wins over an RP's ui_locales and over any refinement (#631 decision 4).
 //
 // Go contexts are immutable, so the returned context is the whole of the
 // effect. On a request that means
@@ -169,7 +172,7 @@ func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Cont
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if !explicit && hasExplicitIntent(ctx) {
+	if hasPageLanguage(ctx) || (!explicit && hasExplicitIntent(ctx)) {
 		return ctx
 	}
 
@@ -187,17 +190,20 @@ func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Cont
 	// catalog and the matcher reads the list as one preference order.
 	// Matching only the first tag would answer English there, silently
 	// discarding the RP's second choice (#385).
-	return attachLocale(ctx, current().localizerFor(usable), usable[0], explicit)
+	return attachLocale(ctx, current().localizerFor(usable), usable[0], explicit, false)
 }
 
 // attachLocale stores the localizer plus the primary resolved language tag
 // (the first preference used to build the localizer; "en" for the bundle's
 // English fallback). The tag is what LocaleTag answers, which an email's body
-// copy is chosen from.
-func attachLocale(ctx context.Context, loc *translator, tag string, explicit bool) context.Context {
+// copy is chosen from. pageLanguage marks the localizer as a user's page
+// language, which WithLocale leaves alone; every attach writes the mark, so a
+// localizer from any other source never inherits it.
+func attachLocale(ctx context.Context, loc *translator, tag string, explicit, pageLanguage bool) context.Context {
 	ctx = context.WithValue(ctx, ctxKeyLocalizer, loc)
 	ctx = context.WithValue(ctx, ctxKeyLocaleTag, primaryTag(tag))
 	ctx = context.WithValue(ctx, ctxKeyExplicitIntent, explicit)
+	ctx = context.WithValue(ctx, ctxKeyPageLanguage, pageLanguage)
 	return ctx
 }
 
@@ -221,6 +227,15 @@ func primaryTag(s string) string {
 
 func hasExplicitIntent(ctx context.Context) bool {
 	if v := ctx.Value(ctxKeyExplicitIntent); v != nil {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+func hasPageLanguage(ctx context.Context) bool {
+	if v := ctx.Value(ctxKeyPageLanguage); v != nil {
 		if b, ok := v.(bool); ok {
 			return b
 		}
