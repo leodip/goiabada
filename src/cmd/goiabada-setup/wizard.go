@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/adminpassword"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/issuerlength"
+	"github.com/leodip/goiabada/core/loopback"
 )
 
 // wizard fills a Config one step at a time, from the prompts or, when --type was given, from the
@@ -403,6 +404,21 @@ func (w *wizard) checkAuthURL(value string) error {
 	return issuerlength.Check(value)
 }
 
+// checkAdminURL is checkURL, and the auth server's start refusal as well: the first start registers
+// the admin console's redirect URI and sign-out redirect URI from its URL, one that is plain http on a
+// host other than loopback receives nothing, so the auth server refuses to start on such a URL, and
+// the wizard writes none (#590).
+func (w *wizard) checkAdminURL(value string) error {
+	if err := w.checkURL(value); err != nil {
+		return err
+	}
+	if loopback.IsPlainHTTPOff(value) {
+		return errs.New("it is plain http on a host other than 127.0.0.1, [::1] or localhost, where the admin " +
+			"console cannot sign in, and the auth server refuses to start with it; give an https URL")
+	}
+	return nil
+}
+
 // checkDistinctHosts refuses, for a deployment that routes by host, an admin console URL on the
 // auth server's host. Two Gateway listeners on one port and hostname are indistinct, and "ALL
 // indistinct Listeners must not be accepted for processing" (Gateway API v1.6.1,
@@ -414,12 +430,13 @@ func (w *wizard) checkDistinctHosts(authServerURL, adminConsoleURL string) error
 	return nil
 }
 
-// askURL asks until the answer passes check, and asks again when a plain-HTTP URL other than
-// localhost is not confirmed.
+// askURL asks until the answer passes check, and asks again when a plain-HTTP URL off loopback is
+// not confirmed. Loopback is core/loopback's test, so http://localhost.example.org is confirmed
+// like any other host (#590).
 func (w *wizard) askURL(prompt, defaultValue string, check func(string) error) (string, error) {
 	for {
 		value, err := w.validated(prompt, defaultValue, "URL", check)
-		if err != nil || !strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "http://localhost") {
+		if err != nil || !loopback.IsPlainHTTPOff(value) {
 			return value, err
 		}
 		w.out.warning("Using HTTP for production is not recommended. Consider using HTTPS.")
@@ -435,7 +452,7 @@ func (w *wizard) askURL(prompt, defaultValue string, check func(string) error) (
 func (w *wizard) askAdminURL(prompt, authServerURL string) (string, error) {
 	defaultURL, _ := defaultAdminURL(authServerURL, w.config.Deployment.routesByHost)
 	for {
-		adminConsoleURL, err := w.askURL(prompt, defaultURL, w.checkURL)
+		adminConsoleURL, err := w.askURL(prompt, defaultURL, w.checkAdminURL)
 		if err != nil {
 			return "", err
 		}
@@ -456,7 +473,7 @@ func (w *wizard) urlsFromFlags() error {
 	if err := w.checkAuthURL(authServerURL); err != nil {
 		return errs.Wrap(err, "invalid auth URL")
 	}
-	if strings.HasPrefix(authServerURL, "http://") {
+	if loopback.IsPlainHTTPOff(authServerURL) {
 		w.out.warning("Using HTTP for production is not recommended. Consider using HTTPS.")
 	}
 	if adminConsoleURL == "" {
@@ -465,14 +482,13 @@ func (w *wizard) urlsFromFlags() error {
 			return errs.Errorf("--admin-url is required when the auth URL's host, %s, is an IP address or a single label, which no admin console URL can be derived from", hostOf(authServerURL))
 		}
 	}
-	if err := w.checkURL(adminConsoleURL); err != nil {
+	// checkAdminURL refuses plain http off loopback, so a plain-http admin console URL that passes
+	// is on loopback, which is warned of no more than an auth server URL there.
+	if err := w.checkAdminURL(adminConsoleURL); err != nil {
 		return errs.Wrap(err, "invalid admin URL")
 	}
 	if err := w.checkDistinctHosts(authServerURL, adminConsoleURL); err != nil {
 		return errs.Wrap(err, "invalid admin URL")
-	}
-	if strings.HasPrefix(adminConsoleURL, "http://") {
-		w.out.warning("Using HTTP for production is not recommended. Consider using HTTPS.")
 	}
 	if authSite, adminSite := siteOf(authServerURL), siteOf(adminConsoleURL); authSite != adminSite {
 		w.out.warning("Domain mismatch: auth=%s, admin=%s", authSite, adminSite)
