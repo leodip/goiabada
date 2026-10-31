@@ -936,10 +936,10 @@ func (m *RateLimiter) LimitAccountEmailChange(next http.Handler) http.Handler {
 }
 
 // LimitAccountPassword rate limits the account's own password check, on the subject of the
-// access token presented. One middleware over three routes, PUT /api/v1/account/password,
-// PUT /api/v1/account/otp and PUT /api/v1/account/email (#404), which is what makes the bucket
-// shared: the sharing is a property of there being one tier rather than of three handlers
-// agreeing on a key.
+// access token presented. One middleware over four routes, PUT /api/v1/account/password,
+// PUT /api/v1/account/otp, PUT /api/v1/account/email (#404) and POST
+// /api/v1/account/otp/recovery-codes (#257), which is what makes the bucket shared: the sharing is
+// a property of there being one tier rather than of four handlers agreeing on a key.
 //
 // Both routes verified the password with an unbounded bcrypt and no failure counter, and the
 // OTP one is the only credential guarding the removal of the account's second factor: its

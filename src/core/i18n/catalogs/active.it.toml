@@ -576,6 +576,14 @@
 "adminconsole.account.otp.recovery_codes.copy" = "Copia codici"
 "adminconsole.account.otp.recovery_codes.copied" = "Codici copiati"
 "adminconsole.account.otp.recovery_codes.copy_failed_status" = "Non è stato possibile copiare i codici. Sono selezionati: puoi copiarli manualmente."
+"adminconsole.account.otp.recovery_codes.section_title" = "Codici di recupero"
+"adminconsole.account.otp.recovery_codes.remaining_other" = "{{.count}} dei tuoi 10 codici di recupero non sono ancora stati usati."
+"adminconsole.account.otp.recovery_codes.remaining_one" = "1 dei tuoi 10 codici di recupero non è ancora stato usato."
+"adminconsole.account.otp.recovery_codes.remaining_none" = "Non hai più codici di recupero inutilizzati. Ottieni un nuovo set per poter accedere anche se perdi l'autenticatore."
+"adminconsole.account.otp.recovery_codes.new_set_lead" = "Se perdi i codici o li hai usati tutti, ottieni un nuovo set. Inserisci la password per confermare che sei tu."
+"adminconsole.account.otp.recovery_codes.new_set_button" = "Ottieni nuovi codici"
+"adminconsole.account.otp.recovery_codes.confirm_title" = "Ottenere nuovi codici di recupero?"
+"adminconsole.account.otp.recovery_codes.confirm_body" = "I codici di recupero attuali smettono di funzionare appena ottieni quelli nuovi, compresi quelli che hai salvato o stampato."
 
 # --- Account manage consents ------------------------------------------------
 

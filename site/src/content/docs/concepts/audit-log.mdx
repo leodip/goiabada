@@ -303,7 +303,7 @@ These come from the Account API, which users reach through the admin console's a
 | `changed_password` | A user changed their own password, after confirming the current one. |
 | `enabled_otp` | A user set up an authenticator for two-factor authentication, on their account page or when a sign-in required it. |
 | `disabled_otp` | A user's authenticator was removed, by the user, by an administrator or by the `recover` command. Its recovery codes were deleted with it. |
-| `recovery_codes_created` | A user got a new set of recovery codes, with the authenticator they set up on their account page or when a sign-in required it. The codes aren't recorded. |
+| `recovery_codes_created` | A user got a new set of recovery codes: with the authenticator they set up on their account page or when a sign-in required it, or on their own, from their account page, replacing the set they had. The codes aren't recorded. |
 | `deleted_own_user_consent` | A user withdrew the consent they had given a client. |
 
 ### Users

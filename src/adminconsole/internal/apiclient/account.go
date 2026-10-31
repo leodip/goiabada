@@ -149,6 +149,28 @@ func (c *AuthServerClient) UpdateAccountOTP(ctx context.Context, accessToken str
 	})
 }
 
+// GetAccountRecoveryCodes answers how many of the current user's recovery codes are unused.
+func (c *AuthServerClient) GetAccountRecoveryCodes(ctx context.Context, accessToken string) (*api.AccountRecoveryCodesResponse, error) {
+	return execute[api.AccountRecoveryCodesResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/account/otp/recovery-codes",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+}
+
+// CreateAccountRecoveryCodes replaces the current user's recovery codes with a new set, given their
+// password, and answers it. This response alone carries the new set (#257).
+func (c *AuthServerClient) CreateAccountRecoveryCodes(ctx context.Context, accessToken string, request *api.CreateAccountRecoveryCodesRequest) (*api.CreateAccountRecoveryCodesResponse, error) {
+	return execute[api.CreateAccountRecoveryCodesResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.baseURL + "/api/v1/account/otp/recovery-codes",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+}
+
 // CreateAccountLogoutRequest asks the auth server to prepare a logout operation. Exactly one of the
 // two returns is non-nil, and which one the endpoint chooses is what request.ResponseMode asked for.
 //

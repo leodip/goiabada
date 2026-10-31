@@ -175,3 +175,53 @@ func UseRecoveryCode(ctx context.Context, db RecoveryCodeDatabase, user *record.
 func IsBlankRecoveryCode(code string) bool {
 	return normalizeRecoveryCode(code) == ""
 }
+
+// ReplaceRecoveryCodesDatabase is what ReplaceRecoveryCodes reads and writes. data.Database
+// satisfies it.
+type ReplaceRecoveryCodesDatabase interface {
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error
+}
+
+// ReplaceRecoveryCodes gives the user a new set of recovery codes, which replaces the set they had,
+// used and unused codes alike, and answers it as shown; replaced is false, with nothing written,
+// when the user has no authenticator by the time the write lands (#257 decision 8).
+//
+// The user's row is taken first and read again under the lock, the order a removal takes it in
+// (RemoveTx's first write is to that row), so a removal committed meanwhile is seen and no set is
+// stored for a user whose codes it deleted, and one arriving later deletes the new set.
+//
+// Only the set changes. The authenticator, the OTP configuration generation and the user's
+// sessions are left as they are, since the second factor itself did not change.
+func ReplaceRecoveryCodes(ctx context.Context, db ReplaceRecoveryCodesDatabase, user *record.User) (codes []string, replaced bool, err error) {
+	// Drawn before the transaction opens, so a deadlocked attempt's rerun stores the same set it
+	// returns rather than a set nobody was shown.
+	codes, codeHashes, err := newRecoveryCodes()
+	if err != nil {
+		return nil, false, err
+	}
+
+	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		replaced = false
+		current, readErr := db.GetUserByIdForUpdate(ctx, tx, user.Id)
+		if readErr != nil {
+			return readErr
+		}
+		if current == nil || !current.OTPEnabled {
+			return nil
+		}
+		if writeErr := db.ReplaceUserRecoveryCodes(ctx, tx, user.Id, codeHashes); writeErr != nil {
+			return writeErr
+		}
+		replaced = true
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	if !replaced {
+		return nil, false, nil
+	}
+	return codes, true, nil
+}

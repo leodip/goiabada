@@ -169,7 +169,7 @@ The auth server limits these endpoints. The limits counted by a user or an email
 | `POST /api/v1/account/email/verification`<br/>Limiter: `email_verification` | 5 per 15 minutes | failed codes | the token's user | always |
 | `POST /api/v1/account/email/verification/send`<br/>Limiter: `email_verification_send` | 5 per 60 minutes | every request | the token's user | always |
 | `PUT /api/v1/account/email`<br/>Limiter: `account_email_change` | 5 per 60 minutes | every request | the token's user | always |
-| `PUT /api/v1/account/password`, `PUT /api/v1/account/otp` and `PUT /api/v1/account/email`<br/>Limiter: `account_password` | 5 per 15 minutes, for the three together | failed passwords | the token's user | always |
+| `PUT /api/v1/account/password`, `PUT /api/v1/account/otp`, `PUT /api/v1/account/email` and `POST /api/v1/account/otp/recovery-codes`<br/>Limiter: `account_password` | 5 per 15 minutes, for the four together | failed passwords | the token's user | always |
 | `POST /forgot-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email | always |
 | `POST /forgot-password`<br/>Limiter: `forgot_pwd_ip` | 20 per 5 minutes | every request | IP address | switch on |
 | `GET /reset-password` and `POST /reset-password`<br/>Limiter: `reset_pwd` | 30 per 5 minutes, for the two together | every request | IP address | switch on |

@@ -107,11 +107,14 @@ command itself and fails on a tree it changed.
 | `core/api` | `AccountLogoutRequest` | both-apps | — |
 | `core/api` | `AccountLogoutResponseModeFormPost` | both-apps | — |
 | `core/api` | `AccountOTPEnrollmentResponse` | both-apps | — |
+| `core/api` | `AccountRecoveryCodesResponse` | both-apps | — |
 | `core/api` | `AddGroupMemberRequest` | both-apps | — |
 | `core/api` | `AuditLogResponse` | both-apps | — |
 | `core/api` | `ClientLogoInfoResponse` | both-apps | — |
 | `core/api` | `ClientLogoUploadResponse` | both-apps | — |
 | `core/api` | `ClientResponse` | both-apps | — |
+| `core/api` | `CreateAccountRecoveryCodesRequest` | both-apps | — |
+| `core/api` | `CreateAccountRecoveryCodesResponse` | both-apps | — |
 | `core/api` | `CreateClientRequest` | both-apps | — |
 | `core/api` | `CreateClientResponse` | both-apps | — |
 | `core/api` | `CreateGroupAttributeRequest` | both-apps | — |

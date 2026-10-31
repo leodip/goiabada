@@ -86,6 +86,14 @@ func (s *ctxRecordingApiClient) UpdateAccountOTP(ctx context.Context, _ string, 
 	return nil, s.record(ctx)
 }
 
+func (s *ctxRecordingApiClient) GetAccountRecoveryCodes(ctx context.Context, _ string) (*api.AccountRecoveryCodesResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) CreateAccountRecoveryCodes(ctx context.Context, _ string, _ *api.CreateAccountRecoveryCodesRequest) (*api.CreateAccountRecoveryCodesResponse, error) {
+	return nil, s.record(ctx)
+}
+
 func (s *ctxRecordingApiClient) CreateAccountLogoutRequest(ctx context.Context, _ string, _ *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
 	return nil, nil, s.record(ctx)
 }
@@ -296,6 +304,18 @@ func accountHandlerCases() []accountHandlerCase {
 				return handlertest.Request(http.MethodPost, "/account/otp",
 					handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
 						"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"},
+					}))
+			},
+		},
+		{
+			name: "HandleOtpPost new recovery codes",
+			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+				return HandleOtpPost(h, c, consoleBaseURL)
+			},
+			request: func() *http.Request {
+				return handlertest.Request(http.MethodPost, "/account/otp",
+					handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
+						"otpAction": {"recovery-codes"}, "password": {"P4ss!word"},
 					}))
 			},
 		},

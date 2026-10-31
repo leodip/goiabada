@@ -12,12 +12,14 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// accountOTPAPI is what the account OTP page needs: the enrolment offer, the profile, and the
-// write.
+// accountOTPAPI is what the account OTP page needs: the enrolment offer, the profile, the write,
+// and the recovery codes' count and new set.
 type accountOTPAPI interface {
 	GetAccountOTPEnrollment(ctx context.Context, accessToken string) (*api.AccountOTPEnrollmentResponse, error)
 	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
 	UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UpdateAccountOTPResponse, error)
+	GetAccountRecoveryCodes(ctx context.Context, accessToken string) (*api.AccountRecoveryCodesResponse, error)
+	CreateAccountRecoveryCodes(ctx context.Context, accessToken string, request *api.CreateAccountRecoveryCodesRequest) (*api.CreateAccountRecoveryCodesResponse, error)
 }
 
 func HandleOtpGet(
@@ -45,17 +47,20 @@ func HandleOtpGet(
 			"otpEnabled": user.OTPEnabled,
 		}
 
-		if !user.OTPEnabled {
-			// request enrollment secret and QR from API
-			enrollment, enrollmentErr := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
-			if enrollmentErr != nil {
-				render.HandleAPIError(httpHelper, w, r, enrollmentErr)
-				return
-			}
-
-			bind["base64Image"] = enrollment.Base64Image
-			bind["secretKey"] = enrollment.SecretKey
+		if user.OTPEnabled {
+			renderOTPEnabledPage(httpHelper, apiClient, w, r, jwtInfo.TokenResponse.AccessToken, bind)
+			return
 		}
+
+		// request enrollment secret and QR from API
+		enrollment, err := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			render.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
+		bind["base64Image"] = enrollment.Base64Image
+		bind["secretKey"] = enrollment.SecretKey
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind)
 		if err != nil {
@@ -88,7 +93,7 @@ func HandleOtpPost(
 		// now; a post naming neither form changes nothing and reloads it the same way (#562
 		// decision 8).
 		otpAction := r.PostFormValue("otpAction")
-		if otpAction != "enable" && otpAction != "disable" {
+		if otpAction != "enable" && otpAction != "disable" && otpAction != "recovery-codes" {
 			http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
 			return
 		}
@@ -104,16 +109,20 @@ func HandleOtpPost(
 		// renderDisableError redraws the disable form, which needs nothing but the message and the
 		// field it is about.
 		renderDisableError := func(message, errorField string) {
-			bind := map[string]interface{}{
+			renderOTPEnabledPage(httpHelper, apiClient, w, r, jwtInfo.TokenResponse.AccessToken, map[string]interface{}{
 				"error":      message,
 				"errorField": errorField,
 				"otpEnabled": true,
-			}
+			})
+		}
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-			}
+		// renderRecoveryCodesError redraws the new-set form, whose one field is the password, with
+		// the message; the disable form above it is drawn without one.
+		renderRecoveryCodesError := func(message string) {
+			renderOTPEnabledPage(httpHelper, apiClient, w, r, jwtInfo.TokenResponse.AccessToken, map[string]interface{}{
+				"recoveryCodesError": message,
+				"otpEnabled":         true,
+			})
 		}
 
 		// renderEnrollmentError redraws the enrolment form with its QR code and seed, fetched from
@@ -158,6 +167,46 @@ func HandleOtpPost(
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 			}
+		}
+
+		if otpAction == "recovery-codes" {
+			// A new set of recovery codes, which replaces the account's set and leaves the
+			// authenticator as it is. The set is shown in the response to this POST and stored
+			// nowhere, as the set created with the authenticator is (#257 decision 8). The
+			// confirmation that the old codes stop working is asked in the browser, before this
+			// form is sent.
+			req := &api.CreateAccountRecoveryCodesRequest{Password: password}
+			created, err := apiClient.CreateAccountRecoveryCodes(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
+			if err != nil {
+				if render.IsRateLimited(err) {
+					renderRecoveryCodesError(render.RateLimitedMessage(r.Context()))
+					return
+				}
+				var apiErr *apiclient.APIError
+				if errors.As(err, &apiErr) {
+					// OTP turned off from another tab or another client: a stale form.
+					if apiErr.Code == "OTP_NOT_ENABLED" {
+						http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
+						return
+					}
+					if apiErr.Code == "AUTHENTICATION_FAILED" {
+						renderRecoveryCodesError(apiErr.Message)
+						return
+					}
+				}
+				render.HandleAPIError(httpHelper, w, r, err)
+				return
+			}
+
+			bind := map[string]interface{}{
+				"otpEnabled":             true,
+				"recoveryCodes":          created.RecoveryCodes,
+				"recoveryCodesRemaining": len(created.RecoveryCodes),
+			}
+			if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind); err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
+			return
 		}
 
 		if otpAction == "disable" {
@@ -233,8 +282,9 @@ func HandleOtpPost(
 			// decisions 1 and 14).
 			if len(enabled.RecoveryCodes) > 0 {
 				bind := map[string]interface{}{
-					"otpEnabled":    true,
-					"recoveryCodes": enabled.RecoveryCodes,
+					"otpEnabled":             true,
+					"recoveryCodes":          enabled.RecoveryCodes,
+					"recoveryCodesRemaining": len(enabled.RecoveryCodes),
 				}
 				if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind); err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -244,6 +294,24 @@ func HandleOtpPost(
 		}
 
 		http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
+	}
+}
+
+// renderOTPEnabledPage draws the page of an account with two-factor authentication: bind's entries
+// and the count of the account's unused recovery codes, read from the auth server each time the
+// page is drawn, since the page always says how many are left (#257 decision 9).
+func renderOTPEnabledPage(httpHelper HttpHelper, apiClient accountOTPAPI, w http.ResponseWriter, r *http.Request,
+	accessToken string, bind map[string]interface{}) {
+
+	count, err := apiClient.GetAccountRecoveryCodes(r.Context(), accessToken)
+	if err != nil {
+		render.HandleAPIError(httpHelper, w, r, err)
+		return
+	}
+	bind["recoveryCodesRemaining"] = count.Remaining
+
+	if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_otp.html", bind); err != nil {
+		httpHelper.InternalServerError(w, r, err)
 	}
 }
 

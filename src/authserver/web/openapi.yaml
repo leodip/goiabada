@@ -3701,6 +3701,72 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/account/otp/recovery-codes:
+    get:
+      tags: [Account]
+      summary: Count unused recovery codes
+      description: |
+        Returns how many of the authenticated user's recovery codes are unused. The codes
+        themselves are never returned again after their set was first shown. A user without an
+        authenticator has no recovery codes, so the count for them is 0.
+      operationId: getAccountRecoveryCodes
+      responses:
+        '200':
+          description: The number of unused recovery codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountRecoveryCodesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Account]
+      summary: Create a new set of recovery codes
+      description: |
+        Replaces the authenticated user's recovery codes with a new set of ten, and returns it.
+        Requires the user's password. The old codes, used and unused, stop working at once. The
+        authenticator is not changed, and no session ends.
+
+        This response is the only time the new codes are returned, since the server stores only
+        their hashes, so show them to the user now.
+
+        A wrong or blank password is refused with 400 (`AUTHENTICATION_FAILED`), and a user without
+        an authenticator with 400 (`OTP_NOT_ENABLED`). A wrong password counts against the
+        `account_password` rate limit, shared with the account's password, two-factor and email
+        changes.
+      operationId: createAccountRecoveryCodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRecoveryCodesRequest'
+      responses:
+        '200':
+          description: The new set of recovery codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAccountRecoveryCodesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/account/consents:
     get:
       tags: [Account]
@@ -6813,6 +6879,41 @@ components:
           maxItems: 10
       required:
         - user
+
+    AccountRecoveryCodesResponse:
+      type: object
+      properties:
+        remaining:
+          type: integer
+          minimum: 0
+          maximum: 10
+          description: How many of the user's recovery codes are unused, 0 to 10.
+      required:
+        - remaining
+
+    CreateAccountRecoveryCodesRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          description: The user's current password.
+      required:
+        - password
+
+    CreateAccountRecoveryCodesResponse:
+      type: object
+      properties:
+        recoveryCodes:
+          type: array
+          description: >-
+            The ten new recovery codes, each 24 characters in six groups of four, such as
+            7kq2-m9xh-4trw-b3np-j6vd-egac. Returned this once and never again.
+          items:
+            type: string
+          minItems: 10
+          maxItems: 10
+      required:
+        - recoveryCodes
 
     AccountLogoutRequest:
       type: object

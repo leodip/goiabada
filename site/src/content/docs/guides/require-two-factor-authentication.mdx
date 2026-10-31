@@ -76,6 +76,8 @@ On the page that asks for the code, **Use a recovery code instead** takes one in
 
 Recovery codes still work when the authenticator was disabled after 100 wrong codes, and they don't count toward those 100. Signing in with one leaves the authenticator as it is, disabled or not. Removing the authenticator deletes its recovery codes, and the next one comes with new ones. Administrators never see a user's codes.
 
+Under **Account**, **Two-factor authentication**, **Recovery codes** says how many of the ten are unused. To get a new set, a user enters their password and clicks **Get new recovery codes**: the page shows the ten new codes once, and the old ones stop working at once, used or not. The authenticator and the user's sessions are left as they are. An app can do the same with [`POST /api/v1/account/otp/recovery-codes`](/reference/api/account/operations/createaccountrecoverycodes/).
+
 ## Users who are already signed in
 
 A user whose session already reached the client's level isn't asked for anything: the session is reused, and the tokens say `urn:goiabada:level2_mandatory` and `["pwd", "otp"]` from the sign-in that earned it.

@@ -1,5 +1,6 @@
 // The user's recovery codes: the set of ten that comes with every new authenticator, each of which
 // signs in once in place of an authenticator code, through "Use a recovery code instead".
+import { cancelDialog, confirmDialog } from "../../../lib/admin-console";
 import { submitPassword } from "../../../lib/browser-sign-in";
 import { enterRecoveryCode, recoveryCodeRefused, signInToConsole, turnOnTwoFactor } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
@@ -79,4 +80,65 @@ test("signing in with a recovery code: a wrong code is refused, a saved one sign
   await enterRecoveryCode(again, recoveryCodes[1]);
   await again.waitForURL(`${env.adminUrl}/account/profile`);
   await second.close();
+});
+
+test("the count, and a new set behind the password and a confirmation, after which an old code is refused", async ({ browser, users }) => {
+  const user = await users.create();
+  const { recoveryCodes } = await turnOnTwoFactor(browser, user);
+
+  // Signing in with a recovery code leaves nine of the ten unused, which the account page says.
+  const own = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await own.newPage();
+  await page.goto(`${env.adminUrl}/account/otp`);
+  await submitPassword(page, user.email, user.password);
+  await enterRecoveryCode(page, recoveryCodes[0]);
+  await page.waitForURL(`${env.adminUrl}/account/otp`);
+  await expect(page.getByRole("heading", { name: "Recovery codes", exact: true })).toBeVisible();
+  await expect(page.getByText("9 of your 10 recovery codes are unused.")).toBeVisible();
+
+  // The new set asks first; Cancel sends nothing.
+  const section = page.locator("form", { has: page.getByRole("heading", { name: "Recovery codes", exact: true }) });
+  await section.getByLabel("Password").fill(user.password);
+  await section.getByRole("button", { name: "Get new recovery codes" }).click();
+  await cancelDialog(page, "Your current recovery codes stop working as soon as you get new ones");
+  await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toHaveCount(0);
+
+  // A wrong password is refused on the form, with nothing replaced.
+  await section.getByLabel("Password").fill("not-the-password");
+  await section.getByRole("button", { name: "Get new recovery codes" }).click();
+  await confirmDialog(page, "Get new recovery codes?");
+  await expect(page.locator("#recovery-codes-error")).toHaveText("That password isn't right. Try again.");
+  await expect(page.locator("#recovery-codes-password")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText("9 of your 10 recovery codes are unused.")).toBeVisible();
+
+  // With the password, the page shows the ten new codes once, and all ten are unused.
+  await section.getByLabel("Password").fill(user.password);
+  await section.getByRole("button", { name: "Get new recovery codes" }).click();
+  await confirmDialog(page, "Get new recovery codes?");
+  await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();
+  const newCodes = (await page.getByRole("list", { name: "Recovery codes" }).getByRole("listitem").allInnerTexts())
+    .map((code) => code.trim());
+  expect(newCodes).toHaveLength(10);
+  for (const code of newCodes) {
+    expect(code).toMatch(codeShape);
+    expect(recoveryCodes).not.toContain(code);
+  }
+  await expect(page.getByText("10 of your 10 recovery codes are unused.")).toBeVisible();
+
+  // Drawn again, the page shows the count and not the codes; the session the user is in goes on.
+  await page.goto(`${env.adminUrl}/account/otp`);
+  await expect(page.getByText("10 of your 10 recovery codes are unused.")).toBeVisible();
+  await expect(page.getByText(newCodes[0])).toHaveCount(0);
+  await own.close();
+
+  // An unused code of the old set is refused at sign-in; one of the new set signs in.
+  const next = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const again = await next.newPage();
+  await again.goto(`${env.adminUrl}/account/profile`);
+  await submitPassword(again, user.email, user.password);
+  await enterRecoveryCode(again, recoveryCodes[1]);
+  await expect(again.locator("#recovery-code-error")).toHaveText(recoveryCodeRefused);
+  await enterRecoveryCode(again, newCodes[0]);
+  await again.waitForURL(`${env.adminUrl}/account/profile`);
+  await next.close();
 });

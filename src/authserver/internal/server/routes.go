@@ -433,6 +433,11 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/otp/enrollment", apihandlers.HandleAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
 		r.With(rateLimiter.LimitAccountPassword).Put("/otp",
 			apihandlers.HandleAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher))
+		// The count of unused recovery codes checks no credential; a new set takes the password,
+		// so it spends the same bucket as the changes above (#257 decision 8).
+		r.Get("/otp/recovery-codes", apihandlers.HandleAccountRecoveryCodesGet(s.database))
+		r.With(rateLimiter.LimitAccountPassword).Post("/otp/recovery-codes",
+			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
 

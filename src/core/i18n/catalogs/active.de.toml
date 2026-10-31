@@ -573,6 +573,14 @@
 "adminconsole.account.otp.recovery_codes.copy" = "Codes kopieren"
 "adminconsole.account.otp.recovery_codes.copied" = "Codes kopiert"
 "adminconsole.account.otp.recovery_codes.copy_failed_status" = "Die Codes konnten nicht kopiert werden. Sie sind markiert, damit Sie sie selbst kopieren können."
+"adminconsole.account.otp.recovery_codes.section_title" = "Wiederherstellungscodes"
+"adminconsole.account.otp.recovery_codes.remaining_other" = "{{.count}} Ihrer 10 Wiederherstellungscodes sind noch unbenutzt."
+"adminconsole.account.otp.recovery_codes.remaining_one" = "1 Ihrer 10 Wiederherstellungscodes ist noch unbenutzt."
+"adminconsole.account.otp.recovery_codes.remaining_none" = "Sie haben keine unbenutzten Wiederherstellungscodes mehr. Fordern Sie neue an, damit Sie sich auch dann anmelden können, wenn Sie Ihren Authenticator verlieren."
+"adminconsole.account.otp.recovery_codes.new_set_lead" = "Wenn Sie Ihre Codes verlieren oder aufgebraucht haben, fordern Sie neue an. Geben Sie zur Bestätigung Ihr Passwort ein."
+"adminconsole.account.otp.recovery_codes.new_set_button" = "Neue Codes anfordern"
+"adminconsole.account.otp.recovery_codes.confirm_title" = "Neue Wiederherstellungscodes anfordern?"
+"adminconsole.account.otp.recovery_codes.confirm_body" = "Ihre bisherigen Wiederherstellungscodes funktionieren nicht mehr, sobald Sie neue erhalten, auch die gespeicherten oder ausgedruckten."
 
 # --- Account manage consents ------------------------------------------------
 

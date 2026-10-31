@@ -103,4 +103,36 @@
     {{ end }}
   </div>
 </form>
+
+{{/* The account's recovery codes: how many of the set's ten are unused, read from the auth server
+     each time the page is drawn, and a new set behind the password, asked first in a confirm_change
+     dialog because the old codes stop working at once. The new set comes back in the answer to this
+     form and is drawn above, once (#257). The form has its own error, recoveryCodesError, so a
+     refusal here leaves the disable form above without one. */}}
+{{ if .otpEnabled }}
+<form class="panel mt-6" method="post" action="/account/otp" novalidate data-confirm-dialog="confirmRecoveryCodes" data-confirm-title="{{ T $.ctx "adminconsole.account.otp.recovery_codes.confirm_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.account.otp.recovery_codes.confirm_body" }}">
+  <div class="panel-body stacked">
+    <h2 class="panel-title" id="recovery-codes-section-title">{{ T $.ctx "adminconsole.account.otp.recovery_codes.section_title" }}</h2>
+    {{ if .recoveryCodesError }}
+    <div class="notice notice-danger" role="alert" id="recovery-codes-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .recoveryCodesError }}</p>
+    </div>
+    {{ end }}
+    {{ with .loggedInUser }}<input type="email" value="{{ .Email }}" autocomplete="username" aria-label="{{ T $.ctx "adminconsole.account.email.field.current_email" }}" hidden>{{ end }}
+    <p>{{ if not .recoveryCodesRemaining }}{{ T $.ctx "adminconsole.account.otp.recovery_codes.remaining_none" }}{{ else if eq .recoveryCodesRemaining 1 }}{{ T $.ctx "adminconsole.account.otp.recovery_codes.remaining_one" }}{{ else }}{{ T $.ctx "adminconsole.account.otp.recovery_codes.remaining_other" "count" .recoveryCodesRemaining }}{{ end }}</p>
+    <p>{{ T $.ctx "adminconsole.account.otp.recovery_codes.new_set_lead" }}</p>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="recovery-codes-password">{{ T $.ctx "adminconsole.account.otp.field.password" }}</label>
+        <input class="control" id="recovery-codes-password" type="password" name="password" autocomplete="current-password"{{ if .recoveryCodesError }} aria-invalid="true" aria-describedby="recovery-codes-error" autofocus{{ end }}>
+      </div>
+    </div>
+  </div>
+  <div class="panel-footer">
+    <button class="button" type="submit" name="otpAction" value="recovery-codes">{{ T $.ctx "adminconsole.account.otp.recovery_codes.new_set_button" }}</button>
+  </div>
+</form>
+{{ template "modal_dialog" (args "confirmRecoveryCodes" "confirm_change" $.ctx (T $.ctx "adminconsole.account.otp.recovery_codes.new_set_button") (T $.ctx "adminconsole.account.otp.recovery_codes.confirm_title")) }}
+{{ end }}
 {{end}}

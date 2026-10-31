@@ -569,6 +569,14 @@
 "adminconsole.account.otp.recovery_codes.copy" = "Copy codes"
 "adminconsole.account.otp.recovery_codes.copied" = "Codes copied"
 "adminconsole.account.otp.recovery_codes.copy_failed_status" = "Couldn't copy the codes. They're selected, so you can copy them yourself."
+"adminconsole.account.otp.recovery_codes.section_title" = "Recovery codes"
+"adminconsole.account.otp.recovery_codes.remaining_other" = "{{.count}} of your 10 recovery codes are unused."
+"adminconsole.account.otp.recovery_codes.remaining_one" = "1 of your 10 recovery codes is unused."
+"adminconsole.account.otp.recovery_codes.remaining_none" = "You have no unused recovery codes. Get a new set, so you can still sign in if you lose your authenticator."
+"adminconsole.account.otp.recovery_codes.new_set_lead" = "If you lose your codes or use them up, get a new set. Enter your password to confirm it's you."
+"adminconsole.account.otp.recovery_codes.new_set_button" = "Get new recovery codes"
+"adminconsole.account.otp.recovery_codes.confirm_title" = "Get new recovery codes?"
+"adminconsole.account.otp.recovery_codes.confirm_body" = "Your current recovery codes stop working as soon as you get new ones, including any you saved or printed."
 
 # --- Account manage consents ------------------------------------------------
 
