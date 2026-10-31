@@ -39,7 +39,6 @@ test("a redirect URI is matched exactly: the registered one goes on to sign-in, 
     `https://${host.toUpperCase()}/callback`,
     `${testRedirectUri}?extra=1`,
     `https://${host}:443/callback`,
-    `http://${host}/callback`,
     `${env.webtest2Url}/callback`,
   ]) {
     await test.step(nearMiss, async () => {
@@ -47,6 +46,11 @@ test("a redirect URI is matched exactly: the registered one goes on to sign-in, 
       expectRefusedOnPage(answer, /The application does not have this redirect URI registered/);
     });
   }
+  // Plain http off loopback is refused before the registered list is read (RFC 9700 section 2.6).
+  await test.step(`http://${host}/callback`, async () => {
+    const answer = await getAuthorize(anonymous.request, codeRequest(client.identifier, { redirect_uri: `http://${host}/callback` }).params);
+    expectRefusedOnPage(answer, /must not use plain http on a host other than the loopback interface/);
+  });
   await anonymous.close();
 });
 
