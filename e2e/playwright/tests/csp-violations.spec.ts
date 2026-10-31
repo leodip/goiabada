@@ -3,6 +3,7 @@
 // one watched and one not, as the auth server's is and the test app's is not. Needs no environment.
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import type { Browser } from "@playwright/test";
 import { CspViolationWatcher, expect, test as watched } from "../lib/csp-violations";
 
 const policy = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
@@ -32,6 +33,34 @@ const pages: Record<string, { type: string; body: string }> = {
     ].join("\n"),
   },
   "/eval.js": { type: "text/javascript", body: "try { eval('1'); } catch {}" },
+  // Refuses its eval only when the button is pressed, so a test can close the page straight after.
+  "/on-press": {
+    type: "text/html",
+    body: [
+      "<!DOCTYPE html>",
+      "<title>On press</title>",
+      '<button>Press</button>',
+      '<script src="/on-press.js"></script>',
+    ].join("\n"),
+  },
+  "/on-press.js": {
+    type: "text/javascript",
+    body: 'document.querySelector("button").addEventListener("click", () => { try { eval("1"); } catch {} });',
+  },
+  // The same button, whose code refuses nothing.
+  "/on-press-clean": {
+    type: "text/html",
+    body: [
+      "<!DOCTYPE html>",
+      "<title>On press</title>",
+      '<button>Press</button>',
+      '<script src="/on-press-clean.js"></script>',
+    ].join("\n"),
+  },
+  "/on-press-clean.js": {
+    type: "text/javascript",
+    body: 'document.querySelector("button").addEventListener("click", () => { document.title = "Pressed"; });',
+  },
 };
 
 async function serve(): Promise<{ port: number; close: () => Promise<void> }> {
@@ -136,4 +165,57 @@ test("the watcher names the page, the directive and what was blocked, on its ori
   }
   for (const line of expected) expect(failure).toContain(line);
   await context.close();
+});
+
+// A test or a helper that closes its context or a page as soon as it is done must not lose a
+// violation the page has fired but not yet handed over: closing a watched context or page hands it
+// over first. Each test closes straight after the press, with nothing between that would let it
+// arrive.
+test.describe("closing straight after a violation", () => {
+  async function pressed(browser: Browser, origin: string, path: string) {
+    const watcher = new CspViolationWatcher([origin]);
+    const context = await browser.newContext();
+    await watcher.watch(context);
+    const page = await context.newPage();
+    await page.goto(`${origin}${path}`);
+    await page.getByRole("button", { name: "Press" }).click();
+    return { watcher, context, page };
+  }
+
+  function failureOf(watcher: CspViolationWatcher): string {
+    try {
+      watcher.expectNone();
+    } catch (error) {
+      return String(error);
+    }
+    return "";
+  }
+
+  test("the context still counts it", async ({ browser, otherPort }) => {
+    const origin = `http://127.0.0.1:${otherPort}`;
+    const { watcher, context } = await pressed(browser, origin, "/on-press");
+    await context.close();
+    const expected = `${origin}/on-press: script-src blocked eval, at ${origin}/on-press.js:1`;
+    expect([...watcher.violations()]).toEqual([expected]);
+    expect(failureOf(watcher)).toContain(expected);
+  });
+
+  test("the page still counts it", async ({ browser, otherPort }) => {
+    const origin = `http://127.0.0.1:${otherPort}`;
+    const { watcher, context, page } = await pressed(browser, origin, "/on-press");
+    await page.close();
+    const expected = `${origin}/on-press: script-src blocked eval, at ${origin}/on-press.js:1`;
+    expect([...watcher.violations()]).toEqual([expected]);
+    expect(failureOf(watcher)).toContain(expected);
+    await context.close();
+  });
+
+  test("a page that refused nothing counts nothing", async ({ browser, otherPort }) => {
+    const origin = `http://127.0.0.1:${otherPort}`;
+    const { watcher, context, page } = await pressed(browser, origin, "/on-press-clean");
+    await page.close();
+    await context.close();
+    expect([...watcher.violations()]).toEqual([]);
+    expect(failureOf(watcher)).toBe("");
+  });
 });

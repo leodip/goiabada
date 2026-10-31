@@ -10,7 +10,7 @@
 // lib/fixtures.ts names the two origins. The test object here watches the test's own context and
 // every context made with browser.newContext() during the test, by a test or by a helper.
 import { randomBytes } from "node:crypto";
-import { test as base, expect, type Browser, type BrowserContext } from "@playwright/test";
+import { test as base, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
 // What the page's event says, as the page hands it over.
 interface Report {
@@ -33,11 +33,20 @@ export class CspViolationWatcher {
     this.origins = new Set(origins);
   }
 
-  // Watches every page the context has from now on, in every frame, across navigations.
+  // Watches every page the context has from now on, in every frame, across navigations. Closing the
+  // context or one of its pages, by a test or a helper, first lets its pages hand over what they
+  // have queued, as settle() does: a closed page's queued violation is lost.
   async watch(context: BrowserContext): Promise<void> {
     if (this.watched.has(context)) return;
     this.watched.add(context);
     context.on("close", () => this.watched.delete(context));
+    const closeContext = context.close.bind(context);
+    context.close = async (options) => {
+      await settlePages(context.pages());
+      return closeContext(options);
+    };
+    for (const page of context.pages()) settleBeforeClose(page);
+    context.on("page", settleBeforeClose);
     await context.exposeBinding(this.binding, (_source, report: Report) => this.record(report));
     await context.addInitScript((binding: string) => {
       document.addEventListener("securitypolicyviolation", (event) => {
@@ -74,15 +83,29 @@ export class CspViolationWatcher {
   // Lets each open page of the contexts still watched run what it has queued, so a violation its
   // page has fired but not yet handed over is counted.
   async settle(): Promise<void> {
-    const pages = [...this.watched].flatMap((context) => context.pages());
-    await Promise.all(
-      pages.map((page) => page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0))).catch(() => undefined)),
-    );
+    await settlePages([...this.watched].flatMap((context) => context.pages()));
   }
 
   expectNone(): void {
     expect(this.found, "pages of the auth server or the admin console reported Content-Security-Policy violations").toEqual([]);
   }
+}
+
+// Lets each page run what it has queued: a violation fired before is handed over to the binding
+// before the page answers. A page already closing or closed has nothing left to hand over.
+async function settlePages(pages: readonly Page[]): Promise<void> {
+  await Promise.all(
+    pages.map((page) => page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0))).catch(() => undefined)),
+  );
+}
+
+// Closing the page first settles it. Two watchers of one context each wrap it, which settles twice.
+function settleBeforeClose(page: Page): void {
+  const closePage = page.close.bind(page);
+  page.close = async (options) => {
+    await settlePages([page]);
+    return closePage(options);
+  };
 }
 
 // Watches each context browser.newContext() makes until the returned function is called. Playwright's
