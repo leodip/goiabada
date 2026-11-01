@@ -148,7 +148,13 @@ var (
 
 // Verifier checks a form's token with siteverify, against the auth server's own hostname.
 type Verifier struct {
+	// client asks about the forms' tokens. Its transport holds at most maxConcurrentChecks
+	// connections to siteverify, dials in progress included: a canceled call's dial goes on in the
+	// background, so the slots alone would not bound them.
 	client *http.Client
+	// keyClient asks about an administrator's secret key, over its own transport, so a flood that
+	// fills the forms' connections cannot hold it up.
+	keyClient *http.Client
 	// slots holds one entry per form check in flight, up to maxConcurrentChecks.
 	slots         chan struct{}
 	siteverifyURL string
@@ -165,15 +171,12 @@ func NewVerifier(reg *metrics.Registry, dataCipher *encryption.DataCipher, authS
 	if parsed, err := url.Parse(authServerBaseURL); err == nil {
 		hostname = strings.ToLower(parsed.Hostname())
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.MaxIdleConnsPerHost = maxConcurrentChecks
+	formTransport := http.DefaultTransport.(*http.Transport).Clone()
+	formTransport.MaxIdleConnsPerHost = maxConcurrentChecks
+	formTransport.MaxConnsPerHost = maxConcurrentChecks
 	return &Verifier{
-		client: &http.Client{
-			Transport: transport,
-			// A redirect is no answer: following it would send the secret key wherever it
-			// pointed.
-			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-		},
+		client:        siteverifyClient(formTransport),
+		keyClient:     siteverifyClient(http.DefaultTransport.(*http.Transport).Clone()),
 		slots:         make(chan struct{}, maxConcurrentChecks),
 		siteverifyURL: siteverifyURL,
 		hostname:      hostname,
@@ -183,6 +186,15 @@ func NewVerifier(reg *metrics.Registry, dataCipher *encryption.DataCipher, authS
 			metrics.Enum("form", FormLogin.label(), FormForgotPassword.label(), FormRegister.label()),
 			metrics.Enum("outcome", string(Passed), string(Refused), string(Missing), string(Unavailable),
 				string(Misconfigured))),
+	}
+}
+
+// siteverifyClient is a client that calls siteverify over transport. A redirect is no answer:
+// following it would send the secret key wherever it pointed.
+func siteverifyClient(transport *http.Transport) *http.Client {
+	return &http.Client{
+		Transport:     transport,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 }
 
@@ -248,7 +260,7 @@ func (v *Verifier) verify(ctx context.Context, form Form, secretKey, token strin
 	}
 	defer func() { <-v.slots }()
 
-	answer, unusable := v.ask(ctx, secretKey, token)
+	answer, unusable := v.ask(ctx, v.client, secretKey, token)
 	if unusable != nil {
 		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
 			slog.String("form", form.label()), slog.String("reason", unusable.reason), unusable.detail)
@@ -288,10 +300,10 @@ type noAnswer struct {
 	detail slog.Attr
 }
 
-// ask posts token under secretKey to siteverify, once, sending those two and nothing else (decision
-// 3), and reads its answer whatever its status, under the bound. It answers the answer, or why
-// there is none to use, within the deadline, or the earlier one ctx carries.
-func (v *Verifier) ask(ctx context.Context, secretKey, token string) (*siteverifyAnswer, *noAnswer) {
+// ask posts token under secretKey to siteverify through client, once, sending those two and nothing
+// else (decision 3), and reads its answer whatever its status, under the bound. It answers the
+// answer, or why there is none to use, within the deadline, or the earlier one ctx carries.
+func (v *Verifier) ask(ctx context.Context, client *http.Client, secretKey, token string) (*siteverifyAnswer, *noAnswer) {
 	ctx, cancel := context.WithTimeout(ctx, verifyTimeout)
 	defer cancel()
 
@@ -302,7 +314,7 @@ func (v *Verifier) ask(ctx context.Context, secretKey, token string) (*siteverif
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := v.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, &noAnswer{reason: "timeout", detail: slog.String("timeout", verifyTimeout.String())}
@@ -408,7 +420,7 @@ const dummyToken = "XXXX.DUMMY.TOKEN.XXXX"
 // unchecked, and is logged with why, never with the secret key. It is not a form's check, so the
 // counter does not count it.
 func (v *Verifier) CheckSecretKey(ctx context.Context, secretKey string) SecretKeyCheck {
-	answer, unusable := v.ask(ctx, secretKey, dummyToken)
+	answer, unusable := v.ask(ctx, v.keyClient, secretKey, dummyToken)
 	if unusable != nil {
 		slog.WarnContext(ctx, "could not check a turnstile secret key with cloudflare",
 			slog.String("reason", unusable.reason), unusable.detail)
