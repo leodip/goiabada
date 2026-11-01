@@ -13,12 +13,15 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -92,6 +95,102 @@ func registrationCeremonyId(r *http.Request) string {
 	return id
 }
 
+// registrationCeremonies is what the registration form needs of the browser's sign-ins: the one its
+// Create an account link named, while the browser still holds it.
+type registrationCeremonies interface {
+	HeldAuthContext(r *http.Request, ceremonyId string) (*ceremony.AuthContext, error)
+}
+
+// signInCeremonies is what registration and activation need of the browser's sign-ins: the one the
+// Create an account link named, read while the browser holds it, and the two writes that carry it on.
+// *ceremony.Store satisfies it.
+type signInCeremonies interface {
+	registrationCeremonies
+	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error
+	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
+}
+
+// registrationLegalDocuments is what the registration form needs of the legal documents: those in
+// effect for all apps and for the app it was reached from.
+type registrationLegalDocuments interface {
+	ForClient(ctx context.Context, clientIdentifier string) ([]legaldocuments.InEffect, error)
+}
+
+// bindRegistrationLegalDocuments adds to bind the legal documents the registration form links where
+// it collects the data (#622): those in effect for all apps, plus the app's own when registration
+// came from a sign-in for that app. It came from one when the browser holds the sign-in the password
+// page's Create an account link named; a link naming one it does not hold, in another browser or
+// after the sign-in ended, names no app. The page's footer links the same documents, so the app is
+// named to the renderer too.
+func bindRegistrationLegalDocuments(r *http.Request, ceremonies registrationCeremonies,
+	legalDocuments registrationLegalDocuments, bind map[string]interface{}) error {
+
+	clientIdentifier, err := registrationClient(r, ceremonies)
+	if err != nil {
+		return err
+	}
+	inEffect, err := legalDocuments.ForClient(r.Context(), clientIdentifier)
+	if err != nil {
+		return err
+	}
+	links := make([]render.LegalDocumentLink, len(inEffect))
+	for i, d := range inEffect {
+		links[i] = render.LegalDocumentLink{Title: d.Current.Title, ShortName: d.Document.ShortName}
+	}
+	bind["legalDocuments"] = links
+	bind[render.LegalFooterClient] = clientIdentifier
+	return nil
+}
+
+// registrationClient is the app a registration or activation page belongs to: the client of the
+// sign-in the request's URL names (registrationCeremonyId), while the browser holds it. A URL naming
+// none, or one the browser does not hold, in another browser or after the sign-in ended, names no
+// app, and the answer is "".
+func registrationClient(r *http.Request, ceremonies registrationCeremonies) (string, error) {
+	ceremonyId := registrationCeremonyId(r)
+	if ceremonyId == "" {
+		return "", nil
+	}
+	authContext, err := ceremonies.HeldAuthContext(r, ceremonyId)
+	if errors.Is(err, ceremony.ErrNoAuthContext) || errors.Is(err, ceremony.ErrCeremonyNotHeld) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return authContext.ClientId, nil
+}
+
+// legalFooterRenderer is a PageRenderer whose pages belong to a sign-in for the app it names: every
+// page it renders names that app to the legal footer (render.LegalFooterClient), unless the page
+// names one itself. Emails, rendered to a buffer, carry no footer and are passed through.
+type legalFooterRenderer struct {
+	PageRenderer
+	clientIdentifier string
+}
+
+func (p legalFooterRenderer) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string,
+	templateName string, data map[string]interface{}) error {
+	if _, named := data[render.LegalFooterClient]; !named {
+		data[render.LegalFooterClient] = p.clientIdentifier
+	}
+	return p.PageRenderer.RenderTemplate(w, r, layoutName, templateName, data)
+}
+
+// forRegistrationClient is pageRenderer for the pages of a registration or activation request,
+// whose footer links the legal documents of the app the request's sign-in is for, as the
+// registration form does (#622, "Where documents show"): the check-your-email page, the activation
+// form, and each of their refusals. A request whose sign-in the browser does not hold renders as
+// pageRenderer does, with the documents for all apps. Whatever address was typed, the answer is the
+// same: it depends on the sign-in alone.
+func forRegistrationClient(pageRenderer PageRenderer, r *http.Request, ceremonies registrationCeremonies) (PageRenderer, error) {
+	clientIdentifier, err := registrationClient(r, ceremonies)
+	if err != nil || clientIdentifier == "" {
+		return pageRenderer, err
+	}
+	return legalFooterRenderer{PageRenderer: pageRenderer, clientIdentifier: clientIdentifier}, nil
+}
+
 // registrationRequiresEmailVerification is the mode in which an account comes from the emailed
 // link: "requires email verification" on, which RefuseUnavailableRegistration lets through only
 // with SMTP on. In it the register form asks for the address alone, and the password is chosen on
@@ -106,6 +205,8 @@ func registrationRequiresEmailVerification(settings *record.Settings) bool {
 
 func HandleRegisterGet(
 	pageRenderer PageRenderer,
+	ceremonies registrationCeremonies,
+	legalDocuments registrationLegalDocuments,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -120,6 +221,10 @@ func HandleRegisterGet(
 			"ceremonyId":                registrationCeremonyId(r),
 			"requiresEmailVerification": registrationRequiresEmailVerification(settings),
 			"passwordRules":             passwordRulesHint(r),
+		}
+		if err := bindRegistrationLegalDocuments(r, ceremonies, legalDocuments, bind); err != nil {
+			pageRenderer.InternalServerError(w, r, err)
+			return
 		}
 
 		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -225,8 +330,17 @@ func auditRequestedRegistration(ctx context.Context, auditLogger AuditLogger, cl
 //
 // Without it the form creates a usable account at once, so whether an address has one cannot be
 // hidden, and a taken address is told so (#207 decision 3).
+//
+// Registration from an app's sign-in carries that sign-in on (#622 decision 9): the Create an account
+// link names it in the page's URL, which the form posts back to. Without verification, the account
+// created is signed into it at once when the browser holds it (carryOnSignIn); with verification,
+// the emailed link names it, so activating in that browser does the same. The "check your email" page
+// is the same for every address; like the form, its footer links the app's documents when the
+// browser holds the sign-in.
 func HandleRegisterPost(
 	pageRenderer PageRenderer,
+	ceremonies signInCeremonies,
+	legalDocuments registrationLegalDocuments,
 	database accountRegisterDatabase,
 	userCreator UserCreator,
 	emailValidator EmailValidator,
@@ -238,6 +352,8 @@ func HandleRegisterPost(
 	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
+
+	proof := authflow.NewPasswordProof(auditLogger)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -271,6 +387,10 @@ func HandleRegisterPost(
 				"ceremonyId":                registrationCeremonyId(r),
 				"requiresEmailVerification": requiresEmailVerification,
 				"passwordRules":             passwordRulesHint(r),
+			}
+			if err := bindRegistrationLegalDocuments(r, ceremonies, legalDocuments, bind); err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+				return
 			}
 
 			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -324,8 +444,16 @@ func HandleRegisterPost(
 		}
 
 		if requiresEmailVerification {
-			registerWithVerification(w, r, pageRenderer, database, emailSender, auditLogger, afterResponse,
-				dataCipher, baseURL, settings, clientIP, email)
+			// The check-your-email page belongs to the sign-in the registration came from, as the
+			// form did, so its footer links that app's documents too.
+			pagesRenderer, rendererErr := forRegistrationClient(pageRenderer, r, ceremonies)
+			if rendererErr != nil {
+				recordRequest(0, registrationOutcomeServerError)
+				pageRenderer.InternalServerError(w, r, rendererErr)
+				return
+			}
+			registerWithVerification(w, r, pagesRenderer, database, emailSender, auditLogger, afterResponse,
+				dataCipher, baseURL, settings, clientIP, email, registrationCeremonyId(r))
 			return
 		}
 
@@ -400,7 +528,7 @@ func HandleRegisterPost(
 			return
 		}
 
-		_, err = userCreator.CreateUser(r.Context(), &usercreation.Input{
+		user, err = userCreator.CreateUser(r.Context(), &usercreation.Input{
 			Email:         email,
 			EmailVerified: false,
 			PasswordHash:  passwordHash,
@@ -442,6 +570,12 @@ func HandleRegisterPost(
 			}
 		}
 
+		// Registered from an app's sign-in the browser still holds: signed straight into it, and on into
+		// the app. Anywhere else, the page saying the account was created.
+		if carryOnSignIn(w, r, ceremonies, proof, baseURL, registrationCeremonyId(r), user) {
+			return
+		}
+
 		bind := map[string]interface{}{
 			"email":               email,
 			"adminConsoleBaseUrl": adminConsoleBaseURL,
@@ -456,7 +590,8 @@ func HandleRegisterPost(
 // registerWithVerification answers a well-formed address in the mode with verification: both
 // lookups, every time and whatever the first found, then the one "check your email" page, and the
 // rest handed to a job that runs after the response (#207 decision 4). No password is read: the
-// person who follows the emailed link chooses it (#207 decision 1).
+// person who follows the emailed link chooses it (#207 decision 1). ceremonyId is the sign-in the
+// registration came from, which the link names, or empty (#622 decision 9).
 func registerWithVerification(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -470,6 +605,7 @@ func registerWithVerification(
 	settings *record.Settings,
 	clientIP string,
 	email string,
+	ceremonyId string,
 ) {
 	user, err := database.GetUserByEmail(r.Context(), nil, email)
 	if err != nil {
@@ -501,7 +637,7 @@ func registerWithVerification(
 
 	afterResponse.Go(r.Context(), afterresponse.ClassRegistration, func(ctx context.Context) {
 		finishRegistration(ctx, r, database, emailSender, auditLogger, pageRenderer, dataCipher, baseURL,
-			settings, clientIP, email, user, preRegistration)
+			settings, clientIP, email, ceremonyId, user, preRegistration)
 	})
 }
 
@@ -526,6 +662,7 @@ func finishRegistration(
 	settings *record.Settings,
 	clientIP string,
 	email string,
+	ceremonyId string,
 	user *record.User,
 	preRegistration *record.PreRegistration,
 ) {
@@ -559,12 +696,14 @@ func finishRegistration(
 	default:
 		// No pending registration, or a dead one, which this replaces.
 		issueActivationLink(ctx, r, database, emailSender, auditLogger, pageRenderer, dataCipher, baseURL,
-			settings, clientIP, email, preRegistration)
+			settings, clientIP, email, ceremonyId, preRegistration)
 	}
 }
 
 // issueActivationLink writes a new address's pending registration, or gives a dead one a fresh
 // code, and mails its link.
+//
+// ceremonyId is the sign-in the registration came from, which the link names, or empty.
 //
 // dead is the pending registration the lookup found and judged dead, or nil when it found none.
 // Its replacement is conditional on the row still holding the dead code, so of two repeats racing
@@ -582,6 +721,7 @@ func issueActivationLink(
 	settings *record.Settings,
 	clientIP string,
 	email string,
+	ceremonyId string,
 	dead *record.PreRegistration,
 ) {
 	var deadId int64
@@ -637,7 +777,7 @@ func issueActivationLink(
 		// The code and nothing else: the address used to travel here too, which broke every '+'
 		// and '%xx' address under form-urlencoded query parsing (#112). The helper also owns the
 		// path the activation handler redirects back to, so the two cannot drift.
-		"link": emaillinks.AccountActivateLink(baseURL, verificationCode),
+		"link": emaillinks.AccountActivateLink(baseURL, verificationCode, ceremonyId),
 	}
 	// The address has no account and so no stored locale; the mail takes the language the
 	// registration page was matched to, then English, the fallback the stored-locale senders

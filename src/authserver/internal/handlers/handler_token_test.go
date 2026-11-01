@@ -1506,6 +1506,52 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		})
 	})
 
+	// A user who proved the password but owes the acceptance step a legal document is refused
+	// invalid_grant through LegalDocumentsOwedError, and told to accept in the browser. Recorded,
+	// as every invalid_grant on this grant is, but not charged: the budget is the one the browser's
+	// password page spends, and an app retrying a correct password must not lock the user out of
+	// the place the refusal sends them to (#622 decision 7).
+	t.Run("a legal document owed is recorded, not charged, and leaves the password page reachable", func(t *testing.T) {
+		owed := &protocolvalidation.LegalDocumentsOwedError{Detail: oauth.NewErrorDetailWithHTTPStatus(
+			"invalid_grant", protocolvalidation.LegalDocumentsOwedErrorMsg, http.StatusBadRequest)}
+		assert.False(t, spends(t, owed), "the password was right, so the refusal is not a guess")
+
+		handler, auditLogger := newHandler(t, owed)
+		assert.Equal(t, http.StatusOK, post(handler))
+		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.EventROPCAuthFailed, map[string]interface{}{
+			"email_digest":      usernameDigest,
+			"client_identifier": "app",
+		})
+
+		// Through one limiter: many refusals at the token endpoint, then the browser's password
+		// check for the same account from the same address still runs.
+		jsonWriter := handlersmocks.NewJSONWriter(t)
+		tokenValidator := handlersmocks.NewTokenValidator(t)
+		tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).Return(nil, owed)
+		jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return()
+		quietAudit := handlersmocks.NewAuditLogger(t)
+		quietAudit.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+		rateLimiter := newTestRateLimiter(nil)
+		token := rateLimiter.LimitROPC(HandleTokenPost(jsonWriter, datamocks.NewDatabase(t),
+			handlersmocks.NewTokenIssuer(t), tokenValidator, quietAudit, rateLimiter, testTokenMetrics()))
+		for i := 0; i < 5*tightBudget; i++ {
+			require.Equal(t, http.StatusOK, post(token), "attempt %d should reach the handler", i+1)
+		}
+		reached := false
+		passwordPage := rateLimiter.LimitPwd(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		req := httptest.NewRequest(http.MethodPost, "/auth/pwd",
+			strings.NewReader(url.Values{"email": {username}, "password": {"the-right-one"}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = "203.0.113.7:5000"
+		rr := httptest.NewRecorder()
+		passwordPage.ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusNoContent, rr.Code)
+		assert.True(t, reached, "the password page the refusal sends the user to still checks their password")
+	})
+
 	// The three error codes that are not a guess against the account. Each names the gate that
 	// must not charge it.
 	notCharged := []struct {

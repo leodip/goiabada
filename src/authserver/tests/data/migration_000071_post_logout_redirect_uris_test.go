@@ -129,9 +129,10 @@ func indexOutlines(shape tableShape) []string {
 }
 
 // assertPostLogoutRedirectURIsBehaviour holds the table to what it does: a duplicate row is accepted,
-// a row naming no client is refused, and deleting the client removes its rows. The client is written
-// through the isolated handle's own data layer; the rows are plain SQL on the table under test, with
-// literals because the four dialects disagree on placeholder syntax and every value is test-controlled.
+// a row naming no client is refused, and deleting the client removes its rows. The client is seeded
+// in SQL by seedClient, since the data layer writes every column the record carries at head; the
+// rows are plain SQL on the table under test, with literals because the four dialects disagree on
+// placeholder syntax and every value is test-controlled.
 func assertPostLogoutRedirectURIsBehaviour(t *testing.T, h *isolatedDB, when string) {
 	t.Helper()
 	ctx := context.Background()
@@ -139,8 +140,7 @@ func assertPostLogoutRedirectURIsBehaviour(t *testing.T, h *isolatedDB, when str
 		_, err := h.SQL.ExecContext(ctx, fmt.Sprintf(query, args...))
 		return err
 	}
-	client := &record.Client{ClientIdentifier: "signout-client-" + fake.LetterN(8)}
-	require.NoError(t, h.DB.CreateClient(ctx, nil, client), "CreateClient")
+	client := &record.Client{Id: seedClient(t, h, "signout-client-"+fake.LetterN(8))}
 	count := func() int64 {
 		var n int64
 		require.NoError(t, h.SQL.QueryRowContext(ctx, fmt.Sprintf(

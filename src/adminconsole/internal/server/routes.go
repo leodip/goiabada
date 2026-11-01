@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/admingrouphandlers"
+	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminlegaldocumenthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminresourcehandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
@@ -154,6 +155,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/otp", accounthandlers.HandleOtpPost(httpHelper, apiClient, baseURL))
 		r.Get("/manage-consents", accounthandlers.HandleManageConsentsGet(httpHelper, apiClient))
 		r.Post("/manage-consents", accounthandlers.HandleManageConsentsRevokePost(httpHelper, apiClient))
+		r.Get("/legal-documents", accounthandlers.HandleLegalDocumentsGet(httpHelper, apiClient))
 		r.Get("/sessions", accounthandlers.HandleSessionsGet(httpHelper, apiClient))
 		r.Post("/sessions", accounthandlers.HandleSessionsEndSessionPost(httpHelper, apiClient))
 
@@ -191,6 +193,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/clients/{clientId}/permissions", adminclienthandlers.HandlePermissionsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/clients/{clientId}/introspection", adminclienthandlers.HandleIntrospectionGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/clients/{clientId}/introspection", adminclienthandlers.HandleIntrospectionPost(httpHelper, s.sessionStore, apiClient))
+		r.Get("/clients/{clientId}/legal-documents", adminclienthandlers.HandleLegalDocumentsGet(httpHelper, apiClient))
 		r.Get("/clients/generate-new-secret", adminclienthandlers.HandleGenerateNewSecretGet(httpHelper))
 		r.Get("/clients/{clientId}/delete", adminclienthandlers.HandleDeleteGet(httpHelper, apiClient))
 		r.Post("/clients/{clientId}/delete", adminclienthandlers.HandleDeletePost(httpHelper, apiClient, baseURL))
@@ -242,6 +245,24 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Get("/groups/new", admingrouphandlers.HandleNewGet(httpHelper))
 		r.Post("/groups/new", admingrouphandlers.HandleNewPost(httpHelper, apiClient, baseURL))
 
+		// Legal document routes (#622): a document is drafted beside the auth server's preview,
+		// published as numbered versions, and retired, restored, or deleted when never published.
+		r.Get("/legal-documents", adminlegaldocumenthandlers.HandleListGet(httpHelper, apiClient))
+		r.Get("/legal-documents/new", adminlegaldocumenthandlers.HandleNewGet(httpHelper))
+		r.Post("/legal-documents/new", adminlegaldocumenthandlers.HandleNewPost(httpHelper, apiClient, baseURL))
+		r.Post("/legal-documents/preview", adminlegaldocumenthandlers.HandlePreviewPost(httpHelper, apiClient))
+		r.Get("/legal-documents/{legalDocumentId}/draft", adminlegaldocumenthandlers.HandleDraftGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/legal-documents/{legalDocumentId}/draft", adminlegaldocumenthandlers.HandleDraftPost(httpHelper, s.sessionStore, apiClient, baseURL))
+		r.Get("/legal-documents/{legalDocumentId}/apps", adminlegaldocumenthandlers.HandleAppsGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/legal-documents/{legalDocumentId}/apps", adminlegaldocumenthandlers.HandleAppsPost(httpHelper, s.sessionStore, apiClient, s.settingsCache, baseURL))
+		r.Post("/legal-documents/{legalDocumentId}/publish", adminlegaldocumenthandlers.HandlePublishPost(httpHelper, s.sessionStore, apiClient, s.settingsCache, baseURL))
+		r.Get("/legal-documents/{legalDocumentId}/versions", adminlegaldocumenthandlers.HandleVersionsGet(httpHelper, s.sessionStore, apiClient))
+		r.Get("/legal-documents/{legalDocumentId}/versions/{version}", adminlegaldocumenthandlers.HandleVersionGet(httpHelper, apiClient))
+		r.Post("/legal-documents/{legalDocumentId}/retire", adminlegaldocumenthandlers.HandleRetirePost(httpHelper, s.sessionStore, apiClient, s.settingsCache, baseURL))
+		r.Post("/legal-documents/{legalDocumentId}/restore", adminlegaldocumenthandlers.HandleRestorePost(httpHelper, s.sessionStore, apiClient, s.settingsCache, baseURL))
+		r.Get("/legal-documents/{legalDocumentId}/delete", adminlegaldocumenthandlers.HandleDeleteGet(httpHelper, apiClient))
+		r.Post("/legal-documents/{legalDocumentId}/delete", adminlegaldocumenthandlers.HandleDeletePost(httpHelper, apiClient, baseURL))
+
 		// User routes
 		r.Get("/users", adminuserhandlers.HandleListGet(httpHelper, apiClient))
 		r.Get("/users/{userId}/details", adminuserhandlers.HandleDetailsGet(httpHelper, s.sessionStore, apiClient))
@@ -258,6 +279,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/users/{userId}/authentication", adminuserhandlers.HandleAuthenticationPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/users/{userId}/consents", adminuserhandlers.HandleConsentsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/users/{userId}/consents", adminuserhandlers.HandleConsentsPost(httpHelper, apiClient))
+		r.Get("/users/{userId}/legal-documents", adminuserhandlers.HandleLegalDocumentsGet(httpHelper, apiClient))
 		r.Get("/users/{userId}/sessions", adminuserhandlers.HandleSessionsGet(httpHelper, apiClient))
 		r.Post("/users/{userId}/sessions", adminuserhandlers.HandleSessionsPost(httpHelper, apiClient))
 		r.Get("/users/{userId}/attributes", adminuserhandlers.HandleAttributesGet(httpHelper, apiClient))

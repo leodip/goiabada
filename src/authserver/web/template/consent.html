@@ -47,6 +47,19 @@
     </div>
   </fieldset>
 
+  {{/* The app's own privacy policy and terms of service, linked whenever set, the moment the user
+       approves what it gets (RFC 7591 section 2, #622 decision 12). */}}
+  {{ if or .clientPrivacyPolicyUrl .clientTermsOfServiceUrl }}
+  <ul class="legal-links text-sm">
+    {{ if .clientPrivacyPolicyUrl }}
+    <li><a class="text-link" href="{{ .clientPrivacyPolicyUrl }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "consent.client_privacy_policy" }}</a></li>
+    {{ end }}
+    {{ if .clientTermsOfServiceUrl }}
+    <li><a class="text-link" href="{{ .clientTermsOfServiceUrl }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "consent.client_terms_of_service" }}</a></li>
+    {{ end }}
+  </ul>
+  {{ end }}
+
   <div class="auth-actions">
     <button class="button" type="submit" name="btnCancel" value="cancel">{{ T $.ctx "consent.button.cancel" }}</button>
     <button class="button button-primary" type="submit" name="btnSubmit" value="submit">{{ T $.ctx "consent.button.submit" }}</button>

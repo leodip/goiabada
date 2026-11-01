@@ -18,9 +18,17 @@
 <div class="auth-status">
   <span class="status-icon status-icon-positive"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg></span>
   <h1 class="auth-title">{{ T $.ctx "account.activation_result.title" }}</h1>
+  {{/* Registered from an app's sign-in this browser does not hold: the person goes back to the
+       app, which this page cannot link, and My Account is the secondary way on. */}}
+  {{ if .returnToApp }}
+  <p>{{ T $.ctx "account.activation_result.return_to_app_body" }}</p>
+  <code class="auth-address">{{ .email }}</code>
+  <p><a class="text-link" href="{{ .adminConsoleBaseUrl }}/account/profile">{{ T $.ctx "common.link.sign_in_to_account" }}</a></p>
+  {{ else }}
   <p>{{ T $.ctx "account.activation_result.success_body" }}</p>
   <code class="auth-address">{{ .email }}</code>
   <a class="button button-primary button-block" href="{{ .adminConsoleBaseUrl }}/account/profile">{{ T $.ctx "common.link.sign_in_to_account" }}</a>
+  {{ end }}
 </div>
 {{ end }}
 {{end}}

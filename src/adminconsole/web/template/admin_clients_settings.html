@@ -56,6 +56,20 @@
           {{- if .error }}{{ if eq .errorField "websiteUrl" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
         <p class="field-hint" id="websiteUrlHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.website_url_tooltip" }}</p>
       </div>
+      {{/* The client's own documents, linked from the consent screen whenever set, with no switch
+           below (#622 decision 12). */}}
+      <div class="field">
+        <label class="field-label" for="privacyPolicyUrl">{{ T $.ctx "adminconsole.admin_clients.settings.field.privacy_policy_url" }}</label>
+        <input class="control" id="privacyPolicyUrl" type="url" name="privacyPolicyUrl" value="{{ .client.PrivacyPolicyURL }}" placeholder="https://example.com/privacy" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "privacyPolicyUrl" }}client-error {{ end }}{{ end }}privacyPolicyUrlHint"
+          {{- if .error }}{{ if eq .errorField "privacyPolicyUrl" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="privacyPolicyUrlHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.privacy_policy_url_tooltip" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="termsOfServiceUrl">{{ T $.ctx "adminconsole.admin_clients.settings.field.terms_of_service_url" }}</label>
+        <input class="control" id="termsOfServiceUrl" type="url" name="termsOfServiceUrl" value="{{ .client.TermsOfServiceURL }}" placeholder="https://example.com/terms" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "termsOfServiceUrl" }}client-error {{ end }}{{ end }}termsOfServiceUrlHint"
+          {{- if .error }}{{ if eq .errorField "termsOfServiceUrl" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="termsOfServiceUrlHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.terms_of_service_url_tooltip" }}</p>
+      </div>
     </div>
   </div>
 

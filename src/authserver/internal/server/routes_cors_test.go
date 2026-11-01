@@ -37,6 +37,7 @@ func TestRegisterRoutes_APreflightIsAnsweredBeforeRouting(t *testing.T) {
 	} {
 		t.Run(tt.path, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
+			expectNoLegalDocuments(database)
 			database.On("WebOriginExists", mock.Anything, mock.Anything, "https://registered.example").Return(true, nil).Maybe()
 			s := newRoutingTestServer(t, database)
 

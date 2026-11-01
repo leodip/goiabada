@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The four admin list pages have shared one handler name since #443, so in initRoutes only the
+// The five admin list pages have shared one handler name since #443, so in initRoutes only the
 // package qualifier tells their registrations apart. Until #483 no test in this package reached a
 // list page as a signed-in administrator, so two registrations swapped would have rendered the
 // wrong page unnoticed: each handler's tests call the function directly. Each page is requested
@@ -35,6 +35,7 @@ func TestInitRoutes_EachAdminListPageReachesItsOwnAreasEndpoint(t *testing.T) {
 		{"/admin/resources", "/api/v1/admin/resources"},
 		{"/admin/groups", "/api/v1/admin/groups"},
 		{"/admin/users", "/api/v1/admin/users/search"},
+		{"/admin/legal-documents", "/api/v1/admin/legal-documents"},
 	}
 
 	for _, page := range adminPages {

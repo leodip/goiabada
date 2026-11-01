@@ -26,15 +26,21 @@ package audit
 import "slices"
 
 const (
-	EventAuthFailedPwd                        = "auth_failed_pwd" //nolint:gosec // G101: an audit event name, not a credential
-	EventAuthFailedOtp                        = "auth_failed_otp"
-	EventAuthSuccessPwd                       = "auth_success_pwd" //nolint:gosec // G101: an audit event name, not a credential
-	EventAuthSuccessOtp                       = "auth_success_otp"
-	EventUserDisabled                         = "user_disabled"
-	EventStartedNewUserSession                = "started_new_user_session"
-	EventBumpedUserSession                    = "bumped_user_session"
-	EventCreatedAuthCode                      = "created_auth_code"
-	EventSavedConsent                         = "saved_consent"
+	EventAuthFailedPwd         = "auth_failed_pwd" //nolint:gosec // G101: an audit event name, not a credential
+	EventAuthFailedOtp         = "auth_failed_otp"
+	EventAuthSuccessPwd        = "auth_success_pwd" //nolint:gosec // G101: an audit event name, not a credential
+	EventAuthSuccessOtp        = "auth_success_otp"
+	EventUserDisabled          = "user_disabled"
+	EventStartedNewUserSession = "started_new_user_session"
+	EventBumpedUserSession     = "bumped_user_session"
+	EventCreatedAuthCode       = "created_auth_code"
+	EventSavedConsent          = "saved_consent"
+	// The acceptance step (#622). accepted_legal_document records one document a user accepted at
+	// the step, after the acceptances commit, with user_id, client_id (the app being signed in
+	// to), legal_document_id, short_name and version. declined_legal_documents records a decline,
+	// with user_id and client_id: nothing is stored, and the next sign-in asks again.
+	EventAcceptedLegalDocument                = "accepted_legal_document"
+	EventDeclinedLegalDocuments               = "declined_legal_documents"
 	EventTokenIssuedAuthorizationCodeResponse = "token_issued_authorization_code_response"
 	EventTokenIssuedClientCredentialsResponse = "token_issued_client_credentials_response"
 	EventTokenIssuedRefreshTokenResponse      = "token_issued_refresh_token_response" //nolint:gosec // G101: an audit event name, not a credential
@@ -161,17 +167,30 @@ const (
 	//
 	// Payload: user_session_id, logged_in_user, and reason, one of the DeletedUserSession values
 	// below, which every row carries whatever site wrote it (#564 decision 7).
-	EventDeletedUserSession           = "deleted_user_session"
-	EventUpdatedRedirectURIs          = "updated_redirect_uris"
-	EventUpdatedClientPermissions     = "updated_client_permissions"
-	EventDeletedClient                = "deleted_client"
-	EventCreatedClient                = "created_client"
-	EventDynamicClientRegistration    = "dynamic_client_registration"
-	EventUpdatedResourcePermissions   = "updated_resource_permissions"
-	EventDeletedResource              = "deleted_resource"
-	EventUpdatedResource              = "updated_resource"
-	EventCreatedResource              = "created_resource"
-	EventUserAddedToGroup             = "user_added_to_group"
+	EventDeletedUserSession         = "deleted_user_session"
+	EventUpdatedRedirectURIs        = "updated_redirect_uris"
+	EventUpdatedClientPermissions   = "updated_client_permissions"
+	EventDeletedClient              = "deleted_client"
+	EventCreatedClient              = "created_client"
+	EventDynamicClientRegistration  = "dynamic_client_registration"
+	EventUpdatedResourcePermissions = "updated_resource_permissions"
+	EventDeletedResource            = "deleted_resource"
+	EventUpdatedResource            = "updated_resource"
+	EventCreatedResource            = "created_resource"
+	EventUserAddedToGroup           = "user_added_to_group"
+	// The legal documents (#622), written by the admin API after each committed change, every row
+	// with legal_document_id, short_name and logged_in_user. created_legal_document adds kind and
+	// published_legal_document the version number it published. A draft save that only changed
+	// the draft writes updated_legal_document_draft; publishing writes no draft event.
+	// updated_legal_document_apps records a change of the apps a document applies to, with
+	// applies_to (all_apps or selected_apps), added_client_ids and removed_client_ids.
+	EventCreatedLegalDocument         = "created_legal_document"
+	EventUpdatedLegalDocumentApps     = "updated_legal_document_apps"
+	EventUpdatedLegalDocumentDraft    = "updated_legal_document_draft"
+	EventPublishedLegalDocument       = "published_legal_document"
+	EventRetiredLegalDocument         = "retired_legal_document"
+	EventRestoredLegalDocument        = "restored_legal_document"
+	EventDeletedLegalDocument         = "deleted_legal_document"
 	EventUserRemovedFromGroup         = "user_removed_from_group"
 	EventCreatedGroup                 = "created_group"
 	EventUpdatedGroup                 = "updated_group"
@@ -630,6 +649,7 @@ func EventTypes() []string {
 // integration tier's api_audit_event_types_test.go, which compares the response with EventTypes in
 // order, hold it.
 var auditEventTypes = []string{
+	EventAcceptedLegalDocument,
 	EventActivatedAccount,
 	EventAddedGroupAttribute,
 	EventAddedGroupPermission,
@@ -651,14 +671,17 @@ var auditEventTypes = []string{
 	EventCreatedAuthCode,
 	EventCreatedClient,
 	EventCreatedGroup,
+	EventCreatedLegalDocument,
 	EventCreatedResource,
 	EventCreatedUser,
 	EventCrossUserSessionReplaced,
+	EventDeclinedLegalDocuments,
 	EventDeletedClient,
 	EventDeletedClientLogo,
 	EventDeletedGroup,
 	EventDeleteGroupAttribute,
 	EventDeletedGroupPermission,
+	EventDeletedLegalDocument,
 	EventDeletedOwnProfilePicture,
 	EventDeletedOwnUserConsent,
 	EventDeletedResource,
@@ -682,6 +705,7 @@ var auditEventTypes = []string{
 	EventLogout,
 	EventOTPAuthenticatorDisabled,
 	EventOTPCodeReplayDetected,
+	EventPublishedLegalDocument,
 	EventRateLimitExceeded,
 	EventRecoveryCodeReplayDetected,
 	EventRecoveryCodesCreated,
@@ -689,6 +713,8 @@ var auditEventTypes = []string{
 	EventRefreshTokenReplayDetected,
 	EventRequestedPasswordReset,
 	EventRequestedRegistration,
+	EventRestoredLegalDocument,
+	EventRetiredLegalDocument,
 	EventRevokedAccessToken,
 	EventRevokedClientGrants,
 	EventRevokedConsentGrants,
@@ -721,6 +747,8 @@ var auditEventTypes = []string{
 	EventUpdatedGeneralSettings,
 	EventUpdatedGroup,
 	EventUpdatedGroupAttribute,
+	EventUpdatedLegalDocumentApps,
+	EventUpdatedLegalDocumentDraft,
 	EventUpdatedOwnAddress,
 	EventUpdatedOwnEmail,
 	EventUpdatedOwnPhone,

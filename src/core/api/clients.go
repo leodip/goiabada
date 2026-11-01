@@ -48,9 +48,13 @@ type ClientResponse struct {
 	ClientIdentifier string     `json:"clientIdentifier"`
 	Description      string     `json:"description"`
 	WebsiteURL       string     `json:"websiteUrl"`
-	DisplayName      string     `json:"displayName"`
-	Enabled          bool       `json:"enabled"`
-	ConsentRequired  bool       `json:"consentRequired"`
+	// PrivacyPolicyURL and TermsOfServiceURL are the app's own privacy policy and terms of service,
+	// linked from the consent screen whenever set (#622 decision 12); empty when it has none.
+	PrivacyPolicyURL  string `json:"privacyPolicyUrl"`
+	TermsOfServiceURL string `json:"termsOfServiceUrl"`
+	DisplayName       string `json:"displayName"`
+	Enabled           bool   `json:"enabled"`
+	ConsentRequired   bool   `json:"consentRequired"`
 	// CreatedViaDCR is read-only on purpose. It records that the client registered itself through
 	// /connect/register, which is a fact about where the client came from rather than a setting, so
 	// UpdateClientSettingsRequest deliberately does not carry it and neither an administrator nor the
@@ -124,14 +128,18 @@ type UpdateClientSettingsRequest struct {
 	ClientIdentifier string `json:"clientIdentifier"`
 	Description      string `json:"description"`
 	WebsiteURL       string `json:"websiteUrl"`
-	DisplayName      string `json:"displayName"`
-	Enabled          bool   `json:"enabled"`
-	ConsentRequired  bool   `json:"consentRequired"`
-	ShowLogo         bool   `json:"showLogo"`
-	ShowDisplayName  bool   `json:"showDisplayName"`
-	ShowDescription  bool   `json:"showDescription"`
-	ShowWebsiteURL   bool   `json:"showWebsiteUrl"`
-	DefaultAcrLevel  string `json:"defaultAcrLevel,omitempty"`
+	// PrivacyPolicyURL and TermsOfServiceURL are optional, and validated like WebsiteURL: http or
+	// https, at most 256 characters. Empty removes the link.
+	PrivacyPolicyURL  string `json:"privacyPolicyUrl"`
+	TermsOfServiceURL string `json:"termsOfServiceUrl"`
+	DisplayName       string `json:"displayName"`
+	Enabled           bool   `json:"enabled"`
+	ConsentRequired   bool   `json:"consentRequired"`
+	ShowLogo          bool   `json:"showLogo"`
+	ShowDisplayName   bool   `json:"showDisplayName"`
+	ShowDescription   bool   `json:"showDescription"`
+	ShowWebsiteURL    bool   `json:"showWebsiteUrl"`
+	DefaultAcrLevel   string `json:"defaultAcrLevel,omitempty"`
 }
 
 // UpdateClientAuthenticationRequest is used to change a client's

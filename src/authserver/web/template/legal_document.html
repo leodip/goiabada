@@ -1,0 +1,26 @@
+{{define "title"}}{{ .documentTitle }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
+
+{{/* A legal document's public page (#622 decision 5): the version it shows, with its number and
+     publish date, its text as legalmarkdown renders it, and every version's page. An earlier
+     version says it is no longer in effect and links the current one. */}}
+{{define "body"}}
+<h1 class="auth-title">{{ .documentTitle }}</h1>
+<p class="auth-lead" id="legal-document-version">{{ T $.ctx "legal_documents.page.version" "version" .versionNumber }} · {{ T $.ctx "legal_documents.page.published" }} <time datetime="{{ .publishedAt }}">{{ .publishedAt }}</time></p>
+
+{{ if not .isCurrent }}
+<div class="notice notice-note mb-6" id="legal-document-superseded">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+  <p>{{ T $.ctx "legal_documents.page.superseded" "version" .currentVersionNumber }} <a class="text-link" href="/legal/{{ .shortName }}">{{ T $.ctx "legal_documents.page.read_current" }}</a></p>
+</div>
+{{ end }}
+
+<div class="legal-text">{{ .documentHTML }}</div>
+
+<h2 class="auth-section-title">{{ T $.ctx "legal_documents.page.versions" }}</h2>
+<ul class="legal-links" id="legal-document-versions">
+  {{ range .versions }}
+  <li><a class="text-link" href="/legal/{{ $.shortName }}/versions/{{ .Number }}"{{ if eq .Number $.versionNumber }} aria-current="page"{{ end }}>{{ T $.ctx "legal_documents.page.version" "version" .Number }}</a></li>
+  {{ end }}
+</ul>
+{{end}}

@@ -171,6 +171,7 @@ func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessi
 	require.NoError(t, err)
 
 	database := datamocks.NewDatabase(t)
+	expectNoLegalDocuments(database)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
 		Id:           1,

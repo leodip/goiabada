@@ -136,6 +136,32 @@ func everyGatedStep() []stepUnderTest {
 					permissionChecker:  handlersmocks.NewPermissionChecker(t),
 				})
 			}},
+		{name: "legal acceptance GET", method: http.MethodGet, path: "/auth/legal-acceptance",
+			accepted: ceremony.AuthStateRequiresLegalAcceptance,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
+				al *handlersmocks.AuditLogger) http.Handler {
+				return buildLegalAcceptanceGet(legalAcceptanceDeps{
+					pageRenderer:      pr,
+					ceremonyStore:     cs,
+					database:          datamocks.NewDatabase(t),
+					templateFS:        fstest.MapFS{},
+					auditLogger:       al,
+					permissionChecker: handlersmocks.NewPermissionChecker(t),
+				})
+			}},
+		{name: "legal acceptance POST", method: http.MethodPost, path: "/auth/legal-acceptance",
+			accepted: ceremony.AuthStateRequiresLegalAcceptance,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
+				al *handlersmocks.AuditLogger) http.Handler {
+				return buildLegalAcceptancePost(legalAcceptanceDeps{
+					pageRenderer:      pr,
+					ceremonyStore:     cs,
+					database:          datamocks.NewDatabase(t),
+					templateFS:        fstest.MapFS{},
+					auditLogger:       al,
+					permissionChecker: handlersmocks.NewPermissionChecker(t),
+				})
+			}},
 		{name: "consent GET", method: http.MethodGet, path: "/auth/consent", accepted: ceremony.AuthStateRequiresConsent,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {

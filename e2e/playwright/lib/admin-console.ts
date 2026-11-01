@@ -15,6 +15,7 @@ export type ClientTab =
   | "user-sessions"
   | "permissions"
   | "introspection"
+  | "legal-documents"
   | "delete";
 
 export function clientUrl(id: number, tab: ClientTab): string {
@@ -201,6 +202,7 @@ export type UserTab =
   | "authentication"
   | "attributes"
   | "consents"
+  | "legal-documents"
   | "sessions"
   | "groups"
   | "permissions"
@@ -416,4 +418,102 @@ export async function grantUserPermission(page: Page, id: number, resource: stri
   await addPermissionRow(page, resource, permission);
   await page.locator("#btnSave").click();
   await expect(page.getByText("Permissions saved.")).toBeVisible();
+}
+
+export type LegalDocumentTab = "draft" | "apps" | "versions" | "delete";
+
+export function legalDocumentUrl(id: number, tab: LegalDocumentTab): string {
+  return `${env.adminUrl}/admin/legal-documents/${id}/${tab}`;
+}
+
+export type LegalDocumentKind = "must_accept" | "for_information";
+
+export interface NewLegalDocument {
+  kind?: LegalDocumentKind;
+  title: string;
+  // Typed over the short name the console suggests from the title, when given.
+  shortName?: string;
+}
+
+// Fills and submits the new legal document form, leaving the page wherever the console answers. No
+// kind is chosen unless one is given, as the form opens.
+export async function submitNewLegalDocument(page: Page, doc: NewLegalDocument) {
+  await page.goto(`${env.adminUrl}/admin/legal-documents/new`);
+  if (doc.kind) await page.locator(doc.kind === "must_accept" ? "#kindMustAccept" : "#kindForInformation").check();
+  await page.locator("#title").fill(doc.title);
+  if (doc.shortName !== undefined) await page.locator("#shortName").fill(doc.shortName);
+  await page.locator("#btnCreate").click();
+}
+
+// The id in a legal document page's address, such as /admin/legal-documents/7/draft.
+export function legalDocumentIdFrom(url: string): number {
+  const match = url.match(/\/admin\/legal-documents\/(\d+)\//);
+  if (!match) throw new Error(`no legal document id in ${url}`);
+  return Number(match[1]);
+}
+
+// Saves a legal document's draft with this text, and its title when given.
+export async function saveLegalDocumentDraft(page: Page, id: number, { title, markdown }: { title?: string; markdown: string }) {
+  await page.goto(legalDocumentUrl(id, "draft"));
+  if (title !== undefined) await page.locator("#title").fill(title);
+  await page.locator("#markdown").fill(markdown);
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Draft saved.", { exact: true })).toBeVisible();
+}
+
+// Publishes a legal document's saved draft, answering the question with Publish.
+export async function publishLegalDocument(page: Page, id: number) {
+  await page.goto(legalDocumentUrl(id, "draft"));
+  await page.locator("#btnPublish").click();
+  await confirmDialog(page);
+  await expect(page).toHaveURL(legalDocumentUrl(id, "versions"));
+}
+
+// Retires a published legal document, answering the question with Retire.
+export async function retireLegalDocument(page: Page, id: number) {
+  await page.goto(legalDocumentUrl(id, "versions"));
+  await page.locator("#btnRetire").click();
+  await confirmDialog(page);
+  await expect(page.getByText("Document retired.", { exact: true })).toBeVisible();
+}
+
+// A legal document's delete page asks for its short name.
+export async function deleteLegalDocument(page: Page, id: number) {
+  await deleteTyping(page, legalDocumentUrl(id, "delete"), "shortName", `${env.adminUrl}/admin/legal-documents`);
+}
+
+// Takes a legal document out of effect the one way its state allows: one never published is
+// deleted, a published one retired, since a published document is never deleted. A retired one,
+// and one already deleted, are left as they are.
+export async function putAwayLegalDocument(page: Page, id: number) {
+  const response = await page.goto(legalDocumentUrl(id, "versions"));
+  if (response?.status() === 404) return;
+  if ((await page.locator("#btnRetire").count()) > 0) {
+    await retireLegalDocument(page, id);
+  } else if ((await page.locator('.page-actions a[href$="/delete"]').count()) > 0) {
+    await deleteLegalDocument(page, id);
+  }
+}
+
+// Saves a legal document's Applies to tab: all apps, or the clients named by identifier, ticked and
+// every other box cleared.
+export async function setLegalDocumentApps(page: Page, id: number, apps: "all" | string[]) {
+  await page.goto(legalDocumentUrl(id, "apps"));
+  if (apps === "all") {
+    await page.locator("#appliesToAllApps").check();
+  } else {
+    await page.locator("#appliesToSelectedApps").check();
+    const boxes = page.locator('#appsList input[type="checkbox"]');
+    for (const box of await boxes.all()) await box.uncheck();
+    for (const identifier of apps) {
+      // The identifier exactly: testapp-web is a prefix of testapp-web2.
+      await page
+        .locator("#appsList label.check-row")
+        .filter({ has: page.getByText(identifier, { exact: true }) })
+        .locator("input")
+        .check();
+    }
+  }
+  await page.locator("#btnSaveApps").click();
+  await expect(page.getByText("Applies to saved.", { exact: true })).toBeVisible();
 }

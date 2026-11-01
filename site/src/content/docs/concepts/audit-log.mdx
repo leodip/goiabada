@@ -108,8 +108,10 @@ An email address typed into a form nobody has signed in to is recorded only as `
 
 | Key | Meaning |
 |---|---|
+| `added_client_ids` | The row ids of the clients a save of a legal document's apps added. |
 | `added_resource_ids` | The row ids of the resources a save of a client's introspection resources added. |
 | `allowed` | Whether the client may now ask for the administrative scopes. |
+| `applies_to` | A legal document's Applies to after the save: `all_apps`, or `selected_apps` for the apps it lists. |
 | `audit_log_retention_days` | The new audit log retention, in days. |
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
 | `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
@@ -143,6 +145,8 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `issue_id_token` | Whether the implicit flow issued an ID token. |
 | `jti` | The `jti` of an access token a client revoked. |
 | `key_id` | The key id (`kid`) of a deleted signing key. |
+| `kind` | A legal document's kind: `must_accept` for terms users must accept, `for_information` for a privacy notice. |
+| `legal_document_id` | The legal document's row id. |
 | `limiter` | The name of the rate limiter that refused. |
 | `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. |
 | `max_user_sessions_per_user` | Under `old` and `new`: the most sessions one user can hold, 0 for no limit. |
@@ -167,6 +171,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `refresh_token_offline_idle_timeout_in_seconds` | Under `old` and `new`: the default idle timeout of an offline refresh token, in seconds. |
 | `refresh_token_offline_max_lifetime_in_seconds` | Under `old` and `new`: the default maximum lifetime of an offline refresh token, in seconds. |
 | `remaining` | How many of a user's recovery codes are left unused after one signed in. |
+| `removed_client_ids` | The row ids of the clients a save of a legal document's apps removed. |
 | `removed_resource_ids` | The row ids of the resources a save of a client's introspection resources removed. |
 | `resource_id` | The resource's row id. |
 | `resource_identifier` | The identifier the resource is known by. |
@@ -180,6 +185,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `scope` | The scope issued, or the scope a token request asked for and was refused. |
 | `scopes` | The administrative scopes a client asked for and was refused. |
 | `session_identifier` | The identifier of a user's session. |
+| `short_name` | A legal document's short name, the address of its public page. |
 | `step` | The time step of an authenticator code that was sent again. |
 | `target_id` | The row id of the user, group, client or resource a request acted on. |
 | `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
@@ -193,6 +199,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `user_session_id` | The row id of a user's session. |
 | `user_session_idle_timeout_in_seconds` | Under `old` and `new`: the session idle timeout, in seconds. |
 | `user_session_max_lifetime_in_seconds` | Under `old` and `new`: the session maximum lifetime, in seconds. |
+| `version` | The number of a legal document version: the one published, or the one a user accepted. |
 
 ## Why a session was deleted
 
@@ -239,6 +246,8 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `started_new_user_session` | A user signed in and a new session was created for them. |
 | `bumped_user_session` | A user's existing session was reused and kept alive, by single sign-on, a `prompt=none` request or a refresh token grant. |
 | `cross_user_session_replaced` | A user signed in on a browser that still held another user's session, so that session was ended. |
+| `accepted_legal_document` | A user accepted a legal document at sign-in. One entry per document, naming its version. |
+| `declined_legal_documents` | A user declined the legal documents asked at sign-in, and the app was told `access_denied`. Nothing is stored. |
 | `saved_consent` | A user approved a client's consent screen, and the scopes they granted were saved. |
 | `created_auth_code` | An authorization code was issued to a client for a user. |
 | `issuance_refused_session_invalid` | The last step of a sign-in was refused because the user's session had passed its idle timeout or maximum lifetime. |
@@ -266,7 +275,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `token_issued_ropc_response` | The token endpoint issued tokens for a username and password, through the password grant. |
 | `token_issued_implicit_response` | The authorization endpoint issued tokens straight to a client, through the implicit flow. |
 | `token_scope_denied` | The token endpoint refused a request for a scope the client or user may not have, or an OpenID Connect scope on the client credentials grant, or a client credentials request that left `scope` out from a client holding no permissions, recorded with an empty `scope`. |
-| `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled or has two-factor authentication on. |
+| `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled, has two-factor authentication on or hasn't accepted a legal document the app requires. |
 | `auth_code_reuse_detected` | A client redeemed an authorization code a second time. The refresh tokens issued through that code's session were revoked, and, if there were any, the session ended. |
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |
 | `revoked_consent_grants` | A user's consent to a client was withdrawn, by the user or by an administrator, so the refresh tokens the user held with that client, and the authorization codes not yet redeemed, were revoked. It's written beside `deleted_own_user_consent` or `deleted_user_consent`, and names the client, the tokens revoked and how many codes. |
@@ -380,6 +389,18 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_resource` | An administrator changed a resource's identifier or description. |
 | `updated_resource_permissions` | An administrator changed the permissions a resource defines: added, renamed, described or deleted them. Granting a permission writes a different event. |
 | `deleted_resource` | An administrator deleted a resource. |
+
+### Legal documents
+
+| Event | Meaning |
+|---|---|
+| `created_legal_document` | An administrator created a legal document, with its first draft. |
+| `updated_legal_document_draft` | An administrator saved a legal document's draft, and its short name when it was never published. |
+| `updated_legal_document_apps` | An administrator changed the apps a legal document applies to. |
+| `published_legal_document` | An administrator published a legal document's draft as its next version. |
+| `retired_legal_document` | An administrator retired a legal document. |
+| `restored_legal_document` | An administrator restored a retired legal document. |
+| `deleted_legal_document` | An administrator deleted a legal document that was never published. |
 
 ### Settings and keys
 

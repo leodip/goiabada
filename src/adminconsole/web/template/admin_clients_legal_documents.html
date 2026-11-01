@@ -1,0 +1,47 @@
+{{define "title"}}{{ T $.ctx "adminconsole.client_tabs.legal_documents" }} – {{ .client.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "page"}}
+{{ template "client_header" (args "legal-documents" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
+
+{{/* Read only: the legal documents that apply to this client, published or not, retired ones left
+     out. A document's apps are chosen on its own Applies to tab. */}}
+{{ if .client.IsSystemLevelClient }}
+<div class="notice notice-note mb-6">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+  <p>{{ T $.ctx "adminconsole.admin_clients.legal_documents.admin_console_notice" }}</p>
+</div>
+{{ end }}
+
+{{ if .legalDocuments }}
+<p class="mb-4 text-ink-muted">{{ T $.ctx "adminconsole.admin_clients.legal_documents.lead" }}</p>
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
+  <table class="data-table data-table-stack" id="clientLegalDocumentsTable">
+    <thead>
+      <tr>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_legal_documents.list.col_document" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_legal_documents.list.col_state" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_legal_documents.common.col_applies_to" }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .legalDocuments }}
+      <tr>
+        <td class="cell-wrap">
+          <a class="text-link" href="/admin/legal-documents/{{ .Id }}/draft">{{ .Title }}</a>
+          <span class="cell-secondary font-mono">{{ .ShortName }}</span>
+        </td>
+        <td data-label="{{ T $.ctx "adminconsole.admin_legal_documents.list.col_state" }}">{{ template "legal_document_tags" (args . $.ctx) }}</td>
+        <td data-label="{{ T $.ctx "adminconsole.admin_legal_documents.common.col_applies_to" }}">{{ template "legal_document_applies_to" (args . $.ctx) }}</td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ else }}
+<div class="panel">
+  <p class="empty-state">{{ T $.ctx "adminconsole.admin_clients.legal_documents.empty" }}</p>
+</div>
+{{ end }}
+{{end}}

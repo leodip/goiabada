@@ -32,13 +32,17 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				TokenEndpointAuthMethod: "client_secret_basic",
 				GrantTypes:              []string{"authorization_code", "refresh_token"},
 				ClientName:              "Example Client",
+				PolicyURI:               "https://client.example.org/privacy",
+				TOSURI:                  "https://client.example.org/terms",
 			},
 			newValue: func() any { return &DynamicClientRegistrationRequest{} },
 			literal: `{"redirect_uris":["https://client.example.org/callback"],` +
 				`"post_logout_redirect_uris":["https://client.example.org/signed-out"],` +
 				`"token_endpoint_auth_method":"client_secret_basic",` +
 				`"grant_types":["authorization_code","refresh_token"],` +
-				`"client_name":"Example Client"}`,
+				`"client_name":"Example Client",` +
+				`"policy_uri":"https://client.example.org/privacy",` +
+				`"tos_uri":"https://client.example.org/terms"}`,
 		},
 		{
 			// Every field of the request is optional, so the zero value is the empty object.
@@ -61,6 +65,8 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				TokenEndpointAuthMethod: "client_secret_basic",
 				GrantTypes:              []string{"authorization_code", "refresh_token"},
 				ClientName:              "Example Client",
+				PolicyURI:               "https://client.example.org/privacy",
+				TOSURI:                  "https://client.example.org/terms",
 			},
 			newValue: func() any { return &DynamicClientRegistrationResponse{} },
 			literal: `{"client_id":"generated-client-id",` +
@@ -71,7 +77,9 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				`"post_logout_redirect_uris":["https://client.example.org/signed-out"],` +
 				`"token_endpoint_auth_method":"client_secret_basic",` +
 				`"grant_types":["authorization_code","refresh_token"],` +
-				`"client_name":"Example Client"}`,
+				`"client_name":"Example Client",` +
+				`"policy_uri":"https://client.example.org/privacy",` +
+				`"tos_uri":"https://client.example.org/terms"}`,
 		},
 		{
 			// A public client gets no secret, and the four members RFC 7591 section 3.2.1

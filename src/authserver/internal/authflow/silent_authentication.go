@@ -33,18 +33,20 @@ type silentAuthenticationSessions interface {
 // browser's session. Authorization.Run hands it such a request; the route table builds one and gives
 // it to NewAuthorization.
 type SilentAuthentication struct {
-	database    silentAuthenticationDatabase
-	sessions    silentAuthenticationSessions
-	scopes      scopeFilter
-	auditLogger auditLogger
+	database       silentAuthenticationDatabase
+	sessions       silentAuthenticationSessions
+	scopes         scopeFilter
+	auditLogger    auditLogger
+	legalDocuments legalDocumentsOwed
 }
 
 // NewSilentAuthentication builds the operation over the database, the user sessions, the scope
-// filter and the audit log it uses.
+// filter, the audit log and the legal documents it uses.
 func NewSilentAuthentication(database silentAuthenticationDatabase, sessions silentAuthenticationSessions,
-	scopes scopeFilter, auditLogger auditLogger) *SilentAuthentication {
+	scopes scopeFilter, auditLogger auditLogger, legalDocuments legalDocumentsOwed) *SilentAuthentication {
 
-	return &SilentAuthentication{database: database, sessions: sessions, scopes: scopes, auditLogger: auditLogger}
+	return &SilentAuthentication{database: database, sessions: sessions, scopes: scopes, auditLogger: auditLogger,
+		legalDocuments: legalDocuments}
 }
 
 // SilentAuthenticationResult is what SilentAuthentication.Run did. When Refusal is nil, the
@@ -63,8 +65,8 @@ type SilentAuthenticationResult struct {
 //
 //  1. Decides from the ceremony and its client (decideSilentAuthentication), loading each fact it
 //     asks for, once: the browser's user session by sessionIdentifier with its user, its validity
-//     with and without max_age, the scope narrowed to what the user holds, and the user's consent to
-//     the client. A failed read is returned as an error, never taken for "no session" or "no
+//     with and without max_age, the scope narrowed to what the user holds, whether the user owes the
+//     acceptance step a legal document for the client, and the user's consent to the client. A failed read is returned as an error, never taken for "no session" or "no
 //     consent", so a database fault is no login_required or consent_required.
 //  2. A refusal: records user_disabled when it is for a disabled account and returns Refusal.
 //     Nothing past the check that refused is read, and nothing is written, so a silent request
@@ -128,6 +130,14 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 				return SilentAuthenticationResult{}, err
 			}
 			facts.EffectiveScope = &effectiveScope
+
+		case silentFactLegalDocuments:
+			owed, err := o.legalDocuments.Owed(ctx, client, facts.Session.User.Id)
+			if err != nil {
+				return SilentAuthenticationResult{}, err
+			}
+			owes := len(owed) > 0
+			facts.LegalDocumentsOwed = &owes
 
 		case silentFactConsent:
 			consent, err := o.database.GetConsentByUserIdAndClientId(ctx, nil, facts.Session.User.Id, client.Id)

@@ -248,6 +248,9 @@ var templateFuncMap = template.FuncMap{
 	"isAdminUserPage": func(urlPath string) bool {
 		return inSection(urlPath, "/admin/users")
 	},
+	"isAdminLegalDocumentPage": func(urlPath string) bool {
+		return inSection(urlPath, "/admin/legal-documents")
+	},
 	"isAdminSettingsEmailPage": func(urlPath string) bool {
 		if urlPath == "/admin/settings" {
 			return true

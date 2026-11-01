@@ -105,13 +105,15 @@ type passwordRefusal struct {
 	form            url.Values
 	// user is the account the username names, or nil for none.
 	user *record.User
+	// legalDocumentOwed has the user owe the acceptance step a legal document for the client.
+	legalDocumentOwed bool
 }
 
 // passwordRefusals is every branch on which the password grant answers an error after the client
 // is found: the flow off, a missing username, a wrong client secret, an unknown account, a wrong
-// password, a disabled account, an account with two-factor authentication, a client whose
-// default ACR level is level 2 (mandatory), a scope the user does not hold, and an
-// administrative scope the client may not request.
+// password, a disabled account, an account with two-factor authentication, a legal document the
+// user owes, a client whose default ACR level is level 2 (mandatory), a scope the user does not
+// hold, and an administrative scope the client may not request.
 func passwordRefusals(t *testing.T) []passwordRefusal {
 	t.Helper()
 	hash, err := passwordhash.Hash("the-password")
@@ -148,6 +150,7 @@ func passwordRefusals(t *testing.T) []passwordRefusal {
 		{name: "a wrong password", form: form(func(v url.Values) { v.Set("password", "wrong") }), user: user(nil)},
 		{name: "a disabled account", form: form(nil), user: user(func(u *record.User) { u.Enabled = false })},
 		{name: "two-factor authentication", form: form(nil), user: user(func(u *record.User) { u.OTPEnabled = true })},
+		{name: "a legal document owed", form: form(nil), user: user(nil), legalDocumentOwed: true},
 		{name: "a client whose default ACR level is level 2 (mandatory)", level2Mandatory: true, form: form(nil), user: user(nil)},
 		{name: "a scope the user does not hold", form: form(func(v url.Values) { v.Set("scope", "openid product-api:write") }),
 			user: user(nil)},
@@ -181,6 +184,18 @@ func passwordGrantErrors(t *testing.T) map[string]string {
 		database := datamocks.NewDatabase(t)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "legacy-app").Return(client, nil).Maybe()
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(refusal.user, nil).Maybe()
+		database.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, int64(7)).
+			Return([]record.LegalDocumentClient{}, nil).Maybe()
+		documents := []record.LegalDocument{}
+		if refusal.legalDocumentOwed {
+			documents = append(documents, record.LegalDocument{Id: 3, ShortName: "terms",
+				Kind: record.LegalDocumentKindMustAccept, AppliesToAllApps: true})
+		}
+		database.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return(documents, nil).Maybe()
+		database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(3)).
+			Return([]record.LegalDocumentVersion{{Id: 31, LegalDocumentId: 3, VersionNumber: 1}}, nil).Maybe()
+		database.On("GetLegalDocumentAcceptancesByUserId", mock.Anything, mock.Anything, mock.Anything).
+			Return([]record.LegalDocumentAcceptance{}, nil).Maybe()
 		database.On("UserLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		database.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		database.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "product-api").

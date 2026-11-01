@@ -1,0 +1,14 @@
+{{/* The legal documents in effect for the page: those for all apps, plus the app's own on a page
+     that belongs to a sign-in for it (#622). The renderer fills legalFooter on the two layouts that
+     draw it, and the footer is left out when there are none. */}}
+{{define "legal_footer"}}
+{{ if .legalFooter }}
+<nav class="legal-footer" aria-label="{{ T $.ctx "legal_documents.footer.label" }}">
+  <ul class="legal-links">
+    {{ range .legalFooter }}
+    <li><a class="text-link" href="/legal/{{ .ShortName }}">{{ .Title }}</a></li>
+    {{ end }}
+  </ul>
+</nav>
+{{ end }}
+{{end}}

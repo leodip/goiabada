@@ -16,6 +16,11 @@ type DynamicClientRegistrationRequest struct {
 
 	// Human-readable metadata (RFC 7591 §2)
 	ClientName string `json:"client_name,omitempty"`
+	// PolicyURI and TOSURI are the client's privacy policy and terms of service, which the consent
+	// screen links. Each is stored only when it is an http or https URL with the scheme and host of
+	// one of the redirect URIs (RFC 7591 section 5), and dropped otherwise (#622 decision 12).
+	PolicyURI string `json:"policy_uri,omitempty"`
+	TOSURI    string `json:"tos_uri,omitempty"`
 
 	// All other fields ignored per RFC 7591 §2:
 	// "The authorization server MUST ignore any client metadata
@@ -40,6 +45,10 @@ type DynamicClientRegistrationResponse struct {
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 	GrantTypes              []string `json:"grant_types"`
 	ClientName              string   `json:"client_name,omitempty"`
+	// PolicyURI and TOSURI are what was stored, so a value that was dropped is absent (RFC 7591
+	// section 3.2.1 lets the server reject or replace a requested value).
+	PolicyURI string `json:"policy_uri,omitempty"`
+	TOSURI    string `json:"tos_uri,omitempty"`
 }
 
 // DynamicClientRegistrationError represents RFC 7591 §3.2.2 error response

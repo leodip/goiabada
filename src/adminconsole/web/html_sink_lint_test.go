@@ -14,10 +14,14 @@ import (
 // through an HTML or JavaScript parser. It covers what #105's check on the redirect URI and web
 // origin cells held, both the write and the read side, on every page rather than two.
 //
-// htmlSinkAllowances names the one site that still does it, by file and text so it does not drift:
+// htmlSinkAllowances names the two sites that still do it, by file and text so they do not drift:
 // the dialog's markup branch, which renders what dialogMarkup or dialogMarkupFormat built, whose
-// markup is the catalog's and whose values are escaped. It is the one audited exception. The
-// dialog's plain branch shows its message as text, and the table cells, links, buttons and banners
+// markup is the catalog's and whose values are escaped; and a legal document's preview, which
+// shows the HTML the auth server's legal document renderer answered (#622 decision 4). That
+// renderer is the guarded sink: it leaves raw HTML out, drops script and file addresses, and draws
+// images as links, so the markup it answers is its own, never raw HTML an administrator wrote.
+// They are the audited exceptions. The dialog's plain branch shows its message as text, and the
+// table cells, links, buttons and banners
 // that were listed here write their data as text; an entry left behind after its site is fixed
 // fails this test.
 func TestServedPages_HandNoDataToAnHTMLParser(t *testing.T) {
@@ -59,4 +63,5 @@ func isVendored(name string) bool {
 
 var htmlSinkAllowances = []guard.HTMLSinkAllowance{
 	{File: "static/utils.js", Text: `messageElement.innerHTML = message.html;`},
+	{File: "static/pages/legal-document-preview.js", Text: `preview.innerHTML = answer.html;`},
 }

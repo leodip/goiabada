@@ -6,6 +6,8 @@ import {
   deleteResource,
   deleteUser,
   idFromListLink,
+  legalDocumentIdFrom,
+  putAwayLegalDocument,
   signInAsAdmin,
 } from "../lib/admin-console";
 import { env } from "../lib/environment";
@@ -47,6 +49,19 @@ setup("sweep what earlier runs left", async ({ page }, testInfo) => {
   for (const identifier of await leftoversOn(page, groups)) {
     await deleteGroup(page, await idFromListLink(page, groups, identifier));
   }
+  // A legal document is listed by its title, with its short name beneath, which is what the tests
+  // name with the prefix. One never published is deleted and a published one retired; a retired one
+  // stays as it is, since a published document is never deleted.
+  await page.goto(`${env.adminUrl}/admin/legal-documents`);
+  const legalDocumentIds = (
+    await page
+      .locator("#legalDocumentsTable tbody tr")
+      .filter({ has: page.locator(".cell-secondary", { hasText: new RegExp(`^${testPrefix}`) }) })
+      .filter({ hasNot: page.locator(".tag-caution") })
+      .locator("td:first-child a")
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""))
+  ).map(legalDocumentIdFrom);
+  for (const id of legalDocumentIds) await putAwayLegalDocument(page, id);
   // The users list is paged; a search narrows it to the test users, a page at a time.
   const users = `${env.adminUrl}/admin/users?query=${testPrefix}`;
   for (let emails = await leftoversOn(page, users); emails.length > 0; emails = await leftoversOn(page, users)) {

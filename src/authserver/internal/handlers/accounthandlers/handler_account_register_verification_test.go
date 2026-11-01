@@ -95,7 +95,7 @@ func newRegisterHarness(t *testing.T) *registerHarness {
 		auditLogger:       handlersmocks.NewAuditLogger(t),
 		jobs:              &heldJobs{},
 	}
-	h.handler = HandleRegisterPost(h.pageRenderer, h.database, h.userCreator, h.emailValidator,
+	h.handler = HandleRegisterPost(h.pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, h.database, h.userCreator, h.emailValidator,
 		h.passwordValidator, h.emailSender, h.auditLogger, h.jobs, testDataCipher, testBaseURL,
 		testAdminConsoleBaseURL)
 	return h

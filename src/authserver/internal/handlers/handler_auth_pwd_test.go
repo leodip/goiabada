@@ -148,7 +148,10 @@ func TestHandleAuthPwdGet(t *testing.T) {
 				data["layoutShowClientSection"] == true &&
 				data["layoutClientName"] == "my-app" && data["layoutHasClientLogo"] == false &&
 				data["layoutClientLogoUrl"] == "" && data["layoutClientDescription"] == "" &&
-				data["layoutClientWebsiteUrl"] == ""
+				data["layoutClientWebsiteUrl"] == "" &&
+				// The page belongs to a sign-in for the client, so its footer links the
+				// client's own legal documents as well (#622).
+				data["legalFooterClient"] == "my-app"
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

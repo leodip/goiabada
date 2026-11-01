@@ -248,6 +248,95 @@ func postLogoutRedirectURIMapping() mappingCase {
 	}
 }
 
+// legalDocumentMapping holds the document's whole-row writes, kind and applies_to_all_apps left
+// out of the UPDATE: a document's kind is fixed at creation (#622 decision 2), and its Applies to
+// has its own writer.
+func legalDocumentMapping() mappingCase {
+	return mappingCase{
+		name:   "legal document",
+		table:  "legal_documents",
+		record: reflect.TypeOf(record.LegalDocument{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetLegalDocumentById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetLegalDocumentById(ctx, nil, 1)
+			},
+			"GetLegalDocumentByShortName": func(ctx context.Context, d *Database) (any, error) {
+				// The distinct value the row carries, so the exact-match check keeps it.
+				return d.GetLegalDocumentByShortName(ctx, nil, distinctString("short_name"))
+			},
+			"GetAllLegalDocuments": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAllLegalDocuments(ctx, nil))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateLegalDocument(ctx, nil, rec.(*record.LegalDocument))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateLegalDocument(ctx, nil, rec.(*record.LegalDocument))
+		},
+	}
+}
+
+// legalDocumentVersionMapping has no update: a published version is never rewritten (#622
+// decision 1).
+func legalDocumentVersionMapping() mappingCase {
+	return mappingCase{
+		name:   "legal document version",
+		table:  "legal_document_versions",
+		record: reflect.TypeOf(record.LegalDocumentVersion{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetLegalDocumentVersionsByLegalDocumentId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentVersionsByLegalDocumentId(ctx, nil, 1))
+			},
+			"GetLegalDocumentVersion": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetLegalDocumentVersion(ctx, nil, 1, 1)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateLegalDocumentVersion(ctx, nil, rec.(*record.LegalDocumentVersion))
+		},
+	}
+}
+
+// legalDocumentClientMapping has no update: a document's app is created and deleted, never
+// rewritten.
+func legalDocumentClientMapping() mappingCase {
+	return mappingCase{
+		name:   "legal document client",
+		table:  "legal_documents_clients",
+		record: reflect.TypeOf(record.LegalDocumentClient{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetLegalDocumentClientsByLegalDocumentId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentClientsByLegalDocumentId(ctx, nil, 1))
+			},
+			"GetLegalDocumentClientsByClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentClientsByClientId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateLegalDocumentClient(ctx, nil, rec.(*record.LegalDocumentClient))
+		},
+	}
+}
+
+// legalDocumentAcceptanceMapping has no update: an acceptance is written once and never
+// rewritten.
+func legalDocumentAcceptanceMapping() mappingCase {
+	return mappingCase{
+		name:   "legal document acceptance",
+		table:  "legal_document_acceptances",
+		record: reflect.TypeOf(record.LegalDocumentAcceptance{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetLegalDocumentAcceptancesByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentAcceptancesByUserId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateLegalDocumentAcceptance(ctx, nil, rec.(*record.LegalDocumentAcceptance))
+		},
+	}
+}
+
 // webOriginMapping has no update: a web origin is created and deleted, never rewritten.
 func webOriginMapping() mappingCase {
 	return mappingCase{
@@ -838,6 +927,8 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		permissionMapping(), resourceMapping(),
 		clientMapping(), clientLogoMapping(), clientPermissionMapping(), clientIntrospectionResourceMapping(),
 		redirectURIMapping(), postLogoutRedirectURIMapping(), webOriginMapping(),
+		legalDocumentMapping(), legalDocumentVersionMapping(), legalDocumentClientMapping(),
+		legalDocumentAcceptanceMapping(),
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
 		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),

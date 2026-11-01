@@ -219,7 +219,7 @@ func TestHandleRegisterPost_WithoutVerificationADeadPendingRegistrationIsAbsent(
 		emailValidator := accounthandlersmocks.NewEmailValidator(t)
 		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator,
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator,
 			accounthandlersmocks.NewEmailSender(t), auditLogger, &heldJobs{}, testDataCipher, testBaseURL,
 			testAdminConsoleBaseURL)
 		return handler, pageRenderer, database, userCreator, emailValidator, passwordValidator, auditLogger

@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -17,19 +18,32 @@ type publicSettingsDatabase interface {
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 }
 
-type PublicSettings struct {
-	database publicSettingsDatabase
+// publicLegalDocuments is what the public settings need of the legal documents: those in effect
+// for all apps.
+type publicLegalDocuments interface {
+	ForAllApps(ctx context.Context) ([]legaldocuments.InEffect, error)
 }
 
-func NewPublicSettings(database publicSettingsDatabase) *PublicSettings {
+type PublicSettings struct {
+	database       publicSettingsDatabase
+	legalDocuments publicLegalDocuments
+	baseURL        string
+}
+
+// NewPublicSettings answers the public settings from database and legalDocuments; baseURL is the auth
+// server's public base URL, which each document's page address is built on.
+func NewPublicSettings(database publicSettingsDatabase, legalDocuments publicLegalDocuments, baseURL string) *PublicSettings {
 	return &PublicSettings{
-		database: database,
+		database:       database,
+		legalDocuments: legalDocuments,
+		baseURL:        baseURL,
 	}
 }
 
 // ServeHTTP answers GET /api/public/settings, which needs no authentication: the settings the
 // admin console needs before anyone holds a token, the application name, the UI theme, whether
-// SMTP is configured, the issuer and the stored password policy's rules, as JSON, or the API's JSON 500 when the settings row cannot
+// SMTP is configured, the issuer, the stored password policy's rules and the legal documents in
+// effect for all apps, as JSON, or the API's JSON 500 when the settings row cannot
 // be read (#279 decision 17).
 //
 // The route is registered for GET only, so the router answers any other method itself, 405 with
@@ -65,12 +79,30 @@ func (h *PublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// PasswordRules is here because the admin console states them under its password fields
 	// (#550 decision 11). The registration form already states them to anyone while registration
 	// is on, and NIST SP 800-63B assumes an attacker knows them.
+	//
+	// LegalDocuments is here because My Account's footer links the documents in effect for all apps
+	// (#622 decision 10). Each one's page is public, and the sign-in pages' footer links them too.
+	inEffect, err := h.legalDocuments.ForAllApps(r.Context())
+	if err != nil {
+		apiresponse.WriteInternalServerError(w, r, errs.Wrap(err, "unable to retrieve the legal documents"))
+		return
+	}
+	legalDocuments := make([]api.PublicLegalDocumentResponse, len(inEffect))
+	for i, d := range inEffect {
+		legalDocuments[i] = api.PublicLegalDocumentResponse{
+			Title:     d.Current.Title,
+			ShortName: d.Document.ShortName,
+			URL:       h.baseURL + "/legal/" + d.Document.ShortName,
+		}
+	}
+
 	response := api.PublicSettingsResponse{
-		AppName:       settings.AppName,
-		UITheme:       settings.UITheme,
-		SMTPEnabled:   settings.SMTPEnabled,
-		Issuer:        settings.Issuer,
-		PasswordRules: apimapping.ToPasswordRulesResponse(settings.PasswordPolicy),
+		AppName:        settings.AppName,
+		UITheme:        settings.UITheme,
+		SMTPEnabled:    settings.SMTPEnabled,
+		Issuer:         settings.Issuer,
+		PasswordRules:  apimapping.ToPasswordRulesResponse(settings.PasswordPolicy),
+		LegalDocuments: legalDocuments,
 	}
 
 	apiresponse.WriteJSON(w, r, http.StatusOK, response)

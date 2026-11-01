@@ -1,0 +1,98 @@
+{{define "title"}}{{ T $.ctx "adminconsole.legal_document_tabs.draft" }} – {{ .doc.Title }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}
+<script src="{{ asset "/static/pages/legal-document-preview.js" }}" defer></script>
+{{end}}
+
+{{define "page"}}
+{{ template "legal_document_header" (args "draft" .doc $.ctx) }}
+
+{{/* The editor and its preview, side by side on a wide screen. legal-document-preview.js renders
+     the text in the preview as it is typed, through the auth server's renderer, the one its public
+     pages use. A retired document is read only until it is restored. errorField names the field a
+     refusal is about, which is marked invalid, described by the notice and focused. */}}
+<div class="grid items-start gap-6 xl:grid-cols-2">
+  <form class="panel" id="draftForm" method="post" action="/admin/legal-documents/{{ .doc.Id }}/draft" novalidate>
+    <div class="panel-body stacked">
+      {{ if .error }}
+      <div class="notice notice-danger" role="alert" id="draft-error">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+        <p>{{ .error }}</p>
+      </div>
+      {{ end }}
+      {{ if .draftSaved }}
+      <div class="notice notice-positive" role="status">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+        <p>{{ T $.ctx "adminconsole.admin_legal_documents.draft.saved" }}</p>
+      </div>
+      {{ end }}
+      {{ if .doc.Retired }}
+      <div class="notice notice-caution">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+        <p>{{ T $.ctx "adminconsole.admin_legal_documents.draft.retired_notice" }}</p>
+      </div>
+      {{ else if not .hasDraft }}
+      <div class="notice notice-note">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+        <p>{{ T $.ctx "adminconsole.admin_legal_documents.draft.no_draft_notice" "version" .doc.CurrentVersion }}</p>
+      </div>
+      {{ end }}
+
+      <div class="field">
+        <label class="field-label" for="shortName">{{ T $.ctx "adminconsole.admin_legal_documents.common.field_short_name" }}</label>
+        {{ if or .shortNameFixed .doc.Retired }}
+        <input class="control control-mono" id="shortName" type="text" value="{{ .shortName }}" readonly aria-describedby="shortNameHint">
+        <p class="field-hint" id="shortNameHint">{{ T $.ctx "adminconsole.admin_legal_documents.draft.short_name_fixed_hint" }}</p>
+        {{ else }}
+        <input class="control control-mono" id="shortName" type="text" name="shortName" value="{{ .shortName }}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "shortName" }}draft-error {{ end }}{{ end }}shortNameHint"
+          {{- if .error }}{{ if eq .errorField "shortName" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="shortNameHint">{{ T $.ctx "adminconsole.admin_legal_documents.common.short_name_hint" }}</p>
+        {{ end }}
+      </div>
+      <div class="field">
+        <label class="field-label" for="title">{{ T $.ctx "adminconsole.admin_legal_documents.common.field_title" }}</label>
+        <input class="control" id="title" type="text" name="title" value="{{ .title }}" autocomplete="off"{{ if .doc.Retired }} readonly{{ end }} aria-describedby="{{ if .error }}{{ if eq .errorField "title" }}draft-error {{ end }}{{ end }}titleHint"
+          {{- if .error }}{{ if eq .errorField "title" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="titleHint">{{ T $.ctx "adminconsole.admin_legal_documents.common.title_hint" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="markdown">{{ T $.ctx "adminconsole.admin_legal_documents.draft.field_markdown" }}</label>
+        <textarea class="control control-mono" id="markdown" name="markdown" rows="20" spellcheck="true"{{ if .doc.Retired }} readonly{{ end }} aria-describedby="{{ if .error }}{{ if eq .errorField "markdown" }}draft-error {{ end }}{{ end }}markdownHint"
+          {{- if .error }}{{ if eq .errorField "markdown" }} aria-invalid="true" autofocus{{ end }}{{ end }}>{{ .markdown }}</textarea>
+        <p class="field-hint" id="markdownHint">{{ T $.ctx "adminconsole.admin_legal_documents.draft.markdown_hint" }}</p>
+      </div>
+    </div>
+    {{ if not .doc.Retired }}
+    <div class="panel-footer">
+      <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_legal_documents.draft.save_button" }}</button>
+    </div>
+    {{ end }}
+  </form>
+
+  <section class="panel" aria-labelledby="preview-title">
+    <div class="panel-body stacked">
+      <div>
+        <h2 class="panel-title" id="preview-title">{{ T $.ctx "adminconsole.admin_legal_documents.common.preview_title" }}</h2>
+        <p class="field-hint">{{ T $.ctx "adminconsole.admin_legal_documents.common.preview_hint" }}</p>
+      </div>
+      <div class="not-empty:block hidden" id="previewStatus" role="status"></div>
+      <div class="legal-text" id="legalDocumentPreview" data-preview-url="/admin/legal-documents/preview" data-preview-source="markdown"></div>
+    </div>
+  </section>
+</div>
+
+{{ if and .hasDraft (not .doc.Retired) }}
+{{/* Publish publishes the draft as saved, asked first; the question says what the version will
+     mean to users, and that changes not saved are not part of it. */}}
+<form class="panel mt-6" id="publishForm" method="post" action="/admin/legal-documents/{{ .doc.Id }}/publish" data-confirm-dialog="confirmPublish" data-confirm-title="{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_confirm_title" "version" .nextVersion }}" data-confirm-always="{{ if .mustAccept }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_must_accept" "version" .nextVersion }}{{ else }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_for_information" "version" .nextVersion }}{{ end }}">
+  <div class="panel-body stacked">
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_title" }}</h2>
+    <p>{{ if .mustAccept }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_must_accept" "version" .nextVersion }}{{ else }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_for_information" "version" .nextVersion }}{{ end }}</p>
+  </div>
+  <div class="panel-footer">
+    <button id="btnPublish" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_button" "version" .nextVersion }}</button>
+  </div>
+</form>
+{{ template "modal_dialog" (args "confirmPublish" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_legal_documents.draft.publish_button" "version" .nextVersion) (T $.ctx "adminconsole.admin_legal_documents.draft.publish_confirm_title" "version" .nextVersion)) }}
+{{ end }}
+{{end}}

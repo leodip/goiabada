@@ -68,6 +68,16 @@
           <p class="notice notice-caution mb-6">{{ T $.ctx "adminconsole.layout.noscript" }}</p>
         </noscript>
         {{ template "page" . }}
+        {{/* My Account's footer: the auth server's legal documents in effect for all apps (#622). */}}
+        {{ if .legalFooter }}
+        <nav class="legal-footer" aria-label="{{ T $.ctx "adminconsole.layout.legal_documents" }}">
+          <ul class="legal-links">
+            {{ range .legalFooter }}
+            <li><a class="text-link" href="{{ .URL }}">{{ .Title }}</a></li>
+            {{ end }}
+          </ul>
+        </nav>
+        {{ end }}
       </main>
     </div>
   </div>

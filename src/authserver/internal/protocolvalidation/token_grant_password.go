@@ -25,6 +25,31 @@ const ROPCNotAuthorizedErrorMsg = "The client is not authorized to use the resou
 	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows'. " +
 	"The switch in 'Admin > General' enables it only for a client set to inherit the global setting."
 
+// LegalDocumentsOwedErrorMsg is the password grant's refusal for a user who owes the acceptance step
+// a legal document for the client (#622 decision 7).
+const LegalDocumentsOwedErrorMsg = "The user has not accepted a legal document this app requires. " +
+	"Sign in to the app in a browser to accept it, then try again."
+
+// LegalDocumentsOwedError is the password grant's refusal of a user who proved their password but
+// owes the acceptance step a legal document for the client: invalid_grant on the wire, and a type
+// of its own so the token handler does not charge it to the account's wrong-password budget. That
+// budget is shared with the browser's password page, where the user is told to go to accept, so
+// charging a correct password would let an app that retries lock the user out of the one place
+// that clears the refusal (#622 decision 7).
+type LegalDocumentsOwedError struct {
+	Detail *oauth.ErrorDetail
+}
+
+func (e *LegalDocumentsOwedError) Error() string {
+	return e.Detail.Error()
+}
+
+// Unwrap puts Detail on the chain, as UserDisabledError's does, so errors.As reaches the
+// *oauth.ErrorDetail every writer and classifier in this tree matches with.
+func (e *LegalDocumentsOwedError) Unwrap() error {
+	return e.Detail
+}
+
 // PasswordGrant is a validated resource owner password credentials request: the client, the user
 // whose password was just checked, and the scope granted to them.
 type PasswordGrant struct {
@@ -127,6 +152,20 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 			"Resource owner password credentials grant is not available for accounts with "+
 				"two-factor authentication enabled. Please use the authorization code flow instead.",
 			http.StatusBadRequest)
+	}
+
+	// The acceptance step is a page, which this grant can never show, so a user who owes it a
+	// legal document for this client is refused until they accept it by signing in through the
+	// browser; left open, the grant would be a way around the step (#622 decision 7). invalid_grant,
+	// as the two-factor refusal above: the grant the user's credentials stand for cannot be issued
+	// as things are. After the password, so the answer says nothing to whoever does not know it.
+	owed, err := val.legalDocuments.Owed(ctx, client, user.Id)
+	if err != nil {
+		return nil, err
+	}
+	if len(owed) > 0 {
+		return nil, &LegalDocumentsOwedError{Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			LegalDocumentsOwedErrorMsg, http.StatusBadRequest)}
 	}
 
 	// Validate scopes - follow authorization code flow pattern

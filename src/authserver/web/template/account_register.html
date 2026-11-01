@@ -41,6 +41,19 @@
   </div>
   {{ end }}
 
+  {{/* The legal documents in effect for the registration, linked where the data is collected:
+       those for all apps, plus the app's own when registration came from its sign-in (#622). */}}
+  {{ if .legalDocuments }}
+  <div class="field" id="legal-documents">
+    <p class="field-hint">{{ T $.ctx "account.register.legal_documents" }}</p>
+    <ul class="legal-links">
+      {{ range .legalDocuments }}
+      <li><a class="text-link" href="/legal/{{ .ShortName }}">{{ .Title }}</a></li>
+      {{ end }}
+    </ul>
+  </div>
+  {{ end }}
+
   <button class="button button-primary button-block" type="submit">{{ T $.ctx "account.register.button" }}</button>
 </form>
 

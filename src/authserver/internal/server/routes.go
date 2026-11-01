@@ -11,11 +11,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -59,8 +59,9 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
-	httpHelper := render.New(s.templateFS, s.staticFS)
+	httpHelper := s.newRenderer()
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
+	legalDocuments := legaldocuments.NewReader(s.database)
 
 	// Two bearer guard sets, one per surface, because the two surfaces promise different refusal
 	// bodies: the admin and account APIs their {error_code, error_description} envelope, /userinfo
@@ -93,6 +94,11 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	pages.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	pages.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
+	// A legal document's public pages, which need no sign-in: its current version, and each
+	// version by number (#622 decision 5).
+	legalDocumentPage := handlers.HandleLegalDocumentGet(httpHelper, s.database)
+	pages.Get("/legal/{shortName}", legalDocumentPage)
+	pages.Get("/legal/{shortName}/versions/{version}", legalDocumentPage)
 	// The email check runs ahead of the limiter, so a request refused for email being off spends
 	// no budget and is never answered 429 (#542).
 	pages.With(accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper))
@@ -129,7 +135,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
-	publicSettingsHandler := handlers.NewPublicSettings(s.database)
+	publicSettingsHandler := handlers.NewPublicSettings(s.database, legalDocuments, baseURL)
 	api.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
 	// One route boundary and one client-error responder, shared by every ceremony route: the
@@ -145,12 +151,12 @@ func (s *Server) initRoutes(branches appBranches) {
 		// A POST is parked and answered with a 303 to a GET, which runs the ceremony from it: the
 		// POST arrives cross-site without the Lax session cookie and must not touch the browser's
 		// own session (#246).
-		r.With(rateLimiter.LimitAuthorize).Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewAuthorization(s.database, userSessionManager, authorizeValidator, tokenParser, clientErrorResponder, auditLogger, authflow.NewSilentAuthentication(s.database, userSessionManager, permissionChecker, auditLogger))))
+		r.With(rateLimiter.LimitAuthorize).Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewAuthorization(s.database, userSessionManager, authorizeValidator, tokenParser, clientErrorResponder, auditLogger, authflow.NewSilentAuthentication(s.database, userSessionManager, permissionChecker, auditLogger, legalDocuments))))
 		r.With(rateLimiter.LimitAuthorize).Post("/authorize", handlers.HandleAuthorizePost(httpHelper, authflow.NewAuthorizationParking(authorizeValidator, s.database), baseURL))
 		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker)))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker, legalDocuments)))
 		r.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewIssuance(s.database, codeIssuer, tokenIssuer, userSessionManager, permissionChecker, auditLogger, tokenMetrics)))
 		passwordPrompt := authflow.NewPasswordPrompt(s.database)
 		r.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, passwordPrompt))
@@ -162,6 +168,9 @@ func (s *Server) initRoutes(branches appBranches) {
 		// decision 14). It checks no credential, so neither method is behind a limiter.
 		r.Get("/recovery-codes", handlers.HandleAuthRecoveryCodesGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewRecoveryCodesPrompt(s.database)))
 		r.Post("/recovery-codes", handlers.HandleAuthRecoveryCodesPost(ceremonyBoundary, ceremonyStore))
+		legalAcceptance := authflow.NewLegalAcceptance(s.database, permissionChecker, auditLogger, legalDocuments)
+		r.Get("/legal-acceptance", handlers.HandleLegalAcceptanceGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
+		r.Post("/legal-acceptance", handlers.HandleLegalAcceptancePost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
 		r.Get("/consent", handlers.HandleConsentGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewConsentPrompt(s.database)))
 		r.Post("/consent", handlers.HandleConsentPost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewConsentSubmission(s.database, permissionChecker, auditLogger)))
 		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
@@ -191,12 +200,12 @@ func (s *Server) initRoutes(branches appBranches) {
 		// submission spends no budget (#526 decision 2). The POST alone is limited: the GET renders
 		// a static form, while the POST probes whether an address already has an account, sends
 		// mail to it and writes a row.
-		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper)).Get("/register", accounthandlers.HandleRegisterGet(httpHelper))
-		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
+		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper)).Get("/register", accounthandlers.HandleRegisterGet(httpHelper, ceremonyStore, legalDocuments))
+		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, ceremonyStore, legalDocuments, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	})
 	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
-	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
-	pages.With(rateLimiter.LimitActivate).Post(emaillinks.AccountActivatePath, accounthandlers.HandleActivatePost(httpHelper, s.sessionStore, s.database, userCreator, passwordValidator, auditLogger, adminConsoleBaseURL))
+	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, ceremonyStore, s.database, auditLogger, s.dataCipher))
+	pages.With(rateLimiter.LimitActivate).Post(emaillinks.AccountActivatePath, accounthandlers.HandleActivatePost(httpHelper, s.sessionStore, ceremonyStore, s.database, userCreator, passwordValidator, auditLogger, baseURL, adminConsoleBaseURL))
 
 	// Admin API routes
 	api.Route("/api/v1/admin", func(r *routing.Router) {
@@ -291,6 +300,9 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleUserConsentsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-consents/{id}", apihandlers.HandleUserConsentDelete(s.database, auditLogger))
 
+		// The legal document versions the user accepted, read as part of the user (#622 decision 6).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/legal-document-acceptances", apihandlers.HandleUserLegalDocumentAcceptancesGet(s.database, baseURL))
+
 		// Group management routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups", apihandlers.HandleGroupsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/groups", apihandlers.HandleGroupCreatePost(s.database, identifierValidator, auditLogger))
@@ -333,6 +345,21 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/resources/{resourceId}/permissions", apihandlers.HandlePermissionsByResourceGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/resources/{resourceId}/permissions", apihandlers.HandleResourcePermissionsPut(s.database, identifierValidator, auditLogger))
 
+		// Legal documents (settings domain: a document sets rules for the whole instance, #622
+		// decision 6). Reading also accepts admin-read; every change, the preview included, needs
+		// manage-settings or manage.
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/legal-documents", apihandlers.HandleLegalDocumentsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents", apihandlers.HandleLegalDocumentCreatePost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/preview", apihandlers.HandleLegalDocumentPreviewPost())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/legal-documents/{id}", apihandlers.HandleLegalDocumentGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/legal-documents/{id}", apihandlers.HandleLegalDocumentDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/legal-documents/{id}/draft", apihandlers.HandleLegalDocumentDraftPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/{id}/publish", apihandlers.HandleLegalDocumentPublishPost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/{id}/retire", apihandlers.HandleLegalDocumentRetirePost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/{id}/restore", apihandlers.HandleLegalDocumentRestorePost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/legal-documents/{id}/apps", apihandlers.HandleLegalDocumentAppsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/legal-documents/{id}/versions/{version}", apihandlers.HandleLegalDocumentVersionGet(s.database))
+
 		// Client management routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients", apihandlers.HandleClientsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}", apihandlers.HandleClientGet(s.database))
@@ -351,6 +378,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/permissions", apihandlers.HandleClientPermissionsPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/introspection-resources", apihandlers.HandleClientIntrospectionResourcesGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/introspection-resources", apihandlers.HandleClientIntrospectionResourcesPut(s.database, auditLogger))
+		// The legal documents that apply to the client, read as part of the client (#622 decision 6).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/legal-documents", apihandlers.HandleClientLegalDocumentsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/administrative-scopes", apihandlers.HandleClientAdministrativeScopesPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}", apihandlers.HandleClientDelete(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/logo", apihandlers.HandleClientLogoGet(s.database, baseURL))
@@ -445,6 +474,8 @@ func (s *Server) initRoutes(branches appBranches) {
 			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
+		// The legal document versions the caller accepted (#622 decision 10).
+		r.Get("/legal-document-acceptances", apihandlers.HandleAccountLegalDocumentAcceptancesGet(s.database, baseURL))
 
 		// Sessions (self-service)
 		r.Get("/sessions", apihandlers.HandleAccountSessionsGet(s.database))

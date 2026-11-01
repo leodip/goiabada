@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,31 @@ import (
 type Renderer struct {
 	templateFS fs.FS
 	assets     *assetFingerprints
+	// legalFooter, when set, answers the legal documents the two page layouts' footer links.
+	legalFooter LegalFooter
+}
+
+// LegalDocumentLink is one legal document a page links: its current version's title, and its short
+// name, which names its public page, /legal/<short-name>.
+type LegalDocumentLink struct {
+	Title     string
+	ShortName string
+}
+
+// LegalFooter answers the legal documents the footer of a page links: those in effect for all apps,
+// plus those for the client clientIdentifier names when it is not empty (#622, "Where documents
+// show").
+type LegalFooter func(ctx context.Context, clientIdentifier string) ([]LegalDocumentLink, error)
+
+// LegalFooterClient is the bind key under which a page that belongs to a sign-in for an app names
+// that app, by its client identifier, so the footer links the app's own documents as well. A page
+// that names none has no app behind it, and its footer links the all-apps documents alone.
+const LegalFooterClient = "legalFooterClient"
+
+// legalFooterLayouts are the layouts that draw the legal footer: the sign-in pages' two.
+var legalFooterLayouts = map[string]bool{
+	"auth_layout.html":    true,
+	"no_menu_layout.html": true,
 }
 
 // New returns a Renderer over templateFS, which holds the layouts and pages, and staticFS, the
@@ -33,6 +59,13 @@ type Renderer struct {
 // function.
 func New(templateFS fs.FS, staticFS fs.FS) *Renderer {
 	return &Renderer{templateFS: templateFS, assets: newAssetFingerprints(staticFS)}
+}
+
+// WithLegalFooter has the renderer draw the legal footer on the sign-in pages' two layouts from
+// footer, and answers the renderer. Without it no page has the footer.
+func (h *Renderer) WithLegalFooter(footer LegalFooter) *Renderer {
+	h.legalFooter = footer
+	return h
 }
 
 // InternalServerError logs err once, with a stack and the request id the page shows, and renders
@@ -164,6 +197,20 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 	data["ctx"] = r.Context()
 
 	name := filepath.Base(layoutName)
+
+	// The footer is the page's furniture, not what it is for: a failed read of the documents logs
+	// and draws the page without it, rather than failing a sign-in page, or the error page that
+	// would report the failure, over its footer. The registration form, which links the documents
+	// where it collects the data, reads them itself and fails when it cannot.
+	if h.legalFooter != nil && legalFooterLayouts[name] {
+		client, _ := data[LegalFooterClient].(string)
+		links, err := h.legalFooter(r.Context(), client)
+		if err != nil {
+			slog.ErrorContext(r.Context(), "unable to read the legal documents the footer links", "error", errs.WithStack(err))
+		} else {
+			data["legalFooter"] = links
+		}
+	}
 
 	templateName = strings.TrimPrefix(templateName, "/")
 	layoutName = strings.TrimPrefix(layoutName, "/")

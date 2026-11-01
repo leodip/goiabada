@@ -71,6 +71,16 @@ func TestResetPasswordLink(t *testing.T) {
 	}
 }
 
+// A registration from an app's sign-in mails a link that names the sign-in too, which the first
+// hop keeps when it drops the code (#622 decision 9).
+func TestAccountActivateLink_CarriesTheSignIn(t *testing.T) {
+	const ceremonyId = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+	assert.Equal(t, "https://auth.example.com/account/activate?ceremony="+ceremonyId+"&code=abc123",
+		AccountActivateLink(testBaseURL, "abc123", ceremonyId))
+	assert.Equal(t, "/account/activate?ceremony="+ceremonyId, AccountActivateContinuation(ceremonyId))
+	assert.Equal(t, "/account/activate", AccountActivateContinuation(""))
+}
+
 func TestAccountActivateLink(t *testing.T) {
 	testCases := []struct {
 		name    string
@@ -106,7 +116,7 @@ func TestAccountActivateLink(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := AccountActivateLink(tc.baseURL, tc.code)
+			got := AccountActivateLink(tc.baseURL, tc.code, "")
 
 			assert.Equal(t, tc.want, got)
 			assert.NotContains(t, got, "@")
@@ -125,7 +135,7 @@ func TestLinkPathsMatchTheSharedConstants(t *testing.T) {
 		want string
 	}{
 		{name: "reset", link: ResetPasswordLink(testBaseURL, "abc123"), want: ResetPasswordPath},
-		{name: "activate", link: AccountActivateLink(testBaseURL, "abc123"), want: AccountActivatePath},
+		{name: "activate", link: AccountActivateLink(testBaseURL, "abc123", ""), want: AccountActivatePath},
 	}
 
 	for _, tc := range testCases {
@@ -175,7 +185,10 @@ func TestLinkCodeSurvivesTheRoundTrip(t *testing.T) {
 			fn   func(baseURL, code string) string
 		}{
 			{name: "reset", fn: ResetPasswordLink},
-			{name: "activate", fn: AccountActivateLink},
+			{name: "activate", fn: func(baseURL, code string) string { return AccountActivateLink(baseURL, code, "") }},
+			{name: "activate from a sign-in", fn: func(baseURL, code string) string {
+				return AccountActivateLink(baseURL, code, "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")
+			}},
 		} {
 			t.Run(build.name+"/"+code, func(t *testing.T) {
 				link := build.fn(testBaseURL, code)

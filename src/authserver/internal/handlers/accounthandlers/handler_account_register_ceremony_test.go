@@ -49,7 +49,7 @@ func TestHandleRegisterGet_EchoesOnlyAWellFormedCeremony(t *testing.T) {
 	for _, tc := range registrationEchoCases {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
-			handler := HandleRegisterGet(pageRenderer)
+			handler := HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{})
 
 			req := httptest.NewRequest(http.MethodGet, "/account/register"+tc.query, nil)
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SelfRegistrationEnabled: true}))
@@ -74,7 +74,7 @@ func TestHandleRegisterPost_TheRedrawnFormKeepsOnlyAWellFormedCeremony(t *testin
 	for _, tc := range registrationEchoCases {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
-			handler := HandleRegisterPost(pageRenderer, datamocks.NewDatabase(t),
+			handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, datamocks.NewDatabase(t),
 				accounthandlersmocks.NewUserCreator(t), accounthandlersmocks.NewEmailValidator(t),
 				accounthandlersmocks.NewPasswordValidator(t), accounthandlersmocks.NewEmailSender(t),
 				handlersmocks.NewAuditLogger(t), &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)

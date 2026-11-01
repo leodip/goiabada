@@ -1059,6 +1059,12 @@
     max-width: 26.5rem;
   }
 
+  /* A card for reading, such as a legal document's public page. */
+
+  .auth-card-wide {
+    max-width: 48rem;
+  }
+
   .auth-card > .panel-body {
     padding: 1.75rem 1.25rem;
     overflow-wrap: anywhere;
@@ -1119,6 +1125,31 @@
     color: var(--color-ink-muted);
     font-size: 0.9375rem;
     text-align: center;
+  }
+
+  /* The legal documents a page links, at its foot: the auth server's card and My Account. */
+
+  .legal-footer {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-line);
+    font-size: 0.875rem;
+  }
+
+  .legal-footer .legal-links {
+    justify-content: center;
+  }
+
+  .legal-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+  }
+
+  .legal-links a {
+    display: inline-block;
+    min-height: 1.5rem;
+    padding-block: 0.125rem;
   }
 
   /* A sentence under the title saying what the page asks for. */
@@ -1326,6 +1357,142 @@
     .detail-list dd + dt {
       margin-top: 0;
     }
+  }
+
+  /* A legal document's text, as the auth server's renderer writes it from Markdown (#622):
+     headings, paragraphs, lists, links, emphasis, quotations, code, rules and tables, set for
+     reading. The admin console's preview draws it as the auth server's public pages do. Code and
+     tables wrap rather than scroll, so the text holds no region a keyboard cannot reach. */
+
+  .legal-text {
+    max-width: 72ch;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+
+  .legal-text > * + * {
+    margin-top: 1rem;
+  }
+
+  .legal-text :where(h1, h2, h3, h4, h5, h6) {
+    color: var(--color-ink);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .legal-text h1 {
+    font-size: 1.5rem;
+  }
+
+  .legal-text h2 {
+    margin-top: 1.75rem;
+    font-size: 1.25rem;
+  }
+
+  .legal-text h3 {
+    margin-top: 1.5rem;
+    font-size: 1.125rem;
+  }
+
+  .legal-text :where(h4, h5, h6) {
+    margin-top: 1.25rem;
+    font-size: 1rem;
+  }
+
+  .legal-text ul {
+    padding-inline-start: 1.5rem;
+    list-style: disc;
+  }
+
+  .legal-text ol {
+    padding-inline-start: 1.5rem;
+    list-style: decimal;
+  }
+
+  .legal-text li + li,
+  .legal-text li > :where(ul, ol) {
+    margin-top: 0.25rem;
+  }
+
+  .legal-text a {
+    color: var(--color-brand);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  .legal-text a:hover {
+    color: var(--color-brand-strong);
+    text-decoration-thickness: 2px;
+  }
+
+  .legal-text strong {
+    font-weight: 600;
+  }
+
+  .legal-text em {
+    font-style: italic;
+  }
+
+  .legal-text blockquote {
+    padding-inline-start: 1rem;
+    border-inline-start: 3px solid var(--color-line-strong);
+    color: var(--color-ink-muted);
+  }
+
+  .legal-text code {
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    background-color: var(--color-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+  }
+
+  .legal-text pre {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-control);
+    background-color: var(--color-subtle);
+    white-space: pre-wrap;
+  }
+
+  .legal-text pre code {
+    padding: 0;
+    background-color: transparent;
+  }
+
+  .legal-text hr {
+    border: 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .legal-text table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .legal-text :where(th, td) {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-line);
+    text-align: start;
+    vertical-align: top;
+  }
+
+  .legal-text th {
+    background-color: var(--color-subtle);
+    font-weight: 600;
+  }
+
+  /* The Markdown a legal document's version was written in, as written. */
+
+  .legal-source {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-control);
+    background-color: var(--color-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   /* The person signed in, with what they can do about it, such as sign out. */

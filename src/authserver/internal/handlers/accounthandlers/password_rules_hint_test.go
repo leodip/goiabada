@@ -47,7 +47,7 @@ func TestPasswordForms_ShowTheNistHint(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		rendered := captureRendered(pageRenderer, "/account_register.html")
 
-		HandleRegisterGet(pageRenderer).ServeHTTP(httptest.NewRecorder(),
+		HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}).ServeHTTP(httptest.NewRecorder(),
 			withNistPolicy(httptest.NewRequest("GET", "/account/register", nil)))
 
 		assert.Equal(t, nistHint, (*rendered)["passwordRules"])
@@ -64,7 +64,7 @@ func TestPasswordForms_ShowTheNistHint(t *testing.T) {
 
 		sent := withMarker(t, store, withNistPolicy(httptest.NewRequest("GET", emaillinks.AccountActivatePath, nil)),
 			emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
-		HandleActivateGet(pageRenderer, store, database, handlersmocks.NewAuditLogger(t), testDataCipher).
+		HandleActivateGet(pageRenderer, store, heldCeremonies{}, database, handlersmocks.NewAuditLogger(t), testDataCipher).
 			ServeHTTP(httptest.NewRecorder(), sent)
 
 		assert.Equal(t, nistHint, (*rendered)["passwordRules"])
@@ -91,7 +91,7 @@ func TestPasswordForms_ShowTheNistHint(t *testing.T) {
 		req := withNistPolicy(httptest.NewRequest("GET", "/account/register", nil))
 		req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
-		HandleRegisterGet(pageRenderer).ServeHTTP(httptest.NewRecorder(), req)
+		HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}).ServeHTTP(httptest.NewRecorder(), req)
 
 		require.NotNil(t, *rendered)
 		//nolint:misspell // the pt-BR catalog's text: "relação" is Portuguese, not a misspelling of "real"

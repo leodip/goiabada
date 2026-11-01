@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -199,7 +200,12 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			"/layouts/auth_layout.html",
 			"/auth_otp.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				if len(bind) != 8 {
+				if len(bind) != 9 {
+					return false
+				}
+				// The page belongs to a sign-in for the client, so its footer links the client's
+				// own legal documents as well (#622).
+				if bind[render.LegalFooterClient] != "test-client" {
 					return false
 				}
 				if err, ok := bind["error"]; !ok || err != nil {
@@ -301,7 +307,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			"/layouts/auth_layout.html",
 			"/auth_otp_enrollment.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
-				if len(bind) != 10 {
+				if len(bind) != 11 {
+					return false
+				}
+				if bind[render.LegalFooterClient] != "test-client" {
 					return false
 				}
 				if err, ok := bind["error"]; !ok || err != nil {

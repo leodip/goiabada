@@ -754,3 +754,118 @@ func TestValidateDCRRequest_AClientNameTakesTheDescriptionBound(t *testing.T) {
 	applyDCRDefaults(&emoji)
 	require.Error(t, validateDCRRequest(&emoji), "51 emoji are 102 UTF-16 code units")
 }
+
+// registerCapturingClient serves a registration that the database accepts and returns the client it
+// was handed to write, with the answer.
+func registerCapturingClient(t *testing.T, request oidc.DynamicClientRegistrationRequest) (*record.Client, oidc.DynamicClientRegistrationResponse, *httptest.ResponseRecorder) {
+	t.Helper()
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	var written *record.Client
+	datamocks.ExpectRunInTransaction(database, dcrTx)
+	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
+		Run(func(args mock.Arguments) { written = args.Get(2).(*record.Client) }).Return(nil).Once()
+	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Maybe()
+	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).Return().Once()
+
+	rr := serveDCR(t, request, database, auditLogger)
+	require.Equal(t, http.StatusCreated, rr.Code, "a policy_uri or tos_uri never refuses the registration: %s", rr.Body.String())
+	require.NotNil(t, written)
+	return written, decodeDCRResponse(t, rr), rr
+}
+
+// A registration keeps a policy_uri and a tos_uri that are http or https URLs with the scheme and
+// host of one of its redirect URIs, and drops every other one, registering the client all the same
+// (RFC 7591 section 5's SHOULD, #622 decision 12). The answer carries exactly what was stored, so a
+// dropped value is absent from it (section 3.2.1). The two fields are judged apart: each row sends
+// its value as both, so a check applied to one field alone fails the row.
+func TestHandleDynamicClientRegistrationPost_KeepsADocumentURLOnARedirectURIsSchemeAndHost(t *testing.T) {
+	confidential := []string{"https://app.example.com/callback", "https://other.example.net:8443/cb"}
+	cases := []struct {
+		name         string
+		authMethod   string
+		grantTypes   []string
+		redirectURIs []string
+		uri          string
+		kept         bool
+	}{
+		{"the first redirect URI's scheme and host", "", nil, confidential, "https://app.example.com/legal/privacy", true},
+		{"the second redirect URI's scheme and host", "", nil, confidential, "https://other.example.net/terms", true},
+		{"another port on the same host", "", nil, confidential, "https://app.example.com:9443/privacy", true},
+		{"the host in another case", "", nil, confidential, "https://APP.Example.COM/privacy", true},
+		{"the scheme in another case", "", nil, confidential, "HTTPS://app.example.com/privacy", true},
+		{"a query and a fragment", "", nil, confidential, "https://app.example.com/legal?doc=privacy#section-2", true},
+		{"a loopback client's own host", "none", nil, []string{"http://127.0.0.1:8765/callback"}, "http://127.0.0.1/privacy", true},
+
+		{"another host", "", nil, confidential, "https://legal.example.org/privacy", false},
+		{"a subdomain of the redirect URI's host", "", nil, confidential, "https://evil.app.example.com/privacy", false},
+		{"the redirect URI's host as a parent domain", "", nil, confidential, "https://example.com/privacy", false},
+		{"the redirect URI's host as user information", "", nil, confidential, "https://app.example.com@evil.example/privacy", false},
+		{"http where the redirect URI is https", "", nil, confidential, "http://app.example.com/privacy", false},
+		{"https where the loopback redirect URI is http", "none", nil, []string{"http://127.0.0.1:8765/callback"}, "https://127.0.0.1/privacy", false},
+		{"a custom scheme client's https page", "none", nil, []string{"com.example.app:/callback"}, "https://app.example.com/privacy", false},
+		{"the custom scheme itself", "none", nil, []string{"myapp://callback"}, "myapp://callback/privacy", false},
+		{"javascript on the redirect URI's host", "", nil, confidential, "javascript://app.example.com/%0aalert(1)", false},
+		{"no host", "", nil, confidential, "https:///privacy", false},
+		{"a relative reference", "", nil, confidential, "/privacy", false},
+		{"not a URL", "", nil, confidential, "not a url", false},
+		{"characters a URI cannot carry", "", nil, confidential, `https://app.example.com/"><b>privacy`, false},
+		{"257 characters", "", nil, confidential, "https://app.example.com/" + strings.Repeat("p", 257-len("https://app.example.com/")), false},
+		{"no redirect URIs at all", "", []string{"client_credentials"}, nil, "https://app.example.com/privacy", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			written, response, rr := registerCapturingClient(t, oidc.DynamicClientRegistrationRequest{
+				ClientName:              "Document URLs",
+				RedirectURIs:            tc.redirectURIs,
+				TokenEndpointAuthMethod: tc.authMethod,
+				GrantTypes:              tc.grantTypes,
+				PolicyURI:               tc.uri,
+				TOSURI:                  tc.uri,
+			})
+
+			want := ""
+			if tc.kept {
+				want = tc.uri
+			}
+			assert.Equal(t, want, written.PrivacyPolicyURL, "the stored privacy policy URL")
+			assert.Equal(t, want, written.TermsOfServiceURL, "the stored terms of service URL")
+			assert.Equal(t, want, response.PolicyURI, "the answer's policy_uri is what was stored")
+			assert.Equal(t, want, response.TOSURI, "the answer's tos_uri is what was stored")
+
+			var raw map[string]any
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &raw))
+			_, hasPolicy := raw["policy_uri"]
+			_, hasTOS := raw["tos_uri"]
+			assert.Equal(t, tc.kept, hasPolicy, "a dropped policy_uri is absent from the answer")
+			assert.Equal(t, tc.kept, hasTOS, "a dropped tos_uri is absent from the answer")
+		})
+	}
+}
+
+// The two fields are judged one at a time: one kept and the other dropped in the same registration.
+func TestHandleDynamicClientRegistrationPost_KeepsOneDocumentURLAndDropsTheOther(t *testing.T) {
+	written, response, rr := registerCapturingClient(t, oidc.DynamicClientRegistrationRequest{
+		ClientName:   "Half kept",
+		RedirectURIs: []string{"https://app.example.com/callback"},
+		PolicyURI:    "https://legal.example.org/privacy",
+		TOSURI:       "https://app.example.com/terms",
+	})
+
+	assert.Empty(t, written.PrivacyPolicyURL, "the policy_uri on another host is dropped")
+	assert.Equal(t, "https://app.example.com/terms", written.TermsOfServiceURL, "the tos_uri on the redirect URI's host is kept")
+	assert.Empty(t, response.PolicyURI)
+	assert.Equal(t, "https://app.example.com/terms", response.TOSURI)
+	assert.NotContains(t, rr.Body.String(), "legal.example.org", "the dropped value is not echoed")
+}
+
+// A registration sending neither field stores neither and answers neither.
+func TestHandleDynamicClientRegistrationPost_NoDocumentURLsStoresNone(t *testing.T) {
+	written, _, rr := registerCapturingClient(t, confidentialTwoURIRegistration)
+	assert.Empty(t, written.PrivacyPolicyURL)
+	assert.Empty(t, written.TermsOfServiceURL)
+	assert.NotContains(t, rr.Body.String(), "policy_uri")
+	assert.NotContains(t, rr.Body.String(), "tos_uri")
+}

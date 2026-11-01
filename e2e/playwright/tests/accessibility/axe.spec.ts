@@ -18,17 +18,19 @@ import {
   grantUserPermission,
   groupUrl,
   idFromListLink,
+  legalDocumentUrl,
   resourceUrl,
+  retireLegalDocument,
   userUrl,
   type ClientTab,
   type GroupTab,
   type ResourceTab,
   type UserTab,
 } from "../../lib/admin-console";
-import { signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
+import { openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { signInToConsole } from "../../lib/console-user";
 import { env } from "../../lib/environment";
-import { expect, test } from "../../lib/fixtures";
+import { expect, type TestClient, type TestLegalDocument, test } from "../../lib/fixtures";
 import { solidPng } from "../../lib/images";
 import { linksIn, waitForMail } from "../../lib/mailpit";
 import { browserSignInClient } from "../../lib/test-clients";
@@ -90,6 +92,26 @@ function authorizeUrl(clientId: string, params: Record<string, string> = {}) {
     ...params,
   });
   return `${env.authUrl}/auth/authorize?${query}`;
+}
+
+interface LegalDocumentsFixture {
+  create(options: { kind: "must_accept"; markdown: string; apps: string[]; publish: true }): Promise<TestLegalDocument>;
+}
+
+// Two documents users must accept, for this client alone, published, so no other test's sign-in owes
+// them: accepted together at one sign-in, and one retired after, they fill a table of acceptances
+// with a document in effect and a retired one. The fixture retires the other.
+async function termsToAccept(legalDocuments: LegalDocumentsFixture, client: TestClient) {
+  const terms = () => legalDocuments.create({ kind: "must_accept", markdown: "Be nice to each other.", apps: [client.identifier], publish: true });
+  return { current: await terms(), retired: await terms() };
+}
+
+// Ticks every box on the acceptance step the page is going to, accepts, and waits for the app.
+async function acceptEverything(page: Page) {
+  await page.waitForURL((url) => url.pathname === "/auth/legal-acceptance");
+  for (const box of await page.getByRole("checkbox").all()) await box.check();
+  await page.getByRole("button", { name: "Accept", exact: true }).click();
+  await page.waitForURL((url) => url.href.startsWith(testRedirectUri));
 }
 
 // The groups-with-permission tab lists every group, ten to a page: goes to the page holding this one.
@@ -326,8 +348,10 @@ test("the console's home, page not found and menus", async ({ page }) => {
   ]);
 });
 
-test("a user's account pages", async ({ page, browser, clients, users }) => {
+test("a user's account pages", async ({ page, browser, clients, users, legalDocuments }) => {
   const { client } = await browserSignInClient(page, clients, { consentRequired: true });
+  const { client: termsClient } = await browserSignInClient(page, clients);
+  const terms = await termsToAccept(legalDocuments, termsClient);
   const user = await users.create();
   const { context, page: own } = await signInToConsole(browser, user);
   const account = (path: string) => `${env.adminUrl}/account/${path}`;
@@ -441,6 +465,20 @@ test("a user's account pages", async ({ page, browser, clients, users }) => {
       },
     },
     asks(own, "consents, revoking one asking first", () => own.locator("button[data-action-url]").click()),
+    at(own, "legal documents, none yet", account("legal-documents")),
+    {
+      // Signed in already, the user goes straight to the client's acceptance step.
+      name: "legal documents, one in effect and one retired",
+      reach: async () => {
+        await own.goto(authorizeUrl(termsClient.identifier));
+        await acceptEverything(own);
+        await retireLegalDocument(page, terms.retired.id);
+        await own.goto(account("legal-documents"));
+        await expect(own.locator("#acceptancesTable tbody tr")).toHaveCount(2);
+        // The retired document is no longer linked.
+        await expect(own.locator("#acceptancesTable tbody a")).toHaveCount(1);
+      },
+    },
     at(own, "sessions", account("sessions")),
     asks(own, "sessions, ending this device's asking first", () => own.locator('button[data-dialog="endCurrentSession"]').click()),
     at(own, "two-factor authentication, setting it up", account("otp")),
@@ -611,6 +649,7 @@ test("the clients' pages", async ({ page, clients, resources }) => {
       await addIntrospectionResource(page, resource.identifier);
       await page.locator("#btnSave").click();
     }),
+    at(page, "a client's legal documents", tab("legal-documents")),
   ]);
 });
 
@@ -776,6 +815,75 @@ test("the groups' pages", async ({ page, groups, users, resources }) => {
   ]);
 });
 
+// The documents here are notices for information: one never published, deleted afterwards, and
+// one published, retired afterwards, by the fixture. The published one is set to a client of the
+// test's own before it is published, so no other test's sign-in shows it.
+test("the legal documents' pages", async ({ page, clients, legalDocuments }) => {
+  const client = await clients.create();
+  const draft = await legalDocuments.create({ markdown: "# Draft\n\nNot published yet." });
+  const published = await legalDocuments.create({
+    markdown: "# Notice\n\nWe keep **your email**.\n\n| Data | Kept for |\n|---|---|\n| Email | A year |\n\n![logo](https://example.com/logo.png)",
+    apps: [client.identifier],
+    publish: true,
+  });
+  const list = `${env.adminUrl}/admin/legal-documents`;
+
+  await checkStates(page, [
+    at(page, "the legal documents list", list),
+    at(page, "a new legal document", `${list}/new`),
+    refused(page, "a new legal document with no kind chosen", "kindMustAccept", () => page.locator("#btnCreate").click()),
+    {
+      name: "a draft beside its preview",
+      reach: async () => {
+        await page.goto(legalDocumentUrl(draft.id, "draft"));
+        await expect(page.locator("#legalDocumentPreview").getByRole("heading", { name: "Draft" })).toBeVisible();
+      },
+    },
+    saved(page, "a draft saved", () => page.locator("#btnSave").click()),
+    asks(page, "a draft, publishing it asking first", () => page.locator("#btnPublish").click()),
+    refused(page, "a draft, the short name refused", "shortName", async () => {
+      await page.goto(legalDocumentUrl(draft.id, "draft"));
+      await page.locator("#shortName").fill("Not Valid");
+      await page.locator("#btnSave").click();
+    }),
+    at(page, "a document's Applies to", legalDocumentUrl(draft.id, "apps")),
+    saved(page, "a document's Applies to saved, no app ticked", async () => {
+      await page.locator("#appliesToSelectedApps").check();
+      await page.locator("#btnSaveApps").click();
+    }),
+    at(page, "the legal documents list, a document with no apps flagged", list),
+    at(page, "a document never published, its versions", legalDocumentUrl(draft.id, "versions")),
+    at(page, "deleting a legal document", legalDocumentUrl(draft.id, "delete")),
+    refused(page, "deleting a legal document, the short name mistyped", "shortName", async () => {
+      await page.locator("#shortName").fill("not-this-one");
+      await page.locator("#btnDelete").click();
+    }),
+    {
+      name: "a published document's versions",
+      reach: async () => {
+        await page.goto(legalDocumentUrl(published.id, "versions"));
+        await expect(page.locator("#versionsTable")).toBeVisible();
+      },
+    },
+    asks(page, "a published document, retiring it asking first", () => page.locator("#btnRetire").click()),
+    {
+      name: "a published version's text",
+      reach: async () => {
+        await page.goto(`${legalDocumentUrl(published.id, "versions")}/1`);
+        await expect(page.locator("#legalDocumentPreview").getByRole("cell", { name: "A year" })).toBeVisible();
+      },
+    },
+    {
+      name: "a published document's draft, with no draft",
+      reach: async () => {
+        await page.goto(legalDocumentUrl(published.id, "draft"));
+        await expect(page.locator("#legalDocumentPreview").getByRole("heading", { name: "Notice" })).toBeVisible();
+      },
+    },
+    at(page, "a published document's delete page", legalDocumentUrl(published.id, "delete")),
+  ]);
+});
+
 test("the users' list, new and delete pages, and a user's details, profile and contact", async ({ page, users }) => {
   const user = await users.create();
   const list = `${env.adminUrl}/admin/users`;
@@ -866,8 +974,18 @@ test("the users' list, new and delete pages, and a user's details, profile and c
   ]);
 });
 
-test("a user's attributes, groups, permissions, sessions and consents, empty and full", async ({ page, users, groups, resources }) => {
+test("a user's attributes, groups, permissions, sessions, consents and legal documents, empty and full", async ({
+  page,
+  browser,
+  clients,
+  users,
+  groups,
+  resources,
+  legalDocuments,
+}) => {
   const user = await users.create();
+  const { client: termsClient } = await browserSignInClient(page, clients);
+  const terms = await termsToAccept(legalDocuments, termsClient);
   const group = await groups.create();
   const resource = await resources.create({ permissions: ["read"] });
   const tab = (name: UserTab) => userUrl(user.id, name);
@@ -903,6 +1021,20 @@ test("a user's attributes, groups, permissions, sessions and consents, empty and
     }),
     at(page, "a user's sessions, none yet", tab("sessions")),
     at(page, "a user's consents, none yet", tab("consents")),
+    at(page, "a user's legal documents, none yet", tab("legal-documents")),
+    {
+      name: "a user's legal documents, one in effect and one retired",
+      reach: async () => {
+        const { context, page: own } = await openSignIn(browser, { clientId: termsClient.identifier, scope: "openid" });
+        await submitPassword(own, user.email, user.password);
+        await acceptEverything(own);
+        await context.close();
+        await retireLegalDocument(page, terms.retired.id);
+        await page.goto(tab("legal-documents"));
+        await expect(page.locator("#acceptancesTable tbody tr")).toHaveCount(2);
+        await expect(page.locator("#acceptancesTable .tag")).toHaveText("Retired");
+      },
+    },
     at(page, "a user's groups, none yet", tab("groups")),
     refused(page, "a user's groups, Add with nothing chosen", "groupsSelect", () => page.locator("#addGroupBtn").click()),
     saved(page, "a user's groups saved", async () => {

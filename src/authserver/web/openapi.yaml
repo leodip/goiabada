@@ -84,6 +84,8 @@ tags:
     description: Resource management (Admin API)
   - name: Permissions
     description: Permission management (Admin API)
+  - name: Legal Documents
+    description: Privacy notices and terms of use (Admin API, settings domain)
   - name: Clients
     description: OAuth client management (Admin API)
   - name: Audit Logs
@@ -1113,6 +1115,40 @@ paths:
   # =============================================================================
   # ADMIN API - GROUPS
   # =============================================================================
+  /api/v1/admin/users/{id}/legal-document-acceptances:
+    get:
+      tags: [Users]
+      summary: List the legal documents a user accepted
+      description: |
+        Every version of a legal document the user accepted at sign-in, the latest acceptance
+        first, retired documents included. `url` is the version's public page, null for a retired
+        document, whose pages all answer not found; the version's text is read with the legal
+        document routes. `acceptances` is `[]` when the user accepted nothing, never null.
+        Acceptances are never edited or removed by hand; they are deleted with the user.
+
+        The route admits `authserver:admin-read`, `authserver:manage-users` and
+        `authserver:manage`.
+      operationId: getUserLegalDocumentAcceptances
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: The user's acceptances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLegalDocumentAcceptancesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/groups:
     get:
       tags: [Groups]
@@ -1848,6 +1884,378 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 
   # =============================================================================
+  # ADMIN API - LEGAL DOCUMENTS
+  # =============================================================================
+  /api/v1/admin/legal-documents:
+    get:
+      tags: [Legal Documents]
+      summary: List legal documents
+      description: |
+        Every legal document, retired ones included, in the order they were created. A document
+        is named by its current version's title, or by its draft's when it was never published.
+      operationId: getLegalDocuments
+      responses:
+        '200':
+          description: Legal documents list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLegalDocumentsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Legal Documents]
+      summary: Create legal document
+      description: |
+        Create a legal document holding a draft. Nothing is shown to users until the draft is
+        published. The kind is fixed from then on: to change it, retire the document and
+        create another.
+
+        The short name is the document's public address, `/legal/<short-name>`: lowercase
+        letters, digits and hyphens, starting and ending with a letter or a digit, at most 64
+        characters, and unique among documents. A refused value answers 400 with its
+        handler.legal_document.* key.
+      operationId: createLegalDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLegalDocumentRequest'
+      responses:
+        '201':
+          description: Legal document created, with its draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocumentDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/legal-documents/preview:
+    post:
+      tags: [Legal Documents]
+      summary: Preview legal document Markdown
+      description: |
+        Render Markdown to HTML exactly as a legal document's published page renders it, and
+        store nothing. CommonMark and tables; raw HTML is left out, a link to a `javascript:`,
+        `vbscript:`, `file:` or non-image `data:` address loses its address, and an image is
+        drawn as a link to it, never loaded.
+      operationId: previewLegalDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewLegalDocumentRequest'
+      responses:
+        '200':
+          description: The rendered HTML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewLegalDocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/legal-documents/{id}:
+    get:
+      tags: [Legal Documents]
+      summary: Get legal document
+      description: A legal document with its draft, or null when it has none, and its versions.
+      operationId: getLegalDocument
+      parameters:
+        - $ref: '#/components/parameters/LegalDocumentIdParam'
+      responses:
+        '200':
+          description: Legal document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocumentDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Legal Documents]
+      summary: Delete legal document
+      description: |
+        Delete a legal document that was never published. A published one is refused with 400
+        and handler.legal_document.published_not_deleted, so the record of what users accepted
+        is kept: retire it instead.
+      operationId: deleteLegalDocument
+      parameters:
+        - $ref: '#/components/parameters/LegalDocumentIdParam'
+      responses:
+        '200':
+          description: Legal document deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/legal-documents/{id}/draft:
+    put:
+      tags: [Legal Documents]
+      summary: Save legal document draft
+      description: |
+        Replace the document's draft, or start one, with as many saves as you like before
+        publishing. A retired document is refused with 400 and handler.legal_document.retired:
+        restore it first.
+
+        An empty `shortName` keeps the document's. Another one is taken only until the first
+        publish; after that it is refused with 400 and handler.legal_document.short_name_fixed,
+        so links to the document keep working.
+      operationId: saveLegalDocumentDraft
+      parameters:
+        - $ref: '#/components/parameters/LegalDocumentIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveLegalDocumentDraftRequest'
+      responses:
+        '200':
+          description: Draft saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocumentDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/legal-documents/{id}/publish:
+    post:
+      tags: [Legal Documents]
+      summary: Publish legal document
+      description: |
+        Freeze the draft as the document's next version, numbered from 1, and make it current.
+        The draft is cleared, and a published version is never changed. Each version of a
+        document users must accept is asked of them again.
+
+        Refused with 400 when the document has no draft (handler.legal_document.no_draft), its
+        draft has no text (handler.legal_document.draft_empty), or it is retired
+        (handler.legal_document.retired).
+      operationId: publishLegalDocument
+      parameters:
+        - $ref: '#/components/parameters/LegalDocumentIdParam'
+      responses:
+        '200':
+          description: Draft published as the current version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocumentDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            error_code is CONCURRENT_UPDATE: another publish of the same document took the next
+            version number at the same moment, so nothing was published. Read the document
+            again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/legal-documents/{id}/retire:
+    post:
+      tags: [Legal Documents]
+      summary: Retire legal document
+      description: |
+        Retire a published document: it applies to no one from then on, and its versions are
+        kept. Refused with 400 for a document that was never published
+        (handler.legal_document.not_published), which is deleted instead, and for one already
+        retired (handler.legal_document.already_retired).
+      operationId: retireLegalDocument
+      parameters:
+        - $ref: '#/components/parameters/LegalDocumentIdParam'
+      responses:
+        '200':
+          description: Legal document retired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocumentDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/legal-documents/{id}/restore:
+    post:
+      tags: [Legal Documents]
+      summary: Restore legal document
+      description: |
+        Restore a retired document as it was, with its current version. Refused with 400 for a
+        document that is not retired (handler.legal_document.not_retired).
+      operationId: restoreLegalDocument
+      parameters:
+        - $ref: '#/components/parameters/LegalDocumentIdParam'
+      responses:
+        '200':
+          description: Legal document restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocumentDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/legal-documents/{id}/apps:
+    put:
+      tags: [Legal Documents]
+      summary: Set the apps a legal document applies to
+      description: |
+        Set the document's Applies to: `all_apps`, the default a document is created with, or
+        `selected_apps` with the client ids it applies to. The whole list is replaced; a repeated
+        id is listed once. `expectedClientIds` is the list as you last read it, `[]` when it was
+        empty; absent or null is refused with `VALIDATION_ERROR`. Changing a document's apps needs
+        no new version.
+
+        `selected_apps` with an empty list is saved, and the document then applies to nobody;
+        deleting a document's last app leaves it the same way. It never becomes `all_apps` by
+        itself. `all_apps` with any client id is refused with
+        handler.legal_document.apps_with_all_apps, and an `appliesTo` that is neither with
+        handler.legal_document.applies_to_invalid. The admin console's own client is never asked
+        to accept a document, so it is refused with handler.legal_document.admin_console_client.
+        A retired document is refused with handler.legal_document.retired. An unknown client id is
+        answered 404 and saves nothing. Every save leaves an `updated_legal_document_apps` audit
+        record naming the document, its Applies to, the client ids added and removed, and the
+        caller.
+      operationId: updateLegalDocumentApps
+      parameters:
+        - $ref: '#/components/parameters/LegalDocumentIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLegalDocumentAppsRequest'
+      responses:
+        '200':
+          description: Applies to saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocumentDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another save changed the document's apps after expectedClientIds was read. error_code
+            is CONCURRENT_UPDATE; nothing was saved. Read the document again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/legal-documents/{id}/versions/{version}:
+    get:
+      tags: [Legal Documents]
+      summary: Get legal document version
+      description: One published version with its text, a retired document's included.
+      operationId: getLegalDocumentVersion
+      parameters:
+        - $ref: '#/components/parameters/LegalDocumentIdParam'
+        - name: version
+          in: path
+          required: true
+          description: The version number, from 1
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: The version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLegalDocumentVersionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # =============================================================================
   # ADMIN API - CLIENTS
   # =============================================================================
   /api/v1/admin/clients:
@@ -2422,6 +2830,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/clients/{id}/legal-documents:
+    get:
+      tags: [Clients]
+      summary: Get the legal documents that apply to a client
+      description: |
+        The legal documents that apply to the client: every document that is not retired and
+        applies to all apps or lists the client, published or not, in the order they were
+        created. A document never published has `currentVersion` 0. `legalDocuments` is `[]` when
+        none applies, never null. The documents are chosen with the legal document routes, in the
+        settings domain; this read is part of the client.
+
+        The route admits `authserver:admin-read`, `authserver:manage-clients` and
+        `authserver:manage`.
+      operationId: getClientLegalDocuments
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      responses:
+        '200':
+          description: The client and the legal documents that apply to it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetClientLegalDocumentsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -3824,6 +4266,32 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/account/legal-document-acceptances:
+    get:
+      tags: [Account]
+      summary: List the legal documents you accepted
+      description: |
+        Every version of a legal document the authenticated user accepted at sign-in, the latest
+        acceptance first. `url` is the version's public page, null for a retired document, whose
+        pages all answer not found. `acceptances` is `[]` when the user accepted nothing, never
+        null.
+      operationId: getAccountLegalDocumentAcceptances
+      responses:
+        '200':
+          description: The user's acceptances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLegalDocumentAcceptancesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/account/sessions:
     get:
       tags: [Account]
@@ -4237,6 +4705,14 @@ components:
       in: path
       required: true
       description: Group ID
+      schema:
+        type: integer
+        format: int64
+    LegalDocumentIdParam:
+      name: id
+      in: path
+      required: true
+      description: Legal document ID
       schema:
         type: integer
         format: int64
@@ -5634,6 +6110,311 @@ components:
         - attribute
 
     # =========================================================================
+    # Legal Document Schemas
+    # =========================================================================
+    LegalDocumentResponse:
+      type: object
+      required:
+        - id
+        - createdAt
+        - updatedAt
+        - shortName
+        - kind
+        - title
+        - currentVersion
+        - publishedAt
+        - hasDraft
+        - retired
+        - retiredAt
+        - appliesTo
+        - clientIds
+      properties:
+        id:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        shortName:
+          type: string
+          description: The document's public address, `/legal/<short-name>`.
+        kind:
+          type: string
+          enum: [must_accept, for_information]
+          description: >-
+            must_accept is terms of use, which users accept; for_information is a privacy
+            notice, shown and linked and never accepted.
+        title:
+          type: string
+          description: The current version's title, or the draft's when the document was never published.
+        currentVersion:
+          type: integer
+          description: The current version's number, or 0 when the document was never published.
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the current version was published, or null.
+        hasDraft:
+          type: boolean
+        retired:
+          type: boolean
+        retiredAt:
+          type: string
+          format: date-time
+          nullable: true
+        appliesTo:
+          type: string
+          enum: [all_apps, selected_apps]
+          description: >-
+            all_apps, the default, or selected_apps, the apps clientIds lists. A document set to
+            selected_apps with no client ids applies to nobody.
+        clientIds:
+          type: array
+          description: The apps a selected_apps document applies to; [] for all_apps, never null.
+          items:
+            type: integer
+            format: int64
+
+    LegalDocumentDraftResponse:
+      type: object
+      required:
+        - title
+        - markdown
+      properties:
+        title:
+          type: string
+        markdown:
+          type: string
+
+    LegalDocumentVersionSummaryResponse:
+      type: object
+      required:
+        - version
+        - title
+        - publishedAt
+      properties:
+        version:
+          type: integer
+        title:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    LegalDocumentVersionResponse:
+      type: object
+      required:
+        - version
+        - title
+        - markdown
+        - publishedAt
+      properties:
+        version:
+          type: integer
+        title:
+          type: string
+        markdown:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    GetLegalDocumentsResponse:
+      type: object
+      required:
+        - legalDocuments
+      properties:
+        legalDocuments:
+          type: array
+          items:
+            $ref: '#/components/schemas/LegalDocumentResponse'
+
+    LegalDocumentDetailResponse:
+      type: object
+      required:
+        - legalDocument
+        - draft
+        - versions
+      properties:
+        legalDocument:
+          $ref: '#/components/schemas/LegalDocumentResponse'
+        draft:
+          allOf:
+            - $ref: '#/components/schemas/LegalDocumentDraftResponse'
+          nullable: true
+          description: The unpublished draft, or null when the document has none.
+        versions:
+          type: array
+          description: The published versions, the first first.
+          items:
+            $ref: '#/components/schemas/LegalDocumentVersionSummaryResponse'
+
+    GetLegalDocumentVersionResponse:
+      type: object
+      required:
+        - legalDocument
+        - version
+      properties:
+        legalDocument:
+          $ref: '#/components/schemas/LegalDocumentResponse'
+        version:
+          $ref: '#/components/schemas/LegalDocumentVersionResponse'
+
+    CreateLegalDocumentRequest:
+      type: object
+      required:
+        - kind
+        - shortName
+        - title
+      properties:
+        kind:
+          type: string
+          enum: [must_accept, for_information]
+        shortName:
+          type: string
+          description: >-
+            Lowercase letters, digits and hyphens, starting and ending with a letter or a digit,
+            at most 64 characters, unique among documents.
+        title:
+          type: string
+          description: At most 200 UTF-16 code units. Leading and trailing spaces are removed.
+        markdown:
+          type: string
+          description: The draft's text, kept as written. At most 100,000 UTF-16 code units.
+
+    UpdateLegalDocumentAppsRequest:
+      type: object
+      required: [appliesTo, expectedClientIds]
+      properties:
+        appliesTo:
+          type: string
+          enum: [all_apps, selected_apps]
+        clientIds:
+          type: array
+          description: >-
+            The whole new list of apps, for selected_apps. Absent or null saves an empty list,
+            which all_apps requires.
+          items:
+            type: integer
+            format: int64
+        expectedClientIds:
+          type: array
+          description: The document's client ids as last read; [] if there were none.
+          items:
+            type: integer
+            format: int64
+
+    GetClientLegalDocumentsResponse:
+      type: object
+      properties:
+        client:
+          $ref: '#/components/schemas/ClientResponse'
+        legalDocuments:
+          type: array
+          description: The legal documents that apply to the client; [] when there are none.
+          items:
+            $ref: '#/components/schemas/LegalDocumentResponse'
+      required:
+        - client
+        - legalDocuments
+
+    LegalDocumentAcceptanceResponse:
+      type: object
+      required:
+        - id
+        - acceptedAt
+        - legalDocumentId
+        - shortName
+        - version
+        - title
+        - publishedAt
+        - retired
+        - url
+      properties:
+        id:
+          type: integer
+          format: int64
+        acceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        legalDocumentId:
+          type: integer
+          format: int64
+        shortName:
+          type: string
+        version:
+          type: integer
+          description: The number of the version accepted.
+        title:
+          type: string
+          description: The accepted version's title.
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        retired:
+          type: boolean
+          description: Whether the document is retired now.
+        url:
+          type: string
+          nullable: true
+          description: >-
+            The absolute URL of the version's public page, /legal/<short-name>/versions/<n>, or
+            null when the document is retired.
+
+    GetLegalDocumentAcceptancesResponse:
+      type: object
+      required:
+        - acceptances
+      properties:
+        acceptances:
+          type: array
+          description: The versions the user accepted, the latest acceptance first; [] when none.
+          items:
+            $ref: '#/components/schemas/LegalDocumentAcceptanceResponse'
+
+    SaveLegalDocumentDraftRequest:
+      type: object
+      required:
+        - title
+      properties:
+        shortName:
+          type: string
+          description: >-
+            Empty keeps the document's short name. Another one is taken only until the
+            document is first published.
+        title:
+          type: string
+          description: At most 200 UTF-16 code units. Leading and trailing spaces are removed.
+        markdown:
+          type: string
+          description: At most 100,000 UTF-16 code units, kept as written.
+
+    PreviewLegalDocumentRequest:
+      type: object
+      properties:
+        markdown:
+          type: string
+          description: At most 100,000 UTF-16 code units.
+
+    PreviewLegalDocumentResponse:
+      type: object
+      required:
+        - html
+      properties:
+        html:
+          type: string
+
+    # =========================================================================
     # Resource & Permission Schemas
     # =========================================================================
     ResourceResponse:
@@ -5924,6 +6705,12 @@ components:
         websiteUrl:
           type: string
           description: The client's website URL
+        privacyPolicyUrl:
+          type: string
+          description: The client's own privacy policy, linked from the consent screen whenever set; empty when it has none
+        termsOfServiceUrl:
+          type: string
+          description: The client's own terms of service, linked from the consent screen whenever set; empty when it has none
         displayName:
           type: string
           description: A user-friendly name for the client
@@ -6016,6 +6803,8 @@ components:
         - clientIdentifier
         - description
         - websiteUrl
+        - privacyPolicyUrl
+        - termsOfServiceUrl
         - displayName
         - enabled
         - consentRequired
@@ -6114,6 +6903,12 @@ components:
         websiteUrl:
           type: string
           description: The client's website URL (http or https, max 256 chars)
+        privacyPolicyUrl:
+          type: string
+          description: The client's own privacy policy (http or https, max 256 chars), linked from the consent screen whenever set. Empty removes it. Not checked against the client's redirect URIs
+        termsOfServiceUrl:
+          type: string
+          description: The client's own terms of service (http or https, max 256 chars), linked from the consent screen whenever set. Empty removes it. Not checked against the client's redirect URIs
         displayName:
           type: string
           description: A user-friendly name for the client (max 100 chars)

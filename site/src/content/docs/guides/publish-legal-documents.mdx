@@ -1,0 +1,161 @@
+---
+title: Publish legal documents
+description: Write your privacy notice and terms of use in the admin console, and publish them as numbered versions that never change.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide puts your organization's privacy notice and terms of use in Goiabada, as [legal documents](/concepts/glossary/#legal-document) you write in the admin console and publish as numbered versions.
+
+## Publish a document
+
+<Steps>
+
+1. In the admin console, open **Admin**, **Legal documents**, and click **New legal document**.
+
+2. Choose the document's kind: **Users must accept** for terms of use, or **For information** for a privacy notice. See [Kinds of document](#kinds-of-document).
+
+3. Give it a title. The console suggests a short name from the title as you type it; change it if you like. Click **Create document**.
+
+4. The document opens on its draft. Write its text under **Text**, in Markdown. The **Preview** beside it shows the text as the document's page will, and follows as you type. Click **Save draft** whenever you like.
+
+5. When the draft is ready, click **Publish version 1**, and confirm. The saved draft becomes version 1, and the **Versions** tab lists it.
+
+</Steps>
+
+To change a published document, edit its draft and publish again: the next version is number 2, and so on.
+
+## Kinds of document
+
+| Kind | For | Users |
+|---|---|---|
+| **Users must accept** | Terms of use | Accept each published version. |
+| **For information** | A privacy notice | Read it. It's shown and linked, and never accepted. |
+
+A privacy notice tells people what you do with their data. It isn't something they agree to, so Goiabada never asks them to accept one.
+
+A document's kind is fixed when you create it, so a version always means the same thing to the users who saw it. To change the kind, [retire](#retiring-a-document) the document and create a new one.
+
+## Writing the text
+
+A document is written in Markdown ([CommonMark](https://commonmark.org/)) with tables: headings, paragraphs, lists, links, emphasis, quotations, code and tables. Its title holds at most 200 characters, and its text at most 100,000.
+
+The page shows the document's title as its main heading, so the text's headings go under it: the highest level the text uses, `#` or lower, is shown one level below the title, and the others keep their places under it.
+
+What the text can't do, so it never runs code or calls another site from a reader's browser:
+
+- HTML in the text isn't shown.
+- A link to a `javascript:`, `vbscript:` or `file:` address, or to a `data:` address that isn't an image, is left out.
+- An image is never loaded. It's shown as a link to the image, named by its alternative text.
+
+A document has one text, in whatever language you write it. If you serve people in several languages, put each language's text in the same document.
+
+## Drafts
+
+A document has at most one draft. **Save draft** replaces it, as often as you like: nobody but administrators sees a draft.
+
+**Publish** publishes the draft as last saved. Changes you haven't saved yet aren't part of it. Once published, the draft is gone, and the editor opens on the current version's text: saving it starts the next draft.
+
+## Versions
+
+A published version never changes. The **Versions** tab lists every version, first to last, with the date it was published, and marks the one in effect, the latest. Click a version to read its text as it was published, and the Markdown it was written in.
+
+<Aside type="caution">
+Every version of a **Users must accept** document is a new set of terms, and users are asked to accept it again. Fix typos in the draft before you publish: there's no way to publish a correction without asking everyone again.
+</Aside>
+
+## Short names
+
+A document's short name is its public address: lowercase letters, digits and hyphens, starting and ending with a letter or a digit, at most 64 characters. No two documents share one.
+
+You can change it on the draft until the document is first published. From then on it's fixed, so links to the document keep working.
+
+## The public page
+
+Once published, a document has a page on the auth server, which anyone can read without signing in:
+
+| Address | Shows |
+|---|---|
+| `/legal/<short-name>` | The version in effect, with its number and the date it was published. |
+| `/legal/<short-name>/versions/<n>` | Version `<n>`, as it was published. An earlier version says it's no longer in effect, and links the current one. |
+
+For example, a privacy notice with the short name `privacy` on `https://auth.example.com` is at `https://auth.example.com/legal/privacy`. Link to it from your website, your emails and your apps.
+
+Each page lists every version, so users can read exactly what they accepted. A draft is never public. A document that was never published, or is [retired](#retiring-a-document), has no page: its addresses answer "Page not found".
+
+## Where documents show
+
+Every document in effect is linked at the foot of the pages where people sign in, and nowhere until it's published:
+
+| Where | Documents linked |
+|---|---|
+| The auth server's pages: sign-in, registration, two-factor authentication, consent, password reset, sign-out and error pages | Those for all apps. A page that's part of a sign-in to a client also links that client's own documents. |
+| The registration form, beside the fields it asks for | Those for all apps, plus the client's own when the user came from that client's sign-in page. |
+| My Account, in the admin console | Those for all apps. |
+
+A document for selected apps shows only on the sign-ins to the clients it lists.
+
+## Accepting documents at sign-in
+
+When a user signs in to a client, after their password and any second factor, and before the consent screen, the auth server checks the **Users must accept** documents in effect for that client. If the user hasn't accepted the current version of one, they see a page listing each such document by its title, linked to its public page, with a box to tick.
+
+- **Accept** with every box ticked records, for each document, the user, the version shown and the time. The sign-in then goes on to the consent screen or back to the client.
+- **Accept** with a box left unticked shows the page again and records nothing.
+- **Decline** sends the client the error `access_denied`. Nothing is recorded, and the user stays signed in, so the next sign-in asks again.
+
+A user is asked at every sign-in, single sign-on included, until they accept. A document accepted once counts on every client it applies to. Each new version is asked again, at the user's next sign-in to a client it covers.
+
+Where the page can't be shown:
+
+| Request | While a document is owed |
+|---|---|
+| A sign-in with [`prompt=none`](/concepts/prompt/#the-silent-checks) | Answered `interaction_required`. |
+| The [password grant](/legacy-flows/ropc/#who-cant-use-it) | Refused with `invalid_grant`, until the user accepts in the browser. |
+| A refresh token | Keeps working. An offline refresh token keeps refreshing for up to its lifetime without the new version accepted. |
+| The client credentials grant | Unaffected: there's no user. |
+
+The admin console's own sign-in never asks, so users can always reach My Account. The [audit log](/concepts/audit-log/) records each acceptance as `accepted_legal_document`, and each decline as `declined_legal_documents`.
+
+## What users accepted
+
+Each user sees the documents they accepted under **Account**, **Legal documents**: each document's title, the version they accepted and when, linked to that version's public page. A retired document shows **No longer in effect** instead of a link.
+
+On a user's page in the admin console, the **Legal documents** tab lists the same. Click **View text** to read the exact version the user accepted, a retired document's included. Acceptances can't be edited or removed by hand; they're deleted with the user.
+
+## Which clients a document applies to
+
+A document applies to every client until you choose otherwise. On its **Applies to** tab, pick one:
+
+| Choice | The document applies to |
+|---|---|
+| **All apps** | Every client, including clients you add later. |
+| **Selected apps** | Only the clients you tick in the list below it. |
+
+Click **Save** to keep your choice. It takes effect at once and publishes no new version, so users who accepted the current version aren't asked again. A user who never accepted it is asked at their next sign-in to a client it now covers.
+
+The admin console's own client isn't in the list. Users are never asked to accept a document when they sign in to the admin console, so they can always reach their account.
+
+A client's own **Legal documents** tab lists the documents that apply to it, published or not. It's read only: choose a document's clients on the document itself.
+
+### When a client is deleted
+
+Deleting a client takes it off every document that listed it, and leaves those documents on their other clients. A document set to **Selected apps** whose last client is deleted applies to nobody. It never switches to all apps by itself. The **Legal documents** list flags it with **No apps** until you tick a client or choose **All apps**.
+
+## Retiring a document
+
+A published document can't be deleted, since that would destroy the record of which version users accepted. Retire it instead: on its page, click **Retire** and confirm.
+
+A retired document is no longer in effect, whichever clients it lists. Its versions stay, and the admin console still shows each one's text. It can't be edited, published, or given other clients while it's retired.
+
+To bring it back, click **Restore**. It's in effect again as it was, at the same version, so users who had accepted that version aren't asked again.
+
+## Deleting a document
+
+A document that was never published can be deleted, since nobody has seen it. On its page, or on the list, click **Delete**, type its short name, and click **Delete document**. Its draft goes with it.
+
+## Next steps
+
+<CardGrid>
+	<LinkCard title="Audit log" description="The events an administrator's changes to a legal document record." href="/concepts/audit-log/" />
+	<LinkCard title="API scopes" description="The admin API scopes that read and manage legal documents." href="/reference/api/scopes/" />
+</CardGrid>

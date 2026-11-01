@@ -1,0 +1,69 @@
+{{define "legal_document_header"}}
+{{- /* (args tab doc ctx): what every page of one legal document opens with, the link back to the
+     list, the document's title as the page's heading, its kind, its state and its public address,
+     the actions on the whole document, and the tabs with tab current. A published document is
+     retired, and a retired one restored, each asked first in a confirm_change dialog; a document
+     never published is deleted from its delete page. */ -}}
+{{- $tab := index . 0 }}
+{{- $doc := index . 1 }}
+{{- $ctx := index . 2 }}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/legal-documents"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $ctx "adminconsole.admin_menu.legal_documents" }}</a></p>
+    <h1 class="page-title" id="page-title">{{ $doc.Title }}</h1>
+    <p class="page-lead flex flex-wrap items-center gap-2">
+      {{- template "legal_document_tags" (args $doc $ctx) }}
+      <span class="code-hint">/legal/{{ $doc.ShortName }}</span>
+    </p>
+  </div>
+  {{- if $doc.Retired }}
+  <form class="page-actions" id="restoreForm" method="post" action="/admin/legal-documents/{{ $doc.Id }}/restore" data-confirm-dialog="confirmRestore" data-confirm-title="{{ T $ctx "adminconsole.admin_legal_documents.header.restore_title" }}" data-confirm-always="{{ T $ctx "adminconsole.admin_legal_documents.header.restore_body" "version" $doc.CurrentVersion }}{{ if eq $doc.Kind "must_accept" }} {{ T $ctx "adminconsole.admin_legal_documents.header.restore_body_must_accept" }}{{ end }}">
+    <button class="button" id="btnRestore" type="submit">{{ T $ctx "adminconsole.admin_legal_documents.header.restore_button" }}</button>
+  </form>
+  {{- else if $doc.CurrentVersion }}
+  <form class="page-actions" id="retireForm" method="post" action="/admin/legal-documents/{{ $doc.Id }}/retire" data-confirm-dialog="confirmRetire" data-confirm-title="{{ T $ctx "adminconsole.admin_legal_documents.header.retire_title" }}" data-confirm-always="{{ T $ctx "adminconsole.admin_legal_documents.header.retire_body" }}{{ if eq $doc.Kind "must_accept" }} {{ T $ctx "adminconsole.admin_legal_documents.header.retire_body_must_accept" }}{{ end }}">
+    <button class="button" id="btnRetire" type="submit">{{ T $ctx "adminconsole.admin_legal_documents.header.retire_button" }}</button>
+  </form>
+  {{- else }}
+  <div class="page-actions">
+    <a class="button button-danger" href="/admin/legal-documents/{{ $doc.Id }}/delete">{{ T $ctx "adminconsole.admin_legal_documents.header.delete_button" }}</a>
+  </div>
+  {{- end }}
+</div>
+<nav class="tab-bar" aria-label="{{ T $ctx "adminconsole.tabs.label" }}">
+  <a class="tab-item" href="/admin/legal-documents/{{ $doc.Id }}/draft"{{ if eq $tab "draft" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.draft" }}</a>
+  <a class="tab-item" href="/admin/legal-documents/{{ $doc.Id }}/apps"{{ if eq $tab "apps" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.apps" }}</a>
+  <a class="tab-item" href="/admin/legal-documents/{{ $doc.Id }}/versions"{{ if eq $tab "versions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.versions" }}</a>
+</nav>
+{{- if $doc.Retired }}
+{{ template "modal_dialog" (args "confirmRestore" "confirm_change" $ctx (T $ctx "adminconsole.admin_legal_documents.header.restore_button") (T $ctx "adminconsole.admin_legal_documents.header.restore_title")) }}
+{{- else if $doc.CurrentVersion }}
+{{ template "modal_dialog" (args "confirmRetire" "confirm_change" $ctx (T $ctx "adminconsole.admin_legal_documents.header.retire_button") (T $ctx "adminconsole.admin_legal_documents.header.retire_title")) }}
+{{- end }}
+{{end}}
+
+{{define "legal_document_applies_to"}}
+{{- /* (args doc ctx): a document's Applies to: all apps, or selected apps, flagged when it lists
+     none and so applies to nobody. A retired document applies to no app whatever it lists, so it
+     is not flagged. */ -}}
+{{- $doc := index . 0 }}
+{{- $ctx := index . 1 }}
+{{- if eq $doc.AppliesTo "all_apps" }}{{ T $ctx "adminconsole.admin_legal_documents.common.applies_all_apps" }}
+{{- else if and (not $doc.ClientIds) (not $doc.Retired) }}<span class="tag tag-caution">{{ T $ctx "adminconsole.admin_legal_documents.common.applies_no_apps" }}</span><span class="cell-secondary">{{ T $ctx "adminconsole.admin_legal_documents.common.applies_nobody" }}</span>
+{{- else }}{{ T $ctx "adminconsole.admin_legal_documents.common.applies_selected_apps" }}{{ end }}
+{{- end}}
+
+{{define "legal_document_tags"}}
+{{- /* (args doc ctx): a document's kind and its state, as tags: retired, not published, or the
+     version in effect, and a draft beside a published version. */ -}}
+{{- $doc := index . 0 }}
+{{- $ctx := index . 1 }}
+<span class="flex flex-wrap gap-1">
+  {{- if eq $doc.Kind "must_accept" }}<span class="tag tag-note">{{ T $ctx "adminconsole.admin_legal_documents.common.kind_must_accept" }}</span>
+  {{- else }}<span class="tag">{{ T $ctx "adminconsole.admin_legal_documents.common.kind_for_information" }}</span>{{ end }}
+  {{- if $doc.Retired }}<span class="tag tag-caution">{{ T $ctx "adminconsole.admin_legal_documents.common.status_retired" }}</span>
+  {{- else if $doc.CurrentVersion }}<span class="tag tag-positive">{{ T $ctx "adminconsole.admin_legal_documents.common.status_version" "version" $doc.CurrentVersion }}</span>
+  {{- else }}<span class="tag">{{ T $ctx "adminconsole.admin_legal_documents.common.status_not_published" }}</span>{{ end }}
+  {{- if and $doc.CurrentVersion $doc.HasDraft }}<span class="tag">{{ T $ctx "adminconsole.admin_legal_documents.common.status_draft" }}</span>{{ end }}
+</span>
+{{- end}}

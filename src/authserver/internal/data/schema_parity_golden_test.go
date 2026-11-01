@@ -90,8 +90,8 @@ func parityAllowlist() []parityRule {
 				"stored as whatever the driver writes, which is the same microsecond text the " +
 				"other three keep in datetime(6). Declaring a precision there would be a lie " +
 				"about a type SQLite does not enforce.",
-			Count:  79,
-			Digest: "0ee8c99060f4eaf2",
+			Count:  85,
+			Digest: "f109cf7cc08972a8",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "datetime(no declared precision)" &&
@@ -104,8 +104,8 @@ func parityAllowlist() []parityRule {
 				"so a width there would be documentation the engine ignores. The other three " +
 				"enforce theirs, which is why this is recorded as a difference rather than " +
 				"folded onto unbounded: SQLite really does store a value SQL Server would refuse.",
-			Count:  102,
-			Digest: "5e02ebe284a80c4d",
+			Count:  110,
+			Digest: "69c2184ec5071760",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "string(no declared length)" &&
@@ -119,8 +119,8 @@ func parityAllowlist() []parityRule {
 				"column accepts, and it is one-directional: every value the signed three can " +
 				"hold fits here. Changing it would rebuild all 25 tables and their foreign keys " +
 				"to buy nothing an installation can observe.",
-			Count:  58,
-			Digest: "7836c23f1778a036",
+			Count:  67,
+			Digest: "67f749d4b82221b1",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.MySQL) &&
 					d.Says[data.MySQL] == "uint64" && d.Says[data.SQLite] == "int64"
@@ -131,8 +131,8 @@ func parityAllowlist() []parityRule {
 			Why: "SQLite has no boolean type and stores 0 and 1 whatever the column is declared " +
 				"as. The migrations spelled some of these NUMERIC and some INTEGER, which the " +
 				"catalog reports verbatim; both accept exactly what the data layer writes.",
-			Count:  20,
-			Digest: "0e429df0964156a0",
+			Count:  21,
+			Digest: "a2d3bd1f3a2f31c6",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "numeric" && d.Says[data.MySQL] == "bool"
@@ -156,8 +156,8 @@ func parityAllowlist() []parityRule {
 				"nothing about width. The columns are counters and enumerations the data layer " +
 				"writes as Go ints, so the narrower declaration on the other three is the " +
 				"binding one and SQLite accepts everything it can produce.",
-			Count:  10,
-			Digest: "30ef294f554d52e7",
+			Count:  11,
+			Digest: "981e7ce37db11624",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "int64" && d.Says[data.MySQL] == "int32"
@@ -170,8 +170,8 @@ func parityAllowlist() []parityRule {
 				"reports no index at all where the other three report one per primary key. The " +
 				"uniqueness is enforced identically; only the object is absent. A composite " +
 				"primary key would produce an index here, and the schema has none.",
-			Count:  29,
-			Digest: "7e673d52243adb9e",
+			Count:  33,
+			Digest: "cf756aafc9a39be7",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisIndex && oddOneOut(d, data.SQLite) &&
 					d.Object == "unique index(id)" && d.Says[data.SQLite] == "absent"
@@ -200,8 +200,8 @@ func parityAllowlist() []parityRule {
 				"substitutes a generated rowid for a NULL rather than refusing it. No NULL is " +
 				"ever stored, so the column behaves exactly like the NOT NULL the other three " +
 				"declare; the catalog is describing how the value arrives, not what it accepts.",
-			Count:  29,
-			Digest: "3682cb51c2b2cfd5",
+			Count:  33,
+			Digest: "e5b7da02ee03b564",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisNullable && oddOneOut(d, data.SQLite) &&
 					d.Object == "id" && d.Says[data.SQLite] == "nullable"
@@ -214,8 +214,8 @@ func parityAllowlist() []parityRule {
 				"SQL Server uses IDENTITY and SQLite uses AUTOINCREMENT. The property that " +
 				"matters, that the engine numbers the column, is compared on its own axis and " +
 				"agrees on all four; what is left here is where each engine keeps it.",
-			Count:  29,
-			Digest: "bf862935b9aa6cae",
+			Count:  33,
+			Digest: "81e77c3e67346795",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisDefault && oddOneOut(d, data.Postgres) &&
 					strings.HasPrefix(d.Says[data.Postgres], `default "nextval(`) &&

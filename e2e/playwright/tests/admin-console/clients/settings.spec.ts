@@ -1,6 +1,9 @@
+import type { Page } from "@playwright/test";
 import { cancelDialog, clientIdFromList, clientRow, clientUrl, confirmDialog, saveAndExpectSaved } from "../../../lib/admin-console";
+import { openSignIn, submitPassword } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
+import { browserSignInClient } from "../../../lib/test-clients";
 
 const saved = "Settings saved.";
 
@@ -32,6 +35,60 @@ test("a website URL that is not http or https is refused at its field, and nothi
 
   await page.goto(clientUrl(client.id, "settings"));
   await expect(page.locator('input[name="websiteUrl"]')).toHaveValue("");
+});
+
+// A client's own privacy policy and terms of service are linked from its consent screen whenever
+// they're set, with no switch to turn on, and each link goes once it's emptied.
+test("the privacy policy and terms of service URLs are saved, and linked from the consent screen", async ({
+  page,
+  browser,
+  clients,
+  users,
+}) => {
+  const user = await users.create();
+  const { client } = await browserSignInClient(page, clients, { consentRequired: true });
+  const privacyLink = (consent: Page) => consent.getByRole("link", { name: "This application's privacy policy" });
+  const termsLink = (consent: Page) => consent.getByRole("link", { name: "This application's terms of service" });
+  const consentPage = async () => {
+    const attempt = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
+    await submitPassword(attempt.page, user.email, user.password);
+    await expect(attempt.page).toHaveURL(/\/auth\/consent/);
+    return attempt;
+  };
+
+  await page.goto(clientUrl(client.id, "settings"));
+  await page.locator('input[name="privacyPolicyUrl"]').fill("https://legal.example.com/privacy");
+  await page.locator('input[name="termsOfServiceUrl"]').fill("https://legal.example.com/terms");
+  await saveAndExpectSaved(page, saved);
+  await page.reload();
+  await expect(page.locator('input[name="privacyPolicyUrl"]')).toHaveValue("https://legal.example.com/privacy");
+  await expect(page.locator('input[name="termsOfServiceUrl"]')).toHaveValue("https://legal.example.com/terms");
+
+  let attempt = await consentPage();
+  await expect(privacyLink(attempt.page)).toHaveAttribute("href", "https://legal.example.com/privacy");
+  await expect(privacyLink(attempt.page)).toHaveAttribute("target", "_blank");
+  await expect(termsLink(attempt.page)).toHaveAttribute("href", "https://legal.example.com/terms");
+  await attempt.context.close();
+
+  await page.goto(clientUrl(client.id, "settings"));
+  await page.locator('input[name="termsOfServiceUrl"]').fill("");
+  await saveAndExpectSaved(page, saved);
+  attempt = await consentPage();
+  await expect(privacyLink(attempt.page)).toBeVisible();
+  await expect(termsLink(attempt.page)).toHaveCount(0);
+  await attempt.context.close();
+});
+
+test("a terms of service URL that is not http or https is refused at its field, and nothing changes", async ({ page, clients }) => {
+  const client = await clients.create();
+  await page.goto(clientUrl(client.id, "settings"));
+  await page.locator('input[name="termsOfServiceUrl"]').fill("ftp://files.example.com/terms");
+  await page.locator("#btnSave").click();
+  await expect(page.locator("#client-error")).toContainText("Terms of service URL must use http or https scheme.");
+  await expect(page.locator("#termsOfServiceUrl")).toHaveAttribute("aria-invalid", "true");
+
+  await page.goto(clientUrl(client.id, "settings"));
+  await expect(page.locator('input[name="termsOfServiceUrl"]')).toHaveValue("");
 });
 
 test("a disabled client shows as disabled in the list, and can be enabled again", async ({ page, clients }) => {

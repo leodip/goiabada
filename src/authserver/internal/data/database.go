@@ -565,6 +565,53 @@ type Database interface {
 	// so it never introspects.
 	DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error
 
+	// Legal documents and their published versions (#622). A second document with a short name
+	// already taken, or a second version of one number in a document, is a unique violation.
+	// UpdateLegalDocument writes the whole row but its kind, which is fixed at creation, and its
+	// Applies to, which UpdateLegalDocumentAppliesToAllApps writes. A version
+	// has no update: once published it is never rewritten. DeleteLegalDocument is refused by the
+	// engine for a document that has a published version, which is retired instead.
+	CreateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
+	// AcquireLegalDocumentRow takes the document's row inside the caller's transaction and holds
+	// it until that transaction ends, as AcquireClientRow does a client's. Every write of a
+	// document's lifecycle (a draft save, publish, retire, restore, delete and a change of apps)
+	// takes it first and reads the document again under it, so none decides on a copy another
+	// committed over: a publish clears only the draft it froze, a save cannot rename a document
+	// published meanwhile, and a save cannot undo a retirement. The transaction is required.
+	AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
+	UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
+	GetLegalDocumentById(ctx context.Context, tx *sql.Tx, legalDocumentId int64) (*record.LegalDocument, error)
+	// GetLegalDocumentByShortName answers the document whose short name is exactly shortName.
+	GetLegalDocumentByShortName(ctx context.Context, tx *sql.Tx, shortName string) (*record.LegalDocument, error)
+	// GetAllLegalDocuments answers every document, retired ones included, in id order.
+	GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]record.LegalDocument, error)
+	DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
+	CreateLegalDocumentVersion(ctx context.Context, tx *sql.Tx, version *record.LegalDocumentVersion) error
+	// GetLegalDocumentVersionsByLegalDocumentId answers a document's versions, the first first.
+	GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
+	// GetLegalDocumentVersion answers one version of a document by its number, or nil.
+	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentId int64, versionNumber int) (*record.LegalDocumentVersion, error)
+	// UpdateLegalDocumentAppliesToAllApps writes a document's Applies to, which UpdateLegalDocument
+	// leaves alone: true is all apps, false the apps its LegalDocumentClient rows list.
+	UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *sql.Tx, legalDocumentId int64, appliesToAllApps bool) error
+
+	// The apps a legal document set to selected apps applies to (#622). A document lists an app
+	// once, and a second row for the same pair is a unique violation. Deleting either the document
+	// or the client removes the row.
+	CreateLegalDocumentClient(ctx context.Context, tx *sql.Tx, link *record.LegalDocumentClient) error
+	// GetLegalDocumentClientsByLegalDocumentId answers a document's apps, in id order.
+	GetLegalDocumentClientsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentClient, error)
+	// GetLegalDocumentClientsByClientId answers the documents that list a client, in id order.
+	GetLegalDocumentClientsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.LegalDocumentClient, error)
+	DeleteLegalDocumentClient(ctx context.Context, tx *sql.Tx, legalDocumentClientId int64) error
+
+	// A user's acceptances of legal document versions (#622). A user accepts a version once, and a
+	// second row for the same pair is a unique violation. An acceptance is never rewritten or
+	// removed by hand; deleting the user removes it.
+	CreateLegalDocumentAcceptance(ctx context.Context, tx *sql.Tx, acceptance *record.LegalDocumentAcceptance) error
+	// GetLegalDocumentAcceptancesByUserId answers a user's acceptances, in id order.
+	GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
+
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)

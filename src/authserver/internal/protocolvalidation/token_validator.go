@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/clientauth"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/liveness"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -31,6 +32,7 @@ type TokenParser interface {
 type tokenValidatorDatabase interface {
 	permissions.ScopeResolverDatabase
 	liveness.RefreshDatabase
+	legaldocuments.Database
 
 	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
@@ -57,6 +59,9 @@ type TokenValidator struct {
 	// verifyPassword is the password comparison the password grant makes, a field so a test can
 	// see which hash each refusal compared against (#681).
 	verifyPassword func(hashedPassword string, password string) bool
+	// legalDocuments answers what a user owes the acceptance step, which the password grant cannot
+	// show and so refuses while anything is owed (#622 decision 7).
+	legalDocuments *legaldocuments.Reader
 }
 
 func NewTokenValidator(database tokenValidatorDatabase, tokenParser TokenParser,
@@ -67,6 +72,7 @@ func NewTokenValidator(database tokenValidatorDatabase, tokenParser TokenParser,
 		permissionChecker: permissionChecker,
 		clients:           clientauth.NewAuthenticator(database, dataCipher),
 		verifyPassword:    passwordhash.Verify,
+		legalDocuments:    legaldocuments.NewReader(database),
 	}
 }
 

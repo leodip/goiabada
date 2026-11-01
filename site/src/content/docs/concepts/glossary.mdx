@@ -97,6 +97,10 @@ A deprecated flow in which the browser comes back from sign-in with the tokens t
 
 An API asking the auth server whether a token is still active, at [`/auth/introspect`](/reference/endpoints/introspect/). The API calls as a confidential client, and an access token is active to it only when its `aud` names one of that client's introspection resources, which you set on the client's **Introspection** tab. See [Introspection resources](/concepts/clients/#introspection-resources).
 
+### Legal document
+
+A privacy notice or terms of use you write in the admin console, under **Legal documents**, and publish as numbered versions that never change. A document's kind says what users do with it: they accept each version of one marked **Users must accept**, and read one marked **For information**. See [Publish legal documents](/guides/publish-legal-documents/).
+
 ### Permission
 
 Something a resource lets you do, such as `manage` on the `authserver` resource. You give permissions to users, groups and clients, and a client asks for one as a scope written `resource:permission`, like `authserver:manage`. See [Resources and permissions](/concepts/resources-and-permissions/).

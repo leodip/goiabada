@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"io/fs"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 )
 
@@ -41,6 +44,8 @@ type authorizeGetDeps struct {
 	auditLogger        AuditLogger
 	permissionChecker  PermissionChecker
 	tokenParser        TokenParser
+	// legalDocuments left out owes nothing.
+	legalDocuments legalDocumentsPort
 }
 
 func buildAuthorizeGet(d authorizeGetDeps) http.HandlerFunc {
@@ -49,7 +54,7 @@ func buildAuthorizeGet(d authorizeGetDeps) http.HandlerFunc {
 		responder, d.pageRenderer, d.ceremonyStore,
 		authflow.NewAuthorization(d.database, d.userSessionManager, d.authorizeValidator, d.tokenParser,
 			responder, d.auditLogger,
-			authflow.NewSilentAuthentication(d.database, d.userSessionManager, d.permissionChecker, d.auditLogger)))
+			authflow.NewSilentAuthentication(d.database, d.userSessionManager, d.permissionChecker, d.auditLogger, legalDocumentsOrNone(d.legalDocuments))))
 }
 
 type authorizePostDeps struct {
@@ -185,13 +190,16 @@ type authCompletedGetDeps struct {
 	templateFS         fs.FS
 	auditLogger        AuditLogger
 	permissionChecker  PermissionChecker
+	// legalDocuments left out owes nothing.
+	legalDocuments legalDocumentsPort
 }
 
 func buildAuthCompletedGet(d authCompletedGetDeps) http.HandlerFunc {
 	return HandleAuthCompletedGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
 		d.pageRenderer, d.ceremonyStore, NewDeviceCookie(false),
-		authflow.NewCompletion(d.database, d.userSessionManager, d.auditLogger, d.permissionChecker))
+		authflow.NewCompletion(d.database, d.userSessionManager, d.auditLogger, d.permissionChecker,
+			legalDocumentsOrNone(d.legalDocuments)))
 }
 
 type consentGetDeps struct {
@@ -253,4 +261,50 @@ func credentialFailuresOrNone(credentialFailures CredentialFailureRecorder) Cred
 		return noCredentialFailures{}
 	}
 	return credentialFailures
+}
+
+// legalDocumentsPort is the legal documents a step asks what a user owes.
+type legalDocumentsPort interface {
+	Owed(ctx context.Context, client *record.Client, userId int64) ([]legaldocuments.InEffect, error)
+}
+
+// noLegalDocumentsOwed owes nothing, for the builders whose test is about something else.
+type noLegalDocumentsOwed struct{}
+
+func (noLegalDocumentsOwed) Owed(context.Context, *record.Client, int64) ([]legaldocuments.InEffect, error) {
+	return nil, nil
+}
+
+func legalDocumentsOrNone(legalDocuments legalDocumentsPort) legalDocumentsPort {
+	if legalDocuments == nil {
+		return noLegalDocumentsOwed{}
+	}
+	return legalDocuments
+}
+
+type legalAcceptanceDeps struct {
+	pageRenderer      PageRenderer
+	ceremonyStore     CeremonyStore
+	database          *datamocks.Database
+	templateFS        fs.FS
+	auditLogger       AuditLogger
+	permissionChecker PermissionChecker
+	legalDocuments    legalDocumentsPort
+}
+
+func (d legalAcceptanceDeps) step() *authflow.LegalAcceptance {
+	return authflow.NewLegalAcceptance(d.database, d.permissionChecker, d.auditLogger,
+		legalDocumentsOrNone(d.legalDocuments))
+}
+
+func buildLegalAcceptanceGet(d legalAcceptanceDeps) http.HandlerFunc {
+	return HandleLegalAcceptanceGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
+		d.pageRenderer, d.ceremonyStore, d.step())
+}
+
+func buildLegalAcceptancePost(d legalAcceptanceDeps) http.HandlerFunc {
+	return HandleLegalAcceptancePost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
+		d.pageRenderer, d.ceremonyStore, d.step())
 }

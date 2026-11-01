@@ -1,6 +1,10 @@
 package emaillinks
 
-import "net/url"
+import (
+	"net/url"
+
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
+)
 
 // ResetPasswordPath and AccountActivatePath are the paths of the two endpoints an
 // emailed link points at.
@@ -32,9 +36,28 @@ func ResetPasswordLink(baseURL, code string) string {
 }
 
 // AccountActivateLink builds the account activation link emailed to someone who has
-// just self-registered. Same shape and same reasoning as ResetPasswordLink.
-func AccountActivateLink(baseURL, code string) string {
-	return baseURL + AccountActivatePath + "?" + codeQuery(code)
+// just self-registered. Same shape and same reasoning as ResetPasswordLink, but for
+// ceremonyId: the sign-in the registration came from, through the password page's
+// Create an account link, so activating in the browser that holds it carries that
+// sign-in on into the app (#622 decision 9). Empty for a registration reached from
+// anywhere else, whose link carries the code alone. The id's alphabet is RFC 3986
+// unreserved too.
+func AccountActivateLink(baseURL, code, ceremonyId string) string {
+	if ceremonyId == "" {
+		return baseURL + AccountActivatePath + "?" + codeQuery(code)
+	}
+	return baseURL + AccountActivatePath + "?" +
+		url.Values{"code": {code}, ceremony.QueryParameter: {ceremonyId}}.Encode()
+}
+
+// AccountActivateContinuation is where the activation link's first hop sends the
+// browser: AccountActivatePath with the code gone and the sign-in the link carried
+// kept, or with no query when it carried none.
+func AccountActivateContinuation(ceremonyId string) string {
+	if ceremonyId == "" {
+		return AccountActivatePath
+	}
+	return AccountActivatePath + "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
 }
 
 // codeQuery encodes the one query parameter both links carry.

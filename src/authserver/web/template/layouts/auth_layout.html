@@ -19,7 +19,7 @@
 
 <body>
   <main class="auth-page">
-    <div class="panel auth-card">
+    <div class="panel auth-card{{ if .layoutWide }} auth-card-wide{{ end }}">
       <div class="panel-body">
         <p class="auth-brand">{{ .appName }}</p>
         {{ if .layoutShowClientSection }}
@@ -37,6 +37,7 @@
         </div>
         {{ end }}
         {{ template "body" . }}
+        {{ template "legal_footer" . }}
       </div>
     </div>
   </main>

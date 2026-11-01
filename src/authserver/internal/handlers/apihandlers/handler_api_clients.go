@@ -622,28 +622,31 @@ func HandleClientUpdatePut(
 			return
 		}
 
-		// Validate website URL (optional field)
-		websiteURL := strings.TrimSpace(updateReq.WebsiteURL)
-		if websiteURL != "" {
-			const maxLengthWebsiteURL = 256
-			if inputvalidation.TextLength(websiteURL) > maxLengthWebsiteURL {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLTooLong, map[string]any{"max": maxLengthWebsiteURL}))
-				return
-			}
-			parsed, err := url.ParseRequestURI(websiteURL)
-			if err != nil {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLInvalid, nil))
-				return
-			}
-			if parsed.Scheme != "http" && parsed.Scheme != "https" {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLSchemeInvalid, nil))
-				return
-			}
+		// The three optional URLs take one rule: http or https, at most 256 characters. The privacy
+		// policy and terms of service URLs are linked from the consent screen whenever set, and an
+		// administrator's are not held to the redirect URIs' hosts as a registration's are (#622
+		// decision 12).
+		websiteURL, refusal := validateOptionalClientURL(updateReq.WebsiteURL, clientWebsiteURLRefusals)
+		if refusal != nil {
+			writeValidationError(w, r, refusal)
+			return
+		}
+		privacyPolicyURL, refusal := validateOptionalClientURL(updateReq.PrivacyPolicyURL, clientPrivacyPolicyURLRefusals)
+		if refusal != nil {
+			writeValidationError(w, r, refusal)
+			return
+		}
+		termsOfServiceURL, refusal := validateOptionalClientURL(updateReq.TermsOfServiceURL, clientTermsOfServiceURLRefusals)
+		if refusal != nil {
+			writeValidationError(w, r, refusal)
+			return
 		}
 
 		client.ClientIdentifier = trimmedClientIdentifier
 		client.Description = strings.TrimSpace(updateReq.Description)
 		client.WebsiteURL = websiteURL
+		client.PrivacyPolicyURL = privacyPolicyURL
+		client.TermsOfServiceURL = termsOfServiceURL
 		client.DisplayName = strings.TrimSpace(updateReq.DisplayName)
 
 		// Validate display name length
@@ -1491,4 +1494,44 @@ func HandleClientTokensPut(
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
+}
+
+// clientURLRefusals names the refusals of one of a client's optional URLs, so each answers with its
+// own field's catalog key, which the console reads the field off (#617).
+type clientURLRefusals struct {
+	tooLong, invalid, schemeInvalid string
+}
+
+var (
+	clientWebsiteURLRefusals = clientURLRefusals{i18n.ErrCodeClientWebsiteURLTooLong,
+		i18n.ErrCodeClientWebsiteURLInvalid, i18n.ErrCodeClientWebsiteURLSchemeInvalid}
+	clientPrivacyPolicyURLRefusals = clientURLRefusals{i18n.ErrCodeClientPrivacyPolicyURLTooLong,
+		i18n.ErrCodeClientPrivacyPolicyURLInvalid, i18n.ErrCodeClientPrivacyPolicyURLSchemeInvalid}
+	clientTermsOfServiceURLRefusals = clientURLRefusals{i18n.ErrCodeClientTermsOfServiceURLTooLong,
+		i18n.ErrCodeClientTermsOfServiceURLInvalid, i18n.ErrCodeClientTermsOfServiceURLSchemeInvalid}
+)
+
+// clientURLMaxLength is the bound of a client's website, privacy policy and terms of service URLs,
+// in inputvalidation.TextLength's characters: their columns' width.
+const clientURLMaxLength = 256
+
+// validateOptionalClientURL trims one of a client's optional URLs and returns it, empty when none was
+// sent, or the refusal of a value longer than clientURLMaxLength, one that does not parse, or one
+// whose scheme is not http or https.
+func validateOptionalClientURL(value string, refusals clientURLRefusals) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", nil
+	}
+	if inputvalidation.TextLength(trimmed) > clientURLMaxLength {
+		return "", i18n.NewLocalizedError(refusals.tooLong, map[string]any{"max": clientURLMaxLength})
+	}
+	parsed, err := url.ParseRequestURI(trimmed)
+	if err != nil {
+		return "", i18n.NewLocalizedError(refusals.invalid, nil)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", i18n.NewLocalizedError(refusals.schemeInvalid, nil)
+	}
+	return trimmed, nil
 }

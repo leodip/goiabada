@@ -3,6 +3,8 @@ package handlers
 import (
 	"net/http"
 	"net/url"
+
+	"github.com/leodip/goiabada/authserver/internal/render"
 )
 
 // This file is the refusal interstitial: the page a user is shown instead of being redirected to a
@@ -65,6 +67,9 @@ func (rsp *ClientErrorResponder) renderRedirectBlocked(w http.ResponseWriter, r 
 		name, unverified := input.client.NameForUsers()
 		bind["clientName"] = name
 		bind["clientNameUnverified"] = unverified
+		// The page ends a sign-in for this app, so its footer links the app's own legal documents
+		// as well (#622).
+		bind[render.LegalFooterClient] = input.client.ClientIdentifier
 	}
 
 	return rsp.pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html", bind)

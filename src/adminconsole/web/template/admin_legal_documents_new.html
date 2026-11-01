@@ -1,0 +1,71 @@
+{{define "title"}}{{ T $.ctx "adminconsole.admin_legal_documents.new.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}
+<script src="{{ asset "/static/pages/legal-document-new.js" }}" defer></script>
+{{end}}
+
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/legal-documents"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $.ctx "adminconsole.admin_menu.legal_documents" }}</a></p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_legal_documents.new.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_legal_documents.new.lead" }}</p>
+  </div>
+</div>
+
+{{/* errorField names the field a refusal is about, which is marked invalid, described by the
+     notice and focused; a refusal naming no field leaves the focus on the title.
+     legal-document-new.js suggests the short name from the title until the person edits it. */}}
+<form class="panel" method="post" novalidate>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="legal-document-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
+
+    <fieldset{{ if .error }}{{ if eq .errorField "kind" }} aria-describedby="legal-document-error"{{ end }}{{ end }}>
+      <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_legal_documents.new.kind_legend" }}</legend>
+      <p class="field-hint mb-3" id="kindHint">{{ T $.ctx "adminconsole.admin_legal_documents.new.kind_hint" }}</p>
+      <div class="grid gap-3 md:grid-cols-2">
+        <label class="option-card">
+          <input type="radio" id="kindMustAccept" name="kind" value="must_accept"{{ if eq .kind "must_accept" }} checked{{ end }} aria-labelledby="kind-name-must-accept" aria-describedby="kind-hint-must-accept"
+            {{- if .error }}{{ if eq .errorField "kind" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="choice-label" id="kind-name-must-accept">{{ T $.ctx "adminconsole.admin_legal_documents.common.kind_must_accept" }}</span>
+            <span class="field-hint" id="kind-hint-must-accept">{{ T $.ctx "adminconsole.admin_legal_documents.new.kind_must_accept_hint" }}</span>
+          </span>
+        </label>
+        <label class="option-card">
+          <input type="radio" id="kindForInformation" name="kind" value="for_information"{{ if eq .kind "for_information" }} checked{{ end }} aria-labelledby="kind-name-for-information" aria-describedby="kind-hint-for-information"
+            {{- if .error }}{{ if eq .errorField "kind" }} aria-invalid="true"{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="choice-label" id="kind-name-for-information">{{ T $.ctx "adminconsole.admin_legal_documents.common.kind_for_information" }}</span>
+            <span class="field-hint" id="kind-hint-for-information">{{ T $.ctx "adminconsole.admin_legal_documents.new.kind_for_information_hint" }}</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="title">{{ T $.ctx "adminconsole.admin_legal_documents.common.field_title" }}</label>
+        <input class="control" id="title" type="text" name="title" value="{{ .title }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "title" }}legal-document-error {{ end }}{{ end }}titleHint"
+          {{- if .error }}{{ if eq .errorField "title" }} aria-invalid="true"{{ end }}{{ if eq .errorField "title" "" }} autofocus{{ end }}{{ else }} autofocus{{ end }}>
+        <p class="field-hint" id="titleHint">{{ T $.ctx "adminconsole.admin_legal_documents.common.title_hint" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="shortName">{{ T $.ctx "adminconsole.admin_legal_documents.common.field_short_name" }}</label>
+        <input class="control control-mono" id="shortName" type="text" name="shortName" value="{{ .shortName }}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "shortName" }}legal-document-error {{ end }}{{ end }}shortNameHint"
+          {{- if .error }}{{ if eq .errorField "shortName" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="shortNameHint">{{ T $.ctx "adminconsole.admin_legal_documents.common.short_name_hint" }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="panel-footer">
+    <a class="button button-quiet" href="/admin/legal-documents">{{ T $.ctx "common.button.cancel" }}</a>
+    <button id="btnCreate" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_legal_documents.new.create_button" }}</button>
+  </div>
+</form>
+{{end}}

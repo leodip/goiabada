@@ -5,6 +5,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/render"
 )
 
 // HandleConsentGet is GET /auth/consent, which accepts requires_consent and runs
@@ -41,12 +42,18 @@ func HandleConsentGet(
 			"clientDescription":    screen.ClientDescription,
 			"clientLogoUrl":        screen.LogoURL,
 			"clientWebsiteUrl":     screen.WebsiteURL,
-			"hasLogo":              screen.HasLogo,
-			"scopes":               screen.Scopes,
+			// The client's own documents, linked whenever set (#622 decision 12).
+			"clientPrivacyPolicyUrl":  screen.PrivacyPolicyURL,
+			"clientTermsOfServiceUrl": screen.TermsOfServiceURL,
+			"hasLogo":                 screen.HasLogo,
+			"scopes":                  screen.Scopes,
 			// The form names the ceremony that rendered it, and the boundary refuses a submission
 			// naming any other: the checkbox indices mean something only against this ceremony's
 			// scope list (#79).
 			"ceremonyId": authContext.CeremonyId,
+			// The page belongs to a sign-in for this app, so its footer links the app's own legal
+			// documents as well (#622).
+			render.LegalFooterClient: authContext.ClientId,
 		}
 
 		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/consent.html", bind)

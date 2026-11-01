@@ -6,6 +6,8 @@
 package apimapping
 
 import (
+	"strconv"
+
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -493,6 +495,8 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		ClientIdentifier:                        client.ClientIdentifier,
 		Description:                             client.Description,
 		WebsiteURL:                              client.WebsiteURL,
+		PrivacyPolicyURL:                        client.PrivacyPolicyURL,
+		TermsOfServiceURL:                       client.TermsOfServiceURL,
 		DisplayName:                             client.DisplayName,
 		Enabled:                                 client.Enabled,
 		ConsentRequired:                         client.ConsentRequired,
@@ -550,4 +554,101 @@ func ToClientResponses(clients []record.Client) []api.ClientResponse {
 		}
 	}
 	return responses
+}
+
+// ToLegalDocumentResponse maps a legal document, its current version, nil when it has never been
+// published, in which case the document is named by its draft's title, and the apps it lists
+// (#622).
+func ToLegalDocumentResponse(doc *record.LegalDocument, current *record.LegalDocumentVersion,
+	links []record.LegalDocumentClient) api.LegalDocumentResponse {
+	resp := api.LegalDocumentResponse{
+		Id:        doc.Id,
+		ShortName: doc.ShortName,
+		Kind:      doc.Kind,
+		Title:     doc.DraftTitle.String,
+		HasDraft:  doc.HasDraft(),
+		Retired:   doc.IsRetired(),
+		AppliesTo: doc.AppliesTo(),
+		ClientIds: make([]int64, 0, len(links)),
+	}
+	for _, link := range links {
+		resp.ClientIds = append(resp.ClientIds, link.ClientId)
+	}
+	if doc.CreatedAt.Valid {
+		resp.CreatedAt = &doc.CreatedAt.Time
+	}
+	if doc.UpdatedAt.Valid {
+		resp.UpdatedAt = &doc.UpdatedAt.Time
+	}
+	if doc.RetiredAt.Valid {
+		resp.RetiredAt = &doc.RetiredAt.Time
+	}
+	if current != nil {
+		resp.Title = current.Title
+		resp.CurrentVersion = current.VersionNumber
+		publishedAt := current.PublishedAt
+		resp.PublishedAt = &publishedAt
+	}
+	return resp
+}
+
+// ToLegalDocumentDetailResponse maps a legal document with its draft, its versions, the first
+// first, and the apps it lists, which are what the admin console's editor and versions list draw.
+func ToLegalDocumentDetailResponse(doc *record.LegalDocument, versions []record.LegalDocumentVersion,
+	links []record.LegalDocumentClient) api.LegalDocumentDetailResponse {
+	var current *record.LegalDocumentVersion
+	if len(versions) > 0 {
+		current = &versions[len(versions)-1]
+	}
+	resp := api.LegalDocumentDetailResponse{
+		LegalDocument: ToLegalDocumentResponse(doc, current, links),
+		Versions:      make([]api.LegalDocumentVersionSummaryResponse, 0, len(versions)),
+	}
+	if doc.HasDraft() {
+		resp.Draft = &api.LegalDocumentDraftResponse{Title: doc.DraftTitle.String, Markdown: doc.DraftMarkdown.String}
+	}
+	for _, version := range versions {
+		publishedAt := version.PublishedAt
+		resp.Versions = append(resp.Versions, api.LegalDocumentVersionSummaryResponse{
+			Version:     version.VersionNumber,
+			Title:       version.Title,
+			PublishedAt: &publishedAt,
+		})
+	}
+	return resp
+}
+
+// ToLegalDocumentVersionResponse maps one published version with its text.
+func ToLegalDocumentVersionResponse(version *record.LegalDocumentVersion) api.LegalDocumentVersionResponse {
+	publishedAt := version.PublishedAt
+	return api.LegalDocumentVersionResponse{
+		Version:     version.VersionNumber,
+		Title:       version.Title,
+		Markdown:    version.Markdown,
+		PublishedAt: &publishedAt,
+	}
+}
+
+// ToLegalDocumentAcceptanceResponse maps one version a user accepted, with the absolute URL of the
+// version's public page on the auth server at baseURL. A retired document's pages all answer "not
+// found", so its acceptances carry no URL.
+func ToLegalDocumentAcceptanceResponse(acceptance *record.LegalDocumentAcceptance, doc *record.LegalDocument,
+	version *record.LegalDocumentVersion, baseURL string) api.LegalDocumentAcceptanceResponse {
+	acceptedAt := acceptance.AcceptedAt
+	publishedAt := version.PublishedAt
+	resp := api.LegalDocumentAcceptanceResponse{
+		Id:              acceptance.Id,
+		AcceptedAt:      &acceptedAt,
+		LegalDocumentId: doc.Id,
+		ShortName:       doc.ShortName,
+		Version:         version.VersionNumber,
+		Title:           version.Title,
+		PublishedAt:     &publishedAt,
+		Retired:         doc.IsRetired(),
+	}
+	if !resp.Retired {
+		url := baseURL + "/legal/" + doc.ShortName + "/versions/" + strconv.Itoa(version.VersionNumber)
+		resp.URL = &url
+	}
+	return resp
 }

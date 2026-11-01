@@ -98,25 +98,28 @@ type completionBrowser interface {
 // (authentication_completed). It binds the ceremony to a user session and sends it on to consent
 // or to issuance. The route table builds one.
 type Completion struct {
-	database    completionDatabase
-	sessions    completionSessions
-	auditLogger auditLogger
-	scopes      scopeFilter
+	database       completionDatabase
+	sessions       completionSessions
+	auditLogger    auditLogger
+	scopes         scopeFilter
+	legalDocuments legalDocumentsOwed
 }
 
-// NewCompletion builds the operation over the database, the user sessions, the audit log and the
-// scope filter it uses.
+// NewCompletion builds the operation over the database, the user sessions, the audit log, the
+// scope filter and the legal documents it uses.
 func NewCompletion(database completionDatabase, sessions completionSessions, auditLogger auditLogger,
-	scopes scopeFilter) *Completion {
+	scopes scopeFilter, legalDocuments legalDocumentsOwed) *Completion {
 
-	return &Completion{database: database, sessions: sessions, auditLogger: auditLogger, scopes: scopes}
+	return &Completion{database: database, sessions: sessions, auditLogger: auditLogger, scopes: scopes,
+		legalDocuments: legalDocuments}
 }
 
 // CompletionResult is what Completion.Run did. Exactly one of NextStep, ClientError, Stale and
 // Replaced is set.
 type CompletionResult struct {
-	// NextStep is the route the ceremony was saved to go to: /auth/level1 on a restart, /auth/consent
-	// or /auth/issue once bound.
+	// NextStep is the route the ceremony was saved to go to: /auth/level1 on a restart, and once
+	// bound /auth/legal-acceptance when the user owes a legal document, or /auth/consent or
+	// /auth/issue.
 	NextStep string
 	// SaveErr is the save's failure, ceremony.ErrCeremonyReplaced when the browser session no longer
 	// holds the ceremony. The handler redirects to NextStep only when it is nil.
@@ -162,9 +165,11 @@ type CompletionResult struct {
 //     session cannot be stored (StartNewUserSession refuses a zero instant, migration 000062 ended
 //     every older session), and an auth_time is never invented for it (#580 decision 5).
 //  7. Sets the ceremony's ACR against the bound session (AuthContext.SetAcrLevel).
-//  8. Decides where the bound ceremony goes (decideAfterBinding), loading what it asks for: the scope
+//  8. Decides where the bound ceremony goes (routeBoundCeremony), loading what it asks for: the scope
 //     narrowed to what the user holds, which replaces the ceremony's, and the stored consent. A user
-//     holding none of the scopes is answered access_denied after the clear; otherwise the ceremony is
+//     holding none of the scopes is answered access_denied after the clear. A user who owes the
+//     acceptance step a legal document for the client is saved towards /auth/legal-acceptance, which
+//     decides consent or issuance once the documents are accepted (#622); otherwise the ceremony is
 //     saved towards /auth/consent or /auth/issue.
 //
 // settings are the request's, for the session's bounds; ipAddress is the browser's, recorded on the
@@ -307,47 +312,25 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 		return CompletionResult{}, err
 	}
 
-	facts := afterBindingFacts{
-		PromptConsent:    authContext.HasPromptValue("consent"),
-		ConsentRequired:  client.ConsentRequired,
-		ClientIdentifier: client.ClientIdentifier,
+	answer, err := routeBoundCeremony(ctx, o.database, o.scopes, authContext, client, user)
+	if err != nil {
+		return CompletionResult{}, err
 	}
-	answer, need := decideAfterBinding(facts)
-	for need != afterBindingFactNone {
-		switch need {
-		case afterBindingFactEffectiveScope:
-			effectiveScope, filterErr := o.scopes.FilterOutScopesWhereUserIsNotAuthorized(ctx, authContext.Scope, user)
-			if filterErr != nil {
-				return CompletionResult{}, filterErr
-			}
-			authContext.SetScope(effectiveScope)
-			scope := authContext.Scope
-			facts.EffectiveScope = &scope
-		case afterBindingFactConsent:
-			consent, consentErr := o.database.GetConsentByUserIdAndClientId(ctx, nil, user.Id, client.Id)
-			if consentErr != nil {
-				return CompletionResult{}, consentErr
-			}
-			facts.ConsentLoaded = true
-			facts.Consent = consent
+	if answer != afterBindingNoScope {
+		owed, owedErr := o.legalDocuments.Owed(ctx, client, user.Id)
+		if owedErr != nil {
+			return CompletionResult{}, owedErr
 		}
-		answer, need = decideAfterBinding(facts)
+		if len(owed) > 0 {
+			authContext.AuthState = ceremony.AuthStateRequiresLegalAcceptance
+			return CompletionResult{NextStep: "/auth/legal-acceptance", SaveErr: browser.SaveAuthContext(authContext)}, nil
+		}
 	}
-
-	switch answer {
-	case afterBindingNoScope:
-		return CompletionResult{
-			ClientError: &ClientError{Client: client, Code: "access_denied",
-				Description: "The user is not authorized to access any of the requested scopes"},
-			ClearErr: browser.ClearAuthContext(authContext.CeremonyId),
-		}, nil
-	case afterBindingConsent:
-		authContext.AuthState = ceremony.AuthStateRequiresConsent
-		return CompletionResult{NextStep: "/auth/consent", SaveErr: browser.SaveAuthContext(authContext)}, nil
-	default:
-		authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-		return CompletionResult{NextStep: "/auth/issue", SaveErr: browser.SaveAuthContext(authContext)}, nil
+	nextStep, clientError, writeErr := moveBoundCeremonyOn(answer, browser, authContext, client)
+	if clientError != nil {
+		return CompletionResult{ClientError: clientError, ClearErr: writeErr}, nil
 	}
+	return CompletionResult{NextStep: nextStep, SaveErr: writeErr}, nil
 }
 
 // restartCompletion is restart route 1: the attempt is discarded with AuthContext.Restart, so the

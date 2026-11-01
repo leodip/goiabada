@@ -882,13 +882,17 @@ type ClientDisplaySettings struct {
 	DisplayName      string
 	Description      string
 	WebsiteURL       string
-	ShowLogo         bool
-	ShowDisplayName  bool
-	ShowDescription  bool
-	ShowWebsiteURL   bool
-	UploadLogo       bool // Whether to actually upload a logo
-	ConsentRequired  bool
-	DefaultAcrLevel  record.AcrLevel
+	// PrivacyPolicyURL and TermsOfServiceURL are the client's own documents, linked from the
+	// consent screen whenever set, with no switch of their own (#622 decision 12).
+	PrivacyPolicyURL  string
+	TermsOfServiceURL string
+	ShowLogo          bool
+	ShowDisplayName   bool
+	ShowDescription   bool
+	ShowWebsiteURL    bool
+	UploadLogo        bool // Whether to actually upload a logo
+	ConsentRequired   bool
+	DefaultAcrLevel   record.AcrLevel
 }
 
 // createClientWithDisplaySettings creates a client with specified display settings
@@ -899,6 +903,8 @@ func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySetting
 		DisplayName:              settings.DisplayName,
 		Description:              settings.Description,
 		WebsiteURL:               settings.WebsiteURL,
+		PrivacyPolicyURL:         settings.PrivacyPolicyURL,
+		TermsOfServiceURL:        settings.TermsOfServiceURL,
 		ShowLogo:                 settings.ShowLogo,
 		ShowDisplayName:          settings.ShowDisplayName,
 		ShowDescription:          settings.ShowDescription,
