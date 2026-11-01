@@ -1411,7 +1411,7 @@
 "adminconsole.admin_legal_documents.apps.all_apps_hint" = "Jede App, auch später hinzugefügte."
 "adminconsole.admin_legal_documents.apps.selected_apps_hint" = "Nur die unten markierten Apps. Ist keine markiert, gilt das Dokument für niemanden."
 "adminconsole.admin_legal_documents.apps.apps_legend" = "Apps"
-"adminconsole.admin_legal_documents.apps.apps_hint" = "Gilt, wenn „Ausgewählte Apps“ gewählt ist. Die Admin-Konsole ist nicht aufgeführt: Benutzer werden bei der Anmeldung an ihr nie gebeten, ein Dokument zu akzeptieren."
+"adminconsole.admin_legal_documents.apps.apps_hint" = "Die Admin-Konsole ist nicht aufgeführt: Benutzer werden bei der Anmeldung an ihr nie gebeten, ein Dokument zu akzeptieren."
 "adminconsole.admin_legal_documents.apps.no_clients" = "Es gibt keine Apps zur Auswahl."
 "adminconsole.admin_legal_documents.apps.no_apps_notice" = "Keine App ist ausgewählt, daher gilt dieses Dokument für niemanden. Wählen Sie seine Apps aus oder wählen Sie „Alle Apps“."
 "adminconsole.admin_legal_documents.apps.retired_notice" = "Dieses Dokument ist außer Kraft gesetzt, daher können die Apps, für die es gilt, nicht geändert werden. Stellen Sie es wieder her, um sie zu ändern."

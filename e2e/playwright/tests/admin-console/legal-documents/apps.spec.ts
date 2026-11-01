@@ -35,10 +35,15 @@ test("a document applies to all apps until its apps are chosen, never the admin 
   await expect(page).toHaveTitle(new RegExp(`^Applies to – ${doc.title} – `));
   await expect(page.getByRole("link", { name: "Applies to", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.locator("#appliesToAllApps")).toBeChecked();
+  // The apps to tick show only while Selected apps is chosen.
   const apps = page.locator("#appsList");
+  await expect(apps).toBeHidden();
+  await page.locator("#appliesToSelectedApps").check();
   await expect(apps.getByText(shop.identifier, { exact: true })).toBeVisible();
   await expect(apps.getByText(blog.identifier, { exact: true })).toBeVisible();
   await expect(apps.getByText("admin-console-client", { exact: true })).toHaveCount(0);
+  await page.locator("#appliesToAllApps").check();
+  await expect(apps).toBeHidden();
   await page.goto(list);
   await expect(appliesToCell(page, doc.title)).toHaveText("All apps");
 
@@ -63,6 +68,7 @@ test("a document applies to all apps until its apps are chosen, never the admin 
 
   // Back to all apps: every client has it, and no box stays ticked.
   await setLegalDocumentApps(page, doc.id, "all");
+  await expect(page.locator("#appsList")).toBeHidden();
   await expect(page.locator('#appsList input[type="checkbox"]:checked')).toHaveCount(0);
   await page.goto(clientUrl(blog.id, "legal-documents"));
   await expect(appliesToCell(page, doc.title)).toHaveText("All apps");

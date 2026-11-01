@@ -1414,7 +1414,7 @@
 "adminconsole.admin_legal_documents.apps.all_apps_hint" = "Ogni app, comprese quelle aggiunte in seguito."
 "adminconsole.admin_legal_documents.apps.selected_apps_hint" = "Solo le app selezionate qui sotto. Se non ne è selezionata nessuna, il documento non si applica a nessuno."
 "adminconsole.admin_legal_documents.apps.apps_legend" = "App"
-"adminconsole.admin_legal_documents.apps.apps_hint" = "Usate quando è scelto App selezionate. La console di amministrazione non è elencata: agli utenti non viene mai chiesto di accettare un documento quando vi accedono."
+"adminconsole.admin_legal_documents.apps.apps_hint" = "La console di amministrazione non è elencata: agli utenti non viene mai chiesto di accettare un documento quando vi accedono."
 "adminconsole.admin_legal_documents.apps.no_clients" = "Non ci sono app tra cui scegliere."
 "adminconsole.admin_legal_documents.apps.no_apps_notice" = "Nessuna app è selezionata, quindi questo documento non si applica a nessuno. Seleziona le sue app o scegli Tutte le app."
 "adminconsole.admin_legal_documents.apps.retired_notice" = "Questo documento è ritirato, quindi le app a cui si applica non possono essere modificate. Ripristinalo per modificarle."

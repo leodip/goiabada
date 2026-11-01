@@ -1345,7 +1345,7 @@
 "adminconsole.admin_legal_documents.apps.all_apps_hint" = "Todos os aplicativos, incluindo os adicionados depois."
 "adminconsole.admin_legal_documents.apps.selected_apps_hint" = "Somente os aplicativos marcados abaixo. Sem nenhum marcado, o documento não se aplica a ninguém."
 "adminconsole.admin_legal_documents.apps.apps_legend" = "Aplicativos"
-"adminconsole.admin_legal_documents.apps.apps_hint" = "Usados quando Aplicativos selecionados está escolhido. O console de administração não aparece: os usuários nunca são solicitados a aceitar um documento ao entrar nele."
+"adminconsole.admin_legal_documents.apps.apps_hint" = "O console de administração não aparece: os usuários nunca são solicitados a aceitar um documento ao entrar nele."
 "adminconsole.admin_legal_documents.apps.no_clients" = "Não há aplicativos para escolher."
 "adminconsole.admin_legal_documents.apps.no_apps_notice" = "Nenhum aplicativo está selecionado, então este documento não se aplica a ninguém. Selecione seus aplicativos ou escolha Todos os aplicativos."
 "adminconsole.admin_legal_documents.apps.retired_notice" = "Este documento está retirado, então os aplicativos aos quais se aplica não podem ser alterados. Restaure-o para alterá-los."

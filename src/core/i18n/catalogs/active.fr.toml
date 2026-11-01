@@ -1410,7 +1410,7 @@
 "adminconsole.admin_legal_documents.apps.all_apps_hint" = "Chaque application, y compris celles ajoutées plus tard."
 "adminconsole.admin_legal_documents.apps.selected_apps_hint" = "Seulement les applications cochées ci-dessous. Si aucune n'est cochée, le document ne s'applique à personne."
 "adminconsole.admin_legal_documents.apps.apps_legend" = "Applications"
-"adminconsole.admin_legal_documents.apps.apps_hint" = "Utilisées lorsque Applications sélectionnées est choisi. La console d'administration n'est pas listée : les utilisateurs ne sont jamais invités à accepter un document lorsqu'ils s'y connectent."
+"adminconsole.admin_legal_documents.apps.apps_hint" = "La console d'administration n'est pas listée : les utilisateurs ne sont jamais invités à accepter un document lorsqu'ils s'y connectent."
 "adminconsole.admin_legal_documents.apps.no_clients" = "Il n'y a aucune application à choisir."
 "adminconsole.admin_legal_documents.apps.no_apps_notice" = "Aucune application n'est sélectionnée, ce document ne s'applique donc à personne. Sélectionnez ses applications ou choisissez Toutes les applications."
 "adminconsole.admin_legal_documents.apps.retired_notice" = "Ce document est retiré, les applications auxquelles il s'applique ne peuvent donc pas être modifiées. Restaurez-le pour les modifier."

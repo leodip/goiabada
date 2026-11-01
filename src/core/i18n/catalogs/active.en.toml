@@ -1407,7 +1407,7 @@
 "adminconsole.admin_legal_documents.apps.all_apps_hint" = "Every app, including apps added later."
 "adminconsole.admin_legal_documents.apps.selected_apps_hint" = "Only the apps ticked below. With none ticked, the document applies to nobody."
 "adminconsole.admin_legal_documents.apps.apps_legend" = "Apps"
-"adminconsole.admin_legal_documents.apps.apps_hint" = "Used when Selected apps is chosen. The admin console isn't listed: users are never asked to accept a document when they sign in to it."
+"adminconsole.admin_legal_documents.apps.apps_hint" = "The admin console isn't listed: users are never asked to accept a document when they sign in to it."
 "adminconsole.admin_legal_documents.apps.no_clients" = "There are no apps to choose from."
 "adminconsole.admin_legal_documents.apps.no_apps_notice" = "No app is selected, so this document applies to nobody. Select its apps, or choose All apps."
 "adminconsole.admin_legal_documents.apps.retired_notice" = "This document is retired, so the apps it applies to can't be changed. Restore it to change them."
