@@ -28,7 +28,7 @@ import (
 // switch says. This tier runs with the switch off. Every test creates its own clients, so a budget
 // it spends is its own; the counts are written out rather than read from the limiter.
 
-// clientAuthAnswer is what a client receives from the token endpoint.
+// clientAuthAnswer is what a client receives from the token, revocation or introspection endpoint.
 type clientAuthAnswer struct {
 	status     int
 	retryAfter string
@@ -44,6 +44,13 @@ func (a clientAuthAnswer) String() string {
 // Authorization header when basic is set and in the body otherwise; an empty secret sends none.
 func postClientAuthentication(t *testing.T, form url.Values, basic bool, clientId, secret string) clientAuthAnswer {
 	t.Helper()
+	return postClientAuthenticationTo(t, "/auth/token/", form, basic, clientId, secret)
+}
+
+// postClientAuthenticationTo is postClientAuthentication to the endpoint at path. An empty body,
+// a revocation's 200, leaves the answer's body nil.
+func postClientAuthenticationTo(t *testing.T, path string, form url.Values, basic bool, clientId, secret string) clientAuthAnswer {
+	t.Helper()
 	sent := url.Values{}
 	for k, v := range form {
 		sent[k] = v
@@ -54,7 +61,7 @@ func postClientAuthentication(t *testing.T, form url.Values, basic bool, clientI
 			sent.Set("client_secret", secret)
 		}
 	}
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + path
 	req, err := http.NewRequest(http.MethodPost, destUrl, strings.NewReader(sent.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -69,7 +76,9 @@ func postClientAuthentication(t *testing.T, form url.Values, basic bool, clientI
 	require.NoError(t, err)
 	answer := clientAuthAnswer{status: resp.StatusCode, retryAfter: resp.Header.Get("Retry-After"),
 		challenge: resp.Header.Get("WWW-Authenticate")}
-	require.NoError(t, json.Unmarshal(raw, &answer.body), "status %d, body: %s", resp.StatusCode, string(raw))
+	if len(raw) > 0 {
+		require.NoError(t, json.Unmarshal(raw, &answer.body), "status %d, body: %s", resp.StatusCode, string(raw))
+	}
 	return answer
 }
 

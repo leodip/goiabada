@@ -71,7 +71,7 @@ func headerEndpoints() []headerEndpoint {
 		{
 			name: "revocation", path: "/auth/revoke", warning: "client authentication refused at the revocation endpoint",
 			handler: func(t *testing.T, database *datamocks.Database) http.HandlerFunc {
-				return HandleRevokePost(render.New(nil, nil), database, handlersmocks.NewTokenParser(t), testDataCipher,
+				return HandleRevokePost(render.New(nil, nil), database, handlersmocks.NewTokenParser(t), testDataCipher, nil,
 					handlersmocks.NewAuditLogger(t), revocationmetrics.Register(metrics.NewRegistry()))
 			},
 			form: url.Values{"token": {"the.presented.token"}},
@@ -79,7 +79,7 @@ func headerEndpoints() []headerEndpoint {
 		{
 			name: "introspection", path: "/auth/introspect", warning: "client authentication refused at the introspection endpoint",
 			handler: func(t *testing.T, database *datamocks.Database) http.HandlerFunc {
-				return HandleIntrospectPost(render.New(nil, nil), database, handlersmocks.NewTokenParser(t), testDataCipher,
+				return HandleIntrospectPost(render.New(nil, nil), database, handlersmocks.NewTokenParser(t), testDataCipher, nil,
 					introspectionmetrics.Register(metrics.NewRegistry()))
 			},
 			form: url.Values{"token": {"the.presented.token"}},

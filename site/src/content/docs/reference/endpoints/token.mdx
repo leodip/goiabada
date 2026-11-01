@@ -243,7 +243,7 @@ Pragma: no-cache
 
 `error_description` is English, with no character outside the ones RFC 6749 allows in it, and at most 512 bytes.
 
-Every grant is limited per confidential client, 200 missing or wrong client secrets an hour, whether or not rate limiting is on. A client over that limit is refused even with its right secret, until the count wears off. The admin console's own client isn't limited. The password grant is also limited per account, 100 wrong passwords an hour, whether or not rate limiting is on, and with rate limiting on, per IP address. A request over a limit is answered `429 Too Many Requests` with a `Retry-After` header. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
+Every grant is limited per confidential client, 200 missing or wrong client secrets an hour, counted together with the [revocation](/reference/endpoints/revoke/) and [introspection](/reference/endpoints/introspect/) endpoints, whether or not rate limiting is on. A client over that limit is refused even with its right secret, until the count wears off. The admin console's own client isn't limited. The password grant is also limited per account, 100 wrong passwords an hour, whether or not rate limiting is on, and with rate limiting on, per IP address. A request over a limit is answered `429 Too Many Requests` with a `Retry-After` header. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
 ## Calling it from a browser
 

@@ -118,10 +118,10 @@ func TestRateLimitsDocs_TheTableIsTheLimitersTiers(t *testing.T) {
 	assertRateLimitTable(t, filepath.Dir(guard.SourceRoot(t)), rateLimitsSection, productionRateLimitTiers(t))
 }
 
-// TestRateLimitsDocs_TheClientAuthenticationTierIsDeclaredOnTheTokenEndpoint holds the one tier no
-// Limit method reaches to the routes the agreement gives it (#707 decision 10): the declaration is
-// what the table is held to, so it is written out here.
-func TestRateLimitsDocs_TheClientAuthenticationTierIsDeclaredOnTheTokenEndpoint(t *testing.T) {
+// TestRateLimitsDocs_TheClientAuthenticationTierIsDeclaredOnTheThreeClientEndpoints holds the one
+// tier no Limit method reaches to the routes the agreement gives it (#707 decisions 2 and 10): the
+// declaration is what the table is held to, so it is written out here.
+func TestRateLimitsDocs_TheClientAuthenticationTierIsDeclaredOnTheThreeClientEndpoints(t *testing.T) {
 	for _, tier := range productionRateLimitTiers(t) {
 		if tier.name != "client_auth" {
 			continue
@@ -129,8 +129,9 @@ func TestRateLimitsDocs_TheClientAuthenticationTierIsDeclaredOnTheTokenEndpoint(
 		if tier.limit != 200 || tier.window != time.Hour || !tier.failuresOnly || tier.countedBy != "countedByClient" {
 			t.Errorf("client_auth reads as %+v, want 200 failures per hour counted by client", tier)
 		}
-		if !slices.Equal(tier.routes, []string{"POST /auth/token"}) {
-			t.Errorf("client_auth guards %v, want POST /auth/token", tier.routes)
+		want := []string{"POST /auth/token", "POST /auth/revoke", "POST /auth/introspect"}
+		if !slices.Equal(tier.routes, want) {
+			t.Errorf("client_auth guards %v, want %v", tier.routes, want)
 		}
 		return
 	}

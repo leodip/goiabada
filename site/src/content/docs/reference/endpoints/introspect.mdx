@@ -98,6 +98,8 @@ The calling client authenticates exactly as at the token endpoint, with `client_
 
 A [public client](/concepts/clients/#public-and-confidential-clients) can't introspect, since it has no secret to authenticate with.
 
+A confidential client is limited to 200 missing or wrong secrets an hour, counted together across the token, revocation and introspection endpoints, whether or not rate limiting is on. A client over that limit is refused `429 Too Many Requests` with a `Retry-After` header at all three, even with its right secret, until the count wears off. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
+
 The auth server's log has a `client authentication refused at the introspection endpoint` warning for each refusal. See [Logs](/deploy/logs/#records-worth-knowing).
 
 ## The answer
@@ -107,6 +109,7 @@ The auth server's log has a `client authentication refused at the introspection 
 | `200 OK` | The token is active, or `{"active": false}` |
 | `400 Bad Request`, `invalid_request` | `token` or `client_id` is missing, a parameter is repeated, the body can't be read, or the secret is sent both ways |
 | `401 Unauthorized`, `invalid_client` | The client couldn't be authenticated, or it's a public client |
+| `429 Too Many Requests`, `invalid_request` | The client is over its limit of failed client authentications. Wait the seconds in `Retry-After` |
 | `500 Internal Server Error`, `server_error` | The auth server couldn't check the token. That says nothing about the token: try again, or refuse the request |
 
 Every answer carries `Cache-Control: no-store`. If your API caches answers itself, keep each one no longer than you can accept a revoked token being honored, and never past the token's `exp`.

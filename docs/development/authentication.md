@@ -134,7 +134,9 @@ A client ends one of its grants by sending a token of it.
 - Endpoint: `POST /auth/revoke`, form-encoded, CSRF-exempt, CORS for registered web origins, on a
   branch of its own whose faults answer 503
 - Order: the client authenticates first through `clientauth` (a public client by `client_id`
-  alone); the token parser refuses a malformed or non-RS256 token before reading a key, and checks
+  alone), a confidential client's secret check spending the `client_auth` budget the token and
+  introspection endpoints spend (a 429 over it, counted in no outcome; a count that cannot be read
+  is a 503, #707); the token parser refuses a malformed or non-RS256 token before reading a key, and checks
   any other against the current key and then each stored one; the token says its type (an access token by its `at+jwt` header, a refresh token by its `typ` claim), and
   `token_type_hint` is never read
 - Liveness before ownership: an access token is judged by `liveness.AccessToken`, a refresh token
@@ -168,7 +170,9 @@ An API, calling as a confidential client, asks whether a token is active.
   answered 405 with `Allow: POST` and `no-store` by `HandleIntrospectOtherMethods`, registered for
   the path on the same branch, whose faults answer 500 and count as `error`
 - Order: the client authenticates first through `clientauth.AuthenticateConfidential`, which
-  refuses a public client 401 `invalid_client` whatever it sent (section 4); the token parser
+  refuses a public client 401 `invalid_client` whatever it sent (section 4), its secret check
+  spending the `client_auth` budget the token and revocation endpoints spend (a 429 over it,
+  counted in no outcome; a count that cannot be read is a 500, #707); the token parser
   refuses a malformed or non-RS256 token before reading a key; `token_type_hint` is never read
 - An access token is active when `liveness.AccessToken` finds it live and its `aud` names a
   resource on the caller's introspection resources (`clients_introspection_resources`, compared
@@ -591,7 +595,8 @@ verification and its resend), since no stranger can spend them (#542), and those
 type (wrong passwords per account, 100 an hour shared by the sign-in form and the password grant,
 and reset mails and registration notices per address), since only Goiabada can count them (#503),
 and `client_auth`, 200 missing or wrong secrets an hour per confidential client at every grant of
-the token endpoint, which RFC 6749 section 2.3.1 makes a MUST (#707 decisions 1 and 5). It is the
+the token endpoint, revocation and introspection together, which RFC 6749 section 2.3.1 makes a
+MUST (#707 decisions 1, 2 and 5): separate budgets would triple a guesser's allowance. It is the
 one tier not mounted as a `Limit…` middleware: client authentication spends it around the secret
 comparison (see Client authentication above), so the rate-limits docs test learns its routes from
 `rateLimitTiersSpentByHandlers` in `internal/server/routes.go`. Like the account and user tiers it

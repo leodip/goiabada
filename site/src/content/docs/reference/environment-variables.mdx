@@ -182,7 +182,7 @@ The auth server limits these endpoints. The limits counted by a user, an email o
 | `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` | always |
 | `POST /auth/token` with `grant_type=password`<br/>Limiter: `ropc_ip` | 30 per minute | failed sign-ins | IP address | switch on |
 | `POST /auth/token` with `grant_type=password`<br/>Limiter: `ropc_ip_requests` | 120 per minute | every request | IP address | switch on |
-| `POST /auth/token` (client authentication, every grant)<br/>Limiter: `client_auth` | 200 per 60 minutes | failed client authentications | client | always |
+| `POST /auth/token` (client authentication, every grant), `POST /auth/revoke` and `POST /auth/introspect`<br/>Limiter: `client_auth` | 200 per 60 minutes, for the three together | failed client authentications | client | always |
 
 A few rules make these work:
 
@@ -196,7 +196,7 @@ A few rules make these work:
 - **A submission the Turnstile challenge refuses spends nothing.** While the [Turnstile challenge](/guides/require-a-turnstile-challenge/) is on, a submission of `POST /auth/pwd`, `POST /forgot-password` or `POST /account/register` without a token Cloudflare verified is refused before any limit on its route counts it.
 - **A limit counted by IP address is only as good as the address.** Behind a proxy, set up [client IP addresses](#client-ip-addresses) first.
 - **Anyone who knows an email can block its password sign-in.** 100 wrong passwords in an hour block that account's password sign-in, at the form and through the password grant, for up to an hour, even with the right password, and about 100 more an hour keep it blocked. A password reset doesn't clear the count, and anyone already signed in stays signed in. That's the price of a bound on guessing that holds whatever address the server sees. The [Turnstile challenge](/guides/require-a-turnstile-challenge/) stops it at the form, as long as no public client has the password grant enabled: the grant shares the budget and can't show a challenge. Without it, block the attacker at your proxy or CDN, which sees their address.
-- **Anyone who knows a confidential client's identifier can block it.** 200 wrong secrets in an hour block that client at the token endpoint for up to an hour, even with its right secret. Block the source at your proxy or CDN.
+- **Anyone who knows a confidential client's identifier can block it.** 200 wrong secrets in an hour block that client at the token, revocation and introspection endpoints for up to an hour, even with its right secret. Block the source at your proxy or CDN.
 - **100 wrong one-time codes in a row disable the user's authenticator.** Unlike the `otp` rate, this count doesn't wear off: only a correct code, or a new authenticator, resets it. Recovery codes neither count toward it nor reset it, and they still sign in while the authenticator is disabled. See [A user who lost their authenticator](/guides/require-two-factor-authentication/#a-user-who-lost-their-authenticator) for the way back.
 
 Each limit that trips writes a `rate_limit_exceeded` [audit event](/concepts/audit-log/), once per key and window on each replica.

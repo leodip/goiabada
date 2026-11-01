@@ -101,10 +101,12 @@ rests with it off: `infra/rate-limiter.sh` sets `GOIABADA_AUTHSERVER_RATELIMITER
 running auth server has the value it asked for.
 
 Off, nothing counts this machine's address, so the e2e suite signs everyone in from it as fast as it
-likes. The limits counted by an account or a user apply either way, since no proxy can count them. The
-e2e suite does not spend them, because a successful sign-in spends nothing and the tests that fail a
-password or a code do it on throwaway accounts of their own. `test.sh` switches the limiter off before
-it runs, in case a run of the rate-limits suite was killed before switching it back.
+likes. The limits counted by an account, a user or a client apply either way, since no proxy can count
+them. The e2e suite does not spend them, because a successful sign-in spends nothing, the tests that
+fail a password or a code do it on throwaway accounts of their own, and the test that fails client
+secrets (`tests/rfc6749/client-authentication-limit.spec.ts`) on throwaway clients of its own.
+`test.sh` switches the limiter off before it runs, in case a run of the rate-limits suite was killed
+before switching it back.
 
 The rate-limits suite tests what the limiter counts by an address: 120 requests a minute to the
 authorization endpoint, and 30 wrong passwords and 120 password checks a minute at the sign-in form and

@@ -70,7 +70,7 @@ func newIntrospectEndpoint(t *testing.T) *introspectEndpoint {
 		// The password grant is on, as it must be for refreshTokenRow's token to refresh.
 		settings: &record.Settings{Id: 1, Issuer: introspectIssuer, ResourceOwnerPasswordCredentialsEnabled: true},
 	}
-	e.handler = HandleIntrospectPost(render.New(nil, nil), e.database, e.parser, testDataCipher,
+	e.handler = HandleIntrospectPost(render.New(nil, nil), e.database, e.parser, testDataCipher, nil,
 		introspectionmetrics.Register(e.registry))
 	return e
 }

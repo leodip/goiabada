@@ -74,7 +74,7 @@ func newRevokeEndpoint(t *testing.T) *revokeEndpoint {
 		registry:    metrics.NewRegistry(),
 		settings:    &record.Settings{Id: 1, Issuer: revokeIssuer},
 	}
-	e.handler = HandleRevokePost(render.New(nil, nil), e.database, e.parser, testDataCipher, e.auditLogger,
+	e.handler = HandleRevokePost(render.New(nil, nil), e.database, e.parser, testDataCipher, nil, e.auditLogger,
 		revocationmetrics.Register(e.registry))
 	return e
 }
