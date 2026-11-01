@@ -298,10 +298,12 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   secret key and the token alone, and decides pass, refuse or fail open from the answer, checking the
   token's hostname against the base URL's host and its action against the form's. It logs what an
   operator must see, never the token or the secret key, and counts every check in
-  `goiabada_challenge_verifications_total`. `BindWidget` puts the widget, and Cloudflare's origin
-  in that response's `script-src`, on each render of a form the challenge is on. The forms'
-  middleware reads the token and draws the refusal: the sign-in form's in `internal/handlers`, the
-  forgot-password and registration forms' in `internal/handlers/accounthandlers`.
+  `goiabada_challenge_verifications_total`. `WithWidget` draws each render of a form the challenge
+  is on with the widget, and Cloudflare's origin in that response's `script-src`, which it puts
+  back as it was when the form fails to render, so the error page replacing it keeps today's
+  policy. The forms' middleware reads the token and draws the refusal: the sign-in form's in
+  `internal/handlers`, the forgot-password and registration forms' in
+  `internal/handlers/accounthandlers`.
   `Verifier.CheckSecretKey` asks siteverify about a secret key with Cloudflare's dummy token, and
   counts nothing: the admin API's Turnstile save calls it before storing a new secret key or turning
   the challenge on (#642)

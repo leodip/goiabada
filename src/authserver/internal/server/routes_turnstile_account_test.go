@@ -80,19 +80,34 @@ func (f challengedForm) submission(email, token string) *http.Request {
 	return challenged(browserForm(http.MethodPost, f.path, form.Encode()))
 }
 
-// assertRedrawn checks rr is the form shown again beside refusal, with the address kept, a fresh
-// widget with the form's action and the widened policy.
-func (f challengedForm) assertRedrawn(t *testing.T, rr *httptest.ResponseRecorder, refusal, email string) {
+// assertRedrawn checks rr is the form shown again beside refusal, announced as an alert, with the
+// address kept, a fresh widget with the form's action and the widened policy. The address field is
+// marked invalid and described by the refusal only when emailRefused, the refusal being about the
+// address: a refusal of the challenge, or of another field, leaves it unmarked.
+func (f challengedForm) assertRedrawn(t *testing.T, rr *httptest.ResponseRecorder, refusal, email string, emailRefused bool) {
 	t.Helper()
 	require.Equal(t, http.StatusOK, rr.Code)
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(rr.Body.String()))
 	require.NoError(t, err)
 	assert.Equal(t, refusal, strings.TrimSpace(doc.Find(f.errorSelector).Text()))
-	assert.Equal(t, email, doc.Find(`form input[name="email"]`).AttrOr("value", ""), "the address typed is kept")
+	notice := doc.Find(f.errorSelector).Parent()
+	assert.Equal(t, "alert", notice.AttrOr("role", ""), "the refusal is announced")
+	field := doc.Find(`form input[name="email"]`)
+	assert.Equal(t, email, field.AttrOr("value", ""), "the address typed is kept")
+	if emailRefused {
+		assert.Equal(t, "true", field.AttrOr("aria-invalid", ""), "the refused address is marked invalid")
+		assert.Equal(t, notice.AttrOr("id", "?"), field.AttrOr("aria-describedby", ""), "and described by the refusal")
+	} else {
+		_, invalid := field.Attr("aria-invalid")
+		assert.False(t, invalid, "the address is not what was refused, so it is not marked invalid")
+		_, described := field.Attr("aria-describedby")
+		assert.False(t, described, "nor described by a refusal that is not about it")
+	}
 	widget := doc.Find(`form div.cf-turnstile`)
 	require.Equal(t, 1, widget.Length(), "a fresh widget on the redrawn form")
 	assert.Equal(t, string(f.form), widget.AttrOr("data-action", ""))
 	assert.Equal(t, turnstileTestSiteKey, widget.AttrOr("data-sitekey", ""))
+	assert.Equal(t, "compact", widget.AttrOr("data-size", ""), "the size that fits the form at 320 pixels")
 	assert.Equal(t, widenedPolicy, rr.Header().Get("Content-Security-Policy"))
 }
 
@@ -113,7 +128,7 @@ func TestTurnstileChallenge_ARefusedForgotPasswordOrRegistrationRedrawsTheFormAn
 
 					rr := serveSecured(server, f.submission("  Victim@Example.com ", turnstileTestToken))
 
-					f.assertRedrawn(t, rr, challengeRefusal, f.kept("  Victim@Example.com "))
+					f.assertRedrawn(t, rr, challengeRefusal, f.kept("  Victim@Example.com "), false)
 					assert.Equal(t, []doubledCheck{{Form: f.form, Token: turnstileTestToken}}, verifier.checked())
 					assertAddressUnread(t, server)
 				})
@@ -278,6 +293,7 @@ func TestTurnstileChallenge_EveryForgotPasswordAndRegistrationFormCarriesTheWidg
 			require.Equal(t, 1, widget.Length(), "one widget, inside the form, so its token is submitted with it")
 			assert.Equal(t, turnstileTestSiteKey, widget.AttrOr("data-sitekey", ""))
 			assert.Equal(t, string(f.form), widget.AttrOr("data-action", ""))
+			assert.Equal(t, "compact", widget.AttrOr("data-size", ""), "the size that fits the form at 320 pixels")
 			assert.Equal(t, "en", widget.AttrOr("data-language", ""))
 			script := doc.Find(`script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]`)
 			require.Equal(t, 1, script.Length(), "the widget's script")
@@ -293,7 +309,7 @@ func TestTurnstileChallenge_EveryForgotPasswordAndRegistrationFormCarriesTheWidg
 
 			t.Run("the handler's own refusal", func(t *testing.T) {
 				rr := serveSecured(server, f.submission("not-an-address", turnstileTestToken))
-				f.assertRedrawn(t, rr, "Please enter a valid email address.", "not-an-address")
+				f.assertRedrawn(t, rr, "Please enter a valid email address.", "not-an-address", true)
 			})
 		})
 	}
@@ -305,7 +321,7 @@ func TestTurnstileChallenge_EveryForgotPasswordAndRegistrationFormCarriesTheWidg
 			turnstile.ResponseField: {turnstileTestToken},
 		}
 		rr := serveSecured(server, challenged(browserForm(http.MethodPost, "/account/register", form.Encode())))
-		challengedForms[1].assertRedrawn(t, rr, "The passwords don't match.", "victim@example.com")
+		challengedForms[1].assertRedrawn(t, rr, "The passwords don't match.", "victim@example.com", false)
 	})
 
 	t.Run("forgot-password's answer, which has no form, keeps today's policy", func(t *testing.T) {

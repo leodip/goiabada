@@ -244,9 +244,8 @@ func renderRegisterForm(w http.ResponseWriter, r *http.Request, pageRenderer Pag
 		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
-	turnstile.BindWidget(w, settings, bind)
-
-	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind); err != nil {
+	err := turnstile.WithWidget(pageRenderer, settings).RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
+	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 	}
 }

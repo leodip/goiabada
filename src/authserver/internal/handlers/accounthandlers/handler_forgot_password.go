@@ -58,24 +58,26 @@ func HandleForgotPasswordGet(
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
-		renderForgotPasswordForm(w, r, pageRenderer, settings, "", "")
+		renderForgotPasswordForm(w, r, pageRenderer, settings, "", "", "")
 	}
 }
 
 // renderForgotPasswordForm draws the forgot-password form, beside refusal and with email in its
-// field when there is one. Every render of the form, its first and each beside a refusal, carries a
+// field when there is one, marking the address field invalid when field names it, the refusal
+// being about the address; a refusal about anything else, the challenge's, marks nothing. Every
+// render of the form, its first and each beside a refusal, carries a
 // fresh Turnstile widget while the challenge is on (#642 decision 2); the page answering a request,
 // which has no form, carries none.
 func renderForgotPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
-	settings *record.Settings, email, refusal string) {
+	settings *record.Settings, email, refusal, field string) {
 
 	bind := map[string]interface{}{
-		"email": email,
-		"error": refusal,
+		"email":      email,
+		"error":      refusal,
+		"errorField": field,
 	}
-	turnstile.BindWidget(w, settings, bind)
-
-	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind); err != nil {
+	err := turnstile.WithWidget(pageRenderer, settings).RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
+	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 	}
 }
@@ -195,7 +197,7 @@ func HandleForgotPasswordPost(
 			// i18n surface: A — browser-flow form rerender. The address is drawn back as typed, so a
 			// typo is corrected rather than typed again.
 			renderForgotPasswordForm(w, r, pageRenderer, settings, r.FormValue("email"),
-				i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()))
+				i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()), "email")
 			return
 		}
 

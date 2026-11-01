@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,12 +10,14 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/turnstile"
+	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -139,7 +142,7 @@ func assertSignInFormRedrawn(t *testing.T, rr *httptest.ResponseRecorder, refusa
 	require.NoError(t, err)
 	assert.Equal(t, refusal, strings.TrimSpace(doc.Find("#pwd-error p").Text()))
 	assert.Equal(t, email, doc.Find(`input[name="email"]`).AttrOr("value", ""), "the address typed is kept")
-	assert.Equal(t, 1, doc.Find(`form div.cf-turnstile[data-action="login"]`).Length(), "a fresh widget on the redrawn form")
+	assert.Equal(t, 1, doc.Find(`form div.cf-turnstile[data-action="login"][data-size="compact"]`).Length(), "a fresh widget on the redrawn form")
 	assert.Equal(t, widenedPolicy, rr.Header().Get("Content-Security-Policy"))
 }
 
@@ -316,6 +319,7 @@ func TestTurnstileChallenge_TheFormCarriesTheWidgetAndOnlyItsPagesAdmitCloudflar
 	require.Equal(t, 1, widget.Length(), "one widget, inside the form, so its token is submitted with it")
 	assert.Equal(t, turnstileTestSiteKey, widget.AttrOr("data-sitekey", ""))
 	assert.Equal(t, "login", widget.AttrOr("data-action", ""))
+	assert.Equal(t, "compact", widget.AttrOr("data-size", ""), "the size that fits the form at 320 pixels")
 	assert.Equal(t, "en", widget.AttrOr("data-language", ""))
 	script := doc.Find(`script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]`)
 	require.Equal(t, 1, script.Length(), "the widget's script")
@@ -338,4 +342,59 @@ func TestTurnstileChallenge_TheFormCarriesTheWidgetAndOnlyItsPagesAdmitCloudflar
 		assert.Equal(t, plainPolicy, rr.Header().Get("Content-Security-Policy"))
 		assert.NotContains(t, rr.Body.String(), "challenges.cloudflare.com")
 	})
+}
+
+// overlaidTemplates is the built-in templates with files laid over them.
+type overlaidTemplates struct {
+	fs.FS
+	files fstest.MapFS
+}
+
+func (o overlaidTemplates) Open(name string) (fs.File, error) {
+	if _, laid := o.files[name]; laid {
+		return o.files.Open(name)
+	}
+	return o.FS.Open(name)
+}
+
+// A form the challenge is on that fails to render is replaced by the error page, which carries no
+// widget, so it is sent today's policy rather than the widened one the form would have been sent
+// (#642 decision 9).
+func TestTurnstileChallenge_AFormThatFailsToRenderIsReplacedUnderTodaysPolicy(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		template string
+		request  func(*Server) *http.Request
+	}{
+		{"sign-in", "auth_pwd.html", func(s *Server) *http.Request {
+			r := challenged(browserRequest(http.MethodGet, "/auth/pwd?ceremony="+routesTestCeremonyId))
+			r.AddCookie(pwdCeremonyCookie(t, s))
+			return r
+		}},
+		{"forgot-password", "forgot_password.html", func(*Server) *http.Request {
+			return challenged(browserRequest(http.MethodGet, "/forgot-password"))
+		}},
+		{"registration", "account_register.html", func(*Server) *http.Request {
+			return challenged(browserRequest(http.MethodGet, "/account/register"))
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			// The form's own template fails as it executes, after the policy was widened for it.
+			failing := overlaidTemplates{FS: web.TemplateFS(), files: fstest.MapFS{tt.template: {Data: []byte(
+				`{{define "title"}}t{{end}}{{define "head"}}{{end}}{{define "body"}}{{template "no-such-template" .}}{{end}}`)}}}
+			verifier := &doubledVerifier{t: t, forbidden: true}
+			server := newRoutesTestServerRendering(t, nil, newTestSessionStore(), verifier, failing)
+
+			rr := serveSecured(server, tt.request(server))
+
+			require.Equal(t, http.StatusInternalServerError, rr.Code)
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(rr.Body.String()))
+			require.NoError(t, err)
+			assert.Contains(t, doc.Find(".auth-status p").First().Text(), "The server couldn't complete your request",
+				"the error page replaced the form")
+			assert.NotContains(t, rr.Body.String(), "cf-turnstile")
+			assert.NotContains(t, rr.Body.String(), "challenges.cloudflare.com")
+			assert.Equal(t, plainPolicy, rr.Header().Get("Content-Security-Policy"))
+		})
+	}
 }

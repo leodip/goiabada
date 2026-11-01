@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -175,6 +176,13 @@ func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessi
 func newRoutesTestServerVerifying(t *testing.T, configure func(*config.Config), sessionStore *sessionstore.ConditionalStore,
 	verifier handlers.ChallengeVerifier) *Server {
 	t.Helper()
+	return newRoutesTestServerRendering(t, configure, sessionStore, verifier, web.TemplateFS())
+}
+
+// newRoutesTestServerRendering is newRoutesTestServerVerifying drawing its pages from templateFS.
+func newRoutesTestServerRendering(t *testing.T, configure func(*config.Config), sessionStore *sessionstore.ConditionalStore,
+	verifier handlers.ChallengeVerifier, templateFS fs.FS) *Server {
+	t.Helper()
 
 	passwordHash, err := passwordhash.Hash("the account's real password")
 	require.NoError(t, err)
@@ -224,7 +232,7 @@ func newRoutesTestServerVerifying(t *testing.T, configure func(*config.Config), 
 		router:               routing.New(),
 		database:             database,
 		sessionStore:         sessionStore,
-		templateFS:           web.TemplateFS(),
+		templateFS:           templateFS,
 		staticFS:             web.StaticFS(),
 		cfg:                  cfg,
 		jobs:                 afterresponse.New(registry),

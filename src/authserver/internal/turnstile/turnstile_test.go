@@ -41,7 +41,8 @@ const (
 
 // standIn is siteverify on this machine: it answers every call with status and body, after
 // holding it until release is closed or the call is given up, when hold is set, and records what
-// each call carried.
+// each call carried. With holdBody set it sends the status, the headers and the body, then holds
+// the response open the same way, so the answer stalls part way through its body.
 type standIn struct {
 	server *httptest.Server
 
@@ -50,7 +51,9 @@ type standIn struct {
 	body   string
 	header http.Header
 	hold   chan struct{}
-	calls  []call
+	// holdBody stalls the response after its body is sent, before it ends.
+	holdBody chan struct{}
+	calls    []call
 }
 
 type call struct {
@@ -67,7 +70,7 @@ func newStandIn(t *testing.T) *standIn {
 		form, _ := url.ParseQuery(string(raw))
 		s.mu.Lock()
 		s.calls = append(s.calls, call{method: r.Method, contentType: r.Header.Get("Content-Type"), form: form})
-		status, body, hold := s.status, s.body, s.hold
+		status, body, hold, holdBody := s.status, s.body, s.hold, s.holdBody
 		for name, values := range s.header {
 			w.Header()[name] = values
 		}
@@ -81,6 +84,13 @@ func newStandIn(t *testing.T) *standIn {
 		}
 		w.WriteHeader(status)
 		_, _ = io.WriteString(w, body)
+		if holdBody != nil {
+			w.(http.Flusher).Flush()
+			select {
+			case <-holdBody:
+			case <-r.Context().Done():
+			}
+		}
 	}))
 	t.Cleanup(s.server.Close)
 	return s
@@ -462,6 +472,59 @@ func TestCheck_ASiteverifyThatDoesNotAnswerInThreeSecondsFailsOpen(t *testing.T)
 	errors := h.recordsAt(slog.LevelError)
 	require.Len(t, errors, 1)
 	assert.Equal(t, "timeout", errors[0].Attrs["reason"])
+	h.assertNothingSecretLogged(t, token)
+}
+
+// An answer whose body breaks off is no usable answer, even when what arrived is a whole verdict:
+// the body is read whole or not at all (decision 4). The stand-in declares a longer body than it
+// sends, so the connection closes before the answer ends.
+func TestCheck_AnAnswerWhoseBodyBreaksOffFailsOpen(t *testing.T) {
+	h := newHarness(t)
+	verdict := `{"success":false,"error-codes":["invalid-input-response"],"messages":[]}`
+	h.standIn.answer(http.StatusOK, verdict)
+	h.standIn.header = http.Header{"Content-Length": {strconv.Itoa(len(verdict) + 20)}}
+
+	outcome := h.check(turnstile.FormLogin, token)
+
+	assert.Equal(t, turnstile.Unavailable, outcome, "a verdict that did not arrive whole is not a verdict")
+	assert.False(t, outcome.Refuses(), "the submission goes on as with the challenge off")
+	assert.Equal(t, 1, h.standIn.callCount(), "one attempt, no retry")
+	assert.Equal(t, "1", h.count(t, "login", "unavailable"))
+	assert.Equal(t, "0", h.count(t, "login", "refused"))
+	errors := h.recordsAt(slog.LevelError)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "unreadable", errors[0].Attrs["reason"])
+	readErr, isError := errors[0].Attrs["error"].(error)
+	require.True(t, isError, "the record carries the read's error")
+	require.ErrorIs(t, readErr, io.ErrUnexpectedEOF)
+	assert.Contains(t, readErr.Error(), "failed to read response body",
+		"the record says the read failed, not the parse")
+	h.assertNothingSecretLogged(t, token)
+}
+
+// The 3-second deadline covers the body too: an answer that sends its status and headers, then
+// stalls part way through its body, is given up as a timeout and the submission goes on.
+func TestCheck_AnAnswerThatStallsInItsBodyFailsOpenAtTheDeadline(t *testing.T) {
+	h := newHarness(t)
+	h.standIn.answer(http.StatusOK, `{"success":false,"error-codes":["invalid-input-response"]`)
+	release := make(chan struct{})
+	h.standIn.holdBody = release
+	t.Cleanup(func() { close(release) })
+
+	started := time.Now()
+	outcome := h.check(turnstile.FormLogin, token)
+	elapsed := time.Since(started)
+
+	assert.Equal(t, turnstile.Unavailable, outcome)
+	assert.False(t, outcome.Refuses())
+	assert.GreaterOrEqual(t, elapsed, 3*time.Second, "the deadline is three seconds")
+	assert.Less(t, elapsed, 4*time.Second, "and no more")
+	assert.Equal(t, 1, h.standIn.callCount())
+	assert.Equal(t, "1", h.count(t, "login", "unavailable"))
+	errors := h.recordsAt(slog.LevelError)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "timeout", errors[0].Attrs["reason"])
+	assert.Equal(t, "3s", errors[0].Attrs["timeout"])
 	h.assertNothingSecretLogged(t, token)
 }
 

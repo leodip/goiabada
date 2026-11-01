@@ -36,19 +36,53 @@ const (
 	ResponseField = "cf-turnstile-response"
 )
 
-// BindWidget puts the widget on a render of a form the challenge is on, while it is on: the site
-// key its template renders the widget with, and Cloudflare's script admitted to this response's
-// script-src alone (#642 decision 9). Every render of such a form calls it, its first and each one
-// beside a refusal, so each carries a fresh widget (decision 2). With the challenge off it does
-// nothing, and the page is sent today's policy.
-func BindWidget(w http.ResponseWriter, settings *record.Settings, bind map[string]interface{}) {
-	if !settings.TurnstileEnabled {
-		return
-	}
-	bind["turnstileSiteKey"] = settings.TurnstileSiteKey
-	bind["turnstileScriptURL"] = ScriptURL
-	httpmw.SetContentSecurityPolicy(w.Header(), ScriptOrigin)
+// TemplateRenderer is what WithWidget draws a form with.
+type TemplateRenderer interface {
+	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
+		data map[string]interface{}) error
 }
+
+// WithWidget is renderer drawing a form the challenge is on, carrying the widget while it is on:
+// the site key its template renders the widget with, and Cloudflare's script admitted to that
+// response's script-src alone (#642 decision 9). Every render of such a form goes through it, its
+// first and each one beside a refusal, so each carries a fresh widget (decision 2). With the
+// challenge off it is renderer, and the form is sent today's policy.
+func WithWidget(renderer TemplateRenderer, settings *record.Settings) TemplateRenderer {
+	if !settings.TurnstileEnabled {
+		return renderer
+	}
+	return widgetRenderer{renderer: renderer, settings: settings}
+}
+
+type widgetRenderer struct {
+	renderer TemplateRenderer
+	settings *record.Settings
+}
+
+// RenderTemplate widens the policy before the render, which writes the response as soon as it
+// succeeds. A render that fails leaves the response as it found it, as the renderer's own failures
+// do, so the error page the caller draws instead, which carries no widget, is sent the policy it
+// would have been sent anyway.
+func (wr widgetRenderer) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
+	data map[string]interface{}) error {
+
+	data["turnstileSiteKey"] = wr.settings.TurnstileSiteKey
+	data["turnstileScriptURL"] = ScriptURL
+	header := w.Header()
+	policy := header.Values(contentSecurityPolicy)
+	httpmw.SetContentSecurityPolicy(header, ScriptOrigin)
+	if err := wr.renderer.RenderTemplate(w, r, layoutName, templateName, data); err != nil {
+		if policy == nil {
+			header.Del(contentSecurityPolicy)
+		} else {
+			header[contentSecurityPolicy] = policy
+		}
+		return err
+	}
+	return nil
+}
+
+const contentSecurityPolicy = "Content-Security-Policy"
 
 // Form is a form the challenge is on, spelled as its widget's action.
 type Form string

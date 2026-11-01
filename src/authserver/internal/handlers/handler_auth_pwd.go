@@ -155,9 +155,8 @@ func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer Pag
 	}
 	// Every render, the form's first and each one beside a refusal, carries a fresh widget while
 	// the challenge is on (#642 decision 2).
-	turnstile.BindWidget(w, settings, bind)
-
-	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind); err != nil {
+	err := turnstile.WithWidget(pageRenderer, settings).RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
+	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 	}
 }

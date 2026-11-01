@@ -19,8 +19,9 @@ import (
 func RequireForgotPasswordChallenge(pageRenderer PageRenderer, verifier ChallengeVerifier) func(http.Handler) http.Handler {
 	return requireChallenge(turnstile.FormForgotPassword, verifier,
 		func(w http.ResponseWriter, r *http.Request, settings *record.Settings, refusal string) {
-			// As typed, as the handler draws back an address it refuses.
-			renderForgotPasswordForm(w, r, pageRenderer, settings, r.PostFormValue("email"), refusal)
+			// As typed, as the handler draws back an address it refuses. No field is marked: the
+			// refusal is about the widget, not the address.
+			renderForgotPasswordForm(w, r, pageRenderer, settings, r.PostFormValue("email"), refusal, "")
 		})
 }
 

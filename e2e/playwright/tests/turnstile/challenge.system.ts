@@ -5,7 +5,7 @@
 // Content-Security-Policy violation, so the widget's script and frame load under the policy the
 // forms are sent. The sign-in, forgot-password and registration forms each carry it. Runs alone, since on the challenge refuses every other test's sign-in, and every
 // test starts and ends with it off and no keys stored, as the baseline has it (lib/settings.ts).
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { openSignIn, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
@@ -193,4 +193,51 @@ test("forgot-password: with the challenge off, the form loads nothing from Cloud
   await expect(visitor.locator(".cf-turnstile")).toHaveCount(0);
   await expect(visitor.locator('script[src^="https://challenges.cloudflare.com"]')).toHaveCount(0);
   await context.close();
+});
+
+// At 320 CSS pixels, the width WCAG 2.2's reflow criterion names, each form with the widget drawn
+// fits the screen: the page does not scroll sideways, and the widget's box and what it draws stay
+// inside it. Cloudflare's normal size, 300 pixels wide, reached 17 pixels past the screen there.
+test("each form fits a 320-pixel screen with the widget drawn", async ({ page, browser, clients }) => {
+  const { client } = await browserSignInClient(page, clients);
+  await withSettingsRestored(page, general, async () => {
+    await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: true });
+    await saveSettings(page);
+    await turnOn(page, alwaysPassSiteKey);
+
+    const forms: { action: string; open: () => Promise<{ context: BrowserContext; page: Page }> }[] = [
+      { action: "login", open: () => openSignIn(browser, { clientId: client.identifier, scope: "openid" }) },
+      { action: "forgot-password", open: async () => {
+        const { context, visitor } = await openAsVisitor(browser, forgotPasswordUrl);
+        return { context, page: visitor };
+      } },
+      { action: "register", open: async () => {
+        const { context, visitor } = await openAsVisitor(browser, registerUrl);
+        return { context, page: visitor };
+      } },
+    ];
+    for (const form of forms) {
+      const { context, page: visitor } = await form.open();
+      await visitor.setViewportSize({ width: 320, height: 640 });
+      await expect(widget(visitor, form.action)).toHaveAttribute("data-sitekey", alwaysPassSiteKey);
+      // The widget has run, so what it draws is in the page.
+      await expect(token(visitor)).toHaveValue(/.+/);
+
+      const layout = await widget(visitor, form.action).evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return {
+          sidewaysScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          left: box.left,
+          right: box.right,
+          overflow: element.scrollWidth - element.clientWidth,
+          screen: document.documentElement.clientWidth,
+        };
+      });
+      expect(layout.sidewaysScroll, `${form.action}: the page scrolls sideways`).toBeLessThanOrEqual(0);
+      expect(layout.left, `${form.action}: the widget's left edge`).toBeGreaterThanOrEqual(-1);
+      expect(layout.right, `${form.action}: the widget's right edge`).toBeLessThanOrEqual(layout.screen + 1);
+      expect(layout.overflow, `${form.action}: what the widget draws reaches past its box`).toBeLessThanOrEqual(1);
+      await context.close();
+    }
+  });
 });
