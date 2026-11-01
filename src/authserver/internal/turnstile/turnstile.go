@@ -148,9 +148,11 @@ var (
 
 // Verifier checks a form's token with siteverify, against the auth server's own hostname.
 type Verifier struct {
-	// client asks about the forms' tokens. Its transport holds at most maxConcurrentChecks
-	// connections to siteverify, dials in progress included: a canceled call's dial goes on in the
-	// background, so the slots alone would not bound them.
+	// client asks about the forms' tokens. Its transport's per-host cap of maxConcurrentChecks
+	// counts dials in progress, which a canceled call leaves running in the background, so it
+	// bounds them where the slots alone would not. It is not a ceiling on every open connection:
+	// over HTTP/2, Go stops counting a connection with no stream to spare while it stays open to
+	// finish its streams.
 	client *http.Client
 	// keyClient asks about an administrator's secret key, over its own transport, so a flood that
 	// fills the forms' connections cannot hold it up.
