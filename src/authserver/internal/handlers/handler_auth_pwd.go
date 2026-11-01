@@ -109,7 +109,8 @@ func HandleAuthPwdPost(
 
 		// The password is verified, so the user's page language discloses nothing any more. It wins
 		// over the browser session's user the page-language middleware applied, being the person
-		// signing in now; on Automatic the page keeps the language it was drawn in (#631 decision 5).
+		// signing in now; on Automatic the page follows the language the request asks for, not the
+		// session user's choice (#631 decisions 2 and 5).
 		r = r.WithContext(i18n.WithPageLanguage(r.Context(), result.UserPageLanguage))
 
 		if result.Answer == authflow.PasswordAccountDisabled {

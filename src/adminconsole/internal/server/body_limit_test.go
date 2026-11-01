@@ -101,7 +101,7 @@ func TestBodyLimitPolicy_TheUploadRowFollowsTheUploadPage(t *testing.T) {
 func TestInitMiddleware_TheBodyLimitSitsAfterTheSlashStrip(t *testing.T) {
 	s := newStaticBranchTestServer("http://127.0.0.1:1", newTestSessionStore())
 	s.initMiddleware()
-	s.serveStaticFiles()
+	s.serveStaticFiles(http.NotFoundHandler())
 
 	var root []string
 	err := s.router.Walk(func(_ string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {

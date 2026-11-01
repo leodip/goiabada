@@ -20,7 +20,10 @@ import (
 	"github.com/leodip/goiabada/core/routing"
 )
 
-func (s *Server) initRoutes(root *routing.Router) {
+// initRoutes mounts the application's routes on root, and returns the not-found page as a
+// signed-in user is shown it, behind SessionHandler and the page language, for the static branch to
+// answer a directory with (serveStaticFiles).
+func (s *Server) initRoutes(root *routing.Router) http.Handler {
 	// The console's own base URL, which every redirect is built from, handed to each handler that
 	// redirects as it is built (#441).
 	baseURL := s.cfg.AdminConsole.BaseURL
@@ -83,7 +86,15 @@ func (s *Server) initRoutes(root *routing.Router) {
 	}
 
 	// Base routes
-	root.NotFound(handlers.HandleNotFoundGet(httpHelper))
+	//
+	// The not-found page is drawn in a signed-in user's page language, over ?ui_locales, wherever it
+	// answers (decisions 4 and 7). Each group under root answers it behind its own chain, which
+	// holds the page language already, so root's own handler is the plain page they inherit; the
+	// second call then puts baseAuth in front of it for a path under no group alone, replacing what
+	// the first set there.
+	notFound := handlers.HandleNotFoundGet(httpHelper)
+	root.NotFound(notFound)
+	root.With(baseAuth...).NotFound(notFound)
 	root.With(baseAuth...).Get("/", handlers.HandleIndexGet(authHelper, httpHelper, s.sessionStore, s.cfg.AuthServer.BaseURL))
 	// /unauthorized is reached by authenticated-but-forbidden users via the
 	// redirect in middleware_jwt's RequiresScope path. Wrapping it through
@@ -288,4 +299,10 @@ func (s *Server) initRoutes(root *routing.Router) {
 		r.Post("/settings/audit-logs", adminsettingshandlers.HandleAuditLogsPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/settings/audit-log-viewer", adminsettingshandlers.HandleAuditLogViewerGet(httpHelper, apiClient))
 	})
+
+	signedInNotFound := http.Handler(notFound)
+	for i := len(baseAuth) - 1; i >= 0; i-- {
+		signedInNotFound = baseAuth[i](signedInNotFound)
+	}
+	return signedInNotFound
 }

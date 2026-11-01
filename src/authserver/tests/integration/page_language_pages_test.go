@@ -397,3 +397,89 @@ func TestPageLanguage_TheResetPageFollowsTheLinksUser(t *testing.T) {
 		})
 	}
 }
+
+// A verified user on Automatic, or whose stored tag's catalog has gone, replaces the browser
+// session's user's choice with the language the request asks for: in a browser signed in as a user
+// who chose pt-BR, another user on Automatic, whose account is disabled, enters their password, and
+// the refusal follows the client's ui_locales=es, not the session user's Portuguese (decisions 2, 3
+// and 5). A user who chose German is the control.
+func TestPageLanguage_TheSignInsUserOnAutomaticReplacesTheSessionsUsersChoice(t *testing.T) {
+	cases := []struct {
+		name         string
+		pageLanguage string
+		refusal      string
+		lang         string
+	}{
+		{"Automatic", "", "Tu cuenta de usuario está desactivada.", "es"},
+		{"a catalog that has gone", "ja", "Tu cuenta de usuario está desactivada.", "es"},
+		{"chosen de", "de", "Ihr Benutzerkonto ist deaktiviert.", "de"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sessionUser, sessionPassword := newPageLanguageUser(t, true, "", "pt-BR")
+			browser := signedInBrowser(t, sessionUser, sessionPassword)
+			user, password := newPageLanguageUser(t, false, "fr", tc.pageLanguage)
+			client, redirectUri := newPageLanguageClient(t, record.AcrLevel1, false)
+
+			pwdPage := followToPage(t, browser, authorizeURL(client, redirectUri,
+				url.Values{"ui_locales": {"es"}, "prompt": {"login"}}))
+			assertPageIn(t, pageIn{"Entrar", "pt-BR"}, pwdPage)
+
+			resp := submitPassword(t, browser, pwdPage, user.Email, password)
+			defer func() { _ = resp.Body.Close() }()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			doc := parseHTMLResponse(t, resp)
+			body := doc.Find("body").Text()
+			assert.Contains(t, body, tc.refusal)
+			assert.NotContains(t, body, "Sua conta de usuário está desativada.", "the session user's choice loses")
+			assert.Equal(t, tc.lang, doc.Find("html").AttrOr("lang", ""))
+		})
+	}
+}
+
+// The reset link's user on Automatic, or whose stored tag's catalog has gone, replaces the browser
+// session's user's choice with the language the request asks for, on the form and on the page
+// saying the password is set: a browser signed in as a user who chose pt-BR opens another user's
+// reset link with ?ui_locales=es and is answered in Spanish (decisions 2, 3 and 5). A link whose
+// user chose German is the control.
+func TestPageLanguage_TheResetLinksUserOnAutomaticReplacesTheSessionsUsersChoice(t *testing.T) {
+	cases := []struct {
+		name         string
+		pageLanguage string
+		form         pageIn
+		done         string
+	}{
+		{"Automatic", "", pageIn{"Establece tu contraseña", "es"}, "Tu contraseña está lista. Ya puedes iniciar sesión con:"},
+		{"a catalog that has gone", "ja", pageIn{"Establece tu contraseña", "es"}, "Tu contraseña está lista. Ya puedes iniciar sesión con:"},
+		{"chosen de", "de", pageIn{"Passwort festlegen", "de"}, "Ihr Passwort ist festgelegt. Sie können sich jetzt mit dieser E-Mail-Adresse anmelden:"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			useMailpitSMTP(t)
+
+			sessionUser, sessionPassword := newPageLanguageUser(t, true, "", "pt-BR")
+			browser := signedInBrowser(t, sessionUser, sessionPassword)
+			email := plusAddress()
+			user, _ := createResetTestUser(t, email)
+			setPageLanguage(t, user.Id, tc.pageLanguage)
+
+			requestPasswordReset(t, browser, email)
+			cleanURL := followResetLink(t, browser, latestResetLink(t, email))
+
+			formResp := loadPage(t, browser, cleanURL+"?ui_locales=es")
+			formBody := bodyString(t, formResp)
+			_ = formResp.Body.Close()
+			formDoc, err := goquery.NewDocumentFromReader(strings.NewReader(formBody))
+			require.NoError(t, err)
+			assertDocumentIn(t, tc.form, formDoc)
+			assert.NotContains(t, formBody, "Defina sua senha", "the session user's choice loses")
+
+			resp := postCleanReset(t, browser, cleanURL+"?ui_locales=es", fake.Password(20), continuationIdIn(t, formBody))
+			defer func() { _ = resp.Body.Close() }()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			doneBody := bodyString(t, resp)
+			assert.Contains(t, doneBody, tc.done)
+			assert.Contains(t, doneBody, `<html lang="`+tc.form.lang+`"`)
+		})
+	}
+}

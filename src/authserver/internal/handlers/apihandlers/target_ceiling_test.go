@@ -214,7 +214,7 @@ var userTargetWrites = []targetWrite{
 		},
 		expectReads:      func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
 		writes:           []string{"SetUserProfile"},
-		expectFirstWrite: failingWrite("SetUserProfile", mock.Anything, (*sql.Tx)(nil), mock.Anything),
+		expectFirstWrite: failingWrite("SetUserProfile", mock.Anything, (*sql.Tx)(nil), mock.Anything, mock.Anything),
 	},
 	{
 		name: "PUT /users/{id}/address",

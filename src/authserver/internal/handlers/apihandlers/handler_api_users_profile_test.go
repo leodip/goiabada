@@ -73,7 +73,7 @@ func TestHandleUserProfilePut_StoresTheGenderWordForEitherSpelling(t *testing.T)
 			database.On("GetUserById", mock.Anything, mock.Anything, profileTestUserId).
 				Return(&record.User{Id: profileTestUserId, Subject: "sub-42", Gender: "other"}, nil).Once()
 			var stored *record.User
-			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything).
+			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { stored = args.Get(2).(*record.User) }).
 				Return(nil).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserProfile, mock.Anything).Return().Once()

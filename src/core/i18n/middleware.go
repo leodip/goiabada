@@ -11,8 +11,8 @@ import (
 
 // UILocalesReader supplies locale preferences from an in-flight authorize
 // transaction. Adminconsole passes nil because it has no such transaction
-// state (identity comes from JWT, which adminconsole refines from in a
-// middleware of its own over WithLocale).
+// state; its own page-language middleware applies the signed-in user's choice
+// over what Locale resolved, with WithPageLanguage.
 type UILocalesReader interface {
 	UILocales(r *http.Request) []string
 }
@@ -137,9 +137,11 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 	return attachLocale(ctx, b.english, "en", false, false)
 }
 
-// WithLocale attaches the translator for the locale the caller is asking for, and
-// is the whole of core/i18n's locale-setting surface: every policy about which
-// locale a process wants, and where it reads it from, belongs to that process.
+// WithLocale attaches the translator for the locale the caller is asking for. It
+// sets the locale a request asks for; a user's page language (WithPageLanguage)
+// and an email's recipient language (WithRecipientLanguage) have setters of their
+// own. Every policy about which locale a process wants, and where it reads it
+// from, belongs to that process.
 //
 // The tags are preferences, best first, and all the usable ones — non-empty
 // after trimming — are matched together, the way an Accept-Language list is. An
@@ -159,7 +161,9 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 // always wins over a request's own preferences.
 //
 // Neither kind of call moves a user's page language (WithPageLanguage) already on ctx: the
-// user's own choice wins over an RP's ui_locales and over any refinement (#631 decision 4).
+// user's own choice wins over an RP's ui_locales and over any refinement (#631 decision 4). The
+// call still changes the language the request asks for beneath it, by the same rules, which is the
+// language a later user's Automatic gives back (decision 5).
 //
 // Go contexts are immutable, so the returned context is the whole of the
 // effect. On a request that means
@@ -173,7 +177,17 @@ func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Cont
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if hasPageLanguage(ctx) || (!explicit && hasExplicitIntent(ctx)) {
+	if hasPageLanguage(ctx) {
+		// The request's own language, beneath the page language, moves as it would on its own.
+		beneath := withLocale(restoreRequestLanguage(ctx), explicit, tags)
+		return context.WithValue(ctx, ctxKeyRequestLanguage, requestLanguageOf(beneath))
+	}
+	return withLocale(ctx, explicit, tags)
+}
+
+// withLocale is WithLocale on a context with no page language.
+func withLocale(ctx context.Context, explicit bool, tags []string) context.Context {
+	if !explicit && hasExplicitIntent(ctx) {
 		return ctx
 	}
 

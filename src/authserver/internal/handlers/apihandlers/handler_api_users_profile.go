@@ -23,7 +23,7 @@ import (
 type usersProfileDatabase interface {
 	userTargetPolicyDatabase
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool) error
 	SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
@@ -131,8 +131,9 @@ func HandleUserProfilePut(
 		user.ZoneInfoCountryName = input.ZoneInfoCountryName
 		user.ZoneInfo = input.ZoneInfo
 		user.Locale = input.Locale
-		// Left out, the page language keeps the value read above, so a client that does not know
-		// the field does not reset the user to Automatic (#631 decisions 8 and 9).
+		// Left out, the page language is not written: the column keeps what the row holds when the
+		// save runs, so a client that does not know the field neither resets the user to Automatic
+		// nor undoes a choice saved since the read above (#631 decisions 8 and 9).
 		if input.PageLanguage != nil {
 			user.PageLanguage = *input.PageLanguage
 		}
@@ -140,7 +141,7 @@ func HandleUserProfilePut(
 		// Only the profile columns: writing back the row read above would undo a disable, a
 		// password change or an OTP change made since, and could write enabled back past the
 		// last-administrator guard (#471).
-		err = database.SetUserProfile(r.Context(), nil, user)
+		err = database.SetUserProfile(r.Context(), nil, user, input.PageLanguage != nil)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

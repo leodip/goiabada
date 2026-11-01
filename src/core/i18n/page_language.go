@@ -15,13 +15,18 @@ import (
 // was known, and any later WithLocale call, explicit or not, such as an authorize or sign-out
 // handler applying the ui_locales it was sent. OIDC Core 1.0 section 3.1.2.1 and RP-Initiated
 // Logout 1.0 section 2 make ui_locales a preference the provider may decline, and the user's own
-// choice answers the same question better. A later WithPageLanguage replaces an earlier one, so a
-// caller applies the user it knows best last.
+// choice answers the same question better.
 //
-// Empty, or a tag that names no loaded catalog, is Automatic and returns ctx unchanged: the
-// language the request resolved stands, and a later WithLocale still applies. A stored tag whose
-// catalog an operator has since removed therefore follows the request, not English. The tag is
-// compared exactly, as IsCatalogTag compares it; it is a stored value, not a preference to match.
+// Empty, or a tag that names no loaded catalog, is Automatic: the language the request asks for. A
+// stored tag whose catalog an operator has since removed therefore follows the request, not
+// English. The tag is compared exactly, as IsCatalogTag compares it; it is a stored value, not a
+// preference to match. On a context with no page language, Automatic returns ctx unchanged, and a
+// later WithLocale still applies.
+//
+// A later WithPageLanguage replaces an earlier one, so a caller applies the user it knows best last,
+// and that user's Automatic replaces the earlier user's choice too: the page is then drawn in the
+// language the request asks for, as it would have been with no choice applied, including what any
+// WithLocale call made while the choice was on the context asked for (decision 5).
 //
 // As with WithLocale, the returned context is the whole of the effect. Unlike WithLocale, it has
 // no nil-context fallback: its callers draw a page, so they always hold the request's context.
@@ -29,9 +34,45 @@ func WithPageLanguage(ctx context.Context, pageLanguage string) context.Context 
 	b := current()
 	tag, ok := b.catalogTag(pageLanguage)
 	if !ok {
-		return ctx
+		if !hasPageLanguage(ctx) {
+			return ctx
+		}
+		return restoreRequestLanguage(ctx)
 	}
-	return attachLocale(ctx, &translator{bundle: b, tag: tag}, pageLanguage, true, true)
+	beneath := requestLanguageOf(ctx)
+	ctx = attachLocale(ctx, &translator{bundle: b, tag: tag}, pageLanguage, true, true)
+	return context.WithValue(ctx, ctxKeyRequestLanguage, beneath)
+}
+
+// requestLanguage is the language a request asks for: the values attachLocale stores, as ctx held
+// them, nil where it held none.
+type requestLanguage struct {
+	localizer, localeTag, explicitIntent any
+}
+
+// requestLanguageOf returns the language the request on ctx asks for: the one kept beneath a page
+// language while one is on ctx, else ctx's own.
+func requestLanguageOf(ctx context.Context) requestLanguage {
+	if hasPageLanguage(ctx) {
+		if beneath, ok := ctx.Value(ctxKeyRequestLanguage).(requestLanguage); ok {
+			return beneath
+		}
+	}
+	return requestLanguage{
+		localizer:      ctx.Value(ctxKeyLocalizer),
+		localeTag:      ctx.Value(ctxKeyLocaleTag),
+		explicitIntent: ctx.Value(ctxKeyExplicitIntent),
+	}
+}
+
+// restoreRequestLanguage replaces the page language on ctx with the language the request asks for.
+// A value absent beneath it is restored as absent, so each reader falls back as it would have.
+func restoreRequestLanguage(ctx context.Context) context.Context {
+	beneath := requestLanguageOf(ctx)
+	ctx = context.WithValue(ctx, ctxKeyLocalizer, beneath.localizer)
+	ctx = context.WithValue(ctx, ctxKeyLocaleTag, beneath.localeTag)
+	ctx = context.WithValue(ctx, ctxKeyExplicitIntent, beneath.explicitIntent)
+	return context.WithValue(ctx, ctxKeyPageLanguage, false)
 }
 
 // CatalogTags returns the tags of the catalogs this process has loaded, which are the languages a

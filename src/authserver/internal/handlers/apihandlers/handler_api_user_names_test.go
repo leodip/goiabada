@@ -123,7 +123,7 @@ func TestHandleUserProfilePut_StoresAndAnswersOneSpellingPerName(t *testing.T) {
 			database.On("GetUserById", mock.Anything, mock.Anything, profileTestUserId).
 				Return(&record.User{Id: profileTestUserId, Subject: "sub-42"}, nil).Once()
 			var stored *record.User
-			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything).
+			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { stored = args.Get(2).(*record.User) }).
 				Return(nil).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserProfile, mock.Anything).Return().Once()
@@ -171,7 +171,7 @@ func TestHandleAccountProfilePut_StoresAndAnswersOneSpellingPerName(t *testing.T
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, profileTestSubject).
 				Return(&record.User{Id: profileTestUserId, Subject: profileTestSubject}, nil).Once()
 			var stored *record.User
-			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything).
+			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { stored = args.Get(2).(*record.User) }).
 				Return(nil).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnProfile, mock.Anything).Return().Once()

@@ -1096,7 +1096,25 @@ func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId i
 
 // setUserProfile, setUserAddress and setUserPhone are the column-group writes: the group's
 // columns, then updated_at, keyed on the user's id, which setUserColumns binds in that order.
+// setUserProfile leaves page_language out, and setUserProfileWithPageLanguage writes it too.
 var setUserProfile = statement{
+	sqlite: "UPDATE users SET username = ?, given_name = ?, middle_name = ?, family_name = ?, " +
+		"nickname = ?, website = ?, gender = ?, birth_date = ?, zone_info_country_name = ?, " +
+		"zone_info = ?, locale = ?, updated_at = ? WHERE id = ?",
+	mysql: "UPDATE users SET username = ?, given_name = ?, middle_name = ?, family_name = ?, " +
+		"nickname = ?, website = ?, gender = ?, birth_date = ?, zone_info_country_name = ?, " +
+		"zone_info = ?, locale = ?, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE users SET username = $1, given_name = $2, middle_name = $3, " +
+		"family_name = $4, nickname = $5, website = $6, gender = $7, birth_date = $8, " +
+		"zone_info_country_name = $9, zone_info = $10, locale = $11, " +
+		"updated_at = $12 WHERE id = $13",
+	mssql: "UPDATE users SET username = @p1, given_name = @p2, middle_name = @p3, " +
+		"family_name = @p4, nickname = @p5, website = @p6, gender = @p7, birth_date = @p8, " +
+		"zone_info_country_name = @p9, zone_info = @p10, locale = @p11, " +
+		"updated_at = @p12 WHERE id = @p13",
+}
+
+var setUserProfileWithPageLanguage = statement{
 	sqlite: "UPDATE users SET username = ?, given_name = ?, middle_name = ?, family_name = ?, " +
 		"nickname = ?, website = ?, gender = ?, birth_date = ?, zone_info_country_name = ?, " +
 		"zone_info = ?, locale = ?, page_language = ?, updated_at = ? WHERE id = ?",
@@ -1143,9 +1161,10 @@ var setUserPhone = statement{
 		"phone_number_verified = @p4, updated_at = @p5 WHERE id = @p6",
 }
 
-// SetUserProfile writes the user's twelve profile columns from user, and updated_at, and no
-// other column. SetUserAddress and SetUserPhone below are its twins for the address and the
-// phone. Each serves the self-service and the administrator's save of its group alike.
+// SetUserProfile writes the user's eleven profile columns from user, the page language too when
+// withPageLanguage is set, and updated_at, and no other column. SetUserAddress and SetUserPhone
+// below are its twins for the address and the phone. Each serves the self-service and the
+// administrator's save of its group alike.
 //
 // Narrow rather than going through UpdateUser, for SetUserPasswordHash's reason: the saves
 // load the user at the start of the request, and writing that read back would re-enable an
@@ -1153,14 +1172,21 @@ var setUserPhone = statement{
 // reset replaced after its revocation had run, or undo a concurrent OTP change (#471). They are
 // unconditional, so the last save of a group wins, as it always has: none of them depends on
 // anything it read.
-func (d *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error {
+//
+// The page language is the profile's one optional field: a save whose request left it out passes
+// withPageLanguage false, and the column keeps what the row holds when the statement runs, not
+// the request's read, so a choice saved in between stands (#631 decision 8).
+func (d *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool) error {
 	if user.Id == 0 {
 		return errs.New("can't set the profile of user with id 0")
 	}
-	return d.setUserColumns(ctx, tx, user, "profile", setUserProfile,
-		user.Username, user.GivenName, user.MiddleName, user.FamilyName, user.Nickname, user.Website,
-		user.Gender, user.BirthDate, user.ZoneInfoCountryName, user.ZoneInfo, user.Locale,
-		user.PageLanguage)
+	values := []any{user.Username, user.GivenName, user.MiddleName, user.FamilyName, user.Nickname,
+		user.Website, user.Gender, user.BirthDate, user.ZoneInfoCountryName, user.ZoneInfo, user.Locale}
+	if !withPageLanguage {
+		return d.setUserColumns(ctx, tx, user, "profile", setUserProfile, values...)
+	}
+	return d.setUserColumns(ctx, tx, user, "profile", setUserProfileWithPageLanguage,
+		append(values, user.PageLanguage)...)
 }
 
 // SetUserAddress writes the user's six address columns from user, and updated_at, and no other

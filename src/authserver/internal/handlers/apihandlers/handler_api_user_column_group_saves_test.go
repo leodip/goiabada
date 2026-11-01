@@ -85,6 +85,20 @@ func expectNarrowSave(database *datamocks.Database, method string) **record.User
 	return &saved
 }
 
+// expectProfileSave stubs the profile's narrow write, which also says whether to write the page
+// language, and captures both.
+func expectProfileSave(database *datamocks.Database) (**record.User, *bool) {
+	var saved *record.User
+	var withPageLanguage bool
+	database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			saved = args.Get(2).(*record.User)
+			withPageLanguage = args.Get(3).(bool)
+		}).
+		Return(nil).Once()
+	return &saved, &withPageLanguage
+}
+
 func requireSavedNarrowly(t *testing.T, database *datamocks.Database, rr *httptest.ResponseRecorder, saved *record.User) api.UserResponse {
 	t.Helper()
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -139,7 +153,7 @@ func TestHandleAccountProfilePut_SavesTheProfileColumnsNarrowly(t *testing.T) {
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectProfileValidatorReads(database, columnGroupStoredUser())
-	saved := expectNarrowSave(database, "SetUserProfile")
+	saved, _ := expectProfileSave(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnProfile, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -156,7 +170,7 @@ func TestHandleUserProfilePut_SavesTheProfileColumnsNarrowly(t *testing.T) {
 
 	database.On("GetUserById", mock.Anything, mock.Anything, columnGroupUserId).Return(columnGroupStoredUser(), nil).Once()
 	expectProfileValidatorReads(database, columnGroupStoredUser())
-	saved := expectNarrowSave(database, "SetUserProfile")
+	saved, _ := expectProfileSave(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserProfile, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()

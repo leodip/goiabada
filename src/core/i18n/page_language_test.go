@@ -107,10 +107,64 @@ func TestWithPageLanguage_ALaterChoiceReplacesAnEarlierOne(t *testing.T) {
 	ctx := WithPageLanguage(WithPageLanguage(base, "de"), "fr")
 	assert.Equal(t, "Connexion", T(ctx, "auth.pwd.title"))
 	assert.Equal(t, "fr", CatalogTag(ctx))
+}
 
-	// An Automatic one after a choice leaves the choice in place.
-	ctx = WithPageLanguage(WithPageLanguage(base, "de"), "")
-	assert.Equal(t, "Anmelden", T(ctx, "auth.pwd.title"))
+// A later user on Automatic, or whose stored tag's catalog has gone, replaces an earlier user's
+// choice with the language the request asks for: the browser session's user chose German, the
+// sign-in's user chose nothing, and the page follows the request's ?ui_locales=es, a sign-in's
+// ui_locales or the browser, not the session user (decisions 2, 3 and 5).
+func TestWithPageLanguage_ALaterAutomaticGivesTheRequestsLanguageBack(t *testing.T) {
+	tests := []struct {
+		name           string
+		reader         UILocalesReader
+		target         string
+		acceptLanguage string
+		want           string
+		catalog        string
+		explicit       bool
+	}{
+		{"?ui_locales", nil, "/auth/pwd?ui_locales=es", "en", "Iniciar sesión", "es", true},
+		{"a sign-in's ui_locales", &stubUILocalesReader{locales: []string{"it"}}, "/auth/pwd", "en", "Accedi", "it", true},
+		{"Accept-Language", nil, "/auth/pwd", "fr", "Connexion", "fr", false},
+		{"the English fallback", nil, "/auth/pwd", "", "Sign in", "en", false},
+	}
+	for _, tt := range tests {
+		for _, automatic := range []string{"", "ja"} {
+			t.Run(tt.name+"/"+automatic, func(t *testing.T) {
+				base := throughLocale(t, tt.reader, tt.target, tt.acceptLanguage)
+				ctx := WithPageLanguage(WithPageLanguage(base, "de"), automatic)
+
+				assert.Equal(t, tt.want, T(ctx, "auth.pwd.title"), "the session user's German loses")
+				assert.Equal(t, tt.catalog, CatalogTag(ctx))
+				assert.Equal(t, LocaleTag(base), LocaleTag(ctx))
+				assert.Equal(t, tt.explicit, hasExplicitIntent(ctx))
+
+				// The request's language is back, so a later handler's own ui_locales applies again.
+				assert.Equal(t, "Entrar", T(WithLocale(ctx, true, "pt-BR"), "auth.pwd.title"))
+			})
+		}
+	}
+}
+
+// A handler's own ui_locales applied while a choice is on the context does not move the choice, but
+// it is what the request asks for: once a later user on Automatic replaces the choice, it stands,
+// and a non-explicit refinement beneath the choice still defers to it.
+func TestWithPageLanguage_AWithLocaleBeneathAChoiceSurvivesALaterAutomatic(t *testing.T) {
+	base := throughLocale(t, nil, "/auth/authorize", "en")
+
+	chosen := WithLocale(WithPageLanguage(base, "de"), true, SanitizeUILocales("es")...)
+	require.Equal(t, "Anmelden", T(chosen, "auth.pwd.title"))
+	chosen = WithLocale(chosen, false, "fr")
+	require.Equal(t, "Anmelden", T(chosen, "auth.pwd.title"))
+
+	ctx := WithPageLanguage(chosen, "")
+	assert.Equal(t, "Iniciar sesión", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "es", CatalogTag(ctx))
+	assert.Equal(t, "es", LocaleTag(ctx))
+
+	// With no handler's ui_locales, the non-explicit refinement beneath the choice is what stands.
+	refined := WithPageLanguage(WithLocale(WithPageLanguage(base, "de"), false, "fr"), "")
+	assert.Equal(t, "Connexion", T(refined, "auth.pwd.title"))
 }
 
 // A value that names no loaded catalog counts as Automatic, whether it never named one or its

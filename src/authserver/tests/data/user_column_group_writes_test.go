@@ -53,7 +53,9 @@ func columnGroupWrites() []columnGroupWrite {
 				user.Locale = "en-GB"
 				user.PageLanguage = "fr"
 			},
-			write: func(ctx context.Context, user *record.User) error { return database.SetUserProfile(ctx, nil, user) },
+			write: func(ctx context.Context, user *record.User) error {
+				return database.SetUserProfile(ctx, nil, user, true)
+			},
 		},
 		{
 			name: "profile cleared",
@@ -71,7 +73,9 @@ func columnGroupWrites() []columnGroupWrite {
 				user.Locale = ""
 				user.PageLanguage = ""
 			},
-			write: func(ctx context.Context, user *record.User) error { return database.SetUserProfile(ctx, nil, user) },
+			write: func(ctx context.Context, user *record.User) error {
+				return database.SetUserProfile(ctx, nil, user, true)
+			},
 		},
 		{
 			name: "address set",
@@ -253,5 +257,62 @@ func TestColumnGroupWrites_RefuseUserIdZero(t *testing.T) {
 				t.Error("expected an error saving user id 0")
 			}
 		})
+	}
+}
+
+// A profile save whose request left the optional page language out does not write the column, so
+// a choice saved after the save's request read the row stands; with the page language, the save
+// writes it (#631 decision 8).
+func TestSetUserProfile_LeavesThePageLanguageAloneWhenTheSaveLeavesItOut(t *testing.T) {
+	ctx := context.Background()
+	user := createTestUser(t)
+
+	// The row as the save's request read it at its start, on Automatic.
+	read, err := database.GetUserById(ctx, nil, user.Id)
+	if err != nil || read == nil {
+		t.Fatalf("Failed to read the user: user=%v err=%v", read, err)
+	}
+	read.PageLanguage = ""
+	if err = database.SetUserProfile(ctx, nil, read, true); err != nil {
+		t.Fatalf("Failed to seed Automatic: %v", err)
+	}
+
+	// Another save commits German while the first is in flight.
+	chooser, err := database.GetUserById(ctx, nil, user.Id)
+	if err != nil || chooser == nil {
+		t.Fatalf("Failed to read the user: user=%v err=%v", chooser, err)
+	}
+	chooser.PageLanguage = "de"
+	if err = database.SetUserProfile(ctx, nil, chooser, true); err != nil {
+		t.Fatalf("Failed to save the choice: %v", err)
+	}
+
+	// The first save, from its stale read, without the page language.
+	read.GivenName = "Ada"
+	if err = database.SetUserProfile(ctx, nil, read, false); err != nil {
+		t.Fatalf("Failed to save the profile: %v", err)
+	}
+	stored, err := database.GetUserById(ctx, nil, user.Id)
+	if err != nil || stored == nil {
+		t.Fatalf("Failed to reload the user: user=%v err=%v", stored, err)
+	}
+	if stored.GivenName != "Ada" {
+		t.Errorf("GivenName = %q, want the save's \"Ada\"", stored.GivenName)
+	}
+	if stored.PageLanguage != "de" {
+		t.Errorf("PageLanguage = %q, want the choice saved in between, \"de\"", stored.PageLanguage)
+	}
+
+	// With the page language, the save writes it.
+	read.PageLanguage = "fr"
+	if err = database.SetUserProfile(ctx, nil, read, true); err != nil {
+		t.Fatalf("Failed to save the profile: %v", err)
+	}
+	stored, err = database.GetUserById(ctx, nil, user.Id)
+	if err != nil || stored == nil {
+		t.Fatalf("Failed to reload the user: user=%v err=%v", stored, err)
+	}
+	if stored.PageLanguage != "fr" {
+		t.Errorf("PageLanguage = %q, want the save's \"fr\"", stored.PageLanguage)
 	}
 }

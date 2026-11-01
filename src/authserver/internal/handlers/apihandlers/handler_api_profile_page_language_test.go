@@ -111,7 +111,7 @@ func TestProfilePuts_ApplyThePageLanguage(t *testing.T) {
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
 				route.expectRead(database, pageLanguageStoredUser())
-				saved := expectNarrowSave(database, "SetUserProfile")
+				saved, withPageLanguage := expectProfileSave(database)
 				auditLogger.On("Log", mock.Anything, route.event, mock.Anything).Return().Once()
 
 				rr := httptest.NewRecorder()
@@ -120,6 +120,9 @@ func TestProfilePuts_ApplyThePageLanguage(t *testing.T) {
 				require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 				require.NotNil(t, *saved, "the narrow write was not reached")
 				assert.Equal(t, tc.stored, (*saved).PageLanguage, "the page language handed to the write")
+				assert.Equal(t, tc.sent != nil, *withPageLanguage,
+					"the write stores the page language only when the request carries it, so one left out "+
+						"cannot undo a choice saved since the read")
 				assert.Equal(t, "Lovelace", (*saved).FamilyName, "the rest of the profile is saved alongside")
 
 				var body map[string]map[string]any

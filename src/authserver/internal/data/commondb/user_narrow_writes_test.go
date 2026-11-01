@@ -69,6 +69,18 @@ func inTx(ctx context.Context, d *Database, write func(tx *sql.Tx) (any, error))
 	return write(tx)
 }
 
+// narrowProfileUser is the user both SetUserProfile cases write, with a value in every profile
+// column and in columns of the other groups, which the write must leave alone.
+func narrowProfileUser() *record.User {
+	return &record.User{
+		Id: narrowUserId, Username: "u-name", GivenName: "g-name", MiddleName: "m-name",
+		FamilyName: "f-name", Nickname: "n-name", Website: "w-site", Gender: "gen",
+		BirthDate:           sql.NullTime{Time: issuedAt, Valid: true},
+		ZoneInfoCountryName: "z-country", ZoneInfo: "z-info", Locale: "loc", PageLanguage: "p-lang",
+		Enabled: true, PasswordHash: "untouched", Email: "untouched@example.com",
+	}
+}
+
 func narrowWrites() []narrowWrite {
 	limit := record.OtpConsecutiveFailureLimit
 	return []narrowWrite{
@@ -111,22 +123,29 @@ func narrowWrites() []narrowWrite {
 			},
 		},
 		{
-			name: "SetUserProfile",
+			name: "SetUserProfile with the page language",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.SetUserProfile(ctx, nil, &record.User{
-					Id: narrowUserId, Username: "u-name", GivenName: "g-name", MiddleName: "m-name",
-					FamilyName: "f-name", Nickname: "n-name", Website: "w-site", Gender: "gen",
-					BirthDate:           sql.NullTime{Time: issuedAt, Valid: true},
-					ZoneInfoCountryName: "z-country", ZoneInfo: "z-info", Locale: "loc", PageLanguage: "p-lang",
-					// Columns of the other groups, which the write must leave alone.
-					Enabled: true, PasswordHash: "untouched", Email: "untouched@example.com",
-				})
+				return nil, d.SetUserProfile(ctx, nil, narrowProfileUser(), true)
 			},
 			statements: []string{
 				"UPDATE users SET username = 'u-name', given_name = 'g-name', middle_name = 'm-name', " +
 					"family_name = 'f-name', nickname = 'n-name', website = 'w-site', gender = 'gen', " +
 					"birth_date = 2001-01-01T00:00:00Z, zone_info_country_name = 'z-country', zone_info = 'z-info', " +
 					"locale = 'loc', page_language = 'p-lang', updated_at = <now> WHERE id = 7",
+			},
+		},
+		{
+			// A save whose request left the page language out does not assign the column, so the
+			// row keeps what it holds when the statement runs (#631 decision 8).
+			name: "SetUserProfile without the page language",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return nil, d.SetUserProfile(ctx, nil, narrowProfileUser(), false)
+			},
+			statements: []string{
+				"UPDATE users SET username = 'u-name', given_name = 'g-name', middle_name = 'm-name', " +
+					"family_name = 'f-name', nickname = 'n-name', website = 'w-site', gender = 'gen', " +
+					"birth_date = 2001-01-01T00:00:00Z, zone_info_country_name = 'z-country', zone_info = 'z-info', " +
+					"locale = 'loc', updated_at = <now> WHERE id = 7",
 			},
 		},
 		{
