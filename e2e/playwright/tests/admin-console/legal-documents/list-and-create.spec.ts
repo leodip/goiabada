@@ -45,7 +45,9 @@ test("a legal document is created with its kind, a title and the short name sugg
   await expect(row.getByRole("link", { name: title, exact: true })).toHaveAttribute("href", `/admin/legal-documents/${id}/draft`);
   await expect(row.getByText(shortName, { exact: true })).toBeVisible();
   await expect(row.getByRole("cell").nth(1)).toHaveText(/Users must accept\s*Not published/);
-  await expect(row.getByRole("cell").nth(2)).toHaveText("Never");
+  // A new document applies to all apps until its apps are chosen.
+  await expect(row.getByRole("cell").nth(2)).toHaveText("All apps");
+  await expect(row.getByRole("cell").nth(3)).toHaveText("Never");
   await expect(row.getByRole("link", { name: `Delete ${title}`, exact: true })).toBeVisible();
 
   await deleteLegalDocument(page, id);
@@ -58,10 +60,13 @@ test("a short name the administrator types stays as the title changes", async ({
   await page.locator("#title").pressSequentially("Terms of use");
   await expect(page.locator("#shortName")).toHaveValue("terms-of-use");
   await page.locator("#shortName").fill(shortName);
+  // Focusing a field puts the caret at its start, so End takes it past the text typed already.
+  await page.locator("#title").press("End");
   await page.locator("#title").pressSequentially(" for partners");
   await expect(page.locator("#shortName")).toHaveValue(shortName);
   // Emptied, it follows the title again.
   await page.locator("#shortName").fill("");
+  await page.locator("#title").press("End");
   await page.locator("#title").pressSequentially("!");
   await expect(page.locator("#shortName")).toHaveValue("terms-of-use-for-partners");
 });

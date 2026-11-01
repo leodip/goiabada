@@ -137,7 +137,7 @@ for (const { name, country, number, field, message } of [
     await expect(page).toHaveTitle(new RegExp(`^Phone – ${user.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} – `));
     const tabBar = page.getByRole("navigation", { name: "Sections" });
     const tabs = tabBar.getByRole("link");
-    await expect(tabs).toHaveCount(12);
+    await expect(tabs).toHaveCount(13);
     await expect(tabBar.getByRole("link", { name: "Phone", exact: true })).toHaveAttribute("aria-current", "page");
     for (const href of await tabs.evaluateAll((links) => links.map((a) => a.getAttribute("href")))) {
       expect(href).toMatch(new RegExp(`^/admin/users/${user.id}/`));

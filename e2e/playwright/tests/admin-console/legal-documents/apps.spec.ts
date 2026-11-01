@@ -51,7 +51,8 @@ test("a document applies to all apps until its apps are chosen, never the admin 
 
   // Each client's own tab lists, read only, the documents that apply to it.
   await page.goto(clientUrl(shop.id, "legal-documents"));
-  await expect(page.getByRole("link", { name: "Legal documents", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "Legal documents", exact: true }))
+    .toHaveAttribute("aria-current", "page");
   await expect(appliesToCell(page, doc.title)).toHaveText("Selected apps");
   await expect(rowWithCell(page, doc.title).getByRole("link", { name: doc.title })).toHaveAttribute(
     "href",
