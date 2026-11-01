@@ -127,12 +127,13 @@ const (
 	// maxAnswerBytes is the ceiling siteverify's answer is read under. A whole answer is a few
 	// hundred bytes; an answer past this is not one, and fails open as unusable.
 	maxAnswerBytes = 8 << 10
-	// maxConcurrentChecks bounds the calls to siteverify in flight at once, whatever the rate of
+	// maxConcurrentChecks bounds the forms' checks in flight at once, whatever the rate of
 	// submissions: a refused token spends no rate-limit budget, because the challenge runs ahead of
-	// the limiter, so a flood of made-up tokens is held here instead. A call past it waits for a
+	// the limiter, so a flood of made-up tokens is held here instead. A check past it waits for a
 	// slot within its own deadline, and fails open when none frees in time, as when Cloudflare
 	// does not answer. The idle pool is as large, so connections are reused rather than opened
-	// per call.
+	// per call. An administrator's check of a secret key takes no slot: it is an authenticated
+	// call, not a flood's, and is answered even while the forms' checks fill every slot.
 	maxConcurrentChecks = 64
 )
 
@@ -148,7 +149,7 @@ var (
 // Verifier checks a form's token with siteverify, against the auth server's own hostname.
 type Verifier struct {
 	client *http.Client
-	// slots holds one entry per call to siteverify in flight, up to maxConcurrentChecks.
+	// slots holds one entry per form check in flight, up to maxConcurrentChecks.
 	slots         chan struct{}
 	siteverifyURL string
 	hostname      string
@@ -227,17 +228,28 @@ type siteverifyAnswer struct {
 	} `json:"metadata"`
 }
 
-// verify asks siteverify about token under secretKey, and decides the outcome from its answer. No
-// usable answer is logged at error with its reason, and what shows it: the timeout, the status or
-// the error.
+// verify asks siteverify about token under secretKey, once a slot is free, and decides the outcome
+// from its answer. The deadline covers the wait for a slot as well as the call. A check that finds
+// no slot in time, or gets no usable answer, is logged at error with its reason, and what shows
+// it: the slots, the timeout, the status or the error.
 func (v *Verifier) verify(ctx context.Context, form Form, secretKey, token string) Outcome {
-	answer, unusable := v.ask(ctx, secretKey, token)
-	if unusable != nil {
-		if unusable.reason == reasonBusy {
+	ctx, cancel := context.WithTimeout(ctx, verifyTimeout)
+	defer cancel()
+
+	if busy := v.takeSlot(ctx); busy != nil {
+		if busy.reason == reasonBusy {
 			slog.ErrorContext(ctx, "every turnstile check slot stayed busy, the challenge fails open without asking cloudflare",
-				slog.String("form", form.label()), slog.String("reason", unusable.reason), unusable.detail)
+				slog.String("form", form.label()), slog.String("reason", busy.reason), busy.detail)
 			return Unavailable
 		}
+		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
+			slog.String("form", form.label()), slog.String("reason", busy.reason), busy.detail)
+		return Unavailable
+	}
+	defer func() { <-v.slots }()
+
+	answer, unusable := v.ask(ctx, secretKey, token)
+	if unusable != nil {
 		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
 			slog.String("form", form.label()), slog.String("reason", unusable.reason), unusable.detail)
 		return Unavailable
@@ -245,9 +257,23 @@ func (v *Verifier) verify(ctx context.Context, form Form, secretKey, token strin
 	return v.judge(ctx, form, answer)
 }
 
-// reasonBusy is the reason of a call that found no free slot before its deadline, so siteverify
+// reasonBusy is the reason of a check that found no free slot before its deadline, so siteverify
 // was never asked.
 const reasonBusy = "busy"
+
+// takeSlot takes one of the forms' check slots, waiting for one until ctx is done. It answers why
+// it took none: the slots stayed busy until the deadline, or the request was given up.
+func (v *Verifier) takeSlot(ctx context.Context) *noAnswer {
+	select {
+	case v.slots <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return &noAnswer{reason: reasonBusy, detail: slog.Int("max_concurrent_checks", maxConcurrentChecks)}
+		}
+		return &noAnswer{reason: "unreachable", detail: slog.Any("error", ctx.Err())}
+	}
+}
 
 // noAnswer is why siteverify gave no usable answer: the reason, and the attribute that shows it.
 type noAnswer struct {
@@ -257,20 +283,10 @@ type noAnswer struct {
 
 // ask posts token under secretKey to siteverify, once, sending those two and nothing else (decision
 // 3), and reads its answer whatever its status, under the bound. It answers the answer, or why
-// there is none to use. The deadline covers the wait for a slot as well as the call.
+// there is none to use, within the deadline, or the earlier one ctx carries.
 func (v *Verifier) ask(ctx context.Context, secretKey, token string) (*siteverifyAnswer, *noAnswer) {
 	ctx, cancel := context.WithTimeout(ctx, verifyTimeout)
 	defer cancel()
-
-	select {
-	case v.slots <- struct{}{}:
-		defer func() { <-v.slots }()
-	case <-ctx.Done():
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, &noAnswer{reason: reasonBusy, detail: slog.Int("max_concurrent_checks", maxConcurrentChecks)}
-		}
-		return nil, &noAnswer{reason: "unreachable", detail: slog.Any("error", ctx.Err())}
-	}
 
 	body := url.Values{"secret": {secretKey}, "response": {token}}.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, v.siteverifyURL, strings.NewReader(body))
@@ -380,7 +396,7 @@ const (
 const dummyToken = "XXXX.DUMMY.TOKEN.XXXX"
 
 // CheckSecretKey asks siteverify whether Cloudflare knows secretKey, with its dummy token: one call
-// under the same deadline and bound as a form's check. A fault in the secret key rejects it; an
+// under the same deadline and bound as a form's check, taking none of the forms' check slots. A fault in the secret key rejects it; an
 // answer about the token, whether it passes the token or not, accepts it; anything else leaves it
 // unchecked, and is logged with why, never with the secret key. It is not a form's check, so the
 // counter does not count it.

@@ -41,7 +41,7 @@ const (
 
 // standIn is siteverify on this machine: it answers every call with status and body, after
 // holding it until release is closed or the call is given up, when hold is set, and records what
-// each call carried. With holdBody set it sends the status, the headers and the body, then holds
+// each call carried. With holdOnly set, only the calls carrying that token are held. With holdBody set it sends the status, the headers and the body, then holds
 // the response open the same way, so the answer stalls part way through its body.
 type standIn struct {
 	server *httptest.Server
@@ -51,6 +51,8 @@ type standIn struct {
 	body   string
 	header http.Header
 	hold   chan struct{}
+	// holdOnly limits hold to the calls carrying this token.
+	holdOnly string
 	// holdBody stalls the response after its body is sent, before it ends.
 	holdBody chan struct{}
 	calls    []call
@@ -74,6 +76,9 @@ func newStandIn(t *testing.T) *standIn {
 		s.calls = append(s.calls, call{method: r.Method, contentType: r.Header.Get("Content-Type"), form: form,
 			remoteAddr: r.RemoteAddr})
 		status, body, hold, holdBody := s.status, s.body, s.hold, s.holdBody
+		if s.holdOnly != "" && form.Get("response") != s.holdOnly {
+			hold = nil
+		}
 		for name, values := range s.header {
 			w.Header()[name] = values
 		}
@@ -662,6 +667,38 @@ const offeredSecretKey = "0x4AAAAAAAoffered-secret-key"
 
 func (h *harness) checkSecretKey() turnstile.SecretKeyCheck {
 	return h.verifier.CheckSecretKey(context.Background(), offeredSecretKey)
+}
+
+// An administrator's check of a secret key takes none of the forms' check slots: it is answered
+// while a flood of form checks fills all 64, rather than reporting that Cloudflare could not be
+// reached when it was never asked.
+func TestCheckSecretKey_IsAnsweredWhileTheFormsChecksFillEverySlot(t *testing.T) {
+	h := newHarness(t)
+	h.standIn.answer(http.StatusOK, `{"success":false,"error-codes":["invalid-input-response"],"messages":[]}`)
+	release := make(chan struct{})
+	h.standIn.hold = release
+	h.standIn.holdOnly = token
+
+	var wg sync.WaitGroup
+	for range 64 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			h.check(turnstile.FormLogin, token)
+		}()
+	}
+	t.Cleanup(func() {
+		close(release)
+		wg.Wait()
+	})
+	require.Eventually(t, func() bool { return h.standIn.callCount() == 64 }, 2*time.Second, 5*time.Millisecond)
+
+	// A deadline shorter than the 64 held calls' own, so a check that waited for one of their
+	// slots would give up before any frees.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	assert.Equal(t, turnstile.SecretKeyAccepted, h.verifier.CheckSecretKey(ctx, offeredSecretKey))
+	assert.Equal(t, 65, h.standIn.callCount(), "the secret key's check is asked at once")
 }
 
 // assertNoFormCounted holds the secret key's check to counting nothing: the counter counts the
