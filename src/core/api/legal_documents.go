@@ -106,3 +106,26 @@ type GetClientLegalDocumentsResponse struct {
 	Client         ClientResponse          `json:"client"`
 	LegalDocuments []LegalDocumentResponse `json:"legalDocuments"`
 }
+
+// LegalDocumentAcceptanceResponse is one published version of a legal document a user accepted, and
+// when: the document's id and short name, the version's number, title and publish date, whether the
+// document is retired, and the absolute URL of the version's public page on the auth server. URL is
+// null for a retired document, whose pages all answer "not found"; the admin console still opens the
+// version's text through the admin API.
+type LegalDocumentAcceptanceResponse struct {
+	Id              int64      `json:"id"`
+	AcceptedAt      *time.Time `json:"acceptedAt"`
+	LegalDocumentId int64      `json:"legalDocumentId"`
+	ShortName       string     `json:"shortName"`
+	Version         int        `json:"version"`
+	Title           string     `json:"title"`
+	PublishedAt     *time.Time `json:"publishedAt"`
+	Retired         bool       `json:"retired"`
+	URL             *string    `json:"url"`
+}
+
+// GetLegalDocumentAcceptancesResponse is every version a user accepted, the latest acceptance first.
+// The account API answers it for the caller, and the admin API for one user.
+type GetLegalDocumentAcceptancesResponse struct {
+	Acceptances []LegalDocumentAcceptanceResponse `json:"acceptances"`
+}

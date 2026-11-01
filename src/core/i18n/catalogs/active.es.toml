@@ -338,6 +338,7 @@
 "adminconsole.account_menu.otp" = "Autenticación de dos factores"
 "adminconsole.account_menu.manage_consents" = "Consentimientos"
 "adminconsole.account_menu.sessions" = "Sesiones"
+"adminconsole.account_menu.legal_documents" = "Documentos legales"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -399,6 +400,7 @@
 "adminconsole.user_tabs.attributes" = "Atributos"
 "adminconsole.user_tabs.permissions" = "Permisos"
 "adminconsole.user_tabs.groups" = "Grupos"
+"adminconsole.user_tabs.legal_documents" = "Documentos legales"
 
 # --- Adminconsole standalone pages (error, not-found, unauthorized, welcome) -
 
@@ -644,6 +646,13 @@
 "adminconsole.account.consents.modal_confirm_title" = "¿Revocar este consentimiento?"
 "adminconsole.account.consents.revoke_confirm" = "¿Quieres revocar el consentimiento que diste a {{.client}}? Tendrá que volver a pedirte permiso para usar tu cuenta."
 "adminconsole.account.consents.revoke_confirm_unverified" = "¿Quieres revocar el consentimiento que diste a {{.client}}, una aplicación que se registró por su cuenta y no se ha verificado? Tendrá que volver a pedirte permiso para usar tu cuenta."
+"adminconsole.account.legal_documents.page_title" = "Documentos legales"
+"adminconsole.account.legal_documents.intro" = "Los documentos legales que aceptaste al iniciar sesión en una aplicación."
+"adminconsole.account.legal_documents.col_document" = "Documento"
+"adminconsole.account.legal_documents.col_version" = "Versión"
+"adminconsole.account.legal_documents.col_accepted_at" = "Aceptado"
+"adminconsole.account.legal_documents.no_longer_in_effect" = "Ya no está en vigor"
+"adminconsole.account.legal_documents.empty" = "No has aceptado ningún documento legal."
 
 # --- Account profile picture ------------------------------------------------
 
@@ -1128,6 +1137,12 @@
 "adminconsole.admin_users.consents.revoke_confirm" = "¿Quieres revocar el consentimiento que el usuario dio a {{.client}}? También se revocarán sus refresh tokens con ese cliente, incluidos los offline. Se le volverá a pedir consentimiento cuando solicite esos scopes de nuevo."
 "adminconsole.admin_users.consents.revoke_dialog_button" = "Revocar consentimiento"
 "adminconsole.admin_users.consents.empty" = "Este usuario no ha dado su consentimiento a ningún cliente."
+"adminconsole.admin_users.legal_documents.intro" = "Los documentos legales que este usuario aceptó al iniciar sesión en un cliente, y cuándo. Las aceptaciones no se pueden editar ni eliminar; se eliminan junto con el usuario."
+"adminconsole.admin_users.legal_documents.col_document" = "Documento"
+"adminconsole.admin_users.legal_documents.col_version" = "Versión"
+"adminconsole.admin_users.legal_documents.col_accepted_at" = "Aceptado"
+"adminconsole.admin_users.legal_documents.view_text" = "Ver texto"
+"adminconsole.admin_users.legal_documents.empty" = "Este usuario no ha aceptado ningún documento legal."
 
 "adminconsole.admin_users.sessions.modal_confirm_title" = "¿Cerrar esta sesión?"
 "adminconsole.admin_users.sessions.lead" = "Una sesión por cada dispositivo en el que el usuario inició sesión. Al cerrar una, el usuario sale de todos los clientes que usó desde ese dispositivo."

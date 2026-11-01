@@ -6,6 +6,8 @@
 package apimapping
 
 import (
+	"strconv"
+
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -623,4 +625,28 @@ func ToLegalDocumentVersionResponse(version *record.LegalDocumentVersion) api.Le
 		Markdown:    version.Markdown,
 		PublishedAt: &publishedAt,
 	}
+}
+
+// ToLegalDocumentAcceptanceResponse maps one version a user accepted, with the absolute URL of the
+// version's public page on the auth server at baseURL. A retired document's pages all answer "not
+// found", so its acceptances carry no URL.
+func ToLegalDocumentAcceptanceResponse(acceptance *record.LegalDocumentAcceptance, doc *record.LegalDocument,
+	version *record.LegalDocumentVersion, baseURL string) api.LegalDocumentAcceptanceResponse {
+	acceptedAt := acceptance.AcceptedAt
+	publishedAt := version.PublishedAt
+	resp := api.LegalDocumentAcceptanceResponse{
+		Id:              acceptance.Id,
+		AcceptedAt:      &acceptedAt,
+		LegalDocumentId: doc.Id,
+		ShortName:       doc.ShortName,
+		Version:         version.VersionNumber,
+		Title:           version.Title,
+		PublishedAt:     &publishedAt,
+		Retired:         doc.IsRetired(),
+	}
+	if !resp.Retired {
+		url := baseURL + "/legal/" + doc.ShortName + "/versions/" + strconv.Itoa(version.VersionNumber)
+		resp.URL = &url
+	}
+	return resp
 }

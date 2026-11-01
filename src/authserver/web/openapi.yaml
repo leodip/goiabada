@@ -1115,6 +1115,40 @@ paths:
   # =============================================================================
   # ADMIN API - GROUPS
   # =============================================================================
+  /api/v1/admin/users/{id}/legal-document-acceptances:
+    get:
+      tags: [Users]
+      summary: List the legal documents a user accepted
+      description: |
+        Every version of a legal document the user accepted at sign-in, the latest acceptance
+        first, retired documents included. `url` is the version's public page, null for a retired
+        document, whose pages all answer not found; the version's text is read with the legal
+        document routes. `acceptances` is `[]` when the user accepted nothing, never null.
+        Acceptances are never edited or removed by hand; they are deleted with the user.
+
+        The route admits `authserver:admin-read`, `authserver:manage-users` and
+        `authserver:manage`.
+      operationId: getUserLegalDocumentAcceptances
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: The user's acceptances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLegalDocumentAcceptancesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/groups:
     get:
       tags: [Groups]
@@ -4232,6 +4266,32 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/account/legal-document-acceptances:
+    get:
+      tags: [Account]
+      summary: List the legal documents you accepted
+      description: |
+        Every version of a legal document the authenticated user accepted at sign-in, the latest
+        acceptance first. `url` is the version's public page, null for a retired document, whose
+        pages all answer not found. `acceptances` is `[]` when the user accepted nothing, never
+        null.
+      operationId: getAccountLegalDocumentAcceptances
+      responses:
+        '200':
+          description: The user's acceptances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetLegalDocumentAcceptancesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/account/sessions:
     get:
       tags: [Account]
@@ -6265,6 +6325,62 @@ components:
       required:
         - client
         - legalDocuments
+
+    LegalDocumentAcceptanceResponse:
+      type: object
+      required:
+        - id
+        - acceptedAt
+        - legalDocumentId
+        - shortName
+        - version
+        - title
+        - publishedAt
+        - retired
+        - url
+      properties:
+        id:
+          type: integer
+          format: int64
+        acceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        legalDocumentId:
+          type: integer
+          format: int64
+        shortName:
+          type: string
+        version:
+          type: integer
+          description: The number of the version accepted.
+        title:
+          type: string
+          description: The accepted version's title.
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        retired:
+          type: boolean
+          description: Whether the document is retired now.
+        url:
+          type: string
+          nullable: true
+          description: >-
+            The absolute URL of the version's public page, /legal/<short-name>/versions/<n>, or
+            null when the document is retired.
+
+    GetLegalDocumentAcceptancesResponse:
+      type: object
+      required:
+        - acceptances
+      properties:
+        acceptances:
+          type: array
+          description: The versions the user accepted, the latest acceptance first; [] when none.
+          items:
+            $ref: '#/components/schemas/LegalDocumentAcceptanceResponse'
 
     SaveLegalDocumentDraftRequest:
       type: object

@@ -145,6 +145,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GetGroupPermissionsResponse` | both-apps | — |
 | `core/api` | `GetGroupResponse` | both-apps | — |
 | `core/api` | `GetGroupsResponse` | both-apps | — |
+| `core/api` | `GetLegalDocumentAcceptancesResponse` | both-apps | — |
 | `core/api` | `GetLegalDocumentVersionResponse` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `GetLegalDocumentsResponse` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `GetPermissionsByResourceResponse` | both-apps | — |
@@ -164,6 +165,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GroupAttributeResponse` | both-apps | — |
 | `core/api` | `GroupResponse` | both-apps | — |
 | `core/api` | `GroupWithPermissionResponse` | both-apps | — |
+| `core/api` | `LegalDocumentAcceptanceResponse` | both-apps | — |
 | `core/api` | `LegalDocumentDetailResponse` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `LegalDocumentDraftResponse` | reachable | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `LegalDocumentResponse` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |

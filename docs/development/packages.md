@@ -344,7 +344,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 - `internal/legaldocuments/` - Which legal documents are in effect where: published, not retired, and
   applying to all apps or listing the client a sign-in names, each with its current version. The
   sign-in pages' footer (through the renderer's `LegalFooter`), the registration form and the public
-  settings read them through it (#622)
+  settings read them through it, and the account and admin APIs read back the versions a user
+  accepted (#622)
 - `internal/legalmarkdown/` - A legal document's Markdown rendered to HTML through goldmark, for the
   admin API's preview and the public pages alike: CommonMark and tables, raw HTML left out,
   dangerous addresses dropped, images drawn as links. Its output is the auth server's one

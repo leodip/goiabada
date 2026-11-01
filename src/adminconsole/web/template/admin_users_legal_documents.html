@@ -1,0 +1,44 @@
+{{define "title"}}{{ T $.ctx "adminconsole.user_tabs.legal_documents" }} – {{ .user.Email }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "page"}}
+{{ template "user_header" (args "legal_documents" .user.Id .user.Email .page .query $.ctx) }}
+
+{{/* Each version the user accepted, the latest first, read only. View text opens the version as it
+     was published, a retired document's included. */}}
+{{ if .acceptances }}
+<p class="mb-4 max-w-prose text-ink-muted">{{ T $.ctx "adminconsole.admin_users.legal_documents.intro" }}</p>
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
+  <table class="data-table data-table-stack" id="acceptancesTable">
+    <thead>
+      <tr>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_users.legal_documents.col_document" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_users.legal_documents.col_version" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_users.legal_documents.col_accepted_at" }}</th>
+        <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.admin_users.attributes.col_actions" }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .acceptances }}
+      <tr>
+        <td class="cell-wrap">
+          <span class="font-semibold">{{ .Title }}</span>{{ if .Retired }} <span class="tag">{{ T $.ctx "adminconsole.admin_legal_documents.common.status_retired" }}</span>{{ end }}
+          <span class="cell-secondary font-mono text-sm">{{ .ShortName }}</span>
+        </td>
+        <td data-label="{{ T $.ctx "adminconsole.admin_users.legal_documents.col_version" }}">{{ .Version }}</td>
+        <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.admin_users.legal_documents.col_accepted_at" }}">{{ DateTime $.ctx .AcceptedAt }}</td>
+        <td class="cell-actions">
+          <a class="button button-sm" href="/admin/legal-documents/{{ .LegalDocumentId }}/versions/{{ .Version }}">{{ T $.ctx "adminconsole.admin_users.legal_documents.view_text" }}<span class="sr-only"> {{ .Title }}, {{ T $.ctx "adminconsole.admin_legal_documents.common.status_version" "version" .Version }}</span></a>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ else }}
+<div class="panel">
+  <p class="empty-state">{{ T $.ctx "adminconsole.admin_users.legal_documents.empty" }}</p>
+</div>
+{{ end }}
+{{end}}

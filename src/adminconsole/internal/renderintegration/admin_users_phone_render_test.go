@@ -77,7 +77,7 @@ func TestRender_AdminUserPhone_ARefusedSaveDrawsThePageWithItsUser(t *testing.T)
 	assert.Contains(t, out, `<title>Telefone – ana@example.com – Test</title>`)
 
 	links := userTabLinkRe.FindAllStringSubmatch(out, -1)
-	require.Len(t, links, 12, "the twelve user tabs")
+	require.Len(t, links, 13, "the thirteen user tabs")
 	for _, link := range links {
 		assert.True(t, strings.HasPrefix(link[1], "/admin/users/9/"), "a tab links to the user: %s", link[1])
 		assert.True(t, strings.HasSuffix(link[1], "?page=2&query=ana"), "and keeps the list position: %s", link[1])

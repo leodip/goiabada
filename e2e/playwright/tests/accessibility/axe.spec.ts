@@ -442,6 +442,7 @@ test("a user's account pages", async ({ page, browser, clients, users }) => {
       },
     },
     asks(own, "consents, revoking one asking first", () => own.locator("button[data-action-url]").click()),
+    at(own, "legal documents, none yet", account("legal-documents")),
     at(own, "sessions", account("sessions")),
     asks(own, "sessions, ending this device's asking first", () => own.locator('button[data-dialog="endCurrentSession"]').click()),
     at(own, "two-factor authentication, setting it up", account("otp")),
@@ -971,6 +972,7 @@ test("a user's attributes, groups, permissions, sessions and consents, empty and
     }),
     at(page, "a user's sessions, none yet", tab("sessions")),
     at(page, "a user's consents, none yet", tab("consents")),
+    at(page, "a user's legal documents, none yet", tab("legal-documents")),
     at(page, "a user's groups, none yet", tab("groups")),
     refused(page, "a user's groups, Add with nothing chosen", "groupsSelect", () => page.locator("#addGroupBtn").click()),
     saved(page, "a user's groups saved", async () => {

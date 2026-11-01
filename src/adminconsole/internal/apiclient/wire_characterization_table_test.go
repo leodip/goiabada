@@ -1601,5 +1601,31 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"client":{"id":42},"legalDocuments":[{"id":7,"shortName":"terms"}]}`,
 			want: "terms",
 		},
+		{
+			name: "GetUserLegalDocumentAcceptances",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetUserLegalDocumentAcceptances(ctx, charAccessToken, 42)
+				if err != nil {
+					return nil, err
+				}
+				return got[0].ShortName, nil
+			},
+			verb: "GET", path: "/api/v1/admin/users/42/legal-document-acceptances",
+			successStatus: 200, reply: `{"acceptances":[{"id":3,"legalDocumentId":7,"shortName":"terms","version":2}]}`,
+			want: "terms",
+		},
+		{
+			name: "GetAccountLegalDocumentAcceptances",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetAccountLegalDocumentAcceptances(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				return *got[0].URL, nil
+			},
+			verb: "GET", path: "/api/v1/account/legal-document-acceptances",
+			successStatus: 200, reply: `{"acceptances":[{"id":3,"shortName":"terms","version":2,"url":"https://auth.example.com/legal/terms/versions/2"}]}`,
+			want: "https://auth.example.com/legal/terms/versions/2",
+		},
 	}
 }

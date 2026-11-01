@@ -115,3 +115,21 @@ func TestLegalDocument_SelectedAppsCarryTheirClientIds(t *testing.T) {
 	none := ToLegalDocumentDetailResponse(doc, versions, nil)
 	assert.Contains(t, wire(t, none.LegalDocument), `"appliesTo":"selected_apps","clientIds":[]`)
 }
+
+// A user's acceptance on the wire: the version's public page for a document in effect, and no
+// address for a retired one, whose pages all answer not found.
+func TestLegalDocumentAcceptance_LinksTheVersionsPublicPageUnlessRetired(t *testing.T) {
+	doc, versions := publishedTerms()
+	acceptedAt := time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC)
+	acceptance := &record.LegalDocumentAcceptance{Id: 31, AcceptedAt: acceptedAt, UserId: 42, LegalDocumentVersionId: 11}
+
+	assert.Equal(t, `{"id":31,"acceptedAt":"2026-10-06T09:00:00Z","legalDocumentId":7,"shortName":"terms",`+
+		`"version":1,"title":"Terms","publishedAt":"2026-10-03T09:00:00Z","retired":false,`+
+		`"url":"https://auth.example/legal/terms/versions/1"}`,
+		wire(t, ToLegalDocumentAcceptanceResponse(acceptance, doc, &versions[0], "https://auth.example")))
+
+	doc.RetiredAt = sql.NullTime{Time: legalRetired, Valid: true}
+	assert.Equal(t, `{"id":31,"acceptedAt":"2026-10-06T09:00:00Z","legalDocumentId":7,"shortName":"terms",`+
+		`"version":1,"title":"Terms","publishedAt":"2026-10-03T09:00:00Z","retired":true,"url":null}`,
+		wire(t, ToLegalDocumentAcceptanceResponse(acceptance, doc, &versions[0], "https://auth.example")))
+}

@@ -333,6 +333,7 @@
 "adminconsole.account_menu.otp" = "Two-factor authentication"
 "adminconsole.account_menu.manage_consents" = "Consents"
 "adminconsole.account_menu.sessions" = "Sessions"
+"adminconsole.account_menu.legal_documents" = "Legal documents"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -394,6 +395,7 @@
 "adminconsole.user_tabs.attributes" = "Attributes"
 "adminconsole.user_tabs.permissions" = "Permissions"
 "adminconsole.user_tabs.groups" = "Groups"
+"adminconsole.user_tabs.legal_documents" = "Legal documents"
 
 # --- Adminconsole standalone pages (error, not-found, unauthorized, welcome) -
 
@@ -639,6 +641,13 @@
 "adminconsole.account.consents.modal_confirm_title" = "Revoke this consent?"
 "adminconsole.account.consents.revoke_confirm" = "Revoke the consent you gave {{.client}}? It will have to ask you again before it can use your account."
 "adminconsole.account.consents.revoke_confirm_unverified" = "Revoke the consent you gave {{.client}}, an application that registered itself and has not been verified? It will have to ask you again before it can use your account."
+"adminconsole.account.legal_documents.page_title" = "Legal documents"
+"adminconsole.account.legal_documents.intro" = "The legal documents you accepted when you signed in to an application."
+"adminconsole.account.legal_documents.col_document" = "Document"
+"adminconsole.account.legal_documents.col_version" = "Version"
+"adminconsole.account.legal_documents.col_accepted_at" = "Accepted"
+"adminconsole.account.legal_documents.no_longer_in_effect" = "No longer in effect"
+"adminconsole.account.legal_documents.empty" = "You haven't accepted any legal documents."
 
 # --- Account profile picture ------------------------------------------------
 
@@ -1123,6 +1132,12 @@
 "adminconsole.admin_users.consents.revoke_confirm" = "Revoke the consent the user gave {{.client}}? The user's refresh tokens with it will be revoked too, offline ones included, and they'll be asked again the next time it asks for those scopes."
 "adminconsole.admin_users.consents.revoke_dialog_button" = "Revoke consent"
 "adminconsole.admin_users.consents.empty" = "This user hasn't given consent to any client."
+"adminconsole.admin_users.legal_documents.intro" = "The legal documents this user accepted when signing in to a client, and when. Acceptances can't be edited or removed; they're deleted with the user."
+"adminconsole.admin_users.legal_documents.col_document" = "Document"
+"adminconsole.admin_users.legal_documents.col_version" = "Version"
+"adminconsole.admin_users.legal_documents.col_accepted_at" = "Accepted"
+"adminconsole.admin_users.legal_documents.view_text" = "View text"
+"adminconsole.admin_users.legal_documents.empty" = "This user hasn't accepted any legal documents."
 
 "adminconsole.admin_users.sessions.modal_confirm_title" = "End this session?"
 "adminconsole.admin_users.sessions.lead" = "One session per device the user signed in on. Ending a session signs the user out of every client they signed in to from that device."

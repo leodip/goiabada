@@ -2,8 +2,9 @@
 // effect once it has a published version and while it is not retired, and its current version is
 // its latest. It applies to all apps, or to the clients it lists. The sign-in pages' footer, the
 // registration form and the public settings read the documents in effect through it. The acceptance
-// step, the silent sign-in and the password grant ask it what a user owes (Owed), and the step
-// records what the user accepted through it (RecordAcceptances).
+// step, the silent sign-in and the password grant ask it what a user owes (Owed), the step
+// records what the user accepted through it (RecordAcceptances), and the account and admin APIs read
+// back what a user accepted (AcceptedBy).
 package legaldocuments
 
 import (

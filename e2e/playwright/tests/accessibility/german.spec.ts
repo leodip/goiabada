@@ -41,12 +41,12 @@ for (const theme of ["light", "dark"] as const) {
       ...(["settings", "logo", "tokens", "authentication", "oauth2-flows", "redirect-uris", "sign-out-redirect-uris", "web-origins", "user-sessions", "permissions", "introspection", "delete"] as const).map((tab) => clientUrl(client.id, tab)),
       ...(["settings", "attributes", "members", "permissions", "delete"] as const).map((tab) => groupUrl(group.id, tab)),
       `${groupUrl(group.id, "attributes")}/add`, `${groupUrl(group.id, "members")}/add`, new URL(groupEdit!, env.adminUrl).href,
-      ...(["details", "profile", "picture", "email", "phone", "address", "authentication", "consents", "sessions", "attributes", "permissions", "groups", "delete"] as const).map((tab) => userUrl(user.id, tab)),
+      ...(["details", "profile", "picture", "email", "phone", "address", "authentication", "consents", "legal-documents", "sessions", "attributes", "permissions", "groups", "delete"] as const).map((tab) => userUrl(user.id, tab)),
       `${userUrl(user.id, "attributes")}/add`, new URL(userEdit!, env.adminUrl).href,
       ...(["settings", "permissions", "users-with-permission", "groups-with-permission", "delete"] as const).map((tab) => resourceUrl(resource.id, tab)),
       new URL(grant!, env.adminUrl).href,
       ...["general", "ui-theme", "sessions", "tokens", "keys", "email", "email/send-test-email", "audit-logs", "audit-log-viewer"].map((tab) => `${env.adminUrl}/admin/settings/${tab}`),
-      ...["profile", "picture", "email", "email-verification", "phone", "address", "change-password", "otp", "manage-consents", "sessions"].map((tab) => `${env.adminUrl}/account/${tab}`),
+      ...["profile", "picture", "email", "email-verification", "phone", "address", "change-password", "otp", "manage-consents", "legal-documents", "sessions"].map((tab) => `${env.adminUrl}/account/${tab}`),
       `${env.adminUrl}/missing-german-page`, `${env.adminUrl}/auth/callback`, `${env.adminUrl}/auth/logout`,
     ];
     for (const url of urls) {

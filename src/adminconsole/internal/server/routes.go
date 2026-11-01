@@ -155,6 +155,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/otp", accounthandlers.HandleOtpPost(httpHelper, apiClient, baseURL))
 		r.Get("/manage-consents", accounthandlers.HandleManageConsentsGet(httpHelper, apiClient))
 		r.Post("/manage-consents", accounthandlers.HandleManageConsentsRevokePost(httpHelper, apiClient))
+		r.Get("/legal-documents", accounthandlers.HandleLegalDocumentsGet(httpHelper, apiClient))
 		r.Get("/sessions", accounthandlers.HandleSessionsGet(httpHelper, apiClient))
 		r.Post("/sessions", accounthandlers.HandleSessionsEndSessionPost(httpHelper, apiClient))
 
@@ -278,6 +279,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/users/{userId}/authentication", adminuserhandlers.HandleAuthenticationPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/users/{userId}/consents", adminuserhandlers.HandleConsentsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/users/{userId}/consents", adminuserhandlers.HandleConsentsPost(httpHelper, apiClient))
+		r.Get("/users/{userId}/legal-documents", adminuserhandlers.HandleLegalDocumentsGet(httpHelper, apiClient))
 		r.Get("/users/{userId}/sessions", adminuserhandlers.HandleSessionsGet(httpHelper, apiClient))
 		r.Post("/users/{userId}/sessions", adminuserhandlers.HandleSessionsPost(httpHelper, apiClient))
 		r.Get("/users/{userId}/attributes", adminuserhandlers.HandleAttributesGet(httpHelper, apiClient))

@@ -138,3 +138,33 @@ func (c *AuthServerClient) GetClientLegalDocuments(ctx context.Context, accessTo
 		successStatus: http.StatusOK,
 	})
 }
+
+// GetUserLegalDocumentAcceptances reads the legal document versions a user accepted, the latest
+// acceptance first, read with the users-read scopes.
+func (c *AuthServerClient) GetUserLegalDocumentAcceptances(ctx context.Context, accessToken string,
+	userId int64) ([]api.LegalDocumentAcceptanceResponse, error) {
+	response, err := execute[api.GetLegalDocumentAcceptancesResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/legal-document-acceptances", c.baseURL, userId),
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.Acceptances, nil
+}
+
+// GetAccountLegalDocumentAcceptances reads the legal document versions the signed-in user accepted,
+// the latest acceptance first.
+func (c *AuthServerClient) GetAccountLegalDocumentAcceptances(ctx context.Context,
+	accessToken string) ([]api.LegalDocumentAcceptanceResponse, error) {
+	response, err := execute[api.GetLegalDocumentAcceptancesResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/account/legal-document-acceptances",
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return response.Acceptances, nil
+}

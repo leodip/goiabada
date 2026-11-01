@@ -300,6 +300,9 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleUserConsentsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-consents/{id}", apihandlers.HandleUserConsentDelete(s.database, auditLogger))
 
+		// The legal document versions the user accepted, read as part of the user (#622 decision 6).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/legal-document-acceptances", apihandlers.HandleUserLegalDocumentAcceptancesGet(s.database, baseURL))
+
 		// Group management routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/groups", apihandlers.HandleGroupsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/groups", apihandlers.HandleGroupCreatePost(s.database, identifierValidator, auditLogger))
@@ -471,6 +474,8 @@ func (s *Server) initRoutes(branches appBranches) {
 			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
+		// The legal document versions the caller accepted (#622 decision 10).
+		r.Get("/legal-document-acceptances", apihandlers.HandleAccountLegalDocumentAcceptancesGet(s.database, baseURL))
 
 		// Sessions (self-service)
 		r.Get("/sessions", apihandlers.HandleAccountSessionsGet(s.database))

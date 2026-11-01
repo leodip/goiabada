@@ -202,6 +202,7 @@ export type UserTab =
   | "authentication"
   | "attributes"
   | "consents"
+  | "legal-documents"
   | "sessions"
   | "groups"
   | "permissions"

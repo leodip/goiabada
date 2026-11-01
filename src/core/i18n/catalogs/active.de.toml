@@ -337,6 +337,7 @@
 "adminconsole.account_menu.otp" = "Zwei-Faktor-Authentifizierung"
 "adminconsole.account_menu.manage_consents" = "Zustimmungen"
 "adminconsole.account_menu.sessions" = "Sitzungen"
+"adminconsole.account_menu.legal_documents" = "Rechtsdokumente"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -398,6 +399,7 @@
 "adminconsole.user_tabs.attributes" = "Attribute"
 "adminconsole.user_tabs.permissions" = "Berechtigungen"
 "adminconsole.user_tabs.groups" = "Gruppen"
+"adminconsole.user_tabs.legal_documents" = "Rechtsdokumente"
 
 # --- Adminconsole standalone pages (error, not-found, unauthorized, welcome) -
 
@@ -643,6 +645,13 @@
 "adminconsole.account.consents.modal_confirm_title" = "Diese Zustimmung widerrufen?"
 "adminconsole.account.consents.revoke_confirm" = "Möchten Sie Ihre Zustimmung für {{.client}} widerrufen? Die Anwendung muss Sie erneut fragen, bevor sie auf Ihr Konto zugreifen kann."
 "adminconsole.account.consents.revoke_confirm_unverified" = "Möchten Sie Ihre Zustimmung für {{.client}} widerrufen? Diese Anwendung hat sich selbst registriert und wurde nicht überprüft. Sie muss Sie erneut fragen, bevor sie auf Ihr Konto zugreifen kann."
+"adminconsole.account.legal_documents.page_title" = "Rechtsdokumente"
+"adminconsole.account.legal_documents.intro" = "Die Rechtsdokumente, die Sie bei der Anmeldung bei einer Anwendung akzeptiert haben."
+"adminconsole.account.legal_documents.col_document" = "Dokument"
+"adminconsole.account.legal_documents.col_version" = "Version"
+"adminconsole.account.legal_documents.col_accepted_at" = "Akzeptiert"
+"adminconsole.account.legal_documents.no_longer_in_effect" = "Nicht mehr in Kraft"
+"adminconsole.account.legal_documents.empty" = "Sie haben noch keine Rechtsdokumente akzeptiert."
 
 # --- Account profile picture ------------------------------------------------
 
@@ -1127,6 +1136,12 @@
 "adminconsole.admin_users.consents.revoke_confirm" = "Möchten Sie die Zustimmung dieses Kontos für {{.client}} widerrufen? Seine Refresh Tokens für diesen Client werden ebenfalls widerrufen, einschließlich Offline-Tokens. Fordert der Client diese Scopes erneut an, wird wieder um Zustimmung gebeten."
 "adminconsole.admin_users.consents.revoke_dialog_button" = "Zustimmung widerrufen"
 "adminconsole.admin_users.consents.empty" = "Dieses Konto hat noch keinem Client zugestimmt."
+"adminconsole.admin_users.legal_documents.intro" = "Die Rechtsdokumente, die dieses Konto bei der Anmeldung bei einem Client akzeptiert hat, und wann. Akzeptierungen können weder bearbeitet noch entfernt werden; sie werden mit dem Konto gelöscht."
+"adminconsole.admin_users.legal_documents.col_document" = "Dokument"
+"adminconsole.admin_users.legal_documents.col_version" = "Version"
+"adminconsole.admin_users.legal_documents.col_accepted_at" = "Akzeptiert"
+"adminconsole.admin_users.legal_documents.view_text" = "Text anzeigen"
+"adminconsole.admin_users.legal_documents.empty" = "Dieses Konto hat noch keine Rechtsdokumente akzeptiert."
 
 "adminconsole.admin_users.sessions.modal_confirm_title" = "Diese Sitzung beenden?"
 "adminconsole.admin_users.sessions.lead" = "Eine Sitzung pro Gerät, auf dem sich die Person angemeldet hat. Wenn Sie eine Sitzung beenden, wird das Konto bei allen Clients abgemeldet, bei denen es über dieses Gerät angemeldet ist."

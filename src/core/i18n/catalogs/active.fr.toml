@@ -336,6 +336,7 @@
 "adminconsole.account_menu.otp" = "Authentification à deux facteurs"
 "adminconsole.account_menu.manage_consents" = "Consentements"
 "adminconsole.account_menu.sessions" = "Sessions"
+"adminconsole.account_menu.legal_documents" = "Documents juridiques"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -397,6 +398,7 @@
 "adminconsole.user_tabs.attributes" = "Attributs"
 "adminconsole.user_tabs.permissions" = "Permissions"
 "adminconsole.user_tabs.groups" = "Groupes"
+"adminconsole.user_tabs.legal_documents" = "Documents juridiques"
 
 # --- Adminconsole standalone pages (error, not-found, unauthorized, welcome) -
 
@@ -642,6 +644,13 @@
 "adminconsole.account.consents.modal_confirm_title" = "Révoquer ce consentement ?"
 "adminconsole.account.consents.revoke_confirm" = "Révoquer le consentement accordé à {{.client}} ? L’application devra vous le redemander avant de pouvoir utiliser votre compte."
 "adminconsole.account.consents.revoke_confirm_unverified" = "Révoquer le consentement accordé à {{.client}}, une application qui s’est enregistrée elle-même et n’a pas été vérifiée ? Elle devra vous le redemander avant de pouvoir utiliser votre compte."
+"adminconsole.account.legal_documents.page_title" = "Documents juridiques"
+"adminconsole.account.legal_documents.intro" = "Les documents juridiques que vous avez acceptés en vous connectant à une application."
+"adminconsole.account.legal_documents.col_document" = "Document"
+"adminconsole.account.legal_documents.col_version" = "Version"
+"adminconsole.account.legal_documents.col_accepted_at" = "Accepté le"
+"adminconsole.account.legal_documents.no_longer_in_effect" = "N’est plus en vigueur"
+"adminconsole.account.legal_documents.empty" = "Vous n’avez accepté aucun document juridique."
 
 # --- Account profile picture ------------------------------------------------
 
@@ -1126,6 +1135,12 @@
 "adminconsole.admin_users.consents.revoke_confirm" = "Révoquer le consentement accordé à {{.client}} ? Les jetons de rafraîchissement de l’utilisateur pour ce client seront aussi révoqués, y compris hors ligne. Le consentement lui sera redemandé la prochaine fois que ce client demandera ces scopes."
 "adminconsole.admin_users.consents.revoke_dialog_button" = "Révoquer le consentement"
 "adminconsole.admin_users.consents.empty" = "Cet utilisateur n’a donné son consentement à aucun client."
+"adminconsole.admin_users.legal_documents.intro" = "Les documents juridiques que cet utilisateur a acceptés en se connectant à un client, et quand. Les acceptations ne peuvent être ni modifiées ni supprimées ; elles sont supprimées avec l’utilisateur."
+"adminconsole.admin_users.legal_documents.col_document" = "Document"
+"adminconsole.admin_users.legal_documents.col_version" = "Version"
+"adminconsole.admin_users.legal_documents.col_accepted_at" = "Accepté le"
+"adminconsole.admin_users.legal_documents.view_text" = "Voir le texte"
+"adminconsole.admin_users.legal_documents.empty" = "Cet utilisateur n’a accepté aucun document juridique."
 
 "adminconsole.admin_users.sessions.modal_confirm_title" = "Fermer cette session ?"
 "adminconsole.admin_users.sessions.lead" = "Une session par appareil sur lequel l’utilisateur s’est connecté. Fermer une session déconnecte l’utilisateur de tous les clients auxquels il s’est connecté depuis cet appareil."
