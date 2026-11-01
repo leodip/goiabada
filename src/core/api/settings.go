@@ -5,7 +5,7 @@ import (
 )
 
 // PublicSettingsResponse is what /api/public/settings answers. That endpoint needs no
-// authentication, so this type is the entire boundary between an anonymous caller and the 32
+// authentication, so this type is the entire boundary between an anonymous caller and the 37
 // fields of record.Settings, among them the legacy AES encryption key and the encrypted SMTP
 // password. The auth server's handler_public_settings_test.go holds that boundary in two
 // directions: an allowlist of the fields below, and a case filling the model with recognizable
@@ -125,6 +125,26 @@ type UpdateSettingsEmailRequest struct {
 	SMTPEncryption    string `json:"smtpEncryption"`
 	SMTPFromName      string `json:"smtpFromName"`
 	SMTPFromEmail     string `json:"smtpFromEmail"`
+}
+
+// SettingsTurnstileResponse is the Cloudflare Turnstile challenge's settings as the admin API
+// answers them. The secret key is never answered: HasTurnstileSecretKey says whether one is stored
+// (#642 decision 11).
+type SettingsTurnstileResponse struct {
+	TurnstileEnabled      bool   `json:"turnstileEnabled"`
+	TurnstileSiteKey      string `json:"turnstileSiteKey"`
+	HasTurnstileSecretKey bool   `json:"hasTurnstileSecretKey"`
+}
+
+// UpdateSettingsTurnstileRequest is a save of the Cloudflare Turnstile challenge's settings. An
+// absent or empty TurnstileSecretKey keeps the stored secret, a non-empty one replaces it, and
+// ClearTurnstileSecretKey removes it; the two together are refused, and so is a site key change
+// while a secret is stored that carries neither (#642 decision 11).
+type UpdateSettingsTurnstileRequest struct {
+	TurnstileEnabled        bool   `json:"turnstileEnabled"`
+	TurnstileSiteKey        string `json:"turnstileSiteKey"`
+	TurnstileSecretKey      string `json:"turnstileSecretKey"`
+	ClearTurnstileSecretKey bool   `json:"clearTurnstileSecretKey"`
 }
 
 // SendTestEmailRequest is used by the admin API to trigger a test email

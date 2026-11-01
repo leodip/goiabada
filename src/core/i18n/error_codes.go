@@ -322,6 +322,14 @@ const (
 	ErrCodeSettingsEmailSMTPPasswordAndClear  = "handler.settings_email.smtp_password_and_clear"
 	ErrCodeSettingsEmailSMTPHostChanged       = "handler.settings_email.smtp_host_changed"
 
+	ErrCodeSettingsTurnstileSiteKeyRequired            = "handler.settings_turnstile.site_key_required"
+	ErrCodeSettingsTurnstileSecretKeyRequired          = "handler.settings_turnstile.secret_key_required"
+	ErrCodeSettingsTurnstileSecretKeyClearWhileEnabled = "handler.settings_turnstile.secret_key_clear_while_enabled"
+	ErrCodeSettingsTurnstileSiteKeyChanged             = "handler.settings_turnstile.site_key_changed"
+	ErrCodeSettingsTurnstileSecretKeyAndClear          = "handler.settings_turnstile.secret_key_and_clear"
+	ErrCodeSettingsTurnstileSiteKeyTooLong             = "handler.settings_turnstile.site_key_too_long"   // Args: {"max": int}
+	ErrCodeSettingsTurnstileSecretKeyTooLong           = "handler.settings_turnstile.secret_key_too_long" // Args: {"max": int}
+
 	ErrCodeSettingsEmailConnectFailedHostNotFound = "handler.settings_email.connect_failed_host_not_found"
 	ErrCodeSettingsEmailConnectFailedTimedOut     = "handler.settings_email.connect_failed_timed_out"
 	ErrCodeSettingsEmailConnectFailedRefused      = "handler.settings_email.connect_failed_refused"

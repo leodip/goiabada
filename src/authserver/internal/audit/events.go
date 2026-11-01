@@ -210,6 +210,7 @@ const (
 	EventUpdatedGeneralSettings       = "updated_general_settings"
 	EventUpdatedSessionsSettings      = "updated_sessions_settings"
 	EventUpdatedTokensSettings        = "updated_tokens_settings"
+	EventUpdatedTurnstileSettings     = "updated_turnstile_settings"
 	EventUpdatedUIThemeSettings       = "updated_ui_theme_settings"
 	EventUpdatedAuditLogsSettings     = "updated_audit_logs_settings"
 	EventUpdatedWebOrigins            = "updated_web_origins"
@@ -761,6 +762,7 @@ var auditEventTypes = []string{
 	EventUpdatedSessionsSettings,
 	EventUpdatedSMTPSettings,
 	EventUpdatedTokensSettings,
+	EventUpdatedTurnstileSettings,
 	EventUpdatedUIThemeSettings,
 	EventUpdatedUserAddress,
 	EventUpdatedUserAttribute,

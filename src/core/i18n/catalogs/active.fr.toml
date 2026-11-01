@@ -1978,6 +1978,14 @@
 "handler.settings_email.smtp_password_and_clear" = "Envoyez soit un nouveau mot de passe SMTP, soit clearSmtpPassword, mais pas les deux."
 "handler.settings_email.smtp_host_changed" = "L’hôte SMTP a changé : saisissez à nouveau le mot de passe SMTP ou supprimez-le."
 
+"handler.settings_turnstile.site_key_required" = "Saisissez la clé de site pour activer le défi Turnstile."
+"handler.settings_turnstile.secret_key_required" = "Saisissez la clé secrète pour activer le défi Turnstile."
+"handler.settings_turnstile.secret_key_clear_while_enabled" = "La clé secrète ne peut pas être supprimée tant que le défi Turnstile est activé."
+"handler.settings_turnstile.site_key_changed" = "La clé de site a changé : saisissez à nouveau la clé secrète ou supprimez-la."
+"handler.settings_turnstile.secret_key_and_clear" = "Envoyez soit une nouvelle clé secrète, soit clearTurnstileSecretKey, mais pas les deux."
+"handler.settings_turnstile.site_key_too_long" = "La clé de site ne peut pas dépasser {{.max}} caractères."
+"handler.settings_turnstile.secret_key_too_long" = "La clé secrète ne peut pas dépasser {{.max}} caractères."
+
 "handler.settings_email.connect_failed_host_not_found" = "Impossible de se connecter au serveur SMTP : nom d’hôte introuvable."
 "handler.settings_email.connect_failed_timed_out" = "Impossible de se connecter au serveur SMTP : délai de connexion dépassé."
 "handler.settings_email.connect_failed_refused" = "Impossible de se connecter au serveur SMTP : connexion refusée."

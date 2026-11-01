@@ -18,7 +18,8 @@ var settingsColumns = columnList{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at",
 	mysql: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
@@ -28,7 +29,8 @@ var settingsColumns = columnList{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at",
 	postgres: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
@@ -38,7 +40,8 @@ var settingsColumns = columnList{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at",
 	mssql: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
@@ -48,7 +51,8 @@ var settingsColumns = columnList{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at",
 }
@@ -82,6 +86,9 @@ func scanSettings(row rowScanner, settings *record.Settings) error {
 		&settings.SMTPFromEmail,
 		&settings.SMTPEncryption,
 		&settings.SMTPEnabled,
+		&settings.TurnstileEnabled,
+		&settings.TurnstileSiteKey,
+		&settings.TurnstileSecretKeyEncrypted,
 		&settings.DynamicClientRegistrationEnabled,
 		&settings.PKCERequired,
 		&settings.ImplicitFlowEnabled,
@@ -101,11 +108,12 @@ var insertSettings = statement{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
 		"last_cleanup_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -113,11 +121,12 @@ var insertSettings = statement{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
 		"last_cleanup_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -125,12 +134,13 @@ var insertSettings = statement{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
 		"last_cleanup_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
 		"$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, " +
-		"$33) RETURNING id",
+		"$33, $34, $35, $36) RETURNING id",
 	mssql: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -138,12 +148,13 @@ var insertSettings = statement{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
 		"last_cleanup_at) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, " +
 		"@p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, " +
-		"@p27, @p28, @p29, @p30, @p31, @p32, @p33)",
+		"@p27, @p28, @p29, @p30, @p31, @p32, @p33, @p34, @p35, @p36)",
 }
 
 // insertInitialSettings is the settings row with its id named, written once, by
@@ -156,11 +167,12 @@ var insertInitialSettings = statement{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
 		"last_cleanup_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -168,11 +180,12 @@ var insertInitialSettings = statement{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
 		"last_cleanup_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -180,11 +193,13 @@ var insertInitialSettings = statement{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
 		"last_cleanup_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
-		"$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)",
+		"$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, " +
+		"$35, $36, $37)",
 	mssql: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -192,12 +207,13 @@ var insertInitialSettings = statement{
 		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
 		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
-		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"smtp_encryption, smtp_enabled, turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted, " +
+		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
 		"last_cleanup_at) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, " +
 		"@p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, " +
-		"@p30, @p31, @p32, @p33, @p34)",
+		"@p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37)",
 }
 
 // updateSettings writes the whole row but created_at, aes_encryption_key and last_cleanup_at, which
@@ -211,7 +227,8 @@ var updateSettings = statement{
 		"user_session_max_lifetime_in_seconds = ?, include_open_id_connect_claims_in_access_token = ?, " +
 		"include_open_id_connect_claims_in_id_token = ?, max_user_sessions_per_user = ?, smtp_host = ?, " +
 		"smtp_port = ?, smtp_username = ?, smtp_password_encrypted = ?, smtp_from_name = ?, " +
-		"smtp_from_email = ?, smtp_encryption = ?, smtp_enabled = ?, " +
+		"smtp_from_email = ?, smtp_encryption = ?, smtp_enabled = ?, turnstile_enabled = ?, " +
+		"turnstile_site_key = ?, turnstile_secret_key_encrypted = ?, " +
 		"dynamic_client_registration_enabled = ?, pkce_required = ?, implicit_flow_enabled = ?, " +
 		"resource_owner_password_credentials_enabled = ?, audit_logs_in_console_enabled = ?, " +
 		"audit_logs_in_database_enabled = ?, audit_log_retention_days = ? WHERE id = ?",
@@ -223,7 +240,8 @@ var updateSettings = statement{
 		"user_session_max_lifetime_in_seconds = ?, include_open_id_connect_claims_in_access_token = ?, " +
 		"include_open_id_connect_claims_in_id_token = ?, max_user_sessions_per_user = ?, smtp_host = ?, " +
 		"smtp_port = ?, smtp_username = ?, smtp_password_encrypted = ?, smtp_from_name = ?, " +
-		"smtp_from_email = ?, smtp_encryption = ?, smtp_enabled = ?, " +
+		"smtp_from_email = ?, smtp_encryption = ?, smtp_enabled = ?, turnstile_enabled = ?, " +
+		"turnstile_site_key = ?, turnstile_secret_key_encrypted = ?, " +
 		"dynamic_client_registration_enabled = ?, pkce_required = ?, implicit_flow_enabled = ?, " +
 		"resource_owner_password_credentials_enabled = ?, audit_logs_in_console_enabled = ?, " +
 		"audit_logs_in_database_enabled = ?, audit_log_retention_days = ? WHERE id = ?",
@@ -237,9 +255,10 @@ var updateSettings = statement{
 		"include_open_id_connect_claims_in_id_token = $14, max_user_sessions_per_user = $15, " +
 		"smtp_host = $16, smtp_port = $17, smtp_username = $18, smtp_password_encrypted = $19, " +
 		"smtp_from_name = $20, smtp_from_email = $21, smtp_encryption = $22, smtp_enabled = $23, " +
-		"dynamic_client_registration_enabled = $24, pkce_required = $25, implicit_flow_enabled = $26, " +
-		"resource_owner_password_credentials_enabled = $27, audit_logs_in_console_enabled = $28, " +
-		"audit_logs_in_database_enabled = $29, audit_log_retention_days = $30 WHERE id = $31",
+		"turnstile_enabled = $24, turnstile_site_key = $25, turnstile_secret_key_encrypted = $26, " +
+		"dynamic_client_registration_enabled = $27, pkce_required = $28, implicit_flow_enabled = $29, " +
+		"resource_owner_password_credentials_enabled = $30, audit_logs_in_console_enabled = $31, " +
+		"audit_logs_in_database_enabled = $32, audit_log_retention_days = $33 WHERE id = $34",
 	mssql: "UPDATE settings SET updated_at = @p1, app_name = @p2, issuer = @p3, ui_theme = @p4, " +
 		"password_policy = @p5, self_registration_enabled = @p6, " +
 		"self_registration_requires_email_verification = @p7, token_expiration_in_seconds = @p8, " +
@@ -250,9 +269,10 @@ var updateSettings = statement{
 		"include_open_id_connect_claims_in_id_token = @p14, max_user_sessions_per_user = @p15, " +
 		"smtp_host = @p16, smtp_port = @p17, smtp_username = @p18, smtp_password_encrypted = @p19, " +
 		"smtp_from_name = @p20, smtp_from_email = @p21, smtp_encryption = @p22, smtp_enabled = @p23, " +
-		"dynamic_client_registration_enabled = @p24, pkce_required = @p25, implicit_flow_enabled = @p26, " +
-		"resource_owner_password_credentials_enabled = @p27, audit_logs_in_console_enabled = @p28, " +
-		"audit_logs_in_database_enabled = @p29, audit_log_retention_days = @p30 WHERE id = @p31",
+		"turnstile_enabled = @p24, turnstile_site_key = @p25, turnstile_secret_key_encrypted = @p26, " +
+		"dynamic_client_registration_enabled = @p27, pkce_required = @p28, implicit_flow_enabled = @p29, " +
+		"resource_owner_password_credentials_enabled = @p30, audit_logs_in_console_enabled = @p31, " +
+		"audit_logs_in_database_enabled = @p32, audit_log_retention_days = @p33 WHERE id = @p34",
 }
 
 var selectSettingsById = statement{
@@ -301,6 +321,7 @@ func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 		settings.MaxUserSessionsPerUser, settings.AESEncryptionKeyLegacy, settings.SMTPHost,
 		settings.SMTPPort, settings.SMTPUsername, settings.SMTPPasswordEncrypted, settings.SMTPFromName,
 		settings.SMTPFromEmail, settings.SMTPEncryption, settings.SMTPEnabled,
+		settings.TurnstileEnabled, settings.TurnstileSiteKey, settings.TurnstileSecretKeyEncrypted,
 		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
 		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
 		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.LastCleanupAt)
@@ -369,6 +390,7 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 		settings.MaxUserSessionsPerUser, settings.AESEncryptionKeyLegacy, settings.SMTPHost,
 		settings.SMTPPort, settings.SMTPUsername, settings.SMTPPasswordEncrypted, settings.SMTPFromName,
 		settings.SMTPFromEmail, settings.SMTPEncryption, settings.SMTPEnabled,
+		settings.TurnstileEnabled, settings.TurnstileSiteKey, settings.TurnstileSecretKeyEncrypted,
 		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
 		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
 		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.LastCleanupAt); err != nil {
@@ -404,6 +426,7 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 		settings.IncludeOpenIDConnectClaimsInIdToken, settings.MaxUserSessionsPerUser, settings.SMTPHost,
 		settings.SMTPPort, settings.SMTPUsername, settings.SMTPPasswordEncrypted, settings.SMTPFromName,
 		settings.SMTPFromEmail, settings.SMTPEncryption, settings.SMTPEnabled,
+		settings.TurnstileEnabled, settings.TurnstileSiteKey, settings.TurnstileSecretKeyEncrypted,
 		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
 		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
 		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.Id)

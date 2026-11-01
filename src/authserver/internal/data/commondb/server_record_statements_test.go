@@ -474,6 +474,7 @@ func TestServerRecordStatements_ReencryptionRekeysEveryProtectedColumn(t *testin
 			}
 			assert.Equal(t, []string{
 				"SELECT id, smtp_password_encrypted FROM settings",
+				"SELECT id, turnstile_secret_key_encrypted FROM settings",
 				"SELECT id, client_secret_encrypted FROM clients",
 				"SELECT id, email_verification_code_encrypted FROM users",
 				"SELECT id, otp_secret_encrypted FROM users",

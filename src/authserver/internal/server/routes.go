@@ -395,6 +395,10 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/email", apihandlers.HandleSettingsEmailPut(s.database, emailValidator, auditLogger, s.dataCipher))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/email/send-test", apihandlers.HandleSettingsEmailSendTestPost(emailValidator, emailSender, auditLogger))
 
+		// Settings - Turnstile
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/turnstile", apihandlers.HandleSettingsTurnstileGet())
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/turnstile", apihandlers.HandleSettingsTurnstilePut(s.database, auditLogger, s.dataCipher))
+
 		// Settings - Sessions
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/sessions", apihandlers.HandleSettingsSessionsGet())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/sessions", apihandlers.HandleSettingsSessionsPut(s.database, auditLogger))

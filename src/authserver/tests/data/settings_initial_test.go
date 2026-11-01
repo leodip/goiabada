@@ -31,6 +31,9 @@ func TestCreateInitialSettings_WritesIdOneAndTheCounterMovesPastIt(t *testing.T)
 	ctx := context.Background()
 
 	settings := initialSettings("Initial")
+	settings.TurnstileEnabled = true
+	settings.TurnstileSiteKey = "1x00000000000000000000AA"
+	settings.TurnstileSecretKeyEncrypted = []byte("sealed-secret-key")
 	require.NoError(t, h.DB.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		return h.DB.CreateInitialSettings(ctx, tx, settings)
 	}))
@@ -40,6 +43,9 @@ func TestCreateInitialSettings_WritesIdOneAndTheCounterMovesPastIt(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, "Initial", stored.AppName)
+	assert.True(t, stored.TurnstileEnabled, "the Turnstile switch is written by the initial insert")
+	assert.Equal(t, "1x00000000000000000000AA", stored.TurnstileSiteKey)
+	assert.Equal(t, []byte("sealed-secret-key"), stored.TurnstileSecretKeyEncrypted)
 	isEmpty, err := h.DB.IsEmpty(ctx)
 	require.NoError(t, err)
 	assert.False(t, isEmpty)

@@ -33,6 +33,9 @@ func TestCreateSettings(t *testing.T) {
 		SMTPFromEmail:                             "sender@test.com",
 		SMTPEncryption:                            "starttls",
 		SMTPEnabled:                               true,
+		TurnstileEnabled:                          true,
+		TurnstileSiteKey:                          "1x00000000000000000000AA",
+		TurnstileSecretKeyEncrypted:               []byte("testturnstilesecret"),
 		DynamicClientRegistrationEnabled:          true,
 		PKCERequired:                              true,
 		ImplicitFlowEnabled:                       true,
@@ -92,6 +95,9 @@ func TestUpdateSettings(t *testing.T) {
 	settings.SMTPFromEmail = "updated@test.com"
 	settings.SMTPEncryption = "ssltls"
 	settings.SMTPEnabled = false
+	settings.TurnstileEnabled = false
+	settings.TurnstileSiteKey = "2x00000000000000000000AB"
+	settings.TurnstileSecretKeyEncrypted = []byte("updatedturnstilesecret")
 	settings.DynamicClientRegistrationEnabled = false
 	settings.PKCERequired = false
 	settings.ImplicitFlowEnabled = false
@@ -160,6 +166,9 @@ func createTestSettings(t *testing.T) *record.Settings {
 		SMTPFromEmail:                             "sender@test.com",
 		SMTPEncryption:                            "starttls",
 		SMTPEnabled:                               true,
+		TurnstileEnabled:                          true,
+		TurnstileSiteKey:                          "1x00000000000000000000AA",
+		TurnstileSecretKeyEncrypted:               []byte("testturnstilesecret"),
 		DynamicClientRegistrationEnabled:          true,
 		PKCERequired:                              true,
 		ImplicitFlowEnabled:                       true,
@@ -241,6 +250,15 @@ func compareSettings(t *testing.T, expected, actual *record.Settings) {
 	}
 	if actual.SMTPEnabled != expected.SMTPEnabled {
 		t.Errorf("Expected SMTPEnabled %v, got %v", expected.SMTPEnabled, actual.SMTPEnabled)
+	}
+	if actual.TurnstileEnabled != expected.TurnstileEnabled {
+		t.Errorf("Expected TurnstileEnabled %v, got %v", expected.TurnstileEnabled, actual.TurnstileEnabled)
+	}
+	if actual.TurnstileSiteKey != expected.TurnstileSiteKey {
+		t.Errorf("Expected TurnstileSiteKey %s, got %s", expected.TurnstileSiteKey, actual.TurnstileSiteKey)
+	}
+	if string(actual.TurnstileSecretKeyEncrypted) != string(expected.TurnstileSecretKeyEncrypted) {
+		t.Errorf("Expected TurnstileSecretKeyEncrypted %s, got %s", string(expected.TurnstileSecretKeyEncrypted), string(actual.TurnstileSecretKeyEncrypted))
 	}
 	if actual.DynamicClientRegistrationEnabled != expected.DynamicClientRegistrationEnabled {
 		t.Errorf("Expected DynamicClientRegistrationEnabled %v, got %v", expected.DynamicClientRegistrationEnabled, actual.DynamicClientRegistrationEnabled)

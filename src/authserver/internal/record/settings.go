@@ -52,6 +52,15 @@ type Settings struct {
 	SMTPEncryption         string `db:"smtp_encryption"`
 	SMTPEnabled            bool   `db:"smtp_enabled"`
 
+	// The Cloudflare Turnstile challenge on the sign-in, forgot-password and registration forms
+	// (#642). One switch covers the three forms, off by default. The site key is public, carried by
+	// the forms' widget; the secret key is sealed under the data key as the SMTP password is, joins
+	// the columns a data-key rotation re-encrypts, and the admin API answers only whether one is
+	// stored.
+	TurnstileEnabled            bool   `db:"turnstile_enabled"`
+	TurnstileSiteKey            string `db:"turnstile_site_key"`
+	TurnstileSecretKeyEncrypted []byte `db:"turnstile_secret_key_encrypted"`
+
 	// Dynamic Client Registration (RFC 7591)
 	DynamicClientRegistrationEnabled bool `db:"dynamic_client_registration_enabled"`
 

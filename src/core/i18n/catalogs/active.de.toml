@@ -1979,6 +1979,14 @@
 "handler.settings_email.smtp_password_and_clear" = "Senden Sie entweder ein neues SMTP-Passwort oder clearSmtpPassword, nicht beides."
 "handler.settings_email.smtp_host_changed" = "Der SMTP-Host wurde geändert. Geben Sie das SMTP-Passwort erneut ein oder entfernen Sie es."
 
+"handler.settings_turnstile.site_key_required" = "Geben Sie den Websiteschlüssel ein, um die Turnstile-Prüfung einzuschalten."
+"handler.settings_turnstile.secret_key_required" = "Geben Sie den geheimen Schlüssel ein, um die Turnstile-Prüfung einzuschalten."
+"handler.settings_turnstile.secret_key_clear_while_enabled" = "Der geheime Schlüssel kann nicht entfernt werden, solange die Turnstile-Prüfung eingeschaltet ist."
+"handler.settings_turnstile.site_key_changed" = "Der Websiteschlüssel wurde geändert. Geben Sie den geheimen Schlüssel erneut ein oder entfernen Sie ihn."
+"handler.settings_turnstile.secret_key_and_clear" = "Senden Sie entweder einen neuen geheimen Schlüssel oder clearTurnstileSecretKey, nicht beides."
+"handler.settings_turnstile.site_key_too_long" = "Der Websiteschlüssel darf höchstens {{.max}} Zeichen lang sein."
+"handler.settings_turnstile.secret_key_too_long" = "Der geheime Schlüssel darf höchstens {{.max}} Zeichen lang sein."
+
 "handler.settings_email.connect_failed_host_not_found" = "Verbindung zum SMTP-Server nicht möglich: Hostname nicht gefunden."
 "handler.settings_email.connect_failed_timed_out" = "Verbindung zum SMTP-Server nicht möglich: Zeitüberschreitung."
 "handler.settings_email.connect_failed_refused" = "Verbindung zum SMTP-Server nicht möglich: Verbindung abgelehnt."

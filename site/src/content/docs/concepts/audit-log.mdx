@@ -137,6 +137,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `group_id` | The group's row id. |
 | `group_identifier` | The identifier the group is known by. |
 | `group_ids` | The row ids of the administrative groups a refused membership change would have moved the user into or out of. |
+| `has_turnstile_secret_key` | Under `old` and `new`: whether a Turnstile secret key is stored. The key itself is never recorded. |
 | `include_open_id_connect_claims_in_access_token` | Under `old` and `new`: whether OpenID Connect claims go in access tokens by default. |
 | `include_open_id_connect_claims_in_id_token` | Under `old` and `new`: whether OpenID Connect claims go in ID tokens by default. |
 | `ip` | The client's IP address, as the auth server resolved it. On `rate_limit_exceeded`, the block the limiter counts: the address for IPv4, its /64 for IPv6. |
@@ -151,10 +152,10 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. |
 | `max_user_sessions_per_user` | Under `old` and `new`: the most sessions one user can hold, 0 for no limit. |
 | `method` | The HTTP method of a refused Admin API request. |
-| `new` | The default token settings, or the session settings, after the change, keyed as below. |
+| `new` | The default token settings, the session settings, or the Turnstile settings, after the change, keyed as below. |
 | `new_generation` | The user's authentication generation after their sessions and tokens were revoked. |
 | `new_ui_theme` | The UI theme after the change. |
-| `old` | The default token settings, or the session settings, before the change, keyed as below. |
+| `old` | The default token settings, the session settings, or the Turnstile settings, before the change, keyed as below. |
 | `old_generation` | The user's authentication generation before their sessions and tokens were revoked. |
 | `old_ui_theme` | The UI theme before the change. |
 | `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. |
@@ -194,6 +195,8 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `token_client_id` | The row id of the client a token sent to the revocation endpoint was issued to. |
 | `token_expiration_in_seconds` | Under `old` and `new`: the default access token lifetime, in seconds. |
 | `token_type` | The type of token a client sent to the revocation endpoint: `access_token` or `refresh_token`. |
+| `turnstile_enabled` | Under `old` and `new`: whether the Turnstile challenge is on. |
+| `turnstile_site_key` | Under `old` and `new`: the site key of the Turnstile widget. |
 | `user_attribute_id` | The row id of a user's custom attribute. |
 | `user_id` | The user's row id. |
 | `user_session_id` | The row id of a user's session. |
@@ -412,6 +415,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_tokens_settings` | An administrator changed the default token settings. The entry holds the old and the new values. |
 | `updated_smtp_settings` | An administrator changed the **Email** settings, including turning email on or off. |
 | `sent_test_email` | An administrator sent a test email, and the mail server accepted it. |
+| `updated_turnstile_settings` | An administrator changed the **Turnstile** settings. The entry holds the old and the new values, the secret key only as whether one is stored. |
 | `updated_audit_logs_settings` | An administrator changed where audit events go or how long they're kept. It holds the new values, and is recorded under the old ones, so turning logging off is recorded too. |
 | `rotated_keys` | An administrator rotated the signing keys: the next key became the current one, and a new next key was generated. |
 | `revoked_key` | An administrator deleted a previous signing key. |

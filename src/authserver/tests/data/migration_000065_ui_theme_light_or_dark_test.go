@@ -90,6 +90,9 @@ func TestMigration000065_UIThemeLightOrDark(t *testing.T) {
 	}
 
 	// 5. An administrator chooses the automatic theme after the upgrade, and the server starts again.
+	// The row is written at head, since the ORM writes every column the record carries, a column a
+	// later migration adds to settings included (000079).
+	migrateToHead000065(t, h)
 	automatic := settings000065("")
 	require.NoError(t, h.DB.CreateSettings(ctx, nil, automatic))
 	migrateToHead000065(t, h)

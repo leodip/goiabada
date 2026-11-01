@@ -330,6 +330,13 @@ cause, each a whole sentence.
 | `handler.settings_email.smtp_from_email_too_long` | `max` (int) | The sender email can't be longer than {{.max}} characters. |
 | `handler.settings_email.smtp_password_and_clear` | (none) | Send either a new SMTP password or clearSmtpPassword, not both. |
 | `handler.settings_email.smtp_host_changed` | (none) | The SMTP host has changed: enter the SMTP password again, or remove it. |
+| `handler.settings_turnstile.site_key_required` | (none) | Enter the site key to turn the Turnstile challenge on. |
+| `handler.settings_turnstile.secret_key_required` | (none) | Enter the secret key to turn the Turnstile challenge on. |
+| `handler.settings_turnstile.secret_key_clear_while_enabled` | (none) | The secret key can't be removed while the Turnstile challenge is on. |
+| `handler.settings_turnstile.site_key_changed` | (none) | The site key has changed: enter the secret key again, or remove it. |
+| `handler.settings_turnstile.secret_key_and_clear` | (none) | Send either a new secret key or clearTurnstileSecretKey, not both. |
+| `handler.settings_turnstile.site_key_too_long` | `max` (int) | The site key can't be longer than {{.max}} characters. |
+| `handler.settings_turnstile.secret_key_too_long` | `max` (int) | The secret key can't be longer than {{.max}} characters. |
 | `handler.settings_email.connect_failed_host_not_found` | (none) | Unable to connect to the SMTP server: host name not found. |
 | `handler.settings_email.connect_failed_timed_out` | (none) | Unable to connect to the SMTP server: connection timed out. |
 | `handler.settings_email.connect_failed_refused` | (none) | Unable to connect to the SMTP server: connection refused. |

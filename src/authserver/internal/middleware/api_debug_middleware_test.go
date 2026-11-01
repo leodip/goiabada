@@ -596,6 +596,9 @@ func TestDebugLog_RedactsSensitiveKeysInBodies(t *testing.T) {
 		{"passwordPolicy", true},
 		{"setPasswordType", true},
 		{"hasSmtpPassword", true},
+		{"turnstileSecretKey", true},
+		{"hasTurnstileSecretKey", true},
+		{"clearTurnstileSecretKey", true},
 		{"otpEnabled", true},
 		{"resourceOwnerPasswordCredentialsEnabled", true},
 		{"includeInIdToken", true},
@@ -613,6 +616,7 @@ func TestDebugLog_RedactsSensitiveKeysInBodies(t *testing.T) {
 		{"givenName", false},
 		{"id", false},
 		{"enabled", false},
+		{"turnstileSiteKey", false},
 	}
 
 	for _, tc := range testCases {

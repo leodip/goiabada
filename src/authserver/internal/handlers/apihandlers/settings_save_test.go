@@ -38,6 +38,7 @@ func settingsRowAsTheRequestLoadedIt(ctx context.Context, _ *sql.Tx, _ int64) (*
 	}
 	stored := *loaded
 	stored.SMTPPasswordEncrypted = bytes.Clone(loaded.SMTPPasswordEncrypted)
+	stored.TurnstileSecretKeyEncrypted = bytes.Clone(loaded.TurnstileSecretKeyEncrypted)
 	return &stored, nil
 }
 
@@ -61,7 +62,7 @@ func allowSettingsSave(database *datamocks.Database) {
 		RunAndReturn(settingsRowAsTheRequestLoadedIt).Maybe()
 }
 
-// settingsSectionSave is one of the seven settings writes, with a body its handler accepts and the
+// settingsSectionSave is one of the eight settings writes, with a body its handler accepts and the
 // columns that section owns.
 type settingsSectionSave struct {
 	name    string
@@ -151,6 +152,17 @@ func settingsSectionSaves() []settingsSectionSave {
 			},
 			owns: []string{"AuditLogsInConsoleEnabled", "AuditLogsInDatabaseEnabled", "AuditLogRetentionDays"},
 		},
+		{
+			name: "turnstile",
+			path: "/api/v1/admin/settings/turnstile",
+			body: func(*testing.T) string {
+				return `{"turnstileEnabled":true,"turnstileSiteKey":"saved-site-key","turnstileSecretKey":"saved-secret-key"}`
+			},
+			handler: func(database settingsSaveDatabase, auditLogger AuditLogger) http.Handler {
+				return HandleSettingsTurnstilePut(database, auditLogger, testDataCipher)
+			},
+			owns: []string{"TurnstileEnabled", "TurnstileSiteKey", "TurnstileSecretKeyEncrypted"},
+		},
 	}
 }
 
@@ -179,6 +191,7 @@ func settingsAsTheRequestLoadedThem() record.Settings {
 		SMTPFromName:                            "Before",
 		SMTPFromEmail:                           "before@example.test",
 		SMTPEncryption:                          "none",
+		TurnstileSiteKey:                        "before-site-key",
 		AuditLogRetentionDays:                   30,
 	}
 }
@@ -214,6 +227,9 @@ func settingsSavedMeanwhile() record.Settings {
 		SMTPFromEmail:                             "meanwhile@example.test",
 		SMTPEncryption:                            "starttls",
 		SMTPEnabled:                               true,
+		TurnstileEnabled:                          true,
+		TurnstileSiteKey:                          "meanwhile-site-key",
+		TurnstileSecretKeyEncrypted:               []byte("meanwhile-turnstile-ciphertext"),
 		DynamicClientRegistrationEnabled:          true,
 		PKCERequired:                              true,
 		ImplicitFlowEnabled:                       true,
@@ -351,6 +367,44 @@ func TestSettingsEmailPut_AKeptPasswordIsTheOneTheHostCheckRead(t *testing.T) {
 	assert.Equal(t, []byte("the-password-for-this-host"), saved.SMTPPasswordEncrypted)
 }
 
+// A kept Turnstile secret key is the one the request's site key check read, not the one the save
+// reads under its lock: a save of another site key and its secret key committed meanwhile must not
+// leave this save's site key paired with that widget's secret key (#642 decision 11).
+func TestSettingsTurnstilePut_AKeptSecretKeyIsTheOneTheSiteKeyCheckRead(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+	datamocks.ExpectRunInTransaction(database, settingsSaveTx)
+	database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, int64(1)).Return(nil).Once()
+	database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, int64(1)).
+		RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
+			stored := settingsAsTheRequestLoadedThem()
+			stored.TurnstileSiteKey = "another-widget-site-key"
+			stored.TurnstileSecretKeyEncrypted = []byte("another-widget-secret-key")
+			return &stored, nil
+		}).Once()
+	var saved record.Settings
+	database.EXPECT().UpdateSettings(mock.Anything, settingsSaveTx, mock.Anything).
+		Run(func(_ context.Context, _ *sql.Tx, settings *record.Settings) { saved = *settings }).Return(nil).Once()
+
+	loaded := settingsAsTheRequestLoadedThem()
+	loaded.TurnstileSiteKey = "this-widget-site-key"
+	loaded.TurnstileSecretKeyEncrypted = []byte("this-widget-secret-key")
+	save := settingsSectionSave{
+		name: "turnstile, keeping the secret key",
+		path: "/api/v1/admin/settings/turnstile",
+		handler: func(database settingsSaveDatabase, auditLogger AuditLogger) http.Handler {
+			return HandleSettingsTurnstilePut(database, auditLogger, testDataCipher)
+		},
+	}
+	rr := serveSectionSave(save, database, auditLogger,
+		`{"turnstileEnabled":true,"turnstileSiteKey":"this-widget-site-key"}`, loaded)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.Equal(t, "this-widget-site-key", saved.TurnstileSiteKey)
+	assert.Equal(t, []byte("this-widget-secret-key"), saved.TurnstileSecretKeyEncrypted)
+}
+
 // lockingSettingsStore is one settings row behind a row lock, as an engine holds it: taken by
 // AcquireSettingsRow and released when the transaction that took it ends.
 type lockingSettingsStore struct {
@@ -402,7 +456,7 @@ func (s *lockingSettingsStore) UpdateSettings(_ context.Context, _ *sql.Tx, sett
 // nothing but the row's lock (#407).
 func TestSettingsSectionSaves_ConcurrentSavesOfDifferentSectionsAllSurvive(t *testing.T) {
 	saves := settingsSectionSaves()
-	concurrent := []settingsSectionSave{saves[0], saves[1], saves[4], saves[5], saves[6]}
+	concurrent := []settingsSectionSave{saves[0], saves[1], saves[4], saves[5], saves[6], saves[7]}
 
 	for round := 0; round < 10; round++ {
 		store := &lockingSettingsStore{row: settingsAsTheRequestLoadedThem(), holders: map[*sql.Tx]bool{}}
@@ -435,6 +489,7 @@ func TestSettingsSectionSaves_ConcurrentSavesOfDifferentSectionsAllSurvive(t *te
 		assert.Equal(t, 3000, row.UserSessionIdleTimeoutInSeconds, "round %d: the sessions save was lost", round)
 		assert.Equal(t, 900, row.TokenExpirationInSeconds, "round %d: the tokens save was lost", round)
 		assert.Equal(t, 12, row.AuditLogRetentionDays, "round %d: the audit log save was lost", round)
+		assert.Equal(t, "saved-site-key", row.TurnstileSiteKey, "round %d: the turnstile save was lost", round)
 	}
 }
 
@@ -455,6 +510,13 @@ var settingsSectionReplaced = map[string]func(stored record.Settings) map[string
 	},
 	"ui theme": func(stored record.Settings) map[string]interface{} {
 		return map[string]interface{}{"old_ui_theme": stored.UITheme}
+	},
+	"turnstile": func(stored record.Settings) map[string]interface{} {
+		return map[string]interface{}{"old": map[string]interface{}{
+			"turnstile_enabled":        stored.TurnstileEnabled,
+			"turnstile_site_key":       stored.TurnstileSiteKey,
+			"has_turnstile_secret_key": len(stored.TurnstileSecretKeyEncrypted) > 0,
+		}}
 	},
 }
 
