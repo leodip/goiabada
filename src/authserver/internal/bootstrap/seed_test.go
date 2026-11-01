@@ -140,6 +140,8 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	require.NotNil(t, client)
 	assert.True(t, client.AdministrativeScopesAllowed,
 		"the admin console's client is seeded allowed to request the administrative scopes, so what the API answers agrees with what the server does (#499)")
+	assert.True(t, client.RememberConsent,
+		"the admin console's client is confidential, and a confidential client is seeded remembering consent, as migration 000080 sets it on an upgraded installation (#711)")
 	secret, err := testDataCipher.Decrypt(client.ClientSecretEncrypted)
 	require.NoError(t, err)
 

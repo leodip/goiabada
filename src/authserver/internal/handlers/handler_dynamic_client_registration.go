@@ -136,12 +136,17 @@ func HandleDynamicClientRegistrationPost(
 			// requires all of its metadata be treated as self-asserted. Consent is the only
 			// control that binds such a client's identity to the user's authority, so it is on
 			// by default: RFC 6749 section 10.2 says the server SHOULD engage the resource owner
-			// to identify a client it cannot authenticate, and SHOULD NOT process repeated
-			// authorization requests without active resource owner interaction. An administrator
-			// who has reviewed a specific client can untick it on the client settings page.
-			// Turning this back off by default makes every self-registered client silently
-			// grantable for any scope the user holds (#108).
+			// to identify a client it cannot authenticate. An administrator who has reviewed a
+			// specific client can untick it on the client settings page. Turning this back off
+			// by default makes every self-registered client silently grantable for any scope the
+			// user holds (#108).
 			ConsentRequired: true,
+			// The same section says the server SHOULD NOT process repeated authorization requests
+			// without active resource owner interaction for a client it cannot authenticate, so
+			// a public registration also stores Remember consent off: a user's earlier approval
+			// does not skip the consent screen for it (RFC 8252 section 8.6). A confidential one
+			// authenticates and stores it on, as every confidential client does (#711).
+			RememberConsent: !isPublic,
 			// Set here and nowhere else. Nothing on the update path can change it, deliberately:
 			// it is a fact about where the client came from, not a trust setting (#108).
 			CreatedViaDCR:            true,

@@ -244,6 +244,9 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		// upgraded installation. The server allows this client whatever the row says, so this is
 		// what keeps the API's answer and the console's switch agreeing with it (#499).
 		AdministrativeScopesAllowed: true,
+		// A confidential client always remembers consent, and its row says so, as migration
+		// 000080 sets it on an upgraded installation (#711 decision 4).
+		RememberConsent: true,
 	}
 	if err := r.db.CreateClient(ctx, tx, client); err != nil {
 		return err

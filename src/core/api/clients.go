@@ -55,6 +55,10 @@ type ClientResponse struct {
 	DisplayName       string `json:"displayName"`
 	Enabled           bool   `json:"enabled"`
 	ConsentRequired   bool   `json:"consentRequired"`
+	// RememberConsent is whether a user's earlier approval may skip the consent screen for this
+	// client, as stored. It is always true for a confidential client, which every writer keeps on;
+	// a public client starts with it off (#711 decisions 4 and 6).
+	RememberConsent bool `json:"rememberConsent"`
 	// CreatedViaDCR is read-only on purpose. It records that the client registered itself through
 	// /connect/register, which is a fact about where the client came from rather than a setting, so
 	// UpdateClientSettingsRequest deliberately does not carry it and neither an administrator nor the

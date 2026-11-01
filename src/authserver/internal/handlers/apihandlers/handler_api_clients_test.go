@@ -243,6 +243,8 @@ func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
 	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
 	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
 	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*record.RefreshToken{}, nil).Once()
@@ -317,6 +319,8 @@ func TestHandleClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothin
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
 	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
 	stubClientResponseLoads(database)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
@@ -352,6 +356,8 @@ func TestHandleClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicIn
 	var written record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { written = *args.Get(2).(*record.Client) }).Return(nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
 	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
 	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*record.RefreshToken{}, nil).Once()
@@ -369,6 +375,95 @@ func TestHandleClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicIn
 	assert.False(t, written.ClientCredentialsEnabled, "a public client was written with client credentials enabled")
 	require.NotNil(t, written.PKCERequired, "a public client was written with PKCE inherited rather than required")
 	assert.True(t, *written.PKCERequired, "a public client was written with PKCE optional")
+}
+
+// answeredRememberConsent reads rememberConsent off a client endpoint's JSON answer, failing when
+// the key is missing: every client response carries it (#711 decision 6).
+func answeredRememberConsent(t *testing.T, rr *httptest.ResponseRecorder) bool {
+	t.Helper()
+	var decoded struct {
+		Client map[string]any `json:"client"`
+	}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &decoded))
+	value, ok := decoded.Client["rememberConsent"]
+	require.True(t, ok, "the client response must carry rememberConsent")
+	remember, ok := value.(bool)
+	require.True(t, ok, "rememberConsent must be a boolean")
+	return remember
+}
+
+// TestUpdateClientNotOwningAuthenticationMode_AnswersRememberConsentFromTheRow is #711 decision 5's
+// race on the saves that do not own Remember consent. The save loaded the client while it was
+// confidential, so its copy says on; by the write the row is public with Remember consent off. The
+// whole-row write leaves the column out, and the copy the endpoint answers with must say what the
+// row holds, not the on it loaded.
+func TestUpdateClientNotOwningAuthenticationMode_AnswersRememberConsentFromTheRow(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: true, RememberConsent: false}, nil).Once()
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+
+	stale := &record.Client{Id: 7, IsPublic: false, RememberConsent: true}
+	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale))
+
+	assert.False(t, stale.RememberConsent,
+		"a save loaded while the client was confidential must not answer Remember consent on for a public client")
+}
+
+// TestHandleClientAuthenticationPut_SwitchToConfidentialTurnsRememberConsentOn: a confidential
+// client always remembers consent, so the switch writes it on, in the transaction that writes the
+// mode, and answers on (#711 decision 4). One transaction, so a switch to public cannot land
+// between the two writes and leave a public client with Remember consent on.
+func TestHandleClientAuthenticationPut_SwitchToConfidentialTurnsRememberConsentOn(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: true, RememberConsent: false}, nil).Once()
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), true).Return(nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleClientAuthenticationPut(database, auditLogger, testDataCipher)
+	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{
+		IsPublic: false, ClientSecret: strings.Repeat("Ab3", 20),
+	}))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.True(t, answeredRememberConsent(t, rr))
+}
+
+// TestHandleClientAuthenticationPut_SwitchToPublicAnswersRememberConsentFromTheRow: the switch's
+// answer is the row's Remember consent as the write left it, never the copy loaded at the top of
+// the request. Here the copy was confidential, so it says on, while another save made the client
+// public first: this save performs no transition and the row holds off (#711 decision 5).
+func TestHandleClientAuthenticationPut_SwitchToPublicAnswersRememberConsentFromTheRow(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"), RememberConsent: true}, nil).Once()
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: true, RememberConsent: false}, nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleClientAuthenticationPut(database, auditLogger, testDataCipher)
+	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.False(t, answeredRememberConsent(t, rr))
 }
 
 // assertNotAttemptedOnClientDatabase fails naming the method, where the strict mock alone would
