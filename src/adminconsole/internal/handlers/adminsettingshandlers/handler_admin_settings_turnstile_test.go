@@ -244,7 +244,7 @@ func TestHandleTurnstilePost_ARefusedSaveIsRedrawnWithTheRefusalAtItsField(t *te
 		{
 			name:    "the challenge turned on while Cloudflare cannot be reached",
 			code:    "handler.settings_turnstile.secret_key_unchecked",
-			message: "Cloudflare couldn't be reached to check the secret key. Try again in a moment.",
+			message: "The secret key couldn't be checked with Cloudflare. Try again in a moment.",
 			edit: func(f url.Values) {
 				f.Del("turnstileSecretKey")
 				f.Set("savedTurnstileEnabled", "")

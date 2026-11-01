@@ -347,7 +347,7 @@ cause, each a whole sentence.
 | `handler.settings_turnstile.site_key_too_long` | `max` (int) | The site key can't be longer than {{.max}} characters. |
 | `handler.settings_turnstile.secret_key_too_long` | `max` (int) | The secret key can't be longer than {{.max}} characters. |
 | `handler.settings_turnstile.secret_key_rejected` | (none) | Cloudflare doesn't accept the secret key. Copy it again from the widget in the Cloudflare dashboard. |
-| `handler.settings_turnstile.secret_key_unchecked` | (none) | Cloudflare couldn't be reached to check the secret key. Try again in a moment. |
+| `handler.settings_turnstile.secret_key_unchecked` | (none) | The secret key couldn't be checked with Cloudflare. Try again in a moment. |
 | `handler.settings_email.connect_failed_host_not_found` | (none) | Unable to connect to the SMTP server: host name not found. |
 | `handler.settings_email.connect_failed_timed_out` | (none) | Unable to connect to the SMTP server: connection timed out. |
 | `handler.settings_email.connect_failed_refused` | (none) | Unable to connect to the SMTP server: connection refused. |

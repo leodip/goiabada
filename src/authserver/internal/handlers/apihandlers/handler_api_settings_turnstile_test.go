@@ -555,7 +555,7 @@ func TestHandleSettingsTurnstilePut_ASecretKeyCloudflareDoesNotAcceptRefusesTheS
 		{turnstile.SecretKeyRejected, "handler.settings_turnstile.secret_key_rejected",
 			"Cloudflare doesn't accept the secret key. Copy it again from the widget in the Cloudflare dashboard."},
 		{turnstile.SecretKeyUnchecked, "handler.settings_turnstile.secret_key_unchecked",
-			"Cloudflare couldn't be reached to check the secret key. Try again in a moment."},
+			"The secret key couldn't be checked with Cloudflare. Try again in a moment."},
 	}
 	saves := []struct {
 		name          string

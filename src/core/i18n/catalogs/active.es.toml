@@ -2006,7 +2006,7 @@
 "handler.settings_turnstile.site_key_too_long" = "La clave del sitio no puede superar los {{.max}} caracteres."
 "handler.settings_turnstile.secret_key_too_long" = "La clave secreta no puede superar los {{.max}} caracteres."
 "handler.settings_turnstile.secret_key_rejected" = "Cloudflare no acepta la clave secreta. Vuelve a copiarla del widget en el panel de Cloudflare."
-"handler.settings_turnstile.secret_key_unchecked" = "No se pudo contactar con Cloudflare para comprobar la clave secreta. Inténtalo de nuevo en un momento."
+"handler.settings_turnstile.secret_key_unchecked" = "No se pudo comprobar la clave secreta con Cloudflare. Inténtalo de nuevo en un momento."
 
 "handler.settings_email.connect_failed_host_not_found" = "No se pudo conectar con el servidor SMTP: no se encontró el nombre de host."
 "handler.settings_email.connect_failed_timed_out" = "No se pudo conectar con el servidor SMTP: se agotó el tiempo de conexión."

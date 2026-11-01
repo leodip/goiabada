@@ -2005,7 +2005,7 @@
 "handler.settings_turnstile.site_key_too_long" = "Der Websiteschlüssel darf höchstens {{.max}} Zeichen lang sein."
 "handler.settings_turnstile.secret_key_too_long" = "Der geheime Schlüssel darf höchstens {{.max}} Zeichen lang sein."
 "handler.settings_turnstile.secret_key_rejected" = "Cloudflare akzeptiert den geheimen Schlüssel nicht. Kopieren Sie ihn erneut aus dem Widget im Cloudflare-Dashboard."
-"handler.settings_turnstile.secret_key_unchecked" = "Cloudflare war nicht erreichbar, um den geheimen Schlüssel zu prüfen. Versuchen Sie es gleich noch einmal."
+"handler.settings_turnstile.secret_key_unchecked" = "Der geheime Schlüssel konnte nicht bei Cloudflare geprüft werden. Versuchen Sie es gleich noch einmal."
 
 "handler.settings_email.connect_failed_host_not_found" = "Verbindung zum SMTP-Server nicht möglich: Hostname nicht gefunden."
 "handler.settings_email.connect_failed_timed_out" = "Verbindung zum SMTP-Server nicht möglich: Zeitüberschreitung."
