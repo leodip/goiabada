@@ -198,6 +198,8 @@ test("forgot-password: with the challenge off, the form loads nothing from Cloud
 // At 320 CSS pixels, the width WCAG 2.2's reflow criterion names, each form with the widget drawn
 // fits the screen: the page does not scroll sideways, and the widget's box and what it draws stay
 // inside it. Cloudflare's normal size, 300 pixels wide, reached 17 pixels past the screen there.
+// The space the page holds for the widget before its script has run is as tall as what it draws,
+// so the button below does not move when the widget appears.
 test("each form fits a 320-pixel screen with the widget drawn", async ({ page, browser, clients }) => {
   const { client } = await browserSignInClient(page, clients);
   await withSettingsRestored(page, general, async () => {
@@ -231,12 +233,15 @@ test("each form fits a 320-pixel screen with the widget drawn", async ({ page, b
           right: box.right,
           overflow: element.scrollWidth - element.clientWidth,
           screen: document.documentElement.clientWidth,
+          drawnHeight: box.height,
+          reservedHeight: parseFloat(getComputedStyle(element).minHeight),
         };
       });
       expect(layout.sidewaysScroll, `${form.action}: the page scrolls sideways`).toBeLessThanOrEqual(0);
       expect(layout.left, `${form.action}: the widget's left edge`).toBeGreaterThanOrEqual(-1);
       expect(layout.right, `${form.action}: the widget's right edge`).toBeLessThanOrEqual(layout.screen + 1);
       expect(layout.overflow, `${form.action}: what the widget draws reaches past its box`).toBeLessThanOrEqual(1);
+      expect(layout.drawnHeight, `${form.action}: the widget is taller than the space held for it`).toBeLessThanOrEqual(layout.reservedHeight + 1);
       await context.close();
     }
   });
