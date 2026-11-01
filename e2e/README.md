@@ -150,7 +150,9 @@ suite run again and again without a reset:
   guards around the system resource and documents for all apps. They are named `*.system.ts` and
   run in the `system` project, which `playwright.config.ts` runs after every other test, on one
   worker. Each puts back what it changes (`lib/settings.ts`), and retires what it published; the
-  setup step restores the seeded settings before a run if one failed to.
+  setup step restores the seeded settings before a run if one failed to. It cannot do so for the
+  Turnstile challenge, which would refuse its sign-in, so `test.sh` and `test-rate-limits.sh` turn
+  the challenge off on the VPS first, with the auth server's `recover --disable-turnstile`.
 - **It never depends on what another test did**, or on counts or order.
 - **Users other than the administrator sign in through the browser** where the subject needs it
   (`lib/console-user.ts`, `lib/browser-sign-in.ts`), always from an empty browser state: inside a test,
