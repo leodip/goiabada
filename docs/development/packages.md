@@ -88,9 +88,12 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   and `expvar` into both servers (#462). Each application's own middleware - session, JWT, rate
   limiting - is in its `internal/middleware`
 - `i18n/` - The internationalization layer: the embedded message catalogs and the runtime overrides
-  that win over them, the `Locale` middleware early in every request chain, `WithLocale` as the one
-  locale-setting primitive with a non-explicit call deferring to explicit intent already on the
-  context, and the error-code vocabulary in `error_codes.md`. The six template helpers only the
+  that win over them, the `Locale` middleware early in every request chain, the three locale setters
+  (`WithLocale` for a locale the request asks for, a non-explicit call deferring to explicit intent
+  already on the context; `WithPageLanguage` for a user's page language, which wins over it, and
+  whose Automatic gives the request's language back; `WithRecipientLanguage` for an email to a
+  user), the loaded catalogs a page language can name (`CatalogTags`, `IsCatalogTag`), and the
+  error-code vocabulary in `error_codes.md`. The six template helpers only the
   admin console renders with, the locale picker's label, the country, phone-country and timezone
   labels and the two date formatters, are that console's, unexported in its `internal/render`: they
   read nothing here but `T` and `CatalogTag`, and here they put CLDR's display tables into the auth
@@ -299,8 +302,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `RunInTransaction` reruns the one the engine rolls back (#301), and the audit events after the
   commit naming the command under `command`. The command in `cmd/goiabada-authserver` parses,
   refuses a schema other than its head, and prints; the data tier runs `Run` on every engine (#498)
-- `internal/reqctx/` - The five request-scoped values (settings, session identifier, bearer token,
-  validated token, and the credential reservation a failures-only rate-limit tier holds), each
+- `internal/reqctx/` - The six request-scoped values (settings, session identifier and that
+  session's user, bearer token, validated token, and the credential reservation a failures-only rate-limit tier holds), each
   written by one middleware and read through a typed accessor; services take theirs as parameters,
   and the context-value guard holds every module file to them with no exemption (#433, #439)
 - `internal/otpcredential/` - The stored TOTP credential: establish, remove, verify a stored or a

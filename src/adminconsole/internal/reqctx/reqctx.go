@@ -41,7 +41,7 @@ func WithJwtInfo(ctx context.Context, jwtInfo oauthclient.JwtInfo) context.Conte
 }
 
 // JwtInfoFrom answers false when the browser holds no signed-in session, which the scope check and
-// the locale refinement treat as an anonymous request and every other reader as ErrNoJwtInfo.
+// the page language treat as an anonymous request and every other reader as ErrNoJwtInfo.
 func JwtInfoFrom(ctx context.Context) (oauthclient.JwtInfo, bool) {
 	jwtInfo, ok := ctx.Value(jwtInfoKey).(oauthclient.JwtInfo)
 	return jwtInfo, ok

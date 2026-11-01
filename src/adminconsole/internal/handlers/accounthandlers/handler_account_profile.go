@@ -6,6 +6,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/locales"
@@ -18,6 +19,20 @@ import (
 type accountProfileAPI interface {
 	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
 	UpdateAccountProfile(ctx context.Context, accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
+}
+
+// copyPageLanguage writes the profile's page language into the session's copy, which every signed-in
+// console page is drawn from (#631 decision 7), and reports whether the copy changed, so a page that
+// changed nothing else saves no session for it; a session with no copy is on Automatic already. The
+// profile page refreshes the copy each time it fetches the profile, which is how a choice made
+// elsewhere, by another administrator or in another browser, reaches this session before its next
+// sign-in, and its save writes the choice the API stored.
+func copyPageLanguage(sess *sessionstore.Session, pageLanguage string) bool {
+	if copied, _ := sess.Values[sessionkeys.PageLanguage].(string); copied == pageLanguage {
+		return false
+	}
+	sess.Values[sessionkeys.PageLanguage] = pageLanguage
+	return true
 }
 
 func HandleProfileGet(
@@ -51,7 +66,8 @@ func HandleProfileGet(
 		}
 
 		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
-		if savedSuccessfully {
+		copied := copyPageLanguage(sess, user.PageLanguage)
+		if savedSuccessfully || copied {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -63,6 +79,8 @@ func HandleProfileGet(
 			"user":              user,
 			"timezones":         timezones,
 			"locales":           locales,
+			"pageLanguages":     render.PageLanguageOptions(),
+			"pageLanguage":      render.SelectedPageLanguage(user.PageLanguage),
 			"savedSuccessfully": savedSuccessfully,
 		}
 
@@ -119,6 +137,8 @@ func HandleProfilePost(
 					"submittedDateOfBirth": render.SubmittedDateOfBirth(r),
 					"timezones":            timezones,
 					"locales":              locales,
+					"pageLanguages":        render.PageLanguageOptions(),
+					"pageLanguage":         render.SelectedPageLanguage(user.PageLanguage),
 					"error":                errorMessage,
 					"errorField":           render.ErrorField(err, render.ProfileErrorFields),
 				}
@@ -137,13 +157,12 @@ func HandleProfilePost(
 			return
 		}
 		sess.SetFlash("savedSuccessfully", "true")
+		copyPageLanguage(sess, updatedUser.PageLanguage)
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-
-		_ = updatedUser // we don't need it here besides success confirmation
 
 		http.Redirect(w, r, baseURL+"/account/profile", http.StatusFound)
 	}

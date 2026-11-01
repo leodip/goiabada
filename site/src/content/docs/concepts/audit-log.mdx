@@ -291,7 +291,7 @@ These come from the Account API, which users reach through the admin console's a
 
 | Event | Meaning |
 |---|---|
-| `updated_own_profile` | A user saved their own profile: names, nickname, username, website, gender, birth date, time zone or locale. |
+| `updated_own_profile` | A user saved their own profile: names, nickname, username, website, gender, birth date, time zone, locale or page language. |
 | `updated_own_email` | A user changed their own email address, after confirming their password. The new address starts unverified. |
 | `sent_email_verification_message` | A user asked for an email verification code, and it was sent to their address. |
 | `verified_email` | A user verified their email address with the code they were sent, or by setting their password through a link sent to it, such as the one an administrator emails a new user. |
@@ -312,7 +312,7 @@ These come from the Account API, which users reach through the admin console's a
 |---|---|
 | `created_user` | A user was created: by an administrator, by someone registering, or by someone activating their registration. |
 | `updated_user_details` | An administrator enabled or disabled a user. |
-| `updated_user_profile` | An administrator changed a user's profile: username, names, nickname, website, gender, birth date, time zone or locale. |
+| `updated_user_profile` | An administrator changed a user's profile: username, names, nickname, website, gender, birth date, time zone, locale or page language. |
 | `updated_user_email` | An administrator changed a user's email address, or whether it's verified. |
 | `generated_email_verification_code` | An administrator generated an email verification code for a user. It was returned to the administrator, not emailed. |
 | `updated_user_phone` | An administrator changed or cleared a user's phone number. |

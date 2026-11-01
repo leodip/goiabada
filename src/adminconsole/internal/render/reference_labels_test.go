@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// localeCtx sets the locale the way a request does, through the one
-// locale-setting primitive core/i18n exports, so the assertions below read the
+// localeCtx sets the locale the way a request does, through the locale setter
+// core/i18n exports for a request's own preferences, so the assertions below read the
 // real embedded catalogs and the real tag rather than a stub. The tags are a
 // preference order, as a request's Accept-Language or ui_locales is.
 func localeCtx(tags ...string) context.Context {

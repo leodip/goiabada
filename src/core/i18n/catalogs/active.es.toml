@@ -489,6 +489,9 @@
 "adminconsole.account.profile.field.locale" = "Idioma y región"
 "adminconsole.account.profile.locale_tooltip" = "Las aplicaciones lo usan para elegir tu idioma y el formato de las fechas y los números."
 "adminconsole.account.profile.locale_blank" = "Sin especificar"
+"adminconsole.account.profile.field.page_language" = "Idioma de las páginas"
+"adminconsole.account.profile.page_language_automatic" = "Automático"
+"adminconsole.account.profile.page_language_tooltip" = "El idioma de estas páginas, de las páginas de inicio de sesión una vez que has escrito tu contraseña y de los correos que se te envían. Automático usa el idioma que pide la aplicación o tu navegador y, para los correos, tu idioma y región."
 "adminconsole.account.profile.saved_successfully" = "Perfil guardado."
 "adminconsole.account.profile.update_button" = "Guardar"
 
@@ -1036,6 +1039,9 @@
 "adminconsole.admin_users.profile.field.locale" = "Idioma y región"
 "adminconsole.admin_users.profile.locale_tooltip" = "El idioma y la región del usuario, que los clientes reciben en el claim locale."
 "adminconsole.admin_users.profile.locale_blank" = "Sin especificar"
+"adminconsole.admin_users.profile.field.page_language" = "Idioma de las páginas"
+"adminconsole.admin_users.profile.page_language_automatic" = "Automático"
+"adminconsole.admin_users.profile.page_language_tooltip" = "El idioma de la consola, de las páginas de inicio de sesión una vez que el usuario ha escrito su contraseña y de los correos que se le envían. Automático usa el idioma que pide el cliente o el navegador y, para los correos, el idioma y la región."
 "adminconsole.admin_users.profile.saved_successfully" = "Perfil guardado."
 
 "adminconsole.admin_users.email.field.email" = "Correo electrónico"
@@ -1866,6 +1872,7 @@
 "validator.profile.dob_in_future" = "La fecha de nacimiento no puede estar en el futuro."
 "validator.profile.zone_info_invalid" = "La zona horaria es desconocida."
 "validator.profile.locale_invalid" = "El idioma y la región son desconocidos."
+"validator.profile.page_language_invalid" = "Elige un idioma de la lista."
 
 # --- Image validator (LocalizedError-backed) ---------------------------------
 

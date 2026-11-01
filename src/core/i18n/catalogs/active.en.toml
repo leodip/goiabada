@@ -484,6 +484,9 @@
 "adminconsole.account.profile.field.locale" = "Language and region"
 "adminconsole.account.profile.locale_tooltip" = "Applications use it for your language, and for how they write dates and numbers."
 "adminconsole.account.profile.locale_blank" = "Not set"
+"adminconsole.account.profile.field.page_language" = "Page language"
+"adminconsole.account.profile.page_language_automatic" = "Automatic"
+"adminconsole.account.profile.page_language_tooltip" = "The language of these pages, of the sign-in pages once you have entered your password, and of the emails sent to you. Automatic uses the language the application or your browser asks for, and your language and region for emails."
 "adminconsole.account.profile.saved_successfully" = "Profile saved."
 "adminconsole.account.profile.update_button" = "Save"
 
@@ -1031,6 +1034,9 @@
 "adminconsole.admin_users.profile.field.locale" = "Language and region"
 "adminconsole.admin_users.profile.locale_tooltip" = "The user's language and region, which clients receive in the locale claim."
 "adminconsole.admin_users.profile.locale_blank" = "Not set"
+"adminconsole.admin_users.profile.field.page_language" = "Page language"
+"adminconsole.admin_users.profile.page_language_automatic" = "Automatic"
+"adminconsole.admin_users.profile.page_language_tooltip" = "The language of the console, of the sign-in pages once the user has entered their password, and of the emails sent to the user. Automatic uses the language the client or the browser asks for, and the language and region for emails."
 "adminconsole.admin_users.profile.saved_successfully" = "Profile saved."
 
 "adminconsole.admin_users.email.field.email" = "Email"
@@ -1861,6 +1867,7 @@
 "validator.profile.dob_in_future" = "The date of birth can't be in the future."
 "validator.profile.zone_info_invalid" = "Unknown time zone."
 "validator.profile.locale_invalid" = "Unknown language and region."
+"validator.profile.page_language_invalid" = "Choose a language from the list."
 
 # --- Image validator (LocalizedError-backed) ---------------------------------
 

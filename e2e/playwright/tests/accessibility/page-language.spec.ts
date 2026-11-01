@@ -4,7 +4,7 @@
 // a pt-BR page, marked pt-BR, not nl. The console's country names follow the page too, so an English
 // page asked for in Swedish names Germany in English.
 import { userUrl } from "../../lib/admin-console";
-import { openSignIn } from "../../lib/browser-sign-in";
+import { openSignIn, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { browserSignInClient } from "../../lib/test-clients";
@@ -47,4 +47,41 @@ test("the phone country list on an English page asked for in Swedish names Germa
   const countries = page.locator('select[name="phoneCountryUniqueId"] option');
   await expect(countries.filter({ hasText: "Germany (+49)" })).toHaveCount(1);
   await expect(countries.filter({ hasText: "Deutschland" })).toHaveCount(0);
+});
+
+// A user's page language, set here by an administrator on their Profile page, is the language of
+// every auth server page drawn once the user is known, over the client's ui_locales and the
+// browser's English; the password page, before the user is known, keeps the client's (#631).
+test("a user whose page language is pt-BR signs in through a client asking for Spanish", async ({ page, browser, clients, users }) => {
+  const { client } = await browserSignInClient(page, clients, { consentRequired: true });
+  const user = await users.create();
+  await page.goto(userUrl(user.id, "profile"));
+  await page.getByLabel("Page language", { exact: true }).selectOption("pt-BR");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Profile saved.", { exact: true })).toBeVisible();
+
+  const signIn = await openSignIn(browser, { clientId: client.identifier, scope: "openid", params: { ui_locales: "es" } });
+  const own = signIn.page;
+  await own.setExtraHTTPHeaders({ "Accept-Language": "en-US" });
+  const html = own.locator("html");
+  await expect(own).toHaveURL(/\/auth\/pwd/);
+  await expect(html).toHaveAttribute("lang", "es");
+  await expect(own.getByRole("heading", { level: 1 })).toHaveText("Iniciar sesión");
+  await own.locator("#email").fill(user.email);
+  await own.locator("#password").fill(user.password);
+  await own.getByRole("button", { name: "Iniciar sesión", exact: true }).click();
+
+  await expect(own).toHaveURL(/\/auth\/consent/);
+  await expect(html).toHaveAttribute("lang", "pt-BR");
+  await expect(own.getByRole("heading", { level: 1 })).toHaveText("Permitir acesso");
+  await own.getByRole("button", { name: "Permitir", exact: true }).click();
+  await own.waitForURL((url) => url.href.startsWith(testRedirectUri));
+
+  await own.goto(`${env.authUrl}/auth/logout?ui_locales=es`);
+  await expect(html).toHaveAttribute("lang", "pt-BR");
+  await expect(own.getByRole("heading", { level: 1 })).toHaveText("Sair");
+  await own.getByRole("button", { name: "Sair", exact: true }).click();
+  await expect(html).toHaveAttribute("lang", "pt-BR");
+  await expect(own.getByRole("heading", { level: 1 })).toHaveText("Sessão encerrada");
+  await signIn.context.close();
 });

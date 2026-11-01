@@ -72,6 +72,42 @@ test("the user picks a time zone and a language by searching their lists, and th
   await expect(page.locator('select[name="locale"]')).toHaveValue("en-GB");
 });
 
+// The Page language is the language Goiabada's own pages use for the user, chosen in My Account's
+// Profile form. The next page is marked and written in it, over a ui_locales in the address and the
+// browser's English; Automatic gives the request's language back, the address's and then the
+// browser's (#631).
+test("the user chooses a page language, which wins over ui_locales, and Automatic gives the request's language back", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user);
+  const html = own.page.locator("html");
+  const phoneHint = (text: string) => own.page.getByText(text, { exact: true });
+  await expect(own.page.getByText("The language of these pages, of the sign-in pages once you have entered your password, and of the emails sent to you. Automatic uses the language the application or your browser asks for, and your language and region for emails.", { exact: true })).toBeVisible();
+  const pageLanguage = own.page.getByLabel("Page language", { exact: true });
+  await expect(pageLanguage).toHaveValue("");
+  await expect(pageLanguage.locator("option").first()).toHaveText("Automatic");
+  await pageLanguage.selectOption("pt-BR");
+  await own.page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(own.page.getByText("Perfil salvo.", { exact: true })).toBeVisible();
+  await expect(html).toHaveAttribute("lang", "pt-BR");
+  await expect(own.page.getByLabel("Idioma das páginas", { exact: true })).toHaveValue("pt-BR");
+
+  await own.page.goto(`${env.adminUrl}/account/phone?ui_locales=es`);
+  await expect(html).toHaveAttribute("lang", "pt-BR");
+  await expect(phoneHint("Digite o número como é discado de outro país, depois do código do país.")).toBeVisible();
+
+  await own.page.goto(`${env.adminUrl}/account/profile`);
+  await own.page.getByLabel("Idioma das páginas", { exact: true }).selectOption("");
+  await own.page.getByRole("button", { name: "Salvar", exact: true }).click();
+  await expect(own.page.getByText("Profile saved.", { exact: true })).toBeVisible();
+  await expect(html).toHaveAttribute("lang", "en");
+  await expect(pageLanguage).toHaveValue("");
+
+  await own.page.goto(`${env.adminUrl}/account/phone?ui_locales=es`);
+  await expect(html).toHaveAttribute("lang", "es");
+  await expect(phoneHint("Escribe el número tal como se marca desde otro país, sin el prefijo de país.")).toBeVisible();
+  await own.context.close();
+});
+
 // The console's own sentence for the auth server's 429, as password-and-otp.spec.ts reads it.
 const tooManyAttempts = "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again.";
 

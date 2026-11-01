@@ -167,6 +167,7 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 		ZoneInfoCountryName:           "Brazil",
 		ZoneInfo:                      "America/Sao_Paulo",
 		Locale:                        "pt-BR",
+		PageLanguage:                  "fr",
 		BirthDate:                     sql.NullTime{Time: birthDate, Valid: true},
 		PhoneNumberCountryUniqueId:    "BRA_0",
 		PhoneNumberCountryCallingCode: "55",
@@ -203,6 +204,7 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 	assert.Equal(t, "Brazil", resp.ZoneInfoCountryName)
 	assert.Equal(t, "America/Sao_Paulo", resp.ZoneInfo)
 	assert.Equal(t, "pt-BR", resp.Locale)
+	assert.Equal(t, "fr", resp.PageLanguage)
 	assert.Equal(t, &birthDate, resp.BirthDate)
 	assert.Equal(t, "BRA_0", resp.PhoneNumberCountryUniqueId)
 	assert.Equal(t, "55", resp.PhoneNumberCountryCallingCode)

@@ -19,7 +19,7 @@ import (
 // and the narrow write of its profile columns.
 type accountProfileDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool) error
 }
 
 // HandleAccountProfileGet - GET /api/v1/account/profile
@@ -90,6 +90,7 @@ func HandleAccountProfilePut(
 			ZoneInfoCountryName: req.ZoneInfoCountryName,
 			ZoneInfo:            req.ZoneInfo,
 			Locale:              req.Locale,
+			PageLanguage:        req.PageLanguage,
 			Subject:             user.Subject,
 		}
 
@@ -126,10 +127,16 @@ func HandleAccountProfilePut(
 		user.ZoneInfoCountryName = input.ZoneInfoCountryName
 		user.ZoneInfo = input.ZoneInfo
 		user.Locale = input.Locale
+		// Left out, the page language is not written: the column keeps what the row holds when the
+		// save runs, so an application that does not know the field neither resets the user to
+		// Automatic nor undoes a choice saved since the read above (#631 decision 8).
+		if input.PageLanguage != nil {
+			user.PageLanguage = *input.PageLanguage
+		}
 
 		// Only the profile columns: writing back the row read above would undo a disable, a
 		// password change or an OTP change made since (#471).
-		if err := database.SetUserProfile(r.Context(), nil, user); err != nil {
+		if err := database.SetUserProfile(r.Context(), nil, user, input.PageLanguage != nil); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

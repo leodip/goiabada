@@ -174,14 +174,16 @@ type Database interface {
 	// update, so a concurrent admin disable cannot be undone by it (#106).
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 	// SetUserProfile writes the user's eleven profile columns (username, the four names,
-	// website, gender, birth date, the zone's country and zone, and locale) from user, and
-	// updated_at, and no other column; it sets user.UpdatedAt to what it stored. SetUserAddress
+	// website, gender, birth date, the zone's country and zone, and locale) from user, the page
+	// language too when withPageLanguage is set, and updated_at, and no other column; it sets
+	// user.UpdatedAt to what it stored. A save whose request left the optional page language
+	// out passes false, so the column keeps what the row holds then (#631 decision 8). SetUserAddress
 	// does the same for the six address columns, and SetUserPhone for the phone's country,
 	// calling code, number and verified flag. Each is an unconditional write shared by the
 	// self-service and the administrator's save of its group, so the last save of a group wins;
 	// narrow rather than a full-row update of the user the request read, so neither save can
 	// undo a concurrent disable, password change or OTP change (#471).
-	SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error
+	SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool) error
 	SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.User) error
 	SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.User) error
 	// TrySetUserEmail moves a user's address from fromEmail to toEmail, clears the verified

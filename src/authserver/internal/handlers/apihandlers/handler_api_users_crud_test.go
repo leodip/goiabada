@@ -24,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -416,6 +417,9 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+	// The administrator's console asks in Portuguese; the setup email goes to the new user, who has
+	// chosen no page language and has no Language and region, so it is in English (#631).
+	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: true, SMTPHost: "smtp.example.com", SMTPFromName: "Acme"}))
 
 	createdUser := &record.User{Id: 7, Email: "newuser@example.com"}
@@ -433,8 +437,10 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
 		}).Return(&bytes.Buffer{}, nil)
 	// The relay is the request's settings (#433).
+	var sent *emaildelivery.SendEmailInput
 	emailSender.On("SendEmail", mock.Anything,
-		emaildelivery.SMTPConfig{Host: "smtp.example.com", FromName: "Acme"}, mock.Anything).Return(nil)
+		emaildelivery.SMTPConfig{Host: "smtp.example.com", FromName: "Acme"}, mock.Anything).
+		Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).Return(nil)
 
 	before := time.Now().UTC()
 	rr := httptest.NewRecorder()
@@ -462,6 +468,8 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	// decision 5).
 	assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode), emailedLink,
 		"the emailed link must be the shared builder's output for the code that was issued")
+	require.NotNil(t, sent)
+	assert.Equal(t, "TestApp - create a password for your new account", sent.Subject)
 
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 	pageRenderer.AssertExpectations(t)

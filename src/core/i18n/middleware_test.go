@@ -403,9 +403,9 @@ func TestResolveRequestLocale_LeavesTheRequestUntouched(t *testing.T) {
 
 func TestLocaleTag_FromContext(t *testing.T) {
 	assert.Equal(t, "en", LocaleTag(context.Background()))
-	ctx := attachLocale(context.Background(), nil, "pt-BR", false)
+	ctx := attachLocale(context.Background(), nil, "pt-BR", false, false)
 	assert.Equal(t, "pt-BR", LocaleTag(ctx))
-	ctx2 := attachLocale(context.Background(), nil, "en-US,en;q=0.9", false)
+	ctx2 := attachLocale(context.Background(), nil, "en-US,en;q=0.9", false, false)
 	// primaryTag splits on comma/semicolon.
 	assert.Equal(t, "en-US", LocaleTag(ctx2))
 }

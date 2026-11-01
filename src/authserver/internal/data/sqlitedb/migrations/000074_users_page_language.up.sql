@@ -1,0 +1,15 @@
+-- The language a user chose for Goiabada's own pages and emails (#631 decision 8): the tag of one of
+-- the catalogs the auth server has loaded, built in or an operator's, or '' for Automatic, which
+-- follows the language the application or the browser asks for. It sits beside users.locale, which
+-- stays the OIDC locale claim applications receive and no longer steers any page.
+--
+-- The six questions (reference/migrations.md 6): (1) all four engines. (2) 32 wide, as locale is,
+-- and case-sensitive like every string column (#283): a tag is compared exactly with the loaded
+-- catalogs' tags. (3) Nothing looks a user up by it, so it has no index; every read and write is by
+-- users.id. (4) No uniqueness. (5) No existing row changes meaning: NOT NULL DEFAULT '' lands every
+-- existing user on Automatic, so nobody's pages change at upgrade, and no read site handles NULL.
+-- (6) Each schema.golden gains the column.
+--
+-- A stored tag whose catalog an operator has since removed counts as Automatic wherever it is read,
+-- so nothing here or in a later migration has to clear it.
+ALTER TABLE users ADD COLUMN page_language TEXT NOT NULL DEFAULT '';

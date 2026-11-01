@@ -4577,6 +4577,16 @@ components:
           type: string
         locale:
           type: string
+          description: >-
+            The user's language and region, such as `fr-CA`, which applications receive as the
+            `locale` claim, or empty when unset.
+        pageLanguage:
+          type: string
+          description: >-
+            The language the user chose for Goiabada's own pages and emails: the tag of one of
+            the auth server's language catalogs, such as `pt-BR`, or empty for Automatic, where
+            pages follow the language the application or the browser asks for and emails follow
+            `locale`. A tag whose catalog an operator has since removed counts as Automatic.
         birthDate:
           type: string
           format: date-time
@@ -4633,6 +4643,7 @@ components:
         - zoneInfoCountryName
         - zoneInfo
         - locale
+        - pageLanguage
         - birthDate
         - phoneNumberCountryUniqueId
         - phoneNumberCountryCallingCode
@@ -4868,6 +4879,17 @@ components:
           type: string
         locale:
           type: string
+          description: >-
+            The user's language and region, which applications receive as the `locale` claim: a
+            tag from Goiabada's language and region list, such as `fr-CA`, or empty to clear it
+        pageLanguage:
+          type: string
+          description: >-
+            The language of Goiabada's own pages and emails for the user. Optional: when it is
+            left out, the stored page language is kept, so a client that doesn't send it never
+            resets it. Empty sets Automatic. Any other value must be exactly the tag of one of
+            the auth server's language catalogs: `en`, `pt-BR`, `es`, `fr`, `it`, `de`, or one an
+            operator added.
 
     UpdateUserEmailRequest:
       type: object

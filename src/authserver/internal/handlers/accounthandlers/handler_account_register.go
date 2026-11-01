@@ -664,7 +664,8 @@ func issueActivationLink(
 // sendExistingAccountNotice mails a verified, enabled account that someone tried to register its
 // address: nothing was created, and the holder can sign in or reset the password from the
 // forgot-password page (#207 decisions 5 and 13). It carries no code and no credential, and is
-// rendered in the account's stored locale, falling back to English, as the reset mail is.
+// rendered in the account's page language, else its stored locale, else English, as every email to
+// a user is (i18n.WithRecipientLanguage), never in the language of the registration page.
 func sendExistingAccountNotice(
 	ctx context.Context,
 	r *http.Request,
@@ -677,7 +678,7 @@ func sendExistingAccountNotice(
 	bind := map[string]interface{}{
 		"link": baseURL + emaillinks.ForgotPasswordPath,
 	}
-	emailReq := r.WithContext(i18n.WithLocale(ctx, true, user.Locale, "en"))
+	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, user.PageLanguage, user.Locale))
 	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_existing_account.html", bind)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to render the existing account notice", "user_id", user.Id, "error", err)

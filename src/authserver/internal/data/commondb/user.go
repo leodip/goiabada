@@ -19,7 +19,7 @@ var userColumns = columnList{
 		"users.username, users.given_name, users.middle_name, users.family_name, users.nickname, " +
 		"users.website, users.gender, users.email, users.email_verified, " +
 		"users.email_verification_code_encrypted, users.email_verification_code_issued_at, " +
-		"users.zone_info_country_name, users.zone_info, users.locale, users.birth_date, " +
+		"users.zone_info_country_name, users.zone_info, users.locale, users.page_language, users.birth_date, " +
 		"users.phone_number_country_uniqueid, users.phone_number_country_callingcode, " +
 		"users.phone_number, users.phone_number_verified, users.address_line1, users.address_line2, " +
 		"users.address_locality, users.address_region, users.address_postal_code, " +
@@ -32,7 +32,7 @@ var userColumns = columnList{
 		"users.username, users.given_name, users.middle_name, users.family_name, users.nickname, " +
 		"users.website, users.gender, users.email, users.email_verified, " +
 		"users.email_verification_code_encrypted, users.email_verification_code_issued_at, " +
-		"users.zone_info_country_name, users.zone_info, users.locale, users.birth_date, " +
+		"users.zone_info_country_name, users.zone_info, users.locale, users.page_language, users.birth_date, " +
 		"users.phone_number_country_uniqueid, users.phone_number_country_callingcode, " +
 		"users.phone_number, users.phone_number_verified, users.address_line1, users.address_line2, " +
 		"users.address_locality, users.address_region, users.address_postal_code, " +
@@ -45,7 +45,7 @@ var userColumns = columnList{
 		"users.username, users.given_name, users.middle_name, users.family_name, users.nickname, " +
 		"users.website, users.gender, users.email, users.email_verified, " +
 		"users.email_verification_code_encrypted, users.email_verification_code_issued_at, " +
-		"users.zone_info_country_name, users.zone_info, users.locale, users.birth_date, " +
+		"users.zone_info_country_name, users.zone_info, users.locale, users.page_language, users.birth_date, " +
 		"users.phone_number_country_uniqueid, users.phone_number_country_callingcode, " +
 		"users.phone_number, users.phone_number_verified, users.address_line1, users.address_line2, " +
 		"users.address_locality, users.address_region, users.address_postal_code, " +
@@ -58,7 +58,7 @@ var userColumns = columnList{
 		"users.username, users.given_name, users.middle_name, users.family_name, users.nickname, " +
 		"users.website, users.gender, users.email, users.email_verified, " +
 		"users.email_verification_code_encrypted, users.email_verification_code_issued_at, " +
-		"users.zone_info_country_name, users.zone_info, users.locale, users.birth_date, " +
+		"users.zone_info_country_name, users.zone_info, users.locale, users.page_language, users.birth_date, " +
 		"users.phone_number_country_uniqueid, users.phone_number_country_callingcode, " +
 		"users.phone_number, users.phone_number_verified, users.address_line1, users.address_line2, " +
 		"users.address_locality, users.address_region, users.address_postal_code, " +
@@ -91,6 +91,7 @@ func scanUser(row rowScanner, user *record.User) error {
 		&user.ZoneInfoCountryName,
 		&user.ZoneInfo,
 		&user.Locale,
+		&user.PageLanguage,
 		&user.BirthDate,
 		&user.PhoneNumberCountryUniqueId,
 		&user.PhoneNumberCountryCallingCode,
@@ -123,7 +124,7 @@ var insertUser = statement{
 	sqlite: "INSERT INTO users (created_at, updated_at, enabled, subject, username, given_name, " +
 		"middle_name, family_name, nickname, website, gender, email, email_verified, " +
 		"email_verification_code_encrypted, email_verification_code_issued_at, " +
-		"zone_info_country_name, zone_info, locale, birth_date, phone_number_country_uniqueid, " +
+		"zone_info_country_name, zone_info, locale, page_language, birth_date, phone_number_country_uniqueid, " +
 		"phone_number_country_callingcode, phone_number, phone_number_verified, address_line1, " +
 		"address_line2, address_locality, address_region, address_postal_code, address_country, " +
 		"password_hash, otp_secret_encrypted, otp_enabled, forgot_password_code_encrypted, " +
@@ -131,11 +132,11 @@ var insertUser = statement{
 		"last_otp_step, otp_config_generation, otp_consecutive_failures, " +
 		"otp_enrollment_secret_encrypted, otp_enrollment_issued_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, " +
 		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?)",
+		"?, ?, ?, ?)",
 	mysql: "INSERT INTO users (created_at, updated_at, enabled, subject, username, given_name, " +
 		"middle_name, family_name, nickname, website, gender, email, email_verified, " +
 		"email_verification_code_encrypted, email_verification_code_issued_at, " +
-		"zone_info_country_name, zone_info, locale, birth_date, phone_number_country_uniqueid, " +
+		"zone_info_country_name, zone_info, locale, page_language, birth_date, phone_number_country_uniqueid, " +
 		"phone_number_country_callingcode, phone_number, phone_number_verified, address_line1, " +
 		"address_line2, address_locality, address_region, address_postal_code, address_country, " +
 		"password_hash, otp_secret_encrypted, otp_enabled, forgot_password_code_encrypted, " +
@@ -143,11 +144,11 @@ var insertUser = statement{
 		"last_otp_step, otp_config_generation, otp_consecutive_failures, " +
 		"otp_enrollment_secret_encrypted, otp_enrollment_issued_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, " +
 		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?)",
+		"?, ?, ?, ?)",
 	postgres: "INSERT INTO users (created_at, updated_at, enabled, subject, username, given_name, " +
 		"middle_name, family_name, nickname, website, gender, email, email_verified, " +
 		"email_verification_code_encrypted, email_verification_code_issued_at, " +
-		"zone_info_country_name, zone_info, locale, birth_date, phone_number_country_uniqueid, " +
+		"zone_info_country_name, zone_info, locale, page_language, birth_date, phone_number_country_uniqueid, " +
 		"phone_number_country_callingcode, phone_number, phone_number_verified, address_line1, " +
 		"address_line2, address_locality, address_region, address_postal_code, address_country, " +
 		"password_hash, otp_secret_encrypted, otp_enabled, forgot_password_code_encrypted, " +
@@ -155,11 +156,11 @@ var insertUser = statement{
 		"last_otp_step, otp_config_generation, otp_consecutive_failures, " +
 		"otp_enrollment_secret_encrypted, otp_enrollment_issued_at) VALUES ($1, $2, $3, $4, $5, $6, " +
 		"$7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, " +
-		"$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41) RETURNING id",
+		"$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42) RETURNING id",
 	mssql: "INSERT INTO users (created_at, updated_at, enabled, subject, username, given_name, " +
 		"middle_name, family_name, nickname, website, gender, email, email_verified, " +
 		"email_verification_code_encrypted, email_verification_code_issued_at, " +
-		"zone_info_country_name, zone_info, locale, birth_date, phone_number_country_uniqueid, " +
+		"zone_info_country_name, zone_info, locale, page_language, birth_date, phone_number_country_uniqueid, " +
 		"phone_number_country_callingcode, phone_number, phone_number_verified, address_line1, " +
 		"address_line2, address_locality, address_region, address_postal_code, address_country, " +
 		"password_hash, otp_secret_encrypted, otp_enabled, forgot_password_code_encrypted, " +
@@ -168,7 +169,7 @@ var insertUser = statement{
 		"otp_enrollment_secret_encrypted, otp_enrollment_issued_at) OUTPUT INSERTED.id VALUES (@p1, " +
 		"@p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, " +
 		"@p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, " +
-		"@p33, @p34, @p35, @p36, @p37, @p38, @p39, @p40, @p41)",
+		"@p33, @p34, @p35, @p36, @p37, @p38, @p39, @p40, @p41, @p42)",
 }
 
 // updateUser writes the whole row but created_at and the six dont-update columns that only
@@ -180,7 +181,7 @@ var updateUser = statement{
 		"given_name = ?, middle_name = ?, family_name = ?, nickname = ?, website = ?, gender = ?, " +
 		"email = ?, email_verified = ?, email_verification_code_encrypted = ?, " +
 		"email_verification_code_issued_at = ?, zone_info_country_name = ?, zone_info = ?, " +
-		"locale = ?, birth_date = ?, phone_number_country_uniqueid = ?, " +
+		"locale = ?, page_language = ?, birth_date = ?, phone_number_country_uniqueid = ?, " +
 		"phone_number_country_callingcode = ?, phone_number = ?, phone_number_verified = ?, " +
 		"address_line1 = ?, address_line2 = ?, address_locality = ?, address_region = ?, " +
 		"address_postal_code = ?, address_country = ?, password_hash = ?, otp_secret_encrypted = ?, " +
@@ -190,7 +191,7 @@ var updateUser = statement{
 		"given_name = ?, middle_name = ?, family_name = ?, nickname = ?, website = ?, gender = ?, " +
 		"email = ?, email_verified = ?, email_verification_code_encrypted = ?, " +
 		"email_verification_code_issued_at = ?, zone_info_country_name = ?, zone_info = ?, " +
-		"locale = ?, birth_date = ?, phone_number_country_uniqueid = ?, " +
+		"locale = ?, page_language = ?, birth_date = ?, phone_number_country_uniqueid = ?, " +
 		"phone_number_country_callingcode = ?, phone_number = ?, phone_number_verified = ?, " +
 		"address_line1 = ?, address_line2 = ?, address_locality = ?, address_region = ?, " +
 		"address_postal_code = ?, address_country = ?, password_hash = ?, otp_secret_encrypted = ?, " +
@@ -200,23 +201,23 @@ var updateUser = statement{
 		"given_name = $5, middle_name = $6, family_name = $7, nickname = $8, website = $9, " +
 		"gender = $10, email = $11, email_verified = $12, email_verification_code_encrypted = $13, " +
 		"email_verification_code_issued_at = $14, zone_info_country_name = $15, zone_info = $16, " +
-		"locale = $17, birth_date = $18, phone_number_country_uniqueid = $19, " +
-		"phone_number_country_callingcode = $20, phone_number = $21, phone_number_verified = $22, " +
-		"address_line1 = $23, address_line2 = $24, address_locality = $25, address_region = $26, " +
-		"address_postal_code = $27, address_country = $28, password_hash = $29, " +
-		"otp_secret_encrypted = $30, otp_enabled = $31, forgot_password_code_encrypted = $32, " +
-		"forgot_password_code_issued_at = $33, forgot_password_code_hash = $34 WHERE id = $35",
+		"locale = $17, page_language = $18, birth_date = $19, phone_number_country_uniqueid = $20, " +
+		"phone_number_country_callingcode = $21, phone_number = $22, phone_number_verified = $23, " +
+		"address_line1 = $24, address_line2 = $25, address_locality = $26, address_region = $27, " +
+		"address_postal_code = $28, address_country = $29, password_hash = $30, " +
+		"otp_secret_encrypted = $31, otp_enabled = $32, forgot_password_code_encrypted = $33, " +
+		"forgot_password_code_issued_at = $34, forgot_password_code_hash = $35 WHERE id = $36",
 	mssql: "UPDATE users SET updated_at = @p1, enabled = @p2, subject = @p3, username = @p4, " +
 		"given_name = @p5, middle_name = @p6, family_name = @p7, nickname = @p8, website = @p9, " +
 		"gender = @p10, email = @p11, email_verified = @p12, " +
 		"email_verification_code_encrypted = @p13, email_verification_code_issued_at = @p14, " +
-		"zone_info_country_name = @p15, zone_info = @p16, locale = @p17, birth_date = @p18, " +
-		"phone_number_country_uniqueid = @p19, phone_number_country_callingcode = @p20, " +
-		"phone_number = @p21, phone_number_verified = @p22, address_line1 = @p23, " +
-		"address_line2 = @p24, address_locality = @p25, address_region = @p26, " +
-		"address_postal_code = @p27, address_country = @p28, password_hash = @p29, " +
-		"otp_secret_encrypted = @p30, otp_enabled = @p31, forgot_password_code_encrypted = @p32, " +
-		"forgot_password_code_issued_at = @p33, forgot_password_code_hash = @p34 WHERE id = @p35",
+		"zone_info_country_name = @p15, zone_info = @p16, locale = @p17, page_language = @p18, birth_date = @p19, " +
+		"phone_number_country_uniqueid = @p20, phone_number_country_callingcode = @p21, " +
+		"phone_number = @p22, phone_number_verified = @p23, address_line1 = @p24, " +
+		"address_line2 = @p25, address_locality = @p26, address_region = @p27, " +
+		"address_postal_code = @p28, address_country = @p29, password_hash = @p30, " +
+		"otp_secret_encrypted = @p31, otp_enabled = @p32, forgot_password_code_encrypted = @p33, " +
+		"forgot_password_code_issued_at = @p34, forgot_password_code_hash = @p35 WHERE id = @p36",
 }
 
 var selectUserById = statement{
@@ -378,7 +379,7 @@ func (d *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *record.User
 		user.CreatedAt, user.UpdatedAt, user.Enabled, user.Subject, user.Username, user.GivenName,
 		user.MiddleName, user.FamilyName, user.Nickname, user.Website, user.Gender, user.Email,
 		user.EmailVerified, user.EmailVerificationCodeEncrypted, user.EmailVerificationCodeIssuedAt,
-		user.ZoneInfoCountryName, user.ZoneInfo, user.Locale, user.BirthDate,
+		user.ZoneInfoCountryName, user.ZoneInfo, user.Locale, user.PageLanguage, user.BirthDate,
 		user.PhoneNumberCountryUniqueId, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
 		user.PhoneNumberVerified, user.AddressLine1, user.AddressLine2, user.AddressLocality,
 		user.AddressRegion, user.AddressPostalCode, user.AddressCountry, user.PasswordHash,
@@ -409,7 +410,7 @@ func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User
 		user.UpdatedAt, user.Enabled, user.Subject, user.Username, user.GivenName, user.MiddleName,
 		user.FamilyName, user.Nickname, user.Website, user.Gender, user.Email, user.EmailVerified,
 		user.EmailVerificationCodeEncrypted, user.EmailVerificationCodeIssuedAt,
-		user.ZoneInfoCountryName, user.ZoneInfo, user.Locale, user.BirthDate,
+		user.ZoneInfoCountryName, user.ZoneInfo, user.Locale, user.PageLanguage, user.BirthDate,
 		user.PhoneNumberCountryUniqueId, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
 		user.PhoneNumberVerified, user.AddressLine1, user.AddressLine2, user.AddressLocality,
 		user.AddressRegion, user.AddressPostalCode, user.AddressCountry, user.PasswordHash,
@@ -1095,6 +1096,7 @@ func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId i
 
 // setUserProfile, setUserAddress and setUserPhone are the column-group writes: the group's
 // columns, then updated_at, keyed on the user's id, which setUserColumns binds in that order.
+// setUserProfile leaves page_language out, and setUserProfileWithPageLanguage writes it too.
 var setUserProfile = statement{
 	sqlite: "UPDATE users SET username = ?, given_name = ?, middle_name = ?, family_name = ?, " +
 		"nickname = ?, website = ?, gender = ?, birth_date = ?, zone_info_country_name = ?, " +
@@ -1104,12 +1106,29 @@ var setUserProfile = statement{
 		"zone_info = ?, locale = ?, updated_at = ? WHERE id = ?",
 	postgres: "UPDATE users SET username = $1, given_name = $2, middle_name = $3, " +
 		"family_name = $4, nickname = $5, website = $6, gender = $7, birth_date = $8, " +
-		"zone_info_country_name = $9, zone_info = $10, locale = $11, updated_at = $12 " +
-		"WHERE id = $13",
+		"zone_info_country_name = $9, zone_info = $10, locale = $11, " +
+		"updated_at = $12 WHERE id = $13",
 	mssql: "UPDATE users SET username = @p1, given_name = @p2, middle_name = @p3, " +
 		"family_name = @p4, nickname = @p5, website = @p6, gender = @p7, birth_date = @p8, " +
-		"zone_info_country_name = @p9, zone_info = @p10, locale = @p11, updated_at = @p12 " +
-		"WHERE id = @p13",
+		"zone_info_country_name = @p9, zone_info = @p10, locale = @p11, " +
+		"updated_at = @p12 WHERE id = @p13",
+}
+
+var setUserProfileWithPageLanguage = statement{
+	sqlite: "UPDATE users SET username = ?, given_name = ?, middle_name = ?, family_name = ?, " +
+		"nickname = ?, website = ?, gender = ?, birth_date = ?, zone_info_country_name = ?, " +
+		"zone_info = ?, locale = ?, page_language = ?, updated_at = ? WHERE id = ?",
+	mysql: "UPDATE users SET username = ?, given_name = ?, middle_name = ?, family_name = ?, " +
+		"nickname = ?, website = ?, gender = ?, birth_date = ?, zone_info_country_name = ?, " +
+		"zone_info = ?, locale = ?, page_language = ?, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE users SET username = $1, given_name = $2, middle_name = $3, " +
+		"family_name = $4, nickname = $5, website = $6, gender = $7, birth_date = $8, " +
+		"zone_info_country_name = $9, zone_info = $10, locale = $11, page_language = $12, " +
+		"updated_at = $13 WHERE id = $14",
+	mssql: "UPDATE users SET username = @p1, given_name = @p2, middle_name = @p3, " +
+		"family_name = @p4, nickname = @p5, website = @p6, gender = @p7, birth_date = @p8, " +
+		"zone_info_country_name = @p9, zone_info = @p10, locale = @p11, page_language = @p12, " +
+		"updated_at = @p13 WHERE id = @p14",
 }
 
 var setUserAddress = statement{
@@ -1142,9 +1161,10 @@ var setUserPhone = statement{
 		"phone_number_verified = @p4, updated_at = @p5 WHERE id = @p6",
 }
 
-// SetUserProfile writes the user's eleven profile columns from user, and updated_at, and no
-// other column. SetUserAddress and SetUserPhone below are its twins for the address and the
-// phone. Each serves the self-service and the administrator's save of its group alike.
+// SetUserProfile writes the user's eleven profile columns from user, the page language too when
+// withPageLanguage is set, and updated_at, and no other column. SetUserAddress and SetUserPhone
+// below are its twins for the address and the phone. Each serves the self-service and the
+// administrator's save of its group alike.
 //
 // Narrow rather than going through UpdateUser, for SetUserPasswordHash's reason: the saves
 // load the user at the start of the request, and writing that read back would re-enable an
@@ -1152,13 +1172,21 @@ var setUserPhone = statement{
 // reset replaced after its revocation had run, or undo a concurrent OTP change (#471). They are
 // unconditional, so the last save of a group wins, as it always has: none of them depends on
 // anything it read.
-func (d *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error {
+//
+// The page language is the profile's one optional field: a save whose request left it out passes
+// withPageLanguage false, and the column keeps what the row holds when the statement runs, not
+// the request's read, so a choice saved in between stands (#631 decision 8).
+func (d *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool) error {
 	if user.Id == 0 {
 		return errs.New("can't set the profile of user with id 0")
 	}
-	return d.setUserColumns(ctx, tx, user, "profile", setUserProfile,
-		user.Username, user.GivenName, user.MiddleName, user.FamilyName, user.Nickname, user.Website,
-		user.Gender, user.BirthDate, user.ZoneInfoCountryName, user.ZoneInfo, user.Locale)
+	values := []any{user.Username, user.GivenName, user.MiddleName, user.FamilyName, user.Nickname,
+		user.Website, user.Gender, user.BirthDate, user.ZoneInfoCountryName, user.ZoneInfo, user.Locale}
+	if !withPageLanguage {
+		return d.setUserColumns(ctx, tx, user, "profile", setUserProfile, values...)
+	}
+	return d.setUserColumns(ctx, tx, user, "profile", setUserProfileWithPageLanguage,
+		append(values, user.PageLanguage)...)
 }
 
 // SetUserAddress writes the user's six address columns from user, and updated_at, and no other

@@ -58,6 +58,33 @@ test("the profile is saved, shown again, and reaches the profile claims", async 
   expect(typeof id.updated_at).toBe("number");
 });
 
+// An administrator sees and sets the user's Page language, the language Goiabada's own pages use
+// for them, beside Language and region; the page stays in the administrator's language (#631).
+test("the page language is set, shown again after a reload, and set back to Automatic", async ({ page, users }) => {
+  const user = await users.create();
+  await page.goto(userUrl(user.id, "profile"));
+  const pageLanguage = page.getByLabel("Page language", { exact: true });
+  await expect(pageLanguage).toHaveValue("");
+  await expect(pageLanguage.locator("option").first()).toHaveText("Automatic");
+  await expect(pageLanguage.locator('option[value="pt-BR"]')).toHaveText("pt-BR – português (Brasil) (Portuguese (Brazil))");
+  await expect(page.getByText("The language of the console, of the sign-in pages once the user has entered their password, and of the emails sent to the user. Automatic uses the language the client or the browser asks for, and the language and region for emails.", { exact: true })).toBeVisible();
+  await pageLanguage.selectOption("pt-BR");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText(saved)).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+  await page.reload();
+  await expect(pageLanguage).toHaveValue("pt-BR");
+  // Language and region is a separate field, left as it was.
+  await expect(page.locator('select[name="locale"]')).toHaveValue("");
+
+  await pageLanguage.selectOption("");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText(saved)).toBeVisible();
+  await page.reload();
+  await expect(pageLanguage).toHaveValue("");
+});
+
 test("one-character names are saved, shown again, and reach the profile claims", async ({ page, request, clients, users }) => {
   const user = await users.create();
   await page.goto(userUrl(user.id, "profile"));

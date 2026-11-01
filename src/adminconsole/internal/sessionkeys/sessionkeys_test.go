@@ -32,4 +32,5 @@ func TestSessionKeys_AreStoredData(t *testing.T) {
 	assert.Equal(t, "RedirectBack", RedirectBack)
 	assert.Equal(t, "JwtExpiresAt", JWTExpiresAt)
 	assert.Equal(t, "RequestedScope", RequestedScope)
+	assert.Equal(t, "PageLanguage", PageLanguage)
 }

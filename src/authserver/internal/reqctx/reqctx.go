@@ -1,6 +1,7 @@
-// Package reqctx holds the auth server's five request-scoped values: the settings, the browser's
-// session identifier, the bearer token read off the request, the token a scope guard validated,
-// and the credential reservation a failures-only rate-limit tier holds (#439). Each is written by
+// Package reqctx holds the auth server's six request-scoped values: the settings, the browser's
+// session identifier and that session's user, the bearer token read off the request, the token a
+// scope guard validated, and the credential reservation a failures-only rate-limit tier holds
+// (#439). Each is written by
 // one middleware and read back through a typed accessor, over an unexported key, so nothing
 // outside this package can write one or read it under the wrong type (#433).
 package reqctx
@@ -20,6 +21,7 @@ type key int
 const (
 	settingsKey key = iota
 	sessionIdentifierKey
+	sessionUserIdKey
 	bearerTokenKey
 	validatedTokenKey
 	credentialReservationKey
@@ -49,6 +51,19 @@ func WithSessionIdentifier(ctx context.Context, id string) context.Context {
 func SessionIdentifierFrom(ctx context.Context) (string, bool) {
 	id, ok := ctx.Value(sessionIdentifierKey).(string)
 	return id, ok
+}
+
+// WithSessionUserId records the user of the session the session identifier names, which the
+// session identifier middleware read with it, so a reader of the user need not read the session
+// again.
+func WithSessionUserId(ctx context.Context, userId int64) context.Context {
+	return context.WithValue(ctx, sessionUserIdKey, userId)
+}
+
+// SessionUserIdFrom answers false when the browser holds no session, as SessionIdentifierFrom does.
+func SessionUserIdFrom(ctx context.Context) (int64, bool) {
+	userId, ok := ctx.Value(sessionUserIdKey).(int64)
+	return userId, ok
 }
 
 func WithBearerToken(ctx context.Context, t oauth.JwtToken) context.Context {

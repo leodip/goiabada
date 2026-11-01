@@ -20,7 +20,10 @@ import (
 	"github.com/leodip/goiabada/core/routing"
 )
 
-func (s *Server) initRoutes(root *routing.Router) {
+// initRoutes mounts the application's routes on root, and returns the not-found page as a
+// signed-in user is shown it, behind SessionHandler and the page language, for the static branch to
+// answer a directory with (serveStaticFiles).
+func (s *Server) initRoutes(root *routing.Router) http.Handler {
 	// The console's own base URL, which every redirect is built from, handed to each handler that
 	// redirects as it is built (#441).
 	baseURL := s.cfg.AdminConsole.BaseURL
@@ -57,40 +60,46 @@ func (s *Server) initRoutes(root *routing.Router) {
 	jwtSessionHandler := middlewareJwt.SessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManagePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManageAccountPermissionIdentifier)})
-	// User-locale refinement sits inside each authenticated chain immediately
-	// after JWT validation. It reads the locale claim from the validated JWT
-	// (requires the profile scope, see middleware_jwt.buildScopeString) and
-	// refines the localizer to the user's stored locale unless explicit
-	// request intent (?ui_locales or in-flight AuthContext.UILocales) is
-	// present. Falls through to the existing localizer if the claim is
-	// missing — never silently jumps to English.
-	localeFromJWT := middleware.LocaleFromJWT()
+	// The user's page language sits inside each authenticated chain right after
+	// SessionHandler, which says whether anyone is signed in. It reads the session's
+	// copy of the choice, which the sign-in and the profile page write, and draws the
+	// page in it over ?ui_locales and the browser; on Automatic the language the
+	// locale middleware resolved stands (#631 decisions 2, 4 and 7).
+	pageLanguage := middleware.PageLanguage(s.sessionStore, builtin.AdminConsoleSessionName)
 
 	// Define middleware combinations
 	baseAuth := []func(http.Handler) http.Handler{
 		jwtSessionHandler,
-		localeFromJWT,
+		pageLanguage,
 	}
 
 	accountAuth := []func(http.Handler) http.Handler{
 		jwtSessionHandler,
-		localeFromJWT,
+		pageLanguage,
 		requiresAccountScope,
 	}
 
 	adminAuth := []func(http.Handler) http.Handler{
 		jwtSessionHandler,
-		localeFromJWT,
+		pageLanguage,
 		requiresAdminScope,
 	}
 
 	// Base routes
-	root.NotFound(handlers.HandleNotFoundGet(httpHelper))
+	//
+	// The not-found page is drawn in a signed-in user's page language, over ?ui_locales, wherever it
+	// answers (decisions 4 and 7). Each group under root answers it behind its own chain, which
+	// holds the page language already, so root's own handler is the plain page they inherit; the
+	// second call then puts baseAuth in front of it for a path under no group alone, replacing what
+	// the first set there.
+	notFound := handlers.HandleNotFoundGet(httpHelper)
+	root.NotFound(notFound)
+	root.With(baseAuth...).NotFound(notFound)
 	root.With(baseAuth...).Get("/", handlers.HandleIndexGet(authHelper, httpHelper, s.sessionStore, s.cfg.AuthServer.BaseURL))
 	// /unauthorized is reached by authenticated-but-forbidden users via the
 	// redirect in middleware_jwt's RequiresScope path. Wrapping it through
-	// baseAuth lets the user-locale refinement fire so the page renders
-	// in the user's stored locale. baseAuth tolerates missing-permission
+	// baseAuth lets the page language apply so the page renders in the
+	// user's chosen language. baseAuth tolerates missing-permission
 	// cases — the whole point of this page is that the user is
 	// authenticated but not authorized.
 	root.With(baseAuth...).Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
@@ -103,7 +112,7 @@ func (s *Server) initRoutes(root *routing.Router) {
 		// address -- and a request by any other method but POST get the sign-in error page at 405
 		// with Allow: POST, rather than the empty body the POST-only registration answered them
 		// with (#632 item 3).
-		callbackPost := handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenClient)
+		callbackPost := handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenClient, apiClient)
 		callbackWrongMethod := handlers.HandleAuthCallbackWrongMethod(httpHelper)
 		r.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
 			if req.Method == http.MethodPost {
@@ -290,4 +299,10 @@ func (s *Server) initRoutes(root *routing.Router) {
 		r.Post("/settings/audit-logs", adminsettingshandlers.HandleAuditLogsPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/settings/audit-log-viewer", adminsettingshandlers.HandleAuditLogViewerGet(httpHelper, apiClient))
 	})
+
+	signedInNotFound := http.Handler(notFound)
+	for i := len(baseAuth) - 1; i >= 0; i-- {
+		signedInNotFound = baseAuth[i](signedInNotFound)
+	}
+	return signedInNotFound
 }

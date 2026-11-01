@@ -15448,16 +15448,16 @@ func (_c *Database_SetUserPhone_Call) RunAndReturn(run func(ctx context.Context,
 }
 
 // SetUserProfile provides a mock function for the type Database
-func (_mock *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User) error {
-	ret := _mock.Called(ctx, tx, user)
+func (_mock *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool) error {
+	ret := _mock.Called(ctx, tx, user, withPageLanguage)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SetUserProfile")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.User) error); ok {
-		r0 = returnFunc(ctx, tx, user)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.User, bool) error); ok {
+		r0 = returnFunc(ctx, tx, user, withPageLanguage)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -15473,11 +15473,12 @@ type Database_SetUserProfile_Call struct {
 //   - ctx context.Context
 //   - tx *sql.Tx
 //   - user *record.User
-func (_e *Database_Expecter) SetUserProfile(ctx any, tx any, user any) *Database_SetUserProfile_Call {
-	return &Database_SetUserProfile_Call{Call: _e.mock.On("SetUserProfile", ctx, tx, user)}
+//   - withPageLanguage bool
+func (_e *Database_Expecter) SetUserProfile(ctx any, tx any, user any, withPageLanguage any) *Database_SetUserProfile_Call {
+	return &Database_SetUserProfile_Call{Call: _e.mock.On("SetUserProfile", ctx, tx, user, withPageLanguage)}
 }
 
-func (_c *Database_SetUserProfile_Call) Run(run func(ctx context.Context, tx *sql.Tx, user *record.User)) *Database_SetUserProfile_Call {
+func (_c *Database_SetUserProfile_Call) Run(run func(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool)) *Database_SetUserProfile_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -15491,10 +15492,15 @@ func (_c *Database_SetUserProfile_Call) Run(run func(ctx context.Context, tx *sq
 		if args[2] != nil {
 			arg2 = args[2].(*record.User)
 		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -15505,7 +15511,7 @@ func (_c *Database_SetUserProfile_Call) Return(err error) *Database_SetUserProfi
 	return _c
 }
 
-func (_c *Database_SetUserProfile_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, user *record.User) error) *Database_SetUserProfile_Call {
+func (_c *Database_SetUserProfile_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool) error) *Database_SetUserProfile_Call {
 	_c.Call.Return(run)
 	return _c
 }

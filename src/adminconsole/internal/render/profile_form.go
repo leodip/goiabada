@@ -14,6 +14,10 @@ import (
 // user profile page both post. The time-zone select's value is the country name and the zone
 // joined by "___"; a value that is not exactly those two halves can only come from a hand-edited
 // request, and is answered with an error, which both pages render as a 500 (#440).
+//
+// The page language is sent only when the form posted the field, "" being Automatic: a form without
+// it sends none, which leaves the stored choice as it is (#631 decision 8). It is read from the body
+// alone, so an address cannot set it.
 func ParseProfileForm(r *http.Request) (*api.UpdateUserProfileRequest, error) {
 	zoneInfoValue := r.FormValue("zoneInfo")
 	zoneInfoCountryName := ""
@@ -28,6 +32,11 @@ func ParseProfileForm(r *http.Request) (*api.UpdateUserProfileRequest, error) {
 		zoneInfo = zoneInfoParts[1]
 	}
 
+	var pageLanguage *string
+	if submitted := r.PostFormValue("pageLanguage"); r.PostForm.Has("pageLanguage") {
+		pageLanguage = &submitted
+	}
+
 	return &api.UpdateUserProfileRequest{
 		Username:            strings.TrimSpace(r.FormValue("username")),
 		GivenName:           strings.TrimSpace(r.FormValue("givenName")),
@@ -40,6 +49,7 @@ func ParseProfileForm(r *http.Request) (*api.UpdateUserProfileRequest, error) {
 		ZoneInfoCountryName: zoneInfoCountryName,
 		ZoneInfo:            zoneInfo,
 		Locale:              r.FormValue("locale"),
+		PageLanguage:        pageLanguage,
 	}, nil
 }
 
@@ -58,6 +68,9 @@ func EchoProfileForm(user *api.UserResponse, request *api.UpdateUserProfileReque
 	user.ZoneInfoCountryName = request.ZoneInfoCountryName
 	user.ZoneInfo = request.ZoneInfo
 	user.Locale = request.Locale
+	if request.PageLanguage != nil {
+		user.PageLanguage = *request.PageLanguage
+	}
 
 	if len(request.Gender) > 0 {
 		if i, err := strconv.Atoi(request.Gender); err == nil {

@@ -8,9 +8,11 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/locales"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/timezones"
 )
@@ -79,6 +81,8 @@ func HandleProfileGet(
 			"user":              user,
 			"timezones":         timezones,
 			"locales":           locales,
+			"pageLanguages":     render.PageLanguageOptions(),
+			"pageLanguage":      render.SelectedPageLanguage(user.PageLanguage),
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
 			"savedSuccessfully": savedSuccessfully,
@@ -149,6 +153,8 @@ func HandleProfilePost(
 					"submittedDateOfBirth": render.SubmittedDateOfBirth(r),
 					"timezones":            timezones,
 					"locales":              locales,
+					"pageLanguages":        render.PageLanguageOptions(),
+					"pageLanguage":         render.SelectedPageLanguage(formUser.PageLanguage),
 					"page":                 r.URL.Query().Get("page"),
 					"query":                r.URL.Query().Get("query"),
 					"error":                errorMessage,
@@ -172,6 +178,12 @@ func HandleProfilePost(
 		}
 
 		sess.SetFlash("savedSuccessfully", "true")
+		// An administrator who saved their own profile sees the page language the API stored on the
+		// next page, as a save in Account > Profile does; an edit of another user leaves the console's
+		// copy alone (#631 decision 7).
+		if signedInSubject(jwtInfo.IdToken) == user.Subject && user.Subject != "" {
+			sess.Values[sessionkeys.PageLanguage] = user.PageLanguage
+		}
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -182,4 +194,13 @@ func HandleProfilePost(
 		//nolint:gosec // G710: the configured base URL, a fixed path around the user's numeric id, and an encoded query
 		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/profile", user.Id), r), http.StatusFound)
 	}
+}
+
+// signedInSubject is the subject of the console's verified ID token, the signed-in user, or empty
+// when the session holds no ID token.
+func signedInSubject(idToken *oauth.JwtToken) string {
+	if idToken == nil {
+		return ""
+	}
+	return idToken.StringClaim("sub")
 }

@@ -80,9 +80,10 @@ function submitSignOut() {
 
 // withPageLanguage names the catalog this page rendered from, which the layout publishes as
 // data-catalog-lang, as ui_locales on a request the page sends. The console resolves each request's
-// language afresh, and ui_locales is the explicit intent neither the browser's Accept-Language nor
-// the profile's locale overrides, so a refusal shown in this page's dialog, the API's or the
-// console's own, is in the page's language (#559 decisions 3 and 7). Every fetch site here and in
+// language afresh, and ui_locales is the explicit intent the browser's Accept-Language does not
+// override, so a refusal shown in this page's dialog, the API's or the console's own, is in the
+// page's language (#559 decisions 3 and 7). A user's page language, which drew the page, wins over
+// it on the console's side (#631). Every fetch site here and in
 // image-upload.js sends its URL through it, and a drift test in internal/render holds them to it.
 function withPageLanguage(url) {
   const lang = document.documentElement.dataset.catalogLang;

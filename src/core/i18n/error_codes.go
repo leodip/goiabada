@@ -346,6 +346,7 @@ const (
 	ErrCodeProfileDobInFuture           = "validator.profile.dob_in_future"
 	ErrCodeProfileZoneInfoInvalid       = "validator.profile.zone_info_invalid"
 	ErrCodeProfileLocaleInvalid         = "validator.profile.locale_invalid"
+	ErrCodeProfilePageLanguageInvalid   = "validator.profile.page_language_invalid"
 
 	// Image validator — profile picture and client logo uploads, from
 	// authserver/internal/imageupload.

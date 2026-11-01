@@ -31,6 +31,9 @@ func TestMigration000073_UserRecoveryCodes(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(ctx, 72), "migrate to 72")
+	// The fixture user is written through the data layer, whose record follows head; the users
+	// columns added after 000073 are scaffolded on, and no down below 000073 touches them.
+	scaffoldHeadUsersColumns(t, h)
 	before := listTables(t, h)
 	assert.NotContains(t, before, "user_recovery_codes",
 		"the table must not exist before 000073, so what is found afterwards is what 000073 added")
@@ -106,8 +109,8 @@ func assertUserRecoveryCodesShape(t *testing.T, h *isolatedDB, when string) {
 }
 
 // assertUserRecoveryCodesBehaviour holds the key, the NOT NULL columns and the cascade to what they
-// do. The user is written through the isolated handle's own data layer, which the database at head
-// accepts; the codes and the deletion are plain SQL on the table under test. Literals rather than
+// do. The user is written through the isolated handle's own data layer, which the database accepts
+// with the head-only users columns scaffolded on; the codes and the deletion are plain SQL on the table under test. Literals rather than
 // placeholders because the four dialects disagree on placeholder syntax, and every value here is
 // test-controlled.
 func assertUserRecoveryCodesBehaviour(t *testing.T, h *isolatedDB, when string) {

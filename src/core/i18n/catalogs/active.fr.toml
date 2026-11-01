@@ -487,6 +487,9 @@
 "adminconsole.account.profile.field.locale" = "Langue et région"
 "adminconsole.account.profile.locale_tooltip" = "Les applications s’en servent pour choisir la langue et le format des dates et des nombres."
 "adminconsole.account.profile.locale_blank" = "Non renseignée"
+"adminconsole.account.profile.field.page_language" = "Langue des pages"
+"adminconsole.account.profile.page_language_automatic" = "Automatique"
+"adminconsole.account.profile.page_language_tooltip" = "La langue de ces pages, des pages de connexion une fois votre mot de passe saisi, et des e-mails qui vous sont envoyés. Automatique utilise la langue que demande l’application ou votre navigateur et, pour les e-mails, votre langue et région."
 "adminconsole.account.profile.saved_successfully" = "Profil enregistré."
 "adminconsole.account.profile.update_button" = "Enregistrer"
 
@@ -1034,6 +1037,9 @@
 "adminconsole.admin_users.profile.field.locale" = "Langue et région"
 "adminconsole.admin_users.profile.locale_tooltip" = "La langue et la région de l’utilisateur, que les clients reçoivent dans le claim locale."
 "adminconsole.admin_users.profile.locale_blank" = "Non renseigné"
+"adminconsole.admin_users.profile.field.page_language" = "Langue des pages"
+"adminconsole.admin_users.profile.page_language_automatic" = "Automatique"
+"adminconsole.admin_users.profile.page_language_tooltip" = "La langue de la console, des pages de connexion une fois que l’utilisateur a saisi son mot de passe, et des e-mails qui lui sont envoyés. Automatique utilise la langue que demande le client ou le navigateur et, pour les e-mails, la langue et région."
 "adminconsole.admin_users.profile.saved_successfully" = "Profil enregistré."
 
 "adminconsole.admin_users.email.field.email" = "Adresse e-mail"
@@ -1864,6 +1870,7 @@
 "validator.profile.dob_in_future" = "La date de naissance ne peut pas être dans le futur."
 "validator.profile.zone_info_invalid" = "Fuseau horaire inconnu."
 "validator.profile.locale_invalid" = "Langue et région inconnues."
+"validator.profile.page_language_invalid" = "Choisissez une langue dans la liste."
 
 # --- Image validator (LocalizedError-backed) ---------------------------------
 

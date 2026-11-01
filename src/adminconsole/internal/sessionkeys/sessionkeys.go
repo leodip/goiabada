@@ -2,9 +2,11 @@
 // sign-in handshake. Every value here is stored data. Request-scoped values are not session keys
 // and live in reqctx (#440).
 //
-// Two name entries in the admin console's own browser session, written and read by this process
-// alone: the authenticated-session key with the access token's recorded expiry beside it. A live
-// session carries these spellings, so renaming one signs every administrator out at deploy. The
+// Three name entries in the admin console's own browser session, written and read by this process
+// alone: the authenticated-session key with the access token's recorded expiry beside it, and the
+// signed-in user's page language. A live session carries these spellings, so renaming one of the
+// first two signs every administrator out at deploy, and renaming the third puts every signed-in
+// user on Automatic until they sign in again or open their profile. The
 // auth server stores that session server-side but never opens it, so there is nothing for the two
 // binaries to agree on beyond the session's name, which core/builtin declares (#385).
 //
@@ -26,6 +28,13 @@ const JWT string = "Jwt"
 // deleted wherever JWT is, because the console never decodes its access token to
 // read an expiry out of it (#427).
 const JWTExpiresAt string = "JwtExpiresAt"
+
+// PageLanguage is the console's copy of the signed-in user's page language: the tag of the catalog
+// they chose for Goiabada's own pages, or empty for Automatic. It is read from the Account API at
+// sign-in and again whenever the profile page fetches the profile, and written when the user saves
+// it there or on their own user Profile page as an administrator; every signed-in page reads it, so a save shows on the user's next page without an auth
+// server round trip per page (#631 decision 7).
+const PageLanguage string = "PageLanguage"
 
 const State string = "State"
 const Nonce string = "Nonce"

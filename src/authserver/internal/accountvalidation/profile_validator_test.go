@@ -67,6 +67,7 @@ var profileErrorMessages = map[string]string{
 	i18n.ErrCodeProfileDobInFuture:           "The date of birth can't be in the future.",
 	i18n.ErrCodeProfileZoneInfoInvalid:       "Unknown time zone.",
 	i18n.ErrCodeProfileLocaleInvalid:         "Unknown language and region.",
+	i18n.ErrCodeProfilePageLanguageInvalid:   "Choose a language from the list.",
 }
 
 // =============================================================================
@@ -971,6 +972,49 @@ func TestValidateProfile_Locale(t *testing.T) {
 			})
 		}
 	})
+}
+
+// The page language is Automatic, "", or exactly the tag of a catalog the server has loaded: the
+// six built in here (#631 decision 3). A tag with no catalog, or one that only matches a catalog,
+// would be stored and change nothing, so it is refused. Left out of the request, it is not checked.
+func TestValidateProfile_PageLanguage(t *testing.T) {
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
+
+	t.Run("left out is not checked", func(t *testing.T) {
+		assert.NoError(t, validator.ValidateProfile(context.Background(), &ValidateProfileInput{PageLanguage: nil}))
+	})
+
+	for _, accepted := range []string{"", "en", "pt-BR", "es", "fr", "it", "de"} {
+		t.Run("accepted/"+accepted, func(t *testing.T) {
+			pageLanguage := accepted
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{PageLanguage: &pageLanguage})
+
+			assert.NoError(t, err)
+		})
+	}
+
+	refused := []struct {
+		name  string
+		value string
+	}{
+		{"a language with no catalog", "ja"},
+		{"a regional tag of a catalog", "en-US"},
+		{"a tag differing only in case", "pt-br"},
+		{"a tag that only matches a catalog", "pt"},
+		{"an underscore spelling", "pt_BR"},
+		{"a padded tag", " es"},
+		{"a valid language and region that is not a catalog", "fr-CA"},
+		{"not a tag at all", "not-a-language"},
+	}
+	for _, tc := range refused {
+		t.Run("refused/"+tc.name, func(t *testing.T) {
+			pageLanguage := tc.value
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{PageLanguage: &pageLanguage})
+
+			assertLocalizedError(t, err, i18n.ErrCodeProfilePageLanguageInvalid,
+				profileErrorMessages[i18n.ErrCodeProfilePageLanguageInvalid])
+		})
+	}
 }
 
 // -----------------------------------------------------------------------------

@@ -199,12 +199,14 @@ func TestMigration000067_WidensTheFourColumnsAndNothingElse(t *testing.T) {
 // writes its values into.
 type rows000067 map[string]int64
 
-// seedRows000067 creates one row in each table 000067 alters, through the data layer, which the
-// isolated database at 000067 matches: it is the head on every engine that carries 000067.
+// seedRows000067 creates one row in each table 000067 alters, through the data layer, whose record
+// follows head: the users columns added after 000067 are scaffolded on first, and neither 000067's
+// down nor its up touches them.
 func seedRows000067(t *testing.T, h *isolatedDB) rows000067 {
 	t.Helper()
 	ctx := context.Background()
 
+	scaffoldHeadUsersColumns(t, h)
 	user := &record.User{Subject: fake.UUID(), Username: fake.Username(), Email: fake.Email()}
 	require.NoError(t, h.DB.CreateUser(ctx, nil, user), "seed a user")
 

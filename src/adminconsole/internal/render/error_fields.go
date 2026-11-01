@@ -65,6 +65,7 @@ var ProfileErrorFields = map[string]string{
 	i18n.ErrCodeProfileDobInFuture:           "dateOfBirth",
 	i18n.ErrCodeProfileZoneInfoInvalid:       "zoneInfo",
 	i18n.ErrCodeProfileLocaleInvalid:         "locale",
+	i18n.ErrCodeProfilePageLanguageInvalid:   "pageLanguage",
 }
 
 // AddressErrorFields are the address form's. Angle brackets are refused in whichever field holds

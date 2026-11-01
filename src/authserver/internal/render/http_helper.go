@@ -172,8 +172,9 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 	// "emails/"), a copy for exactly the recipient's tag still wins first,
 	// and when there is none the locale is matched against the languages a
 	// copy of this email exists in, not taken literally, with the English
-	// fallback the stored-locale senders give the subject
-	// (i18n.WithLocale(ctx, true, user.Locale, "en")). A regional variant
+	// fallback the senders give the subject (i18n.WithRecipientLanguage for
+	// an email to a user, the registration page's language for one to an
+	// address with no account). A regional variant
 	// then falls back to its base language (es-MX renders the .es copy, the
 	// subject renders from the es catalog), and a locale no copy shares a
 	// language with keeps <name>.html, the English baseline. The default

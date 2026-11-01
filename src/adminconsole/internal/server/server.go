@@ -239,15 +239,16 @@ func getAndHead(r *routing.Router, pattern string, handler http.HandlerFunc) {
 	r.Head(pattern, handler)
 }
 
-// registerRoutes mounts everything this server answers on s.router: the root chain, the static
-// branch and the application branch, in that order. Both branches are registered on s.router;
-// only the second carries the middleware initMiddleware returns, which is what keeps a stylesheet
-// from costing a session load, and here that load is an HTTP call to the auth server (see
-// initMiddleware).
+// registerRoutes mounts everything this server answers on s.router: the root chain, the
+// application branch and the static branch, in that order, the static branch answering a directory
+// with the application's signed-in not-found page. Both branches are registered on s.router;
+// only the application branch carries the middleware initMiddleware returns, which is what keeps a
+// stylesheet from costing a session load, and here that load is an HTTP call to the auth server
+// (see initMiddleware).
 func (s *Server) registerRoutes() {
 	app := s.initMiddleware()
 
-	s.serveStaticFiles()
+	s.serveStaticFiles(s.initRoutes(app))
 
 	// Browsers auto-probe /favicon.ico at the site root regardless of the
 	// <link rel="icon"> tags; point it at the real asset under /static.
@@ -257,8 +258,6 @@ func (s *Server) registerRoutes() {
 	// passes through none of the settings cache and the session load, each a call to the auth server, and answers whenever the process is up
 	// (see handlers.HandleHealthCheckGet, #390).
 	getAndHead(s.router, "/health", handlers.HandleHealthCheckGet())
-
-	s.initRoutes(app)
 }
 
 // serveAndDrain is the auth server's, copied rather than shared because each binary owns its
@@ -492,10 +491,11 @@ func (s *Server) applicationChain() []func(http.Handler) http.Handler {
 	return []func(http.Handler) http.Handler{
 		// Global locale middleware: resolves a tentative localizer from
 		// ?ui_locales, Accept-Language, or English. Adminconsole has no
-		// AuthContext concept (identity comes from the JWT later in the chain),
-		// so authHelper is nil. Per-route user-locale refinement lives in
-		// routes.go inside baseAuth/accountAuth/adminAuth, immediately after
-		// JWT validation.
+		// AuthContext concept (identity comes from the session later in the
+		// chain), so authHelper is nil. The signed-in user's page language,
+		// which wins over all three, is applied per route in routes.go inside
+		// baseAuth/accountAuth/adminAuth, right after SessionHandler, and in
+		// front of the not-found page wherever it answers.
 		//
 		// It goes first so that everything below it can answer a request in the
 		// caller's language. It used to go last, which left both of
@@ -612,12 +612,13 @@ const staticPrefix = "/static"
 // A directory is the 404 page, /static/ itself included, where Go's file server answered one with
 // a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
 // too: it redirected to /static/, which looped for ever once its trailing slash was stripped back to
-// /static. The 404 page is drawn behind the application chain, which it reads its settings and
-// language from, so a directory costs what an unmatched path costs; a file still costs neither.
-func (s *Server) serveStaticFiles() {
+// /static. notFound is that page as initRoutes answers an unmatched path with it, behind the
+// session and the signed-in user's page language (#631 decision 7), and it is drawn behind the
+// application chain, which it reads its settings and language from, so a directory costs what an
+// unmatched path costs; a file still costs neither.
+func (s *Server) serveStaticFiles(notFound http.Handler) {
 	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
-	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS))
-	directory := http.Handler(notFound)
+	directory := notFound
 	chain := s.applicationChain()
 	for i := len(chain) - 1; i >= 0; i-- {
 		directory = chain[i](directory)

@@ -136,7 +136,7 @@ func noticeTestServer(t *testing.T, database *datamocks.Database) *Server {
 		revocationMetrics:    revocationmetrics.Register(registry),
 		introspectionMetrics: introspectionmetrics.Register(registry),
 	}
-	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router, revoke: s.router, introspect: s.router})
+	s.initRoutes(appBranches{pages: s.router, files: s.router, protocol: s.router, api: s.router, token: s.router, revoke: s.router, introspect: s.router})
 	return s
 }
 

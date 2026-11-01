@@ -38,7 +38,7 @@ func TestInitMiddleware_EveryAnswerCarriesTheSecurityHeaders(t *testing.T) {
 			s := newStaticBranchTestServer(settings.URL, newTestSessionStoreOver(sessiontest.NewMemoryBackend()))
 			s.cfg.AdminConsole.BaseURL = tc.baseURL
 			app := s.initMiddleware()
-			s.serveStaticFiles()
+			s.serveStaticFiles(http.NotFoundHandler())
 			app.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
 				w.WriteHeader(http.StatusOK)

@@ -172,19 +172,18 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`French account recovery codes fit a phone in ${theme}`, async ({ page, browser, users }) => {
+  test(`French account recovery codes fit a phone in ${theme}`, async ({ browser, users }) => {
     test.setTimeout(90_000);
     const user = await users.create();
-    // The account page's forms post to an address without ui_locales, so the console answers them in
-    // the profile's language, which the ID token carries.
-    await page.goto(userUrl(user.id, "profile"));
-    await choose(page, "locale", "French (Canada)", /French \(Canada\)/);
-    await page.locator("#btnSave").click();
-    await expect(page.getByText("Profile saved.", { exact: true })).toBeVisible();
-    const { context, page: own } = await signInToConsole(browser, user, "/account/otp");
+    // The account page's forms post to an address without ui_locales, so the user chooses the page
+    // language in My Account, which every console page they open from then on is drawn in.
+    const { context, page: own } = await signInToConsole(browser, user);
+    await own.locator("#pageLanguage").selectOption("fr");
+    await own.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(own.getByText("Profil enregistré.", { exact: true })).toBeVisible();
     await own.setViewportSize({ width: 320, height: 740 });
     await own.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
-    await own.goto(`${env.adminUrl}/account/otp?ui_locales=fr`);
+    await own.goto(`${env.adminUrl}/account/otp`);
     // Turning on two-factor authentication shows the new authenticator's set once.
     const secret = (await own.locator("#otp-secret").innerText()).trim();
     await own.locator("#password").fill(user.password);
@@ -193,7 +192,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(own.getByRole("heading", { name: "Enregistrez vos codes de récupération", exact: true })).toBeVisible();
     await fitsInFrench(own);
     // The count, and a new set behind the password and the confirmation.
-    await own.goto(`${env.adminUrl}/account/otp?ui_locales=fr`);
+    await own.goto(`${env.adminUrl}/account/otp`);
     await expect(own.getByRole("heading", { name: "Codes de récupération", exact: true })).toBeVisible();
     await expect(own.getByText("10 de vos 10 codes de récupération ne sont pas encore utilisés.", { exact: true })).toBeVisible();
     await fitsInFrench(own);

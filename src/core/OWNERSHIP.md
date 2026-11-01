@@ -345,6 +345,7 @@ command itself and fails on a tree it changed.
 | `core/httpmw/statuswriter` | `Wrap` | kernel | — |
 | `core/httpmw/statuswriter` | `Writer` | own-package | — |
 | `core/i18n` | `CatalogTag` | both-apps | The cross-process half of a refusal's language: the admin console sends it as `Accept-Language` on every admin API call, and the auth server resolves it against the same catalogs, so its answer is in the language of the console's page (#559 decision 3). The auth server names it in its own right too: the two registration mails read it to take the language the registration page was matched to, rather than the first `Accept-Language` tag alone (#607). It stays because it reads the localizer this package keeps private, as `Raw` does, and exporting the localizer to move it would undo #385 decision 11. |
+| `core/i18n` | `CatalogTags` | contract | The languages a user can choose as their page language: both servers offer and accept the same list, the admin console in My Account's and an administrator's Profile forms and the auth server when it checks a submitted `pageLanguage`, so it is read once here, off the bundle this package keeps private (#631 decision 3). Only the admin console names it in production, listing it in My Account's Profile form; the auth server checks a submitted value with `IsCatalogTag`, which reads the same list. |
 | `core/i18n` | `ErrCodeAccountChangedSinceLoaded` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAccountCurrentPasswordIncorrect` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAccountCurrentPasswordRequired` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
@@ -500,6 +501,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeProfileNicknameAngleBrackets` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileNicknameInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileNicknameTooLong` | both-apps | — |
+| `core/i18n` | `ErrCodeProfilePageLanguageInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileUsernameInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileUsernameTaken` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileWebsiteInvalid` | both-apps | — |
@@ -577,6 +579,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeUserOTPNotEnabled` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeUserPasswordRequired` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeUserSetPasswordTypeInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `IsCatalogTag` | both-apps | — |
 | `core/i18n` | `LoadBundle` | both-apps | — |
 | `core/i18n` | `Locale` | both-apps | — |
 | `core/i18n` | `LocaleTag` | contract | The first language a request or a recipient asked for, whether or not a catalog matches it, which the auth server chooses an email's body copy from, since an operator may ship a copy in a language that has no catalog (#531). Only the auth server names it in production since #645, when both servers' `<html lang>` and the admin console's CLDR labels moved to `CatalogTag`, the language the page is written in; it stays because it reads the context key `WithLocale` and the locale middleware write, which this package keeps private, as `CatalogTag` and `Raw` read its localizer. |
@@ -588,6 +591,8 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `T` | kernel | — |
 | `core/i18n` | `UILocalesReader` | reachable | — |
 | `core/i18n` | `WithLocale` | both-apps | — |
+| `core/i18n` | `WithPageLanguage` | both-apps | — |
+| `core/i18n` | `WithRecipientLanguage` | contract | The rule for the language of an email to a user: their page language when `IsCatalogTag` names it, else their language and region, else English, over whatever the sending request carries, a page language included (#631). Only the auth server sends email, so only it names this; it stays here because replacing a page language means writing the context keys this package keeps private, which `WithLocale` deliberately refuses to do once a page language is on the context, and because the catalog check is the one `WithPageLanguage` and both servers apply, as `LocaleTag` stays for the context key it reads. |
 | `core/inputvalidation` | `ContainsAngleBrackets` | both-apps | — |
 | `core/inputvalidation` | `IdentifierValidator` | own-package | — |
 | `core/inputvalidation` | `NewIdentifierValidator` | both-apps | — |
@@ -615,8 +620,8 @@ command itself and fails on a tree it changed.
 | `core/issuerlength` | `Check` | contract | The one bound on an issuer's length. The setup wizard, which is not one of the two applications, writes the auth server URL the first start seeds as the issuer, and the auth server refuses to start on one longer than the general settings save would keep, so the bound is defined once here for the start, the save and the wizard rather than copied into each (#615). |
 | `core/issuerlength` | `Max` | contract | The bound `Check` holds an issuer to, which the start's refusal and the general settings save's message name to the operator, so each says the number the bound holds rather than a copy of it (#615). |
 | `core/locales` | `All` | contract | The list half of the locale table whose lookup the auth server validates against. Moving it would put one locale list in two places. |
-| `core/locales` | `ByID` | contract | The lookup half of the locale table whose list the admin console renders. Moving it would put one locale list in two places. |
-| `core/locales` | `Locale` | contract | The row type both halves of the table share. |
+| `core/locales` | `ByID` | both-apps | — |
+| `core/locales` | `Locale` | own-package | — |
 | `core/localzone` | `Install` | both-apps | — |
 | `core/logging` | `FieldForLog` | kernel | — |
 | `core/logging` | `Install` | both-apps | — |

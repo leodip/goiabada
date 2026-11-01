@@ -593,11 +593,11 @@ func (m *JWT) RequiresScope(
 func (m *JWT) buildScopeString(customScopes []string) string {
 
 	// Default required scopes.
-	// "profile" is required for the locale claim to be emitted in tokens
+	// "profile" is required for the name claims to be emitted in the ID token
 	// (see userclaims.Mapper.AddOpenIDConnectClaims, which the auth server's token
-	// issuer calls), which adminconsole's
-	// JWT-locale refinement middleware reads to resolve the user's stored
-	// locale.
+	// issuer calls), which the renderer reads for the signed-in user the menu
+	// names. The console's page language is not read from a claim: the sign-in
+	// copies it from the Account API into the session (#631 decision 7).
 	defaultScopes := []string{
 		"openid",
 		"email",

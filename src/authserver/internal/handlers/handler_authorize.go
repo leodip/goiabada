@@ -167,7 +167,9 @@ func answerAuthorizePageRefusal(pageRenderer PageRenderer, w http.ResponseWriter
 // withUILocales refines the request's localizer to the ui_locales hint. The global locale
 // middleware ran on this request but only sees the query string, so a hint that came in a form
 // body, or in a request parked by a POST, has to be applied here for anything browser-visible on
-// this request (the refusal page, the level 1 password page) to render in the chosen locale.
+// this request (the refusal page, the level 1 password page) to render in the chosen locale. A known
+// user's page language, which the page-language middleware applied, wins over it (#631 decision 4):
+// i18n.WithLocale leaves a page language alone.
 func withUILocales(r *http.Request, uiLocales []string) *http.Request {
 	if len(uiLocales) == 0 {
 		return r

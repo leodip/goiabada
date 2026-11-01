@@ -268,7 +268,7 @@ func finishForgotPassword(
 		"name": user.FullName(),
 		"link": emaillinks.ResetPasswordLink(baseURL, verificationCode),
 	}
-	emailReq := r.WithContext(i18n.WithLocale(ctx, true, user.Locale, "en"))
+	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, user.PageLanguage, user.Locale))
 	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to render the password reset email", "user_id", user.Id, "error", err)

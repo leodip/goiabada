@@ -11,8 +11,8 @@ import (
 
 // UILocalesReader supplies locale preferences from an in-flight authorize
 // transaction. Adminconsole passes nil because it has no such transaction
-// state (identity comes from JWT, which adminconsole refines from in a
-// middleware of its own over WithLocale).
+// state; its own page-language middleware applies the signed-in user's choice
+// over what Locale resolved, with WithPageLanguage.
 type UILocalesReader interface {
 	UILocales(r *http.Request) []string
 }
@@ -114,7 +114,7 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 	// own form parsing on POST.
 	if raw := r.URL.Query().Get("ui_locales"); raw != "" {
 		if tags := SanitizeUILocales(raw); len(tags) > 0 {
-			return attachLocale(ctx, b.localizerFor(tags), tags[0], true)
+			return attachLocale(ctx, b.localizerFor(tags), tags[0], true, false)
 		}
 	}
 
@@ -123,23 +123,25 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 	// effectively a map lookup, not a fresh load.
 	if uiLocalesReader != nil {
 		if tags := uiLocalesReader.UILocales(r); len(tags) > 0 {
-			return attachLocale(ctx, b.localizerFor(tags), tags[0], true)
+			return attachLocale(ctx, b.localizerFor(tags), tags[0], true, false)
 		}
 	}
 
 	// (3) Accept-Language, parsed per RFC 9110 section 12.5.4 and matched
 	// against the loaded catalogs (see bundle.localizerFor).
 	if al := r.Header.Get("Accept-Language"); al != "" {
-		return attachLocale(ctx, b.localizerFor([]string{al}), al, false)
+		return attachLocale(ctx, b.localizerFor([]string{al}), al, false, false)
 	}
 
 	// (4) English fallback.
-	return attachLocale(ctx, b.english, "en", false)
+	return attachLocale(ctx, b.english, "en", false, false)
 }
 
-// WithLocale attaches the translator for the locale the caller is asking for, and
-// is the whole of core/i18n's locale-setting surface: every policy about which
-// locale a process wants, and where it reads it from, belongs to that process.
+// WithLocale attaches the translator for the locale the caller is asking for. It
+// sets the locale a request asks for; a user's page language (WithPageLanguage)
+// and an email's recipient language (WithRecipientLanguage) have setters of their
+// own. Every policy about which locale a process wants, and where it reads it
+// from, belongs to that process.
 //
 // The tags are preferences, best first, and all the usable ones — non-empty
 // after trimming — are matched together, the way an Accept-Language list is. An
@@ -151,11 +153,17 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 // usable, ctx is returned unchanged.
 //
 // explicit marks the locale as a stated per-request preference: an RP's
-// ui_locales, or an email rendered in its recipient's language rather than in
-// the language of whoever triggered the send. A call with explicit false leaves
+// ui_locales, or an email to an address with no account rendered in the
+// language of the page it was asked for from (an email to a user takes
+// WithRecipientLanguage instead). A call with explicit false leaves
 // an explicit locale already on ctx untouched, which is what stops user-locale
 // refinement clobbering what the request asked for; a call with explicit true
-// always wins.
+// always wins over a request's own preferences.
+//
+// Neither kind of call moves a user's page language (WithPageLanguage) already on ctx: the
+// user's own choice wins over an RP's ui_locales and over any refinement (#631 decision 4). The
+// call still changes the language the request asks for beneath it, by the same rules, which is the
+// language a later user's Automatic gives back (decision 5).
 //
 // Go contexts are immutable, so the returned context is the whole of the
 // effect. On a request that means
@@ -169,6 +177,16 @@ func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Cont
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if hasPageLanguage(ctx) {
+		// The request's own language, beneath the page language, moves as it would on its own.
+		beneath := withLocale(restoreRequestLanguage(ctx), explicit, tags)
+		return context.WithValue(ctx, ctxKeyRequestLanguage, requestLanguageOf(beneath))
+	}
+	return withLocale(ctx, explicit, tags)
+}
+
+// withLocale is WithLocale on a context with no page language.
+func withLocale(ctx context.Context, explicit bool, tags []string) context.Context {
 	if !explicit && hasExplicitIntent(ctx) {
 		return ctx
 	}
@@ -187,17 +205,20 @@ func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Cont
 	// catalog and the matcher reads the list as one preference order.
 	// Matching only the first tag would answer English there, silently
 	// discarding the RP's second choice (#385).
-	return attachLocale(ctx, current().localizerFor(usable), usable[0], explicit)
+	return attachLocale(ctx, current().localizerFor(usable), usable[0], explicit, false)
 }
 
 // attachLocale stores the localizer plus the primary resolved language tag
 // (the first preference used to build the localizer; "en" for the bundle's
 // English fallback). The tag is what LocaleTag answers, which an email's body
-// copy is chosen from.
-func attachLocale(ctx context.Context, loc *translator, tag string, explicit bool) context.Context {
+// copy is chosen from. pageLanguage marks the localizer as a user's page
+// language, which WithLocale leaves alone; every attach writes the mark, so a
+// localizer from any other source never inherits it.
+func attachLocale(ctx context.Context, loc *translator, tag string, explicit, pageLanguage bool) context.Context {
 	ctx = context.WithValue(ctx, ctxKeyLocalizer, loc)
 	ctx = context.WithValue(ctx, ctxKeyLocaleTag, primaryTag(tag))
 	ctx = context.WithValue(ctx, ctxKeyExplicitIntent, explicit)
+	ctx = context.WithValue(ctx, ctxKeyPageLanguage, pageLanguage)
 	return ctx
 }
 
@@ -221,6 +242,15 @@ func primaryTag(s string) string {
 
 func hasExplicitIntent(ctx context.Context) bool {
 	if v := ctx.Value(ctxKeyExplicitIntent); v != nil {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+func hasPageLanguage(ctx context.Context) bool {
+	if v := ctx.Value(ctxKeyPageLanguage); v != nil {
 		if b, ok := v.(bool); ok {
 			return b
 		}

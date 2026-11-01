@@ -74,7 +74,7 @@ const (
 	// account exists.
 	PasswordRefused PasswordAnswer = iota + 1
 	// PasswordAccountDisabled is the right password for a disabled account. The form is shown again
-	// with the disabled message, in the user's locale. Nothing was written to the browser session.
+	// with the disabled message, in the user's page language. Nothing was written to the browser session.
 	PasswordAccountDisabled
 	// PasswordAccepted is the right password for an enabled account: the ceremony recorded it, the
 	// browser session's identifier was rotated, and the ceremony saved in level1_password_completed.
@@ -84,10 +84,11 @@ const (
 // PasswordSubmissionResult is what PasswordSubmission.Run did.
 type PasswordSubmissionResult struct {
 	Answer PasswordAnswer
-	// UserLocale is the verified user's stored locale, set on PasswordAccountDisabled and
-	// PasswordAccepted. From the verified password on, the handler answers in it, unless the request
-	// named a locale of its own (i18n.WithLocale, non-explicit).
-	UserLocale string
+	// UserPageLanguage is the verified user's page language, set on PasswordAccountDisabled and
+	// PasswordAccepted. From the verified password on, the handler answers in it
+	// (i18n.WithPageLanguage), over the request's ui_locales and the browser; on Automatic it answers
+	// in the request's language, never the user's Language and region (#631 decisions 2 and 5).
+	UserPageLanguage string
 
 	// NextStep is /auth/level1completed, set on PasswordAccepted.
 	NextStep string
@@ -167,7 +168,7 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
 			"user_id": user.Id,
 		})
-		return PasswordSubmissionResult{Answer: PasswordAccountDisabled, UserLocale: user.Locale}, nil
+		return PasswordSubmissionResult{Answer: PasswordAccountDisabled, UserPageLanguage: user.PageLanguage}, nil
 	}
 
 	o.auditLogger.Log(ctx, audit.EventAuthSuccessPwd, map[string]interface{}{
@@ -177,9 +178,9 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 	authContext.RecordPasswordVerified(user, time.Now())
 
 	result := PasswordSubmissionResult{
-		Answer:     PasswordAccepted,
-		UserLocale: user.Locale,
-		NextStep:   "/auth/level1completed",
+		Answer:           PasswordAccepted,
+		UserPageLanguage: user.PageLanguage,
+		NextStep:         "/auth/level1completed",
 	}
 	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
 		return result, nil

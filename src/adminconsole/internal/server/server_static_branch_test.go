@@ -41,7 +41,7 @@ func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) 
 
 	s := newStaticBranchTestServer(settings.URL, store)
 	app := s.initMiddleware()
-	s.serveStaticFiles()
+	s.serveStaticFiles(http.NotFoundHandler())
 	app.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -69,7 +69,7 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 
 	s := newStaticBranchTestServer(settings.URL, store)
 	app := s.initMiddleware()
-	s.serveStaticFiles()
+	s.serveStaticFiles(http.NotFoundHandler())
 
 	reached := false
 	app.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {

@@ -34,6 +34,7 @@ type User struct {
 	ZoneInfoCountryName            string       `db:"zone_info_country_name"`
 	ZoneInfo                       string       `db:"zone_info"`
 	Locale                         string       `db:"locale"`
+	PageLanguage                   string       `db:"page_language"`
 	BirthDate                      sql.NullTime `db:"birth_date"`
 	PhoneNumberCountryUniqueId     string       `db:"phone_number_country_uniqueid"`
 	PhoneNumberCountryCallingCode  string       `db:"phone_number_country_callingcode"`
