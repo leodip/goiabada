@@ -29,7 +29,6 @@ const (
 func newDiscoveryTestServer(t *testing.T) *Server {
 	t.Helper()
 	database := datamocks.NewDatabase(t)
-	expectNoLegalDocuments(database)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Return(&record.Settings{Id: 1, Issuer: "https://issuer.example"}, nil)
 	return newFaultsTestServer(database)

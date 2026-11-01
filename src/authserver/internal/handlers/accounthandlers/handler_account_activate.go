@@ -164,25 +164,15 @@ var errActivationNoLongerOutstanding = errors.New("the pending registration no l
 // Both hops refuse while self-registration is off, the way the register pages do: a link mailed
 // while registration was on must not create an account after an administrator has turned it off
 // (#425 decision 6).
-//
-// Both hops' pages, refusals included, belong to the sign-in the link names while the browser holds
-// it, so their footer links that app's documents (forRegistrationClient).
 func HandleActivateGet(
-	basePageRenderer PageRenderer,
+	pageRenderer PageRenderer,
 	httpSession linkMarkerSessionStore,
-	ceremonies registrationCeremonies,
 	database accountActivateDatabase,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		pageRenderer, err := forRegistrationClient(basePageRenderer, r, ceremonies)
-		if err != nil {
-			basePageRenderer.InternalServerError(w, r, err)
-			return
-		}
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {
@@ -212,7 +202,7 @@ func HandleActivateGet(
 			"passwordRules":  passwordRulesHint(r),
 		}
 
-		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_activate_password.html", bind)
+		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_activate_password.html", bind)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 		}
@@ -415,7 +405,7 @@ func refuseActivationAddressTaken(pageRenderer PageRenderer, database accountAct
 // they were signing in to and sign in with their new password, with My Account as a secondary link.
 // An activation from a registration reached from anywhere else answers the page as it always has.
 func HandleActivatePost(
-	basePageRenderer PageRenderer,
+	pageRenderer PageRenderer,
 	httpSession linkMarkerSessionStore,
 	ceremonies signInCeremonies,
 	database accountActivateDatabase,
@@ -429,14 +419,6 @@ func HandleActivatePost(
 	proof := authflow.NewPasswordProof(auditLogger)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		// The form, its refusals and the result page belong to the sign-in the link names while
-		// the browser holds it, as the form the first hop led to did (forRegistrationClient).
-		pageRenderer, rendererErr := forRegistrationClient(basePageRenderer, r, ceremonies)
-		if rendererErr != nil {
-			basePageRenderer.InternalServerError(w, r, rendererErr)
-			return
-		}
 
 		settings, ok := reqctx.SettingsFrom(r.Context())
 		if !ok {

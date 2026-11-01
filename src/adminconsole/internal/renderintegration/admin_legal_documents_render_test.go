@@ -267,6 +267,7 @@ func TestRender_AdminLegalDocumentApps(t *testing.T) {
 		assert.Contains(t, out, `<input type="hidden" name="expectedClientId" value="4">`)
 		assert.Contains(t, out, `name="appliesTo" value="all_apps" aria-labelledby`)
 		assert.Contains(t, out, `name="appliesTo" value="selected_apps" checked`)
+		assert.Contains(t, out, `<fieldset id="appsSection">`, "the apps show while Selected apps is chosen")
 		assert.Contains(t, out, `<input type="checkbox" id="app-4" name="clientId" value="4" checked aria-describedby="app-4-hint">`)
 		assert.Contains(t, out, `<input type="checkbox" id="app-6" name="clientId" value="6">`)
 		assert.Contains(t, out, `<span class="field-hint" id="app-4-hint">A loja</span>`)
@@ -279,6 +280,7 @@ func TestRender_AdminLegalDocumentApps(t *testing.T) {
 			bind(legalDocumentAt(7, "terms-of-use", "must_accept", "Termos de uso", 2), true, []map[string]any{blog}))
 
 		assert.Contains(t, out, `name="appliesTo" value="all_apps" checked`)
+		assert.Contains(t, out, `<fieldset id="appsSection" hidden>`, "a save of All apps clears the apps, so they don't show")
 		assert.NotContains(t, out, `name="expectedClientId"`, "an empty list carries no id")
 	})
 
@@ -304,7 +306,8 @@ func TestRender_AdminLegalDocumentApps(t *testing.T) {
 		out := renderMenuPage(t, "/admin_legal_documents_apps.html", bind(doc, true, []map[string]any{blog}))
 
 		assert.Contains(t, out, "Este documento está retirado, então os aplicativos")
-		assert.Equal(t, 2, strings.Count(out, "<fieldset disabled>"), "both choices are read only")
+		assert.Contains(t, out, "<fieldset disabled>", "the choice is read only")
+		assert.Contains(t, out, `<fieldset id="appsSection" disabled hidden>`, "and so are the apps")
 		assert.NotContains(t, out, `id="btnSaveApps"`)
 	})
 }

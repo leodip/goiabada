@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -59,7 +60,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
-	httpHelper := s.newRenderer()
+	httpHelper := render.New(s.templateFS, s.staticFS)
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 	legalDocuments := legaldocuments.NewReader(s.database)
 
@@ -137,7 +138,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
-	publicSettingsHandler := handlers.NewPublicSettings(s.database, legalDocuments, baseURL)
+	publicSettingsHandler := handlers.NewPublicSettings(s.database)
 	api.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
 	// One route boundary and one client-error responder, shared by every ceremony route: the
@@ -210,7 +211,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper), accounthandlers.RequireRegistrationChallenge(httpHelper, ceremonyStore, legalDocuments, s.challengeVerifier), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, ceremonyStore, legalDocuments, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	})
 	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
-	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, ceremonyStore, s.database, auditLogger, s.dataCipher))
+	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
 	pages.With(rateLimiter.LimitActivate).Post(emaillinks.AccountActivatePath, accounthandlers.HandleActivatePost(httpHelper, s.sessionStore, ceremonyStore, s.database, userCreator, passwordValidator, auditLogger, baseURL, adminConsoleBaseURL))
 
 	// Admin API routes

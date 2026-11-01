@@ -49,16 +49,6 @@ func titles(inEffect []InEffect) map[string]string {
 	return out
 }
 
-func TestForAllApps_ThePublishedDocumentsNotRetiredForAllApps(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-	documents(database)
-
-	inEffect, err := NewReader(database).ForAllApps(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, map[string]string{"privacy": "Privacy v2"}, titles(inEffect))
-	assert.Equal(t, published, inEffect[0].Current.PublishedAt, "the latest version is the current one")
-}
-
 func TestForClient_TheAllAppsDocumentsAndTheClientsOwn(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	documents(database)
@@ -78,7 +68,9 @@ func TestForClient_NoAppOrAnUnknownOneIsTheAllAppsDocuments(t *testing.T) {
 		documents(database)
 		inEffect, err := NewReader(database).ForClient(context.Background(), "")
 		require.NoError(t, err)
-		assert.Equal(t, map[string]string{"privacy": "Privacy v2"}, titles(inEffect))
+		assert.Equal(t, map[string]string{"privacy": "Privacy v2"}, titles(inEffect),
+			"the documents for all apps that are published and not retired")
+		assert.Equal(t, published, inEffect[0].Current.PublishedAt, "the latest version is the current one")
 	})
 	t.Run("an unknown app", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
@@ -100,6 +92,6 @@ func TestForClient_AFailedReadIsAnError(t *testing.T) {
 
 	database = datamocks.NewDatabase(t)
 	database.EXPECT().GetAllLegalDocuments(mock.Anything, (*sql.Tx)(nil)).Return(nil, failure)
-	_, err = NewReader(database).ForAllApps(context.Background())
+	_, err = NewReader(database).ForClient(context.Background(), "")
 	require.ErrorIs(t, err, failure)
 }

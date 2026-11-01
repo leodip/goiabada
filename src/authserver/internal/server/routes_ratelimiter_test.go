@@ -188,7 +188,6 @@ func newRoutesTestServerRendering(t *testing.T, configure func(*config.Config), 
 	require.NoError(t, err)
 
 	database := datamocks.NewDatabase(t)
-	expectNoLegalDocuments(database)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
 		Id:           1,
@@ -207,6 +206,11 @@ func newRoutesTestServerRendering(t *testing.T, configure func(*config.Config), 
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*record.User)(nil), nil).Maybe()
 	database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, mock.Anything).
 		Return((*record.PreRegistration)(nil), nil).Maybe()
+	// The registration form links the legal documents in effect where it collects the data (#622):
+	// none here, so the form draws without them.
+	database.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return([]record.LegalDocument{}, nil).Maybe()
+	database.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, mock.Anything).
+		Return([]record.LegalDocumentClient{}, nil).Maybe()
 	// What the OTP step reads: the user the auth context names, not yet enrolled, and the
 	// client whose branding the form carries.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).

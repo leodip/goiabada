@@ -30,9 +30,6 @@ type legalDocumentVersionLink struct {
 // one, and a version the document does not have, all answer the not-found page, as an unknown short
 // name does. A version is written in its canonical decimal form: versions/01 names no page, so a
 // version has one address.
-//
-// The page uses the sign-in pages' layout and footer. It names no app, so the footer links the
-// all-apps documents.
 func HandleLegalDocumentGet(pageRenderer PageRenderer, database legalDocumentPageDatabase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		doc, err := database.GetLegalDocumentByShortName(r.Context(), nil, r.PathValue("shortName"))

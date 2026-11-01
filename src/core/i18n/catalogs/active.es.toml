@@ -283,8 +283,7 @@
 "not_found.title" = "Página no encontrada"
 "not_found.body" = "Puede que la dirección esté mal escrita o que la página haya cambiado de ubicación."
 
-# --- Legal documents: public pages and footer (#622) ---------------------------
-"legal_documents.footer.label" = "Documentos legales"
+# --- Legal documents: public pages and acceptance (#622) -----------------------
 "legal_documents.page.version" = "Versión {{.version}}"
 "legal_documents.page.published" = "Publicada"
 "legal_documents.page.superseded" = "Esta versión ya no está en vigor. La versión vigente es la {{.version}}."
@@ -310,7 +309,6 @@
 "adminconsole.menu.logout" = "Cerrar sesión"
 "adminconsole.menu.version_label" = "Versión"
 "adminconsole.layout.skip_to_content" = "Ir al contenido principal"
-"adminconsole.layout.legal_documents" = "Documentos legales"
 "adminconsole.layout.open_menu" = "Abrir menú"
 "adminconsole.layout.close_menu" = "Cerrar menú"
 "adminconsole.layout.user_menu" = "Menú de cuenta"
@@ -1412,7 +1410,7 @@
 "adminconsole.admin_legal_documents.apps.all_apps_hint" = "Todas las aplicaciones, incluidas las que se añadan después."
 "adminconsole.admin_legal_documents.apps.selected_apps_hint" = "Solo las aplicaciones marcadas abajo. Si no hay ninguna marcada, el documento no se aplica a nadie."
 "adminconsole.admin_legal_documents.apps.apps_legend" = "Aplicaciones"
-"adminconsole.admin_legal_documents.apps.apps_hint" = "Se usan cuando se elige Aplicaciones seleccionadas. La consola de administración no aparece: a los usuarios nunca se les pide aceptar un documento al iniciar sesión en ella."
+"adminconsole.admin_legal_documents.apps.apps_hint" = "La consola de administración no aparece: a los usuarios nunca se les pide aceptar un documento al iniciar sesión en ella."
 "adminconsole.admin_legal_documents.apps.no_clients" = "No hay aplicaciones para elegir."
 "adminconsole.admin_legal_documents.apps.no_apps_notice" = "No hay ninguna aplicación seleccionada, así que este documento no se aplica a nadie. Seleccione sus aplicaciones o elija Todas las aplicaciones."
 "adminconsole.admin_legal_documents.apps.retired_notice" = "Este documento está retirado, así que las aplicaciones a las que se aplica no se pueden cambiar. Restáurelo para cambiarlas."

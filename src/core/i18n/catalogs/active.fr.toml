@@ -281,8 +281,7 @@
 "not_found.title" = "Page introuvable"
 "not_found.body" = "L’adresse est peut-être incorrecte, ou la page a été déplacée."
 
-# --- Legal documents: public pages and footer (#622) ---------------------------
-"legal_documents.footer.label" = "Documents juridiques"
+# --- Legal documents: public pages and acceptance (#622) -----------------------
 "legal_documents.page.version" = "Version {{.version}}"
 "legal_documents.page.published" = "Publiée le"
 "legal_documents.page.superseded" = "Cette version n'est plus en vigueur. La version en vigueur est la version {{.version}}."
@@ -308,7 +307,6 @@
 "adminconsole.menu.logout" = "Se déconnecter"
 "adminconsole.menu.version_label" = "Version"
 "adminconsole.layout.skip_to_content" = "Aller au contenu principal"
-"adminconsole.layout.legal_documents" = "Documents juridiques"
 "adminconsole.layout.open_menu" = "Ouvrir le menu"
 "adminconsole.layout.close_menu" = "Fermer le menu"
 "adminconsole.layout.user_menu" = "Menu du compte"
@@ -1410,7 +1408,7 @@
 "adminconsole.admin_legal_documents.apps.all_apps_hint" = "Chaque application, y compris celles ajoutées plus tard."
 "adminconsole.admin_legal_documents.apps.selected_apps_hint" = "Seulement les applications cochées ci-dessous. Si aucune n'est cochée, le document ne s'applique à personne."
 "adminconsole.admin_legal_documents.apps.apps_legend" = "Applications"
-"adminconsole.admin_legal_documents.apps.apps_hint" = "Utilisées lorsque Applications sélectionnées est choisi. La console d'administration n'est pas listée : les utilisateurs ne sont jamais invités à accepter un document lorsqu'ils s'y connectent."
+"adminconsole.admin_legal_documents.apps.apps_hint" = "La console d'administration n'est pas listée : les utilisateurs ne sont jamais invités à accepter un document lorsqu'ils s'y connectent."
 "adminconsole.admin_legal_documents.apps.no_clients" = "Il n'y a aucune application à choisir."
 "adminconsole.admin_legal_documents.apps.no_apps_notice" = "Aucune application n'est sélectionnée, ce document ne s'applique donc à personne. Sélectionnez ses applications ou choisissez Toutes les applications."
 "adminconsole.admin_legal_documents.apps.retired_notice" = "Ce document est retiré, les applications auxquelles il s'applique ne peuvent donc pas être modifiées. Restaurez-le pour les modifier."

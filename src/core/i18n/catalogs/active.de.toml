@@ -282,8 +282,7 @@
 "not_found.title" = "Seite nicht gefunden"
 "not_found.body" = "Die Adresse wurde möglicherweise falsch eingegeben oder die Seite wurde verschoben."
 
-# --- Legal documents: public pages and footer (#622) ---------------------------
-"legal_documents.footer.label" = "Rechtsdokumente"
+# --- Legal documents: public pages and acceptance (#622) -----------------------
 "legal_documents.page.version" = "Version {{.version}}"
 "legal_documents.page.published" = "Veröffentlicht"
 "legal_documents.page.superseded" = "Diese Version ist nicht mehr in Kraft. Aktuell ist Version {{.version}}."
@@ -309,7 +308,6 @@
 "adminconsole.menu.logout" = "Abmelden"
 "adminconsole.menu.version_label" = "Version"
 "adminconsole.layout.skip_to_content" = "Zum Hauptinhalt"
-"adminconsole.layout.legal_documents" = "Rechtsdokumente"
 "adminconsole.layout.open_menu" = "Menü öffnen"
 "adminconsole.layout.close_menu" = "Menü schließen"
 "adminconsole.layout.user_menu" = "Kontomenü"
@@ -1411,7 +1409,7 @@
 "adminconsole.admin_legal_documents.apps.all_apps_hint" = "Jede App, auch später hinzugefügte."
 "adminconsole.admin_legal_documents.apps.selected_apps_hint" = "Nur die unten markierten Apps. Ist keine markiert, gilt das Dokument für niemanden."
 "adminconsole.admin_legal_documents.apps.apps_legend" = "Apps"
-"adminconsole.admin_legal_documents.apps.apps_hint" = "Gilt, wenn „Ausgewählte Apps“ gewählt ist. Die Admin-Konsole ist nicht aufgeführt: Benutzer werden bei der Anmeldung an ihr nie gebeten, ein Dokument zu akzeptieren."
+"adminconsole.admin_legal_documents.apps.apps_hint" = "Die Admin-Konsole ist nicht aufgeführt: Benutzer werden bei der Anmeldung an ihr nie gebeten, ein Dokument zu akzeptieren."
 "adminconsole.admin_legal_documents.apps.no_clients" = "Es gibt keine Apps zur Auswahl."
 "adminconsole.admin_legal_documents.apps.no_apps_notice" = "Keine App ist ausgewählt, daher gilt dieses Dokument für niemanden. Wählen Sie seine Apps aus oder wählen Sie „Alle Apps“."
 "adminconsole.admin_legal_documents.apps.retired_notice" = "Dieses Dokument ist außer Kraft gesetzt, daher können die Apps, für die es gilt, nicht geändert werden. Stellen Sie es wieder her, um sie zu ändern."

@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/stretchr/testify/assert"
@@ -62,15 +61,15 @@ func renderedRegisterBind(t *testing.T, pageRenderer *handlersmocks.PageRenderer
 func TestHandleRegisterGet_LinksTheAllAppsDocumentsAndTheSignInsApps(t *testing.T) {
 	held := heldCeremonies{aCeremonyId: {CeremonyId: aCeremonyId, ClientId: "shop"}}
 	otherHeld := heldCeremonies{"zBcDeFgHiJkLmNoPqRsTuVwXyZ012345": {ClientId: "blog"}}
-	allApps := []render.LegalDocumentLink{{Title: "Privacy notice", ShortName: "privacy"}}
-	withShop := append(append([]render.LegalDocumentLink{}, allApps...), render.LegalDocumentLink{Title: "Shop terms", ShortName: "shop-terms"})
+	allApps := []legalDocumentLink{{Title: "Privacy notice", ShortName: "privacy"}}
+	withShop := append(append([]legalDocumentLink{}, allApps...), legalDocumentLink{Title: "Shop terms", ShortName: "shop-terms"})
 
 	for _, tc := range []struct {
 		name       string
 		ceremonies heldCeremonies
 		query      string
 		client     string
-		want       []render.LegalDocumentLink
+		want       []legalDocumentLink
 	}{
 		{"from the app's sign-in, held by the browser", held, "?ceremony=" + aCeremonyId, "shop", withShop},
 		{"a sign-in this browser does not hold", otherHeld, "?ceremony=" + aCeremonyId, "", allApps},
@@ -85,7 +84,6 @@ func TestHandleRegisterGet_LinksTheAllAppsDocumentsAndTheSignInsApps(t *testing.
 			bind := renderedRegisterBind(t, pageRenderer, HandleRegisterGet(pageRenderer, tc.ceremonies, shopDocuments(&asked)), req)
 
 			assert.Equal(t, tc.want, bind["legalDocuments"])
-			assert.Equal(t, tc.client, bind[render.LegalFooterClient], "the footer links the same app's documents")
 			assert.Equal(t, []string{tc.client}, asked)
 		})
 	}
@@ -104,10 +102,9 @@ func TestHandleRegisterPost_TheRedrawnFormLinksTheSameDocuments(t *testing.T) {
 	bind := renderedRegisterBind(t, pageRenderer, handler, registerRequest(http.MethodPost, "?ceremony="+aCeremonyId))
 
 	assert.Equal(t, "Email is required.", bind["error"])
-	assert.Equal(t, []render.LegalDocumentLink{
+	assert.Equal(t, []legalDocumentLink{
 		{Title: "Privacy notice", ShortName: "privacy"}, {Title: "Shop terms", ShortName: "shop-terms"},
 	}, bind["legalDocuments"])
-	assert.Equal(t, "shop", bind[render.LegalFooterClient])
 }
 
 // A submission the Turnstile challenge refuses draws the form again with the same documents, as
@@ -129,10 +126,9 @@ func TestRequireRegistrationChallenge_TheRedrawnFormLinksTheSameDocuments(t *tes
 	bind := renderedRegisterBind(t, pageRenderer, handler, req)
 
 	assert.Equal(t, "Complete the security check, then try again. The check needs JavaScript.", bind["error"])
-	assert.Equal(t, []render.LegalDocumentLink{
+	assert.Equal(t, []legalDocumentLink{
 		{Title: "Privacy notice", ShortName: "privacy"}, {Title: "Shop terms", ShortName: "shop-terms"},
 	}, bind["legalDocuments"])
-	assert.Equal(t, "shop", bind[render.LegalFooterClient])
 	assert.Equal(t, "1x00000000000000000000AA", bind["turnstileSiteKey"], "the redrawn form carries a fresh widget")
 }
 

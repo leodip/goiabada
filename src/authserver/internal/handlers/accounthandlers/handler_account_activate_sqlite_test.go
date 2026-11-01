@@ -83,7 +83,7 @@ func TestHandleActivateGet_ExpiredLink_OnSQLite(t *testing.T) {
 		expectRenderedLinkExpired(pageRenderer)
 		expectAuditFailedActivationCode(auditLogger, "code_expired", row.Id)
 
-		HandleActivateGet(pageRenderer, newMarkerTestStore(), heldCeremonies{}, db, auditLogger, testDataCipher).
+		HandleActivateGet(pageRenderer, newMarkerTestStore(), db, auditLogger, testDataCipher).
 			ServeHTTP(httptest.NewRecorder(), activationLinkFollowedRequest(expiredCode))
 
 		gone, err := db.GetPreRegistrationByVerificationCodeHash(ctx, nil, codeHash)
@@ -120,7 +120,7 @@ func TestHandleActivateGet_ExpiredLink_OnSQLite(t *testing.T) {
 		expectAuditFailedActivationCode(auditLogger, "code_expired", row.Id)
 
 		rr := httptest.NewRecorder()
-		HandleActivateGet(pageRenderer, newMarkerTestStore(), heldCeremonies{}, raced, auditLogger, testDataCipher).
+		HandleActivateGet(pageRenderer, newMarkerTestStore(), raced, auditLogger, testDataCipher).
 			ServeHTTP(rr, activationLinkFollowedRequest(expiredCode))
 
 		assert.Equal(t, http.StatusOK, rr.Code, "the expired link is refused as any expired link is")

@@ -50,7 +50,6 @@ func newMetricsTestServer(t *testing.T) *Server {
 	t.Helper()
 
 	database := datamocks.NewDatabase(t)
-	expectNoLegalDocuments(database)
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Maybe()
 	database.On("PoolStats").Return(testPoolStats).Maybe()
