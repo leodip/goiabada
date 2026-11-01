@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/clientauth"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -64,6 +65,20 @@ func (endpoint clientAuthenticationEndpoint) logClientAuthenticationRefusal(r *h
 			"client_identifier", logging.FieldForLog(clientIdentifier),
 			"client_auth_method", clientAuthMethod(r))
 	}
+}
+
+// refusedOverClientAuthenticationLimit writes the 429 of a client over the client authentication
+// limit when err is that refusal, and reports whether it did: every endpoint that authenticates a
+// client answers it through here (#707 decision 10). The limiter has already written the refusal's
+// warning, audit event and metric; the caller writes nothing else and counts it in no refusal metric
+// of its own, since the client's credentials were never judged.
+func refusedOverClientAuthenticationLimit(w http.ResponseWriter, r *http.Request, err error) bool {
+	var limitReached *clientauth.LimitReachedError
+	if !errors.As(err, &limitReached) {
+		return false
+	}
+	middleware.WriteOAuthRateLimitRefusal(w, r, limitReached.RetryAfter)
+	return true
 }
 
 // clientAuthMethod names how a request presented its client credentials, as discovery's

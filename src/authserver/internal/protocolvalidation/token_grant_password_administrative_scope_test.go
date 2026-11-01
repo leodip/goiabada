@@ -62,7 +62,7 @@ func TestValidateTokenRequest_ROPC_AdministrativeScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
 			mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), mockPermissionChecker, testDataCipher)
+			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), mockPermissionChecker, testDataCipher, nil)
 
 			passwordHash, err := passwordhash.Hash("correctpassword")
 			require.NoError(t, err)

@@ -206,7 +206,7 @@ func passwordGrantErrors(t *testing.T) map[string]string {
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 		handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
-			protocolvalidation.NewTokenValidator(database, nil, fixedPermissionChecker{held: false}, testDataCipher),
+			protocolvalidation.NewTokenValidator(database, nil, fixedPermissionChecker{held: false}, testDataCipher, nil),
 			auditLogger, noCredentialFailures{}, testTokenMetrics())
 
 		req := httptest.NewRequest(http.MethodPost, "/auth/token", strings.NewReader(refusal.form.Encode()))

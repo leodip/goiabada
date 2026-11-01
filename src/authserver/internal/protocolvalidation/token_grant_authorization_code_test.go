@@ -27,7 +27,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -63,7 +63,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -100,7 +100,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -138,7 +138,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -197,7 +197,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -239,7 +239,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -284,7 +284,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -334,7 +334,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -395,7 +395,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -455,7 +455,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -513,7 +513,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -574,7 +574,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -641,7 +641,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -702,7 +702,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -756,7 +756,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -857,7 +857,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -907,7 +907,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -956,7 +956,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -1003,7 +1003,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -1058,7 +1058,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -1102,7 +1102,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -1152,7 +1152,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -1202,7 +1202,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -1248,7 +1248,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -1302,7 +1302,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 	settings := &record.Settings{}
 	ctx := context.Background()
@@ -1369,7 +1369,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 	settings := &record.Settings{}
 	ctx := context.Background()
@@ -1435,7 +1435,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 	settings := &record.Settings{}
 	ctx := context.Background()
@@ -1495,7 +1495,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 	settings := &record.Settings{}
 	ctx := context.Background()
@@ -1556,7 +1556,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 	settings := &record.Settings{}
 	ctx := context.Background()
@@ -1623,7 +1623,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 	settings := &record.Settings{}
 	ctx := context.Background()
@@ -1694,7 +1694,7 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 	settings := &record.Settings{}
 
@@ -1804,7 +1804,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 
@@ -1948,7 +1948,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		mockDB := datamocks.NewDatabase(t)
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		settings := &record.Settings{}
 

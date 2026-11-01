@@ -203,7 +203,7 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 
 		mockDB := datamocks.NewDatabase(t)
 		validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
-			protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+			protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		require.NoError(t, err)
@@ -306,7 +306,7 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 func TestValidateTokenRequest_MalformedVerifierOnAReusedCodeDoesNotCascade(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
-		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 
 	client := &record.Client{Id: 1, ClientIdentifier: "client1", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true}
 	// A code already redeemed, so the retry lookup with used=true finds it. It is older than the

@@ -244,7 +244,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `auth_failed_recovery_code` | A recovery code was refused at sign-in, because it was wrong, from a set that was replaced, or already used. |
 | `recovery_code_replay_detected` | A recovery code from the user's current set that had already been used was sent again at sign-in, and was refused. Written beside that refusal's `auth_failed_recovery_code`. |
 | `user_disabled` | A disabled user was refused: at sign-in, when reusing a session, before a code or tokens were issued, at the token endpoint or at `/userinfo`. |
-| `rate_limit_exceeded` | A rate limiter started refusing requests from an IP address block, for an email address or for a user. Each instance writes it at most once per key per window. |
+| `rate_limit_exceeded` | A rate limiter started refusing requests from an IP address block, for an email address, for a user or for a client. Each instance writes it at most once per key per window. |
 | `auth_ceremony_mismatch` | A sign-in step was refused because its page belonged to a sign-in the browser no longer holds, or named none. Its details describe the sign-in the browser most recently moved. |
 | `started_new_user_session` | A user signed in and a new session was created for them. |
 | `bumped_user_session` | A user's existing session was reused and kept alive, by single sign-on, a `prompt=none` request or a refresh token grant. |

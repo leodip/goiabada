@@ -48,7 +48,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 			t.Run(tc.name, func(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
 				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
-				validator := NewTokenValidator(mockDB, mockTokenParser, protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+				validator := NewTokenValidator(mockDB, mockTokenParser, protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 
 				client := &record.Client{
 					Id: 1, ClientIdentifier: "ropc_client", Enabled: true,
@@ -106,7 +106,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 	t.Run("an authorization-code token needs none, its instant being on its code", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)

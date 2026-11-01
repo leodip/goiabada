@@ -22,7 +22,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 	settings := &record.Settings{}
 	ctx := context.Background()
@@ -116,7 +116,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		subtestCtx := context.Background()
 
@@ -161,7 +161,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		subtestCtx := context.Background()
 
@@ -200,7 +200,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		subtestCtx := context.Background()
 
@@ -247,7 +247,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		subtestCtx := context.Background()
 
@@ -289,7 +289,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		subtestCtx := context.Background()
 
@@ -334,7 +334,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		subtestCtx := context.Background()
 
@@ -376,7 +376,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		subtestCtx := context.Background()
 
@@ -419,7 +419,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		subtestCtx := context.Background()
 
@@ -463,7 +463,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 		subtestCtx := context.Background()
 
@@ -560,7 +560,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		t.Helper()
 
 		mockDB := datamocks.NewDatabase(t)
-		validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+		validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 
 		client := &record.Client{
 			ClientIdentifier:         "cc_client",
@@ -827,7 +827,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 
 			client := &record.Client{
 				ClientIdentifier:         "cc_client",
@@ -907,7 +907,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 			settings := &record.Settings{}
 			ctx := context.Background()
 
@@ -962,7 +962,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 // answered 500 server_error. Nothing is resolved: the refusal comes before any scope is looked up.
 func TestValidateTokenRequest_ClientCredentials_NoScopeFromAClientHoldingNothingIsInvalidScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
-	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 
 	clientSecretEncrypted, err := testDataCipher.Encrypt("valid_secret")
 	require.NoError(t, err)

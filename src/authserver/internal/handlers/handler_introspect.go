@@ -85,8 +85,9 @@ func HandleIntrospectPost(
 		jsonWriter:  jsonWriter,
 		database:    database,
 		tokenParser: tokenParser,
-		clients:     clientauth.NewAuthenticator(database, dataCipher),
-		metrics:     introspectionMetrics,
+		// No limiter: this endpoint's secret checks spend no client authentication budget.
+		clients: clientauth.NewAuthenticator(database, dataCipher, nil),
+		metrics: introspectionMetrics,
 	}
 	return endpoint.serve
 }

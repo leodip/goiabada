@@ -52,7 +52,7 @@ func TestValidateTokenRequest(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 
 	t.Run("Missing required client_id", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
@@ -248,7 +248,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
 				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 				mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 				settings := &record.Settings{}
 				ctx := context.Background()
 
@@ -330,7 +330,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
 				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 				mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 				settings := &record.Settings{
 					UserSessionIdleTimeoutInSeconds: 3600,
 					UserSessionMaxLifetimeInSeconds: 86400,
@@ -420,7 +420,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
 				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 				mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
 				settings := &record.Settings{}
 				ctx := context.Background()
 
@@ -498,7 +498,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-		return NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher), mockDB, mockTokenParser
+		return NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil), mockDB, mockTokenParser
 	}
 
 	t.Run("authorization code redemption", func(t *testing.T) {

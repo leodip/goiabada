@@ -274,8 +274,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 - `internal/clientauth/` - Client authentication from plain values, the client identifier and the
   secret presented: the lookup, the secret check and their refusals' wording and shape, shared by
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a
-  refusal stay in `internal/handlers`. It also declares `ChallengeRealm`, the realm the Basic and
-  Bearer challenges share, as the lowest package that writes a challenge (#676)
+  refusal stay in `internal/handlers`. It declares `SecretCheckLimiter`, the port the secret check
+  reserves through and the rate limiter's `client_auth` tier implements, and `LimitReachedError`,
+  its refusal (#707). It also declares `ChallengeRealm`, the realm the Basic and Bearer challenges
+  share, as the lowest package that writes a challenge (#676)
 - `internal/introspectionmetrics/` - `goiabada_introspection_requests_total`, the introspection
   endpoint's answers by outcome, a closed set (#676)
 - `internal/liveness/` - Whether a token the auth server issued is still live. An access token:

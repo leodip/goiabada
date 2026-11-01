@@ -26,6 +26,16 @@ import (
 	"github.com/leodip/goiabada/core/routing"
 )
 
+// rateLimitTiersSpentByHandlers are the rate limiter's tiers a handler spends rather than a Limit
+// middleware mounted on its route, each with the routes whose handlers spend it, as "METHOD /path".
+// client_auth is reserved inside client authentication, around the secret comparison, so the router
+// cannot say where it applies (#707 decision 10). The rate-limit table learns these tiers' routes
+// from here, and its test holds each route to one the router mounts. A route whose handler starts
+// spending a tier is added here.
+var rateLimitTiersSpentByHandlers = map[string][]string{
+	"client_auth": {"POST /auth/token"},
+}
+
 // initRoutes registers the application's routes on the branches initMiddleware returns
 // rather than on s.router itself: the settings read, the session load and the locale
 // resolution belong to these routes and not to the static file server registered beside them
@@ -40,7 +50,6 @@ func (s *Server) initRoutes(branches appBranches) {
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
 	tokenParser := signingkeys.NewTokenParser(s.database)
 	permissionChecker := permissions.NewChecker(s.database)
-	tokenValidator := protocolvalidation.NewTokenValidator(s.database, tokenParser, permissionChecker, s.dataCipher)
 	emailValidator := accountvalidation.NewEmailValidator(s.database)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 	profileValidator := accountvalidation.NewProfileValidator(s.database)
@@ -87,6 +96,10 @@ func (s *Server) initRoutes(branches appBranches) {
 		sharedCredentialCounts(s.cfg.Database.Type, s.database),
 		s.metrics,
 	)
+	// The token endpoint's client secret checks spend the rate limiter's client_auth tier, which
+	// client authentication reserves around the comparison rather than a middleware ahead of the
+	// handler (#707 decision 10): rateLimitTiersSpentByHandlers names the routes.
+	tokenValidator := protocolvalidation.NewTokenValidator(s.database, tokenParser, permissionChecker, s.dataCipher, rateLimiter)
 	emitRateLimiterConfigWarnings(
 		authServerConfig.RateLimiterEnabled,
 		authServerConfig.TrustProxyHeaders,
@@ -183,7 +196,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/logout/declined", handlers.HandleLogoutDeclinedGet(httpHelper))
 		r.Post("/logout", handlers.HandleLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
 	})
-	// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force).
+	// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force), and
+	// the client authentication limit its validator spends at every grant (RFC 6749 §2.3.1, #707).
 	// Outside the /auth group, which is mounted on the page branch whole, because it answers on the
 	// token branch, the protocol branch counting its faults as refusals. The router answers POST
 	// /auth/token from this route, behind the token branch alone; any other method falls to the

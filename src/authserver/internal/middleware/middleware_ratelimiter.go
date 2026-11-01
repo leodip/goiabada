@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/clientauth"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
@@ -136,6 +137,10 @@ const (
 	// countedByTokenUser is the subject of the access token the API authentication middleware
 	// validated.
 	countedByTokenUser
+	// countedByClient is the confidential client whose secret client authentication checks: the
+	// client it found by the identifier the request sent, so the limit and the handler cannot
+	// disagree about whose budget is spent (#707 decision 10).
+	countedByClient
 )
 
 // readsTheClientAddress reports whether a tier counts by the client's address: an IP address alone,
@@ -168,6 +173,8 @@ func (k countedBy) String() string {
 		return "signing-in user"
 	case countedByTokenUser:
 		return "access token's user"
+	case countedByClient:
+		return "client"
 	}
 	return "no kind (" + strconv.Itoa(int(k)) + ")"
 }
@@ -427,6 +434,9 @@ type RateLimiter struct {
 	// row and whose POST parks a request, on every request that passes its first validation
 	// (#504).
 	authorize *requestTier
+	// clientAuth bounds the failed client secret checks of one confidential client, spent by
+	// client authentication through ReserveSecretCheck rather than by a Limit method (#707).
+	clientAuth *failureTier
 
 	// refusals counts every refusal by the tier that refused it, on the metrics listener (#400
 	// decision 5). Every refusal, where the audit event is one per key per window: a rate is what an
@@ -598,6 +608,20 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// Off by default with every tier that reads the client's address (#219); PreAuthLifetime
 		// and the reaper bound how long a row lives, never how many arrive.
 		authorize: request("authorize", countedByIP, "ip", 120, time.Minute),
+		// per-client failed client authentications: a missing or wrong secret for an existing,
+		// enabled confidential client, at every grant of the token endpoint. RFC 6749 section 2.3.1
+		// says the authorization server MUST protect any endpoint using a client password against
+		// brute force, and nothing bounded guessing a client's secret before (#707 decision 1). 200
+		// an hour, fixed, is far above what a client that holds its secret ever fails, and bounds
+		// guessing a secret to 4,800 tries a day for the whole deployment: counted in the database on
+		// the server engines, so every replica spends one budget and a rollout does not refill it
+		// (decision 11). It reads no address, so it applies whatever the switch says (decision 5).
+		// Its price is the account-wide password tier's: anyone who knows a confidential client's
+		// identifier can spend its budget, and the client is then refused for up to an hour, its
+		// right secret included, since the budget is consulted before the secret is compared
+		// (decision 6). The admin console's client is never counted (decision 4), which client
+		// authentication decides. A right secret spends nothing.
+		clientAuth: failure("client_auth", countedByClient, 200, 60*time.Minute),
 	}
 	m.refusals = reg.Counter("goiabada_rate_limit_refusals_total",
 		"Requests the rate limiter refused, by the limiter that refused them.",
@@ -717,29 +741,7 @@ func (m *RateLimiter) reject(w http.ResponseWriter, r *http.Request, class rejec
 	w.Header().Set("Cache-Control", "no-store")
 
 	if class == rejectOAuth {
-		// RFC 6749 Section 5.2 puts the token error parameters in "the "application/json"
-		// media type", and RFC 7591 Section 3.2.2 requires a registration error with
-		// "content type application/json". Go writes no header for a hand-encoded body, so
-		// without this the response would be JSON labelled text/plain.
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Pragma", "no-cache")
-		w.WriteHeader(http.StatusTooManyRequests)
-		// invalid_request because RFC 6749 Section 5.2 makes error "REQUIRED. A single
-		// ASCII error code from the following", a closed list extended only through the
-		// IANA registry, and it permits a status other than 400. slow_down is the
-		// registry's only token-endpoint entry about request rate and it means "the
-		// authorization request is still pending and polling should continue" (RFC 8628
-		// Section 3.5), which would tell a conformant client to keep polling a rejected
-		// request (#219).
-		//
-		// The 429 is committed before the body is encoded, so a failed write has nothing left to
-		// answer, and it is recorded at Debug, as the other committed responses record theirs.
-		if err := json.NewEncoder(w).Encode(map[string]string{
-			"error":             "invalid_request",
-			"error_description": "Too many requests. Please wait and try again later.",
-		}); err != nil {
-			slog.DebugContext(r.Context(), "unable to write the rate limit response", "error", err)
-		}
+		writeOAuthRefusal(w, r)
 		return
 	}
 
@@ -759,6 +761,83 @@ func (m *RateLimiter) reject(w http.ResponseWriter, r *http.Request, class rejec
 			"error", err)
 		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 	}
+}
+
+// writeOAuthRefusal writes the 429 body an OAuth2 or RFC 7591 client parses, once Cache-Control and
+// Retry-After are set.
+func writeOAuthRefusal(w http.ResponseWriter, r *http.Request) {
+	// RFC 6749 Section 5.2 puts the token error parameters in "the "application/json"
+	// media type", and RFC 7591 Section 3.2.2 requires a registration error with
+	// "content type application/json". Go writes no header for a hand-encoded body, so
+	// without this the response would be JSON labelled text/plain.
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Pragma", "no-cache")
+	w.WriteHeader(http.StatusTooManyRequests)
+	// invalid_request because RFC 6749 Section 5.2 makes error "REQUIRED. A single
+	// ASCII error code from the following", a closed list extended only through the
+	// IANA registry, and it permits a status other than 400. slow_down is the
+	// registry's only token-endpoint entry about request rate and it means "the
+	// authorization request is still pending and polling should continue" (RFC 8628
+	// Section 3.5), which would tell a conformant client to keep polling a rejected
+	// request (#219).
+	//
+	// The 429 is committed before the body is encoded, so a failed write has nothing left to
+	// answer, and it is recorded at Debug, as the other committed responses record theirs.
+	if err := json.NewEncoder(w).Encode(map[string]string{
+		"error":             "invalid_request",
+		"error_description": "Too many requests. Please wait and try again later.",
+	}); err != nil {
+		slog.DebugContext(r.Context(), "unable to write the rate limit response", "error", err)
+	}
+}
+
+// WriteOAuthRateLimitRefusal writes the 429 an OAuth2 endpoint answers a refusal by a tier its
+// handler spends, the client authentication limit's (#707 decision 7): the response the token
+// endpoint's limiters answer, Retry-After carrying the tier's window. The tier has already written
+// the refusal's warning, audit event and metric; this writes the response alone, and counts it in
+// no endpoint's own refusal metric.
+func WriteOAuthRateLimitRefusal(w http.ResponseWriter, r *http.Request, retryAfter time.Duration) {
+	w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
+	w.Header().Set("Cache-Control", "no-store")
+	writeOAuthRefusal(w, r)
+}
+
+// ReserveSecretCheck is clientauth.SecretCheckLimiter over the client_auth tier: it claims one
+// secret check against the budget of the client clientIdentifier names, the client client
+// authentication found, whatever the switch says (#707 decisions 5 and 10).
+//
+// A client over its budget is refused here, before its secret is compared, with what every trip
+// leaves: the warning, the audit event once per client per window carrying client_identifier, and
+// the refusal counted under client_auth. The response is not written here: the limiter is reached
+// from inside client authentication, which reads no request, so the error carries the window and
+// the endpoint writes the 429 through WriteOAuthRateLimitRefusal, in its own shape. A count that
+// could not be read is returned as the error it is, which the endpoint answers as its own fault,
+// and leaves none of a trip's records (#394 decision 4).
+func (m *RateLimiter) ReserveSecretCheck(ctx context.Context, clientIdentifier string) (clientauth.SecretCheckReservation, error) {
+	t := m.clientAuth
+	key, audited, _ := m.bucket(nil, &t.tier, clientIdentifier)
+	held, err := t.limiter.Reserve(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if held == nil {
+		m.reportTrip(ctx, &t.tier, key, audited)
+		return nil, &clientauth.LimitReachedError{RetryAfter: t.window}
+	}
+	return secretCheckReservation{held: held}, nil
+}
+
+// secretCheckReservation is a client_auth slot as client authentication holds it, charged or
+// refunded the moment its secret comparison answers.
+type secretCheckReservation struct {
+	held *ratelimit.Reservation
+}
+
+// Release charges the slot for a missing or wrong secret and refunds it for the right one. A refund
+// the shared store does not take keeps the charge, the refusing direction, and is logged as every
+// credential reservation's is.
+func (r secretCheckReservation) Release(ctx context.Context, failed bool) {
+	releaseCredentialReservation(ctx, r.held, failed)
 }
 
 // LimitPwd rate limits the sign-in form's password check: per client block with the switch on, on
@@ -1128,25 +1207,26 @@ func (m *RateLimiter) LimitAuthorize(next http.Handler) http.Handler {
 // logged_in_user, the name the account API's own events give the caller. Each is a fresh map, since
 // a refusal adds the limiter's name to the map it is given.
 //
-// account is the identifier the route names an account by, as it was typed: the email on the
-// sign-in, registration and forgot-password forms, the username on the password grant. Only the
-// two account kinds read it, and they record nothing of it here: an address typed into a form is
+// named is the identifier the caller names its subject by. For the two account kinds it is the
+// account as it was typed: the email on the sign-in, registration and forgot-password forms, the
+// username on the password grant. They record nothing of it here: an address typed into a form is
 // audited as its digest, normalized as that route's own lookup normalizes it, which only the route
-// knows (#522 decision 10).
+// knows (#522 decision 10). For the client kind it is the identifier of the client client
+// authentication found, which reads no request, so r may be nil there.
 //
 // A tier declaring no kind panics, which the recoverer answers 500: keying it on anything would be
 // counting by something nobody declared, and answering no bucket would let every request through
 // it unlimited.
-func (m *RateLimiter) bucket(r *http.Request, t *tier, account string) (string, map[string]interface{}, bool) {
+func (m *RateLimiter) bucket(r *http.Request, t *tier, named string) (string, map[string]interface{}, bool) {
 	switch t.countedBy {
 	case countedByIP:
 		// The client IP is trustworthy here (resolved by httpmw.RealIP).
 		key := clientIPRateLimitKey(r)
 		return key, map[string]interface{}{"ip": key}, true
 	case countedByAccount:
-		return ratelimit.AccountKey(account), nil, true
+		return ratelimit.AccountKey(named), nil, true
 	case countedByIPAndAccount:
-		return accountNetworkRateLimitKey(r, ratelimit.AccountKey(account)), nil, true
+		return accountNetworkRateLimitKey(r, ratelimit.AccountKey(named)), nil, true
 	case countedBySigningInUser:
 		authContext, err := m.ceremonyStore.GetAuthContext(r)
 		if err != nil {
@@ -1159,6 +1239,10 @@ func (m *RateLimiter) bucket(r *http.Request, t *tier, account string) (string, 
 			return "", nil, false
 		}
 		return key, map[string]interface{}{"logged_in_user": key}, true
+	case countedByClient:
+		// The identifier of the client client authentication found, as stored, and recorded under
+		// the name every audit event the token endpoint writes about a client gives it.
+		return named, map[string]interface{}{"client_identifier": named}, true
 	}
 	panic(fmt.Sprintf("the rate limit tier %s declares no key kind", t.name))
 }

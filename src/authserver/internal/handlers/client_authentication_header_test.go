@@ -63,7 +63,7 @@ func headerEndpoints() []headerEndpoint {
 			name: "token", path: "/auth/token", warning: "client authentication refused at the token endpoint",
 			handler: func(t *testing.T, database *datamocks.Database) http.HandlerFunc {
 				return HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
-					protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
+					protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher, nil),
 					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
 			},
 			form: url.Values{"grant_type": {"client_credentials"}},

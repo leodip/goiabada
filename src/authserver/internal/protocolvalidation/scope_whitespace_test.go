@@ -129,7 +129,7 @@ func TestValidateTokenRequest_RefreshToken_ScopeWhitespace(t *testing.T) {
 func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator, *datamocks.Database, *ValidateTokenRequestInput) {
 	t.Helper()
 	mockDB := datamocks.NewDatabase(t)
-	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 
 	clientSecretEncrypted, err := testDataCipher.Encrypt("valid_secret")
 	require.NoError(t, err)
@@ -182,7 +182,7 @@ func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *datamocks.
 	t.Helper()
 	mockDB := datamocks.NewDatabase(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), mockPermissionChecker, testDataCipher)
+	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), mockPermissionChecker, testDataCipher, nil)
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}

@@ -54,7 +54,9 @@ type TokenValidator struct {
 	tokenParser       TokenParser
 	permissionChecker PermissionChecker
 	// clients authenticates the client: FindClient before the grant is looked at, VerifySecret at
-	// the point in each grant's own order where it authenticates the client (#437, #676).
+	// the point in each grant's own order where it authenticates the client (#437, #676), bounded by
+	// the client authentication limit, so a client over its budget is refused there, after whatever
+	// that grant refuses first (#707 decision 10).
 	clients *clientauth.Authenticator
 	// verifyPassword is the password comparison the password grant makes, a field so a test can
 	// see which hash each refusal compared against (#681).
@@ -64,13 +66,17 @@ type TokenValidator struct {
 	legalDocuments *legaldocuments.Reader
 }
 
+// NewTokenValidator returns the token request validator. clientLimiter bounds the failed client
+// secret checks of every grant, the rate limiter's client_auth tier in production; nil bounds
+// nothing.
 func NewTokenValidator(database tokenValidatorDatabase, tokenParser TokenParser,
-	permissionChecker PermissionChecker, dataCipher *encryption.DataCipher) *TokenValidator {
+	permissionChecker PermissionChecker, dataCipher *encryption.DataCipher,
+	clientLimiter clientauth.SecretCheckLimiter) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
 		tokenParser:       tokenParser,
 		permissionChecker: permissionChecker,
-		clients:           clientauth.NewAuthenticator(database, dataCipher),
+		clients:           clientauth.NewAuthenticator(database, dataCipher, clientLimiter),
 		verifyPassword:    passwordhash.Verify,
 		legalDocuments:    legaldocuments.NewReader(database),
 	}

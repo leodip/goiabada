@@ -79,10 +79,11 @@ func HandleRevokePost(
 	revocationMetrics *revocationmetrics.Recorder,
 ) http.HandlerFunc {
 	endpoint := revocationEndpoint{
-		jsonWriter:       jsonWriter,
-		database:         database,
-		tokenParser:      tokenParser,
-		clients:          clientauth.NewAuthenticator(database, dataCipher),
+		jsonWriter:  jsonWriter,
+		database:    database,
+		tokenParser: tokenParser,
+		// No limiter: this endpoint's secret checks spend no client authentication budget.
+		clients:          clientauth.NewAuthenticator(database, dataCipher, nil),
 		auditLogger:      auditLogger,
 		metrics:          revocationMetrics,
 		refusalAuditGate: ratelimit.New(1, time.Minute).Gate(),

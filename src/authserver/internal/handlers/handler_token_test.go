@@ -115,7 +115,7 @@ func TestHandleTokenPost(t *testing.T) {
 			jsonWriter := handlersmocks.NewJSONWriter(t)
 			database := datamocks.NewDatabase(t)
 			handler := HandleTokenPost(jsonWriter, database,
-				handlersmocks.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
+				handlersmocks.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher, nil),
 				handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
 
 			rr := httptest.NewRecorder()

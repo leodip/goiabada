@@ -39,7 +39,7 @@ func newCodeGrantRedemption(t *testing.T, grant codeGrant, registered bool) (*To
 
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
-		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
 
 	clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 	require.NoError(t, err)

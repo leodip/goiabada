@@ -2736,10 +2736,11 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 //
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
-// test can reach today are two of nineteen tiers, and the next tier is what this exists for (#320
-// decision 3). The nineteen are twelve request tiers, two of them the per-address ceilings on
-// password checks, and five failures-only ones, plus the two failures-only tiers of the password
-// gate, which ratelimit.AccountLimiter counts and accountTiers names (#439, #564).
+// test can reach today are two of twenty tiers, and the next tier is what this exists for (#320
+// decision 3). The twenty are twelve request tiers, two of them the per-address ceilings on
+// password checks, and six failures-only ones, client_auth among them (#707), plus the two
+// failures-only tiers of the password gate, which ratelimit.AccountLimiter counts and accountTiers
+// names (#439, #564).
 func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// Decision 3's vocabulary. Spelled out rather than imported: the lint's copy is unexported,
 	// and this is deliberately the same rule applied to the one value the lint cannot see.
@@ -2752,9 +2753,9 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// The count is asserted because a walk that silently stopped matching would pass over an
 	// empty set exactly as it passes over a conformant one. It counts instances rather than
 	// distinct names, so a second tier carrying a name an earlier one already used is a
-	// twentieth tier here rather than a replacement for the nineteenth.
-	if len(tiers) != 19 {
-		t.Fatalf("walked %d tiers, expected the 19 the constructor builds: %v", len(tiers), tiers)
+	// twenty-first tier here rather than a replacement for the twentieth.
+	if len(tiers) != 20 {
+		t.Fatalf("walked %d tiers, expected the 20 the constructor builds: %v", len(tiers), tiers)
 	}
 	for _, found := range tiers {
 		if found.keyField == "" {

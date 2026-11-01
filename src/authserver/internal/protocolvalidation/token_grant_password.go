@@ -85,7 +85,7 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 	}
 
 	// Confidential clients MUST authenticate (RFC 6749 Section 4.3.2)
-	if err := val.clients.VerifySecret(client, input.ClientSecret); err != nil {
+	if err := val.clients.VerifySecret(ctx, client, input.ClientSecret); err != nil {
 		return nil, err
 	}
 

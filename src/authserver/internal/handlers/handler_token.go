@@ -53,6 +53,11 @@ func HandleTokenPost(
 		}
 
 		grant, err := tokenValidator.ValidateTokenRequest(r.Context(), settings, input)
+		// A client over the client authentication limit, refused where its grant checks the secret:
+		// the 429, counted under its limiter rather than as a refusal of the token request.
+		if refusedOverClientAuthenticationLimit(w, r, err) {
+			return
+		}
 		if err != nil {
 			responder.refuse(w, r, input.GrantType, auditTokenRefusal(r, database, auditLogger, credentialFailures, input, err))
 			return
