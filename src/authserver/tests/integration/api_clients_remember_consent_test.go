@@ -260,3 +260,44 @@ func TestAPIClient_SavesThatDoNotOwnRememberConsentLeaveItAlone(t *testing.T) {
 		}
 	}
 }
+
+// TestAPIClientSettingsPut_PublicClient_AppliesRememberConsent: the settings save's rememberConsent
+// turns a public client's Remember consent on and off, and the answer and the stored row say so
+// (decisions 5 and 6). The body is written as JSON by hand, so the field's wire name is checked too.
+func TestAPIClientSettingsPut_PublicClient_AppliesRememberConsent(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	client := createRememberConsentClient(t, true, false)
+
+	save := func(remember bool) map[string]any {
+		return adminRequestClient(t, "PUT", clientPath(client.Id), accessToken, map[string]any{
+			"clientIdentifier": client.ClientIdentifier,
+			"enabled":          true,
+			"consentRequired":  true,
+			"rememberConsent":  remember,
+		}, http.StatusOK)
+	}
+
+	assert.True(t, clientRememberConsentAnswer(t, save(true)), "the save's answer, turned on")
+	assert.True(t, storedRememberConsent(t, client.Id), "the stored row, turned on")
+
+	assert.False(t, clientRememberConsentAnswer(t, save(false)), "the save's answer, turned off")
+	assert.False(t, storedRememberConsent(t, client.Id), "the stored row, turned off")
+}
+
+// TestAPIClientSettingsPut_ConfidentialClient_StoresRememberConsentOn: a confidential client always
+// remembers consent, so a settings save sending rememberConsent false is stored and answered as on
+// rather than refused (decision 4). The row starts off, written past the API, so the save's own
+// write shows.
+func TestAPIClientSettingsPut_ConfidentialClient_StoresRememberConsentOn(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	client := createRememberConsentClient(t, false, false)
+
+	answer := adminRequestClient(t, "PUT", clientPath(client.Id), accessToken, map[string]any{
+		"clientIdentifier": client.ClientIdentifier,
+		"enabled":          true,
+		"rememberConsent":  false,
+	}, http.StatusOK)
+
+	assert.True(t, clientRememberConsentAnswer(t, answer), "the save's answer")
+	assert.True(t, storedRememberConsent(t, client.Id), "the stored row")
+}

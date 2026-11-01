@@ -7002,6 +7002,13 @@ components:
           type: boolean
         consentRequired:
           type: boolean
+        rememberConsent:
+          type: boolean
+          description: >-
+            Optional. Whether a user's earlier approval skips the consent screen for this client.
+            Leave it out to keep the stored value. A confidential client always remembers consent, so
+            it is stored and answered as true whatever you send. Turn it on for a public client only
+            when every redirect URI is an https address that only that app receives.
         showLogo:
           type: boolean
           description: When true, the client logo is displayed on sign-in and consent screens

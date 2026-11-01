@@ -139,11 +139,15 @@ type UpdateClientSettingsRequest struct {
 	DisplayName       string `json:"displayName"`
 	Enabled           bool   `json:"enabled"`
 	ConsentRequired   bool   `json:"consentRequired"`
-	ShowLogo          bool   `json:"showLogo"`
-	ShowDisplayName   bool   `json:"showDisplayName"`
-	ShowDescription   bool   `json:"showDescription"`
-	ShowWebsiteURL    bool   `json:"showWebsiteUrl"`
-	DefaultAcrLevel   string `json:"defaultAcrLevel,omitempty"`
+	// RememberConsent is optional: nil, or absent from the JSON, keeps the stored value, so a script
+	// that saves settings without it changes nothing. A value is applied to a public client, and a
+	// confidential client is stored and answered as on whatever is sent (#711 decisions 4 to 6).
+	RememberConsent *bool  `json:"rememberConsent,omitempty"`
+	ShowLogo        bool   `json:"showLogo"`
+	ShowDisplayName bool   `json:"showDisplayName"`
+	ShowDescription bool   `json:"showDescription"`
+	ShowWebsiteURL  bool   `json:"showWebsiteUrl"`
+	DefaultAcrLevel string `json:"defaultAcrLevel,omitempty"`
 }
 
 // UpdateClientAuthenticationRequest is used to change a client's

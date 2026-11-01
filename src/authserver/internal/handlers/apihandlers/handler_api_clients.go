@@ -100,10 +100,23 @@ type clientsDatabase interface {
 // It does not close the lost update on the columns each endpoint DOES own: two concurrent saves
 // of the same section still last-write-wins, which is how every entity in this codebase behaves
 // and is a separate, wider question.
-func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *record.Client) error {
+//
+// rememberConsent is the settings save's optional Remember consent, nil for every other caller and
+// for a settings save without it, which leaves the stored value alone. A value is decided here,
+// against the row re-read under the lock, because it depends on the mode as the property above
+// does (#711 decisions 4 and 5): a confidential client is stored on whatever was sent; a public one
+// takes the value only when the request also loaded it public. A save that loaded the client while
+// it was confidential chose its value for a client that needed no vouching, so it never applies to
+// one made public since, which the switch left off.
+func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *record.Client, rememberConsent *bool) error {
+	// Taken before the transaction: the body overwrites client.IsPublic with the row's mode, and a
+	// rerun after a deadlock must still decide against the mode the request loaded.
+	loadedPublic := client.IsPublic
+
 	// Opened through RunInTransaction, so a deadlock reruns the acquisition, the re-read and the
 	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
-	// this attempt's own lock, and ApplyPublicClientInvariants is idempotent on the result.
+	// this attempt's own lock, ApplyPublicClientInvariants is idempotent on the result, and Remember
+	// consent is decided again from that row and written as a fixed value.
 	return database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := database.AcquireClientRow(ctx, tx, client.Id); err != nil {
 			return err
@@ -126,7 +139,27 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 
 		client.ApplyPublicClientInvariants()
 
-		return database.UpdateClient(ctx, tx, client)
+		if err := database.UpdateClient(ctx, tx, client); err != nil {
+			return err
+		}
+
+		if rememberConsent == nil {
+			return nil
+		}
+		var remember bool
+		switch {
+		case !current.IsPublic:
+			remember = true
+		case loadedPublic:
+			remember = *rememberConsent
+		default:
+			return nil
+		}
+		if err := database.SetClientRememberConsent(ctx, tx, client.Id, remember); err != nil {
+			return err
+		}
+		client.RememberConsent = remember
+		return nil
 	})
 }
 
@@ -691,7 +724,7 @@ func HandleClientUpdatePut(
 			return
 		}
 
-		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, updateReq.RememberConsent); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
 			return
 		}
@@ -1066,7 +1099,7 @@ func HandleClientOAuth2FlowsPut(
 		// became public in between would have its two rules skipped and be saved with client
 		// credentials on and PKCE off, which is the state this whole change exists to make
 		// unreachable (#245, final review finding 1).
-		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, nil); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client OAuth2 flows"), "client_id", client.Id)
 			return
 		}
@@ -1500,7 +1533,7 @@ func HandleClientTokensPut(
 			return
 		}
 
-		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, nil); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client tokens"), "client_id", client.Id)
 			return
 		}

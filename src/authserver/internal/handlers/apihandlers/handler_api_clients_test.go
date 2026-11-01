@@ -85,7 +85,7 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 		Run(func(args mock.Arguments) { written = args.Get(2).(*record.Client) }).Return(nil).Once()
 
 	stale := &record.Client{Id: 7, IsPublic: true, ClientSecretEncrypted: nil, Description: "edited"}
-	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale))
+	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale, nil))
 
 	require.NotNil(t, written)
 	assert.False(t, written.IsPublic, "the write must carry the row's authentication mode")
@@ -138,7 +138,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 		PKCERequired:             &pkceOff,
 		ClientCredentialsEnabled: true,
 	}
-	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale))
+	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale, nil))
 
 	require.NotNil(t, written)
 	assert.True(t, written.IsPublic, "the write must carry the row's authentication mode")
@@ -173,7 +173,7 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 		PKCERequired:             &pkceOff,
 		ClientCredentialsEnabled: true,
 	}
-	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, client))
+	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, client, nil))
 
 	require.NotNil(t, written)
 	assert.True(t, written.ClientCredentialsEnabled,
@@ -192,7 +192,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(nil, nil).Once()
 
-	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{Id: 7})
+	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{Id: 7}, nil)
 	require.Error(t, err)
 	assert.Equal(t, err, stub.BodyErr, "the body hands its error to the helper, which rolls back")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient")
@@ -210,10 +210,77 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).
 		Return(errors.New("deadlock found when trying to get lock")).Once()
 
-	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{Id: 7, IsPublic: true})
+	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{Id: 7, IsPublic: true}, nil)
 	require.Error(t, err)
 	assert.Equal(t, err, stub.BodyErr, "the body hands its error to the helper unchanged, which is what lets a real deadlock be rerun")
 	assertNotAttemptedOnClientDatabase(t, database, "GetClientById", "UpdateClient")
+}
+
+// TestUpdateClientNotOwningAuthenticationMode_RememberConsent is the settings save's Remember
+// consent against the mode the client had when the request loaded it and the mode the row carries
+// under the lock (#711 decisions 4 to 6). Present, it is applied to a client that is public in
+// both; a confidential row is stored and answered on whatever was sent; and a save that loaded the
+// client while it was confidential never applies it to a client made public since, because nobody
+// vouched for that client when the value was chosen. Absent, the stored value stands.
+func TestUpdateClientNotOwningAuthenticationMode_RememberConsent(t *testing.T) {
+	on, off := true, false
+
+	cases := []struct {
+		name         string
+		loadedPublic bool
+		rowPublic    bool
+		rowRemember  bool
+		sent         *bool
+		// wantWrite is the value SetClientRememberConsent must write, nil when it must not run.
+		wantWrite  *bool
+		wantAnswer bool
+	}{
+		{name: "public client turned on", loadedPublic: true, rowPublic: true, rowRemember: false,
+			sent: &on, wantWrite: &on, wantAnswer: true},
+		{name: "public client turned off", loadedPublic: true, rowPublic: true, rowRemember: true,
+			sent: &off, wantWrite: &off, wantAnswer: false},
+		{name: "public client, absent keeps on", loadedPublic: true, rowPublic: true, rowRemember: true,
+			sent: nil, wantWrite: nil, wantAnswer: true},
+		{name: "public client, absent keeps off", loadedPublic: true, rowPublic: true, rowRemember: false,
+			sent: nil, wantWrite: nil, wantAnswer: false},
+		{name: "confidential client sent false is stored on", loadedPublic: false, rowPublic: false, rowRemember: false,
+			sent: &off, wantWrite: &on, wantAnswer: true},
+		{name: "loaded public, made confidential since, sent false is stored on", loadedPublic: true, rowPublic: false,
+			rowRemember: true, sent: &off, wantWrite: &on, wantAnswer: true},
+		{name: "loaded confidential, made public since, sent true is not applied", loadedPublic: false, rowPublic: true,
+			rowRemember: false, sent: &on, wantWrite: nil, wantAnswer: false},
+		{name: "loaded confidential, made public since, sent false is not applied", loadedPublic: false, rowPublic: true,
+			rowRemember: true, sent: &off, wantWrite: nil, wantAnswer: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+
+			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+			database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+			database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+				Return(&record.Client{Id: 7, IsPublic: tc.rowPublic, RememberConsent: tc.rowRemember}, nil).Once()
+			database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+			if tc.wantWrite != nil {
+				database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), *tc.wantWrite).
+					Return(nil).Once()
+			}
+
+			// The copy the request loaded: Remember consent as it read it, opposite to the row, so an
+			// answer taken from the stale copy shows.
+			client := &record.Client{Id: 7, IsPublic: tc.loadedPublic, RememberConsent: !tc.rowRemember}
+			require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, client, tc.sent))
+
+			assert.Equal(t, tc.wantAnswer, client.RememberConsent, "the value the save answers with")
+			if tc.wantWrite == nil {
+				assertNotAttemptedOnClientDatabase(t, database, "SetClientRememberConsent")
+			} else {
+				// Under the row's lock, in the transaction that re-read the mode it decided against.
+				assert.Less(t, callIndex(t, database, "GetClientById"), callIndex(t, database, "SetClientRememberConsent"))
+			}
+		})
+	}
 }
 
 // =============================================================================
@@ -407,7 +474,7 @@ func TestUpdateClientNotOwningAuthenticationMode_AnswersRememberConsentFromTheRo
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 
 	stale := &record.Client{Id: 7, IsPublic: false, RememberConsent: true}
-	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale))
+	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale, nil))
 
 	assert.False(t, stale.RememberConsent,
 		"a save loaded while the client was confidential must not answer Remember consent on for a public client")
