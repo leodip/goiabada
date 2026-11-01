@@ -51,6 +51,11 @@ type ConsentScreen struct {
 	HasLogo           bool
 	LogoURL           string
 	WebsiteURL        string
+	// PrivacyPolicyURL and TermsOfServiceURL are the client's own documents, empty when it has
+	// none. The screen links them whenever set, whatever the client's display switches: RFC 7591
+	// section 2 says the server SHOULD display them (#622 decision 12).
+	PrivacyPolicyURL  string
+	TermsOfServiceURL string
 	// Scopes is the screen's rows, whose order names its checkboxes.
 	Scopes []ScopeInfo
 }
@@ -114,6 +119,8 @@ func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
 			HasLogo:              displayInfo.HasLogo,
 			LogoURL:              displayInfo.LogoURL,
 			WebsiteURL:           displayInfo.WebsiteURL,
+			PrivacyPolicyURL:     client.PrivacyPolicyURL,
+			TermsOfServiceURL:    client.TermsOfServiceURL,
 			Scopes:               scopes,
 		}}, nil
 	}

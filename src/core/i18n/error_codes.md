@@ -217,6 +217,12 @@ cause, each a whole sentence.
 | `handler.client.website_url_too_long` | `max` (int) | The website URL cannot exceed a maximum length of {{.max}} characters. |
 | `handler.client.website_url_invalid` | (none) | Invalid website URL. |
 | `handler.client.website_url_scheme_invalid` | (none) | Website URL must use http or https scheme. |
+| `handler.client.privacy_policy_url_too_long` | `max` (int) | The privacy policy URL cannot exceed a maximum length of {{.max}} characters. |
+| `handler.client.privacy_policy_url_invalid` | (none) | Invalid privacy policy URL. |
+| `handler.client.privacy_policy_url_scheme_invalid` | (none) | Privacy policy URL must use http or https scheme. |
+| `handler.client.terms_of_service_url_too_long` | `max` (int) | The terms of service URL cannot exceed a maximum length of {{.max}} characters. |
+| `handler.client.terms_of_service_url_invalid` | (none) | Invalid terms of service URL. |
+| `handler.client.terms_of_service_url_scheme_invalid` | (none) | Terms of service URL must use http or https scheme. |
 | `handler.client.secret_invalid` | (none) | Invalid client secret. Please generate a new one. |
 | `handler.client_administrative_scopes.allowed_required` | (none) | allowed is required. |
 | `handler.client_administrative_scopes.console_always_allowed` | (none) | The admin console's client is always allowed to request the administrative scopes. |

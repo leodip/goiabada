@@ -945,6 +945,8 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 		ClientIdentifier:                        "web-app",
 		Description:                             "The web app",
 		WebsiteURL:                              "https://app.example.com",
+		PrivacyPolicyURL:                        "https://app.example.com/privacy",
+		TermsOfServiceURL:                       "https://app.example.com/terms",
 		DisplayName:                             "Web App",
 		Enabled:                                 true,
 		ConsentRequired:                         true,
@@ -969,6 +971,8 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 	assert.Equal(t, "web-app", resp.ClientIdentifier)
 	assert.Equal(t, "The web app", resp.Description)
 	assert.Equal(t, "https://app.example.com", resp.WebsiteURL)
+	assert.Equal(t, "https://app.example.com/privacy", resp.PrivacyPolicyURL)
+	assert.Equal(t, "https://app.example.com/terms", resp.TermsOfServiceURL)
 	assert.Equal(t, "Web App", resp.DisplayName)
 	assert.True(t, resp.Enabled)
 	assert.True(t, resp.ConsentRequired)

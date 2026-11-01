@@ -42,8 +42,11 @@ func HandleConsentGet(
 			"clientDescription":    screen.ClientDescription,
 			"clientLogoUrl":        screen.LogoURL,
 			"clientWebsiteUrl":     screen.WebsiteURL,
-			"hasLogo":              screen.HasLogo,
-			"scopes":               screen.Scopes,
+			// The client's own documents, linked whenever set (#622 decision 12).
+			"clientPrivacyPolicyUrl":  screen.PrivacyPolicyURL,
+			"clientTermsOfServiceUrl": screen.TermsOfServiceURL,
+			"hasLogo":                 screen.HasLogo,
+			"scopes":                  screen.Scopes,
 			// The form names the ceremony that rendered it, and the boundary refuses a submission
 			// naming any other: the checkbox indices mean something only against this ceremony's
 			// scope list (#79).

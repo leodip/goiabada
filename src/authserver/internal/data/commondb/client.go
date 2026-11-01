@@ -12,7 +12,8 @@ import (
 // clientColumns is the clients table as scanClient reads it.
 var clientColumns = columnList{
 	sqlite: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
-		"website_url, display_name, enabled, consent_required, created_via_dcr, " +
+		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
+		"consent_required, created_via_dcr, " +
 		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
 		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
 		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -21,7 +22,8 @@ var clientColumns = columnList{
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, default_acr_level",
 	mysql: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
-		"website_url, display_name, enabled, consent_required, created_via_dcr, " +
+		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
+		"consent_required, created_via_dcr, " +
 		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
 		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
 		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -30,7 +32,8 @@ var clientColumns = columnList{
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, default_acr_level",
 	postgres: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
-		"website_url, display_name, enabled, consent_required, created_via_dcr, " +
+		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
+		"consent_required, created_via_dcr, " +
 		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
 		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
 		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -39,7 +42,8 @@ var clientColumns = columnList{
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, default_acr_level",
 	mssql: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
-		"website_url, display_name, enabled, consent_required, created_via_dcr, " +
+		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
+		"consent_required, created_via_dcr, " +
 		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
 		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
 		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -59,6 +63,8 @@ func scanClient(row rowScanner, client *record.Client) error {
 		&client.ClientSecretEncrypted,
 		&client.Description,
 		&client.WebsiteURL,
+		&client.PrivacyPolicyURL,
+		&client.TermsOfServiceURL,
 		&client.DisplayName,
 		&client.Enabled,
 		&client.ConsentRequired,
@@ -85,7 +91,8 @@ func scanClient(row rowScanner, client *record.Client) error {
 
 var insertClient = statement{
 	sqlite: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
-		"client_secret_encrypted, description, website_url, display_name, enabled, " +
+		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
+		"terms_of_service_url, display_name, enabled, " +
 		"consent_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
 		"show_display_name, show_description, show_website_url, is_public, " +
 		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
@@ -94,9 +101,10 @@ var insertClient = statement{
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES (?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
-		"client_secret_encrypted, description, website_url, display_name, enabled, " +
+		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
+		"terms_of_service_url, display_name, enabled, " +
 		"consent_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
 		"show_display_name, show_description, show_website_url, is_public, " +
 		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
@@ -105,9 +113,10 @@ var insertClient = statement{
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES (?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
-		"client_secret_encrypted, description, website_url, display_name, enabled, " +
+		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
+		"terms_of_service_url, display_name, enabled, " +
 		"consent_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
 		"show_display_name, show_description, show_website_url, is_public, " +
 		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
@@ -117,9 +126,10 @@ var insertClient = statement{
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES ($1, $2, $3, $4, " +
 		"$5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, " +
-		"$23, $24, $25, $26, $27) RETURNING id",
+		"$23, $24, $25, $26, $27, $28, $29) RETURNING id",
 	mssql: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
-		"client_secret_encrypted, description, website_url, display_name, enabled, " +
+		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
+		"terms_of_service_url, display_name, enabled, " +
 		"consent_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
 		"show_display_name, show_description, show_website_url, is_public, " +
 		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
@@ -130,14 +140,15 @@ var insertClient = statement{
 		"include_open_id_connect_claims_in_id_token, " +
 		"default_acr_level) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, " +
 		"@p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, " +
-		"@p23, @p24, @p25, @p26, @p27)",
+		"@p23, @p24, @p25, @p26, @p27, @p28, @p29)",
 }
 
 // updateClient writes the whole row but created_at and administrative_scopes_allowed, which are
 // dont-update: the allowance has one writer, SetClientAdministrativeScopesAllowed.
 var updateClient = statement{
 	sqlite: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
-		"description = ?, website_url = ?, display_name = ?, enabled = ?, consent_required = ?, " +
+		"description = ?, website_url = ?, privacy_policy_url = ?, terms_of_service_url = ?, " +
+		"display_name = ?, enabled = ?, consent_required = ?, " +
 		"created_via_dcr = ?, show_logo = ?, show_display_name = ?, show_description = ?, " +
 		"show_website_url = ?, is_public = ?, authorization_code_enabled = ?, " +
 		"client_credentials_enabled = ?, pkce_required = ?, implicit_grant_enabled = ?, " +
@@ -147,7 +158,8 @@ var updateClient = statement{
 		"include_open_id_connect_claims_in_access_token = ?, " +
 		"include_open_id_connect_claims_in_id_token = ?, default_acr_level = ? WHERE id = ?",
 	mysql: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
-		"description = ?, website_url = ?, display_name = ?, enabled = ?, consent_required = ?, " +
+		"description = ?, website_url = ?, privacy_policy_url = ?, terms_of_service_url = ?, " +
+		"display_name = ?, enabled = ?, consent_required = ?, " +
 		"created_via_dcr = ?, show_logo = ?, show_display_name = ?, show_description = ?, " +
 		"show_website_url = ?, is_public = ?, authorization_code_enabled = ?, " +
 		"client_credentials_enabled = ?, pkce_required = ?, implicit_grant_enabled = ?, " +
@@ -157,28 +169,30 @@ var updateClient = statement{
 		"include_open_id_connect_claims_in_access_token = ?, " +
 		"include_open_id_connect_claims_in_id_token = ?, default_acr_level = ? WHERE id = ?",
 	postgres: "UPDATE clients SET updated_at = $1, client_identifier = $2, " +
-		"client_secret_encrypted = $3, description = $4, website_url = $5, display_name = $6, " +
-		"enabled = $7, consent_required = $8, created_via_dcr = $9, show_logo = $10, " +
-		"show_display_name = $11, show_description = $12, show_website_url = $13, " +
-		"is_public = $14, authorization_code_enabled = $15, client_credentials_enabled = $16, " +
-		"pkce_required = $17, implicit_grant_enabled = $18, " +
-		"resource_owner_password_credentials_enabled = $19, token_expiration_in_seconds = $20, " +
-		"refresh_token_offline_idle_timeout_in_seconds = $21, " +
-		"refresh_token_offline_max_lifetime_in_seconds = $22, " +
-		"include_open_id_connect_claims_in_access_token = $23, " +
-		"include_open_id_connect_claims_in_id_token = $24, default_acr_level = $25 WHERE id = $26",
+		"client_secret_encrypted = $3, description = $4, website_url = $5, " +
+		"privacy_policy_url = $6, terms_of_service_url = $7, display_name = $8, " +
+		"enabled = $9, consent_required = $10, created_via_dcr = $11, show_logo = $12, " +
+		"show_display_name = $13, show_description = $14, show_website_url = $15, " +
+		"is_public = $16, authorization_code_enabled = $17, client_credentials_enabled = $18, " +
+		"pkce_required = $19, implicit_grant_enabled = $20, " +
+		"resource_owner_password_credentials_enabled = $21, token_expiration_in_seconds = $22, " +
+		"refresh_token_offline_idle_timeout_in_seconds = $23, " +
+		"refresh_token_offline_max_lifetime_in_seconds = $24, " +
+		"include_open_id_connect_claims_in_access_token = $25, " +
+		"include_open_id_connect_claims_in_id_token = $26, default_acr_level = $27 WHERE id = $28",
 	mssql: "UPDATE clients SET updated_at = @p1, client_identifier = @p2, " +
 		"client_secret_encrypted = @p3, description = @p4, website_url = @p5, " +
-		"display_name = @p6, enabled = @p7, consent_required = @p8, created_via_dcr = @p9, " +
-		"show_logo = @p10, show_display_name = @p11, show_description = @p12, " +
-		"show_website_url = @p13, is_public = @p14, authorization_code_enabled = @p15, " +
-		"client_credentials_enabled = @p16, pkce_required = @p17, implicit_grant_enabled = @p18, " +
-		"resource_owner_password_credentials_enabled = @p19, token_expiration_in_seconds = @p20, " +
-		"refresh_token_offline_idle_timeout_in_seconds = @p21, " +
-		"refresh_token_offline_max_lifetime_in_seconds = @p22, " +
-		"include_open_id_connect_claims_in_access_token = @p23, " +
-		"include_open_id_connect_claims_in_id_token = @p24, " +
-		"default_acr_level = @p25 WHERE id = @p26",
+		"privacy_policy_url = @p6, terms_of_service_url = @p7, " +
+		"display_name = @p8, enabled = @p9, consent_required = @p10, created_via_dcr = @p11, " +
+		"show_logo = @p12, show_display_name = @p13, show_description = @p14, " +
+		"show_website_url = @p15, is_public = @p16, authorization_code_enabled = @p17, " +
+		"client_credentials_enabled = @p18, pkce_required = @p19, implicit_grant_enabled = @p20, " +
+		"resource_owner_password_credentials_enabled = @p21, token_expiration_in_seconds = @p22, " +
+		"refresh_token_offline_idle_timeout_in_seconds = @p23, " +
+		"refresh_token_offline_max_lifetime_in_seconds = @p24, " +
+		"include_open_id_connect_claims_in_access_token = @p25, " +
+		"include_open_id_connect_claims_in_id_token = @p26, " +
+		"default_acr_level = @p27 WHERE id = @p28",
 }
 
 var setClientAdministrativeScopesAllowed = statement{
@@ -251,9 +265,9 @@ func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *record.
 
 	id, err := d.insert(ctx, tx, insertClient, "client",
 		client.CreatedAt, client.UpdatedAt, client.ClientIdentifier, client.ClientSecretEncrypted,
-		client.Description, client.WebsiteURL, client.DisplayName, client.Enabled, client.ConsentRequired,
-		client.CreatedViaDCR, client.AdministrativeScopesAllowed, client.ShowLogo, client.ShowDisplayName,
-		client.ShowDescription, client.ShowWebsiteURL, client.IsPublic, client.AuthorizationCodeEnabled,
+		client.Description, client.WebsiteURL, client.PrivacyPolicyURL, client.TermsOfServiceURL,
+		client.DisplayName, client.Enabled, client.ConsentRequired, client.CreatedViaDCR,
+		client.AdministrativeScopesAllowed, client.ShowLogo, client.ShowDisplayName, client.ShowDescription, client.ShowWebsiteURL, client.IsPublic, client.AuthorizationCodeEnabled,
 		client.ClientCredentialsEnabled, client.PKCERequired, client.ImplicitGrantEnabled,
 		client.ResourceOwnerPasswordCredentialsEnabled, client.TokenExpirationInSeconds,
 		client.RefreshTokenOfflineIdleTimeoutInSeconds, client.RefreshTokenOfflineMaxLifetimeInSeconds,
@@ -280,7 +294,8 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 
 	_, err := d.ExecSQL(ctx, tx, updateClient.text(d.Dialect),
 		client.UpdatedAt, client.ClientIdentifier, client.ClientSecretEncrypted, client.Description,
-		client.WebsiteURL, client.DisplayName, client.Enabled, client.ConsentRequired, client.CreatedViaDCR,
+		client.WebsiteURL, client.PrivacyPolicyURL, client.TermsOfServiceURL, client.DisplayName,
+		client.Enabled, client.ConsentRequired, client.CreatedViaDCR,
 		client.ShowLogo, client.ShowDisplayName, client.ShowDescription, client.ShowWebsiteURL,
 		client.IsPublic, client.AuthorizationCodeEnabled, client.ClientCredentialsEnabled,
 		client.PKCERequired, client.ImplicitGrantEnabled, client.ResourceOwnerPasswordCredentialsEnabled,

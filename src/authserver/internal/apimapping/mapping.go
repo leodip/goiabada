@@ -495,6 +495,8 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		ClientIdentifier:                        client.ClientIdentifier,
 		Description:                             client.Description,
 		WebsiteURL:                              client.WebsiteURL,
+		PrivacyPolicyURL:                        client.PrivacyPolicyURL,
+		TermsOfServiceURL:                       client.TermsOfServiceURL,
 		DisplayName:                             client.DisplayName,
 		Enabled:                                 client.Enabled,
 		ConsentRequired:                         client.ConsentRequired,

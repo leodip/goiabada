@@ -97,8 +97,8 @@ func assertClientsIntrospectionResourcesShape(t *testing.T, h *isolatedDB, when 
 }
 
 // assertClientsIntrospectionResourcesBehaviour holds the key and the cascades to what they do. The
-// client and the resource are written through the isolated handle's own data layer, which the
-// database at head accepts; the links and the deletions are plain SQL on the table under test.
+// resource is written through the isolated handle's own data layer and the client by seedClient;
+// the links and the deletions are plain SQL on the table under test.
 // Literals rather than placeholders because the four dialects disagree on placeholder syntax, and
 // every value here is test-controlled.
 func assertClientsIntrospectionResourcesBehaviour(t *testing.T, h *isolatedDB, when string) {
@@ -113,8 +113,9 @@ func assertClientsIntrospectionResourcesBehaviour(t *testing.T, h *isolatedDB, w
 		require.NoError(t, h.DB.CreateResource(ctx, nil, resource), "CreateResource")
 		return resource.Id
 	}
-	client := &record.Client{ClientIdentifier: "intro-client-" + fake.LetterN(8)}
-	require.NoError(t, h.DB.CreateClient(ctx, nil, client), "CreateClient")
+	// Seeded in SQL: the data layer writes every column the record carries at head, which a
+	// database at 000069 lacks (migration_seed_sql_test.go).
+	client := &record.Client{Id: seedClient(t, h, "intro-client-"+fake.LetterN(8))}
 	resourceId := newResource()
 	count := func() int64 {
 		var n int64

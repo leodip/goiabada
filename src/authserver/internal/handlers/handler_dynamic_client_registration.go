@@ -93,6 +93,14 @@ func HandleDynamicClientRegistrationPost(
 			return
 		}
 
+		// 5c. Keep the privacy policy and terms of service only on a redirect URI's scheme and host
+		// (RFC 7591 section 5), dropping either otherwise and registering the client all the same
+		// (#622 decision 12). Refusing them would break, on upgrade, every client whose legal pages
+		// live on another host than its redirect URIs, every native and loopback client among them,
+		// since these fields were ignored until now.
+		policyURI := keptDCRDocumentURI(req.PolicyURI, req.RedirectURIs)
+		tosURI := keptDCRDocumentURI(req.TOSURI, req.RedirectURIs)
+
 		// 6. Generate client identifier (RFC 7591 §3.2.1)
 		clientIdentifier := generateDCRClientIdentifier()
 
@@ -120,6 +128,8 @@ func HandleDynamicClientRegistrationPost(
 			ClientIdentifier:      clientIdentifier,
 			ClientSecretEncrypted: clientSecretEncrypted,
 			Description:           req.ClientName,
+			PrivacyPolicyURL:      policyURI,
+			TermsOfServiceURL:     tosURI,
 			IsPublic:              isPublic,
 			Enabled:               true,
 			// A self-registered client is one nobody here has vetted, and RFC 7591 section 5
@@ -219,6 +229,9 @@ func HandleDynamicClientRegistrationPost(
 			TokenEndpointAuthMethod: req.TokenEndpointAuthMethod,
 			GrantTypes:              req.GrantTypes,
 			ClientName:              req.ClientName,
+			// What was stored, so a dropped value is absent (RFC 7591 section 3.2.1).
+			PolicyURI: policyURI,
+			TOSURI:    tosURI,
 		}
 
 		// Only include secret for confidential clients (RFC 7591 §3.2.1)
@@ -361,6 +374,37 @@ func validateDCRURIList(uris []string, isPublic bool, field dcrURIField) error {
 
 	return nil
 }
+
+// keptDCRDocumentURI returns a registration's policy_uri or tos_uri when it is kept, and "" when it
+// is dropped. It is kept when it is an absolute http or https URL naming a host, of at most
+// clientDocumentURIMaxLength characters, carrying none of the characters RFC 3986 excludes, whose
+// scheme and host are those of one of the redirect URIs: RFC 7591 section 5 says the server SHOULD
+// check that they are, since a client could otherwise have the consent screen link a page of its
+// choosing as its own. Schemes and hosts compare without regard to case (RFC 3986 sections 3.1 and
+// 3.2.2), and the port is no part of the host. The redirect URIs were validated before this runs.
+func keptDCRDocumentURI(uri string, redirectURIs []string) string {
+	if uri == "" || inputvalidation.TextLength(uri) > clientDocumentURIMaxLength || strings.ContainsAny(uri, excludedURIChars) {
+		return ""
+	}
+	parsed, err := url.Parse(uri)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
+		return ""
+	}
+	for _, redirectURI := range redirectURIs {
+		redirect, err := url.Parse(redirectURI)
+		if err != nil {
+			continue
+		}
+		if strings.EqualFold(redirect.Scheme, parsed.Scheme) && strings.EqualFold(redirect.Hostname(), parsed.Hostname()) {
+			return uri
+		}
+	}
+	return ""
+}
+
+// clientDocumentURIMaxLength bounds a kept policy_uri or tos_uri at the 256 characters the admin API
+// takes for a client's privacy policy and terms of service URLs, their columns' width.
+const clientDocumentURIMaxLength = 256
 
 // excludedURIChars are the characters RFC 3986 excludes from URIs. They must be
 // percent-encoded to appear at all, so a redirect URI carrying one literally is malformed.

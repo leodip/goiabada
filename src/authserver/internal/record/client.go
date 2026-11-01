@@ -14,9 +14,16 @@ type Client struct {
 	ClientSecretEncrypted []byte       `db:"client_secret_encrypted"`
 	Description           string       `db:"description"`
 	WebsiteURL            string       `db:"website_url"`
-	DisplayName           string       `db:"display_name"`
-	Enabled               bool         `db:"enabled"`
-	ConsentRequired       bool         `db:"consent_required"`
+	// PrivacyPolicyURL and TermsOfServiceURL are the app's own privacy policy and terms of service,
+	// which the consent screen links whenever they are set (RFC 7591 section 2, #622 decision 12).
+	// Goiabada neither hosts them nor asks for their acceptance. An administrator sets them; dynamic
+	// registration stores a policy_uri or tos_uri only when it has the scheme and host of one of the
+	// client's redirect URIs.
+	PrivacyPolicyURL  string `db:"privacy_policy_url"`
+	TermsOfServiceURL string `db:"terms_of_service_url"`
+	DisplayName       string `db:"display_name"`
+	Enabled           bool   `db:"enabled"`
+	ConsentRequired   bool   `db:"consent_required"`
 	// CreatedViaDCR records that this client registered itself through /connect/register rather
 	// than being created by an administrator. It is the enforced form of what the dcr_ identifier
 	// prefix only suggests, and it is what the consent screen's unverified marking reads (#108).

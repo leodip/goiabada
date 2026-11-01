@@ -6705,6 +6705,12 @@ components:
         websiteUrl:
           type: string
           description: The client's website URL
+        privacyPolicyUrl:
+          type: string
+          description: The client's own privacy policy, linked from the consent screen whenever set; empty when it has none
+        termsOfServiceUrl:
+          type: string
+          description: The client's own terms of service, linked from the consent screen whenever set; empty when it has none
         displayName:
           type: string
           description: A user-friendly name for the client
@@ -6797,6 +6803,8 @@ components:
         - clientIdentifier
         - description
         - websiteUrl
+        - privacyPolicyUrl
+        - termsOfServiceUrl
         - displayName
         - enabled
         - consentRequired
@@ -6895,6 +6903,12 @@ components:
         websiteUrl:
           type: string
           description: The client's website URL (http or https, max 256 chars)
+        privacyPolicyUrl:
+          type: string
+          description: The client's own privacy policy (http or https, max 256 chars), linked from the consent screen whenever set. Empty removes it. Not checked against the client's redirect URIs
+        termsOfServiceUrl:
+          type: string
+          description: The client's own terms of service (http or https, max 256 chars), linked from the consent screen whenever set. Empty removes it. Not checked against the client's redirect URIs
         displayName:
           type: string
           description: A user-friendly name for the client (max 100 chars)

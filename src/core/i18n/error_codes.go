@@ -197,19 +197,25 @@ const (
 	// Clients, their administrative scopes, permissions, redirect URIs, web origins and tokens. A
 	// client's identifier refusal is handler.client.identifier_required above, and its description
 	// bound is handler.admin_resource_permissions.description_too_long, which says the same sentence.
-	ErrCodeClientDescriptionTooLong            = "handler.client.description_too_long"  // Args: {"max": int}
-	ErrCodeClientDisplayNameTooLong            = "handler.client.display_name_too_long" // Args: {"max": int}
-	ErrCodeClientIdentifierInUse               = "handler.client.identifier_in_use"
-	ErrCodeClientIdentifierNamesResource       = "handler.client.identifier_names_resource"
-	ErrCodeClientSystemLevelDeleteNotAllowed   = "handler.client.system_level_delete_not_allowed"
-	ErrCodeClientSystemLevelIdentifierFixed    = "handler.client.system_level_identifier_fixed"
-	ErrCodeClientSelfRegisteredIdentifierFixed = "handler.client.self_registered_identifier_fixed"
-	ErrCodeClientDefaultAcrNotApplicable       = "handler.client.default_acr_not_applicable"
-	ErrCodeClientDefaultAcrInvalid             = "handler.client.default_acr_invalid"
-	ErrCodeClientWebsiteURLTooLong             = "handler.client.website_url_too_long" // Args: {"max": int}
-	ErrCodeClientWebsiteURLInvalid             = "handler.client.website_url_invalid"
-	ErrCodeClientWebsiteURLSchemeInvalid       = "handler.client.website_url_scheme_invalid"
-	ErrCodeClientSecretInvalid                 = "handler.client.secret_invalid"
+	ErrCodeClientDescriptionTooLong             = "handler.client.description_too_long"  // Args: {"max": int}
+	ErrCodeClientDisplayNameTooLong             = "handler.client.display_name_too_long" // Args: {"max": int}
+	ErrCodeClientIdentifierInUse                = "handler.client.identifier_in_use"
+	ErrCodeClientIdentifierNamesResource        = "handler.client.identifier_names_resource"
+	ErrCodeClientSystemLevelDeleteNotAllowed    = "handler.client.system_level_delete_not_allowed"
+	ErrCodeClientSystemLevelIdentifierFixed     = "handler.client.system_level_identifier_fixed"
+	ErrCodeClientSelfRegisteredIdentifierFixed  = "handler.client.self_registered_identifier_fixed"
+	ErrCodeClientDefaultAcrNotApplicable        = "handler.client.default_acr_not_applicable"
+	ErrCodeClientDefaultAcrInvalid              = "handler.client.default_acr_invalid"
+	ErrCodeClientWebsiteURLTooLong              = "handler.client.website_url_too_long" // Args: {"max": int}
+	ErrCodeClientWebsiteURLInvalid              = "handler.client.website_url_invalid"
+	ErrCodeClientWebsiteURLSchemeInvalid        = "handler.client.website_url_scheme_invalid"
+	ErrCodeClientPrivacyPolicyURLTooLong        = "handler.client.privacy_policy_url_too_long" // Args: {"max": int}
+	ErrCodeClientPrivacyPolicyURLInvalid        = "handler.client.privacy_policy_url_invalid"
+	ErrCodeClientPrivacyPolicyURLSchemeInvalid  = "handler.client.privacy_policy_url_scheme_invalid"
+	ErrCodeClientTermsOfServiceURLTooLong       = "handler.client.terms_of_service_url_too_long" // Args: {"max": int}
+	ErrCodeClientTermsOfServiceURLInvalid       = "handler.client.terms_of_service_url_invalid"
+	ErrCodeClientTermsOfServiceURLSchemeInvalid = "handler.client.terms_of_service_url_scheme_invalid"
+	ErrCodeClientSecretInvalid                  = "handler.client.secret_invalid"
 
 	ErrCodeClientAdministrativeScopesAllowedRequired      = "handler.client_administrative_scopes.allowed_required"
 	ErrCodeClientAdministrativeScopesConsoleAlwaysAllowed = "handler.client_administrative_scopes.console_always_allowed"

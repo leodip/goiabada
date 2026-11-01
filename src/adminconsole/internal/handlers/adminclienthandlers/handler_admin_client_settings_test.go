@@ -28,6 +28,8 @@ type stubAdministrativeScopesApiClient struct {
 	settingsErr error
 	updateErr   error
 
+	// sentSettings is what the settings' write was last sent.
+	sentSettings    *api.UpdateClientSettingsRequest
 	sentAllowance   *api.UpdateClientAdministrativeScopesRequest
 	sentAllowanceTo int64
 	sentAllowanceAs string
@@ -40,8 +42,9 @@ func (s *stubAdministrativeScopesApiClient) GetClientById(_ context.Context, _ s
 }
 
 func (s *stubAdministrativeScopesApiClient) UpdateClient(_ context.Context, _ string, _ int64,
-	_ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
+	request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
 	s.settingsWrites++
+	s.sentSettings = request
 	if s.settingsErr != nil {
 		return nil, s.settingsErr
 	}
@@ -285,4 +288,56 @@ func TestHandleSettingsPost_WithoutManageTheAllowanceStands(t *testing.T) {
 			assert.Equal(t, http.StatusFound, rec.Code)
 		}
 	}
+}
+
+// The tab shows the client's own privacy policy and terms of service URLs as the auth server
+// answers them (#622 decision 12).
+func TestHandleSettingsGet_BindsTheClientsDocumentURLs(t *testing.T) {
+	httpHelper := &stubHttpHelper{}
+	req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
+		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
+	client := &api.ClientResponse{Id: 7, ClientIdentifier: "portal",
+		PrivacyPolicyURL: "https://portal.example.com/privacy", TermsOfServiceURL: "https://portal.example.com/terms"}
+
+	HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: client}).
+		ServeHTTP(httptest.NewRecorder(), req)
+
+	require.NoError(t, httpHelper.err)
+	require.NotNil(t, httpHelper.bind, "the handler rendered nothing")
+	bound := reflect.ValueOf(httpHelper.bind["client"])
+	assert.Equal(t, "https://portal.example.com/privacy", bound.FieldByName("PrivacyPolicyURL").String())
+	assert.Equal(t, "https://portal.example.com/terms", bound.FieldByName("TermsOfServiceURL").String())
+}
+
+// A save sends the two URLs as typed, trimmed, and an emptied field as empty, which clears it; a
+// refused save draws them again as typed.
+func TestHandleSettingsPost_SendsTheClientsDocumentURLs(t *testing.T) {
+	stored := &api.ClientResponse{Id: 7, ClientIdentifier: "portal",
+		PrivacyPolicyURL: "https://portal.example.com/privacy", TermsOfServiceURL: "https://portal.example.com/terms"}
+	apiClient := &stubAdministrativeScopesApiClient{client: stored}
+
+	rec := postSettings(t, apiClient, &stubHttpHelper{}, url.Values{
+		"clientIdentifier":  {"portal"},
+		"privacyPolicyUrl":  {"  https://legal.example.org/portal/privacy  "},
+		"termsOfServiceUrl": {""},
+	}, "")
+
+	assert.Equal(t, http.StatusFound, rec.Code)
+	require.NotNil(t, apiClient.sentSettings)
+	assert.Equal(t, "https://legal.example.org/portal/privacy", apiClient.sentSettings.PrivacyPolicyURL)
+	assert.Empty(t, apiClient.sentSettings.TermsOfServiceURL, "an emptied field clears the URL")
+
+	refused := &stubAdministrativeScopesApiClient{client: stored,
+		settingsErr: &apiclient.APIError{Code: "handler.client.terms_of_service_url_invalid", Message: "Invalid terms of service URL.", StatusCode: http.StatusBadRequest}}
+	httpHelper := &stubHttpHelper{}
+	postSettings(t, refused, httpHelper, url.Values{
+		"clientIdentifier":  {"portal"},
+		"privacyPolicyUrl":  {"https://legal.example.org/portal/privacy"},
+		"termsOfServiceUrl": {"not a url"},
+	}, "")
+	require.NotNil(t, httpHelper.bind, "the refused save is drawn again")
+	assert.Equal(t, "termsOfServiceUrl", httpHelper.bind["errorField"], "the refusal names its field")
+	drawn := reflect.ValueOf(httpHelper.bind["client"])
+	assert.Equal(t, "https://legal.example.org/portal/privacy", drawn.FieldByName("PrivacyPolicyURL").String())
+	assert.Equal(t, "not a url", drawn.FieldByName("TermsOfServiceURL").String(), "the input keeps what was typed")
 }

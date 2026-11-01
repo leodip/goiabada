@@ -561,6 +561,8 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 		ClientIdentifier:                        "web-app",
 		Description:                             "the web app",
 		WebsiteURL:                              "https://app.example",
+		PrivacyPolicyURL:                        "https://app.example/privacy",
+		TermsOfServiceURL:                       "https://app.example/terms",
 		DisplayName:                             "Web App",
 		Enabled:                                 true,
 		ConsentRequired:                         true,
@@ -608,7 +610,8 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			flag = `true`
 		}
 		return `"clientIdentifier":"` + identifier + `","description":"the web app",` +
-			`"websiteUrl":"https://app.example","displayName":"Web App","enabled":true,` +
+			`"websiteUrl":"https://app.example","privacyPolicyUrl":"https://app.example/privacy",` +
+			`"termsOfServiceUrl":"https://app.example/terms","displayName":"Web App","enabled":true,` +
 			`"consentRequired":true,"createdViaDcr":false,"administrativeScopesAllowed":` + flag +
 			`,"showLogo":true,"showDisplayName":true,` +
 			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,"isSystemLevelClient":` + flag +

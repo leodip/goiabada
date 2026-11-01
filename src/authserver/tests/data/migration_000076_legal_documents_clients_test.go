@@ -8,7 +8,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -153,10 +152,10 @@ func assertLegalDocumentsClientsBehaviour(t *testing.T, h *isolatedDB, when stri
 		assert.Truef(t, appliesToAllApps(t, h, shortName), "a document written without the column applies to all apps %s", when)
 		return scalar("SELECT id FROM legal_documents WHERE short_name = '%s'", shortName)
 	}
+	// Seeded in SQL: the data layer writes every column the record carries at head, which a
+	// database at 000076 lacks (migration_seed_sql_test.go).
 	newClient := func() int64 {
-		client := &record.Client{ClientIdentifier: "applies-client-" + fake.LetterN(8)}
-		require.NoError(t, h.DB.CreateClient(ctx, nil, client), "CreateClient")
-		return client.Id
+		return seedClient(t, h, "applies-client-"+fake.LetterN(8))
 	}
 	links := func(column string, id int64) int64 {
 		return scalar("SELECT COUNT(*) FROM legal_documents_clients WHERE %s = %d", column, id)

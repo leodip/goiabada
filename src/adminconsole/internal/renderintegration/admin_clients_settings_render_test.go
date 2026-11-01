@@ -369,6 +369,12 @@ func TestRender_AdminClientSettings_ARefusalByKeyMarksItsField(t *testing.T) {
 		{"handler.client.identifier_in_use", "The client identifier is already in use.", "clientIdentifier"},
 		{"handler.client.website_url_invalid", "Invalid website URL.", "websiteUrl"},
 		{"handler.client.display_name_too_long", "The display name cannot exceed a maximum length of 100 characters.", "displayName"},
+		{"handler.client.privacy_policy_url_too_long", "The privacy policy URL cannot exceed a maximum length of 256 characters.", "privacyPolicyUrl"},
+		{"handler.client.privacy_policy_url_invalid", "Invalid privacy policy URL.", "privacyPolicyUrl"},
+		{"handler.client.privacy_policy_url_scheme_invalid", "Privacy policy URL must use http or https scheme.", "privacyPolicyUrl"},
+		{"handler.client.terms_of_service_url_too_long", "The terms of service URL cannot exceed a maximum length of 256 characters.", "termsOfServiceUrl"},
+		{"handler.client.terms_of_service_url_invalid", "Invalid terms of service URL.", "termsOfServiceUrl"},
+		{"handler.client.terms_of_service_url_scheme_invalid", "Terms of service URL must use http or https scheme.", "termsOfServiceUrl"},
 	} {
 		t.Run(tc.code, func(t *testing.T) {
 			apiClient := &settingsTabAPI{
@@ -385,4 +391,33 @@ func TestRender_AdminClientSettings_ARefusalByKeyMarksItsField(t *testing.T) {
 			assert.Contains(t, invalid[0][0], ` autofocus`)
 		})
 	}
+}
+
+// The Settings tab has a field for each of the client's own documents, labelled, described and
+// holding the stored URL, drawn here in pt-BR, beside the website URL (#622 decision 12). Neither has a switch under
+// Sign-in and consent pages: the consent screen links them whenever set.
+func TestRender_AdminClientSettings_TheClientsDocumentURLFields(t *testing.T) {
+	out := renderClientSettings(t, adminclienthandlers.ClientSettings{
+		ClientId: 7, ClientIdentifier: "portal", Enabled: true,
+		PrivacyPolicyURL:  "https://portal.example.com/privacy",
+		TermsOfServiceURL: "https://portal.example.com/terms?v=2",
+	}, nil)
+
+	for _, field := range []struct{ name, value, label, hint string }{
+		{"privacyPolicyUrl", "https://portal.example.com/privacy", "URL da política de privacidade",
+			"A política de privacidade do próprio cliente. A tela de consentimento a mostra como link sempre que ela estiver definida."},
+		{"termsOfServiceUrl", "https://portal.example.com/terms?v=2", "URL dos termos de serviço",
+			"Os termos de serviço do próprio cliente. A tela de consentimento os mostra como link sempre que estiverem definidos."},
+	} {
+		input := regexp.MustCompile(`<input [^>]*id="` + field.name + `"[^>]*>`).FindString(out)
+		require.NotEmptyf(t, input, "the %s field", field.name)
+		assert.Contains(t, input, `name="`+field.name+`"`)
+		assert.Contains(t, input, `type="url"`)
+		assert.Contains(t, input, `value="`+field.value+`"`, "the field holds the stored URL")
+		assert.Contains(t, input, `aria-describedby="`+field.name+`Hint"`)
+		assert.Contains(t, out, `<label class="field-label" for="`+field.name+`">`+field.label+`</label>`)
+		assert.Contains(t, out, `<p class="field-hint" id="`+field.name+`Hint">`+field.hint+`</p>`)
+	}
+	assert.NotContains(t, out, `name="showPrivacyPolicyUrl"`, "no switch: the consent screen links it whenever set")
+	assert.NotContains(t, out, `name="showTermsOfServiceUrl"`)
 }

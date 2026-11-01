@@ -37,6 +37,8 @@ type ClientSettings struct {
 	ClientIdentifier            string
 	Description                 string
 	WebsiteURL                  string
+	PrivacyPolicyURL            string
+	TermsOfServiceURL           string
 	DisplayName                 string
 	Enabled                     bool
 	ConsentRequired             bool
@@ -61,6 +63,8 @@ func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
 		ClientIdentifier:            c.ClientIdentifier,
 		Description:                 c.Description,
 		WebsiteURL:                  c.WebsiteURL,
+		PrivacyPolicyURL:            c.PrivacyPolicyURL,
+		TermsOfServiceURL:           c.TermsOfServiceURL,
 		DisplayName:                 c.DisplayName,
 		Enabled:                     c.Enabled,
 		ConsentRequired:             c.ConsentRequired,
@@ -221,6 +225,8 @@ func HandleSettingsPost(
 			ClientIdentifier:            r.FormValue("clientIdentifier"),
 			Description:                 r.FormValue("description"),
 			WebsiteURL:                  r.FormValue("websiteUrl"),
+			PrivacyPolicyURL:            r.PostFormValue("privacyPolicyUrl"),
+			TermsOfServiceURL:           r.PostFormValue("termsOfServiceUrl"),
 			DisplayName:                 r.FormValue("displayName"),
 			Enabled:                     enabled,
 			ConsentRequired:             consentRequired,
@@ -255,16 +261,18 @@ func HandleSettingsPost(
 
 		// Build API request
 		updateReq := &api.UpdateClientSettingsRequest{
-			ClientIdentifier: strings.TrimSpace(adminClientSettings.ClientIdentifier),
-			Description:      strings.TrimSpace(adminClientSettings.Description),
-			WebsiteURL:       strings.TrimSpace(adminClientSettings.WebsiteURL),
-			DisplayName:      strings.TrimSpace(adminClientSettings.DisplayName),
-			Enabled:          adminClientSettings.Enabled,
-			ConsentRequired:  adminClientSettings.ConsentRequired,
-			ShowLogo:         adminClientSettings.ShowLogo,
-			ShowDisplayName:  adminClientSettings.ShowDisplayName,
-			ShowDescription:  adminClientSettings.ShowDescription,
-			ShowWebsiteURL:   adminClientSettings.ShowWebsiteURL,
+			ClientIdentifier:  strings.TrimSpace(adminClientSettings.ClientIdentifier),
+			Description:       strings.TrimSpace(adminClientSettings.Description),
+			WebsiteURL:        strings.TrimSpace(adminClientSettings.WebsiteURL),
+			PrivacyPolicyURL:  strings.TrimSpace(adminClientSettings.PrivacyPolicyURL),
+			TermsOfServiceURL: strings.TrimSpace(adminClientSettings.TermsOfServiceURL),
+			DisplayName:       strings.TrimSpace(adminClientSettings.DisplayName),
+			Enabled:           adminClientSettings.Enabled,
+			ConsentRequired:   adminClientSettings.ConsentRequired,
+			ShowLogo:          adminClientSettings.ShowLogo,
+			ShowDisplayName:   adminClientSettings.ShowDisplayName,
+			ShowDescription:   adminClientSettings.ShowDescription,
+			ShowWebsiteURL:    adminClientSettings.ShowWebsiteURL,
 		}
 		if clientResp.AuthorizationCodeEnabled {
 			updateReq.DefaultAcrLevel = r.FormValue("defaultAcrLevel")
