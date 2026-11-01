@@ -32,7 +32,7 @@ const JWTExpiresAt string = "JwtExpiresAt"
 // PageLanguage is the console's copy of the signed-in user's page language: the tag of the catalog
 // they chose for Goiabada's own pages, or empty for Automatic. It is read from the Account API at
 // sign-in and again whenever the profile page fetches the profile, and written when the user saves
-// it there; every signed-in page reads it, so a save shows on the user's next page without an auth
+// it there or on their own user Profile page as an administrator; every signed-in page reads it, so a save shows on the user's next page without an auth
 // server round trip per page (#631 decision 7).
 const PageLanguage string = "PageLanguage"
 

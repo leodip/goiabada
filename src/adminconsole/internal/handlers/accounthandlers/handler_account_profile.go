@@ -25,7 +25,7 @@ type accountProfileAPI interface {
 // console page is drawn from (#631 decision 7), and reports whether the copy changed, so a page that
 // changed nothing else saves no session for it; a session with no copy is on Automatic already. The
 // profile page refreshes the copy each time it fetches the profile, which is how a choice made
-// elsewhere, by an administrator or in another browser, reaches this session before its next
+// elsewhere, by another administrator or in another browser, reaches this session before its next
 // sign-in, and its save writes the choice the API stored.
 func copyPageLanguage(sess *sessionstore.Session, pageLanguage string) bool {
 	if copied, _ := sess.Values[sessionkeys.PageLanguage].(string); copied == pageLanguage {

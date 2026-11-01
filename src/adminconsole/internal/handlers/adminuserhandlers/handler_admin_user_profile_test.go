@@ -15,8 +15,13 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // userProfileRecorder answers the user read with a fresh copy of the stored user on every call, so
@@ -26,11 +31,13 @@ type userProfileRecorder struct {
 	// pageLanguage is the stored page language every read answers, and an update that leaves the
 	// field out keeps.
 	pageLanguage string
-	updateErr    error
-	updates      []*api.UpdateUserProfileRequest
-	updateIds    []int64
-	reads        []int64
-	tokens       []string
+	// subject is the subject of the user an update saves.
+	subject   string
+	updateErr error
+	updates   []*api.UpdateUserProfileRequest
+	updateIds []int64
+	reads     []int64
+	tokens    []string
 }
 
 func storedUserProfile(userId int64) *api.UserResponse {
@@ -68,6 +75,7 @@ func (c *userProfileRecorder) UpdateUserProfile(_ context.Context, accessToken s
 		return nil, c.updateErr
 	}
 	saved := storedUserProfile(userId)
+	saved.Subject = c.subject
 	saved.PageLanguage = c.pageLanguage
 	if request.PageLanguage != nil {
 		saved.PageLanguage = *request.PageLanguage
@@ -252,4 +260,75 @@ func TestHandleProfilePost_SendsThePageLanguageTheFormPosted(t *testing.T) {
 			assert.Equal(t, tc.want, apiClient.updates[0].PageLanguage)
 		})
 	}
+}
+
+// An administrator who saves a page language on their own user Profile page sees the console's next
+// page in it, as a save in Account > Profile does: the console's session copy follows what the API
+// saved (#631 decision 7). Saving another user's profile, or a session with no ID token, leaves the
+// administrator's copy as it was.
+func TestHandleProfilePost_AnAdministratorsOwnSaveRefreshesTheConsoleLanguage(t *testing.T) {
+	const signedIn = "admin-subject"
+	for _, tc := range []struct {
+		name     string
+		saved    string
+		idToken  *oauth.JwtToken
+		form     url.Values
+		wantCopy string
+	}{
+		{"their own user, a language chosen", signedIn, adminIdToken(signedIn),
+			url.Values{"username": {"jane-doe"}, "pageLanguage": {"es"}}, "es"},
+		{"their own user, Automatic chosen", signedIn, adminIdToken(signedIn),
+			url.Values{"username": {"jane-doe"}, "pageLanguage": {""}}, ""},
+		{"another user", "other-subject", adminIdToken(signedIn),
+			url.Values{"username": {"jane-doe"}, "pageLanguage": {"es"}}, "pt-BR"},
+		{"no ID token", signedIn, nil,
+			url.Values{"username": {"jane-doe"}, "pageLanguage": {"es"}}, "pt-BR"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			store := newFlashTestStore()
+			cookie := pageLanguageInSession(t, store, "pt-BR")
+			apiClient := &userProfileRecorder{pageLanguage: "it", subject: tc.saved}
+
+			req := handlertest.Request(http.MethodPost, "/admin/users/7/profile",
+				handlertest.WithJwtInfo(oauthclient.JwtInfo{
+					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
+					IdToken:       tc.idToken,
+				}),
+				handlertest.WithPathValue("userId", "7"), handlertest.WithForm(tc.form))
+			req.AddCookie(cookie)
+			rr := httptest.NewRecorder()
+			HandleProfilePost(httpHelper, store, apiClient, consoleBaseURL).ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusFound, rr.Code)
+			next := httptest.NewRequest(http.MethodGet, "/admin/users/7/profile", nil)
+			next.AddCookie(cookie)
+			for _, c := range rr.Result().Cookies() {
+				next.AddCookie(c)
+			}
+			sess, err := store.Get(next, builtin.AdminConsoleSessionName)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantCopy, sess.Values[sessionkeys.PageLanguage])
+		})
+	}
+}
+
+func adminIdToken(subject string) *oauth.JwtToken {
+	return &oauth.JwtToken{TokenBase64: "id", Claims: map[string]any{"sub": subject}}
+}
+
+// pageLanguageInSession stores a session holding the console's copy of the page language and
+// returns the cookie that names it.
+func pageLanguageInSession(t *testing.T, store *sessionstore.ServerSideStore, pageLanguage string) *http.Cookie {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
+	rec := httptest.NewRecorder()
+	sess, err := store.Get(req, builtin.AdminConsoleSessionName)
+	require.NoError(t, err)
+	sess.Values[sessionkeys.PageLanguage] = pageLanguage
+	require.NoError(t, store.Save(req, rec, sess))
+	cookies := rec.Result().Cookies()
+	require.Len(t, cookies, 1)
+	return cookies[0]
 }
