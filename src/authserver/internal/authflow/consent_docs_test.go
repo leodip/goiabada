@@ -6,11 +6,12 @@ package authflow
 // The screen is decided in two places: /auth/completed sends a ceremony to /auth/consent when the
 // request has prompt=consent, the client requires consent or the scope has offline_access, or when
 // the scope holds authserver:manage-account, the client is not the admin console's and the user's
-// stored consent does not cover it (decideAfterBinding, #509), and /auth/consent then skips
-// the screen when every scope is already consented, unless offline_access or prompt=consent is there
-// (consentScreenOwed). The table states the two together, so it is held to both, for every
-// combination of its five conditions and of the client being the admin console's or not, which the
-// manage-account column folds in.
+// stored consent does not cover it or may not stand in for the screen (decideAfterBinding, #509,
+// #711), and /auth/consent then skips the screen when every scope is already consented and the
+// client remembers consent, unless offline_access or prompt=consent is there (consentScreenOwed).
+// The table states the two together, so it is held to both, for every combination of its six
+// conditions and of the client being the admin console's or not, which the manage-account column
+// folds in.
 //
 // Like the concept pages' guard, it lives here because it drives this package's decisions and reads
 // the site through core/docsreader with no HTTP harness, so the decisions stay unexported (#584).
@@ -38,6 +39,10 @@ var consentScreenSection = conceptSection{clientsPage, "## Consent required"}
 // consentColumnRequired heads the column of the client's consent setting, by its admin console label.
 var consentColumnRequired = "**" + i18n.T(context.Background(), "adminconsole.admin_clients.settings.field.consent_required") + "**"
 
+// consentColumnRemember heads the column of the client's Remember consent, as the page names the
+// setting: always on for a confidential client, and the stored setting for a public one (#711).
+const consentColumnRemember = "**Remember consent**"
+
 // The consent table's other columns, as the page heads them.
 const (
 	consentColumnOffline  = "`offline_access` asked for"
@@ -50,20 +55,21 @@ const (
 // consentManageAccountScope is authserver:manage-account as a request spells it.
 const consentManageAccountScope = builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 
-// consentWorld is one combination of the table's five conditions, and of the client being the admin
+// consentWorld is one combination of the table's six conditions, and of the client being the admin
 // console's or another. The manage-account column reads Yes only for another client asking for it:
-// the admin console's asking for it is a No, which is the exemption the section states.
+// the admin console's asking for it is a No, which is the exemption the section states. The Remember
+// consent column reads Off only for forgetsConsent, a public client with the setting off.
 type consentWorld struct {
-	consentRequired, offlineAccess, promptConsent, manageAccount, adminConsole, approvedBefore bool
+	consentRequired, forgetsConsent, offlineAccess, promptConsent, manageAccount, adminConsole, approvedBefore bool
 }
 
 func (w consentWorld) String() string {
 	onOff := map[bool]string{false: "Off", true: "On"}
 	yesNo := map[bool]string{false: "No", true: "Yes"}
 	client := map[bool]string{false: "another client", true: "the admin console's client"}
-	return fmt.Sprintf("Ask users for consent %s, offline_access %s, prompt=consent %s, manage-account %s by %s, approved before %s",
-		onOff[w.consentRequired], yesNo[w.offlineAccess], yesNo[w.promptConsent], yesNo[w.manageAccount],
-		client[w.adminConsole], yesNo[w.approvedBefore])
+	return fmt.Sprintf("Ask users for consent %s, Remember consent %s, offline_access %s, prompt=consent %s, manage-account %s by %s, approved before %s",
+		onOff[w.consentRequired], onOff[!w.forgetsConsent], yesNo[w.offlineAccess], yesNo[w.promptConsent],
+		yesNo[w.manageAccount], client[w.adminConsole], yesNo[w.approvedBefore])
 }
 
 // consentWorlds is every combination of the conditions.
@@ -71,12 +77,14 @@ func consentWorlds() []consentWorld {
 	var worlds []consentWorld
 	both := []bool{false, true}
 	for _, required := range both {
-		for _, offline := range both {
-			for _, prompt := range both {
-				for _, account := range both {
-					for _, adminConsole := range both {
-						for _, approved := range both {
-							worlds = append(worlds, consentWorld{required, offline, prompt, account, adminConsole, approved})
+		for _, forgets := range both {
+			for _, offline := range both {
+				for _, prompt := range both {
+					for _, account := range both {
+						for _, adminConsole := range both {
+							for _, approved := range both {
+								worlds = append(worlds, consentWorld{required, forgets, offline, prompt, account, adminConsole, approved})
+							}
 						}
 					}
 				}
@@ -116,6 +124,7 @@ func consentScreenShown(t *testing.T, world consentWorld) bool {
 		PromptConsent:    world.promptConsent,
 		ConsentRequired:  world.consentRequired,
 		ClientIdentifier: clientIdentifier,
+		RemembersConsent: !world.forgetsConsent,
 		EffectiveScope:   &scope,
 	}
 	answer, need := decideAfterBinding(facts)
@@ -138,7 +147,7 @@ func consentScreenShown(t *testing.T, world consentWorld) bool {
 	for _, s := range strings.Split(scope, " ") {
 		scopes = append(scopes, ScopeInfo{Scope: s, AlreadyConsented: storedConsent != nil && storedConsent.HasScope(s)})
 	}
-	return consentScreenOwed(scopes, scope, world.promptConsent)
+	return consentScreenOwed(scopes, scope, world.promptConsent, !world.forgetsConsent)
 }
 
 // consentScreens is consentScreenShown for every world.
@@ -161,8 +170,9 @@ func TestConceptDocs_TheConsentTableIsWhenTheCodeShowsTheScreen(t *testing.T) {
 func TestConceptDocs_AConsentTableDisagreeingWithTheCodeFails(t *testing.T) {
 	root := t.TempDir()
 	writeConceptFixture(t, root, "site/clients.mdx", "## Consent required\n\n"+consentFixtureHeader+
-		"| Off | Either | Either | No | Either | Skipped |\n"+
-		"| On | No | No | No | Maybe | Shown |\n")
+		"| Off | Either | Either | Either | No | Either | Skipped |\n"+
+		"| On | On | No | No | No | Maybe | Shown |\n"+
+		"| On | Either | No | No | No | Yes | Skipped |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "## Consent required"}, map[consentWorld]bool{
@@ -170,7 +180,9 @@ func TestConceptDocs_AConsentTableDisagreeingWithTheCodeFails(t *testing.T) {
 			{offlineAccess: true}:   true,
 			{consentRequired: true}: true,
 			{manageAccount: true}:   true,
-			{manageAccount: true, adminConsole: true}: false,
+			{manageAccount: true, adminConsole: true}:                           false,
+			{consentRequired: true, approvedBefore: true}:                       false,
+			{consentRequired: true, forgetsConsent: true, approvedBefore: true}: true,
 		})
 	})
 
@@ -178,10 +190,11 @@ func TestConceptDocs_AConsentTableDisagreeingWithTheCodeFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/clients.mdx: ## Consent required row 1 says the screen is skipped, the code shows it for Ask users for consent Off, offline_access Yes, prompt=consent No, manage-account No by another client, approved before No",
+		"site/clients.mdx: ## Consent required row 1 says the screen is skipped, the code shows it for Ask users for consent Off, Remember consent On, offline_access Yes, prompt=consent No, manage-account No by another client, approved before No",
 		`site/clients.mdx: ## Consent required row 2 says "Maybe" under "Stored consent covers what's required", which is not Yes, No or Either`,
-		"site/clients.mdx: ## Consent required has no row for Ask users for consent Off, offline_access No, prompt=consent No, manage-account Yes by another client, approved before No",
-		"site/clients.mdx: ## Consent required has no row for Ask users for consent On, offline_access No, prompt=consent No, manage-account No by another client, approved before No",
+		"site/clients.mdx: ## Consent required row 3 says the screen is skipped, the code shows it for Ask users for consent On, Remember consent Off, offline_access No, prompt=consent No, manage-account No by another client, approved before Yes",
+		"site/clients.mdx: ## Consent required has no row for Ask users for consent Off, Remember consent On, offline_access No, prompt=consent No, manage-account Yes by another client, approved before No",
+		"site/clients.mdx: ## Consent required has no row for Ask users for consent On, Remember consent On, offline_access No, prompt=consent No, manage-account No by another client, approved before No",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -191,10 +204,11 @@ func TestConceptDocs_AConsentTableDisagreeingWithTheCodeFails(t *testing.T) {
 func TestConceptDocs_AConsentTableAgreeingWithTheCodePasses(t *testing.T) {
 	root := t.TempDir()
 	writeConceptFixture(t, root, "site/clients.mdx", "## Consent required\n\n"+consentFixtureHeader+
-		"| Off | No | No | No | Either | Skipped |\n"+
-		"| Off | No | No | Yes | No | Shown |\n"+
-		"| Either | Yes | Either | Either | Either | Shown |\n"+
-		"| On | No | No | Either | Either | Shown |\n")
+		"| Off | Either | No | No | No | Either | Skipped |\n"+
+		"| Off | Either | No | No | Yes | No | Shown |\n"+
+		"| Either | Either | Yes | Either | Either | Either | Shown |\n"+
+		"| On | Off | No | No | Either | Either | Shown |\n"+
+		"| On | On | No | No | Either | Either | Shown |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "## Consent required"}, map[consentWorld]bool{
@@ -203,8 +217,9 @@ func TestConceptDocs_AConsentTableAgreeingWithTheCodePasses(t *testing.T) {
 			{manageAccount: true, adminConsole: true}: false,
 			{manageAccount: true}:                     true,
 			{offlineAccess: true}:                     true,
-			{consentRequired: true, offlineAccess: true, approvedBefore: true}: true,
-			{consentRequired: true, approvedBefore: true}:                      true,
+			{consentRequired: true, offlineAccess: true, approvedBefore: true}:  true,
+			{consentRequired: true, approvedBefore: true}:                       true,
+			{consentRequired: true, forgetsConsent: true, approvedBefore: true}: true,
 		})
 	})
 
@@ -214,25 +229,34 @@ func TestConceptDocs_AConsentTableAgreeingWithTheCodePasses(t *testing.T) {
 }
 
 func TestConceptDocs_AConsentTableWithoutItsColumnsStops(t *testing.T) {
-	root := t.TempDir()
-	writeConceptFixture(t, root, "site/clients.mdx", "## Consent required\n\n"+
-		"| "+consentColumnRequired+" | `offline_access` asked for | `prompt=consent` | Stored consent covers what's required | Consent screen |\n"+
-		"|---|---|---|---|---|\n| On | No | No | No | Shown |\n")
+	for _, missing := range []struct{ column, header, row string }{
+		{consentColumnAccount,
+			"| " + consentColumnRequired + " | " + consentColumnRemember + " | `offline_access` asked for | `prompt=consent` | Stored consent covers what's required | Consent screen |\n",
+			"|---|---|---|---|---|---|\n| On | On | No | No | No | Shown |\n"},
+		{consentColumnRemember,
+			"| " + consentColumnRequired + " | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |\n",
+			"|---|---|---|---|---|---|\n| On | No | No | No | No | Shown |\n"},
+	} {
+		t.Run(missing.column, func(t *testing.T) {
+			root := t.TempDir()
+			writeConceptFixture(t, root, "site/clients.mdx", "## Consent required\n\n"+missing.header+missing.row)
 
-	report := guard.Run(func(r guard.Reporter) {
-		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "## Consent required"},
-			map[consentWorld]bool{{consentRequired: true}: true})
-	})
+			report := guard.Run(func(r guard.Reporter) {
+				assertConsentTable(r, root, conceptSection{"site/clients.mdx", "## Consent required"},
+					map[consentWorld]bool{{consentRequired: true}: true})
+			})
 
-	if !report.Stopped || !strings.Contains(report.Fatal, consentColumnAccount) {
-		t.Errorf("a table without its columns did not stop the check naming them: %+v", report)
+			if !report.Stopped || !strings.Contains(report.Fatal, missing.column) {
+				t.Errorf("a table without %s did not stop the check naming it: %+v", missing.column, report)
+			}
+		})
 	}
 }
 
 func TestConceptDocs_AMissingConsentSectionStops(t *testing.T) {
 	root := t.TempDir()
 	writeConceptFixture(t, root, "site/clients.mdx", "## Consent\n\n"+consentFixtureHeader+
-		"| On | No | No | No | No | Shown |\n")
+		"| On | On | No | No | No | No | Shown |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertConsentTable(r, root, conceptSection{"site/clients.mdx", "## Consent required"},
@@ -244,15 +268,15 @@ func TestConceptDocs_AMissingConsentSectionStops(t *testing.T) {
 	}
 }
 
-var consentFixtureHeader = "| " + consentColumnRequired + " | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |\n" +
-	"|---|---|---|---|---|---|\n"
+var consentFixtureHeader = "| " + consentColumnRequired + " | " + consentColumnRemember + " | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |\n" +
+	"|---|---|---|---|---|---|---|\n"
 
 // assertConsentTable is the reporting half of the consent table's check: one failure per row whose
 // answer differs from the code's for a combination it matches, per cell that is no condition value
 // or answer, and per combination no row matches; a stop for a section, table or column not found.
 func assertConsentTable(r guard.Reporter, root string, section conceptSection, want map[consentWorld]bool) {
 	r.Helper()
-	columns, err := conceptTableColumns(root, section, consentColumnRequired, consentColumnOffline,
+	columns, err := conceptTableColumns(root, section, consentColumnRequired, consentColumnRemember, consentColumnOffline,
 		consentColumnPrompt, consentColumnAccount, consentColumnApproved, consentColumnScreen)
 	if err != nil {
 		r.Fatalf("%v", err)
@@ -264,6 +288,7 @@ func assertConsentTable(r guard.Reporter, root string, section conceptSection, w
 		valueForWorld func(consentWorld) bool
 	}{
 		{consentColumnRequired, "Off", "On", func(w consentWorld) bool { return w.consentRequired }},
+		{consentColumnRemember, "Off", "On", func(w consentWorld) bool { return !w.forgetsConsent }},
 		{consentColumnOffline, "No", "Yes", func(w consentWorld) bool { return w.offlineAccess }},
 		{consentColumnPrompt, "No", "Yes", func(w consentWorld) bool { return w.promptConsent }},
 		{consentColumnAccount, "No", "Yes", func(w consentWorld) bool { return w.manageAccount && !w.adminConsole }},

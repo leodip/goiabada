@@ -31,6 +31,9 @@ type silentWorld struct {
 	clientIdentifier   string
 	consentScope       *string // nil for no consent row
 	legalDocumentsOwed bool
+	// forgetsConsent is a public client with Remember consent off, whose stored consent never
+	// answers for the user (#711).
+	forgetsConsent bool
 }
 
 // driveSilentAuthentication runs decideSilentAuthentication as SilentAuthentication.Run does,
@@ -45,6 +48,7 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (silentAuthentic
 		Target:           world.target,
 		ConsentRequired:  world.consentRequired,
 		ClientIdentifier: world.clientIdentifier,
+		RemembersConsent: !world.forgetsConsent,
 	}
 	var asked []silentFact
 	for {
@@ -413,6 +417,78 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			wantCode:        oidc.ErrorConsentRequired,
 			wantDescription: "Additional consent is required",
 			wantReads:       []silentFact{session, validity, scope, legal, consent},
+		},
+		// A public client with Remember consent off owing a consent is refused with a description of
+		// its own, and the stored consent is not read, so the answer says nothing about whether the
+		// user approved the real app before (#711 decision 3).
+		{
+			name: "a client forgetting consent that requires it is refused, its covering consent unread",
+			world: with(func(w *silentWorld) {
+				w.forgetsConsent = true
+				w.consentRequired = true
+				w.consentScope = scopes("openid profile")
+			}),
+			wantCode:        oidc.ErrorConsentRequired,
+			wantDescription: "User consent is required for every request from this client",
+			wantReads:       []silentFact{session, validity, scope, legal},
+		},
+		{
+			name: "a client forgetting consent with none stored is refused alike",
+			world: with(func(w *silentWorld) {
+				w.forgetsConsent = true
+				w.consentRequired = true
+			}),
+			wantCode:        oidc.ErrorConsentRequired,
+			wantDescription: "User consent is required for every request from this client",
+			wantReads:       []silentFact{session, validity, scope, legal},
+		},
+		{
+			name: "offline_access from a client forgetting consent is refused",
+			world: with(func(w *silentWorld) {
+				w.forgetsConsent = true
+				w.effectiveScope = "openid offline_access"
+				w.consentScope = scopes("openid offline_access")
+			}),
+			wantCode:        oidc.ErrorConsentRequired,
+			wantDescription: "User consent is required for every request from this client",
+			wantReads:       []silentFact{session, validity, scope, legal},
+		},
+		{
+			name: "manage-account from a client forgetting consent is refused",
+			world: with(func(w *silentWorld) {
+				w.forgetsConsent = true
+				w.clientIdentifier = "public-app"
+				w.effectiveScope = "openid authserver:manage-account"
+				w.consentScope = scopes("openid authserver:manage-account")
+			}),
+			wantCode:        oidc.ErrorConsentRequired,
+			wantDescription: "User consent is required for every request from this client",
+			wantReads:       []silentFact{session, validity, scope, legal},
+		},
+		{
+			name:      "a client forgetting consent and owing none passes",
+			world:     with(func(w *silentWorld) { w.forgetsConsent = true; w.clientIdentifier = "public-app" }),
+			wantReads: []silentFact{session, validity, scope, legal},
+		},
+		{
+			name: "a legal document owed is answered before a client forgetting consent",
+			world: with(func(w *silentWorld) {
+				w.forgetsConsent = true
+				w.consentRequired = true
+				w.legalDocumentsOwed = true
+			}),
+			wantCode:        oidc.ErrorInteractionRequired,
+			wantDescription: "Acceptance of a legal document is required",
+			wantReads:       []silentFact{session, validity, scope, legal},
+		},
+		{
+			name: "a public client remembering consent passes on a covering consent",
+			world: with(func(w *silentWorld) {
+				w.clientIdentifier = "public-app"
+				w.consentRequired = true
+				w.consentScope = scopes("openid profile")
+			}),
+			wantReads: []silentFact{session, validity, scope, legal, consent},
 		},
 		{
 			name: "a tab still separates two scopes of an effective scope",

@@ -62,6 +62,8 @@ A public client has no secret, so nothing it sends to the token endpoint proves 
 
 So a public client **always** uses PKCE, and the auth server refuses a public client's authorization request without a `code_challenge`. There's no setting to turn it off. A public client also can't use the client credentials flow, and a request that sends it a `client_secret` is refused with `invalid_request`. See [Clients](/concepts/clients/#public-and-confidential-clients).
 
+Nothing proves an authorization request comes from your app either: another app can send your `client_id`. So when a sign-in asks for consent, because **Ask users for consent** is on or your app asks for `offline_access` or `authserver:manage-account`, users see the consent screen every time, even after they've approved your app, and a `prompt=none` request gets `consent_required`. An administrator can turn on [**Remember consent**](/concepts/clients/#consent-required) when every redirect URI is an `https` address only your app receives.
+
 ## In the browser
 
 Your SPA calls the token endpoint from JavaScript, from another origin than the auth server's, so the browser lets it read the answer only when the auth server allows that origin (CORS). The auth server allows every origin registered as a [web origin](/concepts/clients/#web-origins). A web origin is permitted server-wide, for every client, whichever client you register it on.

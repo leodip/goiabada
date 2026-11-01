@@ -242,6 +242,9 @@ type afterBindingWorld struct {
 	clientIdentifier string
 	effectiveScope   string
 	consentScope     *string // nil for no consent row
+	// forgetsConsent is a public client with Remember consent off, whose stored consent never stands
+	// in for the consent screen (#711).
+	forgetsConsent bool
 }
 
 // driveAfterBinding runs decideAfterBinding as Completion.Run does, loading each fact it
@@ -253,6 +256,7 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 		PromptConsent:    world.promptConsent,
 		ConsentRequired:  world.consentRequired,
 		ClientIdentifier: world.clientIdentifier,
+		RemembersConsent: !world.forgetsConsent,
 	}
 	var asked []afterBindingFact
 	for {
@@ -378,6 +382,37 @@ func TestDecideAfterBinding(t *testing.T) {
 			world: afterBindingWorld{clientIdentifier: "crafted-link-client", consentRequired: true,
 				effectiveScope: "openid authserver:manage-account"},
 			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope},
+		},
+		// A public client with Remember consent off: a stored consent never lets manage-account
+		// through, and is not read, while a sign-in owing no consent is as before (#711 decision 2).
+		{
+			name: "manage-account from a client forgetting consent goes to the consent screen, its consent covering it unread",
+			world: afterBindingWorld{clientIdentifier: "public-app", forgetsConsent: true,
+				effectiveScope: "openid authserver:manage-account",
+				consentScope:   scopes("openid authserver:manage-account")},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope},
+		},
+		{
+			name: "manage-account from a public client remembering consent goes to issuance on a covering consent",
+			world: afterBindingWorld{clientIdentifier: "public-app",
+				effectiveScope: "openid authserver:manage-account",
+				consentScope:   scopes("openid authserver:manage-account")},
+			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope, consent},
+		},
+		{
+			name:       "a client forgetting consent and owing none goes to issuance",
+			world:      afterBindingWorld{clientIdentifier: "public-app", forgetsConsent: true, effectiveScope: "openid profile"},
+			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope},
+		},
+		{
+			name: "a client forgetting consent with manage-account filtered out goes to issuance",
+			world: afterBindingWorld{clientIdentifier: "public-app", forgetsConsent: true,
+				effectiveScope: "openid"},
+			wantAnswer: afterBindingIssue,
 			wantReads:  []afterBindingFact{scope},
 		},
 		{

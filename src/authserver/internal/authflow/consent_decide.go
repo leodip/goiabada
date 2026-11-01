@@ -69,15 +69,19 @@ func buildScopeInfoArray(ctx context.Context, scope string, consent *record.User
 
 // consentScreenOwed answers whether GET /auth/consent renders the screen rather than going straight
 // on to issuance. It is shown when:
+//   - the client does not remember consent (record.Client's RemembersConsent), a public client
+//     with Remember consent off: nothing proves the request comes from the app the user approved,
+//     so it is processed as if no previous request had been approved (RFC 6749 section 10.2, RFC
+//     8252 section 8.6; #711 decision 2), OR
 //   - not every requested scope is already consented, OR
 //   - offline_access is requested (a refresh token grant is always re-confirmed), OR
 //   - prompt=consent was explicitly requested (force consent UI).
-func consentScreenOwed(scopes []ScopeInfo, scope string, promptConsent bool) bool {
+func consentScreenOwed(scopes []ScopeInfo, scope string, promptConsent, remembersConsent bool) bool {
 	fullyConsented := true
 	for _, scopeInfo := range scopes {
 		fullyConsented = fullyConsented && scopeInfo.AlreadyConsented
 	}
-	return !fullyConsented || oidc.HasOfflineAccessScope(scope) || promptConsent
+	return !remembersConsent || !fullyConsented || oidc.HasOfflineAccessScope(scope) || promptConsent
 }
 
 // consentApproved reads the submission's action from the submitted body, which the handler hands

@@ -47,7 +47,7 @@ With `prompt=none`, the auth server runs every check it would otherwise show the
 | `interaction_required` | "Higher authentication level required" | enter their authenticator code, for the client's ACR level. |
 | `interaction_required` | "Additional authentication setup required" | set up two-factor authentication, which `urn:goiabada:level2_mandatory` requires. |
 | `interaction_required` | "Authentication configuration has changed" | enter their code again, since their two-factor authentication changed. |
-| `consent_required` | "User consent is required" or "Additional consent is required" | approve the scopes on the consent screen. |
+| `consent_required` | "User consent is required", "Additional consent is required" or "User consent is required for every request from this client" | approve the scopes on the consent screen. A public client with [**Remember consent**](/concepts/clients/#consent-required) off gets the last one whenever it needs consent. |
 | `access_denied` | "The user account is disabled" | nothing: an administrator disabled the user. Disabling a user also ends their sessions, so this request usually gets `login_required` instead. |
 | `access_denied` | "The user is not authorized to access any of the requested scopes" | nothing: the user holds none of the permissions asked for. |
 
