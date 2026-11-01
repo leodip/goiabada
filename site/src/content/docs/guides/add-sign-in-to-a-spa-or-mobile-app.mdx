@@ -64,7 +64,7 @@ So a public client **always** uses PKCE, and the auth server refuses a public cl
 
 ## In the browser
 
-Your SPA calls the token endpoint from JavaScript, from another origin than the auth server's, so the browser lets it read the answer only when the auth server allows that origin (CORS). The auth server allows every origin registered as a [web origin](/concepts/clients/#web-origins). A web origin is permitted server-wide, for every client, whichever client you register it on.
+Your SPA calls the token endpoint from JavaScript, from another origin than the auth server's, so the browser lets it read the answer only when the auth server allows that origin (CORS). The auth server allows every origin registered as a [web origin](/concepts/clients/#web-origins). A web origin is permitted server-wide, for every client, whichever client you register it on. From an allowed origin, your script can also read the `WWW-Authenticate` header of a `401` and the `Retry-After` header of a `429`.
 
 Keep the tokens where other sites can't reach them. Keeping them in memory is the safest: the user signs in again when the page reloads, which single sign-on usually makes a redirect and back, with no password.
 

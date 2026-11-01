@@ -29,6 +29,12 @@ var corsAllowedMethods = []string{http.MethodGet, http.MethodHead, http.MethodPo
 // among them because some browsers always ask for it.
 var corsAllowedHeaders = []string{"Accept", "Authorization", "Content-Type", "X-Csrf-Token", "Origin"}
 
+// corsExposedHeaders are the response headers an allowed actual answer lets script read beyond the
+// CORS-safelisted ones (Fetch Standard section 2.2.2): the bearer challenge on a 401 and the back-off
+// on a 429 (#716 item 2). A preflight carries none, since the browser exposes nothing of it to
+// script.
+const corsExposedHeaders = "WWW-Authenticate, Retry-After"
+
 // corsMaxAge is how long, in seconds, a browser may cache a granted preflight: ten minutes. With
 // none, every browser fell back to its own short default and re-preflighted constantly, each one
 // paying for the origin lookup.
@@ -48,9 +54,10 @@ const corsMaxAge = 600
 // on the three request fields it reads, and grants only when the origin, the method and every
 // requested header are allowed: then it names the origin, the one method asked for, the headers
 // asked for, and corsMaxAge. Every other request goes on to its route, varying on Origin, and names
-// its origin only when the request carries one that is allowed and its method is listed. Vary is
-// always added to, never set, and before the route runs, so a Vary of the route's own stays beside
-// it, and no answer carries Access-Control-Allow-Credentials.
+// its origin, exposing corsExposedHeaders beside it, only when the request carries one that is
+// allowed and its method is listed. Vary is always added to, never set, and before the route runs,
+// so a Vary of the route's own stays beside it, and no answer carries
+// Access-Control-Allow-Credentials.
 func CORS(database corsDatabase) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +78,7 @@ func CORS(database corsDatabase) func(next http.Handler) http.Handler {
 				// method outside the list still costs its lookup.
 				if corsOriginAllowed(r, database, origin) && corsMethodAllowed(r.Method) {
 					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Access-Control-Expose-Headers", corsExposedHeaders)
 				}
 			}
 			next.ServeHTTP(w, r)
@@ -94,7 +102,9 @@ func answerPreflight(w http.ResponseWriter, r *http.Request, database corsDataba
 	if !corsMethodAllowed(method) {
 		return
 	}
-	requested := corsRequestedHeaders(r.Header.Get("Access-Control-Request-Headers"))
+	// Every field line, joined in order with commas, is the field's value (RFC 9110 sections 5.2 and
+	// 5.3): Get would read the first line alone and grant only what it asks for (#716 item 1).
+	requested := corsRequestedHeaders(strings.Join(r.Header.Values("Access-Control-Request-Headers"), ","))
 	for _, name := range requested {
 		if !slices.Contains(corsAllowedHeaders, name) {
 			return

@@ -14,7 +14,9 @@ import (
 )
 
 // The CORS answers as the running server sends them, every CORS header field read off the wire
-// (#462 decision 8, #280): a preflight's grant and its refusal, and an ordinary request's. The
+// (#462 decision 8, #280): a preflight's grant and its refusal, its request headers split across
+// field lines (#716 item 1), and an ordinary request's, whose grant exposes WWW-Authenticate and
+// Retry-After to script (#716 item 2). The
 // branches are middleware.CORS's own tests; this holds the middleware mounted, with a registered
 // origin read from the real database.
 func TestCors_TheAnswersOnTheWire(t *testing.T) {
@@ -33,6 +35,7 @@ func TestCors_TheAnswersOnTheWire(t *testing.T) {
 	}))
 
 	preflightVary := []string{"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"}
+	exposed := []string{"WWW-Authenticate, Retry-After"}
 
 	tests := []struct {
 		name       string
@@ -56,6 +59,23 @@ func TestCors_TheAnswersOnTheWire(t *testing.T) {
 				"Access-Control-Allow-Origin":  {registered},
 				"Access-Control-Allow-Methods": {"POST"},
 				"Access-Control-Allow-Headers": {"Authorization, Content-Type"},
+				"Access-Control-Max-Age":       {"600"},
+			},
+		},
+		{
+			name:   "a preflight's request headers on two lines are both granted",
+			method: http.MethodOptions, path: "/userinfo",
+			header: http.Header{
+				"Origin":                         {registered},
+				"Access-Control-Request-Method":  {"GET"},
+				"Access-Control-Request-Headers": {"authorization", "x-csrf-token"},
+			},
+			wantStatus: http.StatusOK,
+			want: http.Header{
+				"Vary":                         preflightVary,
+				"Access-Control-Allow-Origin":  {registered},
+				"Access-Control-Allow-Methods": {"GET"},
+				"Access-Control-Allow-Headers": {"Authorization, X-Csrf-Token"},
 				"Access-Control-Max-Age":       {"600"},
 			},
 		},
@@ -85,8 +105,20 @@ func TestCors_TheAnswersOnTheWire(t *testing.T) {
 			header:     http.Header{"Origin": {unregistered}},
 			wantStatus: http.StatusOK,
 			want: http.Header{
-				"Vary":                        {"Origin"},
-				"Access-Control-Allow-Origin": {unregistered},
+				"Vary":                          {"Origin"},
+				"Access-Control-Allow-Origin":   {unregistered},
+				"Access-Control-Expose-Headers": exposed,
+			},
+		},
+		{
+			name:   "a GET of userinfo from a registered origin exposes the bearer challenge",
+			method: http.MethodGet, path: "/userinfo",
+			header:     http.Header{"Origin": {registered}},
+			wantStatus: http.StatusUnauthorized,
+			want: http.Header{
+				"Vary":                          {"Origin"},
+				"Access-Control-Allow-Origin":   {registered},
+				"Access-Control-Expose-Headers": exposed,
 			},
 		},
 		{
