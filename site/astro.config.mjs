@@ -106,6 +106,7 @@ export default defineConfig({
 						{ label: 'Sign users out', slug: 'guides/sign-users-out' },
 						{ label: 'Protect an API', slug: 'guides/protect-an-api' },
 						{ label: 'Require two-factor authentication', slug: 'guides/require-two-factor-authentication' },
+						{ label: 'Require a Turnstile challenge', slug: 'guides/require-a-turnstile-challenge' },
 						{ label: 'Single sign-on across clients', slug: 'guides/single-sign-on-across-clients' },
 						{ label: 'Let clients register themselves (DCR)', slug: 'guides/let-clients-register-themselves-dcr' },
 						{ label: 'Publish legal documents', slug: 'guides/publish-legal-documents' },

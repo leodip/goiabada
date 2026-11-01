@@ -577,7 +577,14 @@ The switch governs only the tiers that read the client's address, those counted 
 `pwd_account_net`, the 10 wrong passwords per 15 minutes for one email from one client block; with
 it off the password check reserves the account-wide tier alone. The price is #89's lockout: 100
 wrong passwords block an account's password sign-in for up to an hour, its remedy blocking the
-attacker at the proxy or CDN (#503)
+attacker at the proxy or CDN (#503), or the optional Turnstile challenge (#642). While the challenge
+is on, `RequirePasswordChallenge`, `RequireForgotPasswordChallenge` and `RequireRegistrationChallenge`
+run ahead of their forms' limiters, after the forms' own availability refusals, so a submission
+without a verified token spends no tier, those counted by an email and by a client block alike, and
+no password is compared; the limiter itself is unchanged. The password grant shares `pwd_account`
+and carries no challenge, so the lockout stays closed only while no public client has the grant
+enabled (#642 decision 8). `internal/turnstile` refuses on Cloudflare's verdict or a missing token
+and fails open on a configuration fault or no usable answer, so its worst case is the limiter alone.
 
 ## Post-logout redirects
 

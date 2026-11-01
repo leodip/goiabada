@@ -125,3 +125,43 @@ func TestDeployPages_TheRecoveryRunsInEachDeploymentShape(t *testing.T) {
 		}
 	}
 }
+
+// recoverTurnstileUsage is the usage's line for the action that names no user.
+var recoverTurnstileUsage = regexp.MustCompile(`(?m)^  (goiabada-authserver recover --disable-turnstile)$`)
+
+// recoveryCommandPrefix is what a documented recovery runs before `recover --email`, in the
+// last-administrator section's tabs: each deployment shape's way of running the auth server's binary.
+var recoveryCommandPrefix = regexp.MustCompile(`(?m)\| (.+?)recover --email `)
+
+// turnstileGuidePage is the guide that turns the Turnstile challenge on, which names the way back.
+const turnstileGuidePage = "site/src/content/docs/guides/require-a-turnstile-challenge.mdx"
+
+// TestLockedOutPage_TheTurnstileEscapeRunsInEachDeploymentShape: the page's section on a
+// challenge that refuses every sign-in runs `recover --disable-turnstile` the way the
+// last-administrator section runs recover in each deployment shape, and the guide names the flag
+// as the usage spells it, so an operator locked out by a wrong site key copies a command the binary
+// accepts (#642).
+func TestLockedOutPage_TheTurnstileEscapeRunsInEachDeploymentShape(t *testing.T) {
+	root := filepath.Dir(guard.SourceRoot(t))
+	usage := recoverTurnstileUsage.FindStringSubmatch(recoverUsage)
+	require.NotNilf(t, usage, "the usage spells recover --disable-turnstile on a line of its own")
+
+	body, err := os.ReadFile(filepath.Join(root, recoverDocsPage))
+	require.NoError(t, err)
+	tabs, found := docsreader.SectionText(string(body), "## The last administrator can't sign in")
+	require.Truef(t, found, "%s has no section headed ## The last administrator can't sign in", recoverDocsPage)
+	section, found := docsreader.SectionText(string(body), "## The Turnstile challenge refuses every sign-in")
+	require.Truef(t, found, "%s has no section headed ## The Turnstile challenge refuses every sign-in", recoverDocsPage)
+
+	prefixes := recoveryCommandPrefix.FindAllStringSubmatch(tabs, -1)
+	require.Lenf(t, prefixes, 3, "%s: the last-administrator section runs recover in three deployment shapes", recoverDocsPage)
+	for _, prefix := range prefixes {
+		assert.Containsf(t, section, prefix[1]+"recover --disable-turnstile",
+			"%s: the Turnstile section runs the flag the way the recovery runs in that shape", recoverDocsPage)
+	}
+
+	guide, err := os.ReadFile(filepath.Join(root, turnstileGuidePage))
+	require.NoError(t, err)
+	assert.Containsf(t, string(guide), "`"+usage[1]+"`",
+		"%s: the guide names the way back as the usage spells it", turnstileGuidePage)
+}
