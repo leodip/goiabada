@@ -904,7 +904,7 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 			return !expired && data["adminConsoleBaseUrl"] == testAdminConsoleBaseURL
 		})).Return(nil).Once()
 
-	handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+	handler := HandleActivatePost(pageRenderer, store, heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 	rr := httptest.NewRecorder()
 	sent := postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash)
 	handler.ServeHTTP(rr, sent)
@@ -982,7 +982,7 @@ func TestHandleActivatePost_PasswordFieldRejections(t *testing.T) {
 			database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
 			expectRenderedActivationFormError(pageRenderer, continuationId)
 
-			handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+			handler := HandleActivatePost(pageRenderer, store, heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, withMarker(t, store, postActivationRequest(tc.password, tc.passwordConfirmation, continuationId),
 				emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash))
@@ -1083,7 +1083,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 			sent := tc.request(t, store)
 			logs := logtest.CaptureSlog(t)
 
-			handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+			handler := HandleActivatePost(pageRenderer, store, heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 			handler.ServeHTTP(httptest.NewRecorder(), sent)
 
 			assertRefusalNotLogged(t, logs)
@@ -1123,7 +1123,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
 		expectAuditFailedActivationCode(auditLogger, "address_taken", 7)
 
-		handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+		handler := HandleActivatePost(pageRenderer, store, heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 		handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
 		userCreator.AssertNotCalled(t, "CreateUserInTransaction", mock.Anything, mock.Anything, mock.Anything)
@@ -1155,7 +1155,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
 		expectAuditFailedActivationCode(auditLogger, "address_taken", 7)
 
-		handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+		handler := HandleActivatePost(pageRenderer, store, heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 		handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
 		require.ErrorIs(t, stub.BodyErr, data.ErrUniqueViolation, "the body handed the refused insert to the helper, which rolls back")
@@ -1247,7 +1247,7 @@ func TestHandleActivatePost_AFailureCommitsNothing(t *testing.T) {
 			stub := tc.arrange(database, userCreator, codeHash)
 			pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
 
-			handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+			handler := HandleActivatePost(pageRenderer, store, heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 			handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
 			if tc.wantBodyErr {
@@ -1289,7 +1289,7 @@ func TestHandleActivatePost_DeletedMeanwhile(t *testing.T) {
 	expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
 	expectAuditFailedActivationCode(auditLogger, "code_no_longer_outstanding", 0)
 
-	handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+	handler := HandleActivatePost(pageRenderer, store, heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 	handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
 	require.Error(t, stub.BodyErr, "the refusal leaves the transaction through the helper's rollback, account included")
@@ -1315,7 +1315,7 @@ func TestHandleActivatePost_SelfRegistrationDisabled(t *testing.T) {
 	pageRenderer.On("NotFound", mock.Anything, mock.Anything).Once()
 	logs := logtest.CaptureSlog(t)
 
-	handler := HandleActivatePost(pageRenderer, store, database, userCreator, passwordValidator, auditLogger, testAdminConsoleBaseURL)
+	handler := HandleActivatePost(pageRenderer, store, heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 	handler.ServeHTTP(httptest.NewRecorder(), sent)
 
 	assertSelfRegistrationDisabledLogged(t, logs)

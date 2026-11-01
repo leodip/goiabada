@@ -270,7 +270,11 @@ test("self-registration that requires email verification warns while email is no
   });
 });
 
-test("self-registration with email verification: the mailed link activates the account", async ({ page, browser, request }) => {
+test("self-registration with email verification: the mailed link activates the account and carries on the sign-in", async ({
+  page,
+  browser,
+  request,
+}) => {
   await withSettingsRestored(page, general, async () => {
     await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: true });
     await saveSettings(page);
@@ -290,14 +294,18 @@ test("self-registration with email verification: the mailed link activates the a
 
     const mail = await waitForMail(request, email);
     const link = linksIn(mail).find((l) => l.startsWith(env.authUrl))!;
+    // The link names the sign-in My Account started, which this browser still holds.
+    expect(new URL(link).searchParams.get("ceremony")).toBeTruthy();
     await register.goto(link);
     await expect(register.getByRole("heading", { name: "Choose your password" })).toBeVisible();
     await expect(register.locator("code.auth-address")).toHaveText(email);
     await register.locator("#password").fill("a-registered-password");
     await register.locator("#passwordConfirmation").fill("a-registered-password");
     await register.getByRole("button", { name: "Create account", exact: true }).click();
-    await expect(register.getByRole("heading", { name: "Account activated" })).toBeVisible();
-    await expect(register.locator("code.auth-address")).toHaveText(email);
+    // Activated, and signed straight into the sign-in that led to registration: My Account, as the
+    // new user, with no password typed again.
+    await expect(register).toHaveURL(`${env.adminUrl}/account/profile`);
+    await expect(register.locator(".user-menu-email").first()).toHaveText(email);
 
     // A link works once: followed again, it says so and offers to register again.
     await register.goto(link);

@@ -235,6 +235,7 @@
 "account.activation_result.expired_recovery" = "Register again to get a new link. If another link from us is open in this browser, finish there, or wait 5 minutes and try again."
 "account.activation_result.register_again" = "Register again"
 "account.activation_result.success_body" = "Your account is ready. You can now sign in with:"
+"account.activation_result.return_to_app_body" = "Your account is ready. Go back to the application you were signing in to, and sign in with your new password and this email address:"
 
 # --- Forgot password (forgot-password) --------------------------------------
 

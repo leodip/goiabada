@@ -178,7 +178,7 @@ func TestHandleActivatePost_OnSQLite(t *testing.T) {
 			"/account_register_activation_result.html", mock.Anything).Return(nil).Once()
 
 		store := newMarkerTestStore()
-		HandleActivatePost(pageRenderer, store, db, usercreation.New(db), passwordValidator, auditLogger, testAdminConsoleBaseURL).
+		HandleActivatePost(pageRenderer, store, heldCeremonies{}, db, usercreation.New(db), passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL).
 			ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, row.Id, codeHash))
 
 		user, err := db.GetUserByEmail(ctx, nil, activateTestEmail)
@@ -209,8 +209,8 @@ func TestHandleActivatePost_OnSQLite(t *testing.T) {
 		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
 
 		store := newMarkerTestStore()
-		HandleActivatePost(pageRenderer, store, &consumptionFailingDB{Database: db}, usercreation.New(db), passwordValidator,
-			auditLogger, testAdminConsoleBaseURL).
+		HandleActivatePost(pageRenderer, store, heldCeremonies{}, &consumptionFailingDB{Database: db}, usercreation.New(db), passwordValidator,
+			auditLogger, testBaseURL, testAdminConsoleBaseURL).
 			ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, row.Id, codeHash))
 
 		user, err := db.GetUserByEmail(ctx, nil, activateTestEmail)

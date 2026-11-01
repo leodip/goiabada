@@ -239,6 +239,7 @@
 "account.activation_result.expired_recovery" = "Registrieren Sie sich erneut, um einen neuen Link zu erhalten. Falls in diesem Browser ein anderer Link von uns geöffnet ist, schließen Sie den Vorgang dort ab oder warten Sie 5 Minuten und versuchen Sie es erneut."
 "account.activation_result.register_again" = "Erneut registrieren"
 "account.activation_result.success_body" = "Ihr Konto ist bereit. Sie können sich jetzt mit dieser E-Mail-Adresse anmelden:"
+"account.activation_result.return_to_app_body" = "Ihr Konto ist bereit. Kehren Sie zu der Anwendung zurück, bei der Sie sich anmelden wollten, und melden Sie sich mit Ihrem neuen Passwort und dieser E-Mail-Adresse an:"
 
 # --- Forgot password (forgot-password) --------------------------------------
 

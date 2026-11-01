@@ -222,6 +222,7 @@
 "account.activation_result.expired_recovery" = "Cadastre-se novamente para receber um novo link. Se outro link nosso estiver aberto neste navegador, conclua por lá ou aguarde 5 minutos e tente de novo."
 "account.activation_result.register_again" = "Cadastrar novamente"
 "account.activation_result.success_body" = "Sua conta está pronta. Agora você pode entrar com:"
+"account.activation_result.return_to_app_body" = "Sua conta está pronta. Volte ao aplicativo em que você estava entrando e entre com sua nova senha e este endereço de e-mail:"
 
 # --- Esqueci a senha (forgot-password) ---------------------------------------
 

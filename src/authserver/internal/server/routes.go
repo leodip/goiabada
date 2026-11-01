@@ -205,7 +205,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	})
 	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
 	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
-	pages.With(rateLimiter.LimitActivate).Post(emaillinks.AccountActivatePath, accounthandlers.HandleActivatePost(httpHelper, s.sessionStore, s.database, userCreator, passwordValidator, auditLogger, adminConsoleBaseURL))
+	pages.With(rateLimiter.LimitActivate).Post(emaillinks.AccountActivatePath, accounthandlers.HandleActivatePost(httpHelper, s.sessionStore, ceremonyStore, s.database, userCreator, passwordValidator, auditLogger, baseURL, adminConsoleBaseURL))
 
 	// Admin API routes
 	api.Route("/api/v1/admin", func(r *routing.Router) {

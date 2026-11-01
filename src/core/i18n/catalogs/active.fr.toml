@@ -238,6 +238,7 @@
 "account.activation_result.expired_recovery" = "Réinscrivez-vous pour obtenir un nouveau lien. Si un autre de nos liens est ouvert dans ce navigateur, terminez l’opération sur cette page, ou patientez 5 minutes avant de réessayer."
 "account.activation_result.register_again" = "Vous réinscrire"
 "account.activation_result.success_body" = "Votre compte est prêt. Vous pouvez maintenant vous connecter avec :"
+"account.activation_result.return_to_app_body" = "Votre compte est prêt. Revenez à l’application à laquelle vous vous connectiez, et connectez-vous avec votre nouveau mot de passe et cette adresse e-mail :"
 
 # --- Forgot password (forgot-password) --------------------------------------
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -140,10 +141,11 @@ var errActivationNoLongerOutstanding = errors.New("the pending registration no l
 // HandleActivateGet serves both halves of the activation link's journey that a GET reaches.
 //
 // A request carrying ?code= is the emailed link being followed: it validates the code, marks
-// the session and answers 303 to the same path with no query, so the credential does not
+// the session and answers 303 to the same path without the code, so the credential does not
 // remain in the address bar, in browser history, or in the Referer of anything the page then
-// loads (#201, absorbed by #112 decision 1). A request with no query is that redirect landing,
-// and renders the "choose your password" form from the marker alone.
+// loads (#201, absorbed by #112 decision 1). A request with no code is that redirect landing,
+// and renders the "choose your password" form from the marker alone; the only query it keeps is the
+// sign-in a registration from an app came from, which the form posts back (#622 decision 9).
 //
 // The link deliberately does NOT carry the address any more, which is what removes #112's
 // defect class: a '+' or a '%xx' in an address was mangled by form-urlencoded query parsing,
@@ -286,8 +288,11 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession linkMar
 	}
 
 	// 303 rather than 302, so the browser is required to follow with a GET regardless of what
-	// this request was, and the code is gone from the request target from here on.
-	http.Redirect(w, r, emaillinks.AccountActivatePath, http.StatusSeeOther)
+	// this request was, and the code is gone from the request target from here on. The sign-in the
+	// link names, when it names one of the right shape, stays on it, where the form posts it back
+	// (#622 decision 9): it is not a credential, and the password page's own URL carries it.
+	//nolint:gosec // G710: a fixed path, and an id whose shape is checked, encoded as its query
+	http.Redirect(w, r, emaillinks.AccountActivateContinuation(registrationCeremonyId(r)), http.StatusSeeOther)
 }
 
 // isVerificationCodeExpired reports whether the activation code issued for this
@@ -391,15 +396,27 @@ func refuseActivationAddressTaken(pageRenderer PageRenderer, database accountAct
 // an address the lookup found taken. It used to answer the 500 page with an error-level stack. A
 // pending registration deleted between the lookup and the transaction, swept or refused
 // elsewhere, is found there by the fenced consumption and refused as code_no_longer_outstanding.
+//
+// An activation from the link a registration from an app's sign-in was mailed carries that sign-in on
+// (#622 decision 9): the link names it, and the first hop keeps it in the URL this form posts to.
+// When the browser holds it at the password step, the account just created is signed into it with
+// the password just chosen (carryOnSignIn), and the browser goes on into the app. When it does not,
+// the account is activated all the same, and the page tells the person to go back to the application
+// they were signing in to and sign in with their new password, with My Account as a secondary link.
+// An activation from a registration reached from anywhere else answers the page as it always has.
 func HandleActivatePost(
 	pageRenderer PageRenderer,
 	httpSession linkMarkerSessionStore,
+	ceremonies signInCeremonies,
 	database accountActivateDatabase,
 	userCreator TransactionalUserCreator,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
+	baseURL string,
 	adminConsoleBaseURL string,
 ) http.HandlerFunc {
+
+	proof := authflow.NewPasswordProof(auditLogger)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -548,9 +565,17 @@ func HandleActivatePost(
 				"email", createdUser.Email, "error", clearLinkMarkerErr)
 		}
 
+		ceremonyId := registrationCeremonyId(r)
+		if carryOnSignIn(w, r, ceremonies, proof, baseURL, ceremonyId, createdUser) {
+			return
+		}
+
 		bind := map[string]interface{}{
 			"email":               createdUser.Email,
 			"adminConsoleBaseUrl": adminConsoleBaseURL,
+			// The registration came from an app's sign-in this browser does not hold: opened in
+			// another browser, or after that sign-in ended. The person goes back to the app.
+			"returnToApp": ceremonyId != "",
 		}
 
 		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation_result.html", bind)

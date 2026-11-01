@@ -2,6 +2,7 @@ package accounthandlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
@@ -20,6 +21,16 @@ func (h heldCeremonies) HeldAuthContext(_ *http.Request, ceremonyId string) (*ce
 		return nil, ceremony.ErrCeremonyNotHeld
 	}
 	return authContext, nil
+}
+
+// RegenerateSession refuses: a test whose browser carries a sign-in on uses signInsHeld.
+func (h heldCeremonies) RegenerateSession(http.ResponseWriter, *http.Request, string, int64) error {
+	return errors.New("heldCeremonies carries no sign-in on")
+}
+
+// SaveAuthContext refuses, as RegenerateSession does.
+func (h heldCeremonies) SaveAuthContext(http.ResponseWriter, *http.Request, *ceremony.AuthContext) error {
+	return errors.New("heldCeremonies carries no sign-in on")
 }
 
 // legalDocumentsInEffect answers the documents in effect a test sets: allApps for every client, and

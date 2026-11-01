@@ -54,6 +54,9 @@ type passwordSubmissionBrowser interface {
 type PasswordSubmission struct {
 	database    passwordSubmissionDatabase
 	auditLogger auditLogger
+	// proof records an accepted password on the ceremony, as registration and activation record
+	// theirs (#622 decision 9).
+	proof *PasswordProof
 	// verifyPassword is the password comparison the form makes, a field so a test can see which
 	// hash each refusal compared against (#681).
 	verifyPassword func(hashedPassword string, password string) bool
@@ -61,7 +64,8 @@ type PasswordSubmission struct {
 
 // NewPasswordSubmission builds the operation over the database it reads and the audit log.
 func NewPasswordSubmission(database passwordSubmissionDatabase, auditLogger auditLogger) *PasswordSubmission {
-	return &PasswordSubmission{database: database, auditLogger: auditLogger, verifyPassword: passwordhash.Verify}
+	return &PasswordSubmission{database: database, auditLogger: auditLogger, proof: NewPasswordProof(auditLogger),
+		verifyPassword: passwordhash.Verify}
 }
 
 // PasswordAnswer is how PasswordSubmission answered a submission.
@@ -110,21 +114,13 @@ type PasswordSubmissionResult struct {
 //     guess, audits EventAuthFailedPwd with the digest and the account, and answers PasswordRefused.
 //  4. A disabled account: audits EventUserDisabled and answers PasswordAccountDisabled. Not charged
 //     to the rate limiter: the password was right, so there is no guess to bound (#219).
-//  5. Accepted: audits EventAuthSuccessPwd, records the verified password on the ceremony
-//     (RecordPasswordVerified), rotates the browser session's identifier, and only then saves the
+//  5. Accepted: records the proven password on the ceremony through PasswordProof, which audits
+//     EventAuthSuccessPwd, rotates the browser session's identifier, and only then saves the
 //     ceremony in level1_password_completed.
 //
 // The address is audited only as its digest: the form collects whatever anyone types, and the audit
 // table would otherwise keep every mistyped address and pasted password in plain text (#522
 // decision 10).
-//
-// The rotation comes the instant the password is accepted, and before the save. The steps between
-// here and /auth/completed are GETs gated on the ceremony's state alone, so an attacker who planted
-// the browser session's identifier and polls them could otherwise be handed the session minted for
-// this user. Rotating before the save leaves a failure between the two on a fresh identifier whose
-// ceremony is not yet password-completed, the harmless direction; saving first would leave the
-// planted identifier naming a password-completed ceremony (#266). Both land only while the browser
-// session still holds this ceremony (#579).
 func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmissionBrowser,
 	authContext *ceremony.AuthContext, email string, password string) (PasswordSubmissionResult, error) {
 
@@ -171,20 +167,71 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 		return PasswordSubmissionResult{Answer: PasswordAccountDisabled, UserPageLanguage: user.PageLanguage}, nil
 	}
 
+	proven := o.proof.Record(ctx, browser, authContext, user)
+	return PasswordSubmissionResult{
+		Answer:           PasswordAccepted,
+		UserPageLanguage: user.PageLanguage,
+		NextStep:         proven.NextStep,
+		SaveErr:          proven.SaveErr,
+	}, nil
+}
+
+// passwordProofBrowser is what PasswordProof does through the handler's per-request adapter: rotate
+// the browser session's identifier, and save the ceremony.
+type passwordProofBrowser interface {
+	stepSaver
+	sessionRotator
+}
+
+// PasswordProof records on a sign-in that its user has just proven a password: the password page's
+// accepted submission, and registration and activation carrying on the sign-in that started them,
+// where the user has just chosen it (#622 decision 9). The rotation and the state change are
+// security-critical, so they live here alone, and every page that proves a password makes them in
+// the same order. Built by the route table, or by a handler over its audit log.
+type PasswordProof struct {
+	auditLogger auditLogger
+}
+
+// NewPasswordProof builds the operation over the audit log.
+func NewPasswordProof(auditLogger auditLogger) *PasswordProof {
+	return &PasswordProof{auditLogger: auditLogger}
+}
+
+// PasswordProofResult is what PasswordProof.Record did.
+type PasswordProofResult struct {
+	// NextStep is /auth/level1completed, where the ceremony goes on once the save landed.
+	NextStep string
+	// SaveErr is the rotation's failure, or the save's: ceremony.ErrCeremonyReplaced when the
+	// browser session no longer holds the ceremony. A failed rotation is never followed by the save.
+	// The caller sends the browser to NextStep only when it is nil.
+	SaveErr error
+}
+
+// Record audits EventAuthSuccessPwd, records the verified password on the ceremony
+// (RecordPasswordVerified), rotates the browser session's identifier, and only then saves the
+// ceremony in level1_password_completed. The caller has established that user proved the password,
+// that the account is enabled, and that the ceremony is at the password step.
+//
+// The rotation comes the instant the password is accepted, and before the save. The steps between
+// here and /auth/completed are GETs gated on the ceremony's state alone, so an attacker who planted
+// the browser session's identifier and polls them could otherwise be handed the session minted for
+// this user. Rotating before the save leaves a failure between the two on a fresh identifier whose
+// ceremony is not yet password-completed, the harmless direction; saving first would leave the
+// planted identifier naming a password-completed ceremony (#266). Both land only while the browser
+// session still holds this ceremony (#579).
+func (o *PasswordProof) Record(ctx context.Context, browser passwordProofBrowser, authContext *ceremony.AuthContext,
+	user *record.User) PasswordProofResult {
+
 	o.auditLogger.Log(ctx, audit.EventAuthSuccessPwd, map[string]interface{}{
 		"user_id": user.Id,
 	})
 
 	authContext.RecordPasswordVerified(user, time.Now())
 
-	result := PasswordSubmissionResult{
-		Answer:           PasswordAccepted,
-		UserPageLanguage: user.PageLanguage,
-		NextStep:         "/auth/level1completed",
-	}
+	result := PasswordProofResult{NextStep: "/auth/level1completed"}
 	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
-		return result, nil
+		return result
 	}
 	result.SaveErr = browser.SaveAuthContext(authContext)
-	return result, nil
+	return result
 }

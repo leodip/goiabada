@@ -240,6 +240,7 @@
 "account.activation_result.expired_recovery" = "Vuelve a registrarte para recibir otro enlace. Si tienes otro enlace nuestro abierto en este navegador, termina ese proceso o espera 5 minutos y vuelve a intentarlo."
 "account.activation_result.register_again" = "Volver a registrarse"
 "account.activation_result.success_body" = "Tu cuenta está lista. Ya puedes iniciar sesión con:"
+"account.activation_result.return_to_app_body" = "Tu cuenta está lista. Vuelve a la aplicación en la que estabas iniciando sesión e inicia sesión con tu nueva contraseña y este correo electrónico:"
 
 # --- Forgot password (forgot-password) --------------------------------------
 
