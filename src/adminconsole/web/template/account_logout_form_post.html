@@ -7,8 +7,8 @@
 <!-- The logout form binding. This page exists so the id_token_hint travels in a request body
      instead of a top-level navigation's URL, where it would reach the address bar, the browser
      history and the access log of every proxy in front of the deployment. form-post.js submits
-     it as soon as the page is parsed, so it shows only for as long as that takes; without
-     JavaScript its button does (#350). -->
+     it as soon as the page is parsed; without JavaScript its button does (#350). The card is held
+     back for 2 seconds (ui.css), so it does not flash by while the next page loads. -->
 <form class="auth-status" method="post" action="{{ .endpoint }}" data-auto-submit>
   {{ range $name, $value := .params }}<input type="hidden" name="{{ $name }}" value="{{ $value }}">
   {{ end }}

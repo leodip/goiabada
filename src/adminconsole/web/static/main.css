@@ -1315,6 +1315,14 @@
       padding: 2.25rem 2.25rem 2rem;
     }
   }
+  .auth-card:has(form[data-auto-submit]) {
+    animation: auth-card-held-back 0s 2s backwards;
+  }
+  @keyframes auth-card-held-back {
+    from {
+      visibility: hidden;
+    }
+  }
   .auth-brand {
     margin-bottom: 1.5rem;
     color: var(--color-ink-muted);

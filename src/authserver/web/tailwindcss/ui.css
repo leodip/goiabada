@@ -1076,6 +1076,23 @@
     }
   }
 
+  /* A card whose form form-post.js submits as the page loads: the auth server's form_post response
+     and the console's sign-out on its way to the auth server. The page is on screen only until the
+     next one arrives, often a fraction of a second, so its card flashed by too fast to read. The
+     card is held back for 2 seconds, and the page shows only its background meanwhile, as while
+     any page loads. A form still there after that, as without JavaScript, shows with its Continue
+     button. The hold is an animation's delay, which the reduced-motion rule above leaves as it is. */
+
+  .auth-card:has(form[data-auto-submit]) {
+    animation: auth-card-held-back 0s 2s backwards;
+  }
+
+  @keyframes auth-card-held-back {
+    from {
+      visibility: hidden;
+    }
+  }
+
   .auth-brand {
     margin-bottom: 1.5rem;
     color: var(--color-ink-muted);
