@@ -822,6 +822,8 @@
 "adminconsole.admin_clients.settings.field.enabled_hint" = "Ein deaktivierter Client kann niemanden anmelden und keine Tokens erhalten."
 "adminconsole.admin_clients.settings.field.consent_required" = "Um Zustimmung bitten"
 "adminconsole.admin_clients.settings.field.consent_required_tooltip" = "Nach der Anmeldung wird ausgewählt, welche der angeforderten Scopes der Client erhält. Eine Zustimmung wird immer verlangt, wenn ein Client offline_access anfordert oder prompt=consent sendet. Das gilt auch, wenn ein anderer Client als der der Verwaltungskonsole authserver:manage-account anfordert."
+"adminconsole.admin_clients.settings.field.remember_consent" = "Zustimmung merken"
+"adminconsole.admin_clients.settings.field.remember_consent_tooltip" = "Lässt eine frühere Zustimmung die Zustimmungsseite überspringen. Bei einem öffentlichen Client ist die Option zunächst aus: Ohne Secret belegt nichts, dass eine Anfrage von dieser App stammt und nicht von einer anderen App, die ihre Client-Kennung verwendet. Deshalb wird immer gefragt, wenn die Zustimmungsseite fällig ist, auch nach einer früheren Zustimmung. Schalten Sie sie nur ein, wenn jede Redirect-URI eine https-Adresse ist, die nur diese App empfängt."
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" = "Darf administrative Scopes anfordern"
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" = "Erlaubt dem Client, im Namen eines angemeldeten Kontos authserver:manage und die weiteren administrativen Scopes authserver:admin-read, authserver:manage-users, authserver:manage-clients, authserver:manage-settings und authserver:browser-sessions anzufordern. Damit wird er zu einem administrativen Client. Ohne diese Freigabe werden die Scopes abgelehnt."
 "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" = "Der Client der Verwaltungskonsole darf immer administrative Scopes anfordern."
@@ -841,6 +843,7 @@
 "adminconsole.admin_clients.settings.modal.identifier_change" = "Sie ändern die Client-Kennung. Alles, was sich mit diesem Client anmeldet, muss danach die neue Kennung senden."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "Sie deaktivieren den Client. Bis er wieder aktiviert wird, sind damit keine Anmeldungen und kein Abruf von Tokens möglich."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "Sie erlauben dem Client, administrative Scopes anzufordern. Er kann dann Tokens mit den Befugnissen eines angemeldeten Administrationskontos erhalten und wird zu einem administrativen Client."
+"adminconsole.admin_clients.settings.modal.remember_consent_warning" = "Sie lassen eine frühere Zustimmung die Zustimmungsseite für diesen öffentlichen Client überspringen. Eine andere App, die seine Client-Kennung verwendet und seine Weiterleitungen empfängt, würde Tokens für alle erhalten, die dieser App früher zugestimmt haben, ohne sie zu fragen."
 
 # --- Client tokens ---------------------------------------------------------
 
@@ -886,7 +889,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "Neues Secret generiert. Speichern Sie, um es zu verwenden. Bis dahin gilt weiterhin das bisherige Secret."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Authentifizierung gespeichert."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "Sie ändern das Client-Secret. Alles, was noch das alte Secret sendet, wird bis zur Aktualisierung abgelehnt."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Sie machen den Client öffentlich. Sein Secret wird entfernt. Alles, was sich damit anmeldet, muss angepasst werden. Seine Refresh Tokens und Autorisierungscodes werden widerrufen, und die damit ausgestellten Access Tokens werden sofort abgelehnt, vom Authentifizierungsserver und von APIs, die Tokens bei ihm prüfen. Eine API, die nur die Signatur eines Tokens prüft, akzeptiert sie bis zum Ablauf. Seine Introspektions-Ressourcen werden geleert. Anmeldungen bei anderen Clients bleiben bestehen."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Sie machen den Client öffentlich. Sein Secret wird entfernt. Alles, was sich damit anmeldet, muss angepasst werden. Seine Refresh Tokens und Autorisierungscodes werden widerrufen, und die damit ausgestellten Access Tokens werden sofort abgelehnt, vom Authentifizierungsserver und von APIs, die Tokens bei ihm prüfen. Eine API, die nur die Signatur eines Tokens prüft, akzeptiert sie bis zum Ablauf. Seine Introspektions-Ressourcen werden geleert, und „Zustimmung merken“ wird ausgeschaltet. Anmeldungen bei anderen Clients bleiben bestehen."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "Sie machen den Client vertraulich. Alles, was sich damit anmeldet, muss dann das Client-Secret senden."
 
 # --- Client redirect URIs --------------------------------------------------

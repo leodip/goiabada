@@ -3,7 +3,7 @@ import { cancelDialog, clientIdFromList, clientRow, clientUrl, confirmDialog, sa
 import { openSignIn, submitPassword } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
-import { browserSignInClient } from "../../../lib/test-clients";
+import { browserSignInClient, publicSignInClient } from "../../../lib/test-clients";
 
 const saved = "Settings saved.";
 
@@ -218,4 +218,55 @@ test("disabling the system client asks with the system warning too, and Cancel s
   // A fresh navigation, not a reload, which could restore the unchecked box from the page.
   await page.goto(page.url());
   await expect(page.locator('input[name="enabled"]')).toBeChecked();
+});
+
+// Remember consent is offered for a public client only, under Ask users for consent; a confidential
+// client, which proves itself with its secret, always remembers consent and is not offered it.
+test("Remember consent is shown, unticked, for a public client and not for a confidential one", async ({ page, clients }) => {
+  const confidential = await clients.create();
+  await page.goto(clientUrl(confidential.id, "settings"));
+  await expect(page.locator('input[name="consentRequired"]')).toBeVisible();
+  await expect(page.locator("#rememberConsent")).toHaveCount(0);
+  await expect(page.getByText("Remember consent", { exact: true })).toHaveCount(0);
+
+  const client = await publicSignInClient(page, clients);
+  await page.goto(clientUrl(client.id, "settings"));
+  const remember = page.getByRole("checkbox", { name: /^Remember consent/ });
+  await expect(remember).toBeVisible();
+  await expect(remember).not.toBeChecked();
+  await expect(page.locator("#rememberConsentHint")).toHaveText(
+    "Lets a user's earlier approval skip the consent screen. It starts off for a public client: with no secret, nothing proves a request comes from this app rather than another app using its client ID, so users are asked whenever the screen is owed, even if they approved before. Turn it on only when every redirect URI is an https address that only this app receives.",
+  );
+});
+
+test("ticking Remember consent asks first, and Cancel saves nothing", async ({ page, clients }) => {
+  const client = await publicSignInClient(page, clients);
+  await page.goto(clientUrl(client.id, "settings"));
+  await page.locator("#rememberConsent").check();
+  await page.locator("#btnSave").click();
+  await cancelDialog(
+    page,
+    "You're letting an earlier approval skip the consent screen for this public client. Another app that uses its client ID and receives its redirects would get tokens for any user who approved this app before, without asking them.",
+  );
+  await expect(page.getByText(saved)).toHaveCount(0);
+
+  // A fresh navigation, not a reload, which could restore the ticked box from the page.
+  await page.goto(clientUrl(client.id, "settings"));
+  await expect(page.locator("#rememberConsent")).not.toBeChecked();
+});
+
+test("Remember consent ticked and confirmed is saved, and unticking it asks nothing", async ({ page, clients }) => {
+  const client = await publicSignInClient(page, clients);
+  await page.goto(clientUrl(client.id, "settings"));
+  await page.locator("#rememberConsent").check();
+  await page.locator("#btnSave").click();
+  await confirmDialog(page, "You're letting an earlier approval skip the consent screen for this public client.");
+  await expect(page.getByText(saved)).toBeVisible();
+  await page.goto(clientUrl(client.id, "settings"));
+  await expect(page.locator("#rememberConsent")).toBeChecked();
+
+  await page.locator("#rememberConsent").uncheck();
+  await saveAndExpectSaved(page, saved);
+  await page.goto(clientUrl(client.id, "settings"));
+  await expect(page.locator("#rememberConsent")).not.toBeChecked();
 });

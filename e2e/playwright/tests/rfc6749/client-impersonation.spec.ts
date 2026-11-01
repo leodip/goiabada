@@ -6,7 +6,7 @@
 // the consent screen every time it asks for consent, and prompt=none from it is refused; a
 // confidential client, which proves itself with its secret, skips the screen once approved.
 import type { Page } from "@playwright/test";
-import { clientUrl } from "../../lib/admin-console";
+import { clientUrl, confirmDialog } from "../../lib/admin-console";
 import { signInThroughClient } from "../../lib/browser-sign-in";
 import { expect, test } from "../../lib/fixtures";
 import { codeRequest, expectAuthorizeError, followAuthorize, responseParams } from "../../lib/rfc6749";
@@ -54,6 +54,38 @@ test("prompt=none from a public client asking for consent is answered consent_re
   const { redirect } = await followAuthorize(signIn.context.request, silent.params);
   expectAuthorizeError(redirect!, "consent_required", silent.params.state);
   expect(responseParams(redirect!).get("error_description")).toBe("User consent is required for every request from this client");
+  await signIn.context.close();
+});
+
+// Section 8.6 lets the server accept proof of a public client's identity, such as a redirect URI
+// only that app receives; an administrator who can vouch for it turns Remember consent on, after
+// its confirmation, and an earlier approval skips the screen again.
+test("a public client with Remember consent ticked skips the screen once the user approved it", async ({
+  page,
+  browser,
+  clients,
+  users,
+}) => {
+  const user = await users.create();
+  const client = await publicSignInClient(page, clients);
+  await page.goto(clientUrl(client.id, "settings"));
+  await page.locator('input[name="consentRequired"]').check();
+  await page.getByRole("checkbox", { name: /^Remember consent/ }).check();
+  await page.locator("#btnSave").click();
+  await confirmDialog(page, "You're letting an earlier approval skip the consent screen for this public client.");
+  await expect(page.getByText("Settings saved.")).toBeVisible();
+  await expect(page.locator("#rememberConsent")).toBeChecked();
+
+  const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
+
+  const again = codeRequest(client.identifier);
+  const { redirect } = await followAuthorize(signIn.context.request, again.params);
+  expect(redirect?.searchParams.get("state")).toBe(again.params.state);
+  expect(redirect?.searchParams.get("code"), redirect?.href).toBeTruthy();
+
+  const silent = codeRequest(client.identifier, { prompt: "none" });
+  const { redirect: silentRedirect } = await followAuthorize(signIn.context.request, silent.params);
+  expect(silentRedirect?.searchParams.get("code"), silentRedirect?.href).toBeTruthy();
   await signIn.context.close();
 });
 
