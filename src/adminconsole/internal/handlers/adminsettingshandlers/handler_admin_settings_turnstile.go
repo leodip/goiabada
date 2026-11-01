@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/render"
@@ -19,14 +20,29 @@ type settingsTurnstileAPI interface {
 	UpdateSettingsTurnstile(ctx context.Context, accessToken string, request *api.UpdateSettingsTurnstileRequest) (*api.SettingsTurnstileResponse, error)
 }
 
+// authServerHostname is the host name the Turnstile widget's hostnames in the Cloudflare dashboard
+// must include: the host of the auth server's public base URL, which serves the forms that carry
+// the widget, without its port, as the dashboard takes it.
+func authServerHostname(authServerBaseURL string) string {
+	u, err := url.Parse(authServerBaseURL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
+}
+
 // HandleTurnstileGet draws the Cloudflare Turnstile challenge's settings: the switch, the site key,
 // and whether a secret key is saved. The secret key never comes back from the API, so its box is
-// empty on every load (#642 decision 11).
+// empty on every load (#642 decision 11). The page names the host the widget must list,
+// authServerBaseURL's.
 func HandleTurnstileGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTurnstileAPI,
+	authServerBaseURL string,
 ) http.HandlerFunc {
+
+	authServerHost := authServerHostname(authServerBaseURL)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
@@ -66,6 +82,7 @@ func HandleTurnstileGet(
 		bind := map[string]interface{}{
 			"settings":          settingsInfo,
 			"savedSuccessfully": savedSuccessfully,
+			"authServerHost":    authServerHost,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_turnstile.html", bind)
@@ -83,7 +100,10 @@ func HandleTurnstilePost(
 	httpSession sessionstore.Store,
 	apiClient settingsTurnstileAPI,
 	baseURL string,
+	authServerBaseURL string,
 ) http.HandlerFunc {
+
+	authServerHost := authServerHostname(authServerBaseURL)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
@@ -121,9 +141,10 @@ func HandleTurnstilePost(
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				bind := map[string]interface{}{
-					"settings":   settingsInfo,
-					"error":      message,
-					"errorField": render.ErrorField(err, turnstileErrorFields),
+					"settings":       settingsInfo,
+					"error":          message,
+					"errorField":     render.ErrorField(err, turnstileErrorFields),
+					"authServerHost": authServerHost,
 				}
 				renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_turnstile.html", bind)
 				if renderErr != nil {
