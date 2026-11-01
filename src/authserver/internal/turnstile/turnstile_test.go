@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -664,6 +665,88 @@ func TestCheck_TheWaitForASlotAndTheCallShareTheThreeSeconds(t *testing.T) {
 	assert.Equal(t, turnstile.Unavailable, outcome)
 	assert.GreaterOrEqual(t, elapsed, 3*time.Second, "the deadline is three seconds")
 	assert.Less(t, elapsed, 4*time.Second, "counted from its arrival, the wait for a slot included")
+}
+
+// stalledListener accepts every connection and never answers, so a TLS handshake over it never
+// ends: each dial to it stays in progress until the test ends. It counts the connections it
+// accepted, one per dial.
+type stalledListener struct {
+	listener net.Listener
+	mu       sync.Mutex
+	conns    []net.Conn
+}
+
+func newStalledListener(t *testing.T) *stalledListener {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	l := &stalledListener{listener: listener}
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			l.mu.Lock()
+			l.conns = append(l.conns, conn)
+			l.mu.Unlock()
+		}
+	}()
+	t.Cleanup(func() {
+		_ = listener.Close()
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		for _, conn := range l.conns {
+			_ = conn.Close()
+		}
+	})
+	return l
+}
+
+func (l *stalledListener) accepted() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.conns)
+}
+
+// A check whose deadline passes mid-dial frees its slot, but Go finishes the dial in the
+// background. The forms' transport counts those dials against its cap of 64, so the checks after
+// them wait for a connection and fail open at their deadline rather than dial a 65th.
+func TestCheck_TheDialsCanceledChecksLeaveRunningCountAgainstTheCap(t *testing.T) {
+	h := newHarness(t)
+	listener := newStalledListener(t)
+	dataCipher, err := encryption.NewDataCipher([]byte(dataKey))
+	require.NoError(t, err)
+	verifier := turnstile.NewVerifier(metrics.NewRegistry(), dataCipher, baseURL,
+		"https://"+listener.listener.Addr().String()+"/turnstile/v0/siteverify")
+
+	// checks runs n checks at once, each with a deadline short of the dials', and answers their
+	// outcomes once all have returned.
+	checks := func(n int) []turnstile.Outcome {
+		outcomes := make([]turnstile.Outcome, n)
+		var wg sync.WaitGroup
+		for i := range n {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+				defer cancel()
+				outcomes[i] = verifier.Check(ctx, h.settings, turnstile.FormLogin, token)
+			}()
+		}
+		wg.Wait()
+		return outcomes
+	}
+
+	for _, outcome := range checks(64) {
+		require.Equal(t, turnstile.Unavailable, outcome)
+	}
+	require.Eventually(t, func() bool { return listener.accepted() == 64 }, 2*time.Second, 5*time.Millisecond)
+
+	for _, outcome := range checks(16) {
+		assert.Equal(t, turnstile.Unavailable, outcome, "a check that finds no connection fails open")
+	}
+	assert.Equal(t, 64, listener.accepted(), "no 65th dial while 64 are still in progress")
 }
 
 // A check whose deadline has already passed while slots are free is not logged as busy, which tells
