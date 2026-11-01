@@ -1,0 +1,47 @@
+{{define "title"}}{{ T $.ctx "legal_acceptance.page_title" }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<h1 class="auth-title">{{ T $.ctx "legal_acceptance.title" }}</h1>
+<p class="auth-lead">{{ T $.ctx "legal_acceptance.intro" "app" .clientName }}</p>
+
+<form method="post" class="stacked">
+  <input type="hidden" name="ceremonyId" value="{{ .ceremonyId }}">
+  {{ range .documents }}
+  <input type="hidden" name="shownVersion" value="{{ .VersionId }}">
+  {{ end }}
+
+  {{ if .changed }}
+  <div class="notice notice-caution" role="alert" id="legal-acceptance-changed">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+    <p>{{ T $.ctx "legal_acceptance.changed" }}</p>
+  </div>
+  {{ end }}
+  {{ if .unticked }}
+  <div class="notice notice-danger" role="alert" id="legal-acceptance-error">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+    <p>{{ T $.ctx "legal_acceptance.unticked" }}</p>
+  </div>
+  {{ end }}
+
+  <fieldset>
+    <legend class="field-label mb-2">{{ T $.ctx "legal_acceptance.legend" }}</legend>
+    <div class="check-list">
+      {{ range $i, $d := .documents }}
+      <label class="check-row" for="legalDocument{{ $i }}">
+        <input type="checkbox" id="legalDocument{{ $i }}" name="legalDocument" value="{{ $d.VersionId }}"{{ if $d.Ticked }} checked{{ end }}{{ if $.unticked }}{{ if not $d.Ticked }} aria-invalid="true" aria-describedby="legal-acceptance-error"{{ end }}{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label"><a class="text-link" href="/legal/{{ $d.ShortName }}" target="_blank" rel="noopener">{{ $d.Title }}</a></span>
+          <span class="code-hint">{{ T $.ctx "legal_acceptance.version" "version" $d.VersionNumber }}</span>
+        </span>
+      </label>
+      {{ end }}
+    </div>
+  </fieldset>
+
+  <div class="auth-actions">
+    <button class="button" type="submit" name="btnDecline" value="decline">{{ T $.ctx "legal_acceptance.button.decline" }}</button>
+    <button class="button button-primary" type="submit" name="btnAccept" value="accept">{{ T $.ctx "legal_acceptance.button.accept" }}</button>
+  </div>
+</form>
+{{end}}

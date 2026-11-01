@@ -97,3 +97,15 @@ type LegalDocumentVersion struct {
 	Title           string    `db:"title"`
 	Markdown        string    `db:"markdown"`
 }
+
+// LegalDocumentAcceptance records that a user accepted one published version of a must-accept legal
+// document, and when (#622). It is written once, at the acceptance step, and never rewritten or
+// removed by hand: it is deleted with the user. A user accepts a version once; a second row for the
+// same pair is a unique violation. The version names its document, so a newer version of the same
+// document is a new acceptance.
+type LegalDocumentAcceptance struct {
+	Id                     int64     `db:"id" fieldtag:"pk"`
+	AcceptedAt             time.Time `db:"accepted_at"`
+	UserId                 int64     `db:"user_id"`
+	LegalDocumentVersionId int64     `db:"legal_document_version_id"`
+}

@@ -294,8 +294,9 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// against an account, so charging them would let a caller spend an account's
 	// budget without guessing and would fill the audit log with rows naming a
 	// username nothing checked. What invalid_grant does cover is a wrong password,
-	// an unknown user, a disabled user and a 2FA-blocked user, which is exactly the
-	// set EventROPCAuthFailed is documented to mean.
+	// an unknown user, a disabled user, a 2FA-blocked user and a user who owes the
+	// acceptance step a legal document (#622), which is exactly the set
+	// EventROPCAuthFailed is documented to mean.
 	//
 	// The checks that run before the grant is looked at read no credential either, and none
 	// of them answers invalid_grant: a missing client_id is invalid_request, an unknown or

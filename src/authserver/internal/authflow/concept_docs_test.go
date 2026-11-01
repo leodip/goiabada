@@ -51,17 +51,18 @@ var (
 func silentRefusalWorlds() []silentWorld {
 	scope := func(s string) *string { return &s }
 	failsEverything := silentWorld{
-		valid:           false,
-		disabled:        true,
-		subject:         "sub-1",
-		hint:            "sub-2",
-		target:          record.AcrLevel2Mandatory,
-		sessionAcr:      record.AcrLevel1,
-		sessionOtpGen:   1,
-		userOtpGen:      2,
-		otpEnabled:      false,
-		effectiveScope:  "",
-		consentRequired: true,
+		valid:              false,
+		disabled:           true,
+		subject:            "sub-1",
+		hint:               "sub-2",
+		target:             record.AcrLevel2Mandatory,
+		sessionAcr:         record.AcrLevel1,
+		sessionOtpGen:      1,
+		userOtpGen:         2,
+		otpEnabled:         false,
+		effectiveScope:     "",
+		consentRequired:    true,
+		legalDocumentsOwed: true,
 	}
 
 	noSession := failsEverything
@@ -91,8 +92,11 @@ func silentRefusalWorlds() []silentWorld {
 	noScope := authenticatorChanged
 	noScope.userOtpGen = noScope.sessionOtpGen
 
-	noConsent := noScope
-	noConsent.effectiveScope = "openid profile"
+	owesALegalDocument := noScope
+	owesALegalDocument.effectiveScope = "openid profile"
+
+	noConsent := owesALegalDocument
+	noConsent.legalDocumentsOwed = false
 
 	partialConsent := noConsent
 	partialConsent.consentScope = scope("openid")
@@ -101,7 +105,7 @@ func silentRefusalWorlds() []silentWorld {
 	passes.consentScope = scope("openid profile")
 
 	return []silentWorld{noSession, expired, tooOld, disabled, otherUser, lowerLevel, noAuthenticator,
-		authenticatorChanged, noScope, noConsent, partialConsent, passes}
+		authenticatorChanged, noScope, owesALegalDocument, noConsent, partialConsent, passes}
 }
 
 // silentRefusals is what decideSilentAuthentication answers in each of silentRefusalWorlds, up to

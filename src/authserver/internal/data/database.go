@@ -598,6 +598,13 @@ type Database interface {
 	GetLegalDocumentClientsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.LegalDocumentClient, error)
 	DeleteLegalDocumentClient(ctx context.Context, tx *sql.Tx, legalDocumentClientId int64) error
 
+	// A user's acceptances of legal document versions (#622). A user accepts a version once, and a
+	// second row for the same pair is a unique violation. An acceptance is never rewritten or
+	// removed by hand; deleting the user removes it.
+	CreateLegalDocumentAcceptance(ctx context.Context, tx *sql.Tx, acceptance *record.LegalDocumentAcceptance) error
+	// GetLegalDocumentAcceptancesByUserId answers a user's acceptances, in id order.
+	GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
+
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)

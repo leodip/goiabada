@@ -181,7 +181,8 @@ Direct username/password exchange for tokens. **Deprecated in OAuth 2.1** due to
 exposure.
 - Endpoint: `POST /auth/token` (grant_type=password, username, password)
 - Disabled by default. Enable via `Settings.ResourceOwnerPasswordCredentialsEnabled` or per-client
-- Rate limited. Blocks users with 2FA enabled. Logs `audit.EventROPCAuthFailed` on failure
+- Rate limited. Blocks users with 2FA enabled, and users who owe the acceptance step a legal
+  document for the client (`invalid_grant`, #622). Logs `audit.EventROPCAuthFailed` on failure
 - Implementation: `handler_token_password.go`, `protocolvalidation/token_grant_password.go`,
   `issuance/grant_password.go`
 
@@ -240,9 +241,12 @@ ceremony's path depends on the target ACR, the session, and `prompt`.
 | | `authflow.Level2Selection` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
 | | `authflow.OTPSubmission` | OTP verified against the stored authenticator, or a recovery code accepted |
 | | `authflow.ContinueAfterRecoveryCodes` | Continue on the recovery-codes page |
+| `requires_legal_acceptance` | `authflow.Completion` | the user holds a requested scope and owes a legal document for the client: a must-accept document in effect for all apps or for the client whose current version the user has not accepted (`legaldocuments.Reader.Owed`); the admin console's client owes none (#622) |
 | `requires_consent` | `authflow.Completion` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) |
+| | `authflow.LegalAcceptance` | the same, decided once nothing is owed |
 | `ready_to_issue_code` | `authflow.SilentAuthentication` | every silent check passed, skipping every hop between |
 | | `authflow.Completion` | no consent needed |
+| | `authflow.LegalAcceptance` | nothing owed any more, or the documents accepted, then decided as `authflow.Completion` decides it (`routeBoundCeremony`), consent included |
 | | `authflow.ConsentPrompt` | scope already fully consented, no `offline_access`, no `prompt=consent` |
 | | `authflow.ConsentSubmission` | approved with at least one scope the user still holds |
 
@@ -277,6 +281,8 @@ state it finds through `requireAuthState`, which answers 400 when it is not one 
 | `/auth/recovery-codes` | GET | ceremony id first, then `level2_recovery_codes` | 400, 400 |
 | `/auth/recovery-codes` | POST | ceremony id first, then `level2_recovery_codes` | 400, 400 |
 | `/auth/completed` | GET | ceremony id first, then `authentication_completed` | 400, 400 |
+| `/auth/legal-acceptance` | GET | ceremony id first, then `requires_legal_acceptance` | 400, 400 |
+| `/auth/legal-acceptance` | POST | ceremony id first, then `requires_legal_acceptance` | 400, 400 |
 | `/auth/consent` | GET | ceremony id first, then `requires_consent` | 400, 400 |
 | `/auth/consent` | POST | ceremony id first, then `requires_consent` | 400, 400 |
 | `/auth/issue` | GET | ceremony id first, then `ready_to_issue_code` | 400, 400 |
@@ -292,6 +298,7 @@ state it finds through `requireAuthState`, which answers 400 when it is not one 
 | `/auth/otp` | `handler_auth_otp.go`, `authflow/otp.go` | OTP verification (or enrollment if user doesn't have OTP yet), or a recovery code in place of the code. Rotates the browser session's identifier, records level 2 on the ceremony. An enrolment goes on to `/auth/recovery-codes`, anything else to `/auth/completed` |
 | `/auth/recovery-codes` | `handler_auth_recovery_codes.go`, `authflow/recovery_codes_step.go` | Shows an enrolment's recovery codes once, taking them off the ceremony in a save before the page renders; a reload says they were already shown. Its Continue (POST) moves the ceremony to `authentication_completed` and answers 303 to `/auth/completed` |
 | `/auth/completed` | `handler_auth_completed.go`, `authflow/completion.go` | Final auth check (a user who is not the id_token_hint's refused, a disabled user refused, a moved-on generation restarted, all before any session is bound), session bump/create, scope filtering, consent check. The plan is one of three modes (`authflow/completion_decide.go`): reuse, which rotates the browser session's identifier before the bind when it raises the session; create, which confirms the ceremony, starts the session (`StartNewUserSession`, which writes nothing to the browser), then rotates and binds it to the browser session (`RegenerateSessionAndBind`), deletes it when that fails, and writes the device cookie only after; and restart |
+| `/auth/legal-acceptance` | `handler_legal_acceptance.go`, `authflow/legal_acceptance.go` | The acceptance step (#622): lists the must-accept legal documents the user owes for the client, each unticked. Accept records the versions shown (`legaldocuments.RecordAcceptances`), shows the step again for an unticked box or a version published meanwhile, and goes on to consent or issuance; Decline answers `access_denied` and keeps the session. `prompt=none` answers `interaction_required` for what is owed, the password grant `invalid_grant`, and refresh is not checked |
 | `/auth/consent` | `handler_consent.go`, `authflow/consent.go` | User consent screen (if required), and the submission weighed against the permissions the user holds now, recorded through `userconsent` |
 | `/auth/issue` | `handler_auth_issue.go`, `authflow/issuance.go` | Final re-checks (redirect URI, client, flow, hint, session, user, scope), then issues the authorization code or the implicit tokens, redirects to client |
 

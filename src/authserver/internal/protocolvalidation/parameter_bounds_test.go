@@ -284,6 +284,7 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 
 	t.Run("a scope filling the bound is granted whole", func(t *testing.T) {
 		validator, mockDB, settings := setup(t)
+		expectNoLegalDocumentsOwed(mockDB)
 		mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		scope := claimScopesOfBytes(t, record.ScopeMaxBytes)
@@ -296,6 +297,7 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 
 	t.Run("one byte over the bound, with the right password, is invalid_scope", func(t *testing.T) {
 		validator, mockDB, settings := setup(t)
+		expectNoLegalDocumentsOwed(mockDB)
 		mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		scope := claimScopesOfBytes(t, record.ScopeMaxBytes+1)

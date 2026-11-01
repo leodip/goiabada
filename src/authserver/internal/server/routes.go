@@ -151,12 +151,12 @@ func (s *Server) initRoutes(branches appBranches) {
 		// A POST is parked and answered with a 303 to a GET, which runs the ceremony from it: the
 		// POST arrives cross-site without the Lax session cookie and must not touch the browser's
 		// own session (#246).
-		r.With(rateLimiter.LimitAuthorize).Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewAuthorization(s.database, userSessionManager, authorizeValidator, tokenParser, clientErrorResponder, auditLogger, authflow.NewSilentAuthentication(s.database, userSessionManager, permissionChecker, auditLogger))))
+		r.With(rateLimiter.LimitAuthorize).Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewAuthorization(s.database, userSessionManager, authorizeValidator, tokenParser, clientErrorResponder, auditLogger, authflow.NewSilentAuthentication(s.database, userSessionManager, permissionChecker, auditLogger, legalDocuments))))
 		r.With(rateLimiter.LimitAuthorize).Post("/authorize", handlers.HandleAuthorizePost(httpHelper, authflow.NewAuthorizationParking(authorizeValidator, s.database), baseURL))
 		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker)))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker, legalDocuments)))
 		r.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewIssuance(s.database, codeIssuer, tokenIssuer, userSessionManager, permissionChecker, auditLogger, tokenMetrics)))
 		passwordPrompt := authflow.NewPasswordPrompt(s.database)
 		r.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, passwordPrompt))
@@ -168,6 +168,9 @@ func (s *Server) initRoutes(branches appBranches) {
 		// decision 14). It checks no credential, so neither method is behind a limiter.
 		r.Get("/recovery-codes", handlers.HandleAuthRecoveryCodesGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewRecoveryCodesPrompt(s.database)))
 		r.Post("/recovery-codes", handlers.HandleAuthRecoveryCodesPost(ceremonyBoundary, ceremonyStore))
+		legalAcceptance := authflow.NewLegalAcceptance(s.database, permissionChecker, auditLogger, legalDocuments)
+		r.Get("/legal-acceptance", handlers.HandleLegalAcceptanceGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
+		r.Post("/legal-acceptance", handlers.HandleLegalAcceptancePost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
 		r.Get("/consent", handlers.HandleConsentGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewConsentPrompt(s.database)))
 		r.Post("/consent", handlers.HandleConsentPost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewConsentSubmission(s.database, permissionChecker, auditLogger)))
 		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))

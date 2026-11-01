@@ -26,6 +26,7 @@ const (
 	AuthStateLevel2OTP               AuthState = "level2_otp"
 	AuthStateLevel2RecoveryCodes     AuthState = "level2_recovery_codes"
 	AuthStateAuthenticationCompleted AuthState = "authentication_completed"
+	AuthStateRequiresLegalAcceptance AuthState = "requires_legal_acceptance"
 	AuthStateRequiresConsent         AuthState = "requires_consent"
 	AuthStateReadyToIssueCode        AuthState = "ready_to_issue_code"
 )

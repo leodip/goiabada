@@ -24,6 +24,9 @@ const (
 	silentFactValidityWithoutMaxAge
 	// silentFactEffectiveScope is the requested scope narrowed to what the user holds.
 	silentFactEffectiveScope
+	// silentFactLegalDocuments is whether the user owes the acceptance step a legal document for
+	// this client.
+	silentFactLegalDocuments
 	// silentFactConsent is the user's consent to this client, or none.
 	silentFactConsent
 )
@@ -47,6 +50,8 @@ type silentAuthenticationFacts struct {
 	SessionValid              *bool
 	SessionValidWithoutMaxAge *bool
 	EffectiveScope            *string
+	// LegalDocumentsOwed is whether the user owes the acceptance step a document for this client.
+	LegalDocumentsOwed *bool
 	// ConsentLoaded is set once the consent has been looked up; Consent is nil when there is none.
 	ConsentLoaded bool
 	Consent       *record.UserConsent
@@ -78,7 +83,11 @@ type silentAuthenticationAnswer struct {
 //     identical answer (#242 decision 1). Steps 5 to 7 are the step-up rule's three answers, in
 //     the order it gives them;
 //  8. the user holds at least one requested scope;
-//  9. when the client requires consent or offline_access is asked for, a consent covers every
+//  9. the user owes the acceptance step no legal document for this client (#622 decision 7: the
+//     step cannot be shown, and OIDC Core 1.0 section 3.1.2.6 names interaction_required for a
+//     request that "cannot be completed without displaying a user interface"). Asked before the
+//     consent, as an interactive sign-in shows the step before the consent screen;
+//  10. when the client requires consent or offline_access is asked for, a consent covers every
 //     scope, and otherwise it covers authserver:manage-account when the scope holds it and the
 //     client is not the admin console's (userconsent.AlwaysOwed, #509 decision 3).
 //
@@ -133,6 +142,13 @@ func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticati
 	}
 	if len(strings.TrimSpace(*f.EffectiveScope)) == 0 {
 		return refuse("access_denied", "The user is not authorized to access any of the requested scopes")
+	}
+
+	if f.LegalDocumentsOwed == nil {
+		return silentAuthenticationAnswer{}, silentFactLegalDocuments
+	}
+	if *f.LegalDocumentsOwed {
+		return refuse(oidc.ErrorInteractionRequired, "Acceptance of a legal document is required")
 	}
 
 	// The scopes a stored consent must cover: every one when the client requires consent or

@@ -2290,6 +2290,69 @@ func (_c *Database_CreateLegalDocument_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// CreateLegalDocumentAcceptance provides a mock function for the type Database
+func (_mock *Database) CreateLegalDocumentAcceptance(ctx context.Context, tx *sql.Tx, acceptance *record.LegalDocumentAcceptance) error {
+	ret := _mock.Called(ctx, tx, acceptance)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateLegalDocumentAcceptance")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.LegalDocumentAcceptance) error); ok {
+		r0 = returnFunc(ctx, tx, acceptance)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateLegalDocumentAcceptance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateLegalDocumentAcceptance'
+type Database_CreateLegalDocumentAcceptance_Call struct {
+	*mock.Call
+}
+
+// CreateLegalDocumentAcceptance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - acceptance *record.LegalDocumentAcceptance
+func (_e *Database_Expecter) CreateLegalDocumentAcceptance(ctx any, tx any, acceptance any) *Database_CreateLegalDocumentAcceptance_Call {
+	return &Database_CreateLegalDocumentAcceptance_Call{Call: _e.mock.On("CreateLegalDocumentAcceptance", ctx, tx, acceptance)}
+}
+
+func (_c *Database_CreateLegalDocumentAcceptance_Call) Run(run func(ctx context.Context, tx *sql.Tx, acceptance *record.LegalDocumentAcceptance)) *Database_CreateLegalDocumentAcceptance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.LegalDocumentAcceptance
+		if args[2] != nil {
+			arg2 = args[2].(*record.LegalDocumentAcceptance)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateLegalDocumentAcceptance_Call) Return(err error) *Database_CreateLegalDocumentAcceptance_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateLegalDocumentAcceptance_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, acceptance *record.LegalDocumentAcceptance) error) *Database_CreateLegalDocumentAcceptance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateLegalDocumentClient provides a mock function for the type Database
 func (_mock *Database) CreateLegalDocumentClient(ctx context.Context, tx *sql.Tx, link *record.LegalDocumentClient) error {
 	ret := _mock.Called(ctx, tx, link)
@@ -9034,6 +9097,80 @@ func (_c *Database_GetKeyPairById_Call) Return(keyPair *record.KeyPair, err erro
 }
 
 func (_c *Database_GetKeyPairById_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, keyPairId int64) (*record.KeyPair, error)) *Database_GetKeyPairById_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetLegalDocumentAcceptancesByUserId provides a mock function for the type Database
+func (_mock *Database) GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error) {
+	ret := _mock.Called(ctx, tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLegalDocumentAcceptancesByUserId")
+	}
+
+	var r0 []record.LegalDocumentAcceptance
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]record.LegalDocumentAcceptance, error)); ok {
+		return returnFunc(ctx, tx, userId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []record.LegalDocumentAcceptance); ok {
+		r0 = returnFunc(ctx, tx, userId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.LegalDocumentAcceptance)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetLegalDocumentAcceptancesByUserId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLegalDocumentAcceptancesByUserId'
+type Database_GetLegalDocumentAcceptancesByUserId_Call struct {
+	*mock.Call
+}
+
+// GetLegalDocumentAcceptancesByUserId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) GetLegalDocumentAcceptancesByUserId(ctx any, tx any, userId any) *Database_GetLegalDocumentAcceptancesByUserId_Call {
+	return &Database_GetLegalDocumentAcceptancesByUserId_Call{Call: _e.mock.On("GetLegalDocumentAcceptancesByUserId", ctx, tx, userId)}
+}
+
+func (_c *Database_GetLegalDocumentAcceptancesByUserId_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64)) *Database_GetLegalDocumentAcceptancesByUserId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetLegalDocumentAcceptancesByUserId_Call) Return(legalDocumentAcceptances []record.LegalDocumentAcceptance, err error) *Database_GetLegalDocumentAcceptancesByUserId_Call {
+	_c.Call.Return(legalDocumentAcceptances, err)
+	return _c
+}
+
+func (_c *Database_GetLegalDocumentAcceptancesByUserId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)) *Database_GetLegalDocumentAcceptancesByUserId_Call {
 	_c.Call.Return(run)
 	return _c
 }

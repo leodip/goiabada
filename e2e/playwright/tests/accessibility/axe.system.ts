@@ -2,13 +2,15 @@
 // saved and refused, the confirmations their saves ask, the audit log while no event is stored, and
 // self-registration's pages. Runs alone, and each test puts back what it changes (lib/settings.ts).
 import { randomBytes } from "node:crypto";
-import { deleteUser, idFromListLink } from "../../lib/admin-console";
+import { deleteUser, idFromListLink, publishLegalDocument, setLegalDocumentApps } from "../../lib/admin-console";
+import { openSignIn, submitPassword } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { linksIn, waitForMail } from "../../lib/mailpit";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 import { uniqueIdentifier } from "../../lib/unique";
-import { asks, checkStates, refused, saved, titled, type State } from "../../lib/axe";
+import { asks, at, checkStates, refused, saved, titled, type State } from "../../lib/axe";
+import { browserSignInClient } from "../../lib/test-clients";
 
 test.describe.configure({ timeout: 300_000 });
 
@@ -193,5 +195,33 @@ test("self-registration's pages", async ({ page, browser, request }) => {
     for (const email of created) {
       await deleteUser(page, await idFromListLink(page, `${env.adminUrl}/admin/users?${new URLSearchParams({ query: email })}`, email));
     }
+  }
+});
+
+// The acceptance step and a legal document's public page (#622): the step as first shown and with its
+// box left unticked, and the page the step links. The document is set to the test's own client
+// before it is published, so no other sign-in owes it, and the fixtures retire it and delete the
+// client.
+test("the acceptance step and a legal document's page", async ({ page, browser, clients, users, legalDocuments }) => {
+  const user = await users.create();
+  const { client } = await browserSignInClient(page, clients);
+  const doc = await legalDocuments.create({ kind: "must_accept", markdown: "## Using the app\n\nBe nice to **everyone**." });
+  await setLegalDocumentApps(page, doc.id, [client.identifier]);
+  await publishLegalDocument(page, doc.id);
+
+  const { context, page: own } = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
+  try {
+    await checkStates(own, [
+      titled(own, "the acceptance step", "Accept the terms", async () => {
+        await submitPassword(own, user.email, user.password);
+        await own.waitForURL((url) => url.pathname === "/auth/legal-acceptance");
+      }),
+      refused(own, "the acceptance step, the box left unticked", "legalDocument0", () =>
+        own.getByRole("button", { name: "Accept", exact: true }).click(),
+      ),
+      at(own, "a legal document's public page", `${env.authUrl}/legal/${doc.shortName}`),
+    ]);
+  } finally {
+    await context.close();
   }
 });

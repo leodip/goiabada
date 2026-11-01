@@ -26,15 +26,21 @@ package audit
 import "slices"
 
 const (
-	EventAuthFailedPwd                        = "auth_failed_pwd" //nolint:gosec // G101: an audit event name, not a credential
-	EventAuthFailedOtp                        = "auth_failed_otp"
-	EventAuthSuccessPwd                       = "auth_success_pwd" //nolint:gosec // G101: an audit event name, not a credential
-	EventAuthSuccessOtp                       = "auth_success_otp"
-	EventUserDisabled                         = "user_disabled"
-	EventStartedNewUserSession                = "started_new_user_session"
-	EventBumpedUserSession                    = "bumped_user_session"
-	EventCreatedAuthCode                      = "created_auth_code"
-	EventSavedConsent                         = "saved_consent"
+	EventAuthFailedPwd         = "auth_failed_pwd" //nolint:gosec // G101: an audit event name, not a credential
+	EventAuthFailedOtp         = "auth_failed_otp"
+	EventAuthSuccessPwd        = "auth_success_pwd" //nolint:gosec // G101: an audit event name, not a credential
+	EventAuthSuccessOtp        = "auth_success_otp"
+	EventUserDisabled          = "user_disabled"
+	EventStartedNewUserSession = "started_new_user_session"
+	EventBumpedUserSession     = "bumped_user_session"
+	EventCreatedAuthCode       = "created_auth_code"
+	EventSavedConsent          = "saved_consent"
+	// The acceptance step (#622). accepted_legal_document records one document a user accepted at
+	// the step, after the acceptances commit, with user_id, client_id (the app being signed in
+	// to), legal_document_id, short_name and version. declined_legal_documents records a decline,
+	// with user_id and client_id: nothing is stored, and the next sign-in asks again.
+	EventAcceptedLegalDocument                = "accepted_legal_document"
+	EventDeclinedLegalDocuments               = "declined_legal_documents"
 	EventTokenIssuedAuthorizationCodeResponse = "token_issued_authorization_code_response"
 	EventTokenIssuedClientCredentialsResponse = "token_issued_client_credentials_response"
 	EventTokenIssuedRefreshTokenResponse      = "token_issued_refresh_token_response" //nolint:gosec // G101: an audit event name, not a credential
@@ -643,6 +649,7 @@ func EventTypes() []string {
 // integration tier's api_audit_event_types_test.go, which compares the response with EventTypes in
 // order, hold it.
 var auditEventTypes = []string{
+	EventAcceptedLegalDocument,
 	EventActivatedAccount,
 	EventAddedGroupAttribute,
 	EventAddedGroupPermission,
@@ -668,6 +675,7 @@ var auditEventTypes = []string{
 	EventCreatedResource,
 	EventCreatedUser,
 	EventCrossUserSessionReplaced,
+	EventDeclinedLegalDocuments,
 	EventDeletedClient,
 	EventDeletedClientLogo,
 	EventDeletedGroup,

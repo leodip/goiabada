@@ -29,7 +29,12 @@
 //     the ceremony, or ends a sign-in whose enrolment can no longer be stored.
 //   - Completion, GET /auth/completed: decides on the user (decideBeforeBinding), binds the ceremony
 //     to a user session by reusing the browser's or creating one, or restarts it at level 1
-//     (decideCompletion), then sends it to consent or to issuance (decideAfterBinding).
+//     (decideCompletion), then sends it to the acceptance step when the user owes a legal document,
+//     or to consent or to issuance (decideAfterBinding).
+//   - LegalAcceptance, GET and POST /auth/legal-acceptance (#622): lists the must-accept legal
+//     documents the user owes for the client (Prompt), and records the versions shown or ends the
+//     sign-in with access_denied (Submit). Once nothing is owed it decides consent or issuance as
+//     Completion does (routeBoundCeremony).
 //   - ConsentPrompt, GET /auth/consent: shows the consent screen (consentScreenOwed), handing its
 //     data to the handler to render, or moves a ceremony whose scope is already consented on to
 //     issuance.
@@ -95,7 +100,8 @@
 //     foreign session or creates one (#579), and the session start commits before the rotation that
 //     binds the new session to the browser session (#266). A failed rotation deletes the new session
 //     (#198), and the device cookie is written only once the rotation succeeded.
-//   - Audit records of a session write, and of a recorded consent, follow its commit.
+//   - Audit records of a session write, of a recorded consent, and of recorded acceptances, follow
+//     its commit. The acceptance step records nothing for a submission it shows again.
 //   - ConsentSubmission narrows the ticked scopes to what the user holds before it reads or writes a
 //     consent, so a selection the narrowing empties writes nothing (#241). Its refusals read the
 //     client's provenance before the clear, and the clear comes before the answer (#141).

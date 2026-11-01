@@ -282,6 +282,15 @@
 "legal_documents.page.superseded" = "This version is no longer in effect. Version {{.version}} is the current one."
 "legal_documents.page.read_current" = "Read the current version"
 "legal_documents.page.versions" = "Versions"
+"legal_acceptance.page_title" = "Accept the terms"
+"legal_acceptance.title" = "Accept the terms"
+"legal_acceptance.intro" = "{{.app}} asks you to accept the documents below before you continue. Read each one, then tick the box beside it."
+"legal_acceptance.legend" = "Documents to accept"
+"legal_acceptance.version" = "Version {{.version}}"
+"legal_acceptance.unticked" = "Tick the box beside every document to accept them, or decline."
+"legal_acceptance.changed" = "A document changed while this page was open. Read the current version, then accept it."
+"legal_acceptance.button.decline" = "Decline"
+"legal_acceptance.button.accept" = "Accept"
 
 # === Adminconsole foundation =================================================
 

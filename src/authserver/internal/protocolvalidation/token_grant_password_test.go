@@ -43,6 +43,55 @@ func (r *passwordVerifierRecorder) verify(hashedPassword string, password string
 	return r.answer
 }
 
+// expectNoLegalDocumentsOwed answers the password grant's question about the acceptance step: no
+// legal document is in effect, so nothing is owed.
+func expectNoLegalDocumentsOwed(mockDB *datamocks.Database) {
+	mockDB.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, mock.Anything).
+		Return([]record.LegalDocumentClient{}, nil).Once()
+	mockDB.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return([]record.LegalDocument{}, nil).Once()
+}
+
+// A user who owes the acceptance step a legal document for the client is refused invalid_grant,
+// with the description telling them to accept it in a browser, after the password and before any
+// scope is looked at: the grant can never show the step (#622 decision 7).
+func TestValidateTokenRequest_ROPC_ALegalDocumentOwedIsRefused(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
+		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+
+	passwordHash, _ := passwordhash.Hash("correctpassword")
+	user := &record.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
+	ropcEnabled := true
+	client := &record.Client{Id: 7, ClientIdentifier: "ropc-client", Enabled: true, IsPublic: true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, int64(7)).
+		Return([]record.LegalDocumentClient{{LegalDocumentId: 3, ClientId: 7}}, nil).Once()
+	mockDB.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return([]record.LegalDocument{
+		{Id: 3, ShortName: "terms", Kind: record.LegalDocumentKindMustAccept},
+	}, nil).Once()
+	mockDB.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(3)).
+		Return([]record.LegalDocumentVersion{{Id: 31, LegalDocumentId: 3, VersionNumber: 1}}, nil).Once()
+	mockDB.On("GetLegalDocumentAcceptancesByUserId", mock.Anything, mock.Anything, int64(1)).
+		Return([]record.LegalDocumentAcceptance{}, nil).Once()
+
+	result, err := validator.ValidateTokenRequest(context.Background(),
+		&record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}, &ValidateTokenRequestInput{
+			GrantType: "password", ClientId: "ropc-client", Username: "user@example.com",
+			Password: "correctpassword", Scope: "openid",
+		})
+
+	assert.Nil(t, result)
+	var detail *oauth.ErrorDetail
+	require.ErrorAs(t, err, &detail)
+	assert.Equal(t, "invalid_grant", detail.Code())
+	assert.Equal(t, "The user has not accepted a legal document this app requires. "+
+		"Sign in to the app in a browser to accept it, then try again.", detail.Description())
+	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+}
+
 func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
@@ -83,6 +132,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
@@ -173,6 +223,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
@@ -820,6 +871,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryWithCodeFlowOffStillV
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
@@ -878,6 +930,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2OptionalStillValidates(t *test
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
@@ -1065,6 +1118,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
@@ -1116,6 +1170,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
@@ -1165,6 +1220,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
@@ -1221,6 +1277,7 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 			mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+			expectNoLegalDocumentsOwed(mockDB)
 			mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 			mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
@@ -1273,6 +1330,7 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
@@ -1336,6 +1394,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "api").Return(resource, nil).Once()
@@ -1397,6 +1456,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "api").Return(resource, nil).Once()
@@ -1489,6 +1549,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 			mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+			expectNoLegalDocumentsOwed(mockDB)
 			mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 			mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 			tc.setup(mockDB)

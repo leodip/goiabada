@@ -319,6 +319,24 @@ func legalDocumentClientMapping() mappingCase {
 	}
 }
 
+// legalDocumentAcceptanceMapping has no update: an acceptance is written once and never
+// rewritten.
+func legalDocumentAcceptanceMapping() mappingCase {
+	return mappingCase{
+		name:   "legal document acceptance",
+		table:  "legal_document_acceptances",
+		record: reflect.TypeOf(record.LegalDocumentAcceptance{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetLegalDocumentAcceptancesByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentAcceptancesByUserId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateLegalDocumentAcceptance(ctx, nil, rec.(*record.LegalDocumentAcceptance))
+		},
+	}
+}
+
 // webOriginMapping has no update: a web origin is created and deleted, never rewritten.
 func webOriginMapping() mappingCase {
 	return mappingCase{
@@ -910,6 +928,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		clientMapping(), clientLogoMapping(), clientPermissionMapping(), clientIntrospectionResourceMapping(),
 		redirectURIMapping(), postLogoutRedirectURIMapping(), webOriginMapping(),
 		legalDocumentMapping(), legalDocumentVersionMapping(), legalDocumentClientMapping(),
+		legalDocumentAcceptanceMapping(),
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
 		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),

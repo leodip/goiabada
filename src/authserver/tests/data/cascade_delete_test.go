@@ -14,11 +14,13 @@ import (
 
 // Cascade deletion.
 //
-// DeleteUser and DeleteClient are each a single DELETE against the parent table
-// (commondb/user.go, commondb/client.go). They remove no child rows themselves,
-// so the correctness of "delete a user" lives almost entirely in the ON DELETE
-// CASCADE clauses of four separately hand-written schemas. Nothing compared those
-// four until these tests, which run against whichever engine is configured.
+// DeleteUser deletes the user's sessions and refresh tokens first, then the user's
+// row; DeleteClient deletes the client's refresh tokens first, then the client's
+// row, and records the deleted identifier (commondb/user.go, commondb/client.go).
+// Every other child row goes with the parent through the ON DELETE CASCADE
+// clauses of four separately hand-written schemas, so the correctness of "delete
+// a user" lives mostly there. Nothing compared those four until these tests,
+// which run against whichever engine is configured.
 //
 // The per-table checks use assert rather than require deliberately: one run
 // should report every table that failed to cascade, not stop at the first.
@@ -135,6 +137,9 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 	permission := createTestPermission(t, resource)
 	userPermission := createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
 	profilePicture := createTestUserProfilePicture(t, user.Id)
+	legalDocument := createLegalDocument(t, record.LegalDocumentKindMustAccept)
+	acceptedVersion := publishVersion(t, legalDocument.Id, 1, "Terms of use", "Be nice.")
+	acceptLegalDocumentVersion(t, user.Id, acceptedVersion.Id)
 
 	// Second hop: a refresh token under the code, and the session's client row.
 	codeLinkedToken := createCodeLinkedRefreshToken(t, code.Id)
@@ -196,6 +201,9 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 	assert.Nil(t, deletedPicture, "user_profile_pictures must cascade from users")
 	assert.NotZero(t, profilePicture.Id, "sanity: the fixture was created")
 
+	// legal_document_acceptances
+	assert.Empty(t, acceptedVersionIds(t, user.Id), "legal_document_acceptances must cascade from users")
+
 	// The group, resource and permission are independent of the user and must
 	// survive: cascade must not travel up an association table.
 	survivingGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
@@ -207,6 +215,9 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 	survivingClient, err := database.GetClientById(context.Background(), nil, client.Id)
 	require.NoError(t, err, "GetClientById")
 	assert.NotNil(t, survivingClient, "deleting a user must not delete the client")
+	survivingVersion, err := database.GetLegalDocumentVersion(context.Background(), nil, legalDocument.Id, 1)
+	require.NoError(t, err, "GetLegalDocumentVersion")
+	assert.NotNil(t, survivingVersion, "deleting a user must not delete the version they accepted")
 }
 
 // TestDeleteClient_RemovesAllDependentRows covers all eight tables that

@@ -265,6 +265,15 @@
 "legal_documents.page.superseded" = "Esta versão não está mais em vigor. A versão em vigor é a {{.version}}."
 "legal_documents.page.read_current" = "Ler a versão em vigor"
 "legal_documents.page.versions" = "Versões"
+"legal_acceptance.page_title" = "Aceitar os termos"
+"legal_acceptance.title" = "Aceitar os termos"
+"legal_acceptance.intro" = "{{.app}} pede que você aceite os documentos abaixo antes de continuar. Leia cada um e marque a caixa ao lado."
+"legal_acceptance.legend" = "Documentos a aceitar"
+"legal_acceptance.version" = "Versão {{.version}}"
+"legal_acceptance.unticked" = "Marque a caixa ao lado de cada documento para aceitá-los, ou recuse."
+"legal_acceptance.changed" = "Um documento mudou enquanto esta página estava aberta. Leia a versão em vigor e depois aceite-a."
+"legal_acceptance.button.decline" = "Recusar"
+"legal_acceptance.button.accept" = "Aceitar"
 
 # === Adminconsole — fundação =================================================
 

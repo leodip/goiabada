@@ -286,6 +286,15 @@
 "legal_documents.page.superseded" = "Diese Version ist nicht mehr in Kraft. Aktuell ist Version {{.version}}."
 "legal_documents.page.read_current" = "Aktuelle Version lesen"
 "legal_documents.page.versions" = "Versionen"
+"legal_acceptance.page_title" = "Bedingungen akzeptieren"
+"legal_acceptance.title" = "Bedingungen akzeptieren"
+"legal_acceptance.intro" = "{{.app}} bittet dich, die folgenden Dokumente zu akzeptieren, bevor du fortfährst. Lies jedes und setze dann das Häkchen daneben."
+"legal_acceptance.legend" = "Zu akzeptierende Dokumente"
+"legal_acceptance.version" = "Version {{.version}}"
+"legal_acceptance.unticked" = "Setze das Häkchen neben jedem Dokument, um sie zu akzeptieren, oder lehne ab."
+"legal_acceptance.changed" = "Ein Dokument hat sich geändert, während diese Seite geöffnet war. Lies die aktuelle Version und akzeptiere sie dann."
+"legal_acceptance.button.decline" = "Ablehnen"
+"legal_acceptance.button.accept" = "Akzeptieren"
 
 # === Adminconsole foundation =================================================
 

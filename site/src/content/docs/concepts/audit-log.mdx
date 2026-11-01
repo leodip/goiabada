@@ -199,7 +199,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `user_session_id` | The row id of a user's session. |
 | `user_session_idle_timeout_in_seconds` | Under `old` and `new`: the session idle timeout, in seconds. |
 | `user_session_max_lifetime_in_seconds` | Under `old` and `new`: the session maximum lifetime, in seconds. |
-| `version` | The number of the legal document version published. |
+| `version` | The number of a legal document version: the one published, or the one a user accepted. |
 
 ## Why a session was deleted
 
@@ -246,6 +246,8 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `started_new_user_session` | A user signed in and a new session was created for them. |
 | `bumped_user_session` | A user's existing session was reused and kept alive, by single sign-on, a `prompt=none` request or a refresh token grant. |
 | `cross_user_session_replaced` | A user signed in on a browser that still held another user's session, so that session was ended. |
+| `accepted_legal_document` | A user accepted a legal document at sign-in. One entry per document, naming its version. |
+| `declined_legal_documents` | A user declined the legal documents asked at sign-in, and the app was told `access_denied`. Nothing is stored. |
 | `saved_consent` | A user approved a client's consent screen, and the scopes they granted were saved. |
 | `created_auth_code` | An authorization code was issued to a client for a user. |
 | `issuance_refused_session_invalid` | The last step of a sign-in was refused because the user's session had passed its idle timeout or maximum lifetime. |
@@ -273,7 +275,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `token_issued_ropc_response` | The token endpoint issued tokens for a username and password, through the password grant. |
 | `token_issued_implicit_response` | The authorization endpoint issued tokens straight to a client, through the implicit flow. |
 | `token_scope_denied` | The token endpoint refused a request for a scope the client or user may not have, or an OpenID Connect scope on the client credentials grant, or a client credentials request that left `scope` out from a client holding no permissions, recorded with an empty `scope`. |
-| `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled or has two-factor authentication on. |
+| `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled, has two-factor authentication on or hasn't accepted a legal document the app requires. |
 | `auth_code_reuse_detected` | A client redeemed an authorization code a second time. The refresh tokens issued through that code's session were revoked, and, if there were any, the session ended. |
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |
 | `revoked_consent_grants` | A user's consent to a client was withdrawn, by the user or by an administrator, so the refresh tokens the user held with that client, and the authorization codes not yet redeemed, were revoked. It's written beside `deleted_own_user_consent` or `deleted_user_consent`, and names the client, the tokens revoked and how many codes. |

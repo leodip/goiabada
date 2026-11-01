@@ -199,6 +199,7 @@ func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *datamocks.
 	}
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	expectNoLegalDocumentsOwed(mockDB)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 

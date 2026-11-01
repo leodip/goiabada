@@ -93,6 +93,27 @@ Every document in effect is linked at the foot of the pages where people sign in
 
 A document for selected apps shows only on the sign-ins to the clients it lists.
 
+## Accepting documents at sign-in
+
+When a user signs in to a client, after their password and any second factor, and before the consent screen, the auth server checks the **Users must accept** documents in effect for that client. If the user hasn't accepted the current version of one, they see a page listing each such document by its title, linked to its public page, with a box to tick.
+
+- **Accept** with every box ticked records, for each document, the user, the version shown and the time. The sign-in then goes on to the consent screen or back to the client.
+- **Accept** with a box left unticked shows the page again and records nothing.
+- **Decline** sends the client the error `access_denied`. Nothing is recorded, and the user stays signed in, so the next sign-in asks again.
+
+A user is asked at every sign-in, single sign-on included, until they accept. A document accepted once counts on every client it applies to. Each new version is asked again, at the user's next sign-in to a client it covers.
+
+Where the page can't be shown:
+
+| Request | While a document is owed |
+|---|---|
+| A sign-in with [`prompt=none`](/concepts/prompt/#the-silent-checks) | Answered `interaction_required`. |
+| The [password grant](/legacy-flows/ropc/#who-cant-use-it) | Refused with `invalid_grant`, until the user accepts in the browser. |
+| A refresh token | Keeps working. An offline refresh token keeps refreshing for up to its lifetime without the new version accepted. |
+| The client credentials grant | Unaffected: there's no user. |
+
+The admin console's own sign-in never asks, so users can always reach My Account. The [audit log](/concepts/audit-log/) records each acceptance as `accepted_legal_document`, and each decline as `declined_legal_documents`.
+
 ## Which clients a document applies to
 
 A document applies to every client until you choose otherwise. On its **Applies to** tab, pick one:

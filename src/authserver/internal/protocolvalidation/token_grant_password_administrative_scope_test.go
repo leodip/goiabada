@@ -80,6 +80,7 @@ func TestValidateTokenRequest_ROPC_AdministrativeScope(t *testing.T) {
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 			mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+			expectNoLegalDocumentsOwed(mockDB)
 			mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 			mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 			if tc.granted != "" {
