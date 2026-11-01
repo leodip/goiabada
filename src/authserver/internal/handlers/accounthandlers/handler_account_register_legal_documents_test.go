@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -106,6 +108,39 @@ func TestHandleRegisterPost_TheRedrawnFormLinksTheSameDocuments(t *testing.T) {
 		{Title: "Privacy notice", ShortName: "privacy"}, {Title: "Shop terms", ShortName: "shop-terms"},
 	}, bind["legalDocuments"])
 	assert.Equal(t, "shop", bind[render.LegalFooterClient])
+}
+
+// A submission the Turnstile challenge refuses draws the form again with the same documents, as
+// the handler's own refusals do (#642).
+func TestRequireRegistrationChallenge_TheRedrawnFormLinksTheSameDocuments(t *testing.T) {
+	var asked []string
+	held := heldCeremonies{aCeremonyId: {CeremonyId: aCeremonyId, ClientId: "shop"}}
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	unreached := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("a refused submission reached the handler")
+	})
+	handler := RequireRegistrationChallenge(pageRenderer, held, shopDocuments(&asked),
+		refusingVerifier{})(unreached)
+	req := registerRequest(http.MethodPost, "?ceremony="+aCeremonyId)
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
+		SelfRegistrationEnabled: true, TurnstileEnabled: true, TurnstileSiteKey: "1x00000000000000000000AA",
+	}))
+
+	bind := renderedRegisterBind(t, pageRenderer, handler, req)
+
+	assert.Equal(t, "Complete the security check, then try again. The check needs JavaScript.", bind["error"])
+	assert.Equal(t, []render.LegalDocumentLink{
+		{Title: "Privacy notice", ShortName: "privacy"}, {Title: "Shop terms", ShortName: "shop-terms"},
+	}, bind["legalDocuments"])
+	assert.Equal(t, "shop", bind[render.LegalFooterClient])
+	assert.Equal(t, "1x00000000000000000000AA", bind["turnstileSiteKey"], "the redrawn form carries a fresh widget")
+}
+
+// refusingVerifier refuses every token.
+type refusingVerifier struct{}
+
+func (refusingVerifier) Check(context.Context, *record.Settings, turnstile.Form, string) turnstile.Outcome {
+	return turnstile.Refused
 }
 
 // A failed read of the documents, or of the browser's sign-ins, is the error page: the form is not
