@@ -475,9 +475,6 @@ func (s *Server) initMiddleware() appBranches {
 
 	slog.Info("initializing middleware")
 
-	// CORS
-	s.router.Use(middleware.CORS(s.database))
-
 	// Request ID: the X-Request-Id the request arrived with, or one minted as chi minted them
 	// (#462 decision 6), on the context of every record, audit event and error page below.
 	s.router.Use(requestid.Middleware)
@@ -525,6 +522,13 @@ func (s *Server) initMiddleware() appBranches {
 	// wrapped writer and lands in the record (#203). It writes the panic's one ERROR record, with
 	// the request id and the stack, through the process's log handler (#462).
 	s.router.Use(httpmw.Recoverer)
+
+	// CORS, beneath everything above so a preflight, which it answers before any route, carries the
+	// security headers, Strict-Transport-Security over HTTPS included, and its request id, leaves a
+	// request-log record and a metrics sample under the route value preflight, and is answered 500
+	// when its origin lookup panics (#715 decision 6). Above StripTrailingSlash: it normalizes the
+	// trailing slash of the paths it covers itself.
+	s.router.Use(middleware.CORS(s.database))
 
 	// One trailing slash stripped before routing, from r.URL.Path itself, so the router, the
 	// lookups below and the handlers all read the stripped path (#462).

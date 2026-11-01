@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/leodip/goiabada/core/metrics"
 )
 
 // corsDatabase is what the CORS origin check needs: whether any client registered this origin.
@@ -41,7 +43,8 @@ const corsMaxAge = 600
 // answered them before this became the server's own (#462, #280).
 //
 // A preflight, an OPTIONS carrying Origin, even an empty one, and a non-empty
-// Access-Control-Request-Method, is answered 200 here and never reaches a route. It always varies
+// Access-Control-Request-Method, is answered 200 here and never reaches a route; it names itself to
+// the HTTP metrics as metrics.RoutePreflight. It always varies
 // on the three request fields it reads, and grants only when the origin, the method and every
 // requested header are allowed: then it names the origin, the one method asked for, the headers
 // asked for, and corsMaxAge. Every other request goes on to its route, varying on Origin, and names
@@ -53,6 +56,9 @@ func CORS(database corsDatabase) func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, hasOrigin := r.Header["Origin"]
 			if r.Method == http.MethodOptions && hasOrigin && r.Header.Get("Access-Control-Request-Method") != "" {
+				// Named before the origin lookup, so a preflight whose lookup panics is counted
+				// under preflight too, as the 500 its client received (#715 decision 10).
+				metrics.NameRoute(r, metrics.RoutePreflight)
 				answerPreflight(w, r, database)
 				w.WriteHeader(http.StatusOK)
 				return
