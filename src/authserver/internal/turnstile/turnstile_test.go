@@ -608,9 +608,10 @@ func TestCheck_ACallThatFindsNoFreeSlotBeforeItsDeadlineFailsOpenAsBusy(t *testi
 	})
 	require.Eventually(t, func() bool { return h.standIn.callCount() == 64 }, 2*time.Second, 5*time.Millisecond)
 
+	// The clock starts before the deadline does, so the wait measured is never shorter than it.
+	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
-	started := time.Now()
 	outcome := h.verifier.Check(ctx, h.settings, turnstile.FormRegister, token)
 	elapsed := time.Since(started)
 
