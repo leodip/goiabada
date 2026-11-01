@@ -90,6 +90,8 @@ func TestValidateTokenRequest_ROPC_ALegalDocumentOwedIsRefused(t *testing.T) {
 	assert.Equal(t, "The user has not accepted a legal document this app requires. "+
 		"Sign in to the app in a browser to accept it, then try again.", detail.Description())
 	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+	var owed *LegalDocumentsOwedError
+	assert.ErrorAs(t, err, &owed, "typed, so the token handler leaves it off the wrong-password budget")
 }
 
 func TestValidateTokenRequest_ROPC_Success(t *testing.T) {

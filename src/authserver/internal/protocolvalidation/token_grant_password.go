@@ -30,6 +30,26 @@ const ROPCNotAuthorizedErrorMsg = "The client is not authorized to use the resou
 const LegalDocumentsOwedErrorMsg = "The user has not accepted a legal document this app requires. " +
 	"Sign in to the app in a browser to accept it, then try again."
 
+// LegalDocumentsOwedError is the password grant's refusal of a user who proved their password but
+// owes the acceptance step a legal document for the client: invalid_grant on the wire, and a type
+// of its own so the token handler does not charge it to the account's wrong-password budget. That
+// budget is shared with the browser's password page, where the user is told to go to accept, so
+// charging a correct password would let an app that retries lock the user out of the one place
+// that clears the refusal (#622 decision 7).
+type LegalDocumentsOwedError struct {
+	Detail *oauth.ErrorDetail
+}
+
+func (e *LegalDocumentsOwedError) Error() string {
+	return e.Detail.Error()
+}
+
+// Unwrap puts Detail on the chain, as UserDisabledError's does, so errors.As reaches the
+// *oauth.ErrorDetail every writer and classifier in this tree matches with.
+func (e *LegalDocumentsOwedError) Unwrap() error {
+	return e.Detail
+}
+
 // PasswordGrant is a validated resource owner password credentials request: the client, the user
 // whose password was just checked, and the scope granted to them.
 type PasswordGrant struct {
@@ -144,8 +164,8 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 		return nil, err
 	}
 	if len(owed) > 0 {
-		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", LegalDocumentsOwedErrorMsg,
-			http.StatusBadRequest)
+		return nil, &LegalDocumentsOwedError{Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			LegalDocumentsOwedErrorMsg, http.StatusBadRequest)}
 	}
 
 	// Validate scopes - follow authorization code flow pattern

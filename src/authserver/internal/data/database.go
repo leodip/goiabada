@@ -572,6 +572,13 @@ type Database interface {
 	// has no update: once published it is never rewritten. DeleteLegalDocument is refused by the
 	// engine for a document that has a published version, which is retired instead.
 	CreateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
+	// AcquireLegalDocumentRow takes the document's row inside the caller's transaction and holds
+	// it until that transaction ends, as AcquireClientRow does a client's. Every write of a
+	// document's lifecycle (a draft save, publish, retire, restore, delete and a change of apps)
+	// takes it first and reads the document again under it, so none decides on a copy another
+	// committed over: a publish clears only the draft it froze, a save cannot rename a document
+	// published meanwhile, and a save cannot undo a retirement. The transaction is required.
+	AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
 	UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
 	GetLegalDocumentById(ctx context.Context, tx *sql.Tx, legalDocumentId int64) (*record.LegalDocument, error)
 	// GetLegalDocumentByShortName answers the document whose short name is exactly shortName.

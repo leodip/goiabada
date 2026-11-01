@@ -38,8 +38,10 @@ test("a document never published is deleted once its short name is typed", async
   expect(response?.status()).toBe(404);
 });
 
-test("a published document is retired and restored, and is never deleted", async ({ page, legalDocuments }) => {
-  const doc = await legalDocuments.create({ markdown: "In effect.", publish: true });
+// Set to a client of the test's own before it is published, so no other test's sign-in shows it.
+test("a published document is retired and restored, and is never deleted", async ({ page, clients, legalDocuments }) => {
+  const client = await clients.create();
+  const doc = await legalDocuments.create({ markdown: "In effect.", apps: [client.identifier], publish: true });
 
   // Neither its page nor the list offers to delete it, and its delete page says why.
   await page.goto(legalDocumentUrl(doc.id, "versions"));

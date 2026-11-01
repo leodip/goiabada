@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/errs"
@@ -270,7 +271,7 @@ func TestHandleActivateGet_TheLinkFollowedKeepsTheSignIn(t *testing.T) {
 			preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-time.Minute))
 			database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
-			handler := HandleActivateGet(handlersmocks.NewPageRenderer(t), newMarkerTestStore(), database,
+			handler := HandleActivateGet(handlersmocks.NewPageRenderer(t), newMarkerTestStore(), heldCeremonies{}, database,
 				handlersmocks.NewAuditLogger(t), testDataCipher)
 			target := emaillinks.AccountActivatePath + "?" + url.Values{"code": {code}, "ceremony": {tc.ceremony}}.Encode()
 			rr := httptest.NewRecorder()
@@ -367,17 +368,19 @@ func TestHandleActivatePost_ActivatesWhereTheSignInIsNotHeld(t *testing.T) {
 		held            map[string]*ceremony.AuthContext
 		rotateErr       error
 		wantReturnToApp bool
+		// The app the footer names: the held sign-in's, while the browser holds it.
+		wantFooterClient string
 	}{
-		{"a link opened in another browser", "?ceremony=" + aCeremonyId, nil, nil, true},
+		{"a link opened in another browser", "?ceremony=" + aCeremonyId, nil, nil, true, ""},
 		{"a sign-in this browser no longer holds", "?ceremony=" + aCeremonyId,
-			map[string]*ceremony.AuthContext{"another-sign-in-0123456789abcdef": atThePasswordStep()}, nil, true},
+			map[string]*ceremony.AuthContext{"another-sign-in-0123456789abcdef": atThePasswordStep()}, nil, true, ""},
 		{"a sign-in that has moved past the password step", "?ceremony=" + aCeremonyId,
-			map[string]*ceremony.AuthContext{aCeremonyId: pastThePassword}, nil, true},
+			map[string]*ceremony.AuthContext{aCeremonyId: pastThePassword}, nil, true, pastThePassword.ClientId},
 		{"a sign-in the browser lost meanwhile", "?ceremony=" + aCeremonyId,
 			map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()},
-			errs.WithStack(ceremony.ErrCeremonyReplaced), true},
+			errs.WithStack(ceremony.ErrCeremonyReplaced), true, atThePasswordStep().ClientId},
 		{"registration that did not start from a sign-in", "",
-			map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()}, nil, false},
+			map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()}, nil, false, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -392,11 +395,15 @@ func TestHandleActivatePost_ActivatesWhereTheSignInIsNotHeld(t *testing.T) {
 			a.handler.ServeHTTP(rr, postActivationTo(t, a.store, tc.query, 7, a.codeHash))
 
 			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, map[string]interface{}{
+			want := map[string]interface{}{
 				"email":               activateTestEmail,
 				"adminConsoleBaseUrl": testAdminConsoleBaseURL,
 				"returnToApp":         tc.wantReturnToApp,
-			}, bound)
+			}
+			if tc.wantFooterClient != "" {
+				want[render.LegalFooterClient] = tc.wantFooterClient
+			}
+			assert.Equal(t, want, bound)
 			assert.Contains(t, a.audited, audit.EventActivatedAccount, "the account is activated")
 			assert.Nil(t, signIns.saved, "the sign-in is not saved")
 		})

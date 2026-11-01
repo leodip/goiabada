@@ -142,12 +142,14 @@ suite run again and again without a reset:
   fixture retires it, and it stays in the list, retired. The setup step (`tests/admin.setup.ts`)
   sweeps anything left with that prefix by a run that crashed.
 - **It changes nothing global**: no settings, and the system client and the system resource
-  (`authserver`) are only read; a test reaching their save answers Cancel to the confirmation. The
-  exceptions are the tests whose subject is global, the settings pages, the signing keys and the
-  guards around the system resource. They are named `*.system.ts` and run in the `system` project,
-  which `playwright.config.ts` runs after every other test, on one worker. Each puts back what it
-  changes (`lib/settings.ts`), and the setup step restores the seeded settings before a run if one
-  failed to.
+  (`authserver`) are only read; a test reaching their save answers Cancel to the confirmation. A
+  legal document it publishes applies to selected apps, clients of its own, set before it is
+  published (the fixture's `apps`): one for all apps shows in every other test's sign-in. The
+  exceptions are the tests whose subject is global, the settings pages, the signing keys, the
+  guards around the system resource and documents for all apps. They are named `*.system.ts` and
+  run in the `system` project, which `playwright.config.ts` runs after every other test, on one
+  worker. Each puts back what it changes (`lib/settings.ts`), and retires what it published; the
+  setup step restores the seeded settings before a run if one failed to.
 - **It never depends on what another test did**, or on counts or order.
 - **Users other than the administrator sign in through the browser** where the subject needs it
   (`lib/console-user.ts`, `lib/browser-sign-in.ts`), always from an empty browser state: inside a test,

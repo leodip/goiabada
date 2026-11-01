@@ -3,7 +3,8 @@ import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 
 // The documents here are notices for information, published, and retired once each test ends, by
-// the fixture.
+// the fixture. Each one published is set to selected apps, a client of the test's own, before it is
+// published, so no other test's sign-in shows it.
 
 test("the preview shows the text as the document's page will, following the editor", async ({ page, legalDocuments }) => {
   const doc = await legalDocuments.create();
@@ -28,7 +29,7 @@ test("the preview shows the text as the document's page will, following the edit
     ].join("\n"),
   );
 
-  await expect(preview.getByRole("heading", { level: 1, name: "Our privacy notice" })).toBeVisible();
+  await expect(preview.getByRole("heading", { level: 2, name: "Our privacy notice" })).toBeVisible();
   await expect(preview.locator("strong")).toHaveText("your email");
   await expect(preview.getByRole("link", { name: "nothing else" })).toHaveAttribute("href", "https://example.com/more");
   await expect(preview.getByRole("cell", { name: "A year" })).toBeVisible();
@@ -44,8 +45,13 @@ test("the preview shows the text as the document's page will, following the edit
   await expect(preview.getByRole("heading", { level: 1 })).toHaveCount(0);
 });
 
-test("a saved draft is published as version 1, the next one as version 2, and each stays as published", async ({ page, legalDocuments }) => {
-  const doc = await legalDocuments.create({ markdown: "First text." });
+test("a saved draft is published as version 1, the next one as version 2, and each stays as published", async ({
+  page,
+  clients,
+  legalDocuments,
+}) => {
+  const client = await clients.create();
+  const doc = await legalDocuments.create({ markdown: "First text.", apps: [client.identifier] });
 
   await page.goto(legalDocumentUrl(doc.id, "draft"));
   await page.locator("#btnPublish").click();
@@ -84,8 +90,9 @@ test("a saved draft is published as version 1, the next one as version 2, and ea
   await expect(page.locator("#legalDocumentPreview")).toHaveText("First text.");
 });
 
-test("Publish publishes the draft as saved, not the changes typed since", async ({ page, legalDocuments }) => {
-  const doc = await legalDocuments.create({ markdown: "Saved text." });
+test("Publish publishes the draft as saved, not the changes typed since", async ({ page, clients, legalDocuments }) => {
+  const client = await clients.create();
+  const doc = await legalDocuments.create({ markdown: "Saved text.", apps: [client.identifier] });
   await page.goto(legalDocumentUrl(doc.id, "draft"));
   await page.locator("#markdown").fill("Typed but never saved.");
   await page.locator("#btnPublish").click();

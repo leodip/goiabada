@@ -911,7 +911,16 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 				// legalDocumentApps 500 for a failed read, writeLegalDocumentDetail the 500 of
 				// the apps it reads, and shortNameIsFree 400 for a short name another document
 				// holds and 500 for a failed read. writeLegalDocumentNotFound is the 404.
+				// writeLegalDocumentRefusal answers a lifecycle write's failed transaction: 404 for
+				// a document gone, 400 for a refusal decided under the document's row, 500
+				// otherwise. handleLegalDocumentRetirement is retire's and restore's whole body,
+				// which reads the path id (400), answers through writeLegalDocumentRefusal and
+				// writes the detail (500).
 				switch f.Name {
+				case "writeLegalDocumentRefusal", "handleLegalDocumentRetirement":
+					out[400] = true
+					out[404] = true
+					out[500] = true
 				case "legalDocumentId":
 					out[400] = true
 				case "loadLegalDocument":

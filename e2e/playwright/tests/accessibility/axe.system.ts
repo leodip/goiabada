@@ -108,7 +108,9 @@ test("the audit log while no event is stored", async ({ page }) => {
 });
 
 // Registration with the emailed link, as the baseline's email verification has it, then with a
-// password chosen on the form. The accounts it creates are deleted afterwards.
+// password chosen on the form. The emailed link is also opened in a browser that does not hold the
+// sign-in the registration started from, the console's, whose page sends the person back to the app.
+// The accounts it creates are deleted afterwards.
 test("self-registration's pages", async ({ page, browser, request }) => {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const own = await context.newPage();
@@ -117,6 +119,7 @@ test("self-registration's pages", async ({ page, browser, request }) => {
   const password = `${randomBytes(12).toString("base64url")}-Aa1`;
   const withLink = `${uniqueIdentifier("u")}@example.com`;
   const withPassword = `${uniqueIdentifier("u")}@example.com`;
+  const fromSignIn = `${uniqueIdentifier("u")}@example.com`;
   const created: string[] = [];
   const choosePassword = async (confirmation: string) => {
     await own.locator("#password").fill(password);
@@ -164,6 +167,33 @@ test("self-registration's pages", async ({ page, browser, request }) => {
           own.goto(`${env.authUrl}/account/activate?code=not-a-code`),
         ),
       ]);
+
+      await own.goto(`${env.adminUrl}/account/profile`);
+      await own.getByRole("link", { name: "Create an account" }).click();
+      await own.locator("#email").fill(fromSignIn);
+      await createAccount.click();
+      await expect(own.getByRole("heading", { level: 1, name: "Check your email" })).toBeVisible();
+      const fromSignInLink = linksIn(await waitForMail(request, fromSignIn)).find((link) => link.includes("/account/activate"))!;
+      const elsewhere = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      try {
+        const other = await elsewhere.newPage();
+        await checkStates(other, [
+          {
+            name: "the new account activated in another browser, sending the person back to the app",
+            reach: async () => {
+              await other.goto(fromSignInLink);
+              await other.locator("#password").fill(password);
+              await other.locator("#passwordConfirmation").fill(password);
+              await other.getByRole("button", { name: "Create account", exact: true }).click();
+              await expect(other.getByRole("heading", { level: 1, name: "Account activated" })).toBeVisible();
+              created.push(fromSignIn);
+              await expect(other.getByText("Go back to the application you were signing in to")).toBeVisible();
+            },
+          },
+        ]);
+      } finally {
+        await elsewhere.close();
+      }
 
       await fillSettingsForm(page, { selfRegistrationRequiresEmailVerification: false });
       await saveSettings(page);

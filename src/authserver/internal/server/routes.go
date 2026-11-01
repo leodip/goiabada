@@ -204,7 +204,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, ceremonyStore, legalDocuments, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	})
 	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
-	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
+	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, ceremonyStore, s.database, auditLogger, s.dataCipher))
 	pages.With(rateLimiter.LimitActivate).Post(emaillinks.AccountActivatePath, accounthandlers.HandleActivatePost(httpHelper, s.sessionStore, ceremonyStore, s.database, userCreator, passwordValidator, auditLogger, baseURL, adminConsoleBaseURL))
 
 	// Admin API routes

@@ -298,6 +298,12 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// acceptance step a legal document (#622), which is exactly the set
 	// EventROPCAuthFailed is documented to mean.
 	//
+	// The last of those is recorded and not charged. Its caller proved the password, and the
+	// refusal tells the user to accept in the browser, through the password page whose budget
+	// this is: charging it would let an app retrying a correct password lock the user out of
+	// the step that clears the refusal (#622 decision 7). It is matched by type, as a disabled
+	// user is, since its code is the wrong password's.
+	//
 	// The checks that run before the grant is looked at read no credential either, and none
 	// of them answers invalid_grant: a missing client_id is invalid_request, an unknown or
 	// disabled client invalid_client. The disabled client was invalid_grant until #437 and had
@@ -307,7 +313,10 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	if errors.As(err, &errDetail) &&
 		input.GrantType == oidc.GrantTypePassword && errDetail.Code() == "invalid_grant" {
 
-		credentialFailures.RecordCredentialFailure(r)
+		var legalDocumentsOwed *protocolvalidation.LegalDocumentsOwedError
+		if !errors.As(err, &legalDocumentsOwed) {
+			credentialFailures.RecordCredentialFailure(r)
+		}
 		auditLogger.Log(r.Context(), audit.EventROPCAuthFailed, map[string]interface{}{
 			// The address the caller typed, recorded only as its digest, as every address
 			// typed into an unauthenticated form is (#522 decision 10). Normalized to what

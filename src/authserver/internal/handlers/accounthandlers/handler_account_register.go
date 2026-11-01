@@ -125,16 +125,9 @@ type registrationLegalDocuments interface {
 func bindRegistrationLegalDocuments(r *http.Request, ceremonies registrationCeremonies,
 	legalDocuments registrationLegalDocuments, bind map[string]interface{}) error {
 
-	clientIdentifier := ""
-	if ceremonyId := registrationCeremonyId(r); ceremonyId != "" {
-		authContext, err := ceremonies.HeldAuthContext(r, ceremonyId)
-		notHeld := errors.Is(err, ceremony.ErrNoAuthContext) || errors.Is(err, ceremony.ErrCeremonyNotHeld)
-		if err != nil && !notHeld {
-			return err
-		}
-		if err == nil {
-			clientIdentifier = authContext.ClientId
-		}
+	clientIdentifier, err := registrationClient(r, ceremonies)
+	if err != nil {
+		return err
 	}
 	inEffect, err := legalDocuments.ForClient(r.Context(), clientIdentifier)
 	if err != nil {
@@ -147,6 +140,55 @@ func bindRegistrationLegalDocuments(r *http.Request, ceremonies registrationCere
 	bind["legalDocuments"] = links
 	bind[render.LegalFooterClient] = clientIdentifier
 	return nil
+}
+
+// registrationClient is the app a registration or activation page belongs to: the client of the
+// sign-in the request's URL names (registrationCeremonyId), while the browser holds it. A URL naming
+// none, or one the browser does not hold, in another browser or after the sign-in ended, names no
+// app, and the answer is "".
+func registrationClient(r *http.Request, ceremonies registrationCeremonies) (string, error) {
+	ceremonyId := registrationCeremonyId(r)
+	if ceremonyId == "" {
+		return "", nil
+	}
+	authContext, err := ceremonies.HeldAuthContext(r, ceremonyId)
+	if errors.Is(err, ceremony.ErrNoAuthContext) || errors.Is(err, ceremony.ErrCeremonyNotHeld) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return authContext.ClientId, nil
+}
+
+// legalFooterRenderer is a PageRenderer whose pages belong to a sign-in for the app it names: every
+// page it renders names that app to the legal footer (render.LegalFooterClient), unless the page
+// names one itself. Emails, rendered to a buffer, carry no footer and are passed through.
+type legalFooterRenderer struct {
+	PageRenderer
+	clientIdentifier string
+}
+
+func (p legalFooterRenderer) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string,
+	templateName string, data map[string]interface{}) error {
+	if _, named := data[render.LegalFooterClient]; !named {
+		data[render.LegalFooterClient] = p.clientIdentifier
+	}
+	return p.PageRenderer.RenderTemplate(w, r, layoutName, templateName, data)
+}
+
+// forRegistrationClient is pageRenderer for the pages of a registration or activation request,
+// whose footer links the legal documents of the app the request's sign-in is for, as the
+// registration form does (#622, "Where documents show"): the check-your-email page, the activation
+// form, and each of their refusals. A request whose sign-in the browser does not hold renders as
+// pageRenderer does, with the documents for all apps. Whatever address was typed, the answer is the
+// same: it depends on the sign-in alone.
+func forRegistrationClient(pageRenderer PageRenderer, r *http.Request, ceremonies registrationCeremonies) (PageRenderer, error) {
+	clientIdentifier, err := registrationClient(r, ceremonies)
+	if err != nil || clientIdentifier == "" {
+		return pageRenderer, err
+	}
+	return legalFooterRenderer{PageRenderer: pageRenderer, clientIdentifier: clientIdentifier}, nil
 }
 
 // registrationRequiresEmailVerification is the mode in which an account comes from the emailed
@@ -293,7 +335,8 @@ func auditRequestedRegistration(ctx context.Context, auditLogger AuditLogger, cl
 // link names it in the page's URL, which the form posts back to. Without verification, the account
 // created is signed into it at once when the browser holds it (carryOnSignIn); with verification,
 // the emailed link names it, so activating in that browser does the same. The "check your email" page
-// is the same whether or not a sign-in is named.
+// is the same for every address; like the form, its footer links the app's documents when the
+// browser holds the sign-in.
 func HandleRegisterPost(
 	pageRenderer PageRenderer,
 	ceremonies signInCeremonies,
@@ -401,7 +444,15 @@ func HandleRegisterPost(
 		}
 
 		if requiresEmailVerification {
-			registerWithVerification(w, r, pageRenderer, database, emailSender, auditLogger, afterResponse,
+			// The check-your-email page belongs to the sign-in the registration came from, as the
+			// form did, so its footer links that app's documents too.
+			pagesRenderer, rendererErr := forRegistrationClient(pageRenderer, r, ceremonies)
+			if rendererErr != nil {
+				recordRequest(0, registrationOutcomeServerError)
+				pageRenderer.InternalServerError(w, r, rendererErr)
+				return
+			}
+			registerWithVerification(w, r, pagesRenderer, database, emailSender, auditLogger, afterResponse,
 				dataCipher, baseURL, settings, clientIP, email, registrationCeremonyId(r))
 			return
 		}

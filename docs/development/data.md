@@ -87,10 +87,14 @@ shows it on MySQL, PostgreSQL and SQL Server. A row lock is for one row read, de
 back with a security consequence, which today means #245's public/confidential switch
 (`AcquireClientRow`), #139's issuance (`AcquireUserSessionRow`), #131's refresh rotation
 (`AcquireUserRow`), #542's session writes (`AcquireUserSessionRow`) and one-time code claims
-(`AcquireUserRow`), and #407's settings section saves (`AcquireSettingsRow`), each of which reads
+(`AcquireUserRow`), #407's settings section saves (`AcquireSettingsRow`), each of which reads
 the settings row again under it and writes its own section onto what it read, through
 `apihandlers.saveSettingsSection`, so a save of another section committed meanwhile is not written
-back over (#428). One list save also takes a row for that reason: a save adding to a client's
+back over (#428), and #622's legal document lifecycle writes (`AcquireLegalDocumentRow`): a draft
+save, publish, retire, restore, delete and a change of apps each read the document again under its
+row and decide on that, so a publish clears only the draft it froze, a save cannot rename a document
+published meanwhile or undo a retirement, and the data tier's `legal_document_lifecycle_test.go`
+shows each order on every engine. One list save also takes a row for that reason: a save adding to a client's
 introspection resources takes the client's row (`AcquireClientRow`) and refuses a client it then
 finds public, because making a client public takes that row first and clears the list in the same
 transaction (#676)

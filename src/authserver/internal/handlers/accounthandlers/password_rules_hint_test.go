@@ -64,7 +64,7 @@ func TestPasswordForms_ShowTheNistHint(t *testing.T) {
 
 		sent := withMarker(t, store, withNistPolicy(httptest.NewRequest("GET", emaillinks.AccountActivatePath, nil)),
 			emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
-		HandleActivateGet(pageRenderer, store, database, handlersmocks.NewAuditLogger(t), testDataCipher).
+		HandleActivateGet(pageRenderer, store, heldCeremonies{}, database, handlersmocks.NewAuditLogger(t), testDataCipher).
 			ServeHTTP(httptest.NewRecorder(), sent)
 
 		assert.Equal(t, nistHint, (*rendered)["passwordRules"])

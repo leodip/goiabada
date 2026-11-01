@@ -132,6 +132,10 @@ func TestLegalDocumentPages_TheCurrentVersionAndEveryEarlierOne(t *testing.T) {
 	text, err = page.Find(".legal-text").Html()
 	require.NoError(t, err)
 	assert.Contains(t, text, "<strong>email</strong>")
+	// The page's title is its one h1; the text's "# What we keep" sits under it (docs/development/ui.md).
+	assert.Equal(t, 1, page.Find("h1").Length(), "one h1 on the page")
+	assert.Equal(t, "What we keep", strings.TrimSpace(page.Find(".legal-text h2").First().Text()))
+	assert.Zero(t, page.Find(".legal-text h1").Length())
 	assert.Contains(t, page.Find("#legal-document-version").Text(), "Version 1")
 	current, ok := page.Find("#legal-document-superseded a").Attr("href")
 	require.True(t, ok, "an earlier version links to the current one")

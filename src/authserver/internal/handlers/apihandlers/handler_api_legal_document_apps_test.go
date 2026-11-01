@@ -49,6 +49,7 @@ func TestLegalDocumentApps_SelectedAppsAreSavedWholeAndAudited(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
+	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
 	doc := draftDocument(5)
 	doc.AppliesToAllApps = true
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(doc, nil)
@@ -89,6 +90,7 @@ func TestLegalDocumentApps_AllAppsClearsTheList(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
+	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
 	doc := draftDocument(5)
 	doc.AppliesToAllApps = false
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(doc, nil)
@@ -127,6 +129,7 @@ func TestLegalDocumentApps_SelectedAppsWithNoAppIsKeptAsSelected(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
+	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
 	doc := draftDocument(5)
 	doc.AppliesToAllApps = false
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(doc, nil)
@@ -223,6 +226,7 @@ func TestLegalDocumentApps_AnUnreadableBodyIsABadRequest(t *testing.T) {
 func TestLegalDocumentApps_AnOutdatedListIsAConflict(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
+	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil)
 	expectClients(database, 1)
 	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(links(5, 2), nil).Once()
@@ -241,6 +245,7 @@ func TestLegalDocumentApps_AnOutdatedListIsAConflict(t *testing.T) {
 func TestLegalDocumentApps_AnAppAddedMeanwhileIsAConflict(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
+	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil)
 	expectClients(database, 1)
 	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(nil, nil).Once()
@@ -258,6 +263,7 @@ func TestLegalDocumentApps_AnAppAddedMeanwhileIsAConflict(t *testing.T) {
 func TestLegalDocumentApps_ADocumentRetiredMeanwhileIsRefused(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
+	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
 	database.On("GetLegalDocumentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(draftDocument(5), nil).Once()
 	retired := draftDocument(5)
 	retired.RetiredAt = sql.NullTime{Time: time.Now(), Valid: true}

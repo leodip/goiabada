@@ -37,8 +37,8 @@ type legalDocumentAppsDatabase interface {
 // HandleLegalDocumentAppsPut - PUT /api/v1/admin/legal-documents/{id}/apps
 //
 // Sets the document's Applies to and replaces its whole list of apps, as a list save does (#428):
-// the request's 400s and 404s first, then one transaction that reads the document again, refuses a
-// document retired meanwhile, and refuses with 409 unless the stored list is the one the caller
+// the request's 400s and 404s first, then one transaction that takes the document's row and reads
+// the document again under it, refuses a document retired meanwhile, and refuses with 409 unless the stored list is the one the caller
 // loaded.
 func HandleLegalDocumentAppsPut(database legalDocumentAppsDatabase, auditLogger AuditLogger) http.HandlerFunc {
 
@@ -105,16 +105,16 @@ func HandleLegalDocumentAppsPut(database legalDocumentAppsDatabase, auditLogger 
 		listedId := func(link record.LegalDocumentClient) int64 { return link.Id }
 
 		// One transaction, rerun whole after a deadlock (#301), with nothing written to the response
-		// inside it. No row lock, as for every list save: overlapping saves merge item by item, and
-		// an app both add meets the unique key, answered 409 (#428).
+		// inside it. The list itself is not locked, as for every list save: the stored list must be
+		// the one the caller loaded, and an app both add meets the unique key, answered 409 (#428).
+		// The document's row is taken, for its retirement.
 		added, removed := []int64{}, []int64{}
 		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			current, getErr := database.GetLegalDocumentById(r.Context(), tx, doc.Id)
+			// The document's row, as every lifecycle write takes it, so a retirement cannot
+			// commit between this check and this save's commit.
+			current, getErr := lockLegalDocument(r.Context(), database, tx, doc.Id)
 			if getErr != nil {
-				return errs.Wrap(getErr, "database error getting legal document before saving its apps")
-			}
-			if current == nil {
-				return errLegalDocumentNotFound
+				return getErr
 			}
 			if current.IsRetired() {
 				return errLegalDocumentRetired

@@ -117,6 +117,69 @@ func (_c *Database_AcquireClientRow_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// AcquireLegalDocumentRow provides a mock function for the type Database
+func (_mock *Database) AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error {
+	ret := _mock.Called(ctx, tx, legalDocumentId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AcquireLegalDocumentRow")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, legalDocumentId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_AcquireLegalDocumentRow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AcquireLegalDocumentRow'
+type Database_AcquireLegalDocumentRow_Call struct {
+	*mock.Call
+}
+
+// AcquireLegalDocumentRow is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - legalDocumentId int64
+func (_e *Database_Expecter) AcquireLegalDocumentRow(ctx any, tx any, legalDocumentId any) *Database_AcquireLegalDocumentRow_Call {
+	return &Database_AcquireLegalDocumentRow_Call{Call: _e.mock.On("AcquireLegalDocumentRow", ctx, tx, legalDocumentId)}
+}
+
+func (_c *Database_AcquireLegalDocumentRow_Call) Run(run func(ctx context.Context, tx *sql.Tx, legalDocumentId int64)) *Database_AcquireLegalDocumentRow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_AcquireLegalDocumentRow_Call) Return(err error) *Database_AcquireLegalDocumentRow_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_AcquireLegalDocumentRow_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error) *Database_AcquireLegalDocumentRow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // AcquireManagePermissionRow provides a mock function for the type Database
 func (_mock *Database) AcquireManagePermissionRow(ctx context.Context, tx *sql.Tx) (int64, error) {
 	ret := _mock.Called(ctx, tx)

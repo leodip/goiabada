@@ -17,6 +17,7 @@ import {
   resourceUrl,
   saveLegalDocumentDraft,
   saveResourcePermissions,
+  setLegalDocumentApps,
   signInAsAdmin,
   submitNewClient,
   submitNewGroup,
@@ -81,8 +82,11 @@ interface Fixtures {
   };
   legalDocuments: {
     // Creates a legal document under a fresh short name, a notice for information unless said
-    // otherwise, holding this text as its saved draft, and published as version 1 when asked.
-    create(options?: { kind?: LegalDocumentKind; markdown?: string; publish?: boolean }): Promise<TestLegalDocument>;
+    // otherwise, holding this text as its saved draft, applying to these apps (clients of the test's
+    // own, by identifier) when given, and published as version 1 when asked. Publishing asks for the
+    // apps: a document for all apps, the default, reaches every other test's sign-in, so a test
+    // whose subject needs one is a system test and publishes it itself.
+    create(options?: { kind?: LegalDocumentKind; markdown?: string; apps?: string[]; publish?: boolean }): Promise<TestLegalDocument>;
   };
   users: {
     // Creates a user with a password set now, so no link is mailed: a random one unless given; with the
@@ -196,7 +200,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     const page = await context.newPage();
 
     await use({
-      async create({ kind = "for_information", markdown = "", publish = false } = {}) {
+      async create({ kind = "for_information", markdown = "", apps, publish = false } = {}) {
+        if (publish && !apps) throw new Error("a document the fixture publishes applies to apps of the test's own: give apps");
         const shortName = uniqueIdentifier("ld");
         const title = `${shortName} document`;
         await submitNewLegalDocument(page, { kind, title, shortName });
@@ -204,6 +209,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         const id = legalDocumentIdFrom(page.url());
         created.push(id);
         if (markdown !== "") await saveLegalDocumentDraft(page, id, { markdown });
+        if (apps) await setLegalDocumentApps(page, id, apps);
         if (publish) await publishLegalDocument(page, id);
         return { id, shortName, title };
       },

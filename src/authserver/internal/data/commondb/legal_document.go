@@ -66,6 +66,14 @@ var updateLegalDocumentAppliesToAllApps = statement{
 	mssql:    "UPDATE legal_documents SET updated_at = @p1, applies_to_all_apps = @p2 WHERE id = @p3",
 }
 
+// acquireLegalDocumentRow writes updated_at alone; see AcquireLegalDocumentRow.
+var acquireLegalDocumentRow = statement{
+	sqlite:   "UPDATE legal_documents SET updated_at = ? WHERE id = ?",
+	mysql:    "UPDATE legal_documents SET updated_at = ? WHERE id = ?",
+	postgres: "UPDATE legal_documents SET updated_at = $1 WHERE id = $2",
+	mssql:    "UPDATE legal_documents SET updated_at = @p1 WHERE id = @p2",
+}
+
 var selectLegalDocumentById = statement{
 	sqlite:   "SELECT " + legalDocumentColumns.sqlite + " FROM legal_documents WHERE id = ?",
 	mysql:    "SELECT " + legalDocumentColumns.mysql + " FROM legal_documents WHERE id = ?",
@@ -187,6 +195,42 @@ func (d *Database) UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDoc
 	if err != nil {
 		legalDocument.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update legal document")
+	}
+
+	return nil
+}
+
+// AcquireLegalDocumentRow takes the document's row and holds it for the rest of the caller's
+// transaction, the way AcquireClientRow holds a client's: one unconditional UPDATE of the row's
+// updated_at, which the caller's own write overwrites moments later.
+//
+// WHAT IT BUYS. A document's lifecycle writes read the row, decide on it and write it back:
+// UpdateLegalDocument writes the short name, the draft and the retirement together. Without the
+// row held, another write can commit between that read and that write, and the write then carries
+// what it read before it: a publish clears a draft saved after it read the document, a save read
+// before the first publish renames the published address, and a save read before a retirement
+// restores the document (#622 decisions 1, 2 and 5). A bare re-read does not hold, for the reason
+// AcquireClientRow gives: under MVCC it returns the last committed version without waiting for a
+// writer in flight. So each lifecycle write takes this row first and reads the document again on
+// the transaction.
+//
+// A document that is not there affects no rows and is not reported here, as AcquireClientRow does
+// not report a missing client: the read that follows decides whether it exists.
+//
+// The transaction is required. Without one the statement autocommits and releases the row before
+// the caller's read runs, which is the whole of what this buys.
+func (d *Database) AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error {
+
+	if tx == nil {
+		return errs.New("acquiring a legal document row requires a transaction: an autocommitted statement releases the row before the caller can read it")
+	}
+
+	if legalDocumentId == 0 {
+		return errs.New("can't acquire a legal document row with an id of 0")
+	}
+
+	if _, err := d.ExecSQL(ctx, tx, acquireLegalDocumentRow.text(d.Dialect), time.Now().UTC(), legalDocumentId); err != nil {
+		return errs.Wrap(err, "unable to acquire the legal document row")
 	}
 
 	return nil

@@ -30,9 +30,10 @@ import (
 // publish (decision 5). A retired document is read only until it is restored.
 
 // legalDocumentsDatabase is what the legal document endpoints need: the documents, their versions,
-// and the transaction a publish and a delete run in.
+// the document's row its lifecycle writes take, and the transaction they run in.
 type legalDocumentsDatabase interface {
 	CreateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
+	AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
 	UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
 	GetLegalDocumentById(ctx context.Context, tx *sql.Tx, legalDocumentId int64) (*record.LegalDocument, error)
 	GetLegalDocumentByShortName(ctx context.Context, tx *sql.Tx, shortName string) (*record.LegalDocument, error)
@@ -50,15 +51,50 @@ type legalDocumentsDatabase interface {
 // /legal/<short-name> (decision 5).
 var legalDocumentShortNameRe = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`)
 
-// The refusals a publish decides inside its transaction, on the document as read there. Each is
-// answered after the transaction has rolled back.
+// The refusals a lifecycle write decides inside its transaction, on the document as read there.
+// Each is answered after the transaction has rolled back; the others it decides there are
+// *i18n.LocalizedError values, answered 400 by writeLegalDocumentRefusal.
 var (
-	errLegalDocumentNotFound   = errors.New("the legal document does not exist")
-	errLegalDocumentRetired    = errors.New("the legal document is retired")
-	errLegalDocumentNoDraft    = errors.New("the legal document has no draft")
-	errLegalDocumentDraftEmpty = errors.New("the legal document's draft has no text")
-	errLegalDocumentPublished  = errors.New("the legal document has a published version")
+	errLegalDocumentNotFound = errors.New("the legal document does not exist")
+	errLegalDocumentRetired  = errors.New("the legal document is retired")
 )
+
+// lockLegalDocument takes the document's row for the rest of tx and reads the document again under
+// it, so the caller decides on what is committed and nothing else commits over it before tx ends
+// (AcquireLegalDocumentRow). A document that is not there is errLegalDocumentNotFound.
+func lockLegalDocument(ctx context.Context, database legalDocumentsDatabase, tx *sql.Tx, id int64) (*record.LegalDocument, error) {
+	if err := database.AcquireLegalDocumentRow(ctx, tx, id); err != nil {
+		return nil, errs.Wrap(err, "database error taking the legal document's row")
+	}
+	doc, err := database.GetLegalDocumentById(ctx, tx, id)
+	if err != nil {
+		return nil, errs.Wrap(err, "database error getting the legal document under its row")
+	}
+	if doc == nil {
+		return nil, errLegalDocumentNotFound
+	}
+	return doc, nil
+}
+
+// writeLegalDocumentRefusal answers a lifecycle write's transaction that failed: a document gone
+// is 404, a refusal decided on the document is its 400, and anything else a 500. It reports
+// whether err was a failure it answered.
+func writeLegalDocumentRefusal(w http.ResponseWriter, r *http.Request, err error, id int64) bool {
+	var refusal *i18n.LocalizedError
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, errLegalDocumentNotFound):
+		writeLegalDocumentNotFound(w)
+	case errors.Is(err, errLegalDocumentRetired):
+		writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentRetired, nil))
+	case errors.As(err, &refusal):
+		writeValidationError(w, r, refusal)
+	default:
+		writeInternalServerError(w, r, err, "legal_document_id", id)
+	}
+	return true
+}
 
 // validateLegalDocumentShortName holds a short name to its shape and bound.
 func validateLegalDocumentShortName(shortName string) error {
@@ -165,16 +201,28 @@ func writeLegalDocumentDetail(w http.ResponseWriter, r *http.Request, database l
 // shortNameIsFree reports whether no other document holds shortName, answering the request when
 // one does or the read fails.
 func shortNameIsFree(w http.ResponseWriter, r *http.Request, database legalDocumentsDatabase, shortName string, self int64) bool {
-	holder, err := database.GetLegalDocumentByShortName(r.Context(), nil, shortName)
-	if err != nil {
-		writeInternalServerError(w, r, errs.Wrap(err, "database error checking legal document short name"), "short_name", shortName)
-		return false
-	}
-	if holder != nil && holder.Id != self {
-		writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentShortNameInUse, nil))
+	if err := checkShortNameFree(r.Context(), database, nil, shortName, self); err != nil {
+		var refusal *i18n.LocalizedError
+		if errors.As(err, &refusal) {
+			writeValidationError(w, r, refusal)
+		} else {
+			writeInternalServerError(w, r, err, "short_name", shortName)
+		}
 		return false
 	}
 	return true
+}
+
+// checkShortNameFree refuses shortName when a document other than self holds it, reading on tx.
+func checkShortNameFree(ctx context.Context, database legalDocumentsDatabase, tx *sql.Tx, shortName string, self int64) error {
+	holder, err := database.GetLegalDocumentByShortName(ctx, tx, shortName)
+	if err != nil {
+		return errs.Wrap(err, "database error checking legal document short name")
+	}
+	if holder != nil && holder.Id != self {
+		return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentShortNameInUse, nil)
+	}
+	return nil
 }
 
 // shortNameTaken answers a document write the engine refused on the short name's unique key,
@@ -291,11 +339,15 @@ func HandleLegalDocumentGet(database legalDocumentsDatabase) http.HandlerFunc {
 	}
 }
 
+// HandleLegalDocumentDraftPut saves the document's draft, and its short name until the first
+// publish, in one transaction under the document's row: the retirement, the versions and the short
+// name are decided on the document as committed, so a save cannot undo a retirement or rename a
+// document published meanwhile (decisions 2 and 5).
 func HandleLegalDocumentDraftPut(database legalDocumentsDatabase, auditLogger AuditLogger) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		doc, ok := loadLegalDocument(w, r, database)
+		id, ok := legalDocumentId(w, r)
 		if !ok {
 			return
 		}
@@ -306,45 +358,52 @@ func HandleLegalDocumentDraftPut(database legalDocumentsDatabase, auditLogger Au
 			return
 		}
 
-		if doc.IsRetired() {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentRetired, nil))
-			return
-		}
 		title := strings.TrimSpace(req.Title)
-		if err := validateLegalDocumentText(title, req.Markdown); err != nil {
-			writeValidationError(w, r, err)
-			return
-		}
-
-		versions, ok := legalDocumentVersions(w, r, database, doc)
-		if !ok {
-			return
-		}
-
-		// An empty short name keeps the document's. Another one is taken only until the first
-		// publish: from then on links to /legal/<short-name> are out there (decision 5).
 		shortName := strings.TrimSpace(req.ShortName)
-		if shortName != "" && shortName != doc.ShortName {
-			if len(versions) > 0 {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentShortNameFixed, nil))
-				return
-			}
-			if err := validateLegalDocumentShortName(shortName); err != nil {
-				writeValidationError(w, r, err)
-				return
-			}
-			if !shortNameIsFree(w, r, database, shortName, doc.Id) {
-				return
-			}
-			doc.ShortName = shortName
-		}
 
-		doc.DraftTitle = sql.NullString{String: title, Valid: true}
-		doc.DraftMarkdown = sql.NullString{String: req.Markdown, Valid: true}
-		if err := database.UpdateLegalDocument(r.Context(), nil, doc); err != nil {
-			if !shortNameTaken(w, r, err) {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error saving legal document draft"), "legal_document_id", doc.Id)
+		var doc *record.LegalDocument
+		var versions []record.LegalDocumentVersion
+		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			var err error
+			doc, err = lockLegalDocument(r.Context(), database, tx, id)
+			if err != nil {
+				return err
 			}
+			if doc.IsRetired() {
+				return errLegalDocumentRetired
+			}
+			if err = validateLegalDocumentText(title, req.Markdown); err != nil {
+				return err
+			}
+
+			versions, err = database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), tx, id)
+			if err != nil {
+				return errs.Wrap(err, "database error getting legal document versions to save its draft")
+			}
+
+			// An empty short name keeps the document's. Another one is taken only until the first
+			// publish: from then on links to /legal/<short-name> are out there (decision 5).
+			if shortName != "" && shortName != doc.ShortName {
+				if len(versions) > 0 {
+					return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentShortNameFixed, nil)
+				}
+				if err = validateLegalDocumentShortName(shortName); err != nil {
+					return err
+				}
+				if err = checkShortNameFree(r.Context(), database, tx, shortName, doc.Id); err != nil {
+					return err
+				}
+				doc.ShortName = shortName
+			}
+
+			doc.DraftTitle = sql.NullString{String: title, Valid: true}
+			doc.DraftMarkdown = sql.NullString{String: req.Markdown, Valid: true}
+			if err = database.UpdateLegalDocument(r.Context(), tx, doc); err != nil {
+				return errs.Wrap(err, "database error saving legal document draft")
+			}
+			return nil
+		})
+		if shortNameTaken(w, r, err) || writeLegalDocumentRefusal(w, r, err, id) {
 			return
 		}
 
@@ -384,8 +443,10 @@ func HandleLegalDocumentPreviewPost() http.HandlerFunc {
 }
 
 // HandleLegalDocumentPublishPost freezes the draft as the next version and clears it, in one
-// transaction that reads the document and its versions under it. Two publishes racing for one
-// number meet the versions' unique key, and the loser is answered 409 with nothing written.
+// transaction that takes the document's row and reads the document and its versions under it, so
+// the draft it clears is the one it froze: a save waits for it, and a save committed first is the
+// draft it publishes (decision 1). Two publishes are serialized the same way; should their
+// versions still meet the unique key, the loser is answered 409 with nothing written.
 func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger AuditLogger) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -400,19 +461,17 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 		var published *record.LegalDocumentVersion
 		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			var err error
-			doc, err = database.GetLegalDocumentById(r.Context(), tx, id)
+			doc, err = lockLegalDocument(r.Context(), database, tx, id)
 			if err != nil {
-				return errs.Wrap(err, "database error getting legal document to publish")
+				return err
 			}
 			switch {
-			case doc == nil:
-				return errLegalDocumentNotFound
 			case doc.IsRetired():
 				return errLegalDocumentRetired
 			case !doc.HasDraft():
-				return errLegalDocumentNoDraft
+				return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentNoDraft, nil)
 			case strings.TrimSpace(doc.DraftMarkdown.String) == "":
-				return errLegalDocumentDraftEmpty
+				return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentDraftEmpty, nil)
 			}
 
 			versions, err = database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), tx, id)
@@ -442,25 +501,12 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 			}
 			return nil
 		})
-		switch {
-		case errors.Is(err, errLegalDocumentNotFound):
-			writeLegalDocumentNotFound(w)
-			return
-		case errors.Is(err, errLegalDocumentRetired):
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentRetired, nil))
-			return
-		case errors.Is(err, errLegalDocumentNoDraft):
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentNoDraft, nil))
-			return
-		case errors.Is(err, errLegalDocumentDraftEmpty):
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentDraftEmpty, nil))
-			return
-		case errors.Is(err, data.ErrUniqueViolation):
+		if errors.Is(err, data.ErrUniqueViolation) {
 			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentPublishedConcurrently, nil),
 				"CONCURRENT_UPDATE", http.StatusConflict)
 			return
-		case err != nil:
-			writeInternalServerError(w, r, err, "legal_document_id", id)
+		}
+		if writeLegalDocumentRefusal(w, r, err, id) {
 			return
 		}
 
@@ -476,110 +522,116 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 }
 
 // HandleLegalDocumentRetirePost retires a published document: it applies to no one from then on,
-// and its versions stay (decision 2).
+// and its versions stay (decision 2). It decides under the document's row, as every lifecycle
+// write does.
 func HandleLegalDocumentRetirePost(database legalDocumentsDatabase, auditLogger AuditLogger) http.HandlerFunc {
-
-	return func(w http.ResponseWriter, r *http.Request) {
-
-		doc, ok := loadLegalDocument(w, r, database)
-		if !ok {
-			return
-		}
-		if doc.IsRetired() {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentAlreadyRetired, nil))
-			return
-		}
-		versions, ok := legalDocumentVersions(w, r, database, doc)
-		if !ok {
-			return
-		}
-		if len(versions) == 0 {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentNotPublished, nil))
-			return
-		}
-
-		doc.RetiredAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
-		if err := database.UpdateLegalDocument(r.Context(), nil, doc); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error retiring legal document"), "legal_document_id", doc.Id)
-			return
-		}
-
-		auditLogger.Log(r.Context(), audit.EventRetiredLegalDocument, map[string]interface{}{
-			"legal_document_id": doc.Id,
-			"short_name":        doc.ShortName,
-			"logged_in_user":    callerSubject(r),
-		})
-
-		writeLegalDocumentDetail(w, r, database, doc, versions)
-	}
+	return handleLegalDocumentRetirement(database, auditLogger, true)
 }
 
 // HandleLegalDocumentRestorePost restores a retired document as it was, its current version
 // included, so earlier acceptances of that version still count (decision 2).
 func HandleLegalDocumentRestorePost(database legalDocumentsDatabase, auditLogger AuditLogger) http.HandlerFunc {
+	return handleLegalDocumentRetirement(database, auditLogger, false)
+}
+
+// handleLegalDocumentRetirement retires the document (retire) or restores it, in one transaction
+// under the document's row.
+func handleLegalDocumentRetirement(database legalDocumentsDatabase, auditLogger AuditLogger, retire bool) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		doc, ok := loadLegalDocument(w, r, database)
-		if !ok {
-			return
-		}
-		if !doc.IsRetired() {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentNotRetired, nil))
-			return
-		}
-		versions, ok := legalDocumentVersions(w, r, database, doc)
+		id, ok := legalDocumentId(w, r)
 		if !ok {
 			return
 		}
 
-		doc.RetiredAt = sql.NullTime{}
-		if err := database.UpdateLegalDocument(r.Context(), nil, doc); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error restoring legal document"), "legal_document_id", doc.Id)
+		var doc *record.LegalDocument
+		var versions []record.LegalDocumentVersion
+		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			var err error
+			doc, err = lockLegalDocument(r.Context(), database, tx, id)
+			if err != nil {
+				return err
+			}
+			switch {
+			case retire && doc.IsRetired():
+				return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentAlreadyRetired, nil)
+			case !retire && !doc.IsRetired():
+				return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentNotRetired, nil)
+			}
+			versions, err = database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), tx, id)
+			if err != nil {
+				return errs.Wrap(err, "database error getting legal document versions")
+			}
+			if retire && len(versions) == 0 {
+				return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentNotPublished, nil)
+			}
+
+			if retire {
+				doc.RetiredAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+			} else {
+				doc.RetiredAt = sql.NullTime{}
+			}
+			if err := database.UpdateLegalDocument(r.Context(), tx, doc); err != nil {
+				if retire {
+					return errs.Wrap(err, "database error retiring legal document")
+				}
+				return errs.Wrap(err, "database error restoring legal document")
+			}
+			return nil
+		})
+		if writeLegalDocumentRefusal(w, r, err, id) {
 			return
 		}
 
-		auditLogger.Log(r.Context(), audit.EventRestoredLegalDocument, map[string]interface{}{
+		details := map[string]interface{}{
 			"legal_document_id": doc.Id,
 			"short_name":        doc.ShortName,
 			"logged_in_user":    callerSubject(r),
-		})
+		}
+		if retire {
+			auditLogger.Log(r.Context(), audit.EventRetiredLegalDocument, details)
+		} else {
+			auditLogger.Log(r.Context(), audit.EventRestoredLegalDocument, details)
+		}
 
 		writeLegalDocumentDetail(w, r, database, doc, versions)
 	}
 }
 
-// HandleLegalDocumentDelete deletes a document that was never published. The versions are read
-// again in the transaction that deletes it; a publish committed between that read and the delete
-// is refused by the engine, whose foreign key from a version has no cascade.
+// HandleLegalDocumentDelete deletes a document that was never published, in one transaction under
+// the document's row, which a publish takes too: the versions read there are the ones committed,
+// and none can be published before the delete commits. The engine's foreign key from a version,
+// which has no cascade, refuses the delete regardless.
 func HandleLegalDocumentDelete(database legalDocumentsDatabase, auditLogger AuditLogger) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		doc, ok := loadLegalDocument(w, r, database)
+		id, ok := legalDocumentId(w, r)
 		if !ok {
 			return
 		}
 
+		var doc *record.LegalDocument
 		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			var err error
+			doc, err = lockLegalDocument(r.Context(), database, tx, id)
+			if err != nil {
+				return err
+			}
 			versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), tx, doc.Id)
 			if err != nil {
 				return errs.Wrap(err, "database error getting legal document versions to delete")
 			}
 			if len(versions) > 0 {
-				return errLegalDocumentPublished
+				return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentPublishedNotDeleted, nil)
 			}
 			if err := database.DeleteLegalDocument(r.Context(), tx, doc.Id); err != nil {
 				return errs.Wrap(err, "database error deleting legal document")
 			}
 			return nil
 		})
-		if errors.Is(err, errLegalDocumentPublished) {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentPublishedNotDeleted, nil))
-			return
-		}
-		if err != nil {
-			writeInternalServerError(w, r, err, "legal_document_id", doc.Id)
+		if writeLegalDocumentRefusal(w, r, err, id) {
 			return
 		}
 
