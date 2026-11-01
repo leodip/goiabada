@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 func printBanner(out *console) {
@@ -804,10 +805,7 @@ func printNativeInstructions(out *console, config *Config, paths outputPaths) {
 		out.println("    http://127.0.0.1:9090 (auth server) and http://127.0.0.1:9091 (admin console),")
 		out.println("    and have it set X-Forwarded-For and X-Forwarded-Proto.")
 	} else {
-		out.println("  • Both servers listen on every interface and serve plain HTTP until you set")
-		out.printf("    their CERTFILE and KEYFILE in %s, as its comments say. The admin console\n", filepath.Base(paths.description))
-		out.println("    reaches the auth server at its public URL, so it waits to listen until the")
-		out.println("    auth server serves HTTPS there.")
+		printNativeListenerNote(out, config, filepath.Base(paths.description))
 	}
 	out.println()
 	out.println("  • The database must be empty for a fresh deployment. Goiabada will")
@@ -817,6 +815,65 @@ func printNativeInstructions(out *console, config *Config, paths outputPaths) {
 	out.println("  • For production, consider using a process manager like systemd")
 	out.println("    to keep the services running and restart them on failure.")
 	out.println()
+}
+
+// printNativeListenerNote is the native notes' bullet on the listeners with no proxy in front. A
+// server whose URL is https only redirects on its plain HTTP listener, before the certificate and
+// after it, so it serves no page until its CERTFILE and KEYFILE are set; then its listen host goes
+// empty, as the env file's comment advises, or the listener stays to redirect a port-80 forward. With
+// http URLs both servers serve plain HTTP, and the bullet is the one it always was (#715 decisions 7
+// and 12).
+func printNativeListenerNote(out *console, config *Config, envFile string) {
+	authServerHTTPS, adminConsoleHTTPS := isHTTPSURL(config.AuthServerURL), isHTTPSURL(config.AdminConsoleURL)
+	if !authServerHTTPS && !adminConsoleHTTPS {
+		out.println("  • Both servers listen on every interface and serve plain HTTP until you set")
+		out.printf("    their CERTFILE and KEYFILE in %s, as its comments say. The admin console\n", envFile)
+		out.println("    reaches the auth server at its public URL, so it waits to listen until the")
+		out.println("    auth server serves HTTPS there.")
+		return
+	}
+	var note string
+	if authServerHTTPS && adminConsoleHTTPS {
+		note = "Both servers listen on every interface, and with https URLs their plain HTTP listeners " +
+			"only redirect to HTTPS: they serve no page until you set their CERTFILE and KEYFILE in " +
+			envFile + ", as its comments say. Then set their HTTP listen hosts empty, or keep a listener " +
+			"to redirect visitors to HTTPS when you forward port 80 to it."
+	} else {
+		redirecting, serving := "auth server", "admin console"
+		if adminConsoleHTTPS {
+			redirecting, serving = serving, redirecting
+		}
+		note = "Both servers listen on every interface. The " + redirecting + "'s URL is https, so its plain " +
+			"HTTP listener only redirects to HTTPS: it serves no page until you set its CERTFILE and KEYFILE " +
+			"in " + envFile + ", as its comments say. Then set its HTTP listen host empty, or keep the " +
+			"listener to redirect visitors to HTTPS when you forward port 80 to it. The " + serving +
+			"'s URL is http, so it serves plain HTTP until you set its own CERTFILE and KEYFILE."
+	}
+	if authServerHTTPS {
+		note += " The admin console reaches the auth server at its public URL, so it waits to listen " +
+			"until the auth server serves HTTPS there."
+	} else {
+		note += " The admin console reaches the auth server at its public URL, so it waits to listen " +
+			"until the auth server answers there."
+	}
+	printBullet(out, note)
+}
+
+// noteWidth is the column a printed note's bullet wraps before.
+const noteWidth = 80
+
+// printBullet prints a note as a bullet of the instructions, wrapped at noteWidth: "  • " before
+// its first line and four spaces before each other.
+func printBullet(out *console, note string) {
+	line := "  •"
+	for _, word := range strings.Fields(note) {
+		if utf8.RuneCountInString(line)+1+utf8.RuneCountInString(word) > noteWidth && strings.TrimSpace(line) != "•" {
+			out.println(line)
+			line = "   "
+		}
+		line += " " + word
+	}
+	out.println(line)
 }
 
 func printComposeInstructions(out *console, _ *Config, paths outputPaths) {
