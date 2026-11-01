@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -22,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
 )
@@ -47,20 +49,34 @@ func (l *refusingSecretCheckLimiter) ReserveSecretCheck(_ context.Context, clien
 }
 
 // limitedTokenRequest is one grant's request for the_client, its client and the settings it is
-// validated under.
+// validated under. expect, when set, adds the reads the grant makes before it checks the secret.
 type limitedTokenRequest struct {
 	grant    string
 	form     url.Values
 	settings *record.Settings
+	expect   func(database *datamocks.Database, client *record.Client)
 }
 
 func limitedTokenRequests() []limitedTokenRequest {
 	return []limitedTokenRequest{
-		{"client_credentials", url.Values{"grant_type": {"client_credentials"}}, &record.Settings{}},
-		{"refresh_token", url.Values{"grant_type": {"refresh_token"}, "refresh_token": {"any"}}, &record.Settings{}},
+		{"authorization_code", url.Values{"grant_type": {"authorization_code"}, "code": {"the_code"},
+			"redirect_uri": {"https://app.example.com/cb"}}, &record.Settings{}, expectRedeemableCode},
+		{"client_credentials", url.Values{"grant_type": {"client_credentials"}}, &record.Settings{}, nil},
+		{"refresh_token", url.Values{"grant_type": {"refresh_token"}, "refresh_token": {"any"}}, &record.Settings{}, nil},
 		{"password", url.Values{"grant_type": {"password"}, "username": {"user@example.com"}, "password": {"pw"}},
-			&record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}},
+			&record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}, nil},
 	}
+}
+
+// expectRedeemableCode stores the_code, unused, for client and its redirect URI, so the redemption
+// passes every check that comes before the secret's.
+func expectRedeemableCode(database *datamocks.Database, client *record.Client) {
+	code := &record.Code{Id: 11, CodeHash: hashutil.HashString("the_code"), ClientId: client.Id, Client: *client,
+		RedirectURI: "https://app.example.com/cb", UserId: 5, User: record.User{Id: 5, Enabled: true},
+		CreatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}}
+	database.On("GetCodeByCodeHash", mock.Anything, mock.Anything, hashutil.HashString("the_code"), false).Return(code, nil).Once()
+	database.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil).Once()
+	database.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil).Once()
 }
 
 func overLimitClient(t *testing.T) *record.Client {
@@ -77,6 +93,9 @@ func serveLimitedToken(t *testing.T, limiter clientauth.SecretCheckLimiter, clie
 	t.Helper()
 	database := datamocks.NewDatabase(t)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").Return(client, nil).Once()
+	if request.expect != nil {
+		request.expect(database, client)
+	}
 	handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
 		protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher, limiter),
 		handlersmocks.NewAuditLogger(t), noCredentialFailures{}, tokenmetrics.Register(registry))

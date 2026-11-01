@@ -98,7 +98,7 @@ The calling client authenticates exactly as at the token endpoint, with `client_
 
 A [public client](/concepts/clients/#public-and-confidential-clients) can't introspect, since it has no secret to authenticate with.
 
-A confidential client is limited to 200 missing or wrong secrets an hour, counted together across the token, revocation and introspection endpoints, whether or not rate limiting is on. A client over that limit is refused `429 Too Many Requests` with a `Retry-After` header at all three, even with its right secret, until the count wears off. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
+A missing or wrong secret here counts against the client's limit on failed client authentications, one budget with the [token](/reference/endpoints/token/) and [revocation](/reference/endpoints/revoke/) endpoints. See [rate limits](/reference/environment-variables/#rate-limits).
 
 The auth server's log has a `client authentication refused at the introspection endpoint` warning for each refusal. See [Logs](/deploy/logs/#records-worth-knowing).
 

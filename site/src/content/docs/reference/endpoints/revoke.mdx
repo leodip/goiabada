@@ -64,7 +64,7 @@ A confidential client authenticates exactly as at the token endpoint, with `clie
 
 A [public client](/concepts/clients/#public-and-confidential-clients), such as a single-page app or a mobile app, sends its `client_id` in the body and no secret.
 
-A confidential client is limited to 200 missing or wrong secrets an hour, counted together across the token, revocation and introspection endpoints, whether or not rate limiting is on. A client over that limit is refused `429 Too Many Requests` with a `Retry-After` header at all three, even with its right secret, until the count wears off. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
+A missing or wrong secret here counts against the client's limit on failed client authentications, one budget with the [token](/reference/endpoints/token/) and [introspection](/reference/endpoints/introspect/) endpoints. See [rate limits](/reference/environment-variables/#rate-limits).
 
 The auth server's log has a `client authentication refused at the revocation endpoint` warning for each refusal. See [Logs](/deploy/logs/#records-worth-knowing).
 

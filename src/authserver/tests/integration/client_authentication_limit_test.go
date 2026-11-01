@@ -193,6 +193,42 @@ func TestClientAuthenticationLimit_TheTwoHundredAndFirstFailureIsRefusedAtEveryG
 	assert.Equal(t, http.StatusOK, answer.status, "%v", answer)
 }
 
+// TestClientAuthenticationLimit_AValidCodeRedemptionIsRefusedOverTheBudget: a code that passes every
+// check the grant makes before the secret's is redeemed against the client's one budget. 200 wrong
+// secrets, half with that code at the token endpoint and half at revocation, then the code with the
+// right secret is refused 429, by Basic and in the body, and stays unused.
+func TestClientAuthenticationLimit_AValidCodeRedemptionIsRefusedOverTheBudget(t *testing.T) {
+	secret := fake.Password(32)
+	_, code := createAuthCode(t, secret, "openid")
+	clientIdentifier := code.Client.ClientIdentifier
+	redemption := url.Values{"grant_type": {"authorization_code"}, "code": {code.Code},
+		"redirect_uri": {code.RedirectURI}, "code_verifier": {testCodeVerifier}}
+	revocation := limitedClientAuthEndpoints()[1]
+
+	for i := 0; i < 200; i++ {
+		wrong := "wrong-" + fake.LetterN(8)
+		var answer clientAuthAnswer
+		if i%2 == 0 {
+			answer = postClientAuthentication(t, redemption, i%4 == 0, clientIdentifier, wrong)
+		} else {
+			answer = revocation.post(t, i%4 == 1, clientIdentifier, wrong)
+		}
+		require.Equal(t, http.StatusUnauthorized, answer.status, "failure %d is within the budget: %v", i+1, answer)
+		require.Equal(t, "invalid_client", answer.body["error"])
+	}
+	if counted, ok := clientAuthCounted(t, clientIdentifier); ok {
+		assert.Equal(t, 200, counted, "the code grant and revocation count in the one row")
+	}
+
+	for _, basic := range []bool{false, true} {
+		assertOverTheLimit(t, postClientAuthentication(t, redemption, basic, clientIdentifier, secret),
+			"the code with the right secret, basic %v", basic)
+	}
+	stored, err := database.GetCodeById(context.Background(), nil, code.Id)
+	require.NoError(t, err)
+	assert.False(t, stored.Used, "a refused redemption claims nothing")
+}
+
 // TestClientAuthenticationLimit_ARightSecretSpendsNothing: 199 failures, then right secrets, then the
 // 200th failure is still answered invalid_client and only the next one is refused.
 func TestClientAuthenticationLimit_ARightSecretSpendsNothing(t *testing.T) {
