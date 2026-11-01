@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/noredirect"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -60,9 +61,15 @@ func awaitAuthServerAcceptsClient(ctx context.Context, tokens clientTokenSource,
 
 // refusedForGood reports whether err is the token endpoint refusing the request, which asking
 // again does not change: an answer in the 4xx range, but for 408 and 429, which ask a client to
-// come back later. A connection that fails, a 5xx from the auth server or from a proxy in front of
-// it, and an answer the console cannot read are an auth server not answering yet.
+// come back later. A redirect, which the console refuses, is one too: the internal URL reaches a
+// listener that redirects, and it redirects again (#715 decision 13). A connection that fails, a
+// 5xx from the auth server or from a proxy in front of it, and an answer the console cannot read
+// are an auth server not answering yet.
 func refusedForGood(err error) bool {
+	var redirected *noredirect.Error
+	if errors.As(err, &redirected) {
+		return true
+	}
 	var refusal *oauthclient.TokenEndpointError
 	if !errors.As(err, &refusal) {
 		return false
@@ -91,7 +98,8 @@ func authServerRetryDelay(attempt int) time.Duration {
 // with the remedy, because it is the refusal a deployment's own secrets cause: a newly generated
 // secrets file applied to a running deployment, or a rotation half done. The other refusals are
 // the client's provisioning or an address answering for something else, and the error says which,
-// the token client's remedy included.
+// the token client's remedy included. A redirect has its own message, the error naming its origin
+// and the internal URL setting.
 func logClientRefused(err error) {
 	var refusal *oauthclient.TokenEndpointError
 	if errors.As(err, &refusal) && refusal.ErrorCode == "invalid_client" {
@@ -99,6 +107,12 @@ func logClientRefused(err error) {
 			"error", err,
 			"remedy", "set GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET to the secret admin-console-client has in the auth server's database: "+
 				"the one this deployment was set up with, from your backup of it, or the one last generated for that client")
+		return
+	}
+	var redirected *noredirect.Error
+	if errors.As(err, &redirected) {
+		slog.Error("the auth server redirected the admin console's token request, so the admin console cannot start",
+			"error", err)
 		return
 	}
 	slog.Error("the auth server refused the admin console's token request, so the admin console cannot start",

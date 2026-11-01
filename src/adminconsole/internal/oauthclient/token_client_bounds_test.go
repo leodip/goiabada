@@ -349,6 +349,6 @@ func TestNewTokenClient_DefaultsANilClientToTheConfiguredTimeout(t *testing.T) {
 		"a nil client gets the deadline rather than no deadline")
 
 	injected := &http.Client{Timeout: 3 * time.Second}
-	assert.Same(t, injected, NewTokenClient(testTokenURL, "ci", "cs", injected, nil).httpClient,
-		"an injected client is used as given, so the composition root sets the deadline")
+	assert.Equal(t, 3*time.Second, NewTokenClient(testTokenURL, "ci", "cs", injected, nil).httpClient.Timeout,
+		"an injected client keeps its deadline, in the copy that refuses redirects, so the composition root sets it")
 }

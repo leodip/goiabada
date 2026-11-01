@@ -397,6 +397,11 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `TestAuthServerClient_TheCharacterizationCoversEveryMethod` holds every exported method to a wire
   characterization row. One file per resource the methods call, with no `_client.go` suffix, and a
   test beside the file of the method it tests; `layout_test.go` holds both (#386, #441)
+- `internal/noredirect/` - The redirect refusal every one of the console's five clients of the
+  auth server sends through, outside its `upstreammetrics` recording: a redirect net/http would
+  follow fails as `noredirect.Error`, naming the target's origin alone and
+  `GOIABADA_AUTHSERVER_INTERNALBASEURL`. The session backend does not retry it, and the start-up
+  token check stops on it (#715)
 - `internal/publicsettings/` - The auth server's public settings every page renders with: `Client`
   reads `/api/public/settings` under its own timeout and bound, and `Cache` serves the answer for a
   TTL, every request arriving during a fetch sharing that one fetch with no lock held across it, and

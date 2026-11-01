@@ -88,7 +88,8 @@ func TestNewJWKSTokenParser_DefaultsHttpClient(t *testing.T) {
 
 	custom := &http.Client{Timeout: time.Second}
 	tp = NewJWKSTokenParser("https://auth.example.com", custom, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-	assert.Same(t, custom, tp.httpClient)
+	assert.Equal(t, time.Second, tp.httpClient.Timeout,
+		"an injected client keeps its deadline, in the copy that refuses redirects")
 }
 
 // -----------------------------------------------------------------------------
