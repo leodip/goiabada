@@ -1123,15 +1123,6 @@
     font-size: 0.9375rem;
     text-align: center;
   }
-  .legal-footer {
-    margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-line);
-    font-size: 0.875rem;
-  }
-  .legal-footer .legal-links {
-    justify-content: center;
-  }
   .legal-links {
     display: flex;
     flex-wrap: wrap;

@@ -285,8 +285,7 @@
 "not_found.title" = "Pagina non trovata"
 "not_found.body" = "L'indirizzo potrebbe essere errato oppure la pagina potrebbe essere stata spostata."
 
-# --- Legal documents: public pages and footer (#622) ---------------------------
-"legal_documents.footer.label" = "Documenti legali"
+# --- Legal documents: public pages and acceptance (#622) -----------------------
 "legal_documents.page.version" = "Versione {{.version}}"
 "legal_documents.page.published" = "Pubblicata il"
 "legal_documents.page.superseded" = "Questa versione non è più in vigore. La versione in vigore è la {{.version}}."
@@ -312,7 +311,6 @@
 "adminconsole.menu.logout" = "Esci"
 "adminconsole.menu.version_label" = "Versione"
 "adminconsole.layout.skip_to_content" = "Vai al contenuto principale"
-"adminconsole.layout.legal_documents" = "Documenti legali"
 "adminconsole.layout.open_menu" = "Apri menu"
 "adminconsole.layout.close_menu" = "Chiudi menu"
 "adminconsole.layout.user_menu" = "Menu account"

@@ -281,8 +281,7 @@
 "not_found.title" = "Page introuvable"
 "not_found.body" = "L’adresse est peut-être incorrecte, ou la page a été déplacée."
 
-# --- Legal documents: public pages and footer (#622) ---------------------------
-"legal_documents.footer.label" = "Documents juridiques"
+# --- Legal documents: public pages and acceptance (#622) -----------------------
 "legal_documents.page.version" = "Version {{.version}}"
 "legal_documents.page.published" = "Publiée le"
 "legal_documents.page.superseded" = "Cette version n'est plus en vigueur. La version en vigueur est la version {{.version}}."
@@ -308,7 +307,6 @@
 "adminconsole.menu.logout" = "Se déconnecter"
 "adminconsole.menu.version_label" = "Version"
 "adminconsole.layout.skip_to_content" = "Aller au contenu principal"
-"adminconsole.layout.legal_documents" = "Documents juridiques"
 "adminconsole.layout.open_menu" = "Ouvrir le menu"
 "adminconsole.layout.close_menu" = "Fermer le menu"
 "adminconsole.layout.user_menu" = "Menu du compte"

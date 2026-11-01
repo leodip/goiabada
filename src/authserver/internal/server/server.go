@@ -28,6 +28,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/introspectionmetrics"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/poolmetrics"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
@@ -556,10 +557,10 @@ func (s *Server) initMiddleware() appBranches {
 	branches := appBranches{
 		pages:      s.router.With(s.pageChain()...),
 		files:      s.router.With(s.applicationChain(middleware.PageFaults())...),
-		protocol:   s.router.With(s.applicationChain(middleware.ProtocolFaults(s.newRenderer()))...),
-		token:      s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(s.newRenderer())))...),
-		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(s.newRenderer(), s.revocationMetrics)))...),
-		introspect: s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.IntrospectionFaults(s.newRenderer(), s.introspectionMetrics)))...),
+		protocol:   s.router.With(s.applicationChain(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)))...),
+		token:      s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))))...),
+		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS), s.revocationMetrics)))...),
+		introspect: s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.IntrospectionFaults(render.New(s.templateFS, s.staticFS), s.introspectionMetrics)))...),
 		api:        s.router.With(s.applicationChain(middleware.APIFaults())...),
 	}
 
@@ -793,7 +794,7 @@ const staticPrefix = "/static"
 // language from, so a directory costs what an unmatched path costs; a file still costs neither.
 func (s *Server) serveStaticFiles() {
 	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
-	notFound := handlers.HandleNotFoundGet(s.newRenderer())
+	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS))
 	directory := http.Handler(notFound)
 	chain := s.pageChain()
 	for i := len(chain) - 1; i >= 0; i-- {

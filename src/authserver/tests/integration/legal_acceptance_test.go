@@ -313,7 +313,7 @@ func TestLegalAcceptance_ASignInWithADocumentOwedLandsOnTheStepAndAcceptRecordsT
 	requireDatabaseAuditLogs(t)
 	f := newLegalAcceptanceFixture(t)
 	termsId, terms := f.mustAcceptFor(t, "terms", "Shop terms")
-	// A notice for the same app is shown in the footer, never accepted.
+	// A notice for the same app is for information, so the step never lists it.
 	publishedForApps(t, f.adminToken, "notice", "Shop notice", "For information.", f.client)
 	browser := createHttpClient(t)
 

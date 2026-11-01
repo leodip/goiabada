@@ -2,7 +2,6 @@ package integration
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -19,9 +18,8 @@ import (
 // A legal document's public pages and where documents show (#622 decision 5 and "Where documents
 // show"): /legal/<short-name> shows the current version and links every earlier one at
 // /legal/<short-name>/versions/<n>, with no sign-in; drafts are never public and a retired
-// document's pages answer not found. The sign-in pages' footer links the all-apps documents, plus
-// the app's own on a sign-in for that app; the registration form links the same documents where it
-// collects the data; the public settings carry the all-apps documents for My Account's footer.
+// document's pages answer not found. The registration form links the all-apps documents, plus the
+// app's own on a registration from a sign-in for that app, where it collects the data.
 //
 // Every document here applies to selected apps with a client of the test's own, but for the few
 // for information that a test needs for all apps, which are retired when the test ends.
@@ -79,11 +77,6 @@ func linksIn(doc *goquery.Document, selection string) map[string]string {
 		links[href] = strings.TrimSpace(a.Text())
 	})
 	return links
-}
-
-// footerLinks answers the legal footer's links on a page, by address.
-func footerLinks(doc *goquery.Document) map[string]string {
-	return linksIn(doc, "nav.legal-footer")
 }
 
 // appWithRedirect creates a client of the test's own with one redirect URI, deleted when the test
@@ -190,53 +183,14 @@ func TestLegalDocumentPages_DraftsUnknownAndRetiredDocumentsAreNotFound(t *testi
 	assert.Equal(t, http.StatusOK, status, "restored, it has its page again")
 }
 
-func TestLegalDocumentFooter_SignInPagesLinkTheAllAppsDocumentsAndTheAppsOwn(t *testing.T) {
-	accessToken, _ := createAdminClientWithToken(t)
-	app, redirectURI := appWithRedirect(t)
-	other, _ := appWithRedirect(t)
-	allAppsId, allApps := publishedForApps(t, accessToken, "all", "Everyone's notice", "For all.")
-	_, own := publishedForApps(t, accessToken, "own", "The app's notice", "For one app.", app)
-	_, others := publishedForApps(t, accessToken, "others", "Another app's notice", "For another.", other)
-	unpublished := legalShortName("unpublished")
-	createLegalDocumentOverAPI(t, accessToken, "for_information", unpublished, "Not yet", "Draft only.")
-
-	resp := navigateToPasswordScreen(t, createHttpClient(t), app, redirectURI)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	links := footerLinks(parseHTMLResponse(t, resp))
-	_ = resp.Body.Close()
-	assert.Equal(t, "Everyone's notice", links["/legal/"+allApps])
-	assert.Equal(t, "The app's notice", links["/legal/"+own], "the app's own document, on a sign-in to it")
-	assert.NotContains(t, links, "/legal/"+others, "another app's document")
-	assert.NotContains(t, links, "/legal/"+unpublished, "a document never published")
-
-	// A page no app is behind links the all-apps documents alone.
-	status, page := getPublicPage(t, "/legal/"+legalShortName("nothing-here"))
-	require.Equal(t, http.StatusNotFound, status)
-	links = footerLinks(page)
-	assert.Equal(t, "Everyone's notice", links["/legal/"+allApps])
-	assert.NotContains(t, links, "/legal/"+own)
-
-	// The public page itself carries the footer.
-	status, page = getPublicPage(t, "/legal/"+own)
-	require.Equal(t, http.StatusOK, status)
-	assert.Contains(t, footerLinks(page), "/legal/"+allApps)
-
-	retireOverAPI(t, accessToken, allAppsId)
-	resp = navigateToPasswordScreen(t, createHttpClient(t), app, redirectURI)
-	links = footerLinks(parseHTMLResponse(t, resp))
-	_ = resp.Body.Close()
-	assert.NotContains(t, links, "/legal/"+allApps, "a retired document leaves the footer")
-	assert.Contains(t, links, "/legal/"+own)
-}
-
-func TestLegalDocumentFooter_TheRegistrationFormLinksTheDocumentsWhereItCollectsTheData(t *testing.T) {
+func TestLegalDocumentLinks_TheRegistrationFormLinksTheDocumentsWhereItCollectsTheData(t *testing.T) {
 	setRegSettings(t, true, false, false)
 	accessToken, _ := createAdminClientWithToken(t)
 	app, redirectURI := appWithRedirect(t)
 	other, _ := appWithRedirect(t)
 	_, allApps := publishedForApps(t, accessToken, "reg-all", "Everyone's terms", "For all.")
 	_, own := publishedForApps(t, accessToken, "reg-own", "The app's privacy notice", "For one app.", app)
-	_, others := publishedForApps(t, accessToken, "reg-others", "Another app's notice", "For another.", other)
+	publishedForApps(t, accessToken, "reg-others", "Another app's notice", "For another.", other)
 
 	// Registration from the app's sign-in: the password page's Create an account link names it.
 	browser := createHttpClient(t)
@@ -254,9 +208,7 @@ func TestLegalDocumentFooter_TheRegistrationFormLinksTheDocumentsWhereItCollects
 	assert.Equal(t, map[string]string{
 		"/legal/" + allApps: "Everyone's terms",
 		"/legal/" + own:     "The app's privacy notice",
-	}, linksIn(page, "form #legal-documents"), "inside the form, the all-apps documents and the app's own")
-	assert.Contains(t, footerLinks(page), "/legal/"+own)
-	assert.NotContains(t, footerLinks(page), "/legal/"+others)
+	}, linksIn(page, "form #legal-documents"), "inside the form, the all-apps documents and the app's own, not another app's")
 
 	// The same link in a browser that does not hold that sign-in names no app.
 	resp = loadPage(t, createHttpClient(t), registerURL)
@@ -282,37 +234,4 @@ func TestLegalDocumentFooter_TheRegistrationFormLinksTheDocumentsWhereItCollects
 	_ = resp.Body.Close()
 	require.Equal(t, 1, page.Find("#register-error").Length(), "the refusal is shown")
 	assert.Contains(t, linksIn(page, "form #legal-documents"), "/legal/"+allApps)
-}
-
-func TestLegalDocumentFooter_ThePublicSettingsCarryTheAllAppsDocuments(t *testing.T) {
-	accessToken, _ := createAdminClientWithToken(t)
-	app, _ := appWithRedirect(t)
-	allAppsId, allApps := publishedForApps(t, accessToken, "settings-all", "Everyone's notice", "For all.")
-	_, own := publishedForApps(t, accessToken, "settings-own", "The app's notice", "For one app.", app)
-
-	read := func() map[string]map[string]any {
-		resp := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/api/public/settings")
-		defer func() { _ = resp.Body.Close() }()
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-		var body struct {
-			LegalDocuments []map[string]any `json:"legalDocuments"`
-		}
-		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-		byShortName := map[string]map[string]any{}
-		for _, doc := range body.LegalDocuments {
-			byShortName[doc["shortName"].(string)] = doc
-		}
-		return byShortName
-	}
-
-	docs := read()
-	assert.Equal(t, map[string]any{
-		"title":     "Everyone's notice",
-		"shortName": allApps,
-		"url":       appConfig.AuthServer.BaseURL + "/legal/" + allApps,
-	}, docs[allApps])
-	assert.NotContains(t, docs, own, "a document for selected apps")
-
-	retireOverAPI(t, accessToken, allAppsId)
-	assert.NotContains(t, read(), allApps, "a retired document")
 }

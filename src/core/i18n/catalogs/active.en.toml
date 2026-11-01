@@ -278,8 +278,7 @@
 "not_found.title" = "Page not found"
 "not_found.body" = "The address may be mistyped, or the page may have moved."
 
-# --- Legal documents: public pages and footer (#622) ---------------------------
-"legal_documents.footer.label" = "Legal documents"
+# --- Legal documents: public pages and acceptance (#622) -----------------------
 "legal_documents.page.version" = "Version {{.version}}"
 "legal_documents.page.published" = "Published"
 "legal_documents.page.superseded" = "This version is no longer in effect. Version {{.version}} is the current one."
@@ -305,7 +304,6 @@
 "adminconsole.menu.logout" = "Sign out"
 "adminconsole.menu.version_label" = "Version"
 "adminconsole.layout.skip_to_content" = "Skip to main content"
-"adminconsole.layout.legal_documents" = "Legal documents"
 "adminconsole.layout.open_menu" = "Open menu"
 "adminconsole.layout.close_menu" = "Close menu"
 "adminconsole.layout.user_menu" = "Account menu"

@@ -179,7 +179,6 @@ command itself and fails on a tree it changed.
 | `core/api` | `PreviewLegalDocumentResponse` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `ProfilePictureInfoResponse` | both-apps | — |
 | `core/api` | `ProfilePictureUploadResponse` | both-apps | — |
-| `core/api` | `PublicLegalDocumentResponse` | reachable | — |
 | `core/api` | `PublicSettingsResponse` | both-apps | — |
 | `core/api` | `RedirectURIResponse` | reachable | — |
 | `core/api` | `ResourcePermissionUpsert` | both-apps | — |

@@ -32,19 +32,6 @@ type PublicSettingsResponse struct {
 	Issuer      string `json:"issuer"`
 
 	PasswordRules PasswordRulesResponse `json:"passwordRules"`
-
-	// LegalDocuments are the legal documents in effect for all apps, which My Account's footer
-	// links (#622). It discloses nothing new: each one's page is public, and the sign-in pages'
-	// footer links the same documents to anyone.
-	LegalDocuments []PublicLegalDocumentResponse `json:"legalDocuments"`
-}
-
-// PublicLegalDocumentResponse is one legal document in effect, as the public settings carry it: its
-// current version's title, its short name and its public page's absolute URL on the auth server.
-type PublicLegalDocumentResponse struct {
-	Title     string `json:"title"`
-	ShortName string `json:"shortName"`
-	URL       string `json:"url"`
 }
 
 // PasswordRulesResponse is what the stored password policy asks of a new password, as data: the

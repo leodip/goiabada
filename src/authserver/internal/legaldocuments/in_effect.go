@@ -1,8 +1,7 @@
 // Package legaldocuments answers which legal documents are in effect where (#622): a document is in
 // effect once it has a published version and while it is not retired, and its current version is
-// its latest. It applies to all apps, or to the clients it lists. The sign-in pages' footer, the
-// registration form and the public settings read the documents in effect through it. The acceptance
-// step, the silent sign-in and the password grant ask it what a user owes (Owed), the step
+// its latest. It applies to all apps, or to the clients it lists. The registration form reads the
+// documents in effect through it. The acceptance step, the silent sign-in and the password grant ask it what a user owes (Owed), the step
 // records what the user accepted through it (RecordAcceptances), and the account and admin APIs read
 // back what a user accepted (AcceptedBy).
 package legaldocuments
@@ -42,24 +41,19 @@ func NewReader(database Database) *Reader {
 	return &Reader{database: database}
 }
 
-// ForAllApps answers the documents in effect that apply to all apps, in id order.
-func (r *Reader) ForAllApps(ctx context.Context) ([]InEffect, error) {
-	return r.inEffect(ctx, nil)
-}
-
 // ForClient answers the documents in effect that apply to all apps or list the client
 // clientIdentifier names, in id order. An empty identifier, or one no client has, is a page no app
 // is behind, which the all-apps documents alone apply to.
 func (r *Reader) ForClient(ctx context.Context, clientIdentifier string) ([]InEffect, error) {
 	if clientIdentifier == "" {
-		return r.ForAllApps(ctx)
+		return r.inEffect(ctx, nil)
 	}
 	client, err := r.database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the client the legal documents apply to")
 	}
 	if client == nil {
-		return r.ForAllApps(ctx)
+		return r.inEffect(ctx, nil)
 	}
 	return r.forClientRecord(ctx, client)
 }

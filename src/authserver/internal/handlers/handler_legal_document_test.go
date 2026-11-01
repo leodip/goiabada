@@ -74,7 +74,6 @@ func TestHandleLegalDocumentGet_TheCurrentVersion(t *testing.T) {
 	assert.Equal(t, []legalDocumentVersionLink{{Number: 1}, {Number: 2}}, bind["versions"])
 	assert.Equal(t, "privacy", bind["shortName"])
 	assert.Equal(t, true, bind["layoutWide"])
-	assert.NotContains(t, bind, "legalFooterClient", "the page names no app, so its footer links the all-apps documents")
 }
 
 func TestHandleLegalDocumentGet_AnEarlierVersion(t *testing.T) {

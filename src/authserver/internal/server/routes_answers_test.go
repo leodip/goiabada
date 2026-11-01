@@ -43,7 +43,6 @@ const notFoundPage = `<h1 class="auth-title">Page not found</h1>`
 // Start registers them, over database. The request logger is on, so each request leaves its
 // "http request" record.
 func newRoutingTestServer(t *testing.T, database *datamocks.Database) *Server {
-	expectNoLegalDocuments(database)
 	t.Helper()
 
 	database.On("PoolStats").Return(testPoolStats).Maybe()
@@ -62,7 +61,6 @@ func newRoutingDatabase(t *testing.T) *datamocks.Database {
 	t.Helper()
 
 	database := datamocks.NewDatabase(t)
-	expectNoLegalDocuments(database)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Maybe()
 	return database
@@ -145,7 +143,6 @@ func TestRegisterRoutes_AnUnmatchedPathAtTheRootIsThe404Page(t *testing.T) {
 // settings read that fails answers its 500 rather than the 404.
 func TestRegisterRoutes_AnUnmatchedPageMeetsThePageChainFirst(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	expectNoLegalDocuments(database)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Return(nil, errors.New("the database is down"))
 	s := newRoutingTestServer(t, database)
@@ -479,7 +476,6 @@ func TestRegisterRoutes_RequestIdsAreAdoptedOrMinted(t *testing.T) {
 func newPanickingServer(t *testing.T, value any) *Server {
 	t.Helper()
 	database := datamocks.NewDatabase(t)
-	expectNoLegalDocuments(database)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Run(func(mock.Arguments) { panic(value) }).Return(nil, nil)
 	return newRoutingTestServer(t, database)

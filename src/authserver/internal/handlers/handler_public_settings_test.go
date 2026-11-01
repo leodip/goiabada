@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/stretchr/testify/mock"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -13,23 +13,11 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-// fixedLegalDocuments answers the documents in effect for all apps that a test sets, or err.
-type fixedLegalDocuments struct {
-	allApps []legaldocuments.InEffect
-	err     error
-}
-
-func (f fixedLegalDocuments) ForAllApps(context.Context) ([]legaldocuments.InEffect, error) {
-	return f.allApps, f.err
-}
 
 // =============================================================================
 // /api/public/settings
@@ -45,7 +33,7 @@ func (f fixedLegalDocuments) ForAllApps(context.Context) ([]legaldocuments.InEff
 
 func TestPublicSettings_Success(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database, fixedLegalDocuments{}, "https://auth.example")
+	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 		Id:          1,
@@ -67,54 +55,6 @@ func TestPublicSettings_Success(t *testing.T) {
 	assert.Equal(t, "dark", body.UITheme)
 	assert.True(t, body.SMTPEnabled)
 	assert.Equal(t, "https://issuer.example", body.Issuer)
-}
-
-// The legal documents in effect for all apps ride with the public settings, each with its current
-// version's title and its public page's address, for My Account's footer (#622).
-func TestPublicSettings_CarriesTheAllAppsLegalDocuments(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1}, nil).Once()
-	documents := fixedLegalDocuments{allApps: []legaldocuments.InEffect{
-		{Document: record.LegalDocument{Id: 3, ShortName: "privacy"}, Current: record.LegalDocumentVersion{VersionNumber: 2, Title: "Privacy notice"}},
-		{Document: record.LegalDocument{Id: 5, ShortName: "terms"}, Current: record.LegalDocumentVersion{VersionNumber: 1, Title: "Terms of use"}},
-	}}
-
-	recorder := httptest.NewRecorder()
-	NewPublicSettings(database, documents, "https://auth.example").ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
-
-	require.Equal(t, http.StatusOK, recorder.Code)
-	var body map[string]json.RawMessage
-	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
-	assert.JSONEq(t, `[
-		{"title":"Privacy notice","shortName":"privacy","url":"https://auth.example/legal/privacy"},
-		{"title":"Terms of use","shortName":"terms","url":"https://auth.example/legal/terms"}
-	]`, string(body["legalDocuments"]))
-}
-
-// No document in effect is an empty list, never null, so the console reads it as none.
-func TestPublicSettings_NoLegalDocumentIsAnEmptyList(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1}, nil).Once()
-
-	recorder := httptest.NewRecorder()
-	NewPublicSettings(database, fixedLegalDocuments{}, "https://auth.example").ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
-
-	require.Equal(t, http.StatusOK, recorder.Code)
-	var body map[string]json.RawMessage
-	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
-	assert.JSONEq(t, `[]`, string(body["legalDocuments"]))
-}
-
-func TestPublicSettings_AFailedLegalDocumentsReadIsTheAPIs500(t *testing.T) {
-	database := datamocks.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1}, nil).Once()
-
-	recorder := httptest.NewRecorder()
-	NewPublicSettings(database, fixedLegalDocuments{err: errors.New("database is down")}, "https://auth.example").
-		ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
-
-	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-	assert.Contains(t, recorder.Body.String(), "INTERNAL_SERVER_ERROR")
 }
 
 // The stored policy's rules ride with the public settings, as data, so the admin console states
@@ -139,7 +79,7 @@ func TestPublicSettings_CarriesTheStoredPolicysRules(t *testing.T) {
 			}, nil).Once()
 
 			recorder := httptest.NewRecorder()
-			NewPublicSettings(database, fixedLegalDocuments{}, "https://auth.example").ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+			NewPublicSettings(database).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
 
 			require.Equal(t, http.StatusOK, recorder.Code)
 			var body map[string]json.RawMessage
@@ -151,7 +91,7 @@ func TestPublicSettings_CarriesTheStoredPolicysRules(t *testing.T) {
 
 func TestPublicSettings_DatabaseError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database, fixedLegalDocuments{}, "https://auth.example")
+	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(nil, errors.New("database is down")).Once()
@@ -171,7 +111,7 @@ func TestPublicSettings_DatabaseError(t *testing.T) {
 // authentication.
 func TestPublicSettings_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database, fixedLegalDocuments{}, "https://auth.example")
+	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil).Once()
 
@@ -207,7 +147,7 @@ func (f *failingResponseWriter) WriteHeader(int) {}
 
 func TestPublicSettings_EncodeFailure(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database, fixedLegalDocuments{}, "https://auth.example")
+	handler := NewPublicSettings(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 		Id: 1, AppName: "Goiabada",
@@ -237,17 +177,6 @@ var publicSettingsAllowedFields = map[string]string{
 	// fields (#550 decision 11). Already readable by anyone who opens the registration form
 	// while registration is on, and NIST SP 800-63B assumes an attacker knows them.
 	"PasswordRules": "passwordRules",
-	// The legal documents in effect for all apps, which My Account's footer links (#622). Each
-	// one's page is public, and every sign-in page's footer links them to anyone.
-	"LegalDocuments": "legalDocuments",
-}
-
-// publicLegalDocumentAllowedFields is the complete set of fields a legal document carries here:
-// its current version's title, its short name and its public page's address.
-var publicLegalDocumentAllowedFields = map[string]string{
-	"Title":     "title",
-	"ShortName": "shortName",
-	"URL":       "url",
 }
 
 // publicPasswordRulesAllowedFields is the complete set of fields the password rules carry: the
@@ -269,7 +198,6 @@ var publicPasswordRulesAllowedFields = map[string]string{
 func TestPublicSettingsResponse_ExposesOnlyAllowlistedFields(t *testing.T) {
 	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PublicSettingsResponse{}), publicSettingsAllowedFields)
 	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PasswordRulesResponse{}), publicPasswordRulesAllowedFields)
-	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PublicLegalDocumentResponse{}), publicLegalDocumentAllowedFields)
 }
 
 // assertOnlyAllowlistedFields holds responseType to the fields allowed, each under its JSON name.
@@ -296,7 +224,7 @@ func assertOnlyAllowlistedFields(t *testing.T, responseType reflect.Type, allowe
 // namely someone replacing the DTO mapping with a direct encode of settings.
 func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database, fixedLegalDocuments{}, "https://auth.example")
+	handler := NewPublicSettings(database)
 
 	aesKey := []byte("SENTINEL-legacy-aes-encryption-key")
 	smtpPassword := []byte("SENTINEL-smtp-password-encrypted")

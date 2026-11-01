@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -272,9 +271,6 @@ func (b *CeremonyBoundary) requireAuthState(w http.ResponseWriter, r *http.Reque
 		"title":       i18n.T(r.Context(), "auth_error.state_mismatch.title"),
 		"error":       i18n.T(r.Context(), "auth_error.state_mismatch.message"),
 		"_httpStatus": http.StatusBadRequest,
-		// The page belongs to a sign-in for this app, so its footer links the app's own legal
-		// documents as well (#622).
-		render.LegalFooterClient: authContext.ClientId,
 	}
 
 	if err := b.pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
