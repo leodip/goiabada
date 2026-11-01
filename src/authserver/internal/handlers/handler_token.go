@@ -90,7 +90,8 @@ var tokenRequestParameters = []string{
 
 // parseTokenRequest reads the token request's form into the validator's input, refusing what can be
 // refused before any client is known: a body that cannot be parsed, a repeated parameter, two
-// client authentication methods at once, and a scope that is not well formed.
+// Authorization headers, unreadable Basic credentials, two client authentication methods at once,
+// and a scope that is not well formed.
 func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenRequestInput, error) {
 	// A body that cannot be parsed is the client's malformed request, RFC 6749 section 5.2's
 	// invalid_request, and not a server fault: a url-encoding broken by the client, or a body cut
@@ -113,6 +114,8 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	// Extract client credentials - supports both client_secret_basic and client_secret_post
 	clientId, clientSecret, err := extractClientCredentials(r)
 	if err != nil {
+		// Unreadable Basic credentials are an invalid_client naming no client, logged as every one is.
+		atTokenEndpoint.logClientAuthenticationRefusal(r, "", err)
 		return nil, err
 	}
 

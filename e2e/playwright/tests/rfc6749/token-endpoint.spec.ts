@@ -89,6 +89,35 @@ test("Basic credentials are form-urlencoded before base64, as section 2.3.1 has 
   expectTokenResponse(await postToken(request, { grant_type: "client_credentials", scope }, { headers: { Authorization: header } }));
 });
 
+// RFC 9110 section 11.4 puts one or more spaces between the scheme and its credentials. Sent through
+// the proxy, so this also shows the header reaches the auth server as the client wrote it.
+test("Basic followed by two spaces authenticates the client", async ({ page, clients, request }) => {
+  const client = await clientCredentialsClient(page, clients);
+  const header = basicAuth(client.id, client.secret).replace(/^Basic /, "Basic  ");
+
+  expectTokenResponse(await postToken(request, { grant_type: "client_credentials", scope }, { headers: { Authorization: header } }));
+});
+
+// Section 5.2: a client that tried the Authorization header MUST get a 401 with the challenge of its
+// scheme. Basic credentials that cannot be read are that failure, whatever the body holds.
+test("a Basic header whose credentials cannot be read is invalid_client, with the Basic challenge", async ({
+  page,
+  clients,
+  request,
+}) => {
+  const client = await clientCredentialsClient(page, clients);
+  const body = { grant_type: "client_credentials", scope, client_id: client.id, client_secret: client.secret };
+
+  for (const header of ["Basic not-valid-base64!", `Basic ${Buffer.from(client.id).toString("base64")}`]) {
+    const answer = await postToken(request, body, { headers: { Authorization: header } });
+    expectTokenError(answer, "invalid_client", 401);
+    expect(answer.headers["www-authenticate"], header).toBe('Basic realm="goiabada"');
+    expect(answer.body.error_description, header).toBe(
+      "Client authentication failed: the Basic credentials in the Authorization header could not be read.",
+    );
+  }
+});
+
 test("two client authentication methods in one request are refused as invalid_request", async ({ page, clients, request }) => {
   const client = await clientCredentialsClient(page, clients);
 

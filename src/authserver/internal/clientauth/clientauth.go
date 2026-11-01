@@ -50,6 +50,9 @@ const wrongClientSecretErrorMsg = "Client authentication failed. Please review y
 // AuthenticateConfidential's refusal of a public client.
 const publicClientCannotIntrospectErrorMsg = "This client is configured as public, and a public client cannot introspect tokens. Introspect as a confidential client."
 
+// UnreadableBasicCredentials' description.
+const unreadableBasicCredentialsErrorMsg = "Client authentication failed: the Basic credentials in the Authorization header could not be read."
+
 // FindClient's refusals.
 const (
 	clientIdMissingErrorMsg    = "Missing required client_id parameter."
@@ -163,9 +166,17 @@ func (a *Authenticator) VerifySecret(client *record.Client, presentedSecret stri
 	return nil
 }
 
-// invalidClientError is every invalid_client: an unknown client, a disabled one, and a missing or
-// wrong secret. Always 401 with BasicChallenge, whether the client used the Authorization header or
-// the form body (#437).
+// UnreadableBasicCredentials is the refusal of a request whose Authorization header names the Basic
+// scheme but whose credentials cannot be read: none, not base64, or no colon once decoded. The client
+// tried the header, so RFC 6749 section 5.2 requires the 401 with the challenge of the scheme it used,
+// and the body is not read in its place (#707 decision 12). No client was identified.
+func UnreadableBasicCredentials() *oauth.ErrorDetail {
+	return invalidClientError(unreadableBasicCredentialsErrorMsg)
+}
+
+// invalidClientError is every invalid_client: an unknown client, a disabled one, a missing or
+// wrong secret, and unreadable Basic credentials. Always 401 with BasicChallenge, whether the client
+// used the Authorization header or the form body (#437).
 //
 // RFC 6749 section 5.2 makes 401 a MAY in general and a MUST, with a challenge, only for a client
 // that tried the Authorization header; RFC 9110 section 15.5.2 then requires a challenge on every

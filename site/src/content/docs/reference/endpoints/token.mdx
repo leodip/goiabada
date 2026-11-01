@@ -72,6 +72,8 @@ A [confidential client](/concepts/clients/#public-and-confidential-clients) prov
 
 Use one. Sending a secret both ways is refused with `invalid_request`. With the header, the auth server reads the client from it and ignores a `client_id` in the body.
 
+Send one `Authorization` header, with one or more spaces after `Basic`. A request with two `Authorization` headers is refused with `invalid_request`, "The request included more than one Authorization header. Send one.", even when they agree. A header of another scheme, such as `Bearer`, is ignored.
+
 A public client sends `client_id` in the body and no secret, which discovery calls `none`. Sending a secret for a public client is refused with `invalid_request`, since it has none to check.
 
 RFC 6749 section 2.3.1 uses form encoding for both credentials: a space becomes `+`, a literal plus `%2B`, a percent sign `%25`, and a colon `%3A`. For example, the secret `a b+c` becomes `a+b%2Bc` before Base64 encoding. OAuth client libraries handle this for you; curl's `-u` expects you to encode these characters first.
@@ -86,6 +88,7 @@ When the client can't be authenticated, the answer is `401 Unauthorized` with `i
 | "Client is disabled." | An administrator disabled the client |
 | "This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed." | A confidential client sent no secret |
 | "Client authentication failed. Please review your client_secret." | The secret is wrong |
+| "Client authentication failed: the Basic credentials in the Authorization header could not be read." | The `Authorization: Basic` header has no credentials, they aren't valid Base64, or they have no `:` once decoded. Credentials in the body aren't read instead. |
 
 The auth server's log has a `client authentication refused at the token endpoint` warning for each, with the same reason, the client identifier the request named and how its credentials came. See [Logs](/deploy/logs/#records-worth-knowing).
 

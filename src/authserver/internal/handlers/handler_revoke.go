@@ -118,6 +118,8 @@ func (e revocationEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	clientIdentifier, clientSecret, err := extractClientCredentials(r)
 	if err != nil {
+		// Unreadable Basic credentials are an invalid_client naming no client, logged as every one is.
+		atRevocationEndpoint.logClientAuthenticationRefusal(r, "", err)
 		e.refuse(w, r, err)
 		return
 	}
