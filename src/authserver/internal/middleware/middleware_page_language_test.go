@@ -11,6 +11,7 @@ import (
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,37 +24,27 @@ type signInUser int64
 
 func (u signInUser) SignInUserId(*http.Request) int64 { return int64(u) }
 
-// When the page-language middleware cannot read the browser's session or the known user, it stops
-// the page: 500 in text/plain naming the request, the cause in the log and not in the response,
-// and the page itself never reached. The user is read through either identity source, the
-// sign-in's and the browser session's.
+// When the page-language middleware cannot read the known user, it stops the page: 500 in
+// text/plain naming the request, the cause in the log and not in the response, and the page itself
+// never reached. The user is read through either identity source, the sign-in's and the browser
+// session's.
 func TestPageLanguage_ADatabaseFailureStopsThePage(t *testing.T) {
 	cases := []struct {
 		name   string
 		signIn signInUser
-		expect func(db *datamocks.Database, cause error)
 	}{
-		{"the session read fails", 0, func(db *datamocks.Database, cause error) {
-			db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "the-session").Return(nil, cause).Once()
-		}},
-		{"the sign-in's user read fails", 7, func(db *datamocks.Database, cause error) {
-			db.On("GetUserById", mock.Anything, mock.Anything, int64(7)).Return(nil, cause).Once()
-		}},
-		{"the session's user read fails", 0, func(db *datamocks.Database, cause error) {
-			db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "the-session").
-				Return(&record.UserSession{UserId: 7}, nil).Once()
-			db.On("GetUserById", mock.Anything, mock.Anything, int64(7)).Return(nil, cause).Once()
-		}},
+		{"the sign-in's user read fails", 7},
+		{"the session's user read fails", 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 			db := datamocks.NewDatabase(t)
 			cause := errors.New("the database is unavailable")
-			tc.expect(db, cause)
+			db.On("GetUserById", mock.Anything, mock.Anything, int64(7)).Return(nil, cause).Once()
 
 			req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
-			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "the-session"))
+			req = req.WithContext(reqctx.WithSessionUserId(reqctx.WithSessionIdentifier(req.Context(), "the-session"), 7))
 			reached := false
 			rr := httptest.NewRecorder()
 			PageLanguage(tc.signIn, db)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -73,4 +64,36 @@ func TestPageLanguage_ADatabaseFailureStopsThePage(t *testing.T) {
 			assert.Contains(t, fmt.Sprint(records[0].Attrs["error"]), cause.Error(), "the cause is logged")
 		})
 	}
+}
+
+// The browser session's user is the one the session identifier middleware put on the context when
+// it read the session, so a page reads the session once and the user once, and draws in the user's
+// page language. The mock fails the test on any other read.
+func TestPageLanguage_TheSessionsUserComesOffTheContext(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	db.On("GetUserById", mock.Anything, mock.Anything, int64(7)).
+		Return(&record.User{Id: 7, PageLanguage: "pt-BR"}, nil).Once()
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
+	req = req.WithContext(reqctx.WithSessionUserId(reqctx.WithSessionIdentifier(req.Context(), "the-session"), 7))
+	var language string
+	PageLanguage(signInUser(0), db)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		language = i18n.CatalogTag(r.Context())
+	})).ServeHTTP(httptest.NewRecorder(), req)
+
+	assert.Equal(t, "pt-BR", language)
+}
+
+// A browser with no signed-in session and no sign-in in progress has no known user, and nothing is
+// read.
+func TestPageLanguage_NoKnownUserReadsNothing(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
+	var language string
+	PageLanguage(signInUser(0), db)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		language = i18n.CatalogTag(r.Context())
+	})).ServeHTTP(httptest.NewRecorder(), req)
+
+	assert.Equal(t, "en", language, "the request's own language, here none")
 }

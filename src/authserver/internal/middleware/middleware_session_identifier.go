@@ -36,7 +36,7 @@ type sessionIdentifierStore interface {
 var errPointerNotStored = errors.New("the browser session no longer holds the session pointer")
 
 // SessionIdentifier puts on the request's context the session identifier the session
-// cookie names, when that session still exists. A failure to read the session or its row is
+// cookie names, and that session's user, when that session still exists. A failure to read the session or its row is
 // answered through faults, in the format of the branch it is mounted on; on a page route it is
 // text/plain (#435).
 func SessionIdentifier(sessionStore sessionIdentifierStore, database sessionIdentifierDatabase, faults ServerFaults) func(next http.Handler) http.Handler {
@@ -84,6 +84,7 @@ func SessionIdentifier(sessionStore sessionIdentifierStore, database sessionIden
 					}
 				} else {
 					ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
+					ctx = reqctx.WithSessionUserId(ctx, userSession.UserId)
 				}
 			}
 

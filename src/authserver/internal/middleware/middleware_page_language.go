@@ -20,10 +20,10 @@ type pageLanguageCeremonies interface {
 	SignInUserId(r *http.Request) int64
 }
 
-// pageLanguageDatabase is what the page-language middleware reads: the browser's signed-in session,
-// and the user whose page language it applies.
+// pageLanguageDatabase is what the page-language middleware reads: the user whose page language it
+// applies. The browser session's user comes off the request context, where the session identifier
+// middleware put it when it read the session.
 type pageLanguageDatabase interface {
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
 
@@ -41,29 +41,25 @@ type pageLanguageDatabase interface {
 // its address. The reset page, whose user the link names, applies that user's language itself.
 //
 // It is mounted on the page branch alone, beneath the session identifier and locale middleware:
-// the Account and admin APIs answer in the language their request asks for. A failure to read the
-// session or the user answers 500 in text/plain, as the session identifier middleware does on that
-// branch.
+// the Account and admin APIs answer in the language their request asks for, and the images and the
+// OpenAPI document draw no page. A failure to read the user answers 500 in text/plain, as the
+// session identifier middleware does on that branch.
 func PageLanguage(ceremonies pageLanguageCeremonies, database pageLanguageDatabase) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			userId, err := knownUserId(r, ceremonies, database)
-			if err == nil && userId != 0 {
-				var user *record.User
-				user, err = database.GetUserById(ctx, nil, userId)
+			if userId := knownUserId(r, ceremonies); userId != 0 {
+				user, err := database.GetUserById(ctx, nil, userId)
 				if err != nil {
-					err = errs.Wrap(err, "unable to get the user")
-				} else if user != nil {
+					slog.ErrorContext(ctx, "unable to read the page language", "error", errs.Wrap(err, "unable to get the user"))
+					http.Error(w, fmt.Sprintf("fatal failure in page language middleware. For additional information, refer to the server logs. Request Id: %v",
+						requestid.FromContext(ctx)), http.StatusInternalServerError)
+					return
+				}
+				if user != nil {
 					ctx = i18n.WithPageLanguage(ctx, user.PageLanguage)
 				}
-			}
-			if err != nil {
-				slog.ErrorContext(ctx, "unable to read the page language", "error", err)
-				http.Error(w, fmt.Sprintf("fatal failure in page language middleware. For additional information, refer to the server logs. Request Id: %v",
-					requestid.FromContext(ctx)), http.StatusInternalServerError)
-				return
 			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -73,20 +69,10 @@ func PageLanguage(ceremonies pageLanguageCeremonies, database pageLanguageDataba
 
 // knownUserId is the user a page is drawn for: the sign-in's, else the signed-in session's, else
 // zero. The sign-in's wins when the two differ, being the person signing in now.
-func knownUserId(r *http.Request, ceremonies pageLanguageCeremonies, database pageLanguageDatabase) (int64, error) {
+func knownUserId(r *http.Request, ceremonies pageLanguageCeremonies) int64 {
 	if userId := ceremonies.SignInUserId(r); userId != 0 {
-		return userId, nil
+		return userId
 	}
-	sessionIdentifier, ok := reqctx.SessionIdentifierFrom(r.Context())
-	if !ok {
-		return 0, nil
-	}
-	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
-	if err != nil {
-		return 0, errs.Wrap(err, "unable to get the user session")
-	}
-	if userSession == nil {
-		return 0, nil
-	}
-	return userSession.UserId, nil
+	userId, _ := reqctx.SessionUserIdFrom(r.Context())
+	return userId
 }

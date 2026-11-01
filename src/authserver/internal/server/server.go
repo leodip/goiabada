@@ -542,6 +542,7 @@ func (s *Server) initMiddleware() appBranches {
 
 	branches := appBranches{
 		pages:      s.router.With(s.pageChain()...),
+		files:      s.router.With(s.applicationChain(middleware.PageFaults())...),
 		protocol:   s.router.With(s.applicationChain(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)))...),
 		token:      s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))))...),
 		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS), s.revocationMetrics)))...),
@@ -596,16 +597,21 @@ func (s *Server) pageChain() []func(http.Handler) http.Handler {
 		middleware.PageLanguage(ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName), s.database))
 }
 
-// appBranches is the application branch in its three answering formats, which initMiddleware returns
-// and initRoutes registers every application route on. A route goes on the branch of the format its
+// appBranches is the application branch in its answering formats, and on pages with and without
+// the page language, which initMiddleware returns and initRoutes registers every application route
+// on. A route goes on the branch of the format its
 // handler answers every other fault in, so a client parsing a protocol endpoint or an API as JSON is
 // not handed text/plain when the settings or the session cannot be read, or an empty body when
 // something panics. The format is chosen by where routes.go registers a route and never read off the
 // request path, as the bearer guards' refusals are (#435).
 type appBranches struct {
-	// pages carries everything that answers a page, text, an image or a redirect, and answers such a
-	// fault in text/plain, as every route did before #435.
+	// pages carries everything that answers a page, text or a redirect, and answers such a fault in
+	// text/plain, as every route did before #435.
 	pages *routing.Router
+	// files carries the images and the OpenAPI document. It answers a fault as pages does, and leaves
+	// out the page language, which only a drawn page uses, so an image costs no read of its user
+	// (#631).
+	files *routing.Router
 	// protocol carries the endpoints that answer RFC 6749 section 5.2's {error, error_description}:
 	// token, userinfo, JWKS, discovery and dynamic client registration.
 	protocol *routing.Router

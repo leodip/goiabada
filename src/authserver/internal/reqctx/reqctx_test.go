@@ -13,16 +13,18 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// present reports which of the five values ctx carries, so a test can say which it expects.
+// present reports which of the six values ctx carries, so a test can say which it expects.
 func present(ctx context.Context) map[string]bool {
 	_, settings := SettingsFrom(ctx)
 	_, sessionIdentifier := SessionIdentifierFrom(ctx)
+	_, sessionUserId := SessionUserIdFrom(ctx)
 	_, bearer := BearerTokenFrom(ctx)
 	_, validated := ValidatedTokenFrom(ctx)
 	_, reservation := CredentialReservationFrom(ctx)
 	return map[string]bool{
 		"settings":          settings,
 		"sessionIdentifier": sessionIdentifier,
+		"sessionUserId":     sessionUserId,
 		"bearer":            bearer,
 		"validated":         validated,
 		"reservation":       reservation,
@@ -43,6 +45,12 @@ func TestReqctx_RoundTrip(t *testing.T) {
 		got, ok := SessionIdentifierFrom(WithSessionIdentifier(ctx, "session-1"))
 		require.True(t, ok)
 		assert.Equal(t, "session-1", got)
+	})
+
+	t.Run("session user id", func(t *testing.T) {
+		got, ok := SessionUserIdFrom(WithSessionUserId(ctx, 7))
+		require.True(t, ok)
+		assert.Equal(t, int64(7), got)
 	})
 
 	t.Run("bearer token", func(t *testing.T) {
@@ -116,6 +124,7 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 	cases := map[string]context.Context{
 		"settings":          WithSettings(ctx, &record.Settings{}),
 		"sessionIdentifier": WithSessionIdentifier(ctx, "session-1"),
+		"sessionUserId":     WithSessionUserId(ctx, 7),
 		"bearer":            WithBearerToken(ctx, token),
 		"validated":         WithValidatedToken(ctx, token),
 		"reservation":       WithCredentialReservation(ctx, &CredentialReservation{}),

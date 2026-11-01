@@ -24,6 +24,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}
 	branches.pages.Get("/auth/authorize", probe)
+	branches.files.Get("/openapi.yaml", probe)
 	branches.protocol.Get("/certs", probe)
 	branches.token.Post("/auth/token", probe)
 	branches.api.Get("/api/public/settings", probe)
@@ -76,7 +77,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 
 	// The page branch alone then applies a known user's page language, over what the locale
 	// middleware resolved; the protocol endpoints and the APIs answer in the language asked for
-	// (#631 decision 5).
+	// (#631 decision 5). The files branch answers faults as the page branch does, and draws no page.
 	wantPages := append(append([]string{}, wantApp...),
 		"github.com/leodip/goiabada/authserver/internal/middleware.PageLanguage.func1",
 	)
@@ -85,8 +86,47 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	assert.Equal(t, wantRoot, chains["/static/*"])
 	require.Contains(t, chains, "/auth/authorize", "the page route must have been walked")
 	assert.Equal(t, wantPages, chains["/auth/authorize"])
-	for _, route := range []string{"/certs", "/auth/token", "/api/public/settings"} {
+	for _, route := range []string{"/openapi.yaml", "/certs", "/auth/token", "/api/public/settings"} {
 		require.Contains(t, chains, route, "the application route must have been walked")
 		assert.Equal(t, wantApp, chains[route], route)
 	}
+}
+
+// fileRoutes are the page-format routes that draw no page: the images and the OpenAPI document.
+var fileRoutes = []string{
+	"GET /openapi.yaml",
+	"GET /userinfo/picture/{subject}",
+	"HEAD /userinfo/picture/{subject}",
+	"GET /client/logo/{clientIdentifier}",
+	"HEAD /client/logo/{clientIdentifier}",
+}
+
+// Every page route of the real registrations runs the page-language middleware, and the routes that
+// draw no page do not, so an image costs no read of its user (#631). The protocol and API routes
+// are TestInitMiddleware_TheWholeChainInOrder's.
+func TestInitRoutes_ThePageLanguageRunsOnPagesOnly(t *testing.T) {
+	s := newFaultsTestServer(datamocks.NewDatabase(t))
+	const pageLanguage = "github.com/leodip/goiabada/authserver/internal/middleware.PageLanguage.func1"
+
+	seen := 0
+	err := s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		key := method + " " + route
+		if routeFormat(key) != "page" {
+			return nil
+		}
+		hasPageLanguage := false
+		for _, mounted := range middlewares {
+			if runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name() == pageLanguage {
+				hasPageLanguage = true
+			}
+		}
+		isFile := slices.Contains(fileRoutes, key)
+		if isFile {
+			seen++
+		}
+		assert.Equal(t, !isFile, hasPageLanguage, "%s runs the page-language middleware", key)
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, len(fileRoutes), seen, "every file route is registered")
 }
