@@ -199,6 +199,8 @@ func TestRegistrationContinuesSignIn_ThroughAMandatorySecondFactorTheStepAndCons
 	assert.Empty(t, acceptedVersionIds(t, user.Id))
 	resp = authenticateWithOtp(t, browser, otpURL, otpPage, otptest.Code(t, secret, time.Now()))
 	_ = otpPage.Body.Close()
+	// Setting up the authenticator shows its recovery codes before the sign-in goes on.
+	resp = passSetupRecoveryCodes(t, browser, resp)
 	location = assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
