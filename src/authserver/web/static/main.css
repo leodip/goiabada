@@ -1115,6 +1115,7 @@
   }
   .cf-turnstile {
     min-height: 140px;
+    line-height: 0;
   }
   .auth-footer {
     margin-top: 1.5rem;
