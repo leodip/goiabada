@@ -1121,14 +1121,19 @@
   }
 
   /* The Turnstile challenge's widget, on the auth server's forms that carry it (#642). Cloudflare's
-     script draws its compact size, the one that fits a 320-pixel screen, in a frame 140 pixels
-     tall; the space is held before the script has run, so the button below does not move when the
-     widget appears. The frame sits inline, so a zero line height keeps the text line's descender
-     space from adding pixels below it. */
+     script draws it flexible, as wide as the form, in a frame 65 pixels tall, or compact, where the
+     form is narrower than 300 pixels, in one 140 pixels tall (turnstile-widget.js). The space is
+     held before the script has run, so the button below does not move when the widget appears.
+     The frame sits inline, so a zero line height keeps the text line's descender space from adding
+     pixels below it. */
 
   .cf-turnstile {
-    min-height: 140px;
+    min-height: 65px;
     line-height: 0;
+  }
+
+  .cf-turnstile[data-size="compact"] {
+    min-height: 140px;
   }
 
   .auth-footer {

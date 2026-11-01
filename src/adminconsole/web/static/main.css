@@ -1354,8 +1354,11 @@
     text-align: center;
   }
   .cf-turnstile {
-    min-height: 140px;
+    min-height: 65px;
     line-height: 0;
+  }
+  .cf-turnstile[data-size="compact"] {
+    min-height: 140px;
   }
   .auth-footer {
     margin-top: 1.5rem;
