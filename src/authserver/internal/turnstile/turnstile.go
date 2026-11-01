@@ -262,8 +262,15 @@ func (v *Verifier) verify(ctx context.Context, form Form, secretKey, token strin
 const reasonBusy = "busy"
 
 // takeSlot takes one of the forms' check slots, waiting for one until ctx is done. It answers why
-// it took none: the slots stayed busy until the deadline, or the request was given up.
+// it took none: the slots stayed busy until the deadline, or the request was given up. A free slot
+// is taken first without waiting, so busy is answered only after waiting on a full pool, never for
+// a context already done while slots were free.
 func (v *Verifier) takeSlot(ctx context.Context) *noAnswer {
+	select {
+	case v.slots <- struct{}{}:
+		return nil
+	default:
+	}
 	select {
 	case v.slots <- struct{}{}:
 		return nil

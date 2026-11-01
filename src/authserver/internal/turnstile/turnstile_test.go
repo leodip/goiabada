@@ -634,6 +634,22 @@ func TestCheck_ACallThatFindsNoFreeSlotBeforeItsDeadlineFailsOpenAsBusy(t *testi
 	h.assertNothingSecretLogged(t, token)
 }
 
+// A check whose deadline has already passed while slots are free is not logged as busy, which tells
+// an operator to look for a flood: it takes a slot and fails open on its deadline as a timeout.
+func TestCheck_AnExpiredDeadlineWithFreeSlotsIsATimeoutNotBusy(t *testing.T) {
+	h := newHarness(t)
+	h.standIn.answer(http.StatusOK, passingLogin)
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	outcome := h.verifier.Check(ctx, h.settings, turnstile.FormLogin, token)
+
+	assert.Equal(t, turnstile.Unavailable, outcome)
+	errors := h.recordsAt(slog.LevelError)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "timeout", errors[0].Attrs["reason"])
+}
+
 // The counter's label sets are closed and declared, every series there from the start.
 func TestNewVerifier_RegistersTheCounterWithItsClosedLabelSets(t *testing.T) {
 	registry := metrics.NewRegistry()
