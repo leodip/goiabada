@@ -57,6 +57,8 @@ The other steps of a sign-in, the one-time code, recovery codes and consent, and
 
 When Cloudflare can't be reached, gives no usable answer within 3 seconds, or refuses the secret key, the three forms work as they do with the challenge off: the rate limits still apply, and no submission is refused for want of an answer. The auth server logs an error, and the `goiabada_challenge_verifications_total` [metric](/deploy/monitoring/#metrics-catalog) counts it, as `unavailable` or as `misconfigured`. Alert on both. A rising `misconfigured` usually means the secret key was rotated or the widget deleted in Cloudflare: save the widget's current secret key under **Admin**, **Turnstile**.
 
+The auth server asks Cloudflare about at most 64 submissions at a time, and the 3 seconds include any wait for a turn. A submission still waiting when they run out counts as `unavailable` too, and its error is logged with the reason `busy`. Many of those mean a flood of submissions: block its source at your proxy or CDN.
+
 ## What it can't protect
 
 The [password grant](/legacy-flows/ropc/) takes a password straight from a client, with no page to show a challenge on, and it shares each account's budget of wrong passwords with the sign-in form. A public client with the password grant enabled lets anyone send it passwords, so through it a script can still spend an account's budget and block its sign-in on the form. A confidential client has to prove its secret first. So the challenge stops that only while no public client has the password grant enabled. It's off by default.

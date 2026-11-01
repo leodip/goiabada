@@ -585,6 +585,8 @@ no password is compared; the limiter itself is unchanged. The password grant sha
 and carries no challenge, so the lockout stays closed only while no public client has the grant
 enabled (#642 decision 8). `internal/turnstile` refuses on Cloudflare's verdict or a missing token
 and fails open on a configuration fault or no usable answer, so its worst case is the limiter alone.
+A refused token spends no limiter budget, so the verifier caps its calls in flight at 64; a call
+that finds no free slot before its 3-second deadline fails open, logged with the reason `busy`.
 
 ## Post-logout redirects
 

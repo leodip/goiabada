@@ -60,6 +60,8 @@ type call struct {
 	method      string
 	contentType string
 	form        url.Values
+	// remoteAddr is the connection the call came on.
+	remoteAddr string
 }
 
 func newStandIn(t *testing.T) *standIn {
@@ -69,7 +71,8 @@ func newStandIn(t *testing.T) *standIn {
 		raw, _ := io.ReadAll(r.Body)
 		form, _ := url.ParseQuery(string(raw))
 		s.mu.Lock()
-		s.calls = append(s.calls, call{method: r.Method, contentType: r.Header.Get("Content-Type"), form: form})
+		s.calls = append(s.calls, call{method: r.Method, contentType: r.Header.Get("Content-Type"), form: form,
+			remoteAddr: r.RemoteAddr})
 		status, body, hold, holdBody := s.status, s.body, s.hold, s.holdBody
 		for name, values := range s.header {
 			w.Header()[name] = values
@@ -539,6 +542,89 @@ func TestCheck_AnUnreachableSiteverifyFailsOpen(t *testing.T) {
 	errors := h.recordsAt(slog.LevelError)
 	require.Len(t, errors, 1)
 	assert.Equal(t, "unreachable", errors[0].Attrs["reason"])
+	h.assertNothingSecretLogged(t, token)
+}
+
+// A flood of submissions cannot open calls to siteverify without bound: a refused token spends no
+// rate-limit budget, because the challenge runs ahead of the limiter. At most 64 calls are in
+// flight; the rest wait for a slot and are asked in turn, on the connections the first ones freed.
+func TestCheck_AtMost64CallsAreInFlightAndTheRestWaitForASlot(t *testing.T) {
+	const submissions = 80
+	h := newHarness(t)
+	h.standIn.answer(http.StatusOK, passingLogin)
+	release := make(chan struct{})
+	h.standIn.hold = release
+
+	outcomes := make([]turnstile.Outcome, submissions)
+	var wg sync.WaitGroup
+	for i := range submissions {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			outcomes[i] = h.check(turnstile.FormLogin, token)
+		}()
+	}
+
+	require.Eventually(t, func() bool { return h.standIn.callCount() == 64 }, 2*time.Second, 5*time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
+	assert.Equal(t, 64, h.standIn.callCount(), "the 65th call waits while 64 are in flight")
+
+	close(release)
+	wg.Wait()
+	for i, outcome := range outcomes {
+		assert.Equal(t, turnstile.Passed, outcome, "submission %d is asked once a slot frees", i)
+	}
+	assert.Equal(t, submissions, h.standIn.callCount())
+	assert.Equal(t, strconv.Itoa(submissions), h.count(t, "login", "passed"))
+	connections := map[string]bool{}
+	for _, c := range h.standIn.calls {
+		connections[c.remoteAddr] = true
+	}
+	assert.LessOrEqual(t, len(connections), 64, "the waiting calls reuse the connections the first ones freed")
+	assert.Empty(t, h.recordsAt(slog.LevelError))
+}
+
+// A call that finds no free slot before its deadline fails open without asking siteverify, and the
+// log says the slots were busy rather than that Cloudflare did not answer. The deadline is the
+// call's own: the submission's, when shorter than the three seconds, as here, so the test gives
+// up while the 64 calls ahead of it still hold their slots.
+func TestCheck_ACallThatFindsNoFreeSlotBeforeItsDeadlineFailsOpenAsBusy(t *testing.T) {
+	h := newHarness(t)
+	h.standIn.answer(http.StatusOK, passingLogin)
+	release := make(chan struct{})
+	h.standIn.hold = release
+
+	var wg sync.WaitGroup
+	for range 64 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			h.check(turnstile.FormLogin, token)
+		}()
+	}
+	t.Cleanup(func() {
+		close(release)
+		wg.Wait()
+	})
+	require.Eventually(t, func() bool { return h.standIn.callCount() == 64 }, 2*time.Second, 5*time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	outcome := h.verifier.Check(ctx, h.settings, turnstile.FormRegister, token)
+	elapsed := time.Since(started)
+
+	assert.Equal(t, turnstile.Unavailable, outcome)
+	assert.GreaterOrEqual(t, elapsed, 300*time.Millisecond, "it waits for a slot until its deadline")
+	assert.Less(t, elapsed, 3*time.Second, "and no longer")
+	assert.Equal(t, 64, h.standIn.callCount(), "siteverify is not asked")
+	assert.Equal(t, "1", h.count(t, "register", "unavailable"))
+	errors := h.recordsAt(slog.LevelError)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "every turnstile check slot stayed busy, the challenge fails open without asking cloudflare",
+		errors[0].Message)
+	assert.Equal(t, "busy", errors[0].Attrs["reason"])
+	assert.Equal(t, "register", errors[0].Attrs["form"])
 	h.assertNothingSecretLogged(t, token)
 }
 

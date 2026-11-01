@@ -127,6 +127,13 @@ const (
 	// maxAnswerBytes is the ceiling siteverify's answer is read under. A whole answer is a few
 	// hundred bytes; an answer past this is not one, and fails open as unusable.
 	maxAnswerBytes = 8 << 10
+	// maxConcurrentChecks bounds the calls to siteverify in flight at once, whatever the rate of
+	// submissions: a refused token spends no rate-limit budget, because the challenge runs ahead of
+	// the limiter, so a flood of made-up tokens is held here instead. A call past it waits for a
+	// slot within its own deadline, and fails open when none frees in time, as when Cloudflare
+	// does not answer. The idle pool is as large, so connections are reused rather than opened
+	// per call.
+	maxConcurrentChecks = 64
 )
 
 // The error codes siteverify answers that decide the outcome (decision 4). Any other code is no
@@ -140,7 +147,9 @@ var (
 
 // Verifier checks a form's token with siteverify, against the auth server's own hostname.
 type Verifier struct {
-	client        *http.Client
+	client *http.Client
+	// slots holds one entry per call to siteverify in flight, up to maxConcurrentChecks.
+	slots         chan struct{}
 	siteverifyURL string
 	hostname      string
 	dataCipher    *encryption.DataCipher
@@ -155,12 +164,16 @@ func NewVerifier(reg *metrics.Registry, dataCipher *encryption.DataCipher, authS
 	if parsed, err := url.Parse(authServerBaseURL); err == nil {
 		hostname = strings.ToLower(parsed.Hostname())
 	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConnsPerHost = maxConcurrentChecks
 	return &Verifier{
 		client: &http.Client{
+			Transport: transport,
 			// A redirect is no answer: following it would send the secret key wherever it
 			// pointed.
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
+		slots:         make(chan struct{}, maxConcurrentChecks),
 		siteverifyURL: siteverifyURL,
 		hostname:      hostname,
 		dataCipher:    dataCipher,
@@ -220,12 +233,21 @@ type siteverifyAnswer struct {
 func (v *Verifier) verify(ctx context.Context, form Form, secretKey, token string) Outcome {
 	answer, unusable := v.ask(ctx, secretKey, token)
 	if unusable != nil {
+		if unusable.reason == reasonBusy {
+			slog.ErrorContext(ctx, "every turnstile check slot stayed busy, the challenge fails open without asking cloudflare",
+				slog.String("form", form.label()), slog.String("reason", unusable.reason), unusable.detail)
+			return Unavailable
+		}
 		slog.ErrorContext(ctx, "the turnstile check got no usable answer from cloudflare, the challenge fails open",
 			slog.String("form", form.label()), slog.String("reason", unusable.reason), unusable.detail)
 		return Unavailable
 	}
 	return v.judge(ctx, form, answer)
 }
+
+// reasonBusy is the reason of a call that found no free slot before its deadline, so siteverify
+// was never asked.
+const reasonBusy = "busy"
 
 // noAnswer is why siteverify gave no usable answer: the reason, and the attribute that shows it.
 type noAnswer struct {
@@ -235,10 +257,20 @@ type noAnswer struct {
 
 // ask posts token under secretKey to siteverify, once, sending those two and nothing else (decision
 // 3), and reads its answer whatever its status, under the bound. It answers the answer, or why
-// there is none to use.
+// there is none to use. The deadline covers the wait for a slot as well as the call.
 func (v *Verifier) ask(ctx context.Context, secretKey, token string) (*siteverifyAnswer, *noAnswer) {
 	ctx, cancel := context.WithTimeout(ctx, verifyTimeout)
 	defer cancel()
+
+	select {
+	case v.slots <- struct{}{}:
+		defer func() { <-v.slots }()
+	case <-ctx.Done():
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, &noAnswer{reason: reasonBusy, detail: slog.Int("max_concurrent_checks", maxConcurrentChecks)}
+		}
+		return nil, &noAnswer{reason: "unreachable", detail: slog.Any("error", ctx.Err())}
+	}
 
 	body := url.Values{"secret": {secretKey}, "response": {token}}.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, v.siteverifyURL, strings.NewReader(body))
