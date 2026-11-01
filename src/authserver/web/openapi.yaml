@@ -3350,6 +3350,85 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/settings/turnstile:
+    get:
+      tags: [Settings]
+      summary: Get Turnstile settings
+      description: |
+        Get the settings of the Cloudflare Turnstile challenge on the sign-in, forgot-password and
+        registration forms. The secret key is never answered: `hasTurnstileSecretKey` says whether
+        one is stored.
+      operationId: getSettingsTurnstile
+      responses:
+        '200':
+          description: Turnstile settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsTurnstileResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags: [Settings]
+      summary: Update Turnstile settings
+      description: |
+        Turn the Cloudflare Turnstile challenge on or off, and store the site key and the secret key
+        of its widget. A change applies from the next request. Turning the challenge off keeps both
+        keys.
+
+        The stored secret key is kept, replaced or removed: an absent or empty
+        `turnstileSecretKey` keeps it, a non-empty one replaces it, and
+        `clearTurnstileSecretKey: true` removes it. Space around either key is trimmed.
+
+        A save is refused with 400, and writes nothing, when it:
+
+        - turns the challenge on without a site key
+          (`handler.settings_turnstile.site_key_required`), or without a secret key stored or sent
+          (`handler.settings_turnstile.secret_key_required`);
+        - removes the secret key while the challenge is on, or while turning it on
+          (`handler.settings_turnstile.secret_key_clear_while_enabled`);
+        - changes the site key while a secret key is stored, carrying neither a new
+          `turnstileSecretKey` nor `clearTurnstileSecretKey: true`
+          (`handler.settings_turnstile.site_key_changed`). The two keys come from one widget;
+        - sends a new secret key together with `clearTurnstileSecretKey: true`
+          (`handler.settings_turnstile.secret_key_and_clear`);
+        - sends a site key or a secret key longer than 128 characters
+          (`handler.settings_turnstile.site_key_too_long`,
+          `handler.settings_turnstile.secret_key_too_long`).
+
+        A save that stores a new secret key, or turns the challenge on, first checks the secret key
+        with Cloudflare's siteverify. It is refused with 400, and writes nothing, when Cloudflare
+        does not accept the secret key (`handler.settings_turnstile.secret_key_rejected`), or
+        when the key could not be checked with it: Cloudflare could not be reached, or gave no
+        usable answer (`handler.settings_turnstile.secret_key_unchecked`). Turning
+        the challenge off and removing the secret key never call Cloudflare.
+      operationId: updateSettingsTurnstile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsTurnstileRequest'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsTurnstileResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/settings/sessions:
     get:
       tags: [Settings]
@@ -7313,6 +7392,51 @@ components:
           type: string
         smtpFromEmail:
           type: string
+
+    SettingsTurnstileResponse:
+      type: object
+      properties:
+        turnstileEnabled:
+          type: boolean
+          description: Whether the sign-in, forgot-password and registration forms carry the Turnstile challenge.
+        turnstileSiteKey:
+          type: string
+          description: The site key of the Turnstile widget. Empty when none is stored.
+        hasTurnstileSecretKey:
+          type: boolean
+          description: Whether a secret key is stored. The secret key itself is never answered.
+      required:
+        - turnstileEnabled
+        - turnstileSiteKey
+        - hasTurnstileSecretKey
+
+    UpdateSettingsTurnstileRequest:
+      type: object
+      properties:
+        turnstileEnabled:
+          type: boolean
+          description: |
+            `true` turns the challenge on, which needs a site key and a secret key, stored or sent.
+            `false` turns it off and keeps the keys.
+        turnstileSiteKey:
+          type: string
+          maxLength: 128
+          description: |
+            The site key of the Turnstile widget, at most 128 characters. Changing it while a secret
+            key is stored needs a new `turnstileSecretKey`, or `clearTurnstileSecretKey: true`.
+        turnstileSecretKey:
+          type: string
+          maxLength: 128
+          description: |
+            A new secret key, at most 128 characters. The stored secret key is never returned, only
+            `hasTurnstileSecretKey`, so an absent or empty value keeps the stored one; a non-empty
+            value replaces it.
+        clearTurnstileSecretKey:
+          type: boolean
+          default: false
+          description: |
+            `true` removes the stored secret key. Refused while the challenge is on or being turned
+            on, and together with a non-empty `turnstileSecretKey`.
 
     SendTestEmailRequest:
       type: object

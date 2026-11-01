@@ -39,6 +39,7 @@ func restoreSettings(t *testing.T) *record.Settings {
 
 	snapshot := *found
 	snapshot.SMTPPasswordEncrypted = bytes.Clone(found.SMTPPasswordEncrypted)
+	snapshot.TurnstileSecretKeyEncrypted = bytes.Clone(found.TurnstileSecretKeyEncrypted)
 
 	t.Cleanup(func() {
 		assert.NoError(t, database.UpdateSettings(context.Background(), nil, &snapshot),
@@ -74,8 +75,8 @@ var settingsColumnsNoTestOwns = map[string]bool{
 // settingsChanges answers one line per field that differs between two reads of the settings row,
 // skipping settingsColumnsNoTestOwns. It walks the struct rather than naming fields, so a column
 // added later is compared without anyone remembering to list it here. A byte slice is compared by
-// content, since a driver may read an empty blob back as nil, and is not printed, since the one
-// there is the encrypted SMTP password.
+// content, since a driver may read an empty blob back as nil, and is not printed, since the ones
+// there are the encrypted SMTP password and Turnstile secret key.
 func settingsChanges(before, after *record.Settings) []string {
 	beforeValue, afterValue := reflect.ValueOf(*before), reflect.ValueOf(*after)
 	fields := beforeValue.Type()

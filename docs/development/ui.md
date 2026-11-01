@@ -41,7 +41,12 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   browser enforces it: both servers send `Content-Security-Policy: script-src 'self'; object-src
   'none'; base-uri 'none'; frame-ancestors 'none'` (`core/httpmw.SecurityHeaders`), which refuses
   inline code, `eval`, `<object>`/`<embed>` and `<base>`, so a page needing any of them breaks
-  rather than being given a nonce, a hash or an exception. Page
+  rather than being given a nonce, a hash or an exception. The one origin admitted beside `'self'`
+  is Cloudflare's, for the Turnstile challenge (#642): while it is on, the auth server's sign-in,
+  forgot-password and registration forms carry its widget, and each response drawing one of them
+  through `turnstile.WithWidget` adds the constant `https://challenges.cloudflare.com` to
+  `script-src` (`core/httpmw.SetContentSecurityPolicy`). Every other page, those three with the
+  challenge off, and an error page replacing one of them, keep the policy above. Page
   behaviour lives in static files, `static/utils.js`, the console's `static/shell.js` and
   `static/pages/<page>.js`, attached with `addEventListener`. A template hands a script data in a
   JSON data block, `<script type="application/json" id="…">{{ . }}</script>`, or in `data-`
@@ -50,7 +55,8 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   step, for the declared floor: Chrome and Edge 111, Safari 16.4, Firefox 128.
   `core/guard.AssertScriptSyntax` parses every static script with acorn under Node, both pinned in
   `versions.yaml`, so each module's unit tier needs `node` on the path, as the dev container and the
-  test jobs have it. The auth server's pages work with JavaScript off; the console says it needs it.
+  test jobs have it. The auth server's pages work with JavaScript off, except those three forms while the challenge
+  is on, whose submission needs the token the widget's script writes; the console says it needs it.
   In the console a script answers an action in a live region the page draws empty, through
   `showNotice`, not in a dialog, its failures too (`sendAjaxRequest`'s `statusRegion`); a removal
   asks first in a `modal_dialog` of type `confirm`, whose second button names the action; a button

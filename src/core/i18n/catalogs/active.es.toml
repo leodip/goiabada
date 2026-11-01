@@ -357,6 +357,7 @@
 "adminconsole.admin_menu.settings_tokens" = "Tokens"
 "adminconsole.admin_menu.settings_keys" = "Claves de firma"
 "adminconsole.admin_menu.settings_email" = "Correo electrónico"
+"adminconsole.admin_menu.settings_turnstile" = "Turnstile"
 "adminconsole.admin_menu.audit_log_settings" = "Configuración de auditoría"
 "adminconsole.admin_menu.audit_log_viewer" = "Registro de auditoría"
 
@@ -1670,6 +1671,22 @@
 "adminconsole.admin_settings.email_sendtest.smtp_disabled" = "El envío de correo está desactivado. Actívalo y configura el servidor SMTP para enviar un correo de prueba:"
 "adminconsole.admin_settings.email_sendtest.sent_successfully" = "Correo de prueba enviado a {{.address}}."
 "adminconsole.admin_settings.email_sendtest.send_button" = "Enviar correo de prueba"
+"adminconsole.admin_settings.turnstile.page_title" = "Configuración de Turnstile"
+"adminconsole.admin_settings.turnstile.subtitle" = "Turnstile"
+"adminconsole.admin_settings.turnstile.lead" = "Un desafío de Cloudflare Turnstile en los formularios de inicio de sesión, contraseña olvidada y registro, para que un script no pueda agotar los intentos de inicio de sesión de una cuenta ni los correos de una dirección."
+"adminconsole.admin_settings.turnstile.field.enabled" = "Exigir el desafío"
+"adminconsole.admin_settings.turnstile.enabled_hint" = "Los tres formularios muestran el widget de Cloudflare, que necesita JavaScript, y un envío solo se acepta cuando Cloudflare lo ha verificado."
+"adminconsole.admin_settings.turnstile.enable_warning" = "Si la clave del sitio es incorrecta, o el widget no incluye el nombre de host del servidor de autenticación, nadie podrá iniciar sesión, ni siquiera los administradores. Para desactivar el desafío desde la línea de comandos, ejecuta goiabada-authserver recover --disable-turnstile."
+"adminconsole.admin_settings.turnstile.section_keys" = "Claves del widget"
+"adminconsole.admin_settings.turnstile.keys_hint" = "Las claves del widget que añadiste en Turnstile en el panel de Cloudflare, cuyo nombre de host es el host de la URL base del servidor de autenticación."
+"adminconsole.admin_settings.turnstile.field.site_key" = "Clave del sitio"
+"adminconsole.admin_settings.turnstile.field.secret_key" = "Clave secreta"
+"adminconsole.admin_settings.turnstile.secret_key_saved" = "Guardada"
+"adminconsole.admin_settings.turnstile.secret_key_not_set" = "Sin especificar"
+"adminconsole.admin_settings.turnstile.secret_key_tooltip" = "La clave secreta guardada nunca se muestra. Deja el campo vacío para conservarla o escribe una nueva para sustituirla."
+"adminconsole.admin_settings.turnstile.secret_key_keep_placeholder" = "Deja vacío para conservarla"
+"adminconsole.admin_settings.turnstile.clear_secret_key" = "Eliminar la clave secreta guardada"
+"adminconsole.admin_settings.turnstile.clear_secret_key_notice" = "La clave secreta guardada se eliminará al guardar los cambios."
 
 "adminconsole.admin_settings.keys.page_title" = "Claves de firma"
 "adminconsole.admin_settings.keys.subtitle" = "Claves de firma"
@@ -1739,6 +1756,7 @@
 "validator.login.password_required" = "La contraseña es obligatoria."
 "handler.login.auth_failed" = "No se pudo iniciar sesión."
 "handler.login.account_disabled" = "Tu cuenta de usuario está desactivada."
+"handler.challenge.failed" = "Completa la verificación de seguridad y vuelve a intentarlo. La verificación necesita JavaScript."
 
 # --- Email validator (LocalizedError-backed) ---------------------------------
 
@@ -1979,6 +1997,16 @@
 "handler.settings_email.smtp_from_email_too_long" = "El correo electrónico del remitente no puede superar los {{.max}} caracteres."
 "handler.settings_email.smtp_password_and_clear" = "Envía una nueva contraseña SMTP o clearSmtpPassword, pero no ambos."
 "handler.settings_email.smtp_host_changed" = "El host SMTP ha cambiado: vuelve a escribir la contraseña SMTP o elimínala."
+
+"handler.settings_turnstile.site_key_required" = "Introduce la clave del sitio para activar el desafío de Turnstile."
+"handler.settings_turnstile.secret_key_required" = "Introduce la clave secreta para activar el desafío de Turnstile."
+"handler.settings_turnstile.secret_key_clear_while_enabled" = "La clave secreta no se puede eliminar mientras el desafío de Turnstile está activado."
+"handler.settings_turnstile.site_key_changed" = "La clave del sitio ha cambiado: vuelve a escribir la clave secreta o elimínala."
+"handler.settings_turnstile.secret_key_and_clear" = "Envía una nueva clave secreta o clearTurnstileSecretKey, pero no ambos."
+"handler.settings_turnstile.site_key_too_long" = "La clave del sitio no puede superar los {{.max}} caracteres."
+"handler.settings_turnstile.secret_key_too_long" = "La clave secreta no puede superar los {{.max}} caracteres."
+"handler.settings_turnstile.secret_key_rejected" = "Cloudflare no acepta la clave secreta. Vuelve a copiarla del widget en el panel de Cloudflare."
+"handler.settings_turnstile.secret_key_unchecked" = "No se pudo comprobar la clave secreta con Cloudflare. Inténtalo de nuevo en un momento."
 
 "handler.settings_email.connect_failed_host_not_found" = "No se pudo conectar con el servidor SMTP: no se encontró el nombre de host."
 "handler.settings_email.connect_failed_timed_out" = "No se pudo conectar con el servidor SMTP: se agotó el tiempo de conexión."

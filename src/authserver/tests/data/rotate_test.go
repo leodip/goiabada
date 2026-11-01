@@ -56,13 +56,15 @@ func TestReencryptToKey(t *testing.T) {
 	// One seeded value per entry of aesProtectedColumns, plus the RSA private key PEM that
 	// reencryptPrivateKeys handles separately.
 	const (
-		pem        = "-----BEGIN RSA PRIVATE KEY-----\nfakepem\n-----END RSA PRIVATE KEY-----\n"
-		smtpPass   = "smtp-password"
-		clientSec  = "client-secret"
-		emailCode  = "email-verif-code"
-		otpSeed    = "JBSWY3DPEHPK3PXP"
-		forgotCode = "forgot-password-code"
-		preRegCode = "prereg-verif-code"
+		pem      = "-----BEGIN RSA PRIVATE KEY-----\nfakepem\n-----END RSA PRIVATE KEY-----\n"
+		smtpPass = "smtp-password"
+		// The Cloudflare Turnstile secret key (#642).
+		turnstileSecret = "1x0000000000000000000000000000000AA"
+		clientSec       = "client-secret"
+		emailCode       = "email-verif-code"
+		otpSeed         = "JBSWY3DPEHPK3PXP"
+		forgotCode      = "forgot-password-code"
+		preRegCode      = "prereg-verif-code"
 		// The pending TOTP enrolment (#247).
 		otpEnrolment = "otpauth://totp/Goiabada:u@example.com?secret=JBSWY3DPEHPK3PXP"
 	)
@@ -75,6 +77,7 @@ func TestReencryptToKey(t *testing.T) {
 	settings := initialSettings("Rotate")
 	settings.AESEncryptionKeyLegacy = legacyKey
 	settings.SMTPPasswordEncrypted = rekeyEncrypt(t, smtpPass, rekeyKeyA)
+	settings.TurnstileSecretKeyEncrypted = rekeyEncrypt(t, turnstileSecret, rekeyKeyA)
 	require.NoError(t, db.CreateSettings(ctx, nil, settings))
 	client := &record.Client{
 		ClientIdentifier:      "c-" + fake.UUID(),
@@ -118,6 +121,7 @@ func TestReencryptToKey(t *testing.T) {
 	gotSettings, err := db.GetSettingsById(ctx, nil, settings.Id)
 	require.NoError(t, err)
 	rekeyed("settings.smtp_password_encrypted", gotSettings.SMTPPasswordEncrypted, smtpPass)
+	rekeyed("settings.turnstile_secret_key_encrypted", gotSettings.TurnstileSecretKeyEncrypted, turnstileSecret)
 	// The re-key leaves the legacy data-key column alone. Blanking it was the 1.5.x startup
 	// conversion's own bookkeeping and rotation only ever reached it by sharing reencryptAll;
 	// #359 removed that statement (#262), and this is what fails if someone puts it back.

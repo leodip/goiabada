@@ -1,0 +1,76 @@
+---
+title: Require a Turnstile challenge
+description: Put a Cloudflare Turnstile challenge on the sign-in, forgot-password and registration forms, so a script can't use up an account's sign-in attempts or an address's emails.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This guide puts a Cloudflare Turnstile challenge on the auth server's sign-in, forgot-password and registration forms, so they accept a submission only from someone who passed it.
+
+[Turnstile](https://developers.cloudflare.com/turnstile/) is Cloudflare's check that a visitor is a person and not a script. You don't need to serve Goiabada through Cloudflare to use it. Without it, anyone who knows an email address can spend that account's [budget of wrong passwords](/reference/environment-variables/#rate-limits) and block its password sign-in for up to an hour, or spend the address's budget of reset and registration emails. With it on, a script that can't pass the challenge can't spend either. The challenge is off until you turn it on.
+
+## Turn the challenge on
+
+<Steps>
+
+1. In the [Cloudflare dashboard](https://dash.cloudflare.com/), open **Turnstile** and add a widget.
+
+2. Add one hostname: the host of the auth server's public URL, `GOIABADA_AUTHSERVER_BASEURL`, with no scheme and no port. For `https://auth.example.com`, that's `auth.example.com`. The auth server refuses a token solved on any other host. Don't add `localhost` or another local hostname to a production widget.
+
+3. Choose the **Managed** mode, where most visitors never have to click anything. **Non-interactive** and **Invisible** work too. Don't opt for pre-clearance: it's only for sites served through Cloudflare's proxy. Create the widget.
+
+4. In the admin console, open **Admin**, **Turnstile**. Paste the widget's site key into **Site key** and its secret key into **Secret key**, turn on **Require the challenge**, click **Save**, and confirm. The auth server checks the secret key with Cloudflare before it saves it, so a mistyped one is refused there. The secret key is never shown again.
+
+5. Open the auth server's sign-in page in a private window. Cloudflare's widget sits above **Sign in**, and once it shows a tick, the form signs you in.
+
+</Steps>
+
+The change applies to the next request on every replica, with no restart. Administrators sign in to the admin console through the same form, so they pass the challenge too.
+
+<Aside type="caution">
+The auth server can't check the site key or the widget's hostname. If either is wrong, every submission is refused, and nobody can sign in, administrators included. Before you sign out, check that a private window can sign in. If it's too late, [turn the challenge off from the command line](/troubleshooting/locked-out-of-the-admin-console/#the-turnstile-challenge-refuses-every-sign-in) with `goiabada-authserver recover --disable-turnstile`.
+</Aside>
+
+## The forms it covers
+
+The challenge is on three forms, each with its own widget:
+
+- `POST /auth/pwd`, the sign-in form's password;
+- `POST /forgot-password`, which sends a [password reset](/concepts/password-recovery/) link;
+- `POST /account/register`, [self-registration](/concepts/self-registration/).
+
+A submission is accepted only with a token Cloudflare verified for the auth server's host and for that form, so a token solved on one form doesn't pass on another. A submission without one is refused before any [rate limit](/reference/environment-variables/#rate-limits) counts it and before any password is checked, so it spends no budget. The form comes back with a message and the email address as typed.
+
+The other steps of a sign-in, the one-time code, recovery codes and consent, and the pages a reset or activation link opens, carry no challenge.
+
+## What it costs
+
+- **The three forms need JavaScript.** A visitor whose browser runs no scripts gets no token, and the forms refuse them.
+- **Your visitors' browsers contact Cloudflare.** While the challenge is on, the three forms load the widget's script and frame from `https://challenges.cloudflare.com`, and their `Content-Security-Policy` admits that origin to `script-src`. No other page loads anything from Cloudflare. If you set a policy of your own at a proxy, admit that origin on those three forms.
+- **The auth server calls Cloudflare.** It sends each token to Cloudflare's siteverify endpoint at `https://challenges.cloudflare.com`, with the secret key, and waits up to 3 seconds for the answer. Let the auth server reach it over HTTPS. Saving a new secret key, or turning the challenge on, needs it too.
+
+<Aside type="danger">
+**Never** use Cloudflare's [test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) in production. A test secret key passes every token, so the challenge stops nothing.
+</Aside>
+
+## When Cloudflare can't answer
+
+When Cloudflare can't be reached, gives no usable answer within 3 seconds, or refuses the secret key, the three forms work as they do with the challenge off: the rate limits still apply, and no submission is refused for want of an answer. The auth server logs an error, and the `goiabada_challenge_verifications_total` [metric](/deploy/monitoring/#metrics-catalog) counts it, as `unavailable` or as `misconfigured`. Alert on both. A rising `misconfigured` usually means the secret key was rotated or the widget deleted in Cloudflare: save the widget's current secret key under **Admin**, **Turnstile**.
+
+The auth server asks Cloudflare about at most 64 submissions at a time, and the 3 seconds include any wait for a turn. A submission still waiting when they run out counts as `unavailable` too, and its error is logged with the reason `busy`. Many of those mean a flood of submissions: block its source at your proxy or CDN.
+
+## What it can't protect
+
+The [password grant](/legacy-flows/ropc/) takes a password straight from a client, with no page to show a challenge on, and it shares each account's budget of wrong passwords with the sign-in form. A public client with the password grant enabled lets anyone send it passwords, so through it a script can still spend an account's budget and block its sign-in on the form. A confidential client has to prove its secret first. So the challenge stops that only while no public client has the password grant enabled. It's off by default.
+
+## Turn the challenge off
+
+Turn off **Require the challenge** under **Admin**, **Turnstile** and click **Save**. The keys stay stored, so turning it back on needs no new ones. When nobody can sign in to do that, `goiabada-authserver recover --disable-turnstile` turns it off from the command line: see [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-turnstile-challenge-refuses-every-sign-in).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Rate limits" description="Every limit, its budget and what it counts by." href="/reference/environment-variables/#rate-limits" />
+  <LinkCard title="Monitoring" description="Scrape the metrics and alert on the challenge's checks." href="/deploy/monitoring/" />
+  <LinkCard title="Security" description="How Goiabada protects sign-ins, tokens and sessions." href="/reference/security/" />
+</CardGrid>

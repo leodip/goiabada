@@ -61,6 +61,7 @@ var (
 	charUpdateGeneralSettings  = &api.UpdateSettingsGeneralRequest{AppName: "Goiabada"}
 	charUpdateSessionsSettings = &api.UpdateSettingsSessionsRequest{UserSessionIdleTimeoutInSeconds: 900}
 	charUpdateTokensSettings   = &api.UpdateSettingsTokensRequest{TokenExpirationInSeconds: 300}
+	charUpdateTurnstile        = &api.UpdateSettingsTurnstileRequest{TurnstileSiteKey: "1x00000000000000000000AA"}
 	charUpdateUIThemeSettings  = &api.UpdateSettingsUIThemeRequest{UITheme: "dark"}
 
 	charCreateUserAttr = &api.CreateUserAttributeRequest{Key: "team", Value: "green"}
@@ -1171,6 +1172,33 @@ func wireCharacterization() []wireCase {
 			verb: "PUT", path: "/api/v1/admin/settings/tokens", contentType: charJSON,
 			bodyOf:        charUpdateTokensSettings,
 			successStatus: 200, reply: `{"tokenExpirationInSeconds":300}`, want: 300,
+		},
+
+		// --- settings_turnstile.go --------------------------------------------------------
+		{
+			name: "GetSettingsTurnstile",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetSettingsTurnstile(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				return got.TurnstileSiteKey, nil
+			},
+			verb: "GET", path: "/api/v1/admin/settings/turnstile", contentType: charJSON,
+			successStatus: 200, reply: `{"turnstileSiteKey":"1x00000000000000000000AA"}`, want: "1x00000000000000000000AA",
+		},
+		{
+			name: "UpdateSettingsTurnstile",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.UpdateSettingsTurnstile(ctx, charAccessToken, charUpdateTurnstile)
+				if err != nil {
+					return nil, err
+				}
+				return got.HasTurnstileSecretKey, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/settings/turnstile", contentType: charJSON,
+			bodyOf:        charUpdateTurnstile,
+			successStatus: 200, reply: `{"hasTurnstileSecretKey":true}`, want: true,
 		},
 
 		// --- settings_ui_theme.go ---------------------------------------------------------

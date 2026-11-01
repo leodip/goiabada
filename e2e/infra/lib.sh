@@ -92,3 +92,21 @@ hold_suite_lock() {
 require_vps() {
   [[ -n "$E2E_VPS_HOST" ]] || die "set E2E_VPS_HOST, the VPS address, in e2e/.env or the environment (see e2e/.env.example)"
 }
+
+# Turns the auth server's Turnstile challenge off in the e2e environment, before a suite's browser
+# signs in. It is off already, unless a run of the Turnstile spec was killed with it on: then every
+# sign-in is refused, the setup step's included, so nothing in the browser could turn it off. The
+# auth server's recover command does it without signing in. It names no user, ends no sessions and
+# keeps the keys, and changes nothing when the challenge is already off.
+turnstile_off() {
+  local out
+  out="$(ssh_vps "cd $(printf %q "$E2E_REMOTE_DIR") && docker compose run --rm -T goiabada-authserver recover --disable-turnstile" 2>&1)" || {
+    printf '%s\n' "$out" >&2
+    die "could not turn the Turnstile challenge off on $E2E_VPS_HOST"
+  }
+  if grep -q 'turnstile challenge turned off' <<<"$out"; then
+    warn "the Turnstile challenge was on: turned it off"
+  else
+    echo "The Turnstile challenge is off."
+  fi
+}

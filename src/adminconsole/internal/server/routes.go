@@ -317,6 +317,8 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/settings/email", adminsettingshandlers.HandleEmailPost(httpHelper, s.sessionStore, apiClient, s.settingsCache, baseURL))
 		r.Get("/settings/email/send-test-email", adminsettingshandlers.HandleEmailSendTestGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/settings/email/send-test-email", adminsettingshandlers.HandleEmailSendTestPost(httpHelper, s.sessionStore, apiClient, baseURL))
+		r.Get("/settings/turnstile", adminsettingshandlers.HandleTurnstileGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/settings/turnstile", adminsettingshandlers.HandleTurnstilePost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/settings/audit-logs", adminsettingshandlers.HandleAuditLogsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/settings/audit-logs", adminsettingshandlers.HandleAuditLogsPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/settings/audit-log-viewer", adminsettingshandlers.HandleAuditLogViewerGet(httpHelper, apiClient))

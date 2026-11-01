@@ -33,6 +33,7 @@ curl -fsS -o /dev/null --max-time 10 "$auth_url/health" ||
   die "$auth_url does not answer: check it with e2e/infra/verify.sh, or rebuild with e2e/reset.sh"
 
 require_vps
+turnstile_off
 trap '"$E2E_DIR/infra/rate-limiter.sh" off || warn "the rate limiter may still be on: e2e/infra/rate-limiter.sh off"' EXIT
 "$E2E_DIR/infra/rate-limiter.sh" on || exit 1
 

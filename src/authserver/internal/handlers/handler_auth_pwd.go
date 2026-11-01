@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
+	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -152,8 +153,10 @@ func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer Pag
 		bind["errorField"] = errorField
 		bind["email"] = email
 	}
-
-	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind); err != nil {
+	// Every render, the form's first and each one beside a refusal, carries a fresh widget while
+	// the challenge is on (#642 decision 2).
+	err := turnstile.WithWidget(pageRenderer, settings).RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
+	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 	}
 }

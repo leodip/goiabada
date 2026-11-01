@@ -1353,6 +1353,10 @@
     letter-spacing: -0.01em;
     text-align: center;
   }
+  .cf-turnstile {
+    min-height: 140px;
+    line-height: 0;
+  }
   .auth-footer {
     margin-top: 1.5rem;
     color: var(--color-ink-muted);

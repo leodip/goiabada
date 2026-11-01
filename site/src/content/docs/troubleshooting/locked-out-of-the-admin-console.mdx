@@ -12,6 +12,7 @@ Find your case first:
 - **Signing in fails for every administrator** with **Sign-in failed** or **Something went wrong**: [the admin console's client secret changed](#the-admin-consoles-client-secret-changed).
 - **The password you set in `GOIABADA_ADMIN_PASSWORD` is refused:** [you changed it after the first start](#you-changed-goiabada_admin_password).
 - **The only administrator can't sign in**, because they forgot their password, lost their authenticator, or their authenticator refuses every code: [the last administrator can't sign in](#the-last-administrator-cant-sign-in).
+- **The sign-in form refuses everyone since the Turnstile challenge was turned on**: [the Turnstile challenge refuses every sign-in](#the-turnstile-challenge-refuses-every-sign-in).
 
 ## The admin console's client secret changed
 
@@ -140,6 +141,7 @@ When none of these is left, the auth server's `recover` subcommand restores sign
 | `--password-stdin` | Sets a new password, read from the first line of the command's input. It must meet your [password policy](/concepts/password-policy/). |
 | `--password <password>` | Sets a new password given on the command line. Use `--password-stdin` instead, as below. |
 | `--remove-otp` | Turns off the user's two-factor authentication and removes their authenticator |
+| `--disable-turnstile` | Turns off the Turnstile challenge and keeps its keys. It names no user, so it needs no `--email`, and given alone it ends no sessions. |
 
 One run can combine several flags. Type the new password at the first line, where nothing you type is shown. The second line hands it to the command's input, and since `printf` is built into the shell, the password never appears in a command line:
 
@@ -174,6 +176,36 @@ When you don't need a new password, leave out the first line, the pipe and `--pa
 </Aside>
 
 The recovery doesn't reset the limits on wrong passwords. If the sign-in page then says "Too many attempts", first stop whatever is still making attempts. [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/) says which limits a restart of the auth server resets and which only time does.
+
+## The Turnstile challenge refuses every sign-in
+
+With the [Turnstile challenge](/guides/require-a-turnstile-challenge/) on, the sign-in form accepts a password only with a token Cloudflare verified. The auth server can't check the site key or the widget's hostname when you save them, so when either is wrong, every attempt is refused with "Complete the security check, then try again. The check needs JavaScript." The widget may show an error, or not appear at all. It's usually one of these:
+
+- **The site key is wrong**, or belongs to another widget. Copy it again from the widget in the Cloudflare dashboard.
+- **The widget doesn't list the auth server's host**, the host of `GOIABADA_AUTHSERVER_BASEURL`. The widget then shows an error.
+- **The widget lists another host**, and the token is solved there. The auth server logs `refused a turnstile token solved on another hostname` with the `hostname` the token names and the `expected_hostname`.
+
+The admin console signs in through the same form, so nobody can turn the challenge off there. Turn it off with the auth server's `recover` command, where the auth server runs. `--disable-turnstile` names no user, so it needs no `--email`, touches no user and ends no sessions. It keeps the site key and the secret key:
+
+<Tabs>
+  <TabItem label="Docker Compose">
+    ```bash
+    docker compose run --rm -T goiabada-authserver recover --disable-turnstile
+    ```
+  </TabItem>
+  <TabItem label="Native binaries">
+    ```bash
+    sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-authserver recover --disable-turnstile'
+    ```
+  </TabItem>
+  <TabItem label="Kubernetes">
+    ```bash
+    kubectl exec -i -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver recover --disable-turnstile
+    ```
+  </TabItem>
+</Tabs>
+
+The forms stop asking for the challenge at the next request, on every replica. The [audit log](/concepts/audit-log/) records `updated_turnstile_settings` with the command as the actor. Sign in, fix the widget in the Cloudflare dashboard or the site key under **Admin**, **Turnstile**, and turn the challenge on again. Before you sign out, check that a private window can sign in.
 
 ## Next steps
 

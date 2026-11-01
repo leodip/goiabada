@@ -62,6 +62,22 @@ var emailErrorFields = map[string]string{
 	i18n.ErrCodeEmailTooLong:                           "fromEmail",
 }
 
+// turnstileErrorFields maps the Turnstile settings' refusals to the field each is about. A site key
+// changed with a secret key saved for the old one is the secret key's to answer, as a changed SMTP
+// host is the password's, and a removal refused while the challenge stays on is the removal
+// checkbox's, since it disables the secret key's box.
+var turnstileErrorFields = map[string]string{
+	i18n.ErrCodeSettingsTurnstileSiteKeyRequired:            "turnstileSiteKey",
+	i18n.ErrCodeSettingsTurnstileSiteKeyTooLong:             "turnstileSiteKey",
+	i18n.ErrCodeSettingsTurnstileSecretKeyRequired:          "turnstileSecretKey",
+	i18n.ErrCodeSettingsTurnstileSecretKeyTooLong:           "turnstileSecretKey",
+	i18n.ErrCodeSettingsTurnstileSecretKeyAndClear:          "turnstileSecretKey",
+	i18n.ErrCodeSettingsTurnstileSiteKeyChanged:             "turnstileSecretKey",
+	i18n.ErrCodeSettingsTurnstileSecretKeyRejected:          "turnstileSecretKey",
+	i18n.ErrCodeSettingsTurnstileSecretKeyUnchecked:         "turnstileSecretKey",
+	i18n.ErrCodeSettingsTurnstileSecretKeyClearWhileEnabled: "clearTurnstileSecretKey",
+}
+
 // sendTestErrorFields maps the test email's refusals about its address to that field. A send that
 // fails is the server's, and names no field.
 var sendTestErrorFields = map[string]string{
@@ -99,6 +115,21 @@ type SettingsEmailGet struct {
 	HasSMTPPassword   bool
 	SavedSMTPHost     string
 	ClearSMTPPassword bool
+}
+
+// SettingsTurnstile is the Turnstile settings page, as loaded or as a refused save submitted it.
+// TurnstileSecretKey is empty on load: the API never returns the stored secret key, only
+// HasTurnstileSecretKey, which draws the Saved or Not set badge and offers the removal. On a redraw
+// it is the key as typed, so a resubmission sends it rather than keeping the old one.
+// SavedTurnstileEnabled is the switch as stored, which decides whether ticking it asks first: the
+// page's hidden fields carry it and HasTurnstileSecretKey through a refused save (#642 decision 11).
+type SettingsTurnstile struct {
+	TurnstileEnabled        bool
+	TurnstileSiteKey        string
+	TurnstileSecretKey      string
+	HasTurnstileSecretKey   bool
+	ClearTurnstileSecretKey bool
+	SavedTurnstileEnabled   bool
 }
 
 // SettingsEmailPost is the email settings form as submitted, which a refused save is redrawn from:

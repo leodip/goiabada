@@ -230,7 +230,9 @@ func TestDeleteResource(t *testing.T) {
 
 func createTestResource(t *testing.T) *record.Resource {
 	resource := &record.Resource{
-		ResourceIdentifier: "test_resource" + fake.LetterN(4),
+		// The identifier is unique across the tier's shared database, so the suffix is long enough
+		// that two draws do not meet. The whole stays inside the column's 40 characters.
+		ResourceIdentifier: "test_resource_" + fake.LetterN(12),
 		Description:        "Test Resource",
 	}
 	err := database.CreateResource(context.Background(), nil, resource)

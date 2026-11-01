@@ -31,6 +31,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
+	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/httpmw"
@@ -87,12 +88,22 @@ type Server struct {
 	// The requests the introspection endpoint answers, by outcome (#676 decision 11), registered here
 	// for the same reason.
 	introspectionMetrics *introspectionmetrics.Recorder
+
+	// The Turnstile challenge's check, through which the forms that carry it verify a submission's
+	// token with Cloudflare, counting each check on the metrics listener (#642 decisions 3 and 4).
+	// Built here, beside the other counters, over the data cipher its secret key is sealed under.
+	challengeVerifier handlers.ChallengeVerifier
+
+	// The same verifier's check of a secret key, which the admin API's Turnstile save asks before it
+	// puts a secret key in use (#642 decision 11).
+	secretKeyChecker *turnstile.Verifier
 }
 
 func NewServer(router *routing.Router, database data.Database, sessionStore *sessionstore.ConditionalStore,
 	dataCipher *encryption.DataCipher, trustedProxies []*net.IPNet, cfg *config.Config) *Server {
 
 	registry := metrics.NewRegistry()
+	challengeVerifier := turnstile.NewVerifier(registry, dataCipher, cfg.AuthServer.BaseURL, turnstile.SiteverifyURL)
 	s := Server{
 		router:       router,
 		database:     database,
@@ -110,6 +121,9 @@ func NewServer(router *routing.Router, database data.Database, sessionStore *ses
 		tokenMetrics:         tokenmetrics.Register(registry),
 		revocationMetrics:    revocationmetrics.Register(registry),
 		introspectionMetrics: introspectionmetrics.Register(registry),
+
+		challengeVerifier: challengeVerifier,
+		secretKeyChecker:  challengeVerifier,
 	}
 	metrics.RegisterBuildInfo(s.metrics)
 	metrics.RegisterRuntime(s.metrics)

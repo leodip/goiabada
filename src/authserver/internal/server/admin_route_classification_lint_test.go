@@ -194,6 +194,8 @@ var adminRouteClassification = map[string]adminRouteClass{
 		"authority it lacks (#402 decision 7)"),
 	"PUT /api/v1/admin/settings/tokens": outsideCeilings("changes posture and gives the caller no authority it " +
 		"lacks (#402 decision 7)"),
+	"PUT /api/v1/admin/settings/turnstile": outsideCeilings("changes posture, which a wrong site key can turn " +
+		"into denied sign-ins, and gives the caller no authority it lacks (#402 decision 7)"),
 	"POST /api/v1/admin/settings/keys/rotate": outsideCeilings("rotates the signing keys, which can deny " +
 		"service and gives the caller no authority it lacks (#402 decision 7)"),
 	"DELETE /api/v1/admin/settings/keys/{id}": outsideCeilings("deletes a previous signing key, which can deny " +

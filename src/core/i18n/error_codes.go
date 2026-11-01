@@ -21,6 +21,10 @@ const (
 	ErrCodeLoginAuthFailed       = "handler.login.auth_failed"
 	ErrCodeLoginAccountDisabled  = "handler.login.account_disabled"
 
+	// Turnstile challenge — the refusal of a submission whose token Cloudflare did not verify,
+	// or that carried none, on each form the challenge is on (#642).
+	ErrCodeChallengeFailed = "handler.challenge.failed"
+
 	// Email validator — used wherever an email address is validated outside
 	// the OAuth protocol path (account self-service, admin user CRUD, SMTP
 	// settings, registration). Errors that become an RFC 6749
@@ -321,6 +325,16 @@ const (
 	ErrCodeSettingsEmailSMTPFromEmailTooLong  = "handler.settings_email.smtp_from_email_too_long" // Args: {"max": int}
 	ErrCodeSettingsEmailSMTPPasswordAndClear  = "handler.settings_email.smtp_password_and_clear"
 	ErrCodeSettingsEmailSMTPHostChanged       = "handler.settings_email.smtp_host_changed"
+
+	ErrCodeSettingsTurnstileSiteKeyRequired            = "handler.settings_turnstile.site_key_required"
+	ErrCodeSettingsTurnstileSecretKeyRequired          = "handler.settings_turnstile.secret_key_required"
+	ErrCodeSettingsTurnstileSecretKeyClearWhileEnabled = "handler.settings_turnstile.secret_key_clear_while_enabled"
+	ErrCodeSettingsTurnstileSiteKeyChanged             = "handler.settings_turnstile.site_key_changed"
+	ErrCodeSettingsTurnstileSecretKeyAndClear          = "handler.settings_turnstile.secret_key_and_clear"
+	ErrCodeSettingsTurnstileSiteKeyTooLong             = "handler.settings_turnstile.site_key_too_long"   // Args: {"max": int}
+	ErrCodeSettingsTurnstileSecretKeyTooLong           = "handler.settings_turnstile.secret_key_too_long" // Args: {"max": int}
+	ErrCodeSettingsTurnstileSecretKeyRejected          = "handler.settings_turnstile.secret_key_rejected"
+	ErrCodeSettingsTurnstileSecretKeyUnchecked         = "handler.settings_turnstile.secret_key_unchecked"
 
 	ErrCodeSettingsEmailConnectFailedHostNotFound = "handler.settings_email.connect_failed_host_not_found"
 	ErrCodeSettingsEmailConnectFailedTimedOut     = "handler.settings_email.connect_failed_timed_out"

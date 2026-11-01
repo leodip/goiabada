@@ -49,7 +49,7 @@ Goiabada is an open-source authentication server built on **OAuth 2.0** and **Op
 
 ## Privacy
 
-Goiabada runs on your servers, and your users' data stays in your database. It doesn't phone home: there's no telemetry, and its pages load no fonts, scripts, or images from anyone else's servers.
+Goiabada runs on your servers, and your users' data stays in your database. It doesn't phone home: there's no telemetry, and its pages load no fonts, scripts, or images from anyone else's servers. The one exception is the optional [Turnstile challenge](https://goiabada.dev/guides/require-a-turnstile-challenge/): while you have it on, the sign-in, forgot-password and registration forms load Cloudflare's widget, and the auth server asks Cloudflare to verify each submission.
 
 ## Security
 

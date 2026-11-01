@@ -130,7 +130,8 @@ Tests sit under `playwright/tests/`, one folder per area: the admin console (`ad
 `account/` and `settings/`), the test app (`testapp/`: a user signing in to its web apps, its SPA and its API, single
 sign-on across its two sites, signing out, the authorization parameters, and the auth server's own
 pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), the protocol
-itself where no page reaches it (`oauth/`), and accessibility (`accessibility/`: axe over every page and
+itself where no page reaches it (`oauth/`), the Turnstile challenge on the auth server's forms with
+Cloudflare's test keys (`turnstile/`), and accessibility (`accessibility/`: axe over every page and
 state of both applications in the light and the dark scheme, the layout at phone and tablet widths,
 and the main journeys by keyboard). They run eight at a time against an
 environment that stays up between runs, so every test keeps to these rules, which is what lets the
@@ -149,7 +150,9 @@ suite run again and again without a reset:
   guards around the system resource and documents for all apps. They are named `*.system.ts` and
   run in the `system` project, which `playwright.config.ts` runs after every other test, on one
   worker. Each puts back what it changes (`lib/settings.ts`), and retires what it published; the
-  setup step restores the seeded settings before a run if one failed to.
+  setup step restores the seeded settings before a run if one failed to. It cannot do so for the
+  Turnstile challenge, which would refuse its sign-in, so `test.sh` and `test-rate-limits.sh` turn
+  the challenge off on the VPS first, with the auth server's `recover --disable-turnstile`.
 - **It never depends on what another test did**, or on counts or order.
 - **Users other than the administrator sign in through the browser** where the subject needs it
   (`lib/console-user.ts`, `lib/browser-sign-in.ts`), always from an empty browser state: inside a test,

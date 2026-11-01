@@ -278,8 +278,11 @@ func TestMigration000067_DownRefusesAnAddressThatNoLongerFits(t *testing.T) {
 	skipWithout000067(t)
 	ctx := context.Background()
 	h := newIsolatedDB(t)
-	require.NoError(t, h.Migrator.Migrate(ctx, 67), "migrate to 67")
+	// Seeded through the data layer at head, then carried down to 67: the data layer writes every
+	// column the record carries, a column a later migration adds to settings included (000079).
+	migrateToHead000063(t, h)
 	rows := seedRows000067(t, h)
+	require.NoError(t, h.Migrator.Migrate(ctx, 67), "migrate to 67")
 	widened := dumpTables000067(t, h)
 
 	tooLong := strings.Repeat("x", 65)

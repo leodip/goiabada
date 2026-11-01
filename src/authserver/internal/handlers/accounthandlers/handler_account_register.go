@@ -23,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
@@ -217,21 +218,35 @@ func HandleRegisterGet(
 			return
 		}
 
-		bind := map[string]interface{}{
-			"ceremonyId":                registrationCeremonyId(r),
-			"requiresEmailVerification": registrationRequiresEmailVerification(settings),
-			"passwordRules":             passwordRulesHint(r),
-		}
-		if err := bindRegistrationLegalDocuments(r, ceremonies, legalDocuments, bind); err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
+		renderRegisterForm(w, r, pageRenderer, ceremonies, legalDocuments, settings, "", "", "")
+	}
+}
 
-		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
+// renderRegisterForm draws the registration form, beside refusal when there is one, marking the
+// field it names, by its form name, invalid, and with email in its field. The form posts to
+// action="", so the URL the visitor arrived at, ceremony parameter included, is the one a
+// submission has, and a redrawn form carries the id on. Every render of the form, its first and
+// each beside a refusal, carries a fresh Turnstile widget while the challenge is on (#642 decision
+// 2); the pages answering a registration, which have no form, carry none.
+func renderRegisterForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
+	ceremonies registrationCeremonies, legalDocuments registrationLegalDocuments,
+	settings *record.Settings, email, refusal, field string) {
+
+	bind := map[string]interface{}{
+		"email":                     email,
+		"error":                     refusal,
+		"errorField":                field,
+		"ceremonyId":                registrationCeremonyId(r),
+		"requiresEmailVerification": registrationRequiresEmailVerification(settings),
+		"passwordRules":             passwordRulesHint(r),
+	}
+	if err := bindRegistrationLegalDocuments(r, ceremonies, legalDocuments, bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
+		return
+	}
+	err := turnstile.WithWidget(pageRenderer, settings).RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
+	if err != nil {
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }
 
@@ -376,27 +391,9 @@ func HandleRegisterPost(
 			}
 		}
 
-		// renderError redraws the form with message, marking the field it names, by its form name,
-		// invalid. The form posts to action="", so the URL the visitor arrived at, ceremony
-		// parameter included, is the one this request has, and the re-render carries the id on.
+		// renderError redraws the form with message, marking the field it names invalid.
 		renderError := func(field, message string) {
-			bind := map[string]interface{}{
-				"email":                     email,
-				"error":                     message,
-				"errorField":                field,
-				"ceremonyId":                registrationCeremonyId(r),
-				"requiresEmailVerification": requiresEmailVerification,
-				"passwordRules":             passwordRulesHint(r),
-			}
-			if err := bindRegistrationLegalDocuments(r, ceremonies, legalDocuments, bind); err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-
-			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-			}
+			renderRegisterForm(w, r, pageRenderer, ceremonies, legalDocuments, settings, email, message, field)
 		}
 
 		// refuseAddress redraws the form for an address the format or length check refused.

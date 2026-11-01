@@ -371,6 +371,13 @@ func (d *recoveryWriteRefuser) CreateUserPermission(ctx context.Context, tx *sql
 	return d.Database.CreateUserPermission(ctx, tx, userPermission)
 }
 
+func (d *recoveryWriteRefuser) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
+	if d.refuse("UpdateSettings", tx) {
+		return d.failure
+	}
+	return d.Database.UpdateSettings(ctx, tx, settings)
+}
+
 // A call failing inside the transaction rolls back everything the recovery wrote before it, the
 // sweep included, and records nothing: asked for all three actions, a grant whose read or write
 // fails leaves the password set and the authenticator removed before it uncommitted, and a password
@@ -708,4 +715,134 @@ func TestRecovery_FindsAGrantHoldingTheRowAndWritesNoSecond(t *testing.T) {
 	assert.ElementsMatch(t, []int64{f.otherPermission.Id, f.manage.Id}, heldPermissionIds(t, f.user.Id),
 		"one manage row, the one granted while the recovery waited")
 	assert.Equal(t, []string{audit.EventRevokedUserAuthState}, recorder.events)
+}
+
+// turnTurnstileOnInRowOne stores the challenge on in the settings row a recovery reads, with a
+// site key and a sealed secret key, and puts the row back as it was when the test ends: the tier
+// shares the row between tests.
+func turnTurnstileOnInRowOne(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	ensureSettingsRowOne(t)
+	settings, err := database.GetSettingsById(ctx, nil, 1)
+	require.NoError(t, err)
+	original := *settings
+	t.Cleanup(func() {
+		require.NoError(t, database.UpdateSettings(context.Background(), nil, &original))
+	})
+	settings.TurnstileEnabled = true
+	settings.TurnstileSiteKey = "1x00000000000000000000AA"
+	settings.TurnstileSecretKeyEncrypted = []byte("the sealed secret key")
+	require.NoError(t, database.UpdateSettings(ctx, nil, settings))
+}
+
+// assertTurnstile holds what the settings row says of the challenge: on or off, with the keys
+// turnTurnstileOnInRowOne stored kept either way.
+func assertTurnstile(t *testing.T, enabled bool, msg string) {
+	t.Helper()
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	assert.Equal(t, enabled, settings.TurnstileEnabled, msg)
+	assert.Equal(t, "1x00000000000000000000AA", settings.TurnstileSiteKey, "the site key is kept")
+	assert.Equal(t, []byte("the sealed secret key"), settings.TurnstileSecretKeyEncrypted, "the secret key is kept")
+}
+
+// A recovery asked only to turn the challenge off names no user: it turns the challenge off, keeps
+// both keys, records it with the command as the actor, and touches no user, so no generation
+// advances and no session or refresh token ends (#642 decision 11).
+func TestRecovery_DisableTurnstileAloneTouchesNoUser(t *testing.T) {
+	ctx := context.Background()
+	f := seedRecoveryFixture(t)
+	turnTurnstileOnInRowOne(t)
+	recorder := &recoveryAuditRecorder{}
+
+	outcome, err := recovery.Run(ctx, database, recorder, recovery.Request{DisableTurnstile: true})
+	require.NoError(t, err)
+
+	assert.True(t, outcome.TurnstileDisabled)
+	assert.Zero(t, outcome.UserId, "no user was recovered")
+	assertTurnstile(t, false, "the challenge is off")
+
+	after, err := database.GetUserById(ctx, nil, f.user.Id)
+	require.NoError(t, err)
+	assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration, "the generation did not move")
+	assert.True(t, after.OTPEnabled)
+	session, err := database.GetUserSessionById(ctx, nil, f.session.Id)
+	require.NoError(t, err)
+	assert.NotNil(t, session, "the user's session still stands")
+	assertTokenRevoked(t, f.sessionToken.Id, false, "the session-bound refresh token")
+
+	assert.Equal(t, []string{audit.EventUpdatedTurnstileSettings}, recorder.events)
+	assert.Equal(t, map[string]interface{}{
+		"command": recovery.Actor,
+		"old": map[string]interface{}{
+			"turnstile_enabled": true, "turnstile_site_key": "1x00000000000000000000AA", "has_turnstile_secret_key": true,
+		},
+		"new": map[string]interface{}{
+			"turnstile_enabled": false, "turnstile_site_key": "1x00000000000000000000AA", "has_turnstile_secret_key": true,
+		},
+	}, recorder.details[0])
+
+	// A second run finds it off, writes nothing and records nothing.
+	recorder = &recoveryAuditRecorder{}
+	outcome, err = recovery.Run(ctx, database, recorder, recovery.Request{DisableTurnstile: true})
+	require.NoError(t, err)
+	assert.False(t, outcome.TurnstileDisabled)
+	assert.Empty(t, recorder.events)
+}
+
+// Beside a user action, the challenge is turned off in the recovery's one transaction, and the
+// user is recovered as without it.
+func TestRecovery_DisableTurnstileWithAUserAction(t *testing.T) {
+	ctx := context.Background()
+	f := seedRecoveryFixture(t)
+	turnTurnstileOnInRowOne(t)
+	recorder := &recoveryAuditRecorder{}
+
+	outcome, err := recovery.Run(ctx, database, recorder, recovery.Request{
+		Email: f.user.Email, GrantManage: true, DisableTurnstile: true,
+	})
+	require.NoError(t, err)
+
+	assert.True(t, outcome.TurnstileDisabled)
+	assert.True(t, outcome.ManageGranted)
+	assertTurnstile(t, false, "the challenge is off")
+	assertRevokedEverything(t, f, outcome)
+	assert.Equal(t, []string{
+		audit.EventAddedUserPermission,
+		audit.EventAdministrativePermissionChanged,
+		audit.EventUpdatedTurnstileSettings,
+		audit.EventRevokedUserAuthState,
+	}, recorder.events)
+	assert.Equal(t, recovery.Actor, recorder.details[2]["command"])
+}
+
+// The challenge's write and the user's are one transaction: a user action failing inside it
+// leaves the challenge on, and the settings write failing leaves the user as they were.
+func TestRecovery_DisableTurnstileRollsBackWithTheUserActions(t *testing.T) {
+	ctx := context.Background()
+
+	for _, failAt := range []string{"CreateUserPermission", "UpdateSettings"} {
+		t.Run(failAt, func(t *testing.T) {
+			f := seedRecoveryFixture(t)
+			turnTurnstileOnInRowOne(t)
+			db := &recoveryWriteRefuser{Database: database, failAt: failAt,
+				failure: errs.New("the engine refused the call")}
+			recorder := &recoveryAuditRecorder{}
+
+			_, err := recovery.Run(ctx, db, recorder, recovery.Request{
+				Email: f.user.Email, Password: recoveryPassword, GrantManage: true, DisableTurnstile: true,
+			})
+
+			require.ErrorIs(t, err, db.failure)
+			require.True(t, db.reached, "the recovery reached the refused call")
+			assert.Empty(t, recorder.events, "nothing is recorded for a rollback")
+			assertTurnstile(t, true, "the challenge is still on")
+			after, err := database.GetUserById(ctx, nil, f.user.Id)
+			require.NoError(t, err)
+			assert.Equal(t, f.user.PasswordHash, after.PasswordHash, "the password is as it was")
+			assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration, "the generation did not move")
+			assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id), "manage is not granted")
+		})
+	}
 }

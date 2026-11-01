@@ -1,5 +1,5 @@
 {{define "title"}}{{ T $.ctx "account.register.page_title" }} – {{ .appName }}{{end}}
-{{define "head"}}{{end}}
+{{define "head"}}{{ if .turnstileSiteKey }}<script src="{{ .turnstileScriptURL }}" async defer></script>{{ end }}{{end}}
 
 {{define "body"}}
 <h1 class="auth-title">{{ T $.ctx "account.register.title" }}</h1>
@@ -52,6 +52,14 @@
       {{ end }}
     </ul>
   </div>
+  {{ end }}
+
+  {{/* The Turnstile challenge, while it is on: Cloudflare's script renders the widget, which writes
+       its token into the form as cf-turnstile-response. The action names this form, which the
+       server checks the token was solved for (#642). Compact, 150 pixels wide, is the one size
+       Cloudflare draws that fits the form at 320 CSS pixels: normal and flexible are 300 wide. */}}
+  {{ if .turnstileSiteKey }}
+  <div class="cf-turnstile" data-sitekey="{{ .turnstileSiteKey }}" data-size="compact" data-action="register" data-language="{{ Lang $.ctx }}"></div>
   {{ end }}
 
   <button class="button button-primary button-block" type="submit">{{ T $.ctx "account.register.button" }}</button>

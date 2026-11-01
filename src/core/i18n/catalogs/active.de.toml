@@ -356,6 +356,7 @@
 "adminconsole.admin_menu.settings_tokens" = "Tokens"
 "adminconsole.admin_menu.settings_keys" = "Signaturschlüssel"
 "adminconsole.admin_menu.settings_email" = "E-Mail"
+"adminconsole.admin_menu.settings_turnstile" = "Turnstile"
 "adminconsole.admin_menu.audit_log_settings" = "Audit-Protokollierung"
 "adminconsole.admin_menu.audit_log_viewer" = "Audit-Protokoll"
 
@@ -1669,6 +1670,22 @@
 "adminconsole.admin_settings.email_sendtest.smtp_disabled" = "Der E-Mail-Versand ist deaktiviert. Aktivieren Sie ihn und richten Sie den SMTP-Server ein, um eine Test-E-Mail zu senden:"
 "adminconsole.admin_settings.email_sendtest.sent_successfully" = "Test-E-Mail an {{.address}} gesendet."
 "adminconsole.admin_settings.email_sendtest.send_button" = "Test-E-Mail senden"
+"adminconsole.admin_settings.turnstile.page_title" = "Turnstile-Einstellungen"
+"adminconsole.admin_settings.turnstile.subtitle" = "Turnstile"
+"adminconsole.admin_settings.turnstile.lead" = "Eine Cloudflare-Turnstile-Prüfung auf den Formularen für Anmeldung, vergessenes Passwort und Registrierung, damit ein Skript weder die Anmeldeversuche eines Kontos noch die E-Mails einer Adresse aufbrauchen kann."
+"adminconsole.admin_settings.turnstile.field.enabled" = "Prüfung verlangen"
+"adminconsole.admin_settings.turnstile.enabled_hint" = "Die drei Formulare zeigen das Widget von Cloudflare, das JavaScript benötigt, und ein Absenden wird erst angenommen, wenn Cloudflare es bestätigt hat."
+"adminconsole.admin_settings.turnstile.enable_warning" = "Ist der Websiteschlüssel falsch oder führt das Widget den Hostnamen des Authentifizierungsservers nicht auf, kann sich niemand mehr anmelden, auch keine Administratoren. Um die Prüfung über die Befehlszeile auszuschalten, führen Sie goiabada-authserver recover --disable-turnstile aus."
+"adminconsole.admin_settings.turnstile.section_keys" = "Widget-Schlüssel"
+"adminconsole.admin_settings.turnstile.keys_hint" = "Die Schlüssel des Widgets, das Sie im Cloudflare-Dashboard unter Turnstile hinzugefügt haben. Sein Hostname ist der Host der Basis-URL des Authentifizierungsservers."
+"adminconsole.admin_settings.turnstile.field.site_key" = "Websiteschlüssel"
+"adminconsole.admin_settings.turnstile.field.secret_key" = "Geheimer Schlüssel"
+"adminconsole.admin_settings.turnstile.secret_key_saved" = "Gespeichert"
+"adminconsole.admin_settings.turnstile.secret_key_not_set" = "Nicht angegeben"
+"adminconsole.admin_settings.turnstile.secret_key_tooltip" = "Der gespeicherte geheime Schlüssel wird nie angezeigt. Lassen Sie dieses Feld leer, um ihn beizubehalten, oder geben Sie einen neuen ein, um ihn zu ersetzen."
+"adminconsole.admin_settings.turnstile.secret_key_keep_placeholder" = "Leer lassen zum Beibehalten"
+"adminconsole.admin_settings.turnstile.clear_secret_key" = "Gespeicherten geheimen Schlüssel entfernen"
+"adminconsole.admin_settings.turnstile.clear_secret_key_notice" = "Der gespeicherte geheime Schlüssel wird beim Speichern gelöscht."
 
 "adminconsole.admin_settings.keys.page_title" = "Signaturschlüssel"
 "adminconsole.admin_settings.keys.subtitle" = "Signaturschlüssel"
@@ -1738,6 +1755,7 @@
 "validator.login.password_required" = "Geben Sie ein Passwort ein."
 "handler.login.auth_failed" = "Anmeldung fehlgeschlagen."
 "handler.login.account_disabled" = "Ihr Benutzerkonto ist deaktiviert."
+"handler.challenge.failed" = "Schließen Sie die Sicherheitsprüfung ab und versuchen Sie es dann erneut. Die Prüfung benötigt JavaScript."
 
 # --- Email validator (LocalizedError-backed) ---------------------------------
 
@@ -1978,6 +1996,16 @@
 "handler.settings_email.smtp_from_email_too_long" = "Die Absenderadresse darf höchstens {{.max}} Zeichen lang sein."
 "handler.settings_email.smtp_password_and_clear" = "Senden Sie entweder ein neues SMTP-Passwort oder clearSmtpPassword, nicht beides."
 "handler.settings_email.smtp_host_changed" = "Der SMTP-Host wurde geändert. Geben Sie das SMTP-Passwort erneut ein oder entfernen Sie es."
+
+"handler.settings_turnstile.site_key_required" = "Geben Sie den Websiteschlüssel ein, um die Turnstile-Prüfung einzuschalten."
+"handler.settings_turnstile.secret_key_required" = "Geben Sie den geheimen Schlüssel ein, um die Turnstile-Prüfung einzuschalten."
+"handler.settings_turnstile.secret_key_clear_while_enabled" = "Der geheime Schlüssel kann nicht entfernt werden, solange die Turnstile-Prüfung eingeschaltet ist."
+"handler.settings_turnstile.site_key_changed" = "Der Websiteschlüssel wurde geändert. Geben Sie den geheimen Schlüssel erneut ein oder entfernen Sie ihn."
+"handler.settings_turnstile.secret_key_and_clear" = "Senden Sie entweder einen neuen geheimen Schlüssel oder clearTurnstileSecretKey, nicht beides."
+"handler.settings_turnstile.site_key_too_long" = "Der Websiteschlüssel darf höchstens {{.max}} Zeichen lang sein."
+"handler.settings_turnstile.secret_key_too_long" = "Der geheime Schlüssel darf höchstens {{.max}} Zeichen lang sein."
+"handler.settings_turnstile.secret_key_rejected" = "Cloudflare akzeptiert den geheimen Schlüssel nicht. Kopieren Sie ihn erneut aus dem Widget im Cloudflare-Dashboard."
+"handler.settings_turnstile.secret_key_unchecked" = "Der geheime Schlüssel konnte nicht bei Cloudflare geprüft werden. Versuchen Sie es gleich noch einmal."
 
 "handler.settings_email.connect_failed_host_not_found" = "Verbindung zum SMTP-Server nicht möglich: Hostname nicht gefunden."
 "handler.settings_email.connect_failed_timed_out" = "Verbindung zum SMTP-Server nicht möglich: Zeitüberschreitung."

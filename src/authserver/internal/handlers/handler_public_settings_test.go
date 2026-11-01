@@ -35,7 +35,7 @@ func (f fixedLegalDocuments) ForAllApps(context.Context) ([]legaldocuments.InEff
 // /api/public/settings
 //
 // This endpoint requires no authentication: it is what the login and account
-// pages read before anyone has a token. record.Settings holds 32 fields, among
+// pages read before anyone has a token. record.Settings holds 37 fields, among
 // them the legacy AES encryption key and the encrypted SMTP password, so the
 // narrow PublicSettingsResponse DTO is the entire boundary between an anonymous
 // caller and all of it. The two guards further down exist to fail if that
@@ -300,20 +300,24 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 
 	aesKey := []byte("SENTINEL-legacy-aes-encryption-key")
 	smtpPassword := []byte("SENTINEL-smtp-password-encrypted")
+	turnstileSecretKey := []byte("SENTINEL-turnstile-secret-key-encrypted")
 
 	settings := &record.Settings{
-		Id:                     1,
-		AppName:                "Goiabada Test",
-		UITheme:                "light",
-		SMTPEnabled:            true,
-		AESEncryptionKeyLegacy: aesKey,
-		SMTPPasswordEncrypted:  smtpPassword,
-		SMTPHost:               "SENTINEL-smtp-host",
-		SMTPUsername:           "SENTINEL-smtp-username",
-		SMTPFromEmail:          "SENTINEL-smtp-from@example.com",
-		SMTPFromName:           "SENTINEL-smtp-from-name",
-		SMTPEncryption:         "SENTINEL-smtp-encryption",
-		SMTPPort:               2525,
+		Id:                          1,
+		AppName:                     "Goiabada Test",
+		UITheme:                     "light",
+		SMTPEnabled:                 true,
+		AESEncryptionKeyLegacy:      aesKey,
+		SMTPPasswordEncrypted:       smtpPassword,
+		SMTPHost:                    "SENTINEL-smtp-host",
+		SMTPUsername:                "SENTINEL-smtp-username",
+		SMTPFromEmail:               "SENTINEL-smtp-from@example.com",
+		SMTPFromName:                "SENTINEL-smtp-from-name",
+		SMTPEncryption:              "SENTINEL-smtp-encryption",
+		SMTPPort:                    2525,
+		TurnstileEnabled:            true,
+		TurnstileSiteKey:            "SENTINEL-turnstile-site-key",
+		TurnstileSecretKeyEncrypted: turnstileSecretKey,
 	}
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(settings, nil).Once()
@@ -331,12 +335,13 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 		"SENTINEL-smtp-from@example.com",
 		"SENTINEL-smtp-from-name",
 		"SENTINEL-smtp-encryption",
+		"SENTINEL-turnstile-site-key",
 	} {
 		assert.NotContains(t, payload, secret, "the response must not expose %q", secret)
 	}
 
 	// Byte slices would serialize as base64, so check that encoding too.
-	for _, secret := range [][]byte{aesKey, smtpPassword} {
+	for _, secret := range [][]byte{aesKey, smtpPassword, turnstileSecretKey} {
 		assert.NotContains(t, payload, string(secret))
 		assert.NotContains(t, payload, base64.StdEncoding.EncodeToString(secret))
 	}
@@ -373,6 +378,8 @@ func TestPublicSettings_SensitiveSettingsFieldsStillExist(t *testing.T) {
 		"SMTPPasswordEncrypted",
 		"SMTPHost",
 		"SMTPUsername",
+		"TurnstileSiteKey",
+		"TurnstileSecretKeyEncrypted",
 	} {
 		_, present := settingsType.FieldByName(name)
 		assert.True(t, present,
