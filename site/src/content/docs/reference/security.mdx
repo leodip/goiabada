@@ -83,7 +83,7 @@ Both servers add these headers to every answer:
 | `Content-Security-Policy` | `script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'` | The browser runs only script files the server serves itself, never an inline script, an `on…` attribute or a `javascript:` URL. It also refuses plugins, a `<base>` element and framing. Styles, images and requests aren't restricted. |
 | `X-Content-Type-Options` | `nosniff` | The browser takes each answer, an uploaded image included, as the type it's labelled with. |
 | `Referrer-Policy` | `same-origin` | A URL carrying a code or a `state` never reaches another site in the `Referer` header. |
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | The browser uses only `https` for a year, subdomains included. Only when the server's base URL is `https`. |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | The browser uses only `https` for a year, subdomains included. Only when the server's base URL is `https`, and never on the HTTP listener's redirects, so it reaches the browser over HTTPS alone. See [listen addresses](/reference/environment-variables/#listen-addresses). |
 
 While the [Turnstile challenge](/guides/require-a-turnstile-challenge/) is on, the sign-in, forgot-password and registration forms add `https://challenges.cloudflare.com` to `script-src`, for the widget's script. Every other page keeps the policy above.
 
