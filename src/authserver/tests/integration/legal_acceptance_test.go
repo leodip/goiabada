@@ -29,7 +29,10 @@ import (
 // records nothing and shows the step again; Decline answers the app access_denied and keeps the
 // session. A new version is asked again, a single sign-on is asked too, prompt=none is answered
 // interaction_required, the password grant is refused with invalid_grant until the user accepts in
-// the browser, a refresh keeps working, and the admin console's own sign-in is never asked.
+// the browser, a refresh keeps working, and the admin console's own sign-in is never asked. A
+// retired document is asked of nobody until it is restored, and an app a published document gains
+// asks its users at their next sign-in there, with no new version, but not a user who accepted the
+// document on another app.
 //
 // Every document here applies to selected apps with a client of the test's own, so no other test's
 // sign-in owes it, but for the admin console's, which needs one for all apps and retires it before
@@ -97,6 +100,23 @@ func newLegalAcceptanceUser(t *testing.T) (*record.User, string) {
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
 	return user, password
+}
+
+// withUser answers the fixture's app with another user signing in to it.
+func (f *legalAcceptanceFixture) withUser(user *record.User, password string) *legalAcceptanceFixture {
+	other := *f
+	other.user, other.password = user, password
+	return &other
+}
+
+// acceptAll signs the fixture's user in to its app in browser, accepts every document the step
+// lists, and asserts the app gets its code.
+func (f *legalAcceptanceFixture) acceptAll(t *testing.T, browser *http.Client) {
+	t.Helper()
+	page, stepURL := toStep(t, browser, f.signInToCompleted(t, browser))
+	_, documents := readStep(t, page)
+	f.assertCodeIssued(t, browser, postStep(t, browser, stepURL, page, versionsOf(documents), false))
+	_ = page.Body.Close()
 }
 
 // mustAcceptFor publishes a must-accept document for the fixture's app alone and answers its id and
@@ -639,4 +659,64 @@ func TestLegalAcceptance_TheAdminConsolesOwnSignInIsNeverAsked(t *testing.T) {
 	_ = page.Body.Close()
 	assert.True(t, slices.ContainsFunc(documents, func(d stepDocument) bool { return d.href == "/legal/"+shortName }),
 		"another app's sign-in owes the all-apps document")
+}
+
+func TestLegalAcceptance_ARetiredDocumentIsAskedOfNobodyUntilItIsRestored(t *testing.T) {
+	f := newLegalAcceptanceFixture(t)
+	owing := f.withUser(newLegalAcceptanceUser(t))
+	termsId, _ := f.mustAcceptFor(t, "retired", "Terms to retire")
+
+	// The fixture's user accepts version 1 before the document is retired.
+	accepted := createHttpClient(t)
+	f.acceptAll(t, accepted)
+
+	retireOverAPI(t, f.adminToken, termsId)
+	browser := createHttpClient(t)
+	owing.assertCodeIssued(t, browser, owing.signInToCompleted(t, browser))
+
+	status, body, _ := legalCall(t, f.adminToken, http.MethodPost, legalPath(termsId, "/restore"), nil)
+	require.Equal(t, http.StatusOK, status, "restore: %v", body)
+
+	// In effect again at version 1: the user who never accepted it is asked at their next sign-in,
+	// and the one who accepted version 1 is not.
+	page, _ := toStep(t, browser, owing.ssoToCompleted(t, browser))
+	_, documents := readStep(t, page)
+	_ = page.Body.Close()
+	assert.Equal(t, []string{strconv.FormatInt(versionId(t, termsId, 1), 10)}, versionsOf(documents),
+		"version 1, as it was")
+	f.assertCodeIssued(t, accepted, f.ssoToCompleted(t, accepted))
+}
+
+func TestLegalAcceptance_ADocumentsAppsChangeWhoIsAskedWithNoNewVersion(t *testing.T) {
+	shop := newLegalAcceptanceFixture(t)
+	forum := newLegalAcceptanceApp(t, shop.user, shop.password, shop.adminToken)
+	owingUser, owingPassword := newLegalAcceptanceUser(t)
+	owingAtShop, owingAtForum := shop.withUser(owingUser, owingPassword), forum.withUser(owingUser, owingPassword)
+	id, _ := shop.mustAcceptFor(t, "gains-an-app", "Terms that gain an app")
+
+	// The fixture's user accepts it on the shop; the forum asks the other user nothing yet.
+	accepted := createHttpClient(t)
+	shop.acceptAll(t, accepted)
+	browser := createHttpClient(t)
+	owingAtForum.assertCodeIssued(t, browser, owingAtForum.signInToCompleted(t, browser))
+
+	// The forum is added, which publishes no new version.
+	status, body := setApps(t, shop.adminToken, id, "selected_apps", []int64{shop.client.Id, forum.client.Id},
+		[]int64{shop.client.Id})
+	require.Equal(t, http.StatusOK, status, "apps: %v", body)
+	versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(context.Background(), nil, id)
+	require.NoError(t, err)
+	assert.Len(t, versions, 1, "changing the apps publishes no version")
+
+	// The user who never accepted it is asked at their next sign-in to the forum, and the one who
+	// accepted it on the shop is not: one acceptance counts on every app the document covers.
+	page, _ := toStep(t, browser, owingAtForum.ssoToCompleted(t, browser))
+	_ = page.Body.Close()
+	forum.assertCodeIssued(t, accepted, forum.ssoToCompleted(t, accepted))
+
+	// The shop taken off, the document asks nothing there.
+	status, body = setApps(t, shop.adminToken, id, "selected_apps", []int64{forum.client.Id},
+		[]int64{shop.client.Id, forum.client.Id})
+	require.Equal(t, http.StatusOK, status, "apps: %v", body)
+	owingAtShop.assertCodeIssued(t, browser, owingAtShop.ssoToCompleted(t, browser))
 }

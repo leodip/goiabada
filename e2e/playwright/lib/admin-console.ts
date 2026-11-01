@@ -477,6 +477,14 @@ export async function retireLegalDocument(page: Page, id: number) {
   await expect(page.getByText("Document retired.", { exact: true })).toBeVisible();
 }
 
+// Restores a retired legal document, answering the question with Restore.
+export async function restoreLegalDocument(page: Page, id: number) {
+  await page.goto(legalDocumentUrl(id, "versions"));
+  await page.locator("#btnRestore").click();
+  await confirmDialog(page);
+  await expect(page.getByText("Document restored.", { exact: true })).toBeVisible();
+}
+
 // A legal document's delete page asks for its short name.
 export async function deleteLegalDocument(page: Page, id: number) {
   await deleteTyping(page, legalDocumentUrl(id, "delete"), "shortName", `${env.adminUrl}/admin/legal-documents`);

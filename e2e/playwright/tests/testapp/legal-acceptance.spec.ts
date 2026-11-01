@@ -2,13 +2,23 @@
 // lists the must-accept documents the user owes for that app, each with an unticked box. Accept with
 // a box unticked shows the step again; Accept records the versions shown and goes on to the app;
 // Decline answers the app access_denied and the next sign-in asks again; a new version is asked again;
-// a single sign-on is asked too; and prompt=none is answered interaction_required.
+// a single sign-on is asked too; prompt=none is answered interaction_required; a retired document is
+// asked of nobody until it is restored; and an app added to a published document asks its users at
+// their next sign-in there, with no new version, but not a user who accepted it on another app.
 //
 // Every document here is set to selected apps, clients of the test's own, before it is published, so
 // no other test's sign-in owes it. The clients fixture deletes the clients, and the legal documents
 // fixture retires the documents.
 import type { Browser, Page } from "@playwright/test";
-import { type LegalDocumentKind, publishLegalDocument, saveLegalDocumentDraft, setLegalDocumentApps } from "../../lib/admin-console";
+import {
+  type LegalDocumentKind,
+  legalDocumentUrl,
+  publishLegalDocument,
+  restoreLegalDocument,
+  retireLegalDocument,
+  saveLegalDocumentDraft,
+  setLegalDocumentApps,
+} from "../../lib/admin-console";
 import { openSignIn, redirectParams, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, type TestClient, type TestLegalDocument, test } from "../../lib/fixtures";
@@ -49,6 +59,17 @@ function backAtTheApp(page: Page) {
 }
 
 const accept = (page: Page) => page.getByRole("button", { name: "Accept", exact: true }).click();
+
+// Ticks every box on the step, accepts, and waits to be back at the app.
+async function acceptAll(page: Page) {
+  for (const box of await page.getByRole("checkbox").all()) await box.check();
+  await accept(page);
+  await page.waitForURL((url) => url.href.startsWith(testRedirectUri));
+}
+
+function isBackAtTheApp(page: Page) {
+  return page.url().startsWith(testRedirectUri);
+}
 
 test("the step lists what is owed; an unticked box is refused; Accept goes on, and the next sign-in is not asked", async ({
   page,
@@ -149,4 +170,82 @@ test("a single sign-on is asked too, and prompt=none is answered interaction_req
   await authorizeAgain(own, client, { prompt: "none" });
   expect(backAtTheApp(own).get("code"), "accepted, the silent request gets its code").toBeTruthy();
   await context.close();
+});
+
+test("a retired document is asked of nobody; restored, it is asked again of whoever has not accepted it", async ({
+  page,
+  browser,
+  clients,
+  users,
+  legalDocuments,
+}) => {
+  const accepted = await users.create();
+  const owing = await users.create();
+  const { client } = await browserSignInClient(page, clients);
+  const doc = await termsFor(page, legalDocuments, client);
+
+  // One user accepts version 1 before the document is retired.
+  const first = await signIn(browser, client, accepted);
+  await acceptAll(first.page);
+
+  await retireLegalDocument(page, doc.id);
+  const second = await signIn(browser, client, owing);
+  expect(isBackAtTheApp(second.page), "a retired document is not asked").toBe(true);
+  expect(backAtTheApp(second.page).get("code")).toBeTruthy();
+
+  // Restored, it is in effect again at version 1: the user who never accepted it is asked at their
+  // next sign-in, and the one who accepted version 1 is not.
+  await restoreLegalDocument(page, doc.id);
+  await authorizeAgain(second.page, client);
+  await expect(second.page).toHaveURL(/\/auth\/legal-acceptance/);
+  await expect(second.page.getByText("Version 1", { exact: true })).toBeVisible();
+  await authorizeAgain(first.page, client);
+  expect(isBackAtTheApp(first.page), "the version accepted before the retirement still counts").toBe(true);
+  expect(backAtTheApp(first.page).get("code")).toBeTruthy();
+  await first.context.close();
+  await second.context.close();
+});
+
+test("an app added to a published document asks its users with no new version, but not a user who accepted it elsewhere", async ({
+  page,
+  browser,
+  clients,
+  users,
+  legalDocuments,
+}) => {
+  const accepted = await users.create();
+  const owing = await users.create();
+  const { client: shop } = await browserSignInClient(page, clients);
+  const { client: forum } = await browserSignInClient(page, clients);
+  const doc = await termsFor(page, legalDocuments, shop);
+
+  // One user accepts it on the shop; the forum asks the other user nothing yet.
+  const first = await signIn(browser, shop, accepted);
+  await acceptAll(first.page);
+  const second = await signIn(browser, forum, owing);
+  expect(isBackAtTheApp(second.page), "the forum owes nothing yet").toBe(true);
+
+  // The forum is added, which publishes no new version.
+  await setLegalDocumentApps(page, doc.id, [shop.identifier, forum.identifier]);
+  await page.goto(legalDocumentUrl(doc.id, "versions"));
+  await expect(page.locator("#versionsTable tbody tr")).toHaveCount(1);
+
+  // The user who never accepted it is asked at their next sign-in to the forum, at version 1.
+  await authorizeAgain(second.page, forum);
+  await expect(second.page).toHaveURL(/\/auth\/legal-acceptance/);
+  await expect(second.page.getByText("Version 1", { exact: true })).toBeVisible();
+
+  // The user who accepted it on the shop is not asked on the forum: one acceptance counts on every
+  // app the document covers.
+  await authorizeAgain(first.page, forum);
+  expect(isBackAtTheApp(first.page), "accepted on the shop, the forum does not ask").toBe(true);
+  expect(backAtTheApp(first.page).get("code")).toBeTruthy();
+
+  // The shop taken off, the document asks nothing there.
+  await setLegalDocumentApps(page, doc.id, [forum.identifier]);
+  await authorizeAgain(second.page, shop);
+  expect(isBackAtTheApp(second.page), "an app the document no longer lists does not ask").toBe(true);
+  expect(backAtTheApp(second.page).get("code")).toBeTruthy();
+  await first.context.close();
+  await second.context.close();
 });
