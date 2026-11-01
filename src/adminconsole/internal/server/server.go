@@ -72,6 +72,10 @@ type Server struct {
 	// registered, which the route table hands the admin API client and the JWKS fetch.
 	metrics  *metrics.Registry
 	upstream *upstreammetrics.Recorder
+
+	// The HTTP metrics' middleware initMiddleware mounts on the router, kept so the redirect-only HTTP
+	// listener counts into the same two families rather than registering them again (#715).
+	httpMetrics func(http.Handler) http.Handler
 }
 
 func NewServer(router *routing.Router, sessionStore *sessionstore.ServerSideStore, settingsCache *publicsettings.Cache,
@@ -126,30 +130,9 @@ func (s *Server) Start(ctx context.Context) error {
 	httpsPort := s.cfg.AdminConsole.ListenPortHttps
 	certFile := s.cfg.AdminConsole.CertFile
 	keyFile := s.cfg.AdminConsole.KeyFile
-	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
-
-	// One record per listener where five and three lines used to be. A reader
-	// checking why HTTPS is off had to join "https enabled: false" to four
-	// separate lines to see which of the four settings was the empty one (#320).
-	slog.InfoContext(ctx, "https listener configuration",
-		"enabled", httpsEnabled,
-		"host", httpsHost,
-		"port", httpsPort,
-		"cert_file", certFile,
-		"key_file", keyFile)
-
 	httpHost := s.cfg.AdminConsole.ListenHostHttp
 	httpPort := s.cfg.AdminConsole.ListenPortHttp
-	httpEnabled := httpHost != "" && httpPort > 0
-
-	slog.InfoContext(ctx, "http listener configuration",
-		"enabled", httpEnabled,
-		"host", httpHost,
-		"port", httpPort)
-
-	if httpEnabled && !httpsEnabled {
-		logPlainHTTP(s.cfg.AdminConsole.BaseURL, s.cfg.AdminConsole.TrustProxyHeaders)
-	}
+	httpsEnabled, httpEnabled := s.logListenerConfiguration(ctx)
 
 	// The metrics listener is enabled by its own setting rather than by a host and port, since its
 	// defaults are both set; it does not count as a listener below, because it answers no client.
@@ -184,7 +167,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	if httpEnabled {
-		httpServer := newHTTPServer(httpHost, httpPort, s.router)
+		httpServer := newHTTPServer(httpHost, httpPort, s.httpListenerHandler())
 		listeners = append(listeners, listener{
 			server: httpServer,
 			serve:  httpServer.ListenAndServe,
@@ -205,6 +188,148 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	return serveAndDrain(ctx, listeners)
+}
+
+// logListenerConfiguration writes the start's records about the HTTPS and HTTP listeners, and
+// reports which of the two the configuration enables.
+func (s *Server) logListenerConfiguration(ctx context.Context) (httpsEnabled, httpEnabled bool) {
+	httpsHost := s.cfg.AdminConsole.ListenHostHttps
+	httpsPort := s.cfg.AdminConsole.ListenPortHttps
+	certFile := s.cfg.AdminConsole.CertFile
+	keyFile := s.cfg.AdminConsole.KeyFile
+	httpsEnabled = httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
+
+	// One record per listener where five and three lines used to be. A reader
+	// checking why HTTPS is off had to join "https enabled: false" to four
+	// separate lines to see which of the four settings was the empty one (#320).
+	slog.InfoContext(ctx, "https listener configuration",
+		"enabled", httpsEnabled,
+		"host", httpsHost,
+		"port", httpsPort,
+		"cert_file", certFile,
+		"key_file", keyFile)
+
+	httpHost := s.cfg.AdminConsole.ListenHostHttp
+	httpPort := s.cfg.AdminConsole.ListenPortHttp
+	httpEnabled = httpHost != "" && httpPort > 0
+
+	if httpEnabled {
+		// What the listener does, while it is on: an operator reading a redirect loop at start finds
+		// it here (#715 decision 11).
+		mode := "serves"
+		if s.httpListenerRedirects() {
+			mode = "redirects"
+		}
+		slog.InfoContext(ctx, "http listener configuration",
+			"enabled", httpEnabled,
+			"host", httpHost,
+			"port", httpPort,
+			"mode", mode)
+	} else {
+		slog.InfoContext(ctx, "http listener configuration",
+			"enabled", httpEnabled,
+			"host", httpHost,
+			"port", httpPort)
+	}
+
+	if httpEnabled && !httpsEnabled {
+		logPlainHTTP(s.cfg.AdminConsole.BaseURL, s.cfg.AdminConsole.TrustProxyHeaders)
+	}
+
+	// The HTTPS listener on, under a base URL whose scheme says otherwise, is a deployment whose
+	// cookies are not Secure and which sends no HSTS, whichever listener a browser reaches (#715
+	// decision 5).
+	if httpsEnabled && !s.cfg.AdminConsole.IsCookieSecure() {
+		slog.WarnContext(ctx, "the admin console's HTTPS listener serves a deployment whose base URL is http, so its cookies aren't Secure and it sends no HSTS")
+	}
+
+	return httpsEnabled, httpEnabled
+}
+
+// httpListenerRedirects reports whether the HTTP listener only redirects: the base URL is https and
+// the proxy headers are untrusted, so nothing says a proxy that ends TLS stands in front of the
+// listener, and a client reaching it reaches it directly over plain HTTP (#715 decisions 1 and 2).
+// With trust on, the browser's side of the connection is the proxy's HTTPS, and the listener serves.
+func (s *Server) httpListenerRedirects() bool {
+	return s.cfg.AdminConsole.IsCookieSecure() && !s.cfg.AdminConsole.TrustProxyHeaders
+}
+
+// httpListenerHandler is the handler Start gives the HTTP listener: the router, unless the listener
+// only redirects. Call it after registerRoutes, whose root chain the redirecting handler shares the
+// HTTP metrics of.
+func (s *Server) httpListenerHandler() http.Handler {
+	if !s.httpListenerRedirects() {
+		return s.router
+	}
+	return s.redirectingRouter()
+}
+
+// redirectingRouter is the redirect-only HTTP listener's handler, the auth server's copied rather
+// than shared because each binary owns its listener. GET and HEAD /health are answered as the router
+// answers them, so a health check pointed at the listener keeps working; every other request, of any
+// method and on any path, is a 301 to the base URL's origin with the request's own path and query
+// (#715 decision 3, RFC 6797 section 7.2).
+//
+// It runs the router's root middleware that applies to an answer that is never a page: the request
+// id, the security headers with HSTS off (RFC 6797 section 7.2 forbids it over plain HTTP, and
+// decision 9 keeps the baseline headers on every answer), the real IP with the proxy headers
+// untrusted, as they are in this mode, the request log, the HTTP metrics and the panic recovery. No
+// slash strip, body limit, CSRF check, settings or session: nothing here reads a body, a session, the
+// auth server or a path beyond the one it copies, and nothing sets a cookie.
+func (s *Server) redirectingRouter() *routing.Router {
+	redirect := httpsRedirect(s.cfg.AdminConsole.BaseURL)
+
+	r := routing.New()
+	r.Use(requestid.Middleware)
+	r.Use(httpmw.SecurityHeaders(false))
+	r.Use(httpmw.RealIP(false, s.trustedProxies))
+	r.Use(httpmw.RequestLogger(s.cfg.AdminConsole.LogHttpRequests))
+	r.Use(s.httpMetrics)
+	r.Use(httpmw.Recoverer)
+
+	// Counted under /health, as the router counts it, through the route of the same name.
+	getAndHead(r, "/health", handlers.HandleHealthCheckGet())
+	// Every other method of /health, which the router would answer 405, and every path no route
+	// matches, the non-canonical ones such as "//host/x" included.
+	r.Handle("/health", redirect)
+	r.NotFound(redirect.ServeHTTP)
+	return r
+}
+
+// httpsRedirect answers every request with a 301 to baseURL's scheme, host and port followed by the
+// request's path and query, counted under the route value https_redirect. The origin comes from the
+// base URL alone, never from the Host field or the request target's authority, which the client
+// chooses: either would make the listener an open redirect (#715 decision 3). The base URL's own
+// path is not added. The answer is net/http's: Location, and for GET and HEAD its short hypertext
+// note (RFC 9110 section 15.4.2).
+func httpsRedirect(baseURL string) http.Handler {
+	origin := httpsOrigin(baseURL)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		metrics.NameRoute(r, metrics.RouteHTTPSRedirect)
+		target := r.URL.EscapedPath()
+		if target == "" {
+			target = "/"
+		}
+		if r.URL.ForceQuery || r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		//nolint:gosec // G710: the configured base URL's origin, never the Host or the target's authority, then the request's own path and query
+		http.Redirect(w, r, origin+target, http.StatusMovedPermanently)
+	})
+}
+
+// httpsOrigin is an https base URL's origin: https://, then its host and port as configured, with
+// no path, query or fragment.
+func httpsOrigin(baseURL string) string {
+	authority := strings.TrimSpace(baseURL)[len("https://"):]
+	if end := strings.IndexAny(authority, "/?#"); end >= 0 {
+		authority = authority[:end]
+	}
+	// Userinfo has no place in a redirect target; it is dropped as url.URL.Host drops it.
+	if at := strings.LastIndex(authority, "@"); at >= 0 {
+		authority = authority[at+1:]
+	}
+	return "https://" + authority
 }
 
 // metricsHandler is the metrics listener's whole handler, the auth server's copied rather than
@@ -444,7 +569,8 @@ func (s *Server) initMiddleware() *routing.Router {
 	// request logger and for the same reason, above Recoverer, so a panicking request is counted as
 	// the 500 its client received (#400). The route label's set is this router's own table, read
 	// once at the first request, by which time registerRoutes has registered every route.
-	s.router.Use(metrics.HTTPRequests(s.metrics, s.router))
+	s.httpMetrics = metrics.HTTPRequests(s.metrics, s.router)
+	s.router.Use(s.httpMetrics)
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
 	// wrapped writer and lands in the record (#203). It writes the panic's one ERROR record, with
@@ -655,12 +781,20 @@ func (s *Server) isStaticDirectory(urlPath string) bool {
 // that says so, an https base URL with the forwarded headers trusted, as every configuration the
 // setup wizard writes for a proxy sets, that is the deployment working as intended, and the record
 // is Info: as a Warn it greeted every healthy install behind a proxy with a warning (#542).
-// Otherwise nothing says a proxy ends TLS in front of the server, and it stays the Warn #320
-// decision 6 collapsed from an eleven-line banner. The other server's copy is the same records
-// about itself: each names the server it is about, and neither module imports the other.
+// With an https base URL and trust off, the listener only redirects, so the console serves nothing
+// at all; the Warn names both ways out, the second being what a proxy that ends TLS and left trust
+// off, looping on the redirect, needs (#715 decision 11). Otherwise nothing says a proxy ends TLS
+// in front of the server, and it stays the Warn #320 decision 6 collapsed from an eleven-line
+// banner. The other server's copy is the same records about itself: each names the server it is
+// about, and neither module imports the other.
 func logPlainHTTP(baseURL string, trustProxyHeaders bool) {
-	if trustProxyHeaders && strings.HasPrefix(strings.ToLower(baseURL), "https://") {
-		slog.Info("the admin console is listening on HTTP behind a reverse proxy that terminates HTTPS")
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(baseURL)), "https://") {
+		if trustProxyHeaders {
+			slog.Info("the admin console is listening on HTTP behind a reverse proxy that terminates HTTPS")
+			return
+		}
+		slog.Warn("the admin console's HTTP listener only redirects to its https base URL, and its HTTPS listener is off",
+			"remedy", "configure the HTTPS listener, or, behind a reverse proxy that terminates HTTPS, turn on GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS")
 		return
 	}
 	slog.Warn("the admin console is listening on HTTP with no TLS, which is insecure outside development unless a reverse proxy in front of it terminates HTTPS",

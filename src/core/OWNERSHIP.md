@@ -697,13 +697,13 @@ command itself and fails on a tree it changed.
 | `core/metrics` | `HTTPRequests` | both-apps | — |
 | `core/metrics` | `Histogram` | own-package | — |
 | `core/metrics` | `Label` | kernel | — |
-| `core/metrics` | `NameRoute` | contract | How an answer no route gives names the value of the shared HTTP metrics' route label it is counted under, beside the route table both servers' label is read from, so both servers count a preflight and a redirect-only HTTP listener's redirects under the same closed values (#715 decision 10). Only the auth server's CORS middleware names it in production until the redirect-only listeners do. |
+| `core/metrics` | `NameRoute` | both-apps | How an answer no route gives names the value of the shared HTTP metrics' route label it is counted under, beside the route table both servers' label is read from, so both servers count a preflight and a redirect-only HTTP listener's redirects under the same closed values (#715 decision 10). |
 | `core/metrics` | `NamedRoute` | own-package | — |
 | `core/metrics` | `NewRegistry` | both-apps | — |
 | `core/metrics` | `RegisterBuildInfo` | both-apps | — |
 | `core/metrics` | `RegisterRuntime` | both-apps | — |
 | `core/metrics` | `Registry` | both-apps | — |
-| `core/metrics` | `RouteHTTPSRedirect` | own-package | — |
+| `core/metrics` | `RouteHTTPSRedirect` | both-apps | — |
 | `core/metrics` | `RoutePreflight` | own-package | — |
 | `core/metrics` | `Sample` | own-package | — |
 | `core/oauth` | `ConformErrorDescription` | both-apps | — |
