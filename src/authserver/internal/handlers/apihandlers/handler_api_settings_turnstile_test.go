@@ -544,8 +544,8 @@ func TestHandleSettingsTurnstilePut_SavesThatPutNoSecretKeyInUseNeverCallCloudfl
 	}
 }
 
-// A secret key Cloudflare rejects, or cannot be reached to check, refuses the save, which writes and
-// records nothing: a new secret key, or turning the challenge on with the stored one.
+// A secret key Cloudflare rejects, or one that cannot be checked with it, refuses the save, which
+// writes and records nothing: a new secret key, or turning the challenge on with the stored one.
 func TestHandleSettingsTurnstilePut_ASecretKeyCloudflareDoesNotAcceptRefusesTheSave(t *testing.T) {
 	answers := []struct {
 		answer          turnstile.SecretKeyCheck

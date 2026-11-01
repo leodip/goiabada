@@ -3403,7 +3403,8 @@ paths:
         A save that stores a new secret key, or turns the challenge on, first checks the secret key
         with Cloudflare's siteverify. It is refused with 400, and writes nothing, when Cloudflare
         does not accept the secret key (`handler.settings_turnstile.secret_key_rejected`), or
-        cannot be reached to check it (`handler.settings_turnstile.secret_key_unchecked`). Turning
+        when the key could not be checked with it: Cloudflare could not be reached, or gave no
+        usable answer (`handler.settings_turnstile.secret_key_unchecked`). Turning
         the challenge off and removing the secret key never call Cloudflare.
       operationId: updateSettingsTurnstile
       requestBody:

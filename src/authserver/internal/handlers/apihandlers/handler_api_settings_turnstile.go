@@ -55,8 +55,8 @@ type turnstileSecretKeyChecker interface {
 // when it would turn the challenge on without both keys, remove the secret key while the challenge
 // is on, or change the site key without the secret key entered again, since the two come from one
 // widget. It is refused too when it stores a new secret key, or turns the challenge on, and
-// Cloudflare rejects the secret key or cannot be reached to check it. Turning the challenge off keeps
-// the keys.
+// Cloudflare rejects the secret key, or the key cannot be checked with it because Cloudflare cannot be
+// reached or gives no usable answer. Turning the challenge off keeps the keys.
 func HandleSettingsTurnstilePut(
 	database settingsTurnstileDatabase,
 	auditLogger AuditLogger,
@@ -128,7 +128,8 @@ func HandleSettingsTurnstilePut(
 		// transaction: a new secret key, or the stored one when the challenge is turned on. Turning the
 		// challenge off and removing the secret key put none in use, and never call Cloudflare
 		// (#642 decision 11). A key Cloudflare rejects would let every form through as misconfigured;
-		// one it cannot be reached to check is refused too, to be saved once it can be.
+		// one that cannot be checked, Cloudflare unreachable or its answer unusable, is refused too,
+		// to be saved once it can be.
 		checkedSecretKey := secretKey
 		if checkedSecretKey == "" && req.TurnstileEnabled && !currentSettings.TurnstileEnabled {
 			stored, decryptErr := dataCipher.Decrypt(currentSettings.TurnstileSecretKeyEncrypted)
