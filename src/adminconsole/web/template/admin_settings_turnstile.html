@@ -37,7 +37,7 @@
     <div class="check-list">
       <label class="check-row" for="turnstileEnabled">
         <input type="checkbox" id="turnstileEnabled" name="turnstileEnabled" aria-describedby="turnstileEnabledHint"{{ if .settings.TurnstileEnabled }} checked{{ end }}
-          data-confirm="{{ T $.ctx "adminconsole.admin_settings.turnstile.enable_warning" }}" data-confirm-when="checked" data-stored-checked="{{ if .settings.SavedTurnstileEnabled }}true{{ else }}false{{ end }}">
+          data-confirm="{{ T $.ctx "adminconsole.admin_settings.turnstile.enable_warning" "host" .authServerHost }}" data-confirm-when="checked" data-stored-checked="{{ if .settings.SavedTurnstileEnabled }}true{{ else }}false{{ end }}">
         <span class="grid min-w-0 flex-1 gap-0.5">
           <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.turnstile.field.enabled" }}</span>
           <span class="field-hint" id="turnstileEnabledHint">{{ T $.ctx "adminconsole.admin_settings.turnstile.enabled_hint" }}</span>
@@ -50,7 +50,7 @@
   <div class="panel-body stacked">
     <div>
       <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_settings.turnstile.section_keys" }}</h2>
-      <p class="field-hint mt-1">{{ T $.ctx "adminconsole.admin_settings.turnstile.keys_hint" }}</p>
+      <p class="field-hint mt-1">{{ T $.ctx "adminconsole.admin_settings.turnstile.keys_hint" "host" .authServerHost }}</p>
     </div>
     <div class="form-grid">
       <div class="field">

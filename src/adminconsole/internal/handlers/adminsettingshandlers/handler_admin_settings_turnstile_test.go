@@ -16,6 +16,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
+// turnstileAuthServerBaseURL is the auth server's public base URL the page is drawn under, on a
+// port, which the host the page names leaves out.
+const turnstileAuthServerBaseURL = "https://auth.example.com:8443"
+
 // turnstileSettingsAPI answers the stored Turnstile settings, and records the save the page sends,
 // refusing it with saveErr when one is set.
 type turnstileSettingsAPI struct {
@@ -65,7 +69,7 @@ func TestHandleTurnstileGet_ThePageIsToldWhetherASecretKeyIsSaved(t *testing.T) 
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_turnstile.html").Once()
 			apiClient := &turnstileSettingsAPI{stored: tc.stored}
 
-			HandleTurnstileGet(httpHelper, newSettingsTestStore(), apiClient).ServeHTTP(httptest.NewRecorder(),
+			HandleTurnstileGet(httpHelper, newSettingsTestStore(), apiClient, turnstileAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodGet, "/admin/settings/turnstile", handlertest.WithAccessToken()))
 
 			bind := handlertest.Bind(t, httpHelper)
@@ -76,6 +80,7 @@ func TestHandleTurnstileGet_ThePageIsToldWhetherASecretKeyIsSaved(t *testing.T) 
 				SavedTurnstileEnabled: tc.stored.TurnstileEnabled,
 			}, bind["settings"])
 			assert.Equal(t, false, bind["savedSuccessfully"])
+			assert.Equal(t, "auth.example.com", bind["authServerHost"], "the host the widget must list, with no port")
 		})
 	}
 }
@@ -141,7 +146,7 @@ func TestHandleTurnstilePost_TheFormBecomesKeepReplaceOrRemove(t *testing.T) {
 			apiClient := &turnstileSettingsAPI{}
 			w := httptest.NewRecorder()
 
-			HandleTurnstilePost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).
+			HandleTurnstilePost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL, turnstileAuthServerBaseURL).
 				ServeHTTP(w, handlertest.Request(http.MethodPost, "/admin/settings/turnstile",
 					handlertest.WithAccessToken(), handlertest.WithForm(turnstileForm(tc.edit))))
 
@@ -160,7 +165,7 @@ func TestHandleTurnstilePost_TheSecretKeyIsNotReadFromTheQuery(t *testing.T) {
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := &turnstileSettingsAPI{}
 
-	HandleTurnstilePost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).
+	HandleTurnstilePost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL, turnstileAuthServerBaseURL).
 		ServeHTTP(httptest.NewRecorder(), handlertest.Request(http.MethodPost,
 			"/admin/settings/turnstile?turnstileSecretKey=from-the-query",
 			handlertest.WithAccessToken(), handlertest.WithForm(turnstileForm(func(f url.Values) { f.Del("turnstileSecretKey") }))))
@@ -277,7 +282,7 @@ func TestHandleTurnstilePost_ARefusedSaveIsRedrawnWithTheRefusalAtItsField(t *te
 			}}
 			w := httptest.NewRecorder()
 
-			HandleTurnstilePost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).
+			HandleTurnstilePost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL, turnstileAuthServerBaseURL).
 				ServeHTTP(w, handlertest.Request(http.MethodPost, "/admin/settings/turnstile",
 					handlertest.WithAccessToken(), handlertest.WithForm(turnstileForm(tc.edit))))
 
@@ -286,6 +291,7 @@ func TestHandleTurnstilePost_ARefusedSaveIsRedrawnWithTheRefusalAtItsField(t *te
 			assert.Equal(t, tc.message, bind["error"])
 			assert.Equal(t, tc.wantField, bind["errorField"])
 			assert.Equal(t, tc.want, bind["settings"])
+			assert.Equal(t, "auth.example.com", bind["authServerHost"], "the redrawn page names the host too")
 		})
 	}
 }

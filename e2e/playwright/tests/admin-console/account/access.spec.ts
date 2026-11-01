@@ -2,6 +2,7 @@
 // every user holds, and the admin pages only with authserver:manage.
 import type { Page } from "@playwright/test";
 import { clientRow, grantUserPermission } from "../../../lib/admin-console";
+import { expectCardHeldBack } from "../../../lib/auto-submit";
 import { signInToConsole } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
@@ -116,6 +117,7 @@ test("signing out from the home page works without JavaScript (#411)", async ({ 
   // The form binding to the auth server cannot submit itself without script; its Continue button can.
   const binding = page.locator("form.auth-status[data-auto-submit]");
   await expect(binding.getByRole("heading", { name: "Signing you out" })).toBeVisible();
+  await expectCardHeldBack(page);
   await binding.getByRole("button", { name: "Continue", exact: true }).click();
   await page.waitForURL((url) => url.origin === env.adminUrl && url.pathname === "/");
   await page.goto(`${env.adminUrl}/account/profile`);

@@ -35,9 +35,15 @@ func TestRender_AdminSettingsTurnstileWithASavedSecretKey(t *testing.T) {
 			TurnstileEnabled: true, TurnstileSiteKey: "1x00000000000000000000AA",
 			HasTurnstileSecretKey: true, SavedTurnstileEnabled: true,
 		},
+		// Not "auth.": rawKeyRe in helpers_test.go reads "auth.example.com" as a leaked catalog key.
+		"authServerHost": "op.example.com",
 	})
 
 	assert.Contains(t, out, "<title>Configurações do Turnstile – Test</title>")
+	// The host the widget must list, in the keys' hint and in the question turning the challenge on
+	// asks.
+	assert.Contains(t, out, "Os nomes de host do widget devem incluir op.example.com, o host do servidor de autenticação.")
+	assert.Contains(t, turnstileSwitchRe.FindString(out), "se os nomes de host do widget não incluírem op.example.com, ninguém")
 	assert.Contains(t, out, `<span class="tag tag-positive -my-0.5">Salva</span>`, "the Saved tag")
 	assert.NotContains(t, out, ">Não definida</span>")
 	assert.Contains(t, out, "A chave secreta salva nunca é exibida.", "the hint")

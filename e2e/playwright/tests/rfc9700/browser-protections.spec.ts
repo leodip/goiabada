@@ -8,6 +8,7 @@
 // not offer.
 import type { Request, Response } from "@playwright/test";
 import { addRedirectUri, clientUrl, setImplicitGrant } from "../../lib/admin-console";
+import { expectCardHeldBack } from "../../lib/auto-submit";
 import { continuePastRecoveryCodes, openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
@@ -189,7 +190,7 @@ test("form_post is offered, and posts the response to the redirect URI; an in-br
 });
 
 // With no script to submit it, the form_post page says what it is doing and offers the button that
-// sends the response on.
+// sends the response on, once its card's 2-second hold has passed.
 test("without JavaScript, the form_post page says it is returning the user, and Continue posts the response to the redirect URI (section 4.2.4)", async ({
   page,
   browser,
@@ -208,6 +209,7 @@ test("without JavaScript, the form_post page says it is returning the user, and 
   await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(params)}`);
   await expect(tab.getByRole("heading", { name: "Returning you to the application" })).toBeVisible();
   await expect(tab.getByText("If nothing happens, select Continue.")).toBeVisible();
+  await expectCardHeldBack(tab);
   const [posted] = await Promise.all([
     tab.waitForRequest((r) => r.url() === testRedirectUri && r.method() === "POST"),
     tab.getByRole("button", { name: "Continue" }).click(),

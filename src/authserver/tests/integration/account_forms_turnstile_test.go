@@ -143,7 +143,7 @@ func TestAccountFormsTurnstile_TheFormCarriesTheWidgetUnderTheWidenedPolicy(t *t
 			widget := doc.Find("form div.cf-turnstile")
 			assert.Equal(t, turnstileTestSiteKey, widget.AttrOr("data-sitekey", ""))
 			assert.Equal(t, f.action, widget.AttrOr("data-action", ""))
-			assert.Equal(t, 1, doc.Find(`script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]`).Length())
+			assertWidgetLoader(t, doc)
 		})
 	}
 }

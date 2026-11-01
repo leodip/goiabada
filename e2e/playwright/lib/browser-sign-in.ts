@@ -19,10 +19,16 @@ export interface BrowserSignIn {
 // Starts a sign-in through the client in a browser of its own, and leaves the page at the auth
 // server's password form. Any other authorization parameters, such as ui_locales, are added to the
 // request. The caller closes the context.
-export async function openSignIn(browser: Browser, options: { clientId: string; scope: string; params?: Record<string, string> }) {
+export async function openSignIn(
+  browser: Browser,
+  options: { clientId: string; scope: string; params?: Record<string, string>; viewport?: { width: number; height: number } },
+) {
   // An explicit empty state: inside a test, browser.newContext() starts from the test's options, which
   // here carry the administrator's signed-in state, and the sign-in would be the administrator's.
-  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+    ...(options.viewport ? { viewport: options.viewport } : {}),
+  });
   const page = await context.newPage();
   const codeVerifier = randomBytes(32).toString("base64url");
   const query = new URLSearchParams({

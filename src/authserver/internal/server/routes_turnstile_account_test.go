@@ -107,7 +107,6 @@ func (f challengedForm) assertRedrawn(t *testing.T, rr *httptest.ResponseRecorde
 	require.Equal(t, 1, widget.Length(), "a fresh widget on the redrawn form")
 	assert.Equal(t, string(f.form), widget.AttrOr("data-action", ""))
 	assert.Equal(t, turnstileTestSiteKey, widget.AttrOr("data-sitekey", ""))
-	assert.Equal(t, "compact", widget.AttrOr("data-size", ""), "the size that fits the form at 320 pixels")
 	assert.Equal(t, widenedPolicy, rr.Header().Get("Content-Security-Policy"))
 }
 
@@ -293,10 +292,13 @@ func TestTurnstileChallenge_EveryForgotPasswordAndRegistrationFormCarriesTheWidg
 			require.Equal(t, 1, widget.Length(), "one widget, inside the form, so its token is submitted with it")
 			assert.Equal(t, turnstileTestSiteKey, widget.AttrOr("data-sitekey", ""))
 			assert.Equal(t, string(f.form), widget.AttrOr("data-action", ""))
-			assert.Equal(t, "compact", widget.AttrOr("data-size", ""), "the size that fits the form at 320 pixels")
+			_, sized := widget.Attr("data-size")
+			assert.False(t, sized, "no size: turnstile-widget.js sets the one that fits the form")
 			assert.Equal(t, "en", widget.AttrOr("data-language", ""))
-			script := doc.Find(`script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]`)
-			require.Equal(t, 1, script.Length(), "the widget's script")
+			script := doc.Find("script[data-widget-script]")
+			require.Equal(t, 1, script.Length(), "the script that draws the widget")
+			assert.Regexp(t, `^/static/turnstile-widget\.js`, script.AttrOr("src", ""), "from the page's own origin")
+			assert.Equal(t, turnstile.ScriptURL, script.AttrOr("data-widget-script", ""), "Cloudflare's script, which it loads")
 			assert.Empty(t, strings.TrimSpace(script.Text()), "a script with no body, which the policy allows from its origin")
 
 			t.Run("in the page's language", func(t *testing.T) {

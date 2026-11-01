@@ -1,5 +1,5 @@
 {{define "title"}}{{ T $.ctx "auth.pwd.page_title" }} – {{ .appName }}{{end}}
-{{define "head"}}{{ if .turnstileSiteKey }}<script src="{{ .turnstileScriptURL }}" async defer></script>{{ end }}{{end}}
+{{define "head"}}{{ if .turnstileSiteKey }}<script src="{{ asset "/static/turnstile-widget.js" }}" data-widget-script="{{ .turnstileScriptURL }}" defer></script>{{ end }}{{end}}
 
 {{define "body"}}
 <h1 class="auth-title">{{ T $.ctx "auth.pwd.title" }}</h1>
@@ -35,10 +35,10 @@
 
   {{/* The Turnstile challenge, while it is on: Cloudflare's script renders the widget, which writes
        its token into the form as cf-turnstile-response. The action names this form, which the
-       server checks the token was solved for (#642). Compact, 150 pixels wide, is the one size
-       Cloudflare draws that fits the form at 320 CSS pixels: normal and flexible are 300 wide. */}}
+       server checks the token was solved for (#642). Its size is the one that fits the form,
+       which turnstile-widget.js sets before it loads Cloudflare's script. */}}
   {{ if .turnstileSiteKey }}
-  <div class="cf-turnstile" data-sitekey="{{ .turnstileSiteKey }}" data-size="compact" data-action="login" data-language="{{ Lang $.ctx }}"></div>
+  <div class="cf-turnstile" data-sitekey="{{ .turnstileSiteKey }}" data-action="login" data-language="{{ Lang $.ctx }}"></div>
   {{ end }}
 
   <button class="button button-primary button-block" type="submit">{{ T $.ctx "auth.pwd.button" }}</button>

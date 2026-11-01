@@ -46,9 +46,10 @@ async function turnOff(page: Page) {
   await saveSettings(page);
 }
 
-// Opens url in a browser of its own, signed in nowhere, as a visitor would.
-async function openAsVisitor(browser: Browser, url: string) {
-  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+// Opens url in a browser of its own, signed in nowhere, as a visitor would, on a screen of viewport
+// when given.
+async function openAsVisitor(browser: Browser, url: string, viewport?: { width: number; height: number }) {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] }, ...(viewport ? { viewport } : {}) });
   const visitor = await context.newPage();
   await visitor.goto(url);
   return { context, visitor };
@@ -195,54 +196,68 @@ test("forgot-password: with the challenge off, the form loads nothing from Cloud
   await context.close();
 });
 
-// At 320 CSS pixels, the width WCAG 2.2's reflow criterion names, each form with the widget drawn
-// fits the screen: the page does not scroll sideways, and the widget's box and what it draws stay
-// inside it. Cloudflare's normal size, 300 pixels wide, reached 17 pixels past the screen there.
-// The space the page holds for the widget before its script has run is as tall as what it draws,
-// so the button below does not move when the widget appears.
-test("each form fits a 320-pixel screen with the widget drawn", async ({ page, browser, clients }) => {
+// Each form draws the widget at the size that fits it, chosen as the page loads on the visitor's
+// screen. At 320 CSS pixels, the width WCAG 2.2's reflow criterion names, it is compact: the page
+// does not scroll sideways, where Cloudflare's 300-pixel sizes reached 17 pixels past the screen. On
+// a wide screen it is flexible, as wide as the form. Either way the widget's box and what it draws
+// stay inside the screen, and the space the page holds for the widget before its script has run is
+// as tall as what it draws, so the button below does not move when the widget appears.
+test("each form draws the widget at the size that fits it, on a 320-pixel screen and a wide one", async ({ page, browser, clients }) => {
   const { client } = await browserSignInClient(page, clients);
   await withSettingsRestored(page, general, async () => {
     await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: true });
     await saveSettings(page);
     await turnOn(page, alwaysPassSiteKey);
 
-    const forms: { action: string; open: () => Promise<{ context: BrowserContext; page: Page }> }[] = [
-      { action: "login", open: () => openSignIn(browser, { clientId: client.identifier, scope: "openid" }) },
-      { action: "forgot-password", open: async () => {
-        const { context, visitor } = await openAsVisitor(browser, forgotPasswordUrl);
+    type Viewport = { width: number; height: number };
+    const screens: { viewport: Viewport; size: "compact" | "flexible" }[] = [
+      { viewport: { width: 320, height: 640 }, size: "compact" },
+      { viewport: { width: 1280, height: 800 }, size: "flexible" },
+    ];
+    const forms: { action: string; open: (viewport: Viewport) => Promise<{ context: BrowserContext; page: Page }> }[] = [
+      { action: "login", open: (viewport) => openSignIn(browser, { clientId: client.identifier, scope: "openid", viewport }) },
+      { action: "forgot-password", open: async (viewport) => {
+        const { context, visitor } = await openAsVisitor(browser, forgotPasswordUrl, viewport);
         return { context, page: visitor };
       } },
-      { action: "register", open: async () => {
-        const { context, visitor } = await openAsVisitor(browser, registerUrl);
+      { action: "register", open: async (viewport) => {
+        const { context, visitor } = await openAsVisitor(browser, registerUrl, viewport);
         return { context, page: visitor };
       } },
     ];
-    for (const form of forms) {
-      const { context, page: visitor } = await form.open();
-      await visitor.setViewportSize({ width: 320, height: 640 });
-      await expect(widget(visitor, form.action)).toHaveAttribute("data-sitekey", alwaysPassSiteKey);
-      // The widget has run, so what it draws is in the page.
-      await expect(token(visitor)).toHaveValue(/.+/);
+    for (const screen of screens) {
+      for (const form of forms) {
+        const where = `${form.action} at ${screen.viewport.width} pixels`;
+        const { context, page: visitor } = await form.open(screen.viewport);
+        await expect(widget(visitor, form.action)).toHaveAttribute("data-sitekey", alwaysPassSiteKey);
+        await expect(widget(visitor, form.action), where).toHaveAttribute("data-size", screen.size);
+        // The widget has run, so what it draws is in the page.
+        await expect(token(visitor)).toHaveValue(/.+/);
 
-      const layout = await widget(visitor, form.action).evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        return {
-          sidewaysScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-          left: box.left,
-          right: box.right,
-          overflow: element.scrollWidth - element.clientWidth,
-          screen: document.documentElement.clientWidth,
-          drawnHeight: box.height,
-          reservedHeight: parseFloat(getComputedStyle(element).minHeight),
-        };
-      });
-      expect(layout.sidewaysScroll, `${form.action}: the page scrolls sideways`).toBeLessThanOrEqual(0);
-      expect(layout.left, `${form.action}: the widget's left edge`).toBeGreaterThanOrEqual(-1);
-      expect(layout.right, `${form.action}: the widget's right edge`).toBeLessThanOrEqual(layout.screen + 1);
-      expect(layout.overflow, `${form.action}: what the widget draws reaches past its box`).toBeLessThanOrEqual(1);
-      expect(layout.drawnHeight, `${form.action}: the widget is taller than the space held for it`).toBeLessThanOrEqual(layout.reservedHeight + 1);
-      await context.close();
+        const layout = await widget(visitor, form.action).evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return {
+            sidewaysScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            left: box.left,
+            right: box.right,
+            width: box.width,
+            formWidth: element.closest("form")!.clientWidth,
+            overflow: element.scrollWidth - element.clientWidth,
+            screen: document.documentElement.clientWidth,
+            drawnHeight: box.height,
+            reservedHeight: parseFloat(getComputedStyle(element).minHeight),
+          };
+        });
+        expect(layout.sidewaysScroll, `${where}: the page scrolls sideways`).toBeLessThanOrEqual(0);
+        expect(layout.left, `${where}: the widget's left edge`).toBeGreaterThanOrEqual(-1);
+        expect(layout.right, `${where}: the widget's right edge`).toBeLessThanOrEqual(layout.screen + 1);
+        expect(layout.overflow, `${where}: what the widget draws reaches past its box`).toBeLessThanOrEqual(1);
+        expect(layout.drawnHeight, `${where}: the widget is taller than the space held for it`).toBeLessThanOrEqual(layout.reservedHeight + 1);
+        if (screen.size === "flexible") {
+          expect(Math.abs(layout.width - layout.formWidth), `${where}: the widget is as wide as the form`).toBeLessThanOrEqual(1);
+        }
+        await context.close();
+      }
     }
   });
 });

@@ -282,14 +282,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		{
 			name: "HandleTurnstileGet",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleTurnstileGet(h, newSettingsTestStore(), c)
+				return HandleTurnstileGet(h, newSettingsTestStore(), c, turnstileAuthServerBaseURL)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/turnstile", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleTurnstilePost",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleTurnstilePost(h, newSettingsTestStore(), c, consoleBaseURL)
+				return HandleTurnstilePost(h, newSettingsTestStore(), c, consoleBaseURL, turnstileAuthServerBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/turnstile",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{

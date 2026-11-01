@@ -1,7 +1,8 @@
 {{- /* The form_post response page. Always read from the built-in templates, never from
      GOIABADA_AUTHSERVER_TEMPLATEDIR: it encodes an authorization response on the wire. It is parsed
      alone, with no layout and no template functions, so everything it shows arrives in .page. With
-     JavaScript, form-post.js submits it as soon as it is parsed; without, its button does. */ -}}
+     JavaScript, form-post.js submits it as soon as it is parsed; without, its button does. Its card
+     is held back for 2 seconds (ui.css), so it does not flash by while the next page loads. */ -}}
 <!DOCTYPE html>
 <html lang="{{ .page.Lang }}"{{ with .page.Theme }} data-theme="{{ . }}"{{ end }}>
 

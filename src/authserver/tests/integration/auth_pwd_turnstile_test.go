@@ -103,6 +103,16 @@ func assertChallengeRefusal(t *testing.T, resp *http.Response, email string) {
 	assert.Equal(t, turnstileTestSiteKey, doc.Find(`form div.cf-turnstile[data-action="login"]`).AttrOr("data-sitekey", ""))
 }
 
+// assertWidgetLoader checks the page draws the widget: it loads turnstile-widget.js from its own
+// origin, which loads Cloudflare's script, whose address its element carries.
+func assertWidgetLoader(t *testing.T, doc *goquery.Document) {
+	t.Helper()
+	loader := doc.Find("script[data-widget-script]")
+	require.Equal(t, 1, loader.Length(), "the script that draws the widget")
+	assert.Regexp(t, `^/static/turnstile-widget\.js`, loader.AttrOr("src", ""))
+	assert.Equal(t, "https://challenges.cloudflare.com/turnstile/v0/api.js", loader.AttrOr("data-widget-script", ""))
+}
+
 func TestAuthPwdTurnstile_TheFormCarriesTheWidgetUnderTheWidenedPolicy(t *testing.T) {
 	turnOnTurnstile(t, turnstileAlwaysPassSecretKey)
 	form := reachPasswordForm(t)
@@ -118,7 +128,7 @@ func TestAuthPwdTurnstile_TheFormCarriesTheWidgetUnderTheWidenedPolicy(t *testin
 	widget := doc.Find("form div.cf-turnstile")
 	assert.Equal(t, turnstileTestSiteKey, widget.AttrOr("data-sitekey", ""))
 	assert.Equal(t, "login", widget.AttrOr("data-action", ""))
-	assert.Equal(t, 1, doc.Find(`script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]`).Length())
+	assertWidgetLoader(t, doc)
 }
 
 func TestAuthPwdTurnstile_TheAlwaysPassSecretKeyLetsTheSignInProceed(t *testing.T) {
