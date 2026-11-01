@@ -634,6 +634,38 @@ func TestCheck_ACallThatFindsNoFreeSlotBeforeItsDeadlineFailsOpenAsBusy(t *testi
 	h.assertNothingSecretLogged(t, token)
 }
 
+// The three seconds a check has cover its wait for a slot as well as its call: a submission with no
+// deadline of its own, queued behind 64 calls siteverify never answers, fails open three seconds
+// after it arrived, not three seconds after a slot freed.
+func TestCheck_TheWaitForASlotAndTheCallShareTheThreeSeconds(t *testing.T) {
+	h := newHarness(t)
+	h.standIn.answer(http.StatusOK, passingLogin)
+	release := make(chan struct{})
+	h.standIn.hold = release
+
+	var wg sync.WaitGroup
+	for range 64 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			h.check(turnstile.FormLogin, token)
+		}()
+	}
+	t.Cleanup(func() {
+		close(release)
+		wg.Wait()
+	})
+	require.Eventually(t, func() bool { return h.standIn.callCount() == 64 }, 2*time.Second, 5*time.Millisecond)
+
+	started := time.Now()
+	outcome := h.check(turnstile.FormRegister, token)
+	elapsed := time.Since(started)
+
+	assert.Equal(t, turnstile.Unavailable, outcome)
+	assert.GreaterOrEqual(t, elapsed, 3*time.Second, "the deadline is three seconds")
+	assert.Less(t, elapsed, 4*time.Second, "counted from its arrival, the wait for a slot included")
+}
+
 // A check whose deadline has already passed while slots are free is not logged as busy, which tells
 // an operator to look for a flood: it takes a slot and fails open on its deadline as a timeout.
 func TestCheck_AnExpiredDeadlineWithFreeSlotsIsATimeoutNotBusy(t *testing.T) {
