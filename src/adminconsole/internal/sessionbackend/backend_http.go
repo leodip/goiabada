@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/noredirect"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/boundedread"
@@ -94,7 +95,7 @@ func New(baseURL string, tokens TokenSource, rootCAs *x509.CertPool, upstream *u
 	}
 	return &httpBackend{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
-		client:  upstream.Client(upstreammetrics.Sessions, client),
+		client:  noredirect.Client(upstream.Client(upstreammetrics.Sessions, client)),
 		tokens:  tokens,
 	}
 }
@@ -230,6 +231,12 @@ func (b *httpBackend) attempt(ctx context.Context, operation string, encoded []b
 
 	response, err := b.client.Do(request)
 	if err != nil {
+		// A refused redirect is an answer, not a failure to reach the endpoint, and asking the
+		// same address again meets the same redirect (#715 decision 13).
+		var redirected *noredirect.Error
+		if errors.As(err, &redirected) {
+			return 0, nil, errs.Wrap(err, "the browser session endpoint redirected")
+		}
 		return 0, nil, &transportError{errs.Wrap(err, "the browser session endpoint could not be reached")}
 	}
 	defer func() { _ = response.Body.Close() }()

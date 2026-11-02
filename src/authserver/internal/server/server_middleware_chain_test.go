@@ -51,7 +51,6 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	assert.Empty(t, differing, "every method of a route passes through the same chain")
 
 	wantRoot := []string{
-		"github.com/leodip/goiabada/authserver/internal/middleware.CORS.func1",
 		"github.com/leodip/goiabada/core/requestid.Middleware",
 		"github.com/leodip/goiabada/core/httpmw.SecurityHeaders.func1",
 		"github.com/leodip/goiabada/core/httpmw.RealIP.func1",
@@ -59,6 +58,11 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		// Above Recoverer, as the logger is, so a panic is counted as the 500 its client got (#400).
 		"github.com/leodip/goiabada/core/metrics.httpRequests.func2",
 		"github.com/leodip/goiabada/core/httpmw.Recoverer",
+		// Beneath everything above, so a preflight it answers carries the security headers, its
+		// request id, a request-log record and a metrics sample, and a panic in its origin lookup is
+		// answered 500; above the slash strip, since it normalizes the trailing slash itself (#715
+		// decision 6).
+		"github.com/leodip/goiabada/authserver/internal/middleware.CORS.func1",
 		"github.com/leodip/goiabada/core/httpmw.StripTrailingSlash",
 		// After StripTrailingSlash, whose path it routes by, and before the /auth/logout exemption
 		// predicate, which parses the form body (#426).

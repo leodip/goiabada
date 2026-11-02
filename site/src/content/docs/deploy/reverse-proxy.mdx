@@ -183,6 +183,7 @@ You need a server with Docker and Nginx, two hostnames under one domain, such as
 ## What this setup gives you
 
 - **Nginx terminates TLS.** Goiabada serves plain HTTP on `127.0.0.1`, which only processes on the host reach. Goiabada marks its cookies `Secure` because its URLs are `https://`, whatever Nginx speaks to it.
+- **HTTPS is enforced at Nginx.** Its port 80 site redirects everything but Let's Encrypt's challenge to HTTPS. The files the wizard writes turn on `TRUST_PROXY_HEADERS`, so each server's HTTP listener serves what Nginx forwards instead of redirecting it back: see [listen addresses](/reference/environment-variables/#listen-addresses).
 - **Each server sees the client's address,** from the `X-Forwarded-For` entry Nginx appends: see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#reverse-proxy).
 - **The admin console reaches the auth server inside the Compose network,** not through Nginx: see [The hop to the auth server](/deploy/docker-compose/#the-hop-to-the-auth-server).
 - **Goiabada sets its own security headers,** `Strict-Transport-Security` included once its URLs are `https://`, so Nginx adds none. A header Nginx added as well would reach the browser twice.
