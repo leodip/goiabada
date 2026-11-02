@@ -20,7 +20,7 @@ import (
 // carries the origin, the one requested method, the requested headers and a ten-minute Max-Age
 // only when origin, method and headers are all allowed. Any other request is passed on, varies on
 // Origin, and carries the origin only when it is allowed and its method is GET, HEAD, POST, DELETE
-// or OPTIONS. No answer carries Access-Control-Allow-Credentials.
+// or OPTIONS, and with it the exposed headers. No answer carries Access-Control-Allow-Credentials.
 
 const (
 	corsAnyOrigin        = "https://anywhere.example"
@@ -35,6 +35,11 @@ const (
 var (
 	corsPreflightVary = []string{"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"}
 	corsActualVary    = []string{"Origin"}
+
+	// The response headers an allowed actual answer lets script read beyond the CORS-safelisted
+	// ones (Fetch Standard section 2.2.2): the bearer challenge on a 401 and the back-off on a 429
+	// (#716 item 2).
+	corsExposed = []string{"WWW-Authenticate, Retry-After"}
 )
 
 // corsAnswer is what a response says about CORS: its status, whether the next handler ran, and the
@@ -201,6 +206,43 @@ func TestCORS_ARefusedPreflightIsAnsweredWithNoGrant(t *testing.T) {
 	}
 }
 
+// A preflight's Access-Control-Request-Headers may arrive split across field lines, and its value is
+// those lines joined in order with commas (RFC 9110 sections 5.2 and 5.3): every header on every
+// line is weighed, granted in the order asked when all are allowed, and refused when any line asks
+// for one outside the list (#716 item 1).
+func TestCORS_APreflightsRequestHeadersAreReadAcrossEveryLine(t *testing.T) {
+	split := func(lines ...string) http.Header {
+		header := preflight(corsRegisteredOrigin, "GET", "")
+		header["Access-Control-Request-Headers"] = lines
+		return header
+	}
+
+	t.Run("two lines of allowed headers are both granted", func(t *testing.T) {
+		got := serveCORS(corsOriginDatabase(t), http.MethodOptions, "/userinfo", split("authorization", "x-csrf-token"))
+
+		assert.Equal(t, corsAnswer{
+			Status:       http.StatusOK,
+			Vary:         corsPreflightVary,
+			AllowOrigin:  []string{corsRegisteredOrigin},
+			AllowMethods: []string{"GET"},
+			AllowHeaders: []string{"Authorization, X-Csrf-Token"},
+			MaxAge:       []string{"600"},
+		}, got)
+	})
+
+	t.Run("lines that are lists themselves keep their order", func(t *testing.T) {
+		got := serveCORS(corsOriginDatabase(t), http.MethodOptions, "/userinfo", split("content-type, accept", "", "authorization"))
+
+		assert.Equal(t, []string{"Content-Type, Accept, Authorization"}, got.AllowHeaders)
+	})
+
+	t.Run("a header outside the list on the second line refuses the preflight", func(t *testing.T) {
+		got := serveCORS(corsOriginDatabase(t), http.MethodOptions, "/userinfo", split("authorization", "x-requested-with"))
+
+		assert.Equal(t, corsAnswer{Status: http.StatusOK, Vary: corsPreflightVary}, got)
+	})
+}
+
 // What makes a request a preflight: OPTIONS, an Origin field, present even when empty, and a
 // non-empty Access-Control-Request-Method. An OPTIONS missing either is an ordinary request and is
 // passed on, varying on Origin alone.
@@ -230,24 +272,25 @@ func TestCORS_OnlyAnOptionsWithOriginAndRequestMethodIsAPreflight(t *testing.T) 
 		got := serveCORS(corsOriginDatabase(t), http.MethodOptions, "/certs",
 			http.Header{"Origin": {corsAnyOrigin}, "Access-Control-Request-Method": {""}})
 
-		assert.Equal(t, corsAnswer{Status: corsNextStatus, NextRan: true, Vary: corsActualVary, AllowOrigin: []string{corsAnyOrigin}}, got)
+		assert.Equal(t, corsAnswer{Status: corsNextStatus, NextRan: true, Vary: corsActualVary, AllowOrigin: []string{corsAnyOrigin}, ExposeHeaders: corsExposed}, got)
 	})
 
 	t.Run("no Access-Control-Request-Method", func(t *testing.T) {
 		got := serveCORS(corsOriginDatabase(t), http.MethodOptions, "/auth/token", fromOrigin(corsRegisteredOrigin))
 
-		assert.Equal(t, corsAnswer{Status: corsNextStatus, NextRan: true, Vary: corsActualVary, AllowOrigin: []string{corsRegisteredOrigin}}, got)
+		assert.Equal(t, corsAnswer{Status: corsNextStatus, NextRan: true, Vary: corsActualVary, AllowOrigin: []string{corsRegisteredOrigin}, ExposeHeaders: corsExposed}, got)
 	})
 
 	t.Run("not OPTIONS", func(t *testing.T) {
 		got := serveCORS(corsOriginDatabase(t), http.MethodPost, "/auth/token", preflight(corsRegisteredOrigin, "POST", "content-type"))
 
-		assert.Equal(t, corsAnswer{Status: corsNextStatus, NextRan: true, Vary: corsActualVary, AllowOrigin: []string{corsRegisteredOrigin}}, got)
+		assert.Equal(t, corsAnswer{Status: corsNextStatus, NextRan: true, Vary: corsActualVary, AllowOrigin: []string{corsRegisteredOrigin}, ExposeHeaders: corsExposed}, got)
 	})
 }
 
 // The ordinary request branch: passed on, varying on Origin, and naming the origin only when it is
-// allowed and the method is one of the five listed, whatever its case. Nothing else is granted.
+// allowed and the method is one of the five listed, whatever its case, exposing WWW-Authenticate and
+// Retry-After beside it. A refused request exposes nothing, and nothing else is granted.
 func TestCORS_AnOrdinaryRequestNamesAnAllowedOriginOnly(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -276,6 +319,7 @@ func TestCORS_AnOrdinaryRequestNamesAnAllowedOriginOnly(t *testing.T) {
 			want := corsAnswer{Status: corsNextStatus, NextRan: true, Vary: corsActualVary}
 			if tt.wantAllow {
 				want.AllowOrigin = []string{tt.origin}
+				want.ExposeHeaders = corsExposed
 			}
 			assert.Equal(t, want, got)
 		})

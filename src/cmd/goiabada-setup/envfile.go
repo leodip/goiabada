@@ -63,7 +63,7 @@ func generateEnvFile(config *Config, paths outputPaths) string {
 	sb.WriteString("# Auth server settings\n")
 	sb.WriteString("# =============================================================================\n")
 	writeEnvVariable(&sb, "GOIABADA_AUTHSERVER_BASEURL", config.AuthServerURL)
-	writeEnvListenerAndTrust(&sb, config, "AUTHSERVER", "9090", "9443")
+	writeEnvListenerAndTrust(&sb, config, "AUTHSERVER", config.AuthServerURL, "9090", "9443")
 	for _, line := range config.rateLimiterComment() {
 		fmt.Fprintf(&sb, "# %s\n", line)
 	}
@@ -83,7 +83,7 @@ func generateEnvFile(config *Config, paths outputPaths) string {
 	sb.WriteString("# Admin console settings\n")
 	sb.WriteString("# =============================================================================\n")
 	writeEnvVariable(&sb, "GOIABADA_ADMINCONSOLE_BASEURL", config.AdminConsoleURL)
-	writeEnvListenerAndTrust(&sb, config, "ADMINCONSOLE", "9091", "9444")
+	writeEnvListenerAndTrust(&sb, config, "ADMINCONSOLE", config.AdminConsoleURL, "9091", "9444")
 	writeEnvVariable(&sb, "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", config.AdminSessionAuthKey)
 	writeEnvVariable(&sb, "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", config.AdminSessionEncKey)
 	sb.WriteString("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=\"true\"\n")
@@ -126,9 +126,12 @@ func writeEnvInternalURL(sb *strings.Builder, config *Config) {
 
 // writeEnvListenerAndTrust writes one server's HTTP listener and its proxy trust, which the answer
 // to the local proxy question decides together, under the comment saying whom it trusts (#396
-// decision 7). server is the variables' infix, AUTHSERVER or ADMINCONSOLE, and httpsPort the
-// server's own default HTTPS port, which the comment names.
-func writeEnvListenerAndTrust(sb *strings.Builder, config *Config, server, port, httpsPort string) {
+// decision 7). server is the variables' infix, AUTHSERVER or ADMINCONSOLE, baseURL the server's own
+// URL, and httpsPort the server's own default HTTPS port, which the comment names. With no proxy
+// and an https URL the server's HTTP listener only redirects, before the certificate and after it,
+// so the comment says it serves no page until HTTPS is set, and keeps the advice to set the listen
+// host empty then, beside keeping the listener for a port-80 forward (#715 decisions 7 and 12).
+func writeEnvListenerAndTrust(sb *strings.Builder, config *Config, server, baseURL, port, httpsPort string) {
 	prefix := "GOIABADA_" + server + "_"
 	if config.LocalProxy {
 		sb.WriteString("# A reverse proxy on this machine forwards to this server, so it listens on 127.0.0.1\n")
@@ -144,13 +147,29 @@ func writeEnvListenerAndTrust(sb *strings.Builder, config *Config, server, port,
 		return
 	}
 	sb.WriteString("# No reverse proxy fronts this server: it listens on every interface and trusts no\n")
-	sb.WriteString("# forwarded header, so each client is the address it connects from. It serves plain HTTP\n")
-	fmt.Fprintf(sb, "# until you set %sCERTFILE and %sKEYFILE, which turn\n", prefix, prefix)
-	fmt.Fprintf(sb, "# on HTTPS at 0.0.0.0:%s (%sLISTEN_HOST_HTTPS and _LISTEN_PORT_HTTPS\n", httpsPort, prefix)
-	sb.WriteString("# change it); then set the HTTP listen host below empty to stop serving plain HTTP.\n")
+	if isHTTPSURL(baseURL) {
+		sb.WriteString("# forwarded header, so each client is the address it connects from. Its URL is https, so\n")
+		sb.WriteString("# its plain HTTP listener only redirects there, and it serves no page until you set\n")
+		fmt.Fprintf(sb, "# %sCERTFILE and %sKEYFILE, which turn on HTTPS at\n", prefix, prefix)
+		fmt.Fprintf(sb, "# 0.0.0.0:%s (%sLISTEN_HOST_HTTPS and _LISTEN_PORT_HTTPS change it).\n", httpsPort, prefix)
+		sb.WriteString("# Then set the HTTP listen host below empty, or keep this listener to redirect visitors\n")
+		sb.WriteString("# to HTTPS when you forward port 80 to it.\n")
+	} else {
+		sb.WriteString("# forwarded header, so each client is the address it connects from. It serves plain HTTP\n")
+		fmt.Fprintf(sb, "# until you set %sCERTFILE and %sKEYFILE, which turn\n", prefix, prefix)
+		fmt.Fprintf(sb, "# on HTTPS at 0.0.0.0:%s (%sLISTEN_HOST_HTTPS and _LISTEN_PORT_HTTPS\n", httpsPort, prefix)
+		sb.WriteString("# change it); then set the HTTP listen host below empty to stop serving plain HTTP.\n")
+	}
 	fmt.Fprintf(sb, "%sLISTEN_HOST_HTTP=\"0.0.0.0\"\n", prefix)
 	fmt.Fprintf(sb, "%sLISTEN_PORT_HTTP=\"%s\"\n", prefix, port)
 	fmt.Fprintf(sb, "%sTRUST_PROXY_HEADERS=\"false\"\n", prefix)
+}
+
+// isHTTPSURL says whether a URL the wizard took is https, which validateURL spells in lowercase. A
+// server whose base URL is https and that trusts no proxy headers only redirects on its HTTP
+// listener (#715 decision 1).
+func isHTTPSURL(url string) bool {
+	return strings.HasPrefix(url, "https://")
 }
 
 // writeEnvVariable writes one assignment, with no `export`: systemd's EnvironmentFile= reads the

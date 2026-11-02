@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/noredirect"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/boundedread"
@@ -59,7 +60,7 @@ func NewClient(authServerBaseURL string, rootCAs *x509.CertPool, upstream *upstr
 		client.Transport = transport
 	}
 	return &Client{
-		httpClient:        upstream.Client(upstreammetrics.Settings, client),
+		httpClient:        noredirect.Client(upstream.Client(upstreammetrics.Settings, client)),
 		authServerBaseURL: authServerBaseURL,
 	}
 }

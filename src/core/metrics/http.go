@@ -1,7 +1,9 @@
 package metrics
 
 import (
+	"context"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"sync"
@@ -13,6 +15,38 @@ import (
 
 // unmatched is the route a request no route answered is recorded under.
 const unmatched = "unmatched"
+
+// NamedRoute is a value of the route label that an answer no route gives counts itself under, so it
+// is told apart from the 404s and 405s of unmatched in the duration histogram too, which has no
+// status label (#715 decision 10). The set is closed: a value other than the constants below is
+// recorded as unmatched.
+type NamedRoute string
+
+const (
+	// RoutePreflight is a CORS preflight, which the auth server's CORS middleware answers before
+	// any route.
+	RoutePreflight NamedRoute = "preflight"
+	// RouteHTTPSRedirect is the redirect to the https base URL that a redirect-only HTTP listener
+	// answers.
+	RouteHTTPSRedirect NamedRoute = "https_redirect"
+)
+
+// namedRoutes is NamedRoute's closed set, in the order the route label lists it.
+var namedRoutes = []NamedRoute{RoutePreflight, RouteHTTPSRedirect}
+
+// routeNameKey is the context key under which the middleware HTTPRequests returns hands the
+// request a slot for the route its answer names.
+type routeNameKey struct{}
+
+// NameRoute records that r is answered as route, for the middleware HTTPRequests returns to count
+// it under, in place of the route that answered it, if any. Call it from a handler or a middleware
+// beneath that middleware, before the answer's handler returns. A request that never passed through
+// the middleware is not counted, and naming it does nothing.
+func NameRoute(r *http.Request, route NamedRoute) {
+	if slot, ok := r.Context().Value(routeNameKey{}).(*NamedRoute); ok {
+		*slot = route
+	}
+}
 
 // standardMethods are the HTTP methods the method label takes; any other token, which reaches the
 // router as readily as these do, is recorded as other.
@@ -35,8 +69,10 @@ func DurationBuckets() []float64 {
 //
 // The route label's set is router's own route table, read once at the first request or scrape,
 // since the router takes its middleware before its routes; the router names each route in chi's
-// spelling, so the label values are the ones chi gave (#462 decision 5). A request no route
-// answered, a 404, a 405 or one a group's middleware answered before any route, is "unmatched".
+// spelling, so the label values are the ones chi gave (#462 decision 5). Then come the NamedRoute
+// values, under which an answer that named itself with NameRoute is counted. A request no route
+// answered and that named itself as none, a 404, a 405 or one a group's middleware answered before
+// any route, is "unmatched".
 // Mount it with Use on router itself, above the panic recovery, as the request logger is, so a
 // panicking request is counted as the 500 its client received.
 func HTTPRequests(reg *Registry, router *routing.Router) func(http.Handler) http.Handler {
@@ -58,7 +94,7 @@ func httpRequests(reg *Registry, table func() map[string]bool, routeOf func(*htt
 	routes := sync.OnceValue(table)
 	route := Label{
 		name:        "route",
-		description: "the route table, `unmatched`",
+		description: "the route table, `preflight`, `https_redirect`, `unmatched`",
 		described:   true,
 		deferred:    true,
 		values: func() []string {
@@ -67,6 +103,9 @@ func httpRequests(reg *Registry, table func() map[string]bool, routeOf func(*htt
 				table = append(table, pattern)
 			}
 			sort.Strings(table)
+			for _, named := range namedRoutes {
+				table = append(table, string(named))
+			}
 			return append(table, unmatched)
 		},
 	}
@@ -83,12 +122,20 @@ func httpRequests(reg *Registry, table func() map[string]bool, routeOf func(*htt
 			wrapped := statuswriter.Wrap(w)
 			started := time.Now()
 			returned := false
+			var named NamedRoute
+			r = r.WithContext(context.WithValue(r.Context(), routeNameKey{}, &named))
 
 			// Deferred, so a request whose handler panics past this middleware is still counted.
 			defer func() {
 				pattern := routeOf(r)
 				if !routes()[pattern] {
 					pattern = unmatched
+				}
+				if named != "" {
+					pattern = unmatched
+					if slices.Contains(namedRoutes, named) {
+						pattern = string(named)
+					}
 				}
 				code := wrapped.Status()
 				// A handler that returns without writing is answered 200 by net/http, and 200 is

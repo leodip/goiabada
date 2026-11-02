@@ -136,6 +136,43 @@ test("the authorization endpoint answers no CORS request, from a registered web 
   expect(await allowedOrigin(tokenEndpoint, "OPTIONS", "https://elsewhere.example", "POST")).toBeUndefined();
 });
 
+test("a CORS preflight to the token endpoint carries Strict-Transport-Security and the baseline security headers over HTTPS, granted or refused (RFC 6797 section 7.1, #715)", async ({
+  page,
+  clients,
+  request,
+}) => {
+  const client = await clients.create();
+  const registered = `https://${client.identifier}.example.com`;
+  await page.goto(clientUrl(client.id, "web-origins"));
+  await page.locator("#webOrigin").fill(registered);
+  await page.locator("#addOriginBtn").click();
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Web origins saved.")).toBeVisible();
+  expect(new URL(tokenEndpoint).protocol, "the preflight crosses the deployment's HTTPS edge").toBe("https:");
+
+  for (const [origin, allowed] of [
+    [registered, registered],
+    ["https://elsewhere.example", undefined],
+  ] as const) {
+    await test.step(origin, async () => {
+      const response = await request.fetch(tokenEndpoint, {
+        method: "OPTIONS",
+        headers: { Origin: origin, "Access-Control-Request-Method": "POST" },
+        failOnStatusCode: false,
+        maxRedirects: 0,
+      });
+      expect(response.status()).toBe(200);
+      const headers = response.headers();
+      expect(headers["access-control-allow-origin"]).toBe(allowed);
+      expect(headers["strict-transport-security"]).toBe("max-age=31536000; includeSubDomains");
+      expect(headers["x-frame-options"]).toBe("DENY");
+      expect(headers["content-security-policy"]).toBe(contentSecurityPolicy);
+      expect(headers["x-content-type-options"]).toBe("nosniff");
+      expect(headers["referrer-policy"]).toBe("same-origin");
+    });
+  }
+});
+
 test("/userinfo takes the access token from the Authorization header or the body, never from the query (section 4.3.2)", async ({
   page,
   browser,

@@ -86,9 +86,9 @@ A base URL is the address browsers and clients use. A listener is where the serv
 
 | Variable | What it does |
 |---|---|
-| `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS`<br/>Flag: `--authserver-trust-proxy-headers`<br/>Default: `false`<br/>Read by: auth server | Take the client's IP address from `X-Forwarded-For` or `X-Real-IP`. Turn it on behind a reverse proxy, and leave it off without one. See [client IP addresses](#client-ip-addresses). |
+| `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS`<br/>Flag: `--authserver-trust-proxy-headers`<br/>Default: `false`<br/>Read by: auth server | Take the client's IP address from `X-Forwarded-For` or `X-Real-IP`. Turn it on behind a reverse proxy, and leave it off without one. See [client IP addresses](#client-ip-addresses). With an `https://` base URL, it also decides what the HTTP listener does: on, it serves; off, it only redirects to HTTPS. See [listen addresses](#listen-addresses). |
 | `GOIABADA_AUTHSERVER_TRUSTED_PROXIES`<br/>Flag: `--authserver-trusted-proxies`<br/>Default: empty<br/>Read by: auth server | Your proxies' addresses, as comma-separated IP addresses or CIDR ranges, such as `10.0.0.0/8,192.168.1.5`. |
-| `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS`<br/>Flag: `--adminconsole-trust-proxy-headers`<br/>Default: `false`<br/>Read by: admin console | The same switch for the admin console, which records the address in its logs. |
+| `GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS`<br/>Flag: `--adminconsole-trust-proxy-headers`<br/>Default: `false`<br/>Read by: admin console | The same switch for the admin console, which records the address in its logs. It decides what the admin console's HTTP listener does the same way: with an `https://` base URL and this off, it only redirects to HTTPS. See [listen addresses](#listen-addresses). |
 | `GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES`<br/>Flag: `--adminconsole-trusted-proxies`<br/>Default: empty<br/>Read by: admin console | The same list for the admin console. |
 
 ### Keys
@@ -215,6 +215,17 @@ A listen host is an address on the server's own machine, not its public URL. It 
 - **Write an IPv6 address bare or in brackets.** `::1` and `[::1]` are the same address. A link-local address takes its zone, as in `fe80::1%eth0`.
 
 Each server needs at least one listener. With both off, it refuses to start.
+
+### What the HTTP listener does
+
+With an `http://` base URL, each server serves on both its listeners.
+
+With an `https://` base URL, the HTTPS listener serves, and the HTTP listener follows that server's `TRUST_PROXY_HEADERS`:
+
+- **On, the HTTP listener serves.** That's for a proxy that ends TLS and forwards plain HTTP, as every proxy setup the setup wizard writes does. HTTPS is then enforced at the proxy, so make it redirect plain HTTP, and make it the only way to reach the listener.
+- **Off, the HTTP listener only redirects.** Every request gets a `301` to the base URL's scheme, host and port, followed by the request's own path and query, whatever its method. It never serves a page, sets a cookie or sends `Strict-Transport-Security`. Only `GET` and `HEAD` `/health` are answered, so a health check pointed at it keeps working.
+
+Behind a proxy that ends TLS, turn `TRUST_PROXY_HEADERS` on: with it off, the proxy gets the redirect back and the browser loops on it.
 
 ## Client IP addresses
 

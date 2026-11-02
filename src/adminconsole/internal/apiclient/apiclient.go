@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/leodip/goiabada/adminconsole/internal/noredirect"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -76,6 +77,6 @@ func NewAuthServerClient(authServerBaseURL string, rootCAs *x509.CertPool, upstr
 	}
 	return &AuthServerClient{
 		baseURL:    authServerBaseURL,
-		httpClient: upstream.Client(upstreammetrics.AdminAPI, client),
+		httpClient: noredirect.Client(upstream.Client(upstreammetrics.AdminAPI, client)),
 	}
 }

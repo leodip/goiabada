@@ -179,8 +179,9 @@ func TestDurationBuckets_IsAFreshCopy(t *testing.T) {
 	assert.InDelta(t, 0.005, metrics.DurationBuckets()[0], 0)
 }
 
-// The value sets the two families declare: the router's own route table and unmatched, the
-// standard methods, and the status codes. This is what the catalog check holds to the docs.
+// The value sets the two families declare: the router's own route table, the two values an answer
+// no route gives names itself by, and unmatched; the standard methods; and the status codes. This
+// is what the catalog check holds to the docs.
 func TestHTTPRequests_DeclaresTheRouteTable(t *testing.T) {
 	reg := metrics.NewRegistry()
 	newInstrumentedRouter(reg)
@@ -198,10 +199,10 @@ func TestHTTPRequests_DeclaresTheRouteTable(t *testing.T) {
 	route, method, status := requests.Labels[0], requests.Labels[1], requests.Labels[2]
 
 	assert.Equal(t, "route", route.Name())
-	assert.Equal(t, "the route table, `unmatched`", route.Description())
+	assert.Equal(t, "the route table, `preflight`, `https_redirect`, `unmatched`", route.Description())
 	assert.Equal(t, []string{
 		"/admin/clients", "/api/clients/{id}", "/auth", "/auth/token", "/health", "/panic", "/silent",
-		"/static/*", "/users/{id}", "unmatched",
+		"/static/*", "/users/{id}", "preflight", "https_redirect", "unmatched",
 	}, route.Values())
 
 	assert.Equal(t, "method", method.Name())
@@ -217,4 +218,72 @@ func TestHTTPRequests_DeclaresTheRouteTable(t *testing.T) {
 	require.Len(t, duration.Labels, 2)
 	assert.Equal(t, route.Values(), duration.Labels[0].Values())
 	assert.Equal(t, "method", duration.Labels[1].Name())
+}
+
+// An answer no route gives names the route it is counted under: a root middleware answering before
+// routing, as the auth server's CORS middleware answers a preflight, and one that panics after
+// naming itself, which is counted as the 500 its client received. A name outside the closed set is
+// unmatched, and a route's own handler naming itself is counted under the name it gave. Naming a
+// request that never passed through the middleware does nothing.
+func TestHTTPRequests_AnAnswerNamesItsRoute(t *testing.T) {
+	reg := metrics.NewRegistry()
+	r := routing.New()
+	r.Use(metrics.HTTPRequests(reg, r))
+	r.Use(httpmw.Recoverer)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			switch req.URL.Path {
+			case "/preflight":
+				metrics.NameRoute(req, metrics.RoutePreflight)
+				w.WriteHeader(http.StatusOK)
+			case "/preflight-panics":
+				metrics.NameRoute(req, metrics.RoutePreflight)
+				panic("the origin lookup panicked")
+			case "/made-up":
+				metrics.NameRoute(req, metrics.NamedRoute("/users/{id}"))
+				w.WriteHeader(http.StatusOK)
+			default:
+				next.ServeHTTP(w, req)
+			}
+		})
+	})
+	r.Get("/users/{id}", ok)
+	r.Get("/redirects", func(w http.ResponseWriter, req *http.Request) {
+		metrics.NameRoute(req, metrics.RouteHTTPSRedirect)
+		w.WriteHeader(http.StatusMovedPermanently)
+	})
+
+	for _, req := range []struct {
+		method, target string
+		status         int
+	}{
+		{http.MethodOptions, "/preflight", 200},
+		{http.MethodOptions, "/preflight", 200},
+		{http.MethodOptions, "/preflight-panics", 500},
+		{http.MethodGet, "/made-up", 200},
+		{http.MethodGet, "/redirects", 301},
+		{http.MethodGet, "/users/1", 200},
+	} {
+		require.Equal(t, req.status, serve(t, r, req.method, req.target), "%s %s", req.method, req.target)
+	}
+
+	body := scrape(t, reg)
+	assert.Equal(t, []string{
+		`goiabada_http_requests_total{route="/users/{id}",method="GET",status="200"} 1`,
+		`goiabada_http_requests_total{route="https_redirect",method="GET",status="301"} 1`,
+		`goiabada_http_requests_total{route="preflight",method="OPTIONS",status="200"} 2`,
+		`goiabada_http_requests_total{route="preflight",method="OPTIONS",status="500"} 1`,
+		// A name outside the closed set, even one spelling a route of the table, is no route's.
+		`goiabada_http_requests_total{route="unmatched",method="GET",status="200"} 1`,
+	}, lines(body, "goiabada_http_requests_total{"))
+	assert.Equal(t, []string{
+		`goiabada_http_request_duration_seconds_count{route="/users/{id}",method="GET"} 1`,
+		`goiabada_http_request_duration_seconds_count{route="https_redirect",method="GET"} 1`,
+		`goiabada_http_request_duration_seconds_count{route="preflight",method="OPTIONS"} 3`,
+		`goiabada_http_request_duration_seconds_count{route="unmatched",method="GET"} 1`,
+	}, lines(body, "goiabada_http_request_duration_seconds_count{"))
+
+	assert.NotPanics(t, func() {
+		metrics.NameRoute(httptest.NewRequest(http.MethodOptions, "/preflight", nil), metrics.RoutePreflight)
+	})
 }

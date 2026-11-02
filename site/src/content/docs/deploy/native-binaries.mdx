@@ -96,7 +96,7 @@ set -a && . ./goiabada.env && set +a && ./goiabada-authserver
 ## What the wizard's answers set
 
 - **With a reverse proxy on this machine,** both servers listen on `127.0.0.1` alone, so nothing past the proxy reaches the plain HTTP they serve, and they trust the forwarded headers of a connection from `127.0.0.1` alone: see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#native-binaries).
-- **With none** (`--local-proxy=false`), both servers listen on every interface and trust no forwarded header. They serve plain HTTP until you [serve HTTPS directly](#serve-https-without-a-proxy).
+- **With none** (`--local-proxy=false`), both servers listen on every interface and trust no forwarded header. With `https://` URLs, their HTTP listeners only redirect to HTTPS, so they serve no page until you [serve HTTPS directly](#serve-https-without-a-proxy).
 - **The rate limiter** is on unless you answered no (`--rate-limiter=false`). See [Rate limits](/reference/environment-variables/#rate-limits).
 - **With SQLite,** the database is `goiabada.db` in the auth server's working directory, `/var/lib/goiabada` with the unit above. SQLite suits one auth server: see [Database](/deploy/database/).
 
@@ -109,7 +109,7 @@ The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`
 
 ## Serve HTTPS without a proxy
 
-Each server serves HTTPS itself once it has a certificate and a key. Set both in `goiabada.env`, and set each HTTP listen host empty to stop serving plain HTTP:
+Each server serves HTTPS itself once it has a certificate and a key. Set both in `goiabada.env`, and set each HTTP listen host empty to turn the HTTP listeners off:
 
 ```bash
 GOIABADA_AUTHSERVER_CERTFILE="/etc/goiabada/auth.example.com.pem"
@@ -129,6 +129,8 @@ sudo chmod 600 /etc/goiabada/*-key.pem
 ```
 
 Renewing a certificate takes a restart, since each server reads its files when it starts.
+
+With `https://` URLs, each HTTP listener only redirects to HTTPS, before the certificate and after it. If you forward port 80 to it, you can keep it on instead, to send visitors who type `http://` to HTTPS. See [listen addresses](/reference/environment-variables/#listen-addresses).
 
 <Aside type="note" title="macOS and Windows">
 The releases include macOS and Windows binaries, which read the same variables. Load `goiabada.env` into their environment and run them under the service manager you use there.

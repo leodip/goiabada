@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/noredirect"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
@@ -87,7 +88,7 @@ func NewJWKSTokenParser(baseURL string, httpClient *http.Client, upstream *upstr
 	}
 	tp := &JWKSTokenParser{
 		jwksURL:    strings.TrimRight(baseURL, "/") + "/certs",
-		httpClient: upstream.Client(upstreammetrics.JWKS, httpClient),
+		httpClient: noredirect.Client(upstream.Client(upstreammetrics.JWKS, httpClient)),
 		clientID:   clientID,
 		issuer:     issuer,
 		now:        time.Now,

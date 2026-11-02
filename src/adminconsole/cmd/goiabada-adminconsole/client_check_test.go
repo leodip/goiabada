@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
+	"github.com/leodip/goiabada/adminconsole/internal/noredirect"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/errs"
@@ -101,6 +103,23 @@ func TestAwaitAuthServerAcceptsClient_StopsAtARefusal(t *testing.T) {
 	}
 }
 
+// A redirect is an answer asking again does not change: the internal URL reaches a listener that
+// redirects, so the check stops at once and main says why (#715 decision 13), rather than waiting
+// on it for ever.
+func TestAwaitAuthServerAcceptsClient_StopsAtARedirect(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+	redirected := errs.Wrap(&noredirect.Error{StatusCode: http.StatusMovedPermanently, Origin: "https://auth.example.com"},
+		"error sending request")
+	tokens := &scriptedTokens{script: []error{refusal(http.StatusServiceUnavailable, ""), redirected}}
+	var attempts []int
+
+	err := awaitAuthServerAcceptsClient(context.Background(), tokens, recordDelays(&attempts))
+
+	require.ErrorIs(t, err, redirected)
+	assert.Equal(t, 2, tokens.calls, "asking again changes nothing, so it does not ask again")
+	assert.Len(t, logs.Records(), 1, "the one wait before the redirect, and nothing for it: main writes that")
+}
+
 func TestAwaitAuthServerAcceptsClient_EndsTheWaitWhenTheProcessIsStopped(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -157,6 +176,40 @@ func TestAwaitAuthServerAcceptsClient_OverTheRealTokenClient(t *testing.T) {
 		assert.Equal(t, "invalid_client", refused.ErrorCode)
 		assert.Equal(t, int32(2), requests.Load())
 	})
+}
+
+// Over the real token client, a token endpoint that redirects stops the check at the first
+// attempt, and main's record names the redirect's origin and the internal URL setting.
+func TestAwaitAuthServerAcceptsClient_StopsAtARedirectOverTheRealTokenClient(t *testing.T) {
+	var requests atomic.Int32
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		w.Header().Set("Location", "https://auth.example.com/auth/token")
+		w.WriteHeader(http.StatusMovedPermanently)
+	}))
+	t.Cleanup(authServer.Close)
+	var attempts []int
+	// Bounded, so a check that kept waiting on the redirect fails here rather than hanging.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err := awaitAuthServerAcceptsClient(ctx,
+		oauthclient.NewSessionTokenSource(tokenClientFor(authServer.URL)), recordDelays(&attempts))
+
+	var refused *noredirect.Error
+	require.ErrorAs(t, err, &refused)
+	assert.Equal(t, int32(1), requests.Load())
+	assert.Empty(t, attempts)
+
+	logs := logtest.CaptureSlog(t)
+	logClientRefused(err)
+	records := logs.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, slog.LevelError, records[0].Level)
+	assert.Equal(t, "the auth server redirected the admin console's token request, so the admin console cannot start", records[0].Message)
+	assert.Contains(t, fmt.Sprint(records[0].Attrs["error"]), "https://auth.example.com")
+	assert.Contains(t, fmt.Sprint(records[0].Attrs["error"]), "GOIABADA_AUTHSERVER_INTERNALBASEURL")
+	assert.NotContains(t, fmt.Sprint(records[0].Attrs["error"]), "https://auth.example.com/auth/token")
 }
 
 // tokenEndpoint answers the token endpoint with each status of statuses in turn, the last one for

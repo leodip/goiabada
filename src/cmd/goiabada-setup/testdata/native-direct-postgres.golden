@@ -37,10 +37,12 @@ GOIABADA_DB_TLS_MODE="prefer"
 # =============================================================================
 GOIABADA_AUTHSERVER_BASEURL="https://auth.example.com"
 # No reverse proxy fronts this server: it listens on every interface and trusts no
-# forwarded header, so each client is the address it connects from. It serves plain HTTP
-# until you set GOIABADA_AUTHSERVER_CERTFILE and GOIABADA_AUTHSERVER_KEYFILE, which turn
-# on HTTPS at 0.0.0.0:9443 (GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS and _LISTEN_PORT_HTTPS
-# change it); then set the HTTP listen host below empty to stop serving plain HTTP.
+# forwarded header, so each client is the address it connects from. Its URL is https, so
+# its plain HTTP listener only redirects there, and it serves no page until you set
+# GOIABADA_AUTHSERVER_CERTFILE and GOIABADA_AUTHSERVER_KEYFILE, which turn on HTTPS at
+# 0.0.0.0:9443 (GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS and _LISTEN_PORT_HTTPS change it).
+# Then set the HTTP listen host below empty, or keep this listener to redirect visitors
+# to HTTPS when you forward port 80 to it.
 GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP="0.0.0.0"
 GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP="9090"
 GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS="false"
@@ -69,10 +71,12 @@ GOIABADA_AUTHSERVER_LOG_FORMAT="text"
 # =============================================================================
 GOIABADA_ADMINCONSOLE_BASEURL="https://admin.example.com"
 # No reverse proxy fronts this server: it listens on every interface and trusts no
-# forwarded header, so each client is the address it connects from. It serves plain HTTP
-# until you set GOIABADA_ADMINCONSOLE_CERTFILE and GOIABADA_ADMINCONSOLE_KEYFILE, which turn
-# on HTTPS at 0.0.0.0:9444 (GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS and _LISTEN_PORT_HTTPS
-# change it); then set the HTTP listen host below empty to stop serving plain HTTP.
+# forwarded header, so each client is the address it connects from. Its URL is https, so
+# its plain HTTP listener only redirects there, and it serves no page until you set
+# GOIABADA_ADMINCONSOLE_CERTFILE and GOIABADA_ADMINCONSOLE_KEYFILE, which turn on HTTPS at
+# 0.0.0.0:9444 (GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS and _LISTEN_PORT_HTTPS change it).
+# Then set the HTTP listen host below empty, or keep this listener to redirect visitors
+# to HTTPS when you forward port 80 to it.
 GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP="0.0.0.0"
 GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP="9091"
 GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS="false"

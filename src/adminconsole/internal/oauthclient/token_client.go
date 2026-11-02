@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/leodip/goiabada/adminconsole/internal/noredirect"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
@@ -75,7 +76,7 @@ func NewTokenClient(tokenURL, clientID, clientSecret string, httpClient *http.Cl
 		tokenURL:     tokenURL,
 		clientID:     clientID,
 		clientSecret: clientSecret,
-		httpClient:   upstream.Client(upstreammetrics.Token, httpClient),
+		httpClient:   noredirect.Client(upstream.Client(upstreammetrics.Token, httpClient)),
 	}
 }
 
