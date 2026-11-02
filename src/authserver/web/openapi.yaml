@@ -6797,6 +6797,12 @@ components:
           type: boolean
         consentRequired:
           type: boolean
+        rememberConsent:
+          type: boolean
+          description: >-
+            Whether a user's earlier approval skips the consent screen for this client. Always true
+            for a confidential client. A public client starts with it off, so users are asked
+            whenever the consent screen is owed, even if they approved the app before.
         createdViaDcr:
           type: boolean
           description: Read-only. True when the client registered itself through /connect/register
@@ -6887,6 +6893,7 @@ components:
         - displayName
         - enabled
         - consentRequired
+        - rememberConsent
         - createdViaDcr
         - administrativeScopesAllowed
         - showLogo
@@ -6995,6 +7002,13 @@ components:
           type: boolean
         consentRequired:
           type: boolean
+        rememberConsent:
+          type: boolean
+          description: >-
+            Optional. Whether a user's earlier approval skips the consent screen for this client.
+            Leave it out to keep the stored value. A confidential client always remembers consent, so
+            it is stored and answered as true whatever you send. Turn it on for a public client only
+            when every redirect URI is an https address that only that app receives.
         showLogo:
           type: boolean
           description: When true, the client logo is displayed on sign-in and consent screens

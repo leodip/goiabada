@@ -35,13 +35,22 @@ type Client struct {
 	// client save reads the row earlier in its request and a manage-clients token can make each
 	// one, so a save racing an operator's switch would otherwise write back the value it read.
 	AdministrativeScopesAllowed bool `db:"administrative_scopes_allowed" fieldtag:"dont-update"`
-	ShowLogo                    bool `db:"show_logo"`
-	ShowDisplayName             bool `db:"show_display_name"`
-	ShowDescription             bool `db:"show_description"`
-	ShowWebsiteURL              bool `db:"show_website_url"`
-	IsPublic                    bool `db:"is_public"`
-	AuthorizationCodeEnabled    bool `db:"authorization_code_enabled"`
-	ClientCredentialsEnabled    bool `db:"client_credentials_enabled"`
+	// RememberConsent is the stored half of whether a user's earlier approval may skip the consent
+	// screen for this client (#711). A decision goes through RemembersConsent rather than this field:
+	// a confidential client remembers consent whatever this holds. Every writer still keeps a
+	// confidential client's row on, so the row, the admin API's answer and the console agree with
+	// what the server does. Tagged dont-update so the whole-row UpdateClient never writes it: a save
+	// that loaded the client while it was confidential would otherwise write it on over a switch to
+	// public made meanwhile. CreateClient, SetClientRememberConsent and SetClientPublic's transition
+	// write it.
+	RememberConsent          bool `db:"remember_consent" fieldtag:"dont-update"`
+	ShowLogo                 bool `db:"show_logo"`
+	ShowDisplayName          bool `db:"show_display_name"`
+	ShowDescription          bool `db:"show_description"`
+	ShowWebsiteURL           bool `db:"show_website_url"`
+	IsPublic                 bool `db:"is_public"`
+	AuthorizationCodeEnabled bool `db:"authorization_code_enabled"`
+	ClientCredentialsEnabled bool `db:"client_credentials_enabled"`
 	// PKCERequired overrides global setting if set.
 	// nil = use global setting, true = PKCE required, false = PKCE optional
 	PKCERequired *bool `db:"pkce_required"`
@@ -87,6 +96,16 @@ func (c *Client) IsSystemLevelClient() bool {
 // console shows agree with what the server does.
 func (c *Client) MayRequestAdministrativeScopes() bool {
 	return c.ClientIdentifier == builtin.AdminConsoleClientIdentifier || c.AdministrativeScopesAllowed
+}
+
+// RemembersConsent reports whether a user's stored consent may stand in for the consent screen for
+// this client: always for a confidential client, and for a public client only when an
+// administrator turned Remember consent on (#711 decisions 1 and 2). A public client has no secret,
+// so nothing proves an authorization request comes from it rather than from another app using its
+// client ID; RFC 8252 section 8.6 and RFC 6749 section 10.2 say such a request SHOULD be processed as
+// if no previous request had been approved unless the client's identity can be proven.
+func (c *Client) RemembersConsent() bool {
+	return !c.IsPublic || c.RememberConsent
 }
 
 // NameForUsers returns the name a user is shown for this client, by the consent screen, the

@@ -55,6 +55,10 @@ type ClientResponse struct {
 	DisplayName       string `json:"displayName"`
 	Enabled           bool   `json:"enabled"`
 	ConsentRequired   bool   `json:"consentRequired"`
+	// RememberConsent is whether a user's earlier approval may skip the consent screen for this
+	// client, as stored. It is always true for a confidential client, which every writer keeps on;
+	// a public client starts with it off (#711 decisions 4 and 6).
+	RememberConsent bool `json:"rememberConsent"`
 	// CreatedViaDCR is read-only on purpose. It records that the client registered itself through
 	// /connect/register, which is a fact about where the client came from rather than a setting, so
 	// UpdateClientSettingsRequest deliberately does not carry it and neither an administrator nor the
@@ -135,11 +139,15 @@ type UpdateClientSettingsRequest struct {
 	DisplayName       string `json:"displayName"`
 	Enabled           bool   `json:"enabled"`
 	ConsentRequired   bool   `json:"consentRequired"`
-	ShowLogo          bool   `json:"showLogo"`
-	ShowDisplayName   bool   `json:"showDisplayName"`
-	ShowDescription   bool   `json:"showDescription"`
-	ShowWebsiteURL    bool   `json:"showWebsiteUrl"`
-	DefaultAcrLevel   string `json:"defaultAcrLevel,omitempty"`
+	// RememberConsent is optional: nil, or absent from the JSON, keeps the stored value, so a script
+	// that saves settings without it changes nothing. A value is applied to a public client, and a
+	// confidential client is stored and answered as on whatever is sent (#711 decisions 4 to 6).
+	RememberConsent *bool  `json:"rememberConsent,omitempty"`
+	ShowLogo        bool   `json:"showLogo"`
+	ShowDisplayName bool   `json:"showDisplayName"`
+	ShowDescription bool   `json:"showDescription"`
+	ShowWebsiteURL  bool   `json:"showWebsiteUrl"`
+	DefaultAcrLevel string `json:"defaultAcrLevel,omitempty"`
 }
 
 // UpdateClientAuthenticationRequest is used to change a client's

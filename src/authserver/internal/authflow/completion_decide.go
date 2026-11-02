@@ -278,6 +278,9 @@ type afterBindingFacts struct {
 	ConsentRequired bool
 	// ClientIdentifier is the client's ClientIdentifier.
 	ClientIdentifier string
+	// RemembersConsent is the client's RemembersConsent: whether the user's stored consent may stand
+	// in for the consent screen.
+	RemembersConsent bool
 	EffectiveScope   *string
 	// ConsentLoaded is set once the consent has been looked up; Consent is nil when there is none.
 	ConsentLoaded bool
@@ -292,10 +295,12 @@ type afterBindingFacts struct {
 //   - a user holding none of the requested scopes is answered access_denied;
 //   - prompt=consent, the client's ConsentRequired or offline_access goes to the consent screen,
 //     which then skips itself for a scope already consented unless offline_access or prompt=consent
-//     is there;
+//     is there or the client does not remember consent;
 //   - a scope owed a consent whatever the client says (userconsent.AlwaysOwed) goes to the consent
 //     screen unless the user's stored consent covers it, the one case the stored consent is read
-//     here (#509 decision 1);
+//     here (#509 decision 1). A client that does not remember consent, a public one with Remember
+//     consent off, goes to the consent screen without the stored consent being read: nothing proves
+//     the request comes from the app the user approved (#711 decision 2);
 //   - otherwise the ceremony goes on to issuance.
 //
 // The consent table on the Clients concept page is held to this, with the consent step's own rule,
@@ -311,6 +316,9 @@ func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFa
 		return afterBindingConsent, afterBindingFactNone
 	}
 	if owed := userconsent.AlwaysOwed(f.ClientIdentifier, *f.EffectiveScope); len(owed) > 0 {
+		if !f.RemembersConsent {
+			return afterBindingConsent, afterBindingFactNone
+		}
 		if !f.ConsentLoaded {
 			return afterBindingUndecided, afterBindingFactConsent
 		}

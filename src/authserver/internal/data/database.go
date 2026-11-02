@@ -82,6 +82,10 @@ type Database interface {
 	// SetClientAdministrativeScopesAllowed writes whether a client may request the administrative
 	// authserver scopes. It is that column's one writer: UpdateClient never writes it (#499).
 	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error
+	// SetClientRememberConsent writes a client's Remember consent, and nothing else but updated_at.
+	// UpdateClient never writes the column: only this, CreateClient and SetClientPublic's transition
+	// do (#711 decision 5).
+	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientId int64, remember bool) error
 	// AcquireClientRow takes the client's row inside the caller's transaction and holds it
 	// until that transaction ends, so a read taken afterwards cannot be invalidated by
 	// another writer before the caller writes it back (see #245).

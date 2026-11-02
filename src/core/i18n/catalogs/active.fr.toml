@@ -821,6 +821,8 @@
 "adminconsole.admin_clients.settings.field.enabled_hint" = "Un client désactivé ne peut connecter personne ni obtenir de jetons."
 "adminconsole.admin_clients.settings.field.consent_required" = "Demander le consentement des utilisateurs"
 "adminconsole.admin_clients.settings.field.consent_required_tooltip" = "Après la connexion, les utilisateurs choisissent les scopes demandés qu’ils accordent au client. Leur consentement est toujours demandé pour offline_access ou prompt=consent, et lorsqu’un client autre que la console d’administration demande authserver:manage-account."
+"adminconsole.admin_clients.settings.field.remember_consent" = "Mémoriser le consentement"
+"adminconsole.admin_clients.settings.field.remember_consent_tooltip" = "Permet à l’approbation antérieure d’un utilisateur d’éviter l’écran de consentement. Désactivé au départ pour un client public : sans secret, rien ne prouve qu’une requête vient de cette application plutôt que d’une autre qui utilise son identifiant client. Les utilisateurs sont donc sollicités chaque fois que l’écran est dû, même s’ils ont déjà donné leur accord. Ne l’activez que si chaque URI de redirection est une adresse https que seule cette application reçoit."
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" = "Autoriser les scopes d’administration"
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" = "Autorise le client à demander authserver:manage et les autres scopes d’administration, authserver:admin-read, authserver:manage-users, authserver:manage-clients, authserver:manage-settings et authserver:browser-sessions, au nom d’un utilisateur connecté. Il devient ainsi un client d’administration. Ces scopes sont refusés aux clients non autorisés."
 "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" = "Le client de la console d’administration peut toujours demander les scopes d’administration."
@@ -840,6 +842,7 @@
 "adminconsole.admin_clients.settings.modal.identifier_change" = "Vous modifiez l’identifiant du client. Tout ce qui utilise ce client pour se connecter devra envoyer le nouvel identifiant."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "Vous désactivez le client. Plus aucune connexion ni obtention de jetons ne sera possible avec lui tant qu’il ne sera pas réactivé."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "Vous autorisez le client à demander les scopes d’administration. Il pourra obtenir un jeton portant les droits d’un administrateur connecté et deviendra un client d’administration."
+"adminconsole.admin_clients.settings.modal.remember_consent_warning" = "Vous permettez à une approbation antérieure d’éviter l’écran de consentement pour ce client public. Une autre application qui utilise son identifiant client et reçoit ses redirections obtiendrait des jetons pour tout utilisateur ayant déjà approuvé cette application, sans le lui demander."
 
 # --- Client tokens ---------------------------------------------------------
 
@@ -885,7 +888,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "Nouveau secret généré. Enregistrez pour l’utiliser. En attendant, le secret actuel reste valide."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Paramètres d’authentification enregistrés."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "Vous modifiez le secret du client. Tout ce qui envoie encore l’ancien secret sera refusé jusqu’à sa mise à jour."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vous rendez le client public. Son secret sera supprimé et tout ce qui utilise ce client pour se connecter devra être mis à jour. Ses jetons de rafraîchissement et codes d’autorisation seront révoqués, et les jetons d’accès émis avec eux seront refusés aussitôt par le serveur d’authentification et par les API qui vérifient les jetons auprès de lui ; une API qui ne vérifie que la signature d’un jeton les accepte jusqu’à leur expiration. Ses ressources d’introspection seront vidées, et les utilisateurs resteront connectés aux autres clients."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vous rendez le client public. Son secret sera supprimé et tout ce qui utilise ce client pour se connecter devra être mis à jour. Ses jetons de rafraîchissement et codes d’autorisation seront révoqués, et les jetons d’accès émis avec eux seront refusés aussitôt par le serveur d’authentification et par les API qui vérifient les jetons auprès de lui ; une API qui ne vérifie que la signature d’un jeton les accepte jusqu’à leur expiration. Ses ressources d’introspection seront vidées, Mémoriser le consentement sera désactivé, et les utilisateurs resteront connectés aux autres clients."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "Vous rendez le client confidentiel. Tout ce qui utilise ce client pour se connecter devra envoyer son secret."
 
 # --- Client redirect URIs --------------------------------------------------

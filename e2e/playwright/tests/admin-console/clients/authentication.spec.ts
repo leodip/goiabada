@@ -128,3 +128,20 @@ test("a save made by hand with a client type that is neither is refused, the cli
   await page.goto(`${env.adminUrl}/admin/clients`);
   await expect(clientRow(page, client.identifier).getByRole("cell", { name: "Confidential", exact: true })).toBeVisible();
 });
+
+// A confidential client always remembers consent; making it public turns Remember consent off, as
+// its confirmation says, so its users are asked again until an administrator vouches for it.
+test("making a client public says Remember consent will be turned off, and the client shows it unticked", async ({ page, clients }) => {
+  const client = await clients.create();
+  await page.goto(clientUrl(client.id, "authentication"));
+  await page.getByRole("radio", { name: "Public", exact: true }).check();
+  await page.locator("#btnSave").click();
+  await confirmDialog(
+    page,
+    "Its introspection resources will be cleared, Remember consent will be turned off, and users will stay signed in to other clients.",
+  );
+  await expect(page.getByText(saved)).toBeVisible();
+
+  await page.goto(clientUrl(client.id, "settings"));
+  await expect(page.getByRole("checkbox", { name: /^Remember consent/ })).not.toBeChecked();
+});

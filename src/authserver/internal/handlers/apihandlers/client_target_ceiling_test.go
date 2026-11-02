@@ -183,8 +183,8 @@ var clientTargetWrites = []clientTargetWrite{
 			HandleClientAuthenticationPut(database, auditLogger, testDataCipher).ServeHTTP(rr, r)
 			return rr
 		},
-		writes:           []string{"RunInTransaction", "SetClientPublic", "DeleteClientIntrospectionResourcesByClientId", "UpdateClient"},
-		expectFirstWrite: failingWrite("UpdateClient", mock.Anything, (*sql.Tx)(nil), mock.Anything),
+		writes:           []string{"RunInTransaction", "SetClientPublic", "DeleteClientIntrospectionResourcesByClientId", "UpdateClient", "SetClientRememberConsent"},
+		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 		credentials:      true,
 	},
 	{

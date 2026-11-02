@@ -71,9 +71,11 @@ var committedClientWrites = []committedClientWrite{
 			return rr
 		},
 		expectWrite: func(database *datamocks.Database) {
-			database.On("UpdateClient", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+			database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+			database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, targetClientId, true).Return(nil).Once()
 		},
-		expectFailingWrite: failingWrite("UpdateClient", mock.Anything, (*sql.Tx)(nil), mock.Anything),
+		expectFailingWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 	{
 		name:         "PUT /clients/{id}/authentication making the client public",
@@ -90,6 +92,8 @@ var committedClientWrites = []committedClientWrite{
 			database.On("SetClientPublic", mock.Anything, clientUpdateTx, targetClientId).Return(true, nil).Once()
 			database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, targetClientId).Return(nil).Once()
 			database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+			database.On("GetClientById", mock.Anything, clientUpdateTx, targetClientId).
+				Return(&record.Client{Id: targetClientId, ClientIdentifier: "target-client", IsPublic: true}, nil).Once()
 			database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, targetClientId).Return(int64(1), nil).Once()
 			database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, targetClientId).
 				Return([]*record.RefreshToken{}, nil).Once()

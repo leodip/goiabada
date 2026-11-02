@@ -1026,6 +1026,18 @@ func TestToClientResponse_AdministrativeScopesAllowedIsWhatTheServerApplies(t *t
 	}
 }
 
+// TestToClientResponse_RememberConsentIsTheStoredValue pins rememberConsent to the stored value,
+// both ways and for either mode (#711 decision 6). Every writer keeps a confidential client's row on,
+// so the stored value is what the server applies.
+func TestToClientResponse_RememberConsentIsTheStoredValue(t *testing.T) {
+	for _, isPublic := range []bool{true, false} {
+		for _, stored := range []bool{true, false} {
+			resp := ToClientResponse(&record.Client{ClientIdentifier: "web-app", IsPublic: isPublic, RememberConsent: stored})
+			assert.Equalf(t, stored, resp.RememberConsent, "public %v, stored %v", isPublic, stored)
+		}
+	}
+}
+
 // =============================================================================
 // Audit timestamps
 //

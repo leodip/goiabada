@@ -474,3 +474,28 @@ func TestClient_IsRefreshIssuingFlowEnabled(t *testing.T) {
 		})
 	}
 }
+
+// TestRemembersConsent holds the one rule every place a stored consent may stand in for the
+// consent screen asks (#711 decisions 1, 2 and 4): a confidential client always remembers a
+// user's earlier approval, whatever its row holds, and a public client only when an administrator
+// turned Remember consent on for it.
+func TestRemembersConsent(t *testing.T) {
+	cases := []struct {
+		isPublic bool
+		stored   bool
+		want     bool
+	}{
+		{isPublic: false, stored: true, want: true},
+		{isPublic: false, stored: false, want: true},
+		{isPublic: true, stored: true, want: true},
+		{isPublic: true, stored: false, want: false},
+	}
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("public %v, stored %v", c.isPublic, c.stored), func(t *testing.T) {
+			client := &Client{IsPublic: c.isPublic, RememberConsent: c.stored}
+			if got := client.RemembersConsent(); got != c.want {
+				t.Errorf("RemembersConsent() = %v, want %v", got, c.want)
+			}
+		})
+	}
+}

@@ -56,6 +56,7 @@ type clientsDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error
 	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientId int64, remember bool) error
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 }
 
@@ -99,10 +100,23 @@ type clientsDatabase interface {
 // It does not close the lost update on the columns each endpoint DOES own: two concurrent saves
 // of the same section still last-write-wins, which is how every entity in this codebase behaves
 // and is a separate, wider question.
-func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *record.Client) error {
+//
+// rememberConsent is the settings save's optional Remember consent, nil for every other caller and
+// for a settings save without it, which leaves the stored value alone. A value is decided here,
+// against the row re-read under the lock, because it depends on the mode as the property above
+// does (#711 decisions 4 and 5): a confidential client is stored on whatever was sent; a public one
+// takes the value only when the request also loaded it public. A save that loaded the client while
+// it was confidential chose its value for a client that needed no vouching, so it never applies to
+// one made public since, which the switch left off.
+func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *record.Client, rememberConsent *bool) error {
+	// Taken before the transaction: the body overwrites client.IsPublic with the row's mode, and a
+	// rerun after a deadlock must still decide against the mode the request loaded.
+	loadedPublic := client.IsPublic
+
 	// Opened through RunInTransaction, so a deadlock reruns the acquisition, the re-read and the
 	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
-	// this attempt's own lock, and ApplyPublicClientInvariants is idempotent on the result.
+	// this attempt's own lock, ApplyPublicClientInvariants is idempotent on the result, and Remember
+	// consent is decided again from that row and written as a fixed value.
 	return database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := database.AcquireClientRow(ctx, tx, client.Id); err != nil {
 			return err
@@ -117,10 +131,35 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 		}
 		client.IsPublic = current.IsPublic
 		client.ClientSecretEncrypted = current.ClientSecretEncrypted
+		// UpdateClient never writes Remember consent, so none of these saves can write back the
+		// value it loaded. The copy it answers with takes the row's value too, so a save loaded
+		// while the client was confidential cannot answer on for a client made public since
+		// (#711 decision 5).
+		client.RememberConsent = current.RememberConsent
 
 		client.ApplyPublicClientInvariants()
 
-		return database.UpdateClient(ctx, tx, client)
+		if err := database.UpdateClient(ctx, tx, client); err != nil {
+			return err
+		}
+
+		if rememberConsent == nil {
+			return nil
+		}
+		var remember bool
+		switch {
+		case !current.IsPublic:
+			remember = true
+		case loadedPublic:
+			remember = *rememberConsent
+		default:
+			return nil
+		}
+		if err := database.SetClientRememberConsent(ctx, tx, client.Id, remember); err != nil {
+			return err
+		}
+		client.RememberConsent = remember
+		return nil
 	})
 }
 
@@ -433,13 +472,16 @@ func HandleClientCreatePost(
 
 		// Create client model mimicking current implementation defaults
 		client := &record.Client{
-			ClientIdentifier:                        strings.TrimSpace(req.ClientIdentifier),
-			Description:                             strings.TrimSpace(req.Description),
-			DisplayName:                             trimmedDisplayName,
-			ShowDisplayName:                         trimmedDisplayName != "",
-			ClientSecretEncrypted:                   clientSecretEncrypted,
-			IsPublic:                                false,
-			ConsentRequired:                         false,
+			ClientIdentifier:      strings.TrimSpace(req.ClientIdentifier),
+			Description:           strings.TrimSpace(req.Description),
+			DisplayName:           trimmedDisplayName,
+			ShowDisplayName:       trimmedDisplayName != "",
+			ClientSecretEncrypted: clientSecretEncrypted,
+			IsPublic:              false,
+			ConsentRequired:       false,
+			// The create request makes a confidential client, and a confidential client always
+			// remembers consent (#711 decision 4).
+			RememberConsent:                         true,
 			Enabled:                                 true,
 			DefaultAcrLevel:                         record.AcrLevel2Optional,
 			AuthorizationCodeEnabled:                req.AuthorizationCodeEnabled,
@@ -682,7 +724,7 @@ func HandleClientUpdatePut(
 			return
 		}
 
-		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, updateReq.RememberConsent); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
 			return
 		}
@@ -821,6 +863,18 @@ func HandleClientAuthenticationPut(
 				if err := database.UpdateClient(r.Context(), tx, client); err != nil {
 					return false, err
 				}
+				// SetClientPublic turned Remember consent off if it made the client public, and
+				// left it as it was otherwise; UpdateClient never writes it. The answer reads it
+				// from the row under the lock rather than from the copy loaded at the top of the
+				// request, which may predate another save's switch (#711 decision 5).
+				current, readErr := database.GetClientById(r.Context(), tx, client.Id)
+				if readErr != nil {
+					return false, readErr
+				}
+				if current == nil {
+					return false, errs.New("client no longer exists")
+				}
+				client.RememberConsent = current.RememberConsent
 				return becamePublic, nil
 			})
 			if err != nil {
@@ -833,9 +887,23 @@ func HandleClientAuthenticationPut(
 				revocation.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
 					revocation.ReasonClientBecamePublic, callerSubject(r), result)
 			}
-		} else if err := database.UpdateClient(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client authentication"), "client_id", client.Id)
-			return
+		} else {
+			// A confidential client always remembers consent, so the switch to confidential, and
+			// a confidential save, writes Remember consent on. In the transaction that writes the
+			// mode, because UpdateClient leaves the column out: written apart, a switch to public
+			// committed between the two would be left with Remember consent on (#711 decision 4).
+			// Safe to rerun after a deadlock: both writes set fixed values.
+			err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+				if err := database.UpdateClient(r.Context(), tx, client); err != nil {
+					return err
+				}
+				return database.SetClientRememberConsent(r.Context(), tx, client.Id, true)
+			})
+			if err != nil {
+				writeInternalServerError(w, r, errs.Wrap(err, "database error updating client authentication"), "client_id", client.Id)
+				return
+			}
+			client.RememberConsent = true
 		}
 
 		// Either branch has committed its write by here: it is recorded now, before the reads
@@ -1031,7 +1099,7 @@ func HandleClientOAuth2FlowsPut(
 		// became public in between would have its two rules skipped and be saved with client
 		// credentials on and PKCE off, which is the state this whole change exists to make
 		// unreachable (#245, final review finding 1).
-		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, nil); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client OAuth2 flows"), "client_id", client.Id)
 			return
 		}
@@ -1465,7 +1533,7 @@ func HandleClientTokensPut(
 			return
 		}
 
-		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, nil); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client tokens"), "client_id", client.Id)
 			return
 		}

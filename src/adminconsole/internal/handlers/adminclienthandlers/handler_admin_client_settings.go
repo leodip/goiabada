@@ -26,7 +26,9 @@ type clientSettingsAPI interface {
 // ClientSettings is what the Settings tab is drawn from. AdministrativeScopesAllowed is a field of
 // the settings form like the others, under Consent required, saved by the same Save. The auth server
 // keeps it on a route of its own, which only authserver:manage may write (#499 decisions 4 and 5),
-// so HandleSettingsPost writes it there, and only when it changed (#542).
+// so HandleSettingsPost writes it there, and only when it changed (#542). RememberConsent sits
+// under Consent required too, drawn and sent for a public client only: a confidential client's is
+// always on, and its tab draws no checkbox (#711 decisions 4 and 8).
 //
 // The tab binds two: "client", the values its inputs show, and "storedClient", the client as the
 // auth server holds it, which the page title and the confirmation dialogs' original identifier and
@@ -42,6 +44,7 @@ type ClientSettings struct {
 	DisplayName                 string
 	Enabled                     bool
 	ConsentRequired             bool
+	RememberConsent             bool
 	AdministrativeScopesAllowed bool
 	ShowLogo                    bool
 	ShowDisplayName             bool
@@ -68,6 +71,7 @@ func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
 		DisplayName:                 c.DisplayName,
 		Enabled:                     c.Enabled,
 		ConsentRequired:             c.ConsentRequired,
+		RememberConsent:             c.RememberConsent,
 		AdministrativeScopesAllowed: c.AdministrativeScopesAllowed,
 		ShowLogo:                    c.ShowLogo,
 		ShowDisplayName:             c.ShowDisplayName,
@@ -220,6 +224,18 @@ func HandleSettingsPost(
 			allowed = clientResp.AdministrativeScopesAllowed
 		}
 
+		// Remember consent is drawn and sent for a client public as loaded here only (#711 decision
+		// 8). It is read from the body alone, as the allowance is: an unticked checkbox is submitted
+		// as nothing, so its absence means off, and only the checkbox's own value turns it on. A
+		// confidential client's save carries no value, and the auth server keeps it on; were the
+		// client made public since it was loaded, the auth server applies nothing either way.
+		rememberConsent := clientResp.RememberConsent
+		var sentRememberConsent *bool
+		if clientResp.IsPublic {
+			rememberConsent = r.PostFormValue("rememberConsent") == "on"
+			sentRememberConsent = &rememberConsent
+		}
+
 		adminClientSettings := ClientSettings{
 			ClientId:                    id,
 			ClientIdentifier:            r.FormValue("clientIdentifier"),
@@ -230,6 +246,7 @@ func HandleSettingsPost(
 			DisplayName:                 r.FormValue("displayName"),
 			Enabled:                     enabled,
 			ConsentRequired:             consentRequired,
+			RememberConsent:             rememberConsent,
 			AdministrativeScopesAllowed: allowed,
 			ShowLogo:                    showLogo,
 			ShowDisplayName:             showDisplayName,
@@ -269,6 +286,7 @@ func HandleSettingsPost(
 			DisplayName:       strings.TrimSpace(adminClientSettings.DisplayName),
 			Enabled:           adminClientSettings.Enabled,
 			ConsentRequired:   adminClientSettings.ConsentRequired,
+			RememberConsent:   sentRememberConsent,
 			ShowLogo:          adminClientSettings.ShowLogo,
 			ShowDisplayName:   adminClientSettings.ShowDisplayName,
 			ShowDescription:   adminClientSettings.ShowDescription,

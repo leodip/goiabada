@@ -33,6 +33,7 @@ func routeBoundCeremony(ctx context.Context, database consentReader, scopes scop
 		PromptConsent:    authContext.HasPromptValue("consent"),
 		ConsentRequired:  client.ConsentRequired,
 		ClientIdentifier: client.ClientIdentifier,
+		RemembersConsent: client.RemembersConsent(),
 	}
 	answer, need := decideAfterBinding(facts)
 	for need != afterBindingFactNone {
