@@ -90,7 +90,8 @@ func clientAuthMethod(r *http.Request) string {
 // Authorization is not a list (RFC 9110 section 11.6.2), a sender MUST NOT generate several lines of
 // it (section 5.3), and RFC 6749 section 5.2 names a request that "includes multiple credentials".
 // Reading the first, as before, picked a client from an ambiguous request. A Basic header whose
-// credentials cannot be read is refused invalid_client, and the body is not read in its place.
+// credentials cannot be read, or name no client, is refused invalid_client, and the body is not
+// read in its place.
 // A header of another scheme, such as Bearer, is ignored.
 func extractClientCredentials(r *http.Request) (clientId, clientSecret string, err error) {
 	if len(r.Header.Values("Authorization")) > 1 {
@@ -147,6 +148,9 @@ func basicCredentials(authHeader string) (string, bool) {
 // client_secret, and whether the header names the Basic scheme. A Basic header whose credentials
 // cannot be read, because there are none, they are not base64 or they hold no colon once decoded,
 // is clientauth.UnreadableBasicCredentials (#707 decision 12): before, it counted as no header.
+// Credentials with nothing before the colon name no client, and are
+// clientauth.BasicCredentialsNamingNoClient: before, they were answered invalid_request for a
+// missing client_id, with no challenge.
 func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool, err error) {
 	encoded, basic := basicCredentials(authHeader)
 	if !basic {
@@ -166,7 +170,11 @@ func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool, 
 		return "", "", false, clientauth.UnreadableBasicCredentials()
 	}
 
-	return percentDecoded(credentials[:colonIdx]), percentDecoded(credentials[colonIdx+1:]), true, nil
+	clientId = percentDecoded(credentials[:colonIdx])
+	if clientId == "" {
+		return "", "", false, clientauth.BasicCredentialsNamingNoClient()
+	}
+	return clientId, percentDecoded(credentials[colonIdx+1:]), true, nil
 }
 
 // percentDecoded undoes RFC 6749 section 2.3.1's form encoding before Basic authentication:

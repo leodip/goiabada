@@ -125,13 +125,22 @@ func TestParseBasicAuth(t *testing.T) {
 		assert.Empty(t, clientSecret)
 	})
 
-	t.Run("Empty client_id with password is valid", func(t *testing.T) {
-		encoded := base64.StdEncoding.EncodeToString([]byte(":secret"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
-		require.NoError(t, err)
-		assert.True(t, ok)
-		assert.Empty(t, clientId)
-		assert.Equal(t, "secret", clientSecret)
+	// RFC 6749 section 5.2: the client tried the header, so credentials naming no client are a failed
+	// client authentication, 401 invalid_client, not a missing client_id.
+	t.Run("Basic credentials naming no client are invalid_client", func(t *testing.T) {
+		for _, credentials := range []string{":secret", ":"} {
+			encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
+			clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+			assert.False(t, ok, credentials)
+			assert.Empty(t, clientId, credentials)
+			assert.Empty(t, clientSecret, credentials)
+			var errDetail *oauth.ErrorDetail
+			require.ErrorAs(t, err, &errDetail, credentials)
+			assert.Equal(t, "invalid_client", errDetail.Code(), credentials)
+			assert.Equal(t, http.StatusUnauthorized, errDetail.HTTPStatus(), credentials)
+			assert.Equal(t, "Client authentication failed: the Basic credentials in the Authorization header name no client.",
+				errDetail.Description(), credentials)
+		}
 	})
 
 	t.Run("Special characters in credentials", func(t *testing.T) {

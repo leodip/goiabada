@@ -39,9 +39,10 @@ Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does
   caller's own and unproven
 - Header: one or more spaces may follow `Basic` (RFC 9110 section 11.4); two or more Authorization
   fields are 400 `invalid_request` before any is read; a Basic header with no credentials, or ones
-  that are not base64 or have no colon, is `clientauth.UnreadableBasicCredentials`, 401
-  `invalid_client` with the challenge, and the body is not read in its place (RFC 6749 section 5.2).
-  Another scheme, such as Bearer, is ignored (#707)
+  that are not base64 or have no colon, is `clientauth.UnreadableBasicCredentials`, and one with
+  nothing before the colon is `clientauth.BasicCredentialsNamingNoClient`: both 401 `invalid_client`
+  with the challenge, and the body is not read in their place (RFC 6749 section 5.2). Another
+  scheme, such as Bearer, is ignored (#707)
 - Decision: `clientauth` takes the identifier and the secret as plain values and owns the
   refusals: an unknown or disabled client, or a confidential client's missing or wrong secret, is
   401 `invalid_client` with the Basic challenge; a public client that presents a secret is 400

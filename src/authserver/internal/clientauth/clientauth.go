@@ -53,6 +53,9 @@ const publicClientCannotIntrospectErrorMsg = "This client is configured as publi
 // UnreadableBasicCredentials' description.
 const unreadableBasicCredentialsErrorMsg = "Client authentication failed: the Basic credentials in the Authorization header could not be read."
 
+// BasicCredentialsNamingNoClient's description.
+const basicCredentialsNamingNoClientErrorMsg = "Client authentication failed: the Basic credentials in the Authorization header name no client."
+
 // FindClient's refusals.
 const (
 	clientIdMissingErrorMsg    = "Missing required client_id parameter."
@@ -174,9 +177,19 @@ func UnreadableBasicCredentials() *oauth.ErrorDetail {
 	return invalidClientError(unreadableBasicCredentialsErrorMsg)
 }
 
+// BasicCredentialsNamingNoClient is the refusal of Basic credentials that can be read but name no
+// client: nothing comes before the colon, as in ":" and ":secret". The client identifier is the Basic
+// user-id (RFC 6749 section 2.3.1), and the client tried the header, so section 5.2 requires the 401
+// with the challenge, as for unreadable credentials, and the body is not read in its place. A
+// request that tried no header and sends no client_id is FindClient's invalid_request instead
+// (#437 decision 9).
+func BasicCredentialsNamingNoClient() *oauth.ErrorDetail {
+	return invalidClientError(basicCredentialsNamingNoClientErrorMsg)
+}
+
 // invalidClientError is every invalid_client: an unknown client, a disabled one, a missing or
-// wrong secret, and unreadable Basic credentials. Always 401 with BasicChallenge, whether the client
-// used the Authorization header or the form body (#437).
+// wrong secret, and Basic credentials that cannot be read or name no client. Always 401 with
+// BasicChallenge, whether the client used the Authorization header or the form body (#437).
 //
 // RFC 6749 section 5.2 makes 401 a MAY in general and a MUST, with a challenge, only for a client
 // that tried the Authorization header; RFC 9110 section 15.5.2 then requires a challenge on every

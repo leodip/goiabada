@@ -21,8 +21,8 @@ import (
 // sees it over HTTP (#707 decisions 8, 9 and 12): one or more spaces may follow Basic (RFC 9110
 // section 11.4); a request with two Authorization fields is refused 400 invalid_request, whether they
 // agree or not (RFC 9110 section 5.3, RFC 6749 section 5.2); and a Basic header whose credentials
-// cannot be read is refused 401 invalid_client with the Basic challenge, even beside right credentials
-// in the body (RFC 6749 section 5.2).
+// cannot be read, or name no client, is refused 401 invalid_client with the Basic challenge, even
+// beside right credentials in the body (RFC 6749 section 5.2).
 
 // headerAnswer is what an endpoint answered.
 type headerAnswer struct {
@@ -184,17 +184,24 @@ func TestClientAuthentication_TwoAuthorizationFieldsAreRefused(t *testing.T) {
 // Decision 12: a Basic header with no credentials, or with credentials that are not base64 or have
 // no colon, is refused 401 invalid_client with the Basic challenge, and the body is not read in its
 // place: right credentials there do not authenticate the client. Until #707 the header counted as
-// absent and the body's credentials authenticated it.
-func TestClientAuthentication_UnreadableBasicCredentialsAreRefused(t *testing.T) {
+// absent and the body's credentials authenticated it. Credentials with nothing before the colon name
+// no client, and are refused the same way; until #707 they were 400 invalid_request with no challenge.
+func TestClientAuthentication_BasicCredentialsNamingNoClientAreRefused(t *testing.T) {
 	client, secret := createHeaderClient(t)
 
-	fields := map[string]string{
-		"a bare Basic":                      "Basic",
-		"credentials that are not base64":   "Basic not-valid-base64!",
-		"decoded credentials with no colon": basicField(" ", client.ClientIdentifier),
+	const (
+		unreadable = "Client authentication failed: the Basic credentials in the Authorization header could not be read."
+		noClient   = "Client authentication failed: the Basic credentials in the Authorization header name no client."
+	)
+	fields := map[string]struct{ field, description string }{
+		"a bare Basic":                        {"Basic", unreadable},
+		"credentials that are not base64":     {"Basic not-valid-base64!", unreadable},
+		"decoded credentials with no colon":   {basicField(" ", client.ClientIdentifier), unreadable},
+		"the secret and no client identifier": {basicField(" ", ":"+secret), noClient},
+		"a colon alone":                       {basicField(" ", ":"), noClient},
 	}
 	for _, endpoint := range clientAuthEndpoints() {
-		for name, field := range fields {
+		for name, tc := range fields {
 			for _, body := range []bool{false, true} {
 				form := url.Values{}
 				for key, values := range endpoint.form {
@@ -207,10 +214,9 @@ func TestClientAuthentication_UnreadableBasicCredentialsAreRefused(t *testing.T)
 					label += ", right credentials in the body"
 				}
 				t.Run(label, func(t *testing.T) {
-					answer := postWithAuthorizationFields(t, endpoint.path, form, field)
+					answer := postWithAuthorizationFields(t, endpoint.path, form, tc.field)
 
-					assertHeaderError(t, answer, http.StatusUnauthorized, "invalid_client",
-						"Client authentication failed: the Basic credentials in the Authorization header could not be read.")
+					assertHeaderError(t, answer, http.StatusUnauthorized, "invalid_client", tc.description)
 					assert.Equal(t, `Basic realm="goiabada"`, answer.header.Get("WWW-Authenticate"))
 				})
 			}

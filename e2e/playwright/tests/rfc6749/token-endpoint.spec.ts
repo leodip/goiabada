@@ -118,6 +118,23 @@ test("a Basic header whose credentials cannot be read is invalid_client, with th
   }
 });
 
+// The same section 5.2 failure: credentials with nothing before the colon name no client, so the
+// client tried the header and failed it, and the body's client_id is not read in their place.
+test("Basic credentials that name no client are invalid_client, with the Basic challenge", async ({ page, clients, request }) => {
+  const client = await clientCredentialsClient(page, clients);
+  const body = { grant_type: "client_credentials", scope, client_id: client.id, client_secret: client.secret };
+
+  for (const credentials of [`:${client.secret}`, ":"]) {
+    const header = `Basic ${Buffer.from(credentials).toString("base64")}`;
+    const answer = await postToken(request, body, { headers: { Authorization: header } });
+    expectTokenError(answer, "invalid_client", 401);
+    expect(answer.headers["www-authenticate"], credentials).toBe('Basic realm="goiabada"');
+    expect(answer.body.error_description, credentials).toBe(
+      "Client authentication failed: the Basic credentials in the Authorization header name no client.",
+    );
+  }
+});
+
 test("two client authentication methods in one request are refused as invalid_request", async ({ page, clients, request }) => {
   const client = await clientCredentialsClient(page, clients);
 

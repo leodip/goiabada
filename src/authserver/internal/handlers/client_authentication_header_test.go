@@ -29,9 +29,9 @@ import (
 // endpoints, read the Authorization header (#707 decisions 8, 9 and 12): one or more spaces may follow
 // Basic (RFC 9110 section 11.4); two or more Authorization fields are refused 400 invalid_request
 // before any credential is read (RFC 9110 section 5.3, RFC 6749 section 5.2); and a Basic header whose
-// credentials cannot be read is refused 401 invalid_client with the Basic challenge, the body unread
-// (RFC 6749 section 5.2). Every database is a strict mock, so a client lookup nothing armed fails the
-// test: a refusal here is made before any client is read.
+// credentials cannot be read, or name no client, is refused 401 invalid_client with the Basic
+// challenge, the body unread (RFC 6749 section 5.2). Every database is a strict mock, so a client
+// lookup nothing armed fails the test: a refusal here is made before any client is read.
 
 const (
 	headerClientIdentifier = "the-client"
@@ -152,20 +152,27 @@ func TestClientAuthentication_TwoAuthorizationFieldsAreRefused(t *testing.T) {
 
 // Decision 12: a Basic header with no credentials, or with credentials that are not base64 or have no
 // colon, is refused 401 invalid_client with the Basic challenge, and the body is not consulted: its
-// credentials neither authenticate the client nor make the request one of two methods. The refusal
-// writes the endpoint's Warn record, as every invalid_client does, naming no client.
-func TestClientAuthentication_UnreadableBasicCredentialsAreInvalidClient(t *testing.T) {
+// credentials neither authenticate the client nor make the request one of two methods. So are
+// credentials with nothing before the colon, which name no client (RFC 6749 section 5.2: the client
+// tried the header). The refusal writes the endpoint's Warn record, as every invalid_client does,
+// naming no client.
+func TestClientAuthentication_BasicCredentialsNamingNoClientAreInvalidClient(t *testing.T) {
+	const noClientDescription = "Client authentication failed: the Basic credentials in the Authorization header name no client."
 	cases := []struct {
-		name  string
-		field string
+		name        string
+		field       string
+		description string
 	}{
-		{"a bare Basic", "Basic"},
-		{"a bare lowercase basic", "basic"},
-		{"Basic and spaces alone", "Basic   "},
-		{"credentials that are not base64", "Basic not-valid-base64!"},
-		{"base64 with a space inside", "Basic " + encodedBasic("the-client:the")[:8] + " " + encodedBasic("the-client:the")[8:]},
-		{"decoded credentials with no colon", "Basic " + encodedBasic("no-colon-here")},
-		{"no colon, after two spaces", "Basic  " + encodedBasic("no-colon-here")},
+		{"a bare Basic", "Basic", unreadableBasicDescription},
+		{"a bare lowercase basic", "basic", unreadableBasicDescription},
+		{"Basic and spaces alone", "Basic   ", unreadableBasicDescription},
+		{"credentials that are not base64", "Basic not-valid-base64!", unreadableBasicDescription},
+		{"base64 with a space inside", "Basic " + encodedBasic("the-client:the")[:8] + " " + encodedBasic("the-client:the")[8:], unreadableBasicDescription},
+		{"decoded credentials with no colon", "Basic " + encodedBasic("no-colon-here"), unreadableBasicDescription},
+		{"no colon, after two spaces", "Basic  " + encodedBasic("no-colon-here"), unreadableBasicDescription},
+		{"a secret and no client identifier", "Basic " + encodedBasic(":the-secret"), noClientDescription},
+		{"a colon alone", "Basic " + encodedBasic(":"), noClientDescription},
+		{"no client identifier, after two spaces", "Basic  " + encodedBasic(":the-secret"), noClientDescription},
 	}
 	for _, endpoint := range headerEndpoints() {
 		for _, tc := range cases {
@@ -182,14 +189,14 @@ func TestClientAuthentication_UnreadableBasicCredentialsAreInvalidClient(t *test
 
 					rr := postWithAuthorization(handler, endpoint.path, form, tc.field)
 
-					assertErrorAnswer(t, rr, http.StatusUnauthorized, "invalid_client", unreadableBasicDescription)
+					assertErrorAnswer(t, rr, http.StatusUnauthorized, "invalid_client", tc.description)
 					assert.Equal(t, `Basic realm="goiabada"`, rr.Header().Get("WWW-Authenticate"))
 
 					records := logged.Records()
 					require.Len(t, records, 1, logged.Text())
 					assert.Equal(t, slog.LevelWarn, records[0].Level)
 					assert.Equal(t, endpoint.warning, records[0].Message)
-					assert.Equal(t, unreadableBasicDescription, records[0].Attrs["reason"])
+					assert.Equal(t, tc.description, records[0].Attrs["reason"])
 					assert.Empty(t, records[0].Attrs["client_identifier"])
 					assert.Equal(t, "client_secret_basic", records[0].Attrs["client_auth_method"])
 				})
