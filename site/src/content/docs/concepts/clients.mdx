@@ -146,7 +146,7 @@ Turn **Ask users for consent** on when users should approve what a client can ac
 
 You usually don't need it for your own clients. Turn it on for third-party ones, so users can see who's asking for their data. Users see the consent screen anyway when a client asks for `offline_access` or sends `prompt=consent`.
 
-They also see it when a client asks for `authserver:manage-account`, until they've approved it for that client. That scope lets a client call the [Account API](/reference/api/scopes/#the-account-api-scope) for the user: change their profile, end their sessions and withdraw their consents. Every user holds it, so without the screen any client could get it for whoever is signed in. The admin console's own client is the one exception: it signs users in without the screen, so their **Account** pages work as they always do.
+They also see it when a client asks for `authserver:manage-account`, unless they've approved that scope for the client before and it has **Remember consent** on. That scope lets a client call the [Account API](/reference/api/scopes/#the-account-api-scope) for the user: change their profile, end their sessions and withdraw their consents. Every user holds it, so without the screen any client could get it for whoever is signed in. The admin console's own client is the one exception: it signs users in without the screen, so their **Account** pages work as they always do.
 
 Clients you create start with consent off. Clients that register themselves start with it on, since nobody has reviewed them yet.
 
@@ -166,9 +166,9 @@ Whether a sign-in shows the consent screen depends on the two settings, the requ
 | Either | Either | Yes | Either | Either | Either | Shown |
 | Either | Either | Either | Yes | Either | Either | Shown |
 
-`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Ask users for consent** off, a prior approval for that scope skips the screen even if the user hasn't approved the client's other requested scopes.
+`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Ask users for consent** off and **Remember consent** on, the stored consent needs to cover only that scope, not the client's other requested scopes.
 
-The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept, so the next sign-in skips the screen while it covers every scope and the client has **Remember consent** on, and a user can withdraw it under **Account**, **Consents**, which also revokes the refresh tokens they hold with that client. A user who unticks `authserver:manage-account` is asked for it again at the client's next sign-in that asks for it.
+The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept: while it covers every scope and the client has **Remember consent** on, a later sign-in skips the screen unless it asks for `offline_access` or sends `prompt=consent`, and a user can withdraw it under **Account**, **Consents**, which also revokes the refresh tokens they hold with that client. A user who unticks `authserver:manage-account` is asked for it again at the client's next sign-in that asks for it.
 
 Choosing **Don't allow** ends the sign-in. A client you created gets `access_denied`, "The user did not provide consent", at its redirect URI. A client that [registered itself](#self-registered-clients) gets nothing: the user sees a page naming the app and the address it asked to send them to, and the request stops there. So does a client whose redirect URI has been removed since the request began.
 

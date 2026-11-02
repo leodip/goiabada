@@ -295,7 +295,7 @@ type afterBindingFacts struct {
 //   - a user holding none of the requested scopes is answered access_denied;
 //   - prompt=consent, the client's ConsentRequired or offline_access goes to the consent screen,
 //     which then skips itself for a scope already consented unless offline_access or prompt=consent
-//     is there;
+//     is there or the client does not remember consent;
 //   - a scope owed a consent whatever the client says (userconsent.AlwaysOwed) goes to the consent
 //     screen unless the user's stored consent covers it, the one case the stored consent is read
 //     here (#509 decision 1). A client that does not remember consent, a public one with Remember
