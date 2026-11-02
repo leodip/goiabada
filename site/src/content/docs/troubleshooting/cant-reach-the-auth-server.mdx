@@ -34,7 +34,7 @@ The usual causes:
 - **The internal URL is empty, and the public URL isn't reachable from inside,** such as a public hostname that only resolves outside your network, or a firewall that stops the admin console's host from reaching it.
 - **The internal URL is `https`, and its certificate isn't trusted** or doesn't name the host in the URL.
 - **On Kubernetes, the NetworkPolicies refuse a service mesh's port.** A mesh whose proxies deliver on a port of their own, such as Istio's ambient mode or Linkerd, needs that port admitted beside the auth server's: the error is a `connection reset by peer`, or `authserver returned status 504` from the mesh's proxy. See [Who can reach Goiabada](/deploy/kubernetes/security/#who-can-reach-goiabada).
-- **The internal URL reaches an address that redirects.** The admin console doesn't follow redirects, so its `error` says `a redirect to` and the address it was sent to. The usual one is the auth server's `http` port when the auth server's base URL is `https` and `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` is off: that listener only redirects to the base URL. Its `/health` still answers there, so the check below passes. Use the auth server's HTTPS listener, or turn trust on when a proxy that ends HTTPS fronts the auth server.
+- **The internal URL reaches an address that redirects.** The admin console doesn't follow redirects, so its `error` says `a redirect to` and the address it was sent to. The usual one is the auth server's `http` port when the auth server's base URL is `https` and `GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS` is off: that listener only redirects to the base URL. Its `/health` still answers there, while every other path redirects. Use the auth server's HTTPS listener, or turn trust on when a proxy that ends HTTPS fronts the auth server.
 - **Something answers, but with an error,** `authserver returned status` and the status: a proxy in between answering `404` or `502`, or the auth server answering `500` because its database is down. The auth server's `/health` doesn't check the database, so it can answer `healthy` meanwhile: read the auth server's log.
 
 ## Fix it
@@ -43,17 +43,17 @@ The usual causes:
 
 1. Find the URL the admin console calls: its `GOIABADA_AUTHSERVER_INTERNALBASEURL`, or its `GOIABADA_AUTHSERVER_BASEURL` when that's empty.
 
-2. From where the admin console runs, check that the auth server answers there. For example, with Docker Compose:
+2. From where the admin console runs, ask that URL for the settings, as the admin console does. For example, with Docker Compose:
 
    ```bash
-   docker compose exec goiabada-adminconsole wget -qO- http://goiabada-authserver:9090/health
+   docker compose exec goiabada-adminconsole wget -S -O- http://goiabada-authserver:9090/api/public/settings
    ```
 
-   It should print `healthy`.
+   It should print `HTTP/1.1 200 OK`, then the settings as JSON. A `301` and a `Location` mean the address only redirects, even when its `/health` answers: the redirect cause above.
 
-   For an `https` internal URL, check the auth server's `http` port instead, as above: the admin console's image has no `wget` for `https://`, [by design](/deploy/docker-compose/#what-the-images-contain). A certificate problem is the cause listed above.
+   The admin console's image has no `wget` for `https://`, [by design](/deploy/docker-compose/#what-the-images-contain). For an `https` internal URL, send the same request from a machine that reaches the auth server as the admin console does, with an HTTPS client that doesn't follow redirects, such as `curl -i`. Give `curl` your own authority's certificate with `--cacert` when that authority signed the auth server's. A certificate error is the cause listed above: fix the certificate, as below, and keep the URL `https`.
 
-3. Set the admin console's `GOIABADA_AUTHSERVER_INTERNALBASEURL` to the address that answered, and restart the admin console.
+3. Set the admin console's `GOIABADA_AUTHSERVER_INTERNALBASEURL` to the address that answered `200` with the settings, and restart the admin console.
 
 </Steps>
 

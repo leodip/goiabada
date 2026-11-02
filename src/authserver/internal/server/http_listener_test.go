@@ -66,11 +66,11 @@ func redirectingServer(t *testing.T) *Server {
 	})
 }
 
-// serveHTTPListener serves the handler Start gives s's HTTP listener on a loopback port, and
+// serveHTTPListener serves s's HTTP listener, built as Start builds it, on a loopback port, and
 // answers its address.
 func serveHTTPListener(t *testing.T, s *Server) string {
 	t.Helper()
-	served := servedOnLoopback(t, s.httpListenerHandler())
+	served := servedOnLoopbackAs(t, s.newHTTPListenerServer("127.0.0.1", 0))
 	go func() { _ = served.serve() }()
 	return served.server.Addr
 }
@@ -264,6 +264,36 @@ func TestHTTPListener_LogsAndCountsItsAnswers(t *testing.T) {
 	assert.NotContains(t, exposition, `goiabada_http_requests_total{route="unmatched"`)
 }
 
+// A server-wide OPTIONS, whose target is the asterisk (RFC 9110 section 9.3.7), is redirected like
+// any other request rather than answered by net/http's own OPTIONS shortcut, which would skip the
+// whole chain: no Location, no baseline header, no log record and no metric sample (#715 decisions
+// 3, 9 and 10). The asterisk is no path, so the target is the base URL's origin with the root path.
+func TestHTTPListener_RedirectsTheServerWideOptions(t *testing.T) {
+	s := redirectingServer(t)
+	addr := serveHTTPListener(t, s)
+	logged := logtest.CaptureSlog(t)
+
+	resp, body := sendToHTTPListener(t, addr, http.MethodOptions, "OPTIONS * HTTP/1.1\r\nHost: auth.example.com\r\nConnection: close\r\n\r\n")
+
+	assert.Equal(t, http.StatusMovedPermanently, resp.StatusCode)
+	assert.Equal(t, []string{"https://auth.example.com:8443/"}, resp.Header.Values("Location"))
+	assertBaselineHeadersWithoutHSTS(t, resp.Header)
+	assert.Empty(t, body)
+
+	records := httpRequestRecords(logged)
+	require.Len(t, records, 1)
+	assert.Equal(t, "OPTIONS", records[0].Attrs["method"])
+	assert.EqualValues(t, http.StatusMovedPermanently, records[0].Attrs["status"])
+
+	exposition := scrape(t, s)
+	for _, line := range []string{
+		`goiabada_http_requests_total{route="https_redirect",method="OPTIONS",status="301"} 1`,
+		`goiabada_http_request_duration_seconds_count{route="https_redirect",method="OPTIONS"} 1`,
+	} {
+		assert.Contains(t, exposition, line+"\n")
+	}
+}
+
 // The redirecting listener runs the root middleware that applies to it, in the router's order: the
 // request id, the security headers, the real IP, the request log, the metrics and the panic
 // recovery; not CORS, the slash strip, the body limit or the CSRF check (#715).
@@ -370,6 +400,10 @@ func TestStart_TheHTTPListenerAndItsRecords(t *testing.T) {
 				return
 			}
 			assert.Equal(t, http.StatusNotFound, page.StatusCode, "the router's 404")
+			// A serving listener keeps net/http's own answer to a server-wide OPTIONS, as before.
+			options, _ := sendToHTTPListener(t, addr, http.MethodOptions, "OPTIONS * HTTP/1.1\r\nHost: auth.example.com\r\nConnection: close\r\n\r\n")
+			assert.Equal(t, http.StatusOK, options.StatusCode)
+			assert.Empty(t, options.Header.Values("Location"))
 			if tt.baseURL == "https://auth.example.com" {
 				assert.Equal(t, []string{"max-age=31536000; includeSubDomains"}, health.Header.Values("Strict-Transport-Security"),
 					"behind a proxy that ends TLS, the browser's side is HTTPS (RFC 6797 section 7.1)")

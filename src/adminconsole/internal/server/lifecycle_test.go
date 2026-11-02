@@ -43,7 +43,14 @@ func (h *heldHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 func servedOnLoopback(t *testing.T, handler http.Handler) listener {
 	t.Helper()
 
-	srv := newHTTPServer("127.0.0.1", 0, handler)
+	return servedOnLoopbackAs(t, newHTTPServer("127.0.0.1", 0, handler))
+}
+
+// servedOnLoopbackAs is servedOnLoopback for a listener built by a constructor of its own, such as
+// the HTTP listener's, with its address moved to an ephemeral port on 127.0.0.1.
+func servedOnLoopbackAs(t *testing.T, srv *http.Server) listener {
+	t.Helper()
+
 	ln, err := net.Listen("tcp", srv.Addr)
 	require.NoError(t, err)
 	srv.Addr = ln.Addr().String()

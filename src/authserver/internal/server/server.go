@@ -203,7 +203,7 @@ func (s *Server) Start(ctx context.Context) (drained bool, err error) {
 	}
 
 	if httpEnabled {
-		httpServer := newHTTPServer(httpHost, httpPort, s.httpListenerHandler())
+		httpServer := s.newHTTPListenerServer(httpHost, httpPort)
 		listeners = append(listeners, listener{
 			server: httpServer,
 			serve:  httpServer.ListenAndServe,
@@ -302,6 +302,17 @@ func (s *Server) httpListenerHandler() http.Handler {
 	return s.redirectingRouter()
 }
 
+// newHTTPListenerServer builds the HTTP listener Start serves, unstarted, with the handler
+// httpListenerHandler chooses. A redirect-only listener also turns off net/http's own answer to a
+// server-wide OPTIONS (target "*"), which reaches the client before the handler does, so it would
+// carry no redirect, no baseline header, no log record and no metric sample (#715 decisions 3, 9
+// and 10); the handler redirects it instead. A serving listener keeps net/http's answer, as before.
+func (s *Server) newHTTPListenerServer(host string, port int) *http.Server {
+	srv := newHTTPServer(host, port, s.httpListenerHandler())
+	srv.DisableGeneralOptionsHandler = s.httpListenerRedirects()
+	return srv
+}
+
 // redirectingRouter is the redirect-only HTTP listener's handler. GET and HEAD /health are answered
 // as the router answers them, so a health check pointed at the listener keeps working; every other
 // request, of any method and on any path, is a 301 to the base URL's origin with the request's own
@@ -344,7 +355,10 @@ func httpsRedirect(baseURL string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		metrics.NameRoute(r, metrics.RouteHTTPSRedirect)
 		target := r.URL.EscapedPath()
-		if target == "" {
+		// No path, as in an absolute-form target naming only an authority, or no path at all, as the
+		// asterisk of a server-wide OPTIONS (RFC 9110 section 9.3.7): the root, so the target is
+		// always the origin followed by a rooted path.
+		if !strings.HasPrefix(target, "/") {
 			target = "/"
 		}
 		if r.URL.ForceQuery || r.URL.RawQuery != "" {
