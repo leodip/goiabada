@@ -16,14 +16,16 @@ import (
 
 func TestParseBasicAuth(t *testing.T) {
 	t.Run("Empty header returns false", func(t *testing.T) {
-		clientId, clientSecret, ok := parseBasicAuth("")
+		clientId, clientSecret, ok, err := parseBasicAuth("")
+		require.NoError(t, err)
 		assert.False(t, ok)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
 	})
 
 	t.Run("Non-Basic scheme returns false", func(t *testing.T) {
-		clientId, clientSecret, ok := parseBasicAuth("Bearer some-token")
+		clientId, clientSecret, ok, err := parseBasicAuth("Bearer some-token")
+		require.NoError(t, err)
 		assert.False(t, ok)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
@@ -32,7 +34,8 @@ func TestParseBasicAuth(t *testing.T) {
 	t.Run("The scheme name is case-insensitive", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
 		for _, scheme := range []string{"basic", "BASIC", "bAsIc"} {
-			clientId, clientSecret, ok := parseBasicAuth(scheme + " " + encoded)
+			clientId, clientSecret, ok, err := parseBasicAuth(scheme + " " + encoded)
+			require.NoError(t, err)
 			assert.True(t, ok, scheme)
 			assert.Equal(t, "client", clientId, scheme)
 			assert.Equal(t, "secret", clientSecret, scheme)
@@ -41,28 +44,34 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("A longer scheme name is not Basic", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
-		_, _, ok := parseBasicAuth("Basicx " + encoded)
+		_, _, ok, err := parseBasicAuth("Basicx " + encoded)
 		assert.False(t, ok)
+		require.NoError(t, err)
 	})
 
-	t.Run("Invalid base64 returns false", func(t *testing.T) {
-		clientId, clientSecret, ok := parseBasicAuth("Basic not-valid-base64!")
-		assert.False(t, ok)
-		assert.Empty(t, clientId)
-		assert.Empty(t, clientSecret)
-	})
-
-	t.Run("Missing colon separator returns false", func(t *testing.T) {
-		encoded := base64.StdEncoding.EncodeToString([]byte("nocolon"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
-		assert.False(t, ok)
-		assert.Empty(t, clientId)
-		assert.Empty(t, clientSecret)
+	// #707 decision 12: Basic credentials that cannot be read are refused, not taken for no header.
+	t.Run("Unreadable Basic credentials are invalid_client", func(t *testing.T) {
+		for _, header := range []string{
+			"Basic not-valid-base64!",
+			"Basic " + base64.StdEncoding.EncodeToString([]byte("nocolon")),
+			"Basic",
+			"Basic ",
+		} {
+			clientId, clientSecret, ok, err := parseBasicAuth(header)
+			assert.False(t, ok, header)
+			assert.Empty(t, clientId, header)
+			assert.Empty(t, clientSecret, header)
+			var errDetail *oauth.ErrorDetail
+			require.ErrorAs(t, err, &errDetail, header)
+			assert.Equal(t, "invalid_client", errDetail.Code(), header)
+			assert.Equal(t, http.StatusUnauthorized, errDetail.HTTPStatus(), header)
+		}
 	})
 
 	t.Run("Valid credentials are parsed correctly", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("my-client-id:my-secret"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "my-client-id", clientId)
 		assert.Equal(t, "my-secret", clientSecret)
@@ -72,7 +81,8 @@ func TestParseBasicAuth(t *testing.T) {
 	// openid-client does, escaping even '-', '.' and '_'. Every generated secret holds those.
 	t.Run("Form-urlencoded credentials are decoded", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("my%2Dclient%5Fid:s3cr%2Et%2Dwith%2Bplus%3Aand%25+a+space"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "my-client_id", clientId)
 		assert.Equal(t, "s3cr.t-with+plus:and% a space", clientSecret)
@@ -81,7 +91,8 @@ func TestParseBasicAuth(t *testing.T) {
 	// Preserve the legacy fallback only when form decoding fails on a malformed percent escape.
 	t.Run("A malformed escape keeps the unencoded value", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("my-client:a+b/c=d%zz"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "my-client", clientId)
 		assert.Equal(t, "a+b/c=d%zz", clientSecret)
@@ -89,7 +100,8 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("A plus in either encoded value is a space", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("my+client:a+b%2Bc"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "my client", clientId)
 		assert.Equal(t, "a b+c", clientSecret)
@@ -97,7 +109,8 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("Password with colons is parsed correctly", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:pass:with:colons"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "client", clientId)
 		assert.Equal(t, "pass:with:colons", clientSecret)
@@ -105,24 +118,36 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("Empty password is valid", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "client", clientId)
 		assert.Empty(t, clientSecret)
 	})
 
-	t.Run("Empty client_id with password is valid", func(t *testing.T) {
-		encoded := base64.StdEncoding.EncodeToString([]byte(":secret"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
-		assert.True(t, ok)
-		assert.Empty(t, clientId)
-		assert.Equal(t, "secret", clientSecret)
+	// RFC 6749 section 5.2: the client tried the header, so credentials naming no client are a failed
+	// client authentication, 401 invalid_client, not a missing client_id.
+	t.Run("Basic credentials naming no client are invalid_client", func(t *testing.T) {
+		for _, credentials := range []string{":secret", ":"} {
+			encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
+			clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+			assert.False(t, ok, credentials)
+			assert.Empty(t, clientId, credentials)
+			assert.Empty(t, clientSecret, credentials)
+			var errDetail *oauth.ErrorDetail
+			require.ErrorAs(t, err, &errDetail, credentials)
+			assert.Equal(t, "invalid_client", errDetail.Code(), credentials)
+			assert.Equal(t, http.StatusUnauthorized, errDetail.HTTPStatus(), credentials)
+			assert.Equal(t, "Client authentication failed: the Basic credentials in the Authorization header name no client.",
+				errDetail.Description(), credentials)
+		}
 	})
 
 	t.Run("Special characters in credentials", func(t *testing.T) {
 		// Test with special chars that might cause issues
 		encoded := base64.StdEncoding.EncodeToString([]byte("client%2Bid%40example.com:p%40ss%3Dword%26special%21"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "client+id@example.com", clientId)
 		assert.Equal(t, "p@ss=word&special!", clientSecret)
@@ -130,25 +155,27 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("Unicode characters in credentials", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("клиент:密码"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "клиент", clientId)
 		assert.Equal(t, "密码", clientSecret)
 	})
 
-	t.Run("Extra whitespace after Basic is handled", func(t *testing.T) {
-		// Extra space should cause base64 decode to fail or produce wrong result
+	// RFC 9110 section 11.4: one or more spaces follow the scheme (#707 decision 8).
+	t.Run("Two spaces after Basic are read", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic  " + encoded) // two spaces
-		// The extra space becomes part of the base64 string, likely causing decode failure
-		assert.False(t, ok)
-		assert.Empty(t, clientId)
-		assert.Empty(t, clientSecret)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic  " + encoded) // two spaces
+		require.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "client", clientId)
+		assert.Equal(t, "secret", clientSecret)
 	})
 
-	t.Run("Missing space after Basic is rejected", func(t *testing.T) {
+	t.Run("Missing space after Basic is another scheme", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
-		clientId, clientSecret, ok := parseBasicAuth("Basic" + encoded) // no space
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic" + encoded) // no space
+		require.NoError(t, err)
 		assert.False(t, ok)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
@@ -158,7 +185,8 @@ func TestParseBasicAuth(t *testing.T) {
 		longClientId := strings.Repeat("a", 1000)
 		longSecret := strings.Repeat("b", 1000)
 		encoded := base64.StdEncoding.EncodeToString([]byte(longClientId + ":" + longSecret))
-		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, longClientId, clientId)
 		assert.Equal(t, longSecret, clientSecret)
@@ -243,8 +271,8 @@ func TestExtractClientCredentials(t *testing.T) {
 		assert.Equal(t, "basic-secret", clientSecret)
 	})
 
-	t.Run("Invalid Basic auth header falls back to POST body", func(t *testing.T) {
-		// Malformed Basic auth should be ignored, not cause an error
+	// #707 decision 12: the client tried the header, so the body is not read in its place.
+	t.Run("Invalid Basic auth header is refused, the POST body unread", func(t *testing.T) {
 		formData := "grant_type=client_credentials&client_id=post-client&client_secret=post-secret"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
 		req = withSettings(req, &record.Settings{})
@@ -253,9 +281,11 @@ func TestExtractClientCredentials(t *testing.T) {
 		_ = req.ParseForm()
 
 		clientId, clientSecret, err := extractClientCredentials(req)
-		require.NoError(t, err)
-		assert.Equal(t, "post-client", clientId)
-		assert.Equal(t, "post-secret", clientSecret)
+		assert.Empty(t, clientId)
+		assert.Empty(t, clientSecret)
+		var errDetail *oauth.ErrorDetail
+		require.ErrorAs(t, err, &errDetail)
+		assert.Equal(t, "invalid_client", errDetail.Code())
 	})
 
 	t.Run("Bearer token header does not interfere with POST body", func(t *testing.T) {
