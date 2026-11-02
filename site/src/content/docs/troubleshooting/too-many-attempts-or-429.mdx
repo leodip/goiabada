@@ -9,17 +9,17 @@ This page helps you when Goiabada's rate limiter refuses a request, and especial
 
 ## What you see
 
-The limits counted by a user, an email or a client always apply: wrong passwords for one account, wrong client secrets for one client, one-time codes, the Account pages' password checks, email changes on the Account pages, email verification, and password-reset and registration mails to one address. The limits counted by an IP address apply once you set `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` to `true`. A refused request gets `429 Too Many Requests` with a `Retry-After` header, in the format the endpoint usually answers with:
+The limits counted by a user or an email always apply: wrong passwords for one account, one-time codes, the Account pages' password checks, email changes on the Account pages, email verification, and password-reset and registration mails to one address. The limits counted by an IP address apply once you set `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` to `true`. A refused request gets `429 Too Many Requests` with a `Retry-After` header, in the format the endpoint usually answers with:
 
 - **The authorization endpoint, `/auth/authorize`, and a sign-in, two-factor, registration, activation or password reset page** show "Too many attempts" and "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again." At the authorization endpoint that includes a silent request, and nothing reaches your app: see [Rate limit](/reference/endpoints/authorize/#rate-limit).
-- **The token, revocation and introspection endpoints and `POST /connect/register`** answer `{"error": "invalid_request", "error_description": "Too many requests. Please wait and try again later."}`.
+- **The token endpoint's password grant and `POST /connect/register`** answer `{"error": "invalid_request", "error_description": "Too many requests. Please wait and try again later."}`.
 - **The Account API** answers the error code `TOO_MANY_REQUESTS`.
 
 The auth server logs a `rate limit reached` warning naming the limiter, and writes a `rate_limit_exceeded` [audit event](/concepts/audit-log/), once per key and window on each replica.
 
 ## Why it happens
 
-Most of the time it's the limiter doing its job: someone typed a wrong password too often, or a script is trying addresses. Each limit counts by something, an IP address, an email, a user or a client, and refuses the next request once that one has used its budget. The [rate limits table](/reference/environment-variables/#rate-limits) lists every limit, what it counts and what it counts by.
+Most of the time it's the limiter doing its job: someone typed a wrong password too often, or a script is trying addresses. Each limit counts by something, an IP address, an email or a user, and refuses the next request once that one has used its budget. The [rate limits table](/reference/environment-variables/#rate-limits) lists every limit, what it counts and what it counts by.
 
 When **every user** sees "Too many attempts" at once, with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, the auth server is almost certainly behind a proxy it doesn't trust. It then sees the proxy's address on every request, so all your users share one IP address's budget, and a handful of wrong passwords uses it up for everyone.
 
@@ -28,8 +28,6 @@ When **every user** sees "Too many attempts" at once, with `GOIABADA_AUTHSERVER_
 If one user or one address is refused, wait. The `Retry-After` header gives the limit's window in seconds, and the budget comes back gradually over the window after it. Restarting the auth server resets only the limits it keeps in the process, as described below, so on PostgreSQL, MySQL and SQL Server it doesn't reset the limits on wrong passwords for one account.
 
 If one account can't sign in with its password and its owner didn't cause it, someone is guessing that password. The `rate_limit_exceeded` audit event names the account by `email_digest`. Turn on the [Turnstile challenge](/guides/require-a-turnstile-challenge/), so a script that can't pass it spends no more of the budget, or block their address at your proxy or CDN. The challenge doesn't cover the password grant, so it's enough only while no public client has the grant enabled. The same goes for password-reset or registration emails to one address that its owner didn't ask for.
-
-If a confidential client is refused at the token, revocation or introspection endpoint, even with its right secret, it or someone else sent 200 missing or wrong secrets for it in the past hour, at the three endpoints together. The limiter is `client_auth`, and the `rate_limit_exceeded` audit event names the client by `client_identifier`. A copy of your app still using an old secret does it too: the `client authentication refused at the token endpoint` warnings in the auth server's log, and their revocation and introspection counterparts, say why each attempt failed. Anyone who knows a confidential client's identifier can spend its budget, so if you didn't cause it, block the source at your proxy or CDN. A restart doesn't clear it on PostgreSQL, MySQL and SQL Server.
 
 If everyone is refused behind a proxy, tell the auth server to read the client's address from the proxy's headers:
 
@@ -59,7 +57,7 @@ Trust forwarded headers only when the proxy is the **only** way to reach the aut
 
 A limit that counts failures, such as wrong passwords, isn't spent by a success, so signing in normally never uses it up, even for many people behind one office or mobile network. A limit that counts every request is spent by every request, successful or not. The ones on sign-in, `pwd_ip_requests` and `ropc_ip_requests`, allow 120 a minute from one IP address, which only something signing in over and over reaches. `authorize` allows the same 120 a minute at the authorization endpoint, but every sign-in, single sign-on and silent renew spends one or two of it, so a busy network behind one address can reach it.
 
-Limits on failures against an account, a user or a client are kept in the database on PostgreSQL, MySQL and SQL Server, so they hold across replicas and a restart doesn't refill them. The others, `pwd_ip`, `ropc_ip` and every limit on every request, are kept in each process: each replica allows the full budget, and a restart resets it. On SQLite, which runs one replica, all of them are kept in the process.
+Limits on failures against an account or a user are kept in the database on PostgreSQL, MySQL and SQL Server, so they hold across replicas and a restart doesn't refill them. The others, `pwd_ip`, `ropc_ip` and every limit on every request, are kept in each process: each replica allows the full budget, and a restart resets it. On SQLite, which runs one replica, all of them are kept in the process.
 
 Wrong passwords meet up to two limits. `pwd_account` counts by email alone, as a ceiling across every network, and always applies. 100 wrong passwords in an hour, from anywhere, use it up, and then the account can't sign in with its password for the rest of the hour, whoever is typing and even with the right password. A password reset doesn't clear it, and anyone already signed in stays signed in. That's the price of having a ceiling per account at all, and the remedy for someone doing it on purpose is the [Turnstile challenge](/guides/require-a-turnstile-challenge/) or blocking them at your proxy or CDN. With `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, `pwd_account_net` counts by IP address and email together, 10 every 15 minutes, so someone guessing from one network runs out of their own budget long before the account's, and the account's owner signs in normally from anywhere else.
 

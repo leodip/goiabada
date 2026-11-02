@@ -53,7 +53,7 @@ func everyLimiterAtZeroBut(t *testing.T, reg *metrics.Registry, refused map[stri
 			}
 		}
 	}
-	require.Len(t, want, 20, "every tier the constructor builds")
+	require.Len(t, want, 19, "every tier the constructor builds")
 	for limiter, value := range refused {
 		require.Contains(t, want, limiter)
 		want[limiter] = value
@@ -149,7 +149,7 @@ func TestRateLimiter_TheLimiterLabelIsEveryTierName(t *testing.T) {
 
 	var tiers []foundTier
 	collectTierKeyFields(reflect.ValueOf(m), "middleware", &tiers, map[visitedValue]bool{})
-	require.Len(t, tiers, 20, "the walk reaches every tier the constructor builds")
+	require.Len(t, tiers, 19, "the walk reaches every tier the constructor builds")
 
 	var names []string
 	for _, found := range tiers {

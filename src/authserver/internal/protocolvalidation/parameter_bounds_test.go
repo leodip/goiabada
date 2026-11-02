@@ -261,7 +261,7 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 		t.Helper()
 		mockDB := datamocks.NewDatabase(t)
 		validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
-			protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
+			protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 		passwordHash, err := passwordhash.Hash("correctpassword")
 		require.NoError(t, err)

@@ -67,11 +67,6 @@ var errAnotherClientsToken = oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 // whatever client it names (RFC 7009 section 2.2), and a live one of another client 400
 // invalid_grant, with nothing revoked.
 //
-// A confidential client's secret check spends the client authentication limit, the one budget the
-// token endpoint's and the introspection endpoint's checks spend (#707 decision 2): a client over it
-// is answered the token endpoint's 429, counted under its limiter and not in this endpoint's metric,
-// and a count that cannot be read is this endpoint's 503.
-//
 // A fault reading the database or the signing keys is 503, never the 200 of an invalid token: RFC 7009
 // section 2.2.1 has the client assume the token still exists and retry. The revocation may have
 // committed all the same, when the fault is in the commit's acknowledgement.
@@ -80,16 +75,14 @@ func HandleRevokePost(
 	database revokeDatabase,
 	tokenParser TokenParser,
 	dataCipher *encryption.DataCipher,
-	limiter clientauth.SecretCheckLimiter,
 	auditLogger AuditLogger,
 	revocationMetrics *revocationmetrics.Recorder,
 ) http.HandlerFunc {
 	endpoint := revocationEndpoint{
-		jsonWriter:  jsonWriter,
-		database:    database,
-		tokenParser: tokenParser,
-		// The secret checks spend the client authentication budget the token endpoint's spend (#707).
-		clients:          clientauth.NewAuthenticator(database, dataCipher, limiter),
+		jsonWriter:       jsonWriter,
+		database:         database,
+		tokenParser:      tokenParser,
+		clients:          clientauth.NewAuthenticator(database, dataCipher),
 		auditLogger:      auditLogger,
 		metrics:          revocationMetrics,
 		refusalAuditGate: ratelimit.New(1, time.Minute).Gate(),
@@ -134,11 +127,6 @@ func (e revocationEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 	// RFC 7009 section 2.1: the client authenticates as at the token endpoint, and a public client
 	// by its client_id alone (section 5).
 	client, err := e.clients.Authenticate(ctx, clientIdentifier, clientSecret)
-	// A client over the client authentication limit: the 429, counted under its limiter rather than
-	// as a refusal of the revocation request.
-	if refusedOverClientAuthenticationLimit(w, r, err) {
-		return
-	}
 	if err != nil {
 		var refusal *oauth.ErrorDetail
 		if !errors.As(err, &refusal) {

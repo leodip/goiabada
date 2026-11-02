@@ -57,7 +57,7 @@ func expectNoLegalDocumentsOwed(mockDB *datamocks.Database) {
 func TestValidateTokenRequest_ROPC_ALegalDocumentOwedIsRefused(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
-		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
+		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
@@ -99,7 +99,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -152,7 +152,7 @@ func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
@@ -191,7 +191,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
@@ -242,7 +242,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true, // Globally enabled
@@ -280,7 +280,7 @@ func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -321,7 +321,7 @@ func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -364,7 +364,7 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -409,7 +409,7 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -463,7 +463,7 @@ func TestValidateTokenRequest_ROPC_UserWithoutPassword(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -528,7 +528,7 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -574,7 +574,7 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -614,7 +614,7 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -669,7 +669,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -723,7 +723,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -786,7 +786,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryRefused(t *testing.T)
 			mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 			mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 			settings := &record.Settings{
 				ResourceOwnerPasswordCredentialsEnabled: true,
@@ -836,7 +836,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryWithCodeFlowOffStillV
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -895,7 +895,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2OptionalStillValidates(t *test
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -950,7 +950,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -993,7 +993,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	encryptedSecret, _ := testDataCipher.Encrypt("correct-secret")
 
@@ -1045,7 +1045,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCi
 
 	otherCipher, err := encryption.NewDataCipher([]byte("fedcba9876543210fedcba9876543210"))
 	require.NoError(t, err)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, otherCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, otherCipher)
 
 	encryptedSecret, err := testDataCipher.Encrypt("correct-secret")
 	require.NoError(t, err)
@@ -1081,7 +1081,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	encryptedSecret, _ := testDataCipher.Encrypt("correct-secret")
 
@@ -1138,7 +1138,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -1188,7 +1188,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -1245,7 +1245,7 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 			mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 			mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 			settings := &record.Settings{
 				ResourceOwnerPasswordCredentialsEnabled: true,
@@ -1298,7 +1298,7 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -1353,7 +1353,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -1415,7 +1415,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
@@ -1528,7 +1528,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
+			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t), protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 			settings := &record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
 			ctx := context.Background()

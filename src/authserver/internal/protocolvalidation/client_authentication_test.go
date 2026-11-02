@@ -167,7 +167,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 			t.Run(f.grant.String()+": "+r.name, func(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
 				validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
-					protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
+					protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 				encryptedSecret, err := testDataCipher.Encrypt(theSecret)
 				require.NoError(t, err)
@@ -269,7 +269,7 @@ func TestValidateTokenRequest_PreludeInvalidClient(t *testing.T) {
 			t.Run(grant.String()+": "+r.name, func(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
 				validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
-					protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
+					protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").Return(r.client, nil).Once()
 
 				result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
@@ -288,7 +288,7 @@ func TestValidateTokenRequest_PreludeInvalidClient(t *testing.T) {
 		t.Run(grant.String()+": missing client_id", func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
 			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
-				protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
+				protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 			result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 				&ValidateTokenRequestInput{GrantType: grant, ClientSecret: "a_secret"})

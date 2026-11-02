@@ -26,16 +26,6 @@ import (
 	"github.com/leodip/goiabada/core/routing"
 )
 
-// rateLimitTiersSpentByHandlers are the rate limiter's tiers a handler spends rather than a Limit
-// middleware mounted on its route, each with the routes whose handlers spend it, as "METHOD /path".
-// client_auth is reserved inside client authentication, around the secret comparison, so the router
-// cannot say where it applies (#707 decision 10). The rate-limit table learns these tiers' routes
-// from here, and its test holds each route to one the router mounts. A route whose handler starts
-// spending a tier is added here.
-var rateLimitTiersSpentByHandlers = map[string][]string{
-	"client_auth": {"POST /auth/token", "POST /auth/revoke", "POST /auth/introspect"},
-}
-
 // initRoutes registers the application's routes on the branches initMiddleware returns
 // rather than on s.router itself: the settings read, the session load and the locale
 // resolution belong to these routes and not to the static file server registered beside them
@@ -50,6 +40,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
 	tokenParser := signingkeys.NewTokenParser(s.database)
 	permissionChecker := permissions.NewChecker(s.database)
+	tokenValidator := protocolvalidation.NewTokenValidator(s.database, tokenParser, permissionChecker, s.dataCipher)
 	emailValidator := accountvalidation.NewEmailValidator(s.database)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 	profileValidator := accountvalidation.NewProfileValidator(s.database)
@@ -96,11 +87,6 @@ func (s *Server) initRoutes(branches appBranches) {
 		sharedCredentialCounts(s.cfg.Database.Type, s.database),
 		s.metrics,
 	)
-	// The client secret checks of the token, revocation and introspection endpoints spend one
-	// budget, the rate limiter's client_auth tier, which client authentication reserves around the
-	// comparison rather than a middleware ahead of the handlers (#707 decisions 2 and 10):
-	// rateLimitTiersSpentByHandlers names the routes.
-	tokenValidator := protocolvalidation.NewTokenValidator(s.database, tokenParser, permissionChecker, s.dataCipher, rateLimiter)
 	emitRateLimiterConfigWarnings(
 		authServerConfig.RateLimiterEnabled,
 		authServerConfig.TrustProxyHeaders,
@@ -197,8 +183,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/logout/declined", handlers.HandleLogoutDeclinedGet(httpHelper))
 		r.Post("/logout", handlers.HandleLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
 	})
-	// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force), and
-	// the client authentication limit its validator spends at every grant (RFC 6749 §2.3.1, #707).
+	// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force).
 	// Outside the /auth group, which is mounted on the page branch whole, because it answers on the
 	// token branch, the protocol branch counting its faults as refusals. The router answers POST
 	// /auth/token from this route, behind the token branch alone; any other method falls to the
@@ -206,15 +191,14 @@ func (s *Server) initRoutes(branches appBranches) {
 	// own (#435).
 	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics))
 	// Token revocation (RFC 7009, #676), outside the /auth group for the reason the token endpoint
-	// is, on a branch of its own that answers a fault 503. The client authenticates before anything
-	// else, its secret check spending the client authentication limit (#707).
-	revoke.Post("/auth/revoke", handlers.HandleRevokePost(httpHelper, s.database, tokenParser, s.dataCipher, rateLimiter, auditLogger, s.revocationMetrics))
+	// is, on a branch of its own that answers a fault 503. No rate limit: the client authenticates
+	// before anything else, as at the token endpoint's grants that have none (decision 10).
+	revoke.Post("/auth/revoke", handlers.HandleRevokePost(httpHelper, s.database, tokenParser, s.dataCipher, auditLogger, s.revocationMetrics))
 	// Token introspection (RFC 7662, #676), outside the /auth group for the same reason, on a branch
 	// of its own that counts the faults it answers. POST alone: every other method is a 405 the
 	// endpoint answers itself rather than the /auth group's, so no token reaches a URL and the
-	// refusal is not stored either (decision 13). The client's secret check spends the client
-	// authentication limit, as at revocation (#707).
-	introspect.Post("/auth/introspect", handlers.HandleIntrospectPost(httpHelper, s.database, tokenParser, s.dataCipher, rateLimiter, s.introspectionMetrics))
+	// refusal is not stored either (decision 13). No rate limit, as for revocation (decision 10).
+	introspect.Post("/auth/introspect", handlers.HandleIntrospectPost(httpHelper, s.database, tokenParser, s.dataCipher, s.introspectionMetrics))
 	introspect.Handle("/auth/introspect", handlers.HandleIntrospectOtherMethods())
 
 	pages.Route("/account", func(r *routing.Router) {

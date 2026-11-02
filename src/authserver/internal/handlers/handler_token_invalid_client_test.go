@@ -63,7 +63,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 					Return(r.client, nil).Once()
 				handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t),
 					handlersmocks.NewTokenIssuer(t),
-					protocolvalidation.NewTokenValidator(validatorDB, nil, nil, testDataCipher, nil),
+					protocolvalidation.NewTokenValidator(validatorDB, nil, nil, testDataCipher),
 					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
 
 				form := url.Values{"grant_type": {"client_credentials"}}
@@ -98,7 +98,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 	t.Run("missing client_id", func(t *testing.T) {
 		handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t),
 			handlersmocks.NewTokenIssuer(t),
-			protocolvalidation.NewTokenValidator(datamocks.NewDatabase(t), nil, nil, testDataCipher, nil),
+			protocolvalidation.NewTokenValidator(datamocks.NewDatabase(t), nil, nil, testDataCipher),
 			handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
 
 		req, err := http.NewRequest("POST", "/auth/token", strings.NewReader("grant_type=client_credentials"))

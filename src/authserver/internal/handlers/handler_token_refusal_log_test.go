@@ -67,7 +67,7 @@ func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			handler := HandleTokenPost(jsonWriter, database, handlersmocks.NewTokenIssuer(t),
-				protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher, nil),
+				protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
 				auditLogger, noCredentialFailures{}, testTokenMetrics())
 
 			form := url.Values{"grant_type": {"client_credentials"}}
@@ -109,7 +109,7 @@ func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 		jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 		handler := HandleTokenPost(jsonWriter, database, handlersmocks.NewTokenIssuer(t),
-			protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher, nil),
+			protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
 			handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
 
 		form := url.Values{"grant_type": {"client_credentials"}, "client_id": {"app\nlevel=ERROR"}}

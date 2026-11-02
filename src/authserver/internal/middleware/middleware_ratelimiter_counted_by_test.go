@@ -10,14 +10,14 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// TestRateLimiter_EveryTierDeclaresWhatItCountsBy holds each of the twenty tiers the constructor
+// TestRateLimiter_EveryTierDeclaresWhatItCountsBy holds each of the nineteen tiers the constructor
 // builds to the kind #522 decision 11 gives it: ten by IP address, three by the account a form
-// names, one by IP address and account, one by the signing-in user, four by the access token's
-// user, and one by the client whose secret is checked (#707). The kinds are written here rather than read from the constructor, because the rate-limit
+// names, one by IP address and account, one by the signing-in user and four by the access token's
+// user. The kinds are written here rather than read from the constructor, because the rate-limit
 // table's Counted by column is held to the declaration, and a declaration changed by mistake would
 // carry the table with it through a regenerated reading.
 //
-// Found by walking the struct, as the conventional-key test beside it finds them, so a twenty-first
+// Found by walking the struct, as the conventional-key test beside it finds them, so a twentieth
 // tier fails the count rather than going unchecked.
 func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 	want := map[string]countedBy{
@@ -40,7 +40,6 @@ func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 		"email_verification_send": countedByTokenUser,
 		"account_email_change":    countedByTokenUser,
 		"account_password":        countedByTokenUser,
-		"client_auth":             countedByClient,
 	}
 
 	var tiers []foundTier
@@ -52,7 +51,7 @@ func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 	for _, found := range tiers {
 		kind, ok := want[found.name]
 		if !ok {
-			t.Errorf("tier %q at %s is not one of the twenty this test knows", found.name, found.where)
+			t.Errorf("tier %q at %s is not one of the nineteen this test knows", found.name, found.where)
 			continue
 		}
 		if found.countedBy != kind {
@@ -62,10 +61,9 @@ func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 }
 
 // TestRateLimiter_EachKindDerivesItsBucket is the one derivation every Limit method keys through,
-// over one request that carries every thing a tier can count by: the client address, an address
-// typed into the form, the user of the ceremony the browser is in, and the subject of a validated
-// access token; and the identifier named beside it, which the client kind reads as the client
-// client authentication found. Each kind takes its own and nothing else, and names the identity a
+// over one request that carries all five things a tier can count by: the client address, an
+// address typed into the form, the user of the ceremony the browser is in, and the subject of a
+// validated access token. Each kind takes its own and nothing else, and names the identity a
 // refusal's audit event records where the kind reads it; an account's is the route's, since only
 // the route knows how its own lookup normalizes the address (#522 decision 10).
 //
@@ -92,9 +90,6 @@ func TestRateLimiter_EachKindDerivesItsBucket(t *testing.T) {
 		{countedByIPAndAccount, "203.0.113.7|holder@example.com", nil},
 		{countedBySigningInUser, "user_42", map[string]interface{}{"user_id": int64(42)}},
 		{countedByTokenUser, subject, map[string]interface{}{"logged_in_user": subject}},
-		// The identifier exactly as client authentication found it: a client identifier is matched
-		// as stored, so nothing is normalized.
-		{countedByClient, account, map[string]interface{}{"client_identifier": account}},
 	}
 	m := newTestMiddleware(stubCeremonyStore{}, true)
 	for _, c := range cases {

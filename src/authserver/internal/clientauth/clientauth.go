@@ -9,23 +9,16 @@
 // FindClient before it looks at the grant and VerifySecret at the point in each grant's own order
 // where that grant authenticates the client, so its answers and their order stay what they were
 // (#437).
-//
-// A confidential client's secret check is bounded by the client authentication limit, through the
-// SecretCheckLimiter port this package declares and the rate limiter implements (#707).
 package clientauth
 
 import (
 	"context"
 	"crypto/subtle"
 	"database/sql"
-	"errors"
 	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -72,50 +65,15 @@ type Database interface {
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 }
 
-// SecretCheckLimiter bounds the failed secret checks one client may make, RFC 6749 section 2.3.1's
-// protection against brute force: the rate limiter's client_auth tier implements it (#707 decisions
-// 1 and 10). VerifySecret reserves through it before it compares a confidential client's secret,
-// and releases the reservation as soon as the comparison has answered.
-type SecretCheckLimiter interface {
-	// ReserveSecretCheck claims one secret check against the budget of the client clientIdentifier
-	// names, the identifier of the client FindClient found. A refusal is a *LimitReachedError, and
-	// the limiter has already written what a refusal records. Any other error is a count that could
-	// not be read, a fault, after which no secret may be compared. Either way no reservation comes
-	// back.
-	ReserveSecretCheck(ctx context.Context, clientIdentifier string) (SecretCheckReservation, error)
-}
-
-// SecretCheckReservation is one secret check's slot, released once with the comparison's verdict:
-// failed charges it, a right secret refunds it. Releasing reports its own failures.
-type SecretCheckReservation interface {
-	Release(ctx context.Context, failed bool)
-}
-
-// LimitReachedError is a secret check refused because the client has spent its budget of failed
-// checks. The secret was not compared, so the client's credentials were never judged: the endpoint
-// answers 429 Too Many Requests with RetryAfter, never an invalid_client (#707 decisions 6 and 7).
-type LimitReachedError struct {
-	// RetryAfter is the limit's window, which the 429's Retry-After carries.
-	RetryAfter time.Duration
-}
-
-func (e *LimitReachedError) Error() string {
-	return "the client authentication limit is reached; retry after " +
-		strconv.Itoa(int(e.RetryAfter.Seconds())) + " seconds"
-}
-
 // Authenticator authenticates clients against the stored clients, opening their secrets with the
-// process's data cipher and bounding the failed secret checks through its limiter.
+// process's data cipher.
 type Authenticator struct {
 	database   Database
 	dataCipher *encryption.DataCipher
-	limiter    SecretCheckLimiter
 }
 
-// NewAuthenticator returns an Authenticator over database and dataCipher whose secret checks
-// limiter bounds. A nil limiter bounds nothing.
-func NewAuthenticator(database Database, dataCipher *encryption.DataCipher, limiter SecretCheckLimiter) *Authenticator {
-	return &Authenticator{database: database, dataCipher: dataCipher, limiter: limiter}
+func NewAuthenticator(database Database, dataCipher *encryption.DataCipher) *Authenticator {
+	return &Authenticator{database: database, dataCipher: dataCipher}
 }
 
 // Authenticate returns the client clientIdentifier names once presentedSecret authenticates it, or
@@ -127,7 +85,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, clientIdentifier, pres
 	if err != nil {
 		return nil, err
 	}
-	if err := a.VerifySecret(ctx, client, presentedSecret); err != nil {
+	if err := a.VerifySecret(client, presentedSecret); err != nil {
 		return nil, err
 	}
 	return client, nil
@@ -145,7 +103,7 @@ func (a *Authenticator) AuthenticateConfidential(ctx context.Context, clientIden
 	if client.IsPublic {
 		return nil, invalidClientError(publicClientCannotIntrospectErrorMsg)
 	}
-	if err := a.VerifySecret(ctx, client, presentedSecret); err != nil {
+	if err := a.VerifySecret(client, presentedSecret); err != nil {
 		return nil, err
 	}
 	return client, nil
@@ -180,26 +138,12 @@ func (a *Authenticator) FindClient(ctx context.Context, clientIdentifier string)
 // A confidential client must present its secret (RFC 6749 section 3.2.1); a missing or wrong one
 // is invalid_client. The comparison is constant-time.
 //
-// A confidential client's check is bounded by the client authentication limit (#707 decision 10):
-// a slot is reserved for the client before the secret is looked at, and released as soon as the
-// comparison answers, charged for a missing or wrong secret and refunded for the right one, so a
-// client that authenticates spends nothing. A client over its budget gets the limiter's
-// *LimitReachedError and no comparison, its right secret included (decision 6); a count that could
-// not be read is a fault, and no comparison either. The identifier counted is the client's as
-// stored. A stored secret that cannot be opened is a fault that judged nothing, refunded.
-//
-// The admin console's own client is never counted or refused (decision 4). Its identifier is
-// public, so counting it would let anyone stop every administrator's console sign-in and refresh
-// for an hour, and its secret is at least 60 characters, whether goiabada-setup generated it or an
-// administrator set it. That departs from RFC 6749 section 2.3.1's MUST for that one client,
-// knowingly.
-//
 // A public client that presents a secret is refused invalid_request. That is symmetry, not a
 // defect fix (#245 decision 11): no specification requires refusing a superfluous secret and
 // nothing was exposed by ignoring one; what it buys is that one request gets one answer whichever
 // grant carries it. The client credentials grant never reaches that branch, because it refuses a
-// public client before authenticating. A public client compares no secret, so it spends nothing.
-func (a *Authenticator) VerifySecret(ctx context.Context, client *record.Client, presentedSecret string) error {
+// public client before authenticating.
+func (a *Authenticator) VerifySecret(client *record.Client, presentedSecret string) error {
 	if client.IsPublic {
 		if len(presentedSecret) > 0 {
 			return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
@@ -208,23 +152,6 @@ func (a *Authenticator) VerifySecret(ctx context.Context, client *record.Client,
 		return nil
 	}
 
-	if a.limiter == nil || client.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
-		return a.compareSecret(client, presentedSecret)
-	}
-
-	reservation, err := a.limiter.ReserveSecretCheck(ctx, client.ClientIdentifier)
-	if err != nil {
-		return err
-	}
-	err = a.compareSecret(client, presentedSecret)
-	var refusal *oauth.ErrorDetail
-	reservation.Release(ctx, errors.As(err, &refusal))
-	return err
-}
-
-// compareSecret is a confidential client's secret check: its refusal for a missing or wrong secret,
-// or the fault of a stored secret that cannot be opened.
-func (a *Authenticator) compareSecret(client *record.Client, presentedSecret string) error {
 	if len(presentedSecret) == 0 {
 		return invalidClientError(clientSecretRequiredErrorMsg)
 	}

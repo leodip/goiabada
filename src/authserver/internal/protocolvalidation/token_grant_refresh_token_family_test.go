@@ -107,7 +107,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 				mockDB := datamocks.NewDatabase(t)
 				mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser,
-					protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
+					protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 				clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 				require.NoError(t, err)

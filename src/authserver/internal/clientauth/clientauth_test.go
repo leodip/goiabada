@@ -85,7 +85,7 @@ func publicClient() *record.Client {
 func TestFindClient(t *testing.T) {
 	t.Run("a missing client identifier is refused before any lookup", func(t *testing.T) {
 		// No expectation is set, so a lookup fails the test.
-		authenticator := clientauth.NewAuthenticator(datamocks.NewDatabase(t), testDataCipher, nil)
+		authenticator := clientauth.NewAuthenticator(datamocks.NewDatabase(t), testDataCipher)
 
 		client, err := authenticator.FindClient(context.Background(), "")
 
@@ -108,7 +108,7 @@ func TestFindClient(t *testing.T) {
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").
 				Return(row.stored, nil).Once()
 
-			client, err := clientauth.NewAuthenticator(database, testDataCipher, nil).
+			client, err := clientauth.NewAuthenticator(database, testDataCipher).
 				FindClient(context.Background(), "the_client")
 
 			assert.Nil(t, client)
@@ -122,7 +122,7 @@ func TestFindClient(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").
 			Return(stored, nil).Once()
 
-		client, err := clientauth.NewAuthenticator(database, testDataCipher, nil).
+		client, err := clientauth.NewAuthenticator(database, testDataCipher).
 			FindClient(context.Background(), "the_client")
 
 		require.NoError(t, err)
@@ -135,7 +135,7 @@ func TestFindClient(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").
 			Return(nil, fault).Once()
 
-		client, err := clientauth.NewAuthenticator(database, testDataCipher, nil).
+		client, err := clientauth.NewAuthenticator(database, testDataCipher).
 			FindClient(context.Background(), "the_client")
 
 		assert.Nil(t, client)
@@ -169,8 +169,8 @@ func TestVerifySecret(t *testing.T) {
 				client = publicClient()
 			}
 			// No expectation is set: checking a secret reads nothing.
-			err := clientauth.NewAuthenticator(datamocks.NewDatabase(t), testDataCipher, nil).
-				VerifySecret(context.Background(), client, row.secret)
+			err := clientauth.NewAuthenticator(datamocks.NewDatabase(t), testDataCipher).
+				VerifySecret(client, row.secret)
 
 			if row.want == nil {
 				assert.NoError(t, err)
@@ -182,8 +182,8 @@ func TestVerifySecret(t *testing.T) {
 
 	t.Run("a secret that cannot be decrypted is a fault, not a refusal", func(t *testing.T) {
 		otherCipher := newCipher(t, "fedcba9876543210fedcba9876543210")
-		err := clientauth.NewAuthenticator(datamocks.NewDatabase(t), otherCipher, nil).
-			VerifySecret(context.Background(), confidentialClient(t), theSecret)
+		err := clientauth.NewAuthenticator(datamocks.NewDatabase(t), otherCipher).
+			VerifySecret(confidentialClient(t), theSecret)
 
 		require.Error(t, err)
 		var detail *oauth.ErrorDetail
@@ -226,7 +226,7 @@ func TestAuthenticate(t *testing.T) {
 					Return(stored, nil).Once()
 			}
 
-			client, err := clientauth.NewAuthenticator(database, testDataCipher, nil).
+			client, err := clientauth.NewAuthenticator(database, testDataCipher).
 				Authenticate(context.Background(), row.identifier, row.secret)
 
 			if row.want == nil {
@@ -278,7 +278,7 @@ func TestAuthenticateConfidential(t *testing.T) {
 					Return(stored, nil).Once()
 			}
 
-			client, err := clientauth.NewAuthenticator(database, testDataCipher, nil).
+			client, err := clientauth.NewAuthenticator(database, testDataCipher).
 				AuthenticateConfidential(context.Background(), row.identifier, row.secret)
 
 			if row.want == nil {

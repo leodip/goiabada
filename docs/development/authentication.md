@@ -48,18 +48,14 @@ Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does
   `invalid_request`; the secret is compared in constant time
 - The token validator calls `FindClient` before it looks at the grant and `VerifySecret` at each
   grant's own point of authentication, so the token endpoint's answers keep their order (#437, #676)
-- Limit: `VerifySecret` bounds a confidential client's secret check through
-  `clientauth.SecretCheckLimiter`, which the rate limiter's `client_auth` tier implements. It
-  reserves for the client `FindClient` found before the comparison and releases at once: charged
-  for a missing or wrong secret, refunded for the right one or for a stored secret the cipher cannot
-  open. A public client, an unknown or disabled client and a request refused before the secret is
-  looked at reserve nothing, and neither does `admin-console-client`, whose public identifier would
-  otherwise let anyone lock every administrator out (#707 decisions 3, 4 and 10). A client over its
-  budget gets `*clientauth.LimitReachedError` before any comparison, its right secret included,
-  which the endpoint answers 429 through `refusedOverClientAuthenticationLimit` and counts in no
-  refusal metric of its own; a count that cannot be read is the endpoint's own fault. A password
-  grant's account reservation is separate: a wrong password never charges the client, a wrong
-  secret never the account
+- No limit: no rate limit bounds a client's secret check, at the token, revocation or
+  introspection endpoint. Goiabada generates every secret with `securerandom.String(60)`, about 361
+  bits, far past the 2^-128 guessing bound RFC 6749 section 10.10 sets for credentials not handled
+  by end users, and one an administrator sets must also be at least 60 characters
+  (`validateClientSecret`). A limit counted by client would protect nothing those secrets don't,
+  and would let anyone who knows a confidential client's identifier, which every authorization
+  request of a client signing users in carries, have its right secret refused and stop its users'
+  sign-ins and refreshes. That departs from section 2.3.1's brute-force MUST, knowingly (#707)
 
 ### Access token claims (RFC 9068)
 Every access token, from every grant, is an RFC 9068 JWT access token.
@@ -134,9 +130,7 @@ A client ends one of its grants by sending a token of it.
 - Endpoint: `POST /auth/revoke`, form-encoded, CSRF-exempt, CORS for registered web origins, on a
   branch of its own whose faults answer 503
 - Order: the client authenticates first through `clientauth` (a public client by `client_id`
-  alone), a confidential client's secret check spending the `client_auth` budget the token and
-  introspection endpoints spend (a 429 over it, counted in no outcome; a count that cannot be read
-  is a 503, #707); the token parser refuses a malformed or non-RS256 token before reading a key, and checks
+  alone); the token parser refuses a malformed or non-RS256 token before reading a key, and checks
   any other against the current key and then each stored one; the token says its type (an access token by its `at+jwt` header, a refresh token by its `typ` claim), and
   `token_type_hint` is never read
 - Liveness before ownership: an access token is judged by `liveness.AccessToken`, a refresh token
@@ -170,9 +164,7 @@ An API, calling as a confidential client, asks whether a token is active.
   answered 405 with `Allow: POST` and `no-store` by `HandleIntrospectOtherMethods`, registered for
   the path on the same branch, whose faults answer 500 and count as `error`
 - Order: the client authenticates first through `clientauth.AuthenticateConfidential`, which
-  refuses a public client 401 `invalid_client` whatever it sent (section 4), its secret check
-  spending the `client_auth` budget the token and revocation endpoints spend (a 429 over it,
-  counted in no outcome; a count that cannot be read is a 500, #707); the token parser
+  refuses a public client 401 `invalid_client` whatever it sent (section 4); the token parser
   refuses a malformed or non-RS256 token before reading a key; `token_type_hint` is never read
 - An access token is active when `liveness.AccessToken` finds it live and its `aud` names a
   resource on the caller's introspection resources (`clients_introspection_resources`, compared
@@ -584,8 +576,8 @@ columns are `dont-update` (#242).
 
 Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, account password, OTP
 and email changes, email verification and its resend, forgot/reset password, self-registration,
-activation, DCR, the authorization endpoint, both methods of which share one admission budget
-per client block, #504, and client authentication at the token endpoint, #707). Credential checks count failures only, so a successful attempt spends
+activation, DCR, and the authorization endpoint, both methods of which share one admission budget
+per client block, #504). Credential checks count failures only, so a successful attempt spends
 nothing; the email change counts every request beside its password check, since past the password
 it says whether another account holds the address (#683). The limits counted by a user or by an
 email apply whatever
@@ -593,16 +585,7 @@ email apply whatever
 authenticated, the signing-in user or a token's subject (OTP, account password, email change, email
 verification and its resend), since no stranger can spend them (#542), and those counted by an email anyone can
 type (wrong passwords per account, 100 an hour shared by the sign-in form and the password grant,
-and reset mails and registration notices per address), since only Goiabada can count them (#503),
-and `client_auth`, 200 missing or wrong secrets an hour per confidential client at every grant of
-the token endpoint, revocation and introspection together, which RFC 6749 section 2.3.1 makes a
-MUST (#707 decisions 1, 2 and 5): separate budgets would triple a guesser's allowance. It is the
-one tier not mounted as a `Limit…` middleware: client authentication spends it around the secret
-comparison (see Client authentication above), so the rate-limits docs test learns its routes from
-`rateLimitTiersSpentByHandlers` in `internal/server/routes.go`. Like the account and user tiers it
-counts in the database on the server engines. Its price is the lockout the account-wide password
-tier accepts: anyone who knows a confidential client's identifier can spend its budget and have it
-refused for up to an hour, the remedy again the proxy or CDN (decision 6).
+and reset mails and registration notices per address), since only Goiabada can count them (#503).
 The switch governs only the tiers that read the client's address, those counted by an IP address and
 `pwd_account_net`, the 10 wrong passwords per 15 minutes for one email from one client block; with
 it off the password check reserves the account-wide tier alone. The price is #89's lockout: 100

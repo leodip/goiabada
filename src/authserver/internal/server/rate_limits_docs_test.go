@@ -23,7 +23,6 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
-	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -71,7 +70,6 @@ var docCountedBy = map[string]string{
 	"countedByIPAndAccount":  "IP address and {account}",
 	"countedBySigningInUser": "user",
 	"countedByTokenUser":     "the token's user",
-	"countedByClient":        "client",
 }
 
 // docApplies is what the table's Applies cell says of each key kind (#503 decisions 1 and 2): a
@@ -84,7 +82,6 @@ var docApplies = map[string]string{
 	"countedByIPAndAccount":  docAppliesWithTheSwitch,
 	"countedBySigningInUser": docAppliesAlways,
 	"countedByTokenUser":     docAppliesAlways,
-	"countedByClient":        docAppliesAlways,
 }
 
 // The two things an Applies cell can say.
@@ -116,70 +113,6 @@ var (
 
 func TestRateLimitsDocs_TheTableIsTheLimitersTiers(t *testing.T) {
 	assertRateLimitTable(t, filepath.Dir(guard.SourceRoot(t)), rateLimitsSection, productionRateLimitTiers(t))
-}
-
-// TestRateLimitsDocs_TheClientAuthenticationTierIsDeclaredOnTheThreeClientEndpoints holds the one
-// tier no Limit method reaches to the routes the agreement gives it (#707 decisions 2 and 10): the
-// declaration is what the table is held to, so it is written out here.
-func TestRateLimitsDocs_TheClientAuthenticationTierIsDeclaredOnTheThreeClientEndpoints(t *testing.T) {
-	for _, tier := range productionRateLimitTiers(t) {
-		if tier.name != "client_auth" {
-			continue
-		}
-		if tier.limit != 200 || tier.window != time.Hour || !tier.failuresOnly || tier.countedBy != "countedByClient" {
-			t.Errorf("client_auth reads as %+v, want 200 failures per hour counted by client", tier)
-		}
-		want := []string{"POST /auth/token", "POST /auth/revoke", "POST /auth/introspect"}
-		if !slices.Equal(tier.routes, want) {
-			t.Errorf("client_auth guards %v, want %v", tier.routes, want)
-		}
-		return
-	}
-	t.Fatalf("the constructor builds no client_auth tier")
-}
-
-// TestAttachHandlerSpentRoutes_RefusesWhatItCannotPlace is the declaration's reader stopping rather
-// than passing: a tier nobody builds, a tier a Limit method already mounts, a route the router does
-// not mount, and a tier neither the router nor the declaration places.
-func TestAttachHandlerSpentRoutes_RefusesWhatItCannotPlace(t *testing.T) {
-	tiers := func() []rateLimitTier {
-		return []rateLimitTier{
-			{name: "dcr", routes: []string{"POST /connect/register"}},
-			{name: "client_auth"},
-		}
-	}
-	mounted := map[string]bool{"POST /connect/register": true, "POST /auth/token": true}
-	cases := []struct {
-		name     string
-		declared map[string][]string
-		want     string
-	}{
-		{"a tier nobody builds", map[string][]string{"client_auth": {"POST /auth/token"}, "ghost": {"POST /auth/token"}},
-			"names the tier ghost, which"},
-		{"a tier a Limit method mounts", map[string][]string{"client_auth": {"POST /auth/token"}, "dcr": {"POST /auth/token"}},
-			"names the tier dcr, which a Limit method already mounts"},
-		{"a route the router does not mount", map[string][]string{"client_auth": {"POST /auth/tokens"}},
-			"gives the tier client_auth the route POST /auth/tokens, which the router does not mount"},
-		{"a tier placed nowhere", map[string][]string{}, "the tier client_auth guards no route"},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			err := attachHandlerSpentRoutes(tiers(), c.declared, mounted)
-			if err == nil || !strings.Contains(err.Error(), c.want) {
-				t.Errorf("error %v, want one containing %q", err, c.want)
-			}
-		})
-	}
-
-	t.Run("a declared tier is placed on its routes", func(t *testing.T) {
-		placed := tiers()
-		if err := attachHandlerSpentRoutes(placed, map[string][]string{"client_auth": {"POST /auth/token"}}, mounted); err != nil {
-			t.Fatalf("%v", err)
-		}
-		if !slices.Equal(placed[1].routes, []string{"POST /auth/token"}) {
-			t.Errorf("client_auth is placed on %v, want POST /auth/token", placed[1].routes)
-		}
-	})
 }
 
 func TestRateLimitsDocs_ATableDisagreeingWithTheCodeFails(t *testing.T) {
@@ -527,10 +460,8 @@ func (m *RateLimiter) LimitOtp(next any) any { return next }
 }
 
 // productionRateLimitTiers is every tier NewRateLimiter builds, with the routes initRoutes mounts
-// it on, and for a tier a handler spends, the routes rateLimitTiersSpentByHandlers declares. It
-// stops the test when the reader's tiers are not exactly the limiter label's values, when a route
-// mounts a Limit method the reader did not find, when no route mounts one at all, or when
-// attachHandlerSpentRoutes refuses the declaration.
+// it on. It stops the test when the reader's tiers are not exactly the limiter label's values, when
+// a route mounts a Limit method the reader did not find, or when no route mounts one at all.
 func productionRateLimitTiers(t *testing.T) []rateLimitTier {
 	t.Helper()
 
@@ -571,9 +502,7 @@ func productionRateLimitTiers(t *testing.T) []rateLimitTier {
 		byName[read.tiers[i].name] = &read.tiers[i]
 	}
 	mounted := 0
-	routes := map[string]bool{}
 	err = s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
-		routes[method+" "+route] = true
 		for _, mw := range middlewares {
 			match := rateLimitMethodName.FindStringSubmatch(runtime.FuncForPC(reflect.ValueOf(mw).Pointer()).Name())
 			if match == nil {
@@ -597,46 +526,7 @@ func productionRateLimitTiers(t *testing.T) []rateLimitTier {
 	if mounted == 0 {
 		t.Fatalf("the router walk found no route mounting a rate limiter, so this check asserts nothing")
 	}
-	if err := attachHandlerSpentRoutes(read.tiers, rateLimitTiersSpentByHandlers, routes); err != nil {
-		t.Fatalf("%v", err)
-	}
 	return read.tiers
-}
-
-// attachHandlerSpentRoutes gives each tier a handler spends the routes declared for it, once the
-// Limit methods' routes are attached (#707 decision 10). It refuses a declaration naming a tier the
-// constructor does not build, a tier a Limit method already reaches, or a route the router does not
-// mount; and then any tier left guarding no route, which neither the router nor a declaration
-// accounts for.
-func attachHandlerSpentRoutes(tiers []rateLimitTier, declared map[string][]string, mounted map[string]bool) error {
-	byName := make(map[string]*rateLimitTier, len(tiers))
-	for i := range tiers {
-		byName[tiers[i].name] = &tiers[i]
-	}
-	for _, name := range slices.Sorted(maps.Keys(declared)) {
-		tier, ok := byName[name]
-		if !ok {
-			return fmt.Errorf("rateLimitTiersSpentByHandlers names the tier %s, which %s does not build", name, rateLimiterSource)
-		}
-		if len(tier.routes) > 0 {
-			return fmt.Errorf("rateLimitTiersSpentByHandlers names the tier %s, which a Limit method already mounts on %v",
-				name, tier.routes)
-		}
-		for _, route := range declared[name] {
-			if !mounted[route] {
-				return fmt.Errorf("rateLimitTiersSpentByHandlers gives the tier %s the route %s, which the router does not mount",
-					name, route)
-			}
-			tier.routes = append(tier.routes, route)
-		}
-	}
-	for _, tier := range tiers {
-		if len(tier.routes) == 0 {
-			return fmt.Errorf("the tier %s guards no route: no Limit method reaches it and rateLimitTiersSpentByHandlers "+
-				"does not name it", tier.name)
-		}
-	}
-	return nil
 }
 
 // rateLimiterTiers is what rateLimiterSourceTiers reads: every tier, in the order the constructor

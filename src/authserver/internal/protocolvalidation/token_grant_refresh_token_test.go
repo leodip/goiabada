@@ -46,7 +46,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -119,7 +119,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -158,7 +158,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -201,7 +201,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -238,7 +238,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -278,7 +278,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -315,7 +315,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -369,7 +369,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -433,7 +433,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -502,7 +502,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -574,7 +574,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -653,7 +653,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -722,7 +722,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -785,7 +785,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -847,7 +847,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -932,7 +932,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -1009,7 +1009,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 		ctx := context.Background()
@@ -1086,7 +1086,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -1169,7 +1169,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -1254,7 +1254,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -1346,7 +1346,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -1439,7 +1439,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
@@ -1556,7 +1556,7 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{}
 	ctx := context.Background()
@@ -1624,7 +1624,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
@@ -2060,7 +2060,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 	settings := &record.Settings{}
 	ctx := context.Background()
@@ -2125,7 +2125,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
@@ -2258,7 +2258,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		mockDB := datamocks.NewDatabase(t)
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 		mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
-		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 
 		settings := &record.Settings{}
 
@@ -2454,7 +2454,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 			mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
 
-			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher, nil)
+			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
 			settings := &record.Settings{}
 			ctx := context.Background()
 
@@ -2598,7 +2598,7 @@ func refreshGrantWithParser(t *testing.T, refreshToken string,
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
 	validator := NewTokenValidator(mockDB, signingkeys.NewTokenParser(mockDB),
-		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher, nil)
+		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 	capture := logtest.CaptureSlog(t)
 	result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{

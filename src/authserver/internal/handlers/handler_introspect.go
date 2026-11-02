@@ -70,11 +70,6 @@ type introspection struct {
 // and, when that signature fails, each stored one. token_type_hint is never read: the token
 // says what it is, an access token by its at+jwt header and a refresh token by its typ claim.
 //
-// A confidential client's secret check spends the client authentication limit, the one budget the
-// token endpoint's and the revocation endpoint's checks spend (#707 decision 2): a client over it is
-// answered the token endpoint's 429, counted under its limiter and not in this endpoint's metric, and
-// a count that cannot be read is this endpoint's 500.
-//
 // A fault reading the database or the signing keys is 500, never {"active": false}, which would
 // report a fault as a dead token. Every answer carries Cache-Control: no-store, so no cache keeps one
 // past the token's expiry (RFC 7662 section 4). Introspection changes nothing, so it writes no audit
@@ -84,16 +79,14 @@ func HandleIntrospectPost(
 	database introspectDatabase,
 	tokenParser TokenParser,
 	dataCipher *encryption.DataCipher,
-	limiter clientauth.SecretCheckLimiter,
 	introspectionMetrics *introspectionmetrics.Recorder,
 ) http.HandlerFunc {
 	endpoint := introspectionEndpoint{
 		jsonWriter:  jsonWriter,
 		database:    database,
 		tokenParser: tokenParser,
-		// The secret checks spend the client authentication budget the token endpoint's spend (#707).
-		clients: clientauth.NewAuthenticator(database, dataCipher, limiter),
-		metrics: introspectionMetrics,
+		clients:     clientauth.NewAuthenticator(database, dataCipher),
+		metrics:     introspectionMetrics,
 	}
 	return endpoint.serve
 }
@@ -129,11 +122,6 @@ func (e introspectionEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client, err := e.clients.AuthenticateConfidential(ctx, clientIdentifier, clientSecret)
-	// A client over the client authentication limit: the 429, counted under its limiter rather than
-	// as a refusal of the introspection request.
-	if refusedOverClientAuthenticationLimit(w, r, err) {
-		return
-	}
 	if err != nil {
 		var refusal *oauth.ErrorDetail
 		if !errors.As(err, &refusal) {
