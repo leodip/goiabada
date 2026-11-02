@@ -37,12 +37,26 @@ Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does
   never both, the header's values percent-decoded, and writes the Warn record of a refusal, naming
   the endpoint that refused. A refusal is a log record, not an audit event: the identifier is the
   caller's own and unproven
+- Header: one or more spaces may follow `Basic` (RFC 9110 section 11.4); two or more Authorization
+  fields are 400 `invalid_request` before any is read; a Basic header with no credentials, or ones
+  that are not base64 or have no colon, is `clientauth.UnreadableBasicCredentials`, and one with
+  nothing before the colon is `clientauth.BasicCredentialsNamingNoClient`: both 401 `invalid_client`
+  with the challenge, and the body is not read in their place (RFC 6749 section 5.2). Another
+  scheme, such as Bearer, is ignored (#707)
 - Decision: `clientauth` takes the identifier and the secret as plain values and owns the
   refusals: an unknown or disabled client, or a confidential client's missing or wrong secret, is
   401 `invalid_client` with the Basic challenge; a public client that presents a secret is 400
   `invalid_request`; the secret is compared in constant time
 - The token validator calls `FindClient` before it looks at the grant and `VerifySecret` at each
   grant's own point of authentication, so the token endpoint's answers keep their order (#437, #676)
+- No limit: no rate limit bounds a client's secret check, at the token, revocation or
+  introspection endpoint. Goiabada generates every secret with `securerandom.String(60)`, about 361
+  bits, far past the 2^-128 guessing bound RFC 6749 section 10.10 sets for credentials not handled
+  by end users, and one an administrator sets must also be at least 60 characters
+  (`validateClientSecret`). A limit counted by client would protect nothing those secrets don't,
+  and would let anyone who knows a confidential client's identifier, which every authorization
+  request of a client signing users in carries, have its right secret refused and stop its users'
+  sign-ins and refreshes. That departs from section 2.3.1's brute-force MUST, knowingly (#707)
 
 ### Access token claims (RFC 9068)
 Every access token, from every grant, is an RFC 9068 JWT access token.
