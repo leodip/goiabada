@@ -242,12 +242,12 @@ ceremony's path depends on the target ACR, the session, and `prompt`.
 | | `authflow.OTPSubmission` | OTP verified against the stored authenticator, or a recovery code accepted |
 | | `authflow.ContinueAfterRecoveryCodes` | Continue on the recovery-codes page |
 | `requires_legal_acceptance` | `authflow.Completion` | the user holds a requested scope and owes a legal document for the client: a must-accept document in effect for all apps or for the client whose current version the user has not accepted (`legaldocuments.Reader.Owed`); the admin console's client owes none (#622) |
-| `requires_consent` | `authflow.Completion` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) |
+| `requires_consent` | `authflow.Completion` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) or a client not remembering consent (`record.Client.RemembersConsent`, a public client with Remember consent off, whose stored consent is then not read, #711) |
 | | `authflow.LegalAcceptance` | the same, decided once nothing is owed |
 | `ready_to_issue_code` | `authflow.SilentAuthentication` | every silent check passed, skipping every hop between |
 | | `authflow.Completion` | no consent needed |
 | | `authflow.LegalAcceptance` | nothing owed any more, or the documents accepted, then decided as `authflow.Completion` decides it (`routeBoundCeremony`), consent included |
-| | `authflow.ConsentPrompt` | scope already fully consented, no `offline_access`, no `prompt=consent` |
+| | `authflow.ConsentPrompt` | scope already fully consented, the client remembering consent (#711), no `offline_access`, no `prompt=consent` |
 | | `authflow.ConsentSubmission` | approved with at least one scope the user still holds |
 
 Every step handler takes the route boundary, `handlers.CeremonyBoundary` (`auth_ceremony.go`), and

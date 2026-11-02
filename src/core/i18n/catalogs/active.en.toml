@@ -818,6 +818,8 @@
 "adminconsole.admin_clients.settings.field.enabled_hint" = "A disabled client can't sign anyone in or get tokens."
 "adminconsole.admin_clients.settings.field.consent_required" = "Ask users for consent"
 "adminconsole.admin_clients.settings.field.consent_required_tooltip" = "After signing in, users choose which of the requested scopes the client gets. Users are asked anyway when a client requests offline_access or sends prompt=consent, and when a client other than the admin console's requests authserver:manage-account."
+"adminconsole.admin_clients.settings.field.remember_consent" = "Remember consent"
+"adminconsole.admin_clients.settings.field.remember_consent_tooltip" = "Lets a user's earlier approval skip the consent screen. It starts off for a public client: with no secret, nothing proves a request comes from this app rather than another app using its client ID, so users are asked whenever the screen is owed, even if they approved before. Turn it on only when every redirect URI is an https address that only this app receives."
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" = "May request administrative scopes"
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" = "Lets the client request authserver:manage and the other administrative scopes, authserver:admin-read, authserver:manage-users, authserver:manage-clients, authserver:manage-settings and authserver:browser-sessions, on behalf of a signed-in user, which makes it an administrator client. A client not allowed them is refused them."
 "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" = "The admin console's client may always request the administrative scopes."
@@ -837,6 +839,7 @@
 "adminconsole.admin_clients.settings.modal.identifier_change" = "You're changing the client identifier, so anything that signs in with this client will have to send the new one."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "You're disabling the client, so nothing will be able to sign in with it or get tokens through it until it's enabled again."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "You're allowing the client to request the administrative scopes. It will be able to get a token carrying a signed-in administrator's authority, and it will become an administrator client."
+"adminconsole.admin_clients.settings.modal.remember_consent_warning" = "You're letting an earlier approval skip the consent screen for this public client. Another app that uses its client ID and receives its redirects would get tokens for any user who approved this app before, without asking them."
 
 # --- Client tokens ---------------------------------------------------------
 
@@ -882,7 +885,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "New secret generated. Save to start using it; until then the current one keeps working."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Authentication saved."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "You're changing the client secret, so anything still sending the old one will be refused until it's updated."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "You're making the client public. Its secret will be removed, so anything that signs in with it will need updating. Its refresh tokens and authorization codes will be revoked, and the access tokens issued with them will be refused at once by the auth server and by APIs that check tokens with it; an API that only checks a token's signature accepts them until they expire. Its introspection resources will be cleared, and users will stay signed in to other clients."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "You're making the client public. Its secret will be removed, so anything that signs in with it will need updating. Its refresh tokens and authorization codes will be revoked, and the access tokens issued with them will be refused at once by the auth server and by APIs that check tokens with it; an API that only checks a token's signature accepts them until they expire. Its introspection resources will be cleared, Remember consent will be turned off, and users will stay signed in to other clients."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "You're making the client confidential. Anything that signs in with it will have to send the client secret."
 
 # --- Client redirect URIs --------------------------------------------------

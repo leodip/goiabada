@@ -96,6 +96,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 		Target:           authContext.GetTargetAcrLevel(client.DefaultAcrLevel),
 		ConsentRequired:  client.ConsentRequired,
 		ClientIdentifier: client.ClientIdentifier,
+		RemembersConsent: client.RemembersConsent(),
 	}
 
 	answer, need := decideSilentAuthentication(facts)

@@ -67,12 +67,13 @@ The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authenti
 
 A confidential client proves who it is at the token endpoint with its client secret. The **Authentication** tab shows it behind **Show**. Opening the tab reads the secret, and each read leaves a `viewed_client_secret` entry in the audit log, whether or not you click **Show**. **Generate a new secret** makes a new one, which replaces the old one when you save, so your app needs it straight away.
 
-A public client has no secret, so two rules make up for it:
+A public client has no secret, so three rules make up for it:
 
 - **It always uses PKCE.** PKCE ties an authorization code to the app that asked for it, so a stolen code is useless. You can't turn it off for a public client. See [PKCE](/concepts/pkce/).
 - **It can't use the client credentials flow,** since that flow is nothing but the client's own secret.
+- **A user's earlier approval doesn't skip the consent screen,** unless you turn on [**Remember consent**](#consent-required) for it.
 
-Switching a client from confidential to public deletes its secret, turns off the client credentials flow, empties its [introspection resources](#introspection-resources), and revokes the authorization codes and refresh tokens it already holds, because they were issued to a client that had to authenticate. Switching the other way revokes nothing.
+Switching a client from confidential to public deletes its secret, turns off the client credentials flow and **Remember consent**, empties its [introspection resources](#introspection-resources), and revokes the authorization codes and refresh tokens it already holds, because they were issued to a client that had to authenticate. Switching the other way revokes nothing.
 
 ## Flows
 
@@ -145,25 +146,29 @@ Turn **Ask users for consent** on when users should approve what a client can ac
 
 You usually don't need it for your own clients. Turn it on for third-party ones, so users can see who's asking for their data. Users see the consent screen anyway when a client asks for `offline_access` or sends `prompt=consent`.
 
-They also see it when a client asks for `authserver:manage-account`, until they've approved it for that client. That scope lets a client call the [Account API](/reference/api/scopes/#the-account-api-scope) for the user: change their profile, end their sessions and withdraw their consents. Every user holds it, so without the screen any client could get it for whoever is signed in. The admin console's own client is the one exception: it signs users in without the screen, so their **Account** pages work as they always do.
+They also see it when a client asks for `authserver:manage-account`, unless they've approved that scope for the client before and it has **Remember consent** on. That scope lets a client call the [Account API](/reference/api/scopes/#the-account-api-scope) for the user: change their profile, end their sessions and withdraw their consents. Every user holds it, so without the screen any client could get it for whoever is signed in. The admin console's own client is the one exception: it signs users in without the screen, so their **Account** pages work as they always do.
 
 Clients you create start with consent off. Clients that register themselves start with it on, since nobody has reviewed them yet.
 
-Whether a sign-in shows the consent screen depends on the setting, the request, and what the user approved before. In the approval column, **Yes** means stored consent covers every requested scope when **Ask users for consent** is on. When it's off, **Yes** means it covers `authserver:manage-account` if the client asks for that scope:
+**Remember consent** decides whether a user's earlier approval can skip the screen. It's always on for a confidential client. A public client starts with it off, because it has no secret: nothing proves a request comes from your app rather than another app that uses its client ID and receives its redirects. With it off, users see the screen on every sign-in that asks for consent, even when they've approved the app before, and a [`prompt=none`](/concepts/prompt/#the-silent-checks) request that needs consent is refused. Turn it on only when every redirect URI is an `https` address that only your app receives. It's under **Ask users for consent** on a public client's **Settings** tab: tick it, click **Save**, and confirm with **Save**, or call [the Admin API](/reference/api/admin/operations/updateclientsettings/) with `rememberConsent`.
 
-| **Ask users for consent** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |
-|---|---|---|---|---|---|
-| Off | No | No | No | Either | Skipped |
-| Off | No | No | Yes | No | Shown |
-| Off | No | No | Yes | Yes | Skipped |
-| On | No | No | Either | No | Shown |
-| On | No | No | Either | Yes | Skipped |
-| Either | Yes | Either | Either | Either | Shown |
-| Either | Either | Yes | Either | Either | Shown |
+Whether a sign-in shows the consent screen depends on the two settings, the request, and what the user approved before. In the approval column, **Yes** means stored consent covers every requested scope when **Ask users for consent** is on. When it's off, **Yes** means it covers `authserver:manage-account` if the client asks for that scope:
 
-`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Ask users for consent** off, a prior approval for that scope skips the screen even if the user hasn't approved the client's other requested scopes.
+| **Ask users for consent** | **Remember consent** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |
+|---|---|---|---|---|---|---|
+| Off | Either | No | No | No | Either | Skipped |
+| Off | Off | No | No | Yes | Either | Shown |
+| Off | On | No | No | Yes | No | Shown |
+| Off | On | No | No | Yes | Yes | Skipped |
+| On | Off | No | No | Either | Either | Shown |
+| On | On | No | No | Either | No | Shown |
+| On | On | No | No | Either | Yes | Skipped |
+| Either | Either | Yes | Either | Either | Either | Shown |
+| Either | Either | Either | Yes | Either | Either | Shown |
 
-The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept, so the next sign-in skips the screen while it covers every scope, and a user can withdraw it under **Account**, **Consents**, which also revokes the refresh tokens they hold with that client. A user who unticks `authserver:manage-account` is asked for it again at the client's next sign-in that asks for it.
+`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Ask users for consent** off and **Remember consent** on, the stored consent needs to cover only that scope, not the client's other requested scopes.
+
+The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept: while it covers every scope and the client has **Remember consent** on, a later sign-in skips the screen unless it asks for `offline_access` or sends `prompt=consent`, and a user can withdraw it under **Account**, **Consents**, which also revokes the refresh tokens they hold with that client. A user who unticks `authserver:manage-account` is asked for it again at the client's next sign-in that asks for it.
 
 Choosing **Don't allow** ends the sign-in. A client you created gets `access_denied`, "The user did not provide consent", at its redirect URI. A client that [registered itself](#self-registered-clients) gets nothing: the user sees a page naming the app and the address it asked to send them to, and the request stops there. So does a client whose redirect URI has been removed since the request began.
 
@@ -281,7 +286,7 @@ Because nobody has reviewed them, self-registered clients are treated more caref
 
 - **They're marked.** The list of clients shows a **Self-registered** badge on each one.
 - **Their identifier can't be changed.** It's generated, `dcr_` followed by a UUID.
-- **They start with consent on.** The consent screen shows the name the client gave itself, with a note that it registered itself and hasn't been verified. Give it a display name and turn on **Display name** under **Sign-in and consent pages** to replace both.
+- **They start with consent on.** The consent screen shows the name the client gave itself, with a note that it registered itself and hasn't been verified. Give it a display name and turn on **Display name** under **Sign-in and consent pages** to replace both. A public one also starts with [**Remember consent**](#consent-required) off, so its users see the screen on every sign-in.
 - **They're never sent an error.** An error response is a redirect to the client, and anyone can point a self-registered client anywhere. So when the user declines or the auth server refuses the request, the user sees a page naming the app and the address it asked for, and the request stops there. `prompt=none` included.
 - **A sign-out without a hint doesn't send the user back to them.** Their sign-out redirect URIs prove nothing about where the user should go, so a [sign-out](/reference/endpoints/logout/#where-the-user-lands) with no `id_token_hint` ends on the auth server's "Signed out" page. One with a hint the auth server confirms still goes back to one of the client's sign-out redirect URIs.
 

@@ -823,6 +823,8 @@
 "adminconsole.admin_clients.settings.field.enabled_hint" = "Un cliente desactivado no puede iniciar sesiones ni obtener tokens."
 "adminconsole.admin_clients.settings.field.consent_required" = "Pedir consentimiento a los usuarios"
 "adminconsole.admin_clients.settings.field.consent_required_tooltip" = "Después de iniciar sesión, los usuarios eligen qué scopes de los solicitados recibe el cliente. Siempre se pide consentimiento si un cliente solicita offline_access o envía prompt=consent, y si un cliente distinto al de la consola de administración solicita authserver:manage-account."
+"adminconsole.admin_clients.settings.field.remember_consent" = "Recordar el consentimiento"
+"adminconsole.admin_clients.settings.field.remember_consent_tooltip" = "Permite que la aprobación anterior de un usuario omita la pantalla de consentimiento. Empieza desactivado en un cliente público: sin secreto, nada demuestra que una solicitud venga de esta aplicación y no de otra que use su identificador de cliente, así que se pregunta a los usuarios siempre que corresponda la pantalla, aunque ya la hayan aprobado. Actívalo solo si cada URI de redirección es una dirección https que solo recibe esta aplicación."
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" = "Puede solicitar scopes administrativos"
 "adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" = "Permite al cliente solicitar authserver:manage y los demás scopes administrativos, authserver:admin-read, authserver:manage-users, authserver:manage-clients, authserver:manage-settings y authserver:browser-sessions, en nombre de un usuario con sesión iniciada. Esto lo convierte en un cliente administrador. Los clientes sin esta autorización no pueden obtenerlos."
 "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" = "El cliente de la consola de administración siempre puede solicitar los scopes administrativos."
@@ -842,6 +844,7 @@
 "adminconsole.admin_clients.settings.modal.identifier_change" = "Vas a cambiar el identificador del cliente. Todo lo que inicie sesión con él tendrá que enviar el nuevo identificador."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "Vas a desactivar el cliente. Nadie podrá iniciar sesión con él ni obtener tokens a través de él hasta que lo actives de nuevo."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "Vas a permitir que el cliente solicite scopes administrativos. Podrá obtener un token con la autoridad de un administrador con sesión iniciada y se convertirá en un cliente administrador."
+"adminconsole.admin_clients.settings.modal.remember_consent_warning" = "Vas a permitir que una aprobación anterior omita la pantalla de consentimiento de este cliente público. Otra aplicación que use su identificador de cliente y reciba sus redirecciones obtendría tokens de cualquier usuario que haya aprobado esta aplicación antes, sin preguntarle."
 
 # --- Client tokens ---------------------------------------------------------
 
@@ -887,7 +890,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "Nuevo secreto generado. Guarda para empezar a usarlo; hasta entonces, seguirá funcionando el actual."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Configuración de autenticación guardada."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "Vas a cambiar el secreto del cliente. Todo lo que siga enviando el antiguo será rechazado hasta que se actualice."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vas a convertir el cliente en público. Se eliminará su secreto y habrá que actualizar todo lo que inicie sesión con él. Se revocarán sus refresh tokens y códigos de autorización, y el servidor de autenticación y las API que comprueban tokens con él rechazarán al instante los tokens de acceso emitidos con ellos; una API que solo comprueba la firma de un token los acepta hasta que caduquen. Se vaciarán sus recursos de introspección y los usuarios mantendrán sus sesiones en otros clientes."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vas a convertir el cliente en público. Se eliminará su secreto y habrá que actualizar todo lo que inicie sesión con él. Se revocarán sus refresh tokens y códigos de autorización, y el servidor de autenticación y las API que comprueban tokens con él rechazarán al instante los tokens de acceso emitidos con ellos; una API que solo comprueba la firma de un token los acepta hasta que caduquen. Se vaciarán sus recursos de introspección, se desactivará Recordar el consentimiento y los usuarios mantendrán sus sesiones en otros clientes."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "Vas a convertir el cliente en confidencial. Todo lo que inicie sesión con él tendrá que enviar el secreto del cliente."
 
 # --- Client redirect URIs --------------------------------------------------

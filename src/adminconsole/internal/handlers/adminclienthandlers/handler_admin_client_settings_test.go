@@ -341,3 +341,97 @@ func TestHandleSettingsPost_SendsTheClientsDocumentURLs(t *testing.T) {
 	assert.Equal(t, "https://legal.example.org/portal/privacy", drawn.FieldByName("PrivacyPolicyURL").String())
 	assert.Equal(t, "not a url", drawn.FieldByName("TermsOfServiceURL").String(), "the input keeps what was typed")
 }
+
+// The tab draws Remember consent from the client as the auth server answers it, with whether the
+// client is public, which decides whether the checkbox is drawn at all (#711 decision 8).
+func TestHandleSettingsGet_BindsRememberConsent(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		client *api.ClientResponse
+	}{
+		{"a public client remembering consent", &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: true}},
+		{"a public client not remembering consent", &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true}},
+		{"a confidential client", &api.ClientResponse{Id: 7, ClientIdentifier: "portal", RememberConsent: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := &stubHttpHelper{}
+			req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
+
+			HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: tc.client}).
+				ServeHTTP(httptest.NewRecorder(), req)
+
+			require.NoError(t, httpHelper.err)
+			require.NotNil(t, httpHelper.bind, "the handler rendered nothing")
+			bound := reflect.ValueOf(httpHelper.bind["client"])
+			assert.Equal(t, tc.client.RememberConsent, bound.FieldByName("RememberConsent").Bool())
+			assert.Equal(t, tc.client.IsPublic, bound.FieldByName("IsPublic").Bool())
+		})
+	}
+}
+
+// For a client public as the save loads it, the save sends rememberConsent as the checkbox was
+// submitted in the body: on only for the checkbox's own value, and off when it is absent, as a
+// browser submits an unticked checkbox, or only in the query, which is no submission of this form
+// (#711 decision 8).
+func TestHandleSettingsPost_SendsAPublicClientsRememberConsentFromTheBody(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		stored bool
+		form   url.Values
+		query  string
+		want   bool
+	}{
+		{name: "ticked", form: url.Values{"rememberConsent": {"on"}}, want: true},
+		{name: "ticked while already on", stored: true, form: url.Values{"rememberConsent": {"on"}}, want: true},
+		{name: "unticked", stored: true, form: url.Values{}, want: false},
+		{name: "only in the query", form: url.Values{}, query: "rememberConsent=on", want: false},
+		{name: "a value other than the checkbox's", form: url.Values{"rememberConsent": {"true"}}, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			apiClient := &stubAdministrativeScopesApiClient{
+				client: &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: tc.stored}}
+			form := tc.form
+			form.Set("clientIdentifier", "spa")
+
+			rec := postSettings(t, apiClient, &stubHttpHelper{}, form, tc.query)
+
+			assert.Equal(t, http.StatusFound, rec.Code)
+			require.NotNil(t, apiClient.sentSettings)
+			require.NotNil(t, apiClient.sentSettings.RememberConsent, "a public client's save carries rememberConsent")
+			assert.Equal(t, tc.want, *apiClient.sentSettings.RememberConsent)
+		})
+	}
+}
+
+// A confidential client's save carries no rememberConsent, whatever the body holds: the auth server
+// keeps it on for a confidential client, and the tab draws no checkbox for it (#711 decision 8).
+func TestHandleSettingsPost_SendsNoRememberConsentForAConfidentialClient(t *testing.T) {
+	for _, form := range []url.Values{
+		{"clientIdentifier": {"portal"}},
+		{"clientIdentifier": {"portal"}, "rememberConsent": {"on"}},
+	} {
+		apiClient := &stubAdministrativeScopesApiClient{
+			client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", RememberConsent: true}}
+
+		rec := postSettings(t, apiClient, &stubHttpHelper{}, form, "")
+
+		assert.Equal(t, http.StatusFound, rec.Code)
+		require.NotNil(t, apiClient.sentSettings)
+		assert.Nil(t, apiClient.sentSettings.RememberConsent, "form %v", form)
+	}
+}
+
+// A refused save draws the checkbox again as submitted, so the administrator does not lose it.
+func TestHandleSettingsPost_ARefusedSaveKeepsRememberConsentAsSubmitted(t *testing.T) {
+	apiClient := &stubAdministrativeScopesApiClient{
+		client:      &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true},
+		settingsErr: &apiclient.APIError{Code: "handler.client.website_url_invalid", Message: "Invalid website URL.", StatusCode: http.StatusBadRequest}}
+	httpHelper := &stubHttpHelper{}
+
+	postSettings(t, apiClient, httpHelper, url.Values{"clientIdentifier": {"spa"}, "rememberConsent": {"on"}, "websiteUrl": {"x"}}, "")
+
+	require.NotNil(t, httpHelper.bind, "the refused save is drawn again")
+	assert.True(t, reflect.ValueOf(httpHelper.bind["client"]).FieldByName("RememberConsent").Bool(), "drawn as submitted")
+	assert.False(t, reflect.ValueOf(httpHelper.bind["storedClient"]).FieldByName("RememberConsent").Bool(), "compared with the stored value")
+}

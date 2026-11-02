@@ -92,6 +92,7 @@ The new client is enabled straight away, and:
 - **Its identifier is generated,** `dcr_` followed by a UUID, and can't be changed later.
 - **A confidential client gets a secret** of 60 characters, which the answer carries once. A public client gets none.
 - **Consent is on,** so users see what it asks for before it gets a token.
+- **A public client has [Remember consent](/concepts/clients/#consent-required) off,** so users see the consent screen on every sign-in, even after they've approved it. A confidential client remembers it.
 - **Its sign-in level is `urn:goiabada:level2_optional`,** so a user with two-factor authentication set up is asked for their code. See [ACR and AMR](/concepts/acr-and-amr/).
 - **A public client always uses [PKCE](/concepts/pkce/).**
 - **Its token lifetimes are copied** from **Admin**, **Tokens** onto its own **Tokens** tab when it registers, so a later change to the server's settings doesn't reach it.

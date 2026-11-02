@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -224,4 +226,47 @@ func TestDCR_Consent_UnverifiedNameSuppressesTheDescriptionLine(t *testing.T) {
 	doc := parseHTMLResponse(t, resp)
 	assert.Equal(t, 1, strings.Count(doc.Text(), selfAssertedName),
 		"the name is shown once, as the client name under the unverified notice")
+}
+
+// A public client that registered itself starts with consent on and Remember consent off, so the
+// user is shown the consent screen on every sign-in, even after approving every scope: nothing
+// proves a later request comes from the app that registered rather than another app using its
+// client ID (RFC 8252 section 8.6, #711 decision 1). The client is registered through the endpoint,
+// so the defaults under test are the registration handler's.
+func TestDCR_Consent_APublicClientShowsTheScreenOnEverySignIn(t *testing.T) {
+	enableDCR(t)
+
+	const redirectURI = "http://127.0.0.1/callback"
+	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
+		RedirectURIs:            []string{redirectURI},
+		ClientName:              "My CLI tool",
+		TokenEndpointAuthMethod: "none",
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	var registered oidc.DynamicClientRegistrationResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&registered))
+
+	user, password := createCeremonyUser(t)
+	httpClient := createHttpClient(t)
+
+	chain, page := followAuthChain(t, httpClient, registered.ClientID, redirectURI, user, password)
+	defer func() { _ = page.Body.Close() }()
+	require.Equal(t, "/auth/consent", chain[len(chain)-1], "the first sign-in reaches the consent screen")
+	approved := postConsent(t, httpClient, appConfig.AuthServer.BaseURL+chain[len(chain)-1], page, []int{0, 1, 2})
+	defer func() { _ = approved.Body.Close() }()
+	assertRedirect(t, approved, "/auth/issue")
+
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
+	require.NoError(t, err)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	require.NoError(t, err)
+	require.NotNil(t, consent, "the approval is stored")
+	require.Equal(t, "openid profile email", consent.Scope)
+
+	chain, again := followAuthChain(t, httpClient, registered.ClientID, redirectURI, user, password)
+	defer func() { _ = again.Body.Close() }()
+	flow := strings.Join(chain, " -> ")
+	assert.Equal(t, "/auth/consent", chain[len(chain)-1], "the second sign-in shows the screen again: %s", flow)
+	assert.Equal(t, http.StatusOK, again.StatusCode)
 }

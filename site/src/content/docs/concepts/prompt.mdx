@@ -67,6 +67,7 @@ With `prompt=none`, the auth server makes the checks it would otherwise show the
 | The user's two-factor authentication hasn't changed since the session was last checked for a second factor, when the level is above `urn:goiabada:level1` | `interaction_required` | "Authentication configuration has changed" |
 | The user holds at least one of the scopes asked for | `access_denied` | "The user is not authorized to access any of the requested scopes" |
 | The user has accepted every [legal document](/guides/publish-legal-documents/) the app requires | `interaction_required` | "Acceptance of a legal document is required" |
+| A public client has [**Remember consent**](/concepts/clients/#consent-required) on, when the next check applies | `consent_required` | "User consent is required for every request from this client" |
 | The user has consented to the client, when it requires consent, the request asks for `offline_access`, or the scope holds `authserver:manage-account` and the client isn't the admin console's | `consent_required` | "User consent is required" |
 | That consent covers every scope the user would get, or only `authserver:manage-account` when that alone is why it's checked | `consent_required` | "Additional consent is required" |
 

@@ -63,6 +63,7 @@ func silentRefusalWorlds() []silentWorld {
 		effectiveScope:     "",
 		consentRequired:    true,
 		legalDocumentsOwed: true,
+		forgetsConsent:     true,
 	}
 
 	noSession := failsEverything
@@ -95,8 +96,11 @@ func silentRefusalWorlds() []silentWorld {
 	owesALegalDocument := noScope
 	owesALegalDocument.effectiveScope = "openid profile"
 
-	noConsent := owesALegalDocument
-	noConsent.legalDocumentsOwed = false
+	forgetsConsent := owesALegalDocument
+	forgetsConsent.legalDocumentsOwed = false
+
+	noConsent := forgetsConsent
+	noConsent.forgetsConsent = false
 
 	partialConsent := noConsent
 	partialConsent.consentScope = scope("openid")
@@ -105,7 +109,7 @@ func silentRefusalWorlds() []silentWorld {
 	passes.consentScope = scope("openid profile")
 
 	return []silentWorld{noSession, expired, tooOld, disabled, otherUser, lowerLevel, noAuthenticator,
-		authenticatorChanged, noScope, owesALegalDocument, noConsent, partialConsent, passes}
+		authenticatorChanged, noScope, owesALegalDocument, forgetsConsent, noConsent, partialConsent, passes}
 }
 
 // silentRefusals is what decideSilentAuthentication answers in each of silentRefusalWorlds, up to

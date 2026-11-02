@@ -178,7 +178,9 @@ func TestConsentScreenOwed(t *testing.T) {
 		scopes        []ScopeInfo
 		scope         string
 		promptConsent bool
-		want          bool
+		// forgetsConsent is a public client with Remember consent off (#711).
+		forgetsConsent bool
+		want           bool
 	}{
 		{name: "everything already consented goes on", scopes: consented, scope: "openid profile", want: false},
 		{name: "one scope not yet consented is shown", scopes: partial, scope: "openid profile", want: true},
@@ -190,11 +192,18 @@ func TestConsentScreenOwed(t *testing.T) {
 		},
 		{name: "prompt=consent forces the screen", scopes: consented, scope: "openid profile", promptConsent: true, want: true},
 		{name: "an empty scope list is fully consented", scopes: []ScopeInfo{}, scope: "", want: false},
+		// A stored consent never stands in for the screen for a public client with Remember
+		// consent off, as if no previous request had been approved (RFC 6749 section 10.2, RFC 8252
+		// section 8.6; #711 decision 2).
+		{name: "everything consented is shown for a client forgetting consent", scopes: consented,
+			scope: "openid profile", forgetsConsent: true, want: true},
+		{name: "a partial consent is shown for a client forgetting consent", scopes: partial,
+			scope: "openid profile", forgetsConsent: true, want: true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, consentScreenOwed(tc.scopes, tc.scope, tc.promptConsent))
+			assert.Equal(t, tc.want, consentScreenOwed(tc.scopes, tc.scope, tc.promptConsent, !tc.forgetsConsent))
 		})
 	}
 }

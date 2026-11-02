@@ -42,6 +42,9 @@ type silentAuthenticationFacts struct {
 	ConsentRequired bool
 	// ClientIdentifier is the client's ClientIdentifier.
 	ClientIdentifier string
+	// RemembersConsent is the client's RemembersConsent: whether the user's stored consent may answer
+	// for them.
+	RemembersConsent bool
 
 	// SessionLoaded is set once the session has been looked up; Session is nil when there is none,
 	// and otherwise carries its User.
@@ -87,7 +90,13 @@ type silentAuthenticationAnswer struct {
 //     step cannot be shown, and OIDC Core 1.0 section 3.1.2.6 names interaction_required for a
 //     request that "cannot be completed without displaying a user interface"). Asked before the
 //     consent, as an interactive sign-in shows the step before the consent screen;
-//  10. when the client requires consent or offline_access is asked for, a consent covers every
+//  10. when a consent is owed, the client remembers consent: a public client with Remember consent
+//     off is refused without its stored consent being read, so the answer does not tell an app
+//     that has not proven its identity whether the user approved the real one before (#711
+//     decision 3). A consent is owed when the client requires consent or offline_access is asked
+//     for, or when the scope holds authserver:manage-account and the client is not the admin
+//     console's;
+//  11. when the client requires consent or offline_access is asked for, a consent covers every
 //     scope, and otherwise it covers authserver:manage-account when the scope holds it and the
 //     client is not the admin console's (userconsent.AlwaysOwed, #509 decision 3).
 //
@@ -159,6 +168,9 @@ func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticati
 		mustCover = oidc.SplitScope(*f.EffectiveScope)
 	}
 	if len(mustCover) > 0 {
+		if !f.RemembersConsent {
+			return refuse(oidc.ErrorConsentRequired, "User consent is required for every request from this client")
+		}
 		if !f.ConsentLoaded {
 			return silentAuthenticationAnswer{}, silentFactConsent
 		}
