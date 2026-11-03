@@ -10,9 +10,9 @@
 #
 # Commands:
 #   show    - Display all versions from versions.yaml
-#   check   - Check online for newer versions of dependencies
+#   check   - Check online for newer versions of dependencies [--now]
 #   update  - Update version strings in all project files
-#   deps    - Update Go modules and npm packages, and Playwright's browsers
+#   deps    - Update Go modules and npm packages, and Playwright's browsers [--now]
 #   generate - Regenerate committed data files (timezones, countries, passwordblocklist)
 #   all     - Run all commands in sequence (check → update → deps)
 #
@@ -208,52 +208,80 @@ version_lt() {
     return 1
 }
 
-# Fetch latest version from GitHub releases API
-# Usage: get_github_latest "tailwindlabs/tailwindcss"
-get_github_latest() {
-    local repo="$1"
-    local response
-    response=$(curl -s --connect-timeout 10 "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null)
-    if [ $? -eq 0 ] && [ -n "$response" ]; then
-        echo "$response" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 | sed 's/^v//'
-    fi
-}
-
 # Fetch latest version from the Go module proxy
 # Usage: get_goproxy_latest "honnef.co/go/tools"
 #
-# Used instead of get_github_latest for Go tools whose module version does not
+# Used instead of get_github_settled for Go tools whose module version does not
 # match their GitHub release tag. dominikh/go-tools tags releases as "2026.1"
 # while the module is v0.7.0, so comparing against the release tag would report
 # an update forever; golang/vuln's releases page trails its module tags by
 # several minors, so it would never report one. The proxy is authoritative for
 # what `go install` will actually fetch, which is what we pin.
+#
+# Prints the version and, after a space, the time the proxy records it
+# published, which check holds to RELEASE_MIN_AGE_DAYS.
 get_goproxy_latest() {
     local module="$1"
     local response
     response=$(curl -s --connect-timeout 10 "https://proxy.golang.org/${module}/@latest" 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$response" ]; then
-        echo "$response" | grep -o '"Version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 | sed 's/^v//'
+        goproxy_info_fields <<< "$response"
     fi
 }
 
-# Fetch latest Go version from go.dev
+# Reduce a Go module proxy .info answer, read on stdin, to its version without
+# the v and its time, separated by a space.
+goproxy_info_fields() {
+    local info version time
+    info=$(cat)
+    version=$(echo "$info" | grep -o '"Version"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 | sed 's/^v//')
+    time=$(echo "$info" | grep -o '"Time"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+    [ -n "$version" ] && echo "$version $time"
+}
+
+# Fetch latest Go version from go.dev, with the time the Go module proxy records
+# its toolchain published, separated by a space.
 get_go_latest() {
-    local response
+    local response version info
     response=$(curl -s --connect-timeout 10 "https://go.dev/dl/?mode=json" 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$response" ]; then
-        echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"go[0-9.]*"' | head -1 | cut -d'"' -f4 | sed 's/^go//'
+        version=$(echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"go[0-9.]*"' | head -1 | cut -d'"' -f4 | sed 's/^go//')
+        [ -n "$version" ] || return 0
+        info=$(curl -s --connect-timeout 10 "https://proxy.golang.org/golang.org/toolchain/@v/v0.0.1-go${version}.linux-amd64.info" 2>/dev/null)
+        echo "$version $(goproxy_info_fields <<< "$info" | cut -d' ' -f2)"
     fi
 }
 
-# Fetch the newest Node.js LTS release from nodejs.org. index.json lists releases newest first, an
-# LTS one with its line's codename in "lts" and the others with false.
+# Fetch the newest settled Node.js LTS release from nodejs.org, as
+# node_settled_lts selects it.
 get_node_latest() {
     local response
     response=$(curl -s --connect-timeout 10 "https://nodejs.org/dist/index.json" 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$response" ]; then
-        echo "$response" | grep -o '"version":"v[0-9.]*"[^}]*"lts":"' | head -1 | cut -d'"' -f4 | sed 's/^v//'
+        echo "$response" | node_settled_lts "$(date -u +%s)" 2>/dev/null
     fi
+}
+
+# Reduce nodejs.org's index.json, read on stdin, to the newest LTS release, an
+# entry with its line's codename in "lts" rather than false, dated at least
+# RELEASE_MIN_AGE_DAYS before NOW, given in seconds since the epoch. index.json
+# dates a release by its day alone, so a release counts from that day's start.
+# Usage: node_settled_lts NOW < index.json
+node_settled_lts() {
+    node -e '
+        const [now, days] = process.argv.slice(1).map(Number);
+        const cutoff = (now - days * 86400) * 1000;
+        const releases = JSON.parse(require("fs").readFileSync(0, "utf8"));
+        const newer = (a, b) => (a[0] - b[0] || a[1] - b[1] || a[2] - b[2]) > 0;
+        let best = null;
+        for (const r of releases) {
+            if (!r.lts || !/^v\d+\.\d+\.\d+$/.test(r.version)) continue;
+            if (!(Date.parse(r.date + "T00:00:00Z") <= cutoff)) continue;
+            const parts = r.version.slice(1).split(".").map(Number);
+            if (!best || newer(parts, best)) best = parts;
+        }
+        if (best) console.log(best.join("."));
+    ' "$1" "$RELEASE_MIN_AGE_DAYS"
 }
 
 # Reduce Alpine's releases.json, read on stdin, to its newest stable release as
@@ -272,11 +300,42 @@ alpine_latest_minor() {
 }
 
 # The days a release must have been public before check suggests it or deps
-# upgrades to it: on GitHub for Trivy and Grype, on the npm registry for the npm
-# packages. A pin cannot be swapped once it is set, so the danger left is
+# upgrades to it, as its source records the publication: GitHub's releases, the
+# Go module proxy, nodejs.org, the npm registry. --now sets it to 0, for an
+# urgent fix. A pin written into versions.yaml by hand is applied whatever its
+# age; this shapes only what the script picks. A pin cannot be swapped once it is set, so the danger left is
 # bumping to a release that is already poisoned: Trivy's malicious v0.69.4 was
 # public for about 12 hours before it was pulled (#520).
 RELEASE_MIN_AGE_DAYS=3
+
+# Whether a release published at TIME, as RFC 3339 in UTC, is younger than
+# RELEASE_MIN_AGE_DAYS. One whose time is unknown counts as too young.
+# Usage: released_too_recently TIME
+released_too_recently() {
+    local cutoff
+    cutoff=$(utc_timestamp $(( $(date -u +%s) - RELEASE_MIN_AGE_DAYS * 86400 ))) || return 0
+    [ -z "$1" ] || [[ "$1" > "$cutoff" ]]
+}
+
+# check's line for a newer release still younger than RELEASE_MIN_AGE_DAYS,
+# where its source names only the newest release, so no older one can stand in.
+# Usage: held_back CURRENT LATEST PUBLISHED
+held_back() {
+    print_info "Held back ($1): $2, published ${3:-at an unknown time}, is under $RELEASE_MIN_AGE_DAYS days old"
+}
+
+# take_now_flag reads a command's arguments: --now sets RELEASE_MIN_AGE_DAYS to
+# 0, for an urgent fix that cannot wait. Anything else is refused.
+# Usage: take_now_flag "$@"
+take_now_flag() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --now) RELEASE_MIN_AGE_DAYS=0 ;;
+            *) print_error "Unknown option: $1"; return 1 ;;
+        esac
+        shift
+    done
+}
 
 # utc_timestamp prints seconds since the epoch as GitHub writes a time,
 # 2026-10-21T11:18:34Z, which compares as text in time order. GNU date, then BSD.
@@ -521,6 +580,7 @@ cmd_show() {
 # Check online for newer versions of dependencies
 
 cmd_check() {
+    take_now_flag "$@" || return 1
     require_yq
     print_header "Checking for Newer Versions Online"
 
@@ -537,9 +597,12 @@ cmd_check() {
     # --- Go ---
     echo -n "Checking Go... "
     local current_go=$(get_version 'tools.go')
-    local latest_go=$(get_go_latest)
+    local latest_go published_go
+    read -r latest_go published_go <<< "$(get_go_latest)"
     if [ -n "$latest_go" ]; then
-        if version_lt "$current_go" "$latest_go"; then
+        if version_lt "$current_go" "$latest_go" && released_too_recently "$published_go"; then
+            held_back "$current_go" "$latest_go" "$published_go"
+        elif version_lt "$current_go" "$latest_go"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
             updates_available+=("Go|$current_go|$latest_go|https://go.dev/dl/")
         else
@@ -552,7 +615,7 @@ cmd_check() {
     # --- Tailwind CSS ---
     echo -n "Checking Tailwind CSS... "
     local current_tailwind=$(get_version 'tools.tailwind')
-    local latest_tailwind=$(get_github_latest "tailwindlabs/tailwindcss")
+    local latest_tailwind=$(get_github_settled "tailwindlabs/tailwindcss")
     if [ -n "$latest_tailwind" ]; then
         if version_lt "$current_tailwind" "$latest_tailwind"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
@@ -584,7 +647,7 @@ cmd_check() {
     # --- golangci-lint ---
     echo -n "Checking golangci-lint... "
     local current_lint=$(get_version 'tools."golangci-lint"')
-    local latest_lint=$(get_github_latest "golangci/golangci-lint")
+    local latest_lint=$(get_github_settled "golangci/golangci-lint")
     if [ -n "$latest_lint" ]; then
         if version_lt "$current_lint" "$latest_lint"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
@@ -599,7 +662,7 @@ cmd_check() {
     # --- mockery ---
     echo -n "Checking mockery... "
     local current_mockery=$(get_version 'tools.mockery')
-    local latest_mockery=$(get_github_latest "vektra/mockery")
+    local latest_mockery=$(get_github_settled "vektra/mockery")
     if [ -n "$latest_mockery" ]; then
         if version_lt "$current_mockery" "$latest_mockery"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
@@ -617,9 +680,12 @@ cmd_check() {
     # schemes would report an update on every run.
     echo -n "Checking staticcheck... "
     local current_staticcheck=$(get_version 'tools.staticcheck')
-    local latest_staticcheck=$(get_goproxy_latest "honnef.co/go/tools")
+    local latest_staticcheck published_staticcheck
+    read -r latest_staticcheck published_staticcheck <<< "$(get_goproxy_latest "honnef.co/go/tools")"
     if [ -n "$latest_staticcheck" ]; then
-        if version_lt "$current_staticcheck" "$latest_staticcheck"; then
+        if version_lt "$current_staticcheck" "$latest_staticcheck" && released_too_recently "$published_staticcheck"; then
+            held_back "$current_staticcheck" "$latest_staticcheck" "$published_staticcheck"
+        elif version_lt "$current_staticcheck" "$latest_staticcheck"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
             updates_available+=("staticcheck|$current_staticcheck|$latest_staticcheck|https://github.com/dominikh/go-tools/releases")
         else
@@ -635,9 +701,12 @@ cmd_check() {
     # this module offers.
     echo -n "Checking unparam... "
     local current_unparam=$(get_version 'tools.unparam')
-    local latest_unparam=$(get_goproxy_latest "mvdan.cc/unparam")
+    local latest_unparam published_unparam
+    read -r latest_unparam published_unparam <<< "$(get_goproxy_latest "mvdan.cc/unparam")"
     if [ -n "$latest_unparam" ]; then
-        if version_lt "$current_unparam" "$latest_unparam"; then
+        if version_lt "$current_unparam" "$latest_unparam" && released_too_recently "$published_unparam"; then
+            held_back "$current_unparam" "$latest_unparam" "$published_unparam"
+        elif version_lt "$current_unparam" "$latest_unparam"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
             updates_available+=("unparam|$current_unparam|$latest_unparam|https://github.com/mvdan/unparam/commits/master")
         else
@@ -652,9 +721,12 @@ cmd_check() {
     # tags by several minor versions.
     echo -n "Checking govulncheck... "
     local current_govulncheck=$(get_version 'tools.govulncheck')
-    local latest_govulncheck=$(get_goproxy_latest "golang.org/x/vuln")
+    local latest_govulncheck published_govulncheck
+    read -r latest_govulncheck published_govulncheck <<< "$(get_goproxy_latest "golang.org/x/vuln")"
     if [ -n "$latest_govulncheck" ]; then
-        if version_lt "$current_govulncheck" "$latest_govulncheck"; then
+        if version_lt "$current_govulncheck" "$latest_govulncheck" && released_too_recently "$published_govulncheck"; then
+            held_back "$current_govulncheck" "$latest_govulncheck" "$published_govulncheck"
+        elif version_lt "$current_govulncheck" "$latest_govulncheck"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
             updates_available+=("govulncheck|$current_govulncheck|$latest_govulncheck|https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck")
         else
@@ -1091,6 +1163,44 @@ cmd_update() {
     echo "  4. Commit changes"
 }
 
+# settled_go_version reads candidate versions of a module, newest first, each
+# with the time the Go module proxy records it published (RFC 3339, UTC), and
+# prints the first published at or before CUTOFF, or FALLBACK when none is.
+# Usage: settled_go_version CUTOFF FALLBACK < "VERSION TIME" lines
+settled_go_version() {
+    awk -v cutoff="$1" -v fallback="$2" '
+        NF == 2 && $2 <= cutoff { print $1; found = 1; exit }
+        END { if (!found) print fallback }'
+}
+
+# hold_young_go_modules runs in a Go module's directory after go get -u, given
+# the file of "PATH VERSION" lines go list -m printed before it. A module the
+# upgrade moved to a version younger than CUTOFF goes back to its newest
+# release between the two that is old enough, or to where it was: go get -u
+# takes the newest release whatever its age.
+# Usage: hold_young_go_modules BEFORE CUTOFF
+hold_young_go_modules() {
+    local before="$1" cutoff="$2" path version time old target
+    local -a held=()
+    while read -r path version time; do
+        [ -n "$version" ] || continue
+        [ -n "$time" ] && [[ "$time" > "$cutoff" ]] || continue
+        old=$(awk -v p="$path" '$1 == p { print $2 }' "$before")
+        [ "$old" = "$version" ] && continue
+        target=$(go list -m -versions -f '{{range .Versions}}{{.}}{{"\n"}}{{end}}' "$path" 2>/dev/null \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -rV \
+            | while read -r candidate; do
+                version_lt "$candidate" "$version" || continue
+                [ -z "$old" ] || version_lt "$old" "$candidate" || break
+                echo "$candidate $(go list -m -f '{{if .Time}}{{.Time.UTC.Format "2006-01-02T15:04:05Z"}}{{end}}' "$path@$candidate" 2>/dev/null)"
+            done | settled_go_version "$cutoff" "${old:-$version}")
+        [ "$target" = "$version" ] && continue
+        held+=("$path@$target")
+        print_info "Held back: $path $version is under $RELEASE_MIN_AGE_DAYS days old; $target instead"
+    done < <(go list -m -f '{{.Path}} {{.Version}} {{if .Time}}{{.Time.UTC.Format "2006-01-02T15:04:05Z"}}{{end}}' all 2>/dev/null)
+    [ ${#held[@]} -eq 0 ] || go get "${held[@]}"
+}
+
 # =============================================================================
 # Command: deps
 # =============================================================================
@@ -1104,7 +1214,12 @@ cmd_update() {
 # change of its own, which check lists.
 
 cmd_deps() {
+    take_now_flag "$@" || return 1
     print_header "Updating Dependencies"
+
+    local cutoff before
+    cutoff=$(utc_timestamp $(( $(date -u +%s) - RELEASE_MIN_AGE_DAYS * 86400 )))
+    before=$(mktemp) || return 1
 
     # -------------------------------------------------------------------------
     # Go Modules
@@ -1129,11 +1244,17 @@ cmd_deps() {
             echo -e "\n${BOLD}Updating ${module_dir}${NC}"
             pushd "$module_dir" > /dev/null 2>&1
 
+            go list -m -f '{{.Path}} {{.Version}}' all > "$before" 2>/dev/null
             if go get -u ./... 2>&1; then
                 # Reset core module back to v0.0.0 (local pseudo-version)
                 # This is needed because go get -u tries to fetch from remote
                 go mod edit -require=github.com/leodip/goiabada/core@v0.0.0 2>/dev/null || true
                 print_success "go get -u ./..."
+                if hold_young_go_modules "$before" "$cutoff"; then
+                    go mod edit -require=github.com/leodip/goiabada/core@v0.0.0 2>/dev/null || true
+                else
+                    print_error "go get of the held-back versions failed"
+                fi
             else
                 print_error "go get -u ./... failed"
             fi
@@ -1154,8 +1275,10 @@ cmd_deps() {
             echo -e "\n${BOLD}Updating ${module_dir}${NC}"
             pushd "$module_dir" > /dev/null 2>&1
 
+            go list -m -f '{{.Path}} {{.Version}}' all > "$before" 2>/dev/null
             if go get -u ./... 2>&1; then
                 print_success "go get -u ./..."
+                hold_young_go_modules "$before" "$cutoff" || print_error "go get of the held-back versions failed"
             else
                 print_error "go get -u ./... failed"
             fi
@@ -1175,8 +1298,6 @@ cmd_deps() {
     # -------------------------------------------------------------------------
     echo -e "\n${BOLD}npm Packages${NC}"
 
-    local cutoff
-    cutoff=$(utc_timestamp $(( $(date -u +%s) - RELEASE_MIN_AGE_DAYS * 86400 )))
     local project dir
     for project in "${NPM_PROJECTS[@]}"; do
         dir="$BASE_DIR/$project"
@@ -1218,6 +1339,8 @@ cmd_deps() {
         print_warning "The browsers need system libraries this machine lacks. Install them with:"
         echo "  (cd e2e/playwright && npx playwright install-deps)   # asks for sudo itself"
     fi
+
+    rm -f "$before"
 
     echo ""
     print_success "Dependency update complete"
@@ -1335,6 +1458,9 @@ show_help() {
     echo "  generate Regenerate committed data files (timezones, countries, passwordblocklist)"
     echo "  all     Run all commands in sequence"
     echo ""
+    echo "check and deps take a release only once it has been public for $RELEASE_MIN_AGE_DAYS days."
+    echo "With --now they take the newest, for an urgent fix that cannot wait."
+    echo ""
     echo "Scope: toolchain and CDN pins only. The product version comes from"
     echo "the git tag, not from versions.yaml."
     echo ""
@@ -1352,6 +1478,7 @@ show_help() {
     echo "  $0 check         # Check for newer versions online"
     echo "  $0 update        # Apply versions from yaml to files"
     echo "  $0 deps          # Update Go modules and npm packages"
+    echo "  $0 deps --now    # The same, with releases younger than $RELEASE_MIN_AGE_DAYS days"
     echo "  $0 generate      # Regenerate timezones, countries and passwordblocklist data files"
     echo ""
 }
@@ -1378,13 +1505,15 @@ case "${1:-}" in
         cmd_show
         ;;
     check)
-        cmd_check
+        shift
+        cmd_check "$@"
         ;;
     update)
         cmd_update
         ;;
     deps)
-        cmd_deps
+        shift
+        cmd_deps "$@"
         ;;
     generate)
         cmd_generate "${2:-all}"
