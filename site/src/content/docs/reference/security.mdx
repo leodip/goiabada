@@ -48,6 +48,9 @@ Goiabada emails a user when their sign-in details change, so someone who stole a
 | Two-factor authentication set up, on the Account pages or during a sign-in | The account's address |
 | Two-factor authentication turned off on the Account pages | The account's address |
 | Two-factor authentication turned off by an administrator | The account's address |
+| Their authenticator, disabled after 100 wrong codes in a row at sign-in | The account's address |
+| A recovery code, used to sign in. The email says how many unused codes are left | The account's address |
+| A new set of recovery codes, made on the Account pages | The account's address |
 
 A notice is sent only while **Send email** is on under **Admin**, **Email**, and only to an address the user has verified. An administrator changing a user's email address sends nothing. Neither does a user's first password, whether they set it with the link an administrator emailed them or an administrator set it before they did.
 

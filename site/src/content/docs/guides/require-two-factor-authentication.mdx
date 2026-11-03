@@ -60,7 +60,7 @@ At level 3, a user with no authenticator sets one up during the sign-in, on the 
 
 The authenticator app lists the account under the auth server's **App name** and the user's email address.
 
-Whenever email is set up and the user's address is verified, setting up an authenticator, or turning one off, emails the user. See [Emails about account changes](/reference/security/#emails-about-account-changes).
+Whenever email is set up and the user's address is verified, setting up an authenticator, or turning one off, emails the user. So do the wrong code that disables an authenticator, a sign-in with a recovery code, and a new set of recovery codes. See [Emails about account changes](/reference/security/#emails-about-account-changes).
 
 ## The code
 
@@ -68,7 +68,7 @@ The code is a time-based one-time password ([RFC 6238](https://www.rfc-editor.or
 
 Each code works once. Sent again, it's refused, and the [audit log](/concepts/audit-log/) records `otp_code_replay_detected`. Each user gets 5 wrong codes in 15 minutes, and then waits. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
-100 wrong codes in a row, with no right one between them, disable the user's authenticator. From then on every code is refused, the right one included, and the audit log records `otp_authenticator_disabled`. Someone who knew the user's password, or held one of their sessions, sent those codes, so treat the password as known. The user's **Authentication** tab in the admin console says the authenticator is disabled, and [A user who lost their authenticator](#a-user-who-lost-their-authenticator) is the way back.
+100 wrong codes in a row, with no right one between them, disable the user's authenticator. From then on every code is refused, the right one included, and the audit log records `otp_authenticator_disabled`. The user is emailed once, when it's disabled. Someone who knew the user's password, or held one of their sessions, sent those codes, so treat the password as known. The user's **Authentication** tab in the admin console says the authenticator is disabled, and [A user who lost their authenticator](#a-user-who-lost-their-authenticator) is the way back.
 
 ## Recovery codes
 
@@ -76,9 +76,9 @@ Each authenticator comes with ten recovery codes, shown once when it's set up. A
 
 On the page that asks for the code, **Use a recovery code instead** takes one in place of the app's code. It's a full second factor: it reaches the same level as a code, with `amr` `["pwd", "recovery_code"]`. A code that's wrong, from a set that was replaced, or already used is refused, and counts against the same 5 wrong codes in 15 minutes. One sent again after it was used is also recorded as `recovery_code_replay_detected` in the audit log.
 
-Recovery codes still work when the authenticator was disabled after 100 wrong codes, and they don't count toward those 100. Signing in with one leaves the authenticator as it is, disabled or not. Removing the authenticator deletes its recovery codes, and the next one comes with new ones. Administrators never see a user's codes.
+Recovery codes still work when the authenticator was disabled after 100 wrong codes, and they don't count toward those 100. Signing in with one leaves the authenticator as it is, disabled or not, and emails the user how many unused codes are left. Removing the authenticator deletes its recovery codes, and the next one comes with new ones. Administrators never see a user's codes.
 
-Under **Account**, **Two-factor authentication**, **Recovery codes** says how many of the ten are unused. To get a new set, a user enters their password and clicks **Get new recovery codes**: the page shows the ten new codes once, and the old ones stop working at once, used or not. The authenticator and the user's sessions are left as they are. An app can do the same with [`POST /api/v1/account/otp/recovery-codes`](/reference/api/account/operations/createaccountrecoverycodes/).
+Under **Account**, **Two-factor authentication**, **Recovery codes** says how many of the ten are unused. To get a new set, a user enters their password and clicks **Get new recovery codes**: the page shows the ten new codes once, and the old ones stop working at once, used or not. The user is emailed that a new set was made. The authenticator and the user's sessions are left as they are. An app can do the same with [`POST /api/v1/account/otp/recovery-codes`](/reference/api/account/operations/createaccountrecoverycodes/).
 
 ## Users who are already signed in
 
@@ -92,7 +92,7 @@ When a user sets up or removes an authenticator, each of their sessions is check
 
 ## A user who lost their authenticator
 
-A user who saved their recovery codes gets back in alone. They sign in with a recovery code, turn two-factor authentication off under **Account**, **Two-factor authentication** with their password, and set up a new authenticator, which comes with new codes. If their authenticator was disabled after 100 wrong codes, whoever sent those codes knew the password, so they change it under **Account**, **Change password** first.
+A user who saved their recovery codes gets back in alone. They sign in with a recovery code, turn two-factor authentication off under **Account**, **Two-factor authentication** with their password, and set up a new authenticator, which comes with new codes. If their authenticator was disabled after 100 wrong codes, which they're emailed about, whoever sent those codes knew the password, so they change it under **Account**, **Change password** first.
 
 A user with no codes left needs an administrator. The administrator opens **Admin**, **Users**, the user, and their **Authentication** tab, turns off **Enabled** under **Two-factor authentication**, clicks **Save**, and confirms. At level 3, the user sets up a new authenticator at their next sign-in.
 

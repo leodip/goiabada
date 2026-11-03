@@ -485,7 +485,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// so it spends the same bucket as the changes above (#257 decision 8).
 		r.Get("/otp/recovery-codes", apihandlers.HandleAccountRecoveryCodesGet(s.database))
 		r.With(rateLimiter.LimitAccountPassword).Post("/otp/recovery-codes",
-			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter))
+			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter, notifier))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
 		// The legal document versions the caller accepted (#622 decision 10).

@@ -356,10 +356,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   #394 review, #724 decision 4)
 - `internal/accountnotice/` - The one notifier for every email about a change to an account: the
   email change's notice to the previous address and the security notices, such as a changed
-  password. A handler calls `Send` after its change commits; the notifier sends nothing with SMTP
-  off or to an unverified address, hands the rest to an after-response job of the notice's class,
-  renders it in the recipient's language with no link, and logs a failure as one Error record
-  (#724)
+  password. A handler calls `Send`, or `SendRecoveryCodeUsed` with the count of codes left, after
+  its change commits; the notifier sends nothing with SMTP off or to an unverified address, hands
+  the rest to an after-response job of the notice's class, renders it in the recipient's language
+  with no link, and logs a failure as one Error record (#724, #737)
 - `internal/emaillinks/` - The emailed-link round trip for password reset and activation: build the
   link, mark it followed, redeem it once. Beside `emaildelivery`, which sends it (#387)
 - `internal/legaldocuments/` - Which legal documents are in effect where: published, not retired, and

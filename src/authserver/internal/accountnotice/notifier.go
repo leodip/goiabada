@@ -1,7 +1,9 @@
 // Package accountnotice is the one notifier that emails a user about a change to their account:
 // the email change's notice to the previous address (#404 decisions 9 and 11), and the security
-// notices that tell a user their password was changed, by them or an administrator, or reset, and
-// that their two-factor authentication was set up or turned off (#724).
+// notices that tell a user their password was changed, by them or an administrator, or reset, that
+// their two-factor authentication was set up or turned off, that their authenticator was disabled
+// after too many wrong codes, that a recovery code signed in, and that a new set of recovery codes
+// was made (#724, #737).
 //
 // Every notice follows the same rules, which is why they live here once rather than beside each
 // handler. A handler calls Send after its change has committed, and only for the request whose
@@ -80,6 +82,16 @@ const (
 	// OTPDisabledByAdministrator tells a user an administrator turned their two-factor
 	// authentication off.
 	OTPDisabledByAdministrator Notice = "otp_disabled_by_administrator"
+	// OTPLockout tells a user their authenticator was disabled after record.OtpConsecutiveFailureLimit
+	// wrong codes in a row at sign-in, which only someone holding the password reaches (#489, #724
+	// decision 7). The refusal that disabled it sends it, so it goes once per lockout.
+	OTPLockout Notice = "otp_lockout"
+	// RecoveryCodeUsed tells a user a recovery code signed in, with how many unused codes are left
+	// (#737). SendRecoveryCodeUsed sends it, since it carries the count.
+	RecoveryCodeUsed Notice = "recovery_code_used"
+	// RecoveryCodesReplaced tells a user a new set of recovery codes was made on the Account pages,
+	// which voids the old set (#737). The set an authenticator comes with is OTPEnabled's.
+	RecoveryCodesReplaced Notice = "recovery_codes_replaced"
 )
 
 // class is the job class whose budget the notice is admitted against: every notice but the email
@@ -133,6 +145,17 @@ func New(renderer Renderer, sender Sender, jobs Jobs) *Notifier {
 // have SMTP enabled and the address is verified, and does nothing otherwise. The caller calls it
 // once its change has committed.
 func (n *Notifier) Send(r *http.Request, notice Notice, to Recipient) {
+	n.send(r, notice, to, nil)
+}
+
+// SendRecoveryCodeUsed sends RecoveryCodeUsed as Send does, saying that remaining unused recovery
+// codes are left. The count is not a secret: the Account pages show it.
+func (n *Notifier) SendRecoveryCodeUsed(r *http.Request, to Recipient, remaining int) {
+	n.send(r, RecoveryCodeUsed, to, map[string]interface{}{"remaining": remaining})
+}
+
+// send is Send with the values the notice's page shows beside the recipient's name.
+func (n *Notifier) send(r *http.Request, notice Notice, to Recipient, values map[string]interface{}) {
 	settings, ok := reqctx.SettingsFrom(r.Context())
 	if !ok {
 		slog.ErrorContext(r.Context(), "unable to send an account notice",
@@ -145,14 +168,14 @@ func (n *Notifier) Send(r *http.Request, notice Notice, to Recipient) {
 
 	smtpConfig := emaildelivery.SMTPConfigFromSettings(settings)
 	n.jobs.Go(r.Context(), notice.class(), func(ctx context.Context) {
-		n.deliver(ctx, r, notice, to, smtpConfig)
+		n.deliver(ctx, r, notice, to, values, smtpConfig)
 	})
 }
 
 // deliver renders and sends one notice, in the job. The page and subject are literals here, one
 // pair per notice, so the template guard can tell which page each renders.
 func (n *Notifier) deliver(ctx context.Context, r *http.Request, notice Notice, to Recipient,
-	smtpConfig emaildelivery.SMTPConfig) {
+	values map[string]interface{}, smtpConfig emaildelivery.SMTPConfig) {
 	var page, subject string
 	switch notice {
 	case EmailAddressChanged:
@@ -169,6 +192,12 @@ func (n *Notifier) deliver(ctx context.Context, r *http.Request, notice Notice, 
 		page, subject = "/emails/email_otp_disabled.html", "email.otp_disabled.subject"
 	case OTPDisabledByAdministrator:
 		page, subject = "/emails/email_otp_disabled_by_administrator.html", "email.otp_disabled_by_administrator.subject"
+	case OTPLockout:
+		page, subject = "/emails/email_otp_lockout.html", "email.otp_lockout.subject"
+	case RecoveryCodeUsed:
+		page, subject = "/emails/email_recovery_code_used.html", "email.recovery_code_used.subject"
+	case RecoveryCodesReplaced:
+		page, subject = "/emails/email_recovery_codes_replaced.html", "email.recovery_codes_replaced.subject"
 	default:
 		slog.ErrorContext(ctx, "unable to render an account notice",
 			"notice", string(notice), "user_id", to.UserId, "error", errUnknownNotice)
@@ -180,6 +209,9 @@ func (n *Notifier) deliver(ctx context.Context, r *http.Request, notice Notice, 
 	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, to.PageLanguage, to.Locale))
 	bind := map[string]interface{}{
 		"name": to.Name,
+	}
+	for key, value := range values {
+		bind[key] = value
 	}
 	buf, err := n.renderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", page, bind)
 	if err != nil {

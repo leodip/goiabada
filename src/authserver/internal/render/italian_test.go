@@ -54,6 +54,9 @@ func TestItalian_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"otp_enabled", "L'autenticazione a due fattori è stata configurata", "Insieme è stato creato un nuovo set di codici di recupero"},
 			{"otp_disabled", "L'autenticazione a due fattori è stata disattivata", "configura di nuovo l'autenticazione a due fattori"},
 			{"otp_disabled_by_administrator", "Un amministratore ha disattivato la tua autenticazione a due fattori", "Puoi configurare una nuova app di autenticazione"}, //nolint:misspell // the it catalog's text: "configurare" is Italian, not a misspelling of "configure"
+			{"recovery_code_used", "È stato usato un codice di recupero per accedere", "Ti restano 3 codici di recupero inutilizzati."},
+			{"recovery_codes_replaced", "I tuoi codici di recupero sono stati sostituiti", "I codici di recupero precedenti non funzionano più"},
+			{"otp_lockout", "La tua app di autenticazione è stata bloccata dopo troppi codici errati", "Accedi con uno dei tuoi codici di recupero"},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -64,7 +67,7 @@ func TestItalian_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 				assert.Equal(t, tc.subject, i18n.T(ctx, "email."+tc.name+".subject", map[string]any{"code": "123456", "appName": "Test"}))
 				buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
 					"layouts/email_layout.html", "emails/email_"+tc.name+".html",
-					map[string]interface{}{"name": "Andrea", "link": "https://example.com/continue", "verificationCode": "123456"})
+					map[string]interface{}{"name": "Andrea", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3})
 				require.NoError(t, err)
 				assert.Contains(t, buf.String(), `<html lang="it">`)
 				assert.Contains(t, buf.String(), tc.body)

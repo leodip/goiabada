@@ -1,0 +1,17 @@
+{{define "title"}}{{ .appName }} - La tua app di autenticazione è stata bloccata dopo troppi codici errati{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Ciao {{.name}},</p>
+
+    <p>L'app di autenticazione del tuo account {{ .appName }} è stata bloccata dopo troppi codici errati inseriti di seguito durante l'accesso. I suoi codici non vengono più accettati, nemmeno quelli giusti.</p>
+
+    <p><strong>Quei codici si potevano inserire solo dopo la password, quindi qualcun altro potrebbe conoscerla.</strong> Accedi con uno dei tuoi codici di recupero, cambia la password dalle impostazioni del tuo account, poi disattiva l'autenticazione a due fattori e configura una nuova app di autenticazione. Se non ti restano codici di recupero, contatta il tuo amministratore.</p>
+
+    <p>Un saluto,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

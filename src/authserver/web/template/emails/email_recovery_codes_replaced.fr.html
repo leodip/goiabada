@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Vos codes de récupération ont été remplacés{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Bonjour {{.name}},</p>
+
+    <p>Un nouveau jeu de codes de récupération a été créé pour votre compte {{ .appName }} depuis les paramètres de votre compte. Vos anciens codes de récupération ne fonctionnent plus, qu’ils aient été utilisés ou non.</p>
+
+    <p>Si vous l’avez créé, vous n’avez rien à faire. Conservez les nouveaux codes en lieu sûr.</p>
+
+    <p><strong>Sinon, une autre personne connaît peut-être votre mot de passe.</strong> Choisissez un nouveau mot de passe avec « Mot de passe oublié ? » sur la page de connexion, puis connectez-vous et créez un nouveau jeu de codes de récupération dans les paramètres de votre compte, ou contactez votre administrateur.</p>
+
+    <p>Cordialement,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

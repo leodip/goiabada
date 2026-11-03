@@ -2137,6 +2137,9 @@
 "email.otp_enabled.subject" = "Die Zwei-Faktor-Authentifizierung wurde eingerichtet"
 "email.otp_disabled.subject" = "Die Zwei-Faktor-Authentifizierung wurde deaktiviert"
 "email.otp_disabled_by_administrator.subject" = "Ihre Zwei-Faktor-Authentifizierung wurde von der Administration deaktiviert"
+"email.recovery_code_used.subject" = "Für die Anmeldung wurde ein Wiederherstellungscode verwendet"
+"email.recovery_codes_replaced.subject" = "Ihre Wiederherstellungscodes wurden ersetzt"
+"email.otp_lockout.subject" = "Ihre Authenticator-App wurde nach zu vielen falschen Codes gesperrt"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

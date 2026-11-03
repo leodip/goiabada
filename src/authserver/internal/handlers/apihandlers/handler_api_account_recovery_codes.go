@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -65,10 +66,15 @@ func HandleAccountRecoveryCodesGet(database accountRecoveryCodesDatabase) http.H
 // Mounted behind the account_password limiter, and a wrong password is the one refusal that spends
 // it, as at the password, two-factor and email changes: the same password is guessed at all four,
 // so separate budgets would hand an attacker more guesses by alternating.
+//
+// A new set stored is told to the user through notifier, after the response, naming none of the
+// codes (#737). A refusal, and a set not stored because the authenticator was removed meanwhile,
+// send nothing.
 func HandleAccountRecoveryCodesPost(
 	database accountRecoveryCodesDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, subject, ok := accountCaller(w, r)
@@ -128,5 +134,6 @@ func HandleAccountRecoveryCodesPost(
 		})
 
 		writeJSON(w, r, http.StatusOK, api.CreateAccountRecoveryCodesResponse{RecoveryCodes: codes})
+		notifier.Send(r, accountnotice.RecoveryCodesReplaced, accountnotice.To(user))
 	}
 }

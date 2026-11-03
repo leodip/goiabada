@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - I tuoi codici di recupero sono stati sostituiti{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Ciao {{.name}},</p>
+
+    <p>Dalle impostazioni del tuo account {{ .appName }} è stato creato un nuovo set di codici di recupero. I codici di recupero precedenti non funzionano più, usati o no.</p>
+
+    <p>Se l'hai creato tu, non devi fare nulla. Conserva i nuovi codici in un posto sicuro.</p>
+
+    <p><strong>Altrimenti, qualcun altro potrebbe conoscere la tua password.</strong> Scegli una nuova password con «Hai dimenticato la password?» nella pagina di accesso, poi accedi e crea un nuovo set di codici di recupero dalle impostazioni del tuo account, oppure contatta il tuo amministratore.</p>
+
+    <p>Un saluto,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

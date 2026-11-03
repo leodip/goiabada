@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Un code de récupération a été utilisé pour vous connecter{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Bonjour {{.name}},</p>
+
+    <p>L’un de vos codes de récupération a été utilisé pour vous connecter à votre compte {{ .appName }}, à la place d’un code de votre application d’authentification. Chaque code de récupération ne fonctionne qu’une fois, celui-ci ne fonctionne donc plus. {{if eq .remaining 0}}Il ne vous reste aucun code de récupération inutilisé.{{else if eq .remaining 1}}Il vous reste 1 code de récupération inutilisé.{{else}}Il vous reste {{ .remaining }} codes de récupération inutilisés.{{end}}</p>
+
+    <p>Si c’était vous et que vous n’avez plus votre application d’authentification, désactivez l’authentification à deux facteurs dans les paramètres de votre compte, puis configurez une nouvelle application d’authentification, fournie avec un nouveau jeu de codes de récupération. Si vous avez toujours l’application, vous pouvez obtenir un nouveau jeu de codes de récupération dans les paramètres de votre compte avant d’en manquer.</p>
+
+    <p><strong>Sinon, une autre personne connaît peut-être votre mot de passe et possède vos codes de récupération.</strong> Choisissez un nouveau mot de passe avec « Mot de passe oublié ? » sur la page de connexion, puis connectez-vous, désactivez l’authentification à deux facteurs et configurez une nouvelle application d’authentification, ou contactez votre administrateur.</p>
+
+    <p>Cordialement,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

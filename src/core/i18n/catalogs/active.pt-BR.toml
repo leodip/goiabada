@@ -2027,6 +2027,9 @@
 "email.otp_enabled.subject" = "A autenticação de dois fatores foi configurada"
 "email.otp_disabled.subject" = "A autenticação de dois fatores foi desativada"
 "email.otp_disabled_by_administrator.subject" = "Um administrador desativou a sua autenticação de dois fatores"
+"email.recovery_code_used.subject" = "Um código de recuperação foi usado para entrar"
+"email.recovery_codes_replaced.subject" = "Seus códigos de recuperação foram substituídos"
+"email.otp_lockout.subject" = "Seu aplicativo autenticador foi bloqueado após muitos códigos errados"
 
 # --- Bootstrap de JS --------------------------------------------------------
 

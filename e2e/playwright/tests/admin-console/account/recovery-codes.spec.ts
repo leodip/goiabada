@@ -5,6 +5,7 @@ import { submitPassword } from "../../../lib/browser-sign-in";
 import { enterRecoveryCode, recoveryCodeRefused, signInToConsole, turnOnTwoFactor } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
+import { linksIn, waitForMail } from "../../../lib/mailpit";
 import { freshTotp } from "../../../lib/totp";
 
 // 24 characters of Crockford's base32 alphabet, which leaves out i, l, o and u, in six groups of
@@ -142,4 +143,45 @@ test("the count, and a new set behind the password and a confirmation, after whi
   await enterRecoveryCode(again, newCodes[0]);
   await again.waitForURL(`${env.adminUrl}/account/profile`);
   await next.close();
+});
+
+test("a recovery-code sign-in sends the user a notice with the codes left, and a new set sends another", async ({
+  browser,
+  request,
+  users,
+}) => {
+  // Verified, since a notice goes only to a verified address. Setting up the authenticator sends
+  // the first mail, the set-up notice.
+  const user = await users.create({ emailVerified: true });
+  const { recoveryCodes } = await turnOnTwoFactor(browser, user);
+  await waitForMail(request, user.email);
+
+  const own = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await own.newPage();
+  await page.goto(`${env.adminUrl}/account/otp`);
+  await submitPassword(page, user.email, user.password);
+  await enterRecoveryCode(page, recoveryCodes[0]);
+  await page.waitForURL(`${env.adminUrl}/account/otp`);
+
+  const signedIn = await waitForMail(request, user.email, 2);
+  expect(signedIn.subject).toBe("A recovery code was used to sign in");
+  expect(signedIn.html).toContain("You have 9 unused recovery codes left.");
+  expect(signedIn.html).toContain("turn two-factor authentication off and set up a new authenticator");
+  expect(linksIn(signedIn)).toEqual([]);
+  for (const code of recoveryCodes) expect(signedIn.text + signedIn.html).not.toContain(code);
+
+  const section = page.locator("form", { has: page.getByRole("heading", { name: "Recovery codes", exact: true }) });
+  await section.getByLabel("Password", { exact: true }).fill(user.password);
+  await section.getByRole("button", { name: "Get new recovery codes" }).click();
+  await confirmDialog(page, "Get new recovery codes?");
+  await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();
+  const newCodes = (await page.getByRole("list", { name: "Recovery codes" }).getByRole("listitem").allInnerTexts())
+    .map((code) => code.trim());
+  await own.close();
+
+  const replaced = await waitForMail(request, user.email, 3);
+  expect(replaced.subject).toBe("Your recovery codes were replaced");
+  expect(replaced.html).toContain("Your previous recovery codes no longer work, used or not.");
+  expect(linksIn(replaced)).toEqual([]);
+  for (const code of [...recoveryCodes, ...newCodes]) expect(replaced.text + replaced.html).not.toContain(code);
 });

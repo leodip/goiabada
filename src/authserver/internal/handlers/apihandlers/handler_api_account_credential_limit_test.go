@@ -87,7 +87,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 			HandleAccountEmailPut(database, accountvalidation.NewEmailValidator(database),
 				auditLogger, rateLimiter, heldNotifier(t, &heldJobs{}))),
 		recoveryCodes: rateLimiter.LimitAccountPassword(
-			HandleAccountRecoveryCodesPost(database, auditLogger, rateLimiter)),
+			HandleAccountRecoveryCodesPost(database, auditLogger, rateLimiter, heldNotifier(t, &heldJobs{}))),
 		database: database,
 	}
 }

@@ -54,6 +54,9 @@ func TestGerman_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"otp_enabled", "Die Zwei-Faktor-Authentifizierung wurde eingerichtet", "Dazu wurde ein neuer Satz Wiederherstellungscodes erstellt"},
 			{"otp_disabled", "Die Zwei-Faktor-Authentifizierung wurde deaktiviert", "richten Sie die Zwei-Faktor-Authentifizierung erneut ein."},
 			{"otp_disabled_by_administrator", "Ihre Zwei-Faktor-Authentifizierung wurde von der Administration deaktiviert", "In Ihren Kontoeinstellungen können Sie eine neue Authenticator-App einrichten."},
+			{"recovery_code_used", "Für die Anmeldung wurde ein Wiederherstellungscode verwendet", "Sie haben noch 3 unbenutzte Wiederherstellungscodes."},
+			{"recovery_codes_replaced", "Ihre Wiederherstellungscodes wurden ersetzt", "Ihre bisherigen Wiederherstellungscodes funktionieren nicht mehr"},
+			{"otp_lockout", "Ihre Authenticator-App wurde nach zu vielen falschen Codes gesperrt", "Melden Sie sich mit einem Ihrer Wiederherstellungscodes an"},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -64,7 +67,7 @@ func TestGerman_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 				assert.Equal(t, tc.subject, i18n.T(ctx, "email."+tc.name+".subject", map[string]any{"code": "123456", "appName": "Test"}))
 				buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
 					"layouts/email_layout.html", "emails/email_"+tc.name+".html",
-					map[string]interface{}{"name": "Alex", "link": "https://example.com/continue", "verificationCode": "123456"})
+					map[string]interface{}{"name": "Alex", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3})
 				require.NoError(t, err)
 				assert.Contains(t, buf.String(), `<html lang="de">`)
 				assert.Contains(t, buf.String(), tc.body)

@@ -2140,6 +2140,9 @@
 "email.otp_enabled.subject" = "L'autenticazione a due fattori è stata configurata"
 "email.otp_disabled.subject" = "L'autenticazione a due fattori è stata disattivata"
 "email.otp_disabled_by_administrator.subject" = "Un amministratore ha disattivato la tua autenticazione a due fattori"
+"email.recovery_code_used.subject" = "È stato usato un codice di recupero per accedere"
+"email.recovery_codes_replaced.subject" = "I tuoi codici di recupero sono stati sostituiti"
+"email.otp_lockout.subject" = "La tua app di autenticazione è stata bloccata dopo troppi codici errati"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

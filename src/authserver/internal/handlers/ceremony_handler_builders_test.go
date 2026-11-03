@@ -264,6 +264,8 @@ type noNotices struct{}
 
 func (noNotices) Send(*http.Request, accountnotice.Notice, accountnotice.Recipient) {}
 
+func (noNotices) SendRecoveryCodeUsed(*http.Request, accountnotice.Recipient, int) {}
+
 func notifierOrNone(notifier AccountNotifier) AccountNotifier {
 	if notifier == nil {
 		return noNotices{}

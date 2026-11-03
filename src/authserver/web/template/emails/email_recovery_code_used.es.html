@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Se ha usado un código de recuperación para iniciar sesión{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Hola, {{.name}}:</p>
+
+    <p>Se ha usado uno de tus códigos de recuperación para iniciar sesión en tu cuenta de {{ .appName }}, en lugar de un código de tu aplicación de autenticación. Cada código de recuperación sirve una sola vez, así que ese ya no sirve. {{if eq .remaining 0}}No te queda ningún código de recuperación sin usar.{{else if eq .remaining 1}}Te queda 1 código de recuperación sin usar.{{else}}Te quedan {{ .remaining }} códigos de recuperación sin usar.{{end}}</p>
+
+    <p>Si has sido tú y ya no tienes tu aplicación de autenticación, desactiva la autenticación de dos factores en la configuración de tu cuenta y configura una nueva aplicación de autenticación, que viene con un nuevo conjunto de códigos de recuperación. Si aún tienes la aplicación, puedes obtener allí un nuevo conjunto de códigos de recuperación antes de que se te acaben.</p>
+
+    <p><strong>Si no has sido tú, puede que otra persona conozca tu contraseña y tenga tus códigos de recuperación.</strong> Elige una contraseña nueva con «¿Olvidaste tu contraseña?» en la página de inicio de sesión. Después, inicia sesión, desactiva la autenticación de dos factores y configura una nueva aplicación de autenticación, o contacta con tu administrador.</p>
+
+    <p>Un saludo,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

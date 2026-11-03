@@ -69,19 +69,22 @@ func HandleAuthOtpGet(
 }
 
 // AccountNotifier emails a user about a change to their account, after the response. The sign-in
-// code step calls it once the step's change has committed, for the notice the step reports (#724).
-// The notifier decides the rest: nothing is sent with SMTP off or to an unverified address, and a
-// notice that cannot be rendered or sent is an Error record that never fails the sign-in.
-// *accountnotice.Notifier is the one implementation.
+// code step calls it once the step's change has committed, for the notice the step reports (#724):
+// SendRecoveryCodeUsed for a recovery code that signed in, which carries the count of codes left,
+// and Send for the others. The notifier decides the rest: nothing is sent with SMTP off or to an
+// unverified address, and a notice that cannot be rendered or sent is an Error record that never
+// fails the sign-in. *accountnotice.Notifier is the one implementation.
 type AccountNotifier interface {
 	Send(r *http.Request, notice accountnotice.Notice, to accountnotice.Recipient)
+	SendRecoveryCodeUsed(r *http.Request, to accountnotice.Recipient, remaining int)
 }
 
 // HandleAuthOtpPost is POST /auth/otp, which accepts level2_otp. It reads the code from the
 // submitted body and runs authflow.OTPSubmission on it, then answers what it did: the form again
 // beside a refusal, which for a code from the next step says to check the device's time (#142), the
 // lost-enrolment page, or the redirect to /auth/completed. An authenticator set up by the
-// submission is then told to the user through notifier, after the response (#724).
+// submission, the refusal that disabled the authenticator, and a recovery code that signed in are
+// then told to the user through notifier, after the response (#724, #737).
 //
 // A body carrying the recovery-code form's field is that form's submission, and runs
 // OTPSubmission.RunRecoveryCode instead: the same ceremony boundary, state gate and otp limiter
@@ -111,7 +114,7 @@ func HandleAuthOtpPost(
 		recoveryCode := r.PostFormValue(recoveryCodeField)
 		if _, recoveryForm := r.PostForm[recoveryCodeField]; recoveryForm {
 			answerRecoveryCode(w, r, boundary, pageRenderer, ceremonyStore, credentialFailures, submission,
-				authContext, recoveryCode)
+				notifier, authContext, recoveryCode)
 			return
 		}
 
@@ -150,17 +153,22 @@ func HandleAuthOtpPost(
 // the operation committed the change and names it as a plain value, and sends nothing itself
 // (#724). A submission that changed nothing, or lost its change, reports none.
 func sendOTPNotice(r *http.Request, notifier AccountNotifier, result authflow.OTPSubmissionResult) {
-	if result.Notice == authflow.OTPNoticeAuthenticatorSetUp {
+	switch result.Notice {
+	case authflow.OTPNoticeAuthenticatorSetUp:
 		notifier.Send(r, accountnotice.OTPEnabled, accountnotice.To(result.NoticeTo))
+	case authflow.OTPNoticeAuthenticatorLockedOut:
+		notifier.Send(r, accountnotice.OTPLockout, accountnotice.To(result.NoticeTo))
+	case authflow.OTPNoticeRecoveryCodeUsed:
+		notifier.SendRecoveryCodeUsed(r, accountnotice.To(result.NoticeTo), result.NoticeRecoveryCodesLeft)
 	}
 }
 
 // answerRecoveryCode is HandleAuthOtpPost's recovery-code arm: it runs
 // OTPSubmission.RunRecoveryCode on the code and answers what it did, drawing the recovery-code form
-// again beside a refusal.
+// again beside a refusal, and then hands a code that signed in to notifier (#737).
 func answerRecoveryCode(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary,
 	pageRenderer PageRenderer, ceremonyStore CeremonyStore, credentialFailures CredentialFailureRecorder,
-	submission *authflow.OTPSubmission, authContext *ceremony.AuthContext, code string) {
+	submission *authflow.OTPSubmission, notifier AccountNotifier, authContext *ceremony.AuthContext, code string) {
 
 	result, err := submission.RunRecoveryCode(r.Context(),
 		newCredentialCheckingBrowserSession(w, r, ceremonyStore, credentialFailures), authContext, code)
@@ -189,6 +197,8 @@ func answerRecoveryCode(w http.ResponseWriter, r *http.Request, boundary *Ceremo
 	case authflow.OTPAccepted:
 		boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 	}
+
+	sendOTPNotice(r, notifier, result)
 }
 
 // otpFormBind is the data every OTP form renders with. The form names its ceremony, so the boundary

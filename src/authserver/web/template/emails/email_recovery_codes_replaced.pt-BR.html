@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Seus códigos de recuperação foram substituídos{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Olá {{.name}},</p>
+
+    <p>Um novo conjunto de códigos de recuperação foi gerado para a sua conta {{ .appName }} nas configurações da sua conta. Os seus códigos de recuperação anteriores não funcionam mais, usados ou não.</p>
+
+    <p>Se foi você quem o gerou, não é preciso fazer nada. Guarde os novos códigos em um lugar seguro.</p>
+
+    <p><strong>Se não foi você, outra pessoa pode saber a sua senha.</strong> Escolha uma nova senha em "Esqueceu sua senha?" na página de entrada, depois entre na sua conta e gere um novo conjunto de códigos de recuperação nas configurações da sua conta, ou entre em contato com o administrador.</p>
+
+    <p>Atenciosamente,<br />{{ .appName }}</p>
+</div>
+
+{{end}}
