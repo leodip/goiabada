@@ -482,6 +482,9 @@ function makeSearchable(select) {
   const purpose = (select.getAttribute("autocomplete") || "").trim().toLowerCase();
   input.autocomplete = purpose || "off";
   input.spellcheck = false;
+  // A keyboard's correction fires the insertReplacementText input isAutofill takes for Firefox's
+  // fill, so it would commit a typed code; autocorrect is on by default (HTML §6.8.8).
+  input.setAttribute("autocorrect", "off");
   input.setAttribute("role", "combobox");
   input.setAttribute("aria-autocomplete", "list");
   input.setAttribute("aria-expanded", "false");

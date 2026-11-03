@@ -119,14 +119,20 @@ test("signing in puts a shown password back to dots before the page leaves", asy
     return route.abort();
   });
   const sent = page.waitForRequest((request) => request.method() === "POST" && isSignIn(new URL(request.url())));
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await sent;
-  expect(await password.getAttribute("type")).toBe("password");
-  expect(await page.locator("button[data-password-toggle]").textContent()).toBe("Show");
-  expect(await page.locator("button[data-password-toggle]").getAttribute("aria-label")).toBe("Show password");
-  const dropped = page.waitForEvent("requestfailed");
-  release();
-  await dropped;
+  try {
+    // The click does not wait for the navigation it starts, which the route holds until release.
+    await page.getByRole("button", { name: "Sign in", exact: true }).click({ noWaitAfter: true });
+    await sent;
+    expect(await password.getAttribute("type")).toBe("password");
+    expect(await page.locator("button[data-password-toggle]").textContent()).toBe("Show");
+    expect(await page.locator("button[data-password-toggle]").getAttribute("aria-label")).toBe("Show password");
+    const dropped = page.waitForEvent("requestfailed");
+    release();
+    await dropped;
+  } finally {
+    // A failed assertion still lets the held request go.
+    release();
+  }
   await context.close();
 });
 

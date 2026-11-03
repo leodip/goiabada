@@ -281,17 +281,22 @@ async function autofill(field: Locator, value: string, engine: "chromium" | "fir
 }
 
 // The person's own fields say what they hold (WCAG 2.2 SC 1.3.5): the searchable lists' fields take
-// their select's purpose, and the time zone, which has none, stays off (#722).
+// their select's purpose, and the time zone, which has none, stays off (#722). Each field turns
+// autocorrection off, since a correction arrives as the input event Firefox's fill fires.
 test("the account pages' fields declare their input purposes", async ({ browser, users }) => {
   const user = await users.create();
   const own = await signInToConsole(browser, user);
   await expect(own.page.getByLabel("Username", { exact: true })).toHaveAttribute("autocomplete", "username");
   await expect(own.page.getByRole("combobox", { name: "Language and region" })).toHaveAttribute("autocomplete", "language");
   await expect(own.page.getByRole("combobox", { name: "Time zone" })).toHaveAttribute("autocomplete", "off");
+  await expect(own.page.getByRole("combobox", { name: "Language and region" })).toHaveAttribute("autocorrect", "off");
+  await expect(own.page.getByRole("combobox", { name: "Time zone" })).toHaveAttribute("autocorrect", "off");
   await own.page.goto(`${env.adminUrl}/account/address`);
   await expect(own.page.getByRole("combobox", { name: "Country" })).toHaveAttribute("autocomplete", "country");
+  await expect(own.page.getByRole("combobox", { name: "Country" })).toHaveAttribute("autocorrect", "off");
   await own.page.goto(`${env.adminUrl}/account/phone`);
   await expect(own.page.getByRole("combobox", { name: "Country" })).toHaveAttribute("autocomplete", "tel-country-code");
+  await expect(own.page.getByRole("combobox", { name: "Country" })).toHaveAttribute("autocorrect", "off");
   await own.context.close();
 });
 

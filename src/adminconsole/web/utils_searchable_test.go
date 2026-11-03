@@ -214,3 +214,24 @@ func TestUtilsJS_SearchableListsReadThePurposeAndCallingCode(t *testing.T) {
 		t.Error("account_phone.html writes no data-calling-code on its options")
 	}
 }
+
+// makeSearchable turns autocorrection off on the field it draws, beside spell checking, since a
+// keyboard's correction arrives as the insertReplacementText input that isAutofill takes for
+// Firefox's fill, and would commit a typed code as a choice (#722 decision 5). The HTML Standard
+// turns autocorrect on by default (§6.8.8), and spellcheck does not turn it off.
+func TestUtilsJS_SearchableFieldTurnsOffCorrection(t *testing.T) {
+	script := utilsJS(t)
+	start := strings.Index(script, "function makeSearchable(select) {")
+	if start < 0 {
+		t.Fatal("utils.js has no makeSearchable")
+	}
+	body := script[start:]
+	if end := strings.Index(body, "\n}\n"); end >= 0 {
+		body = body[:end]
+	}
+	for _, want := range []string{`input.spellcheck = false;`, `input.setAttribute("autocorrect", "off");`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("makeSearchable does not set %s on its field", want)
+		}
+	}
+}

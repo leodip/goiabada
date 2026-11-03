@@ -104,15 +104,21 @@ test("Change password: sending the form puts every shown field back to dots befo
     return route.abort();
   });
   const sent = page.waitForRequest((request) => request.method() === "POST" && request.url() === `${env.adminUrl}/account/change-password`);
-  await page.getByRole("button", { name: "Change password" }).click();
-  await sent;
-  for (const id of fields) {
-    expect(await page.locator(`#${id}`).getAttribute("type"), id).toBe("password");
+  try {
+    // The click does not wait for the navigation it starts, which the route holds until release.
+    await page.getByRole("button", { name: "Change password" }).click({ noWaitAfter: true });
+    await sent;
+    for (const id of fields) {
+      expect(await page.locator(`#${id}`).getAttribute("type"), id).toBe("password");
+    }
+    expect(await page.getByRole("button", { name: "Show new password", exact: true }).textContent()).toBe("Show");
+    const dropped = page.waitForEvent("requestfailed");
+    release();
+    await dropped;
+  } finally {
+    // A failed assertion still lets the held request go.
+    release();
   }
-  expect(await page.getByRole("button", { name: "Show new password", exact: true }).textContent()).toBe("Show");
-  const dropped = page.waitForEvent("requestfailed");
-  release();
-  await dropped;
   await own.context.close();
 });
 
