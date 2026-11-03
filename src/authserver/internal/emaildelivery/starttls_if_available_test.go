@@ -262,10 +262,13 @@ var stalledUpgrades = []struct {
 
 // The reconnect has no budget of its own: it runs within the send's, which runs from the first
 // connect. An upgrade that stalls until the budget is spent leaves nothing for a second connection,
-// so the send fails as timed out without making one.
+// so the send fails as timed out without making one. Nothing went unencrypted, so no record says it
+// did, and the failure still says the upgrade failed first.
 func TestSendEmail_AFallbackReconnectHasNoBudgetOfItsOwn(t *testing.T) {
 	for _, stall := range stalledUpgrades {
 		t.Run(stall.name, func(t *testing.T) {
+			capture := logtest.CaptureSlog(t)
+
 			f := stall.fake()
 			port := f.start(t)
 
@@ -282,6 +285,8 @@ func TestSendEmail_AFallbackReconnectHasNoBudgetOfItsOwn(t *testing.T) {
 			assert.Empty(t, f.data())
 			assert.GreaterOrEqual(t, elapsed, sender.sendTimeout, "the send ended before its budget")
 			assert.Less(t, elapsed, 3*sender.sendTimeout, "the send ran well past its budget")
+			assert.Contains(t, err.Error(), "after the STARTTLS upgrade failed", "the failure lost why the upgrade failed")
+			assert.Empty(t, recordsAt(capture, slog.LevelInfo), "nothing was sent unencrypted")
 		})
 	}
 }

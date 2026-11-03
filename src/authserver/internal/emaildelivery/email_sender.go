@@ -271,18 +271,21 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 			if ctx.Err() != nil {
 				return SendResult{}, tlsFailure(errs.Wrap(upgradeErr, "unable to send SMTP message"))
 			}
+			closeConnection()
+			reconnected, closeReconnected, reconnectErr := e.connect(ctx, dial)
+			if reconnectErr != nil {
+				closeConnection = func() {}
+				// Nothing went unencrypted, so no record says it did, and the failure keeps why
+				// the upgrade failed. That reason goes in as text: on the chain, a timed-out
+				// upgrade could pass as the cause of a reconnect that failed for another reason.
+				return SendResult{}, errs.Wrapf(reconnectErr, "unable to reconnect after the STARTTLS upgrade failed (%v)", upgradeErr)
+			}
+			client, closeConnection = reconnected, closeReconnected
 			reason := unencryptedReasonTLSFailed
 			if upgrade == upgradeCommandFailed {
 				reason = unencryptedReasonSTARTTLSFailed
 			}
 			logSentUnencrypted(ctx, reason, upgradeErr)
-			closeConnection()
-			reconnected, closeReconnected, reconnectErr := e.connect(ctx, dial)
-			if reconnectErr != nil {
-				closeConnection = func() {}
-				return SendResult{}, reconnectErr
-			}
-			client, closeConnection = reconnected, closeReconnected
 		default:
 			return SendResult{}, tlsFailure(errs.Wrap(upgradeErr, "unable to send SMTP message"))
 		}
