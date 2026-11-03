@@ -80,7 +80,12 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
   is `aria-hidden="true"`, and a button showing one alone carries `sr-only` text; targets are at
-  least 24 pixels. A refusal about one field marks it `aria-invalid="true"` and names the notice in
+  least 24 pixels. The console's sticky header is `--app-header-height` tall, and
+  `html:has(.app-header)` reserves that height plus 0.5rem as `scroll-padding-top`, so Tab,
+  `focus()`, `scrollIntoView` and in-page links leave the element, focus ring included, below the
+  header (SC 2.4.11); change the header's height only through the property, and give anything else
+  pinned over the page a scroll offset of its own. `focus-not-obscured.spec.ts` checks it in
+  Chromium, Firefox and WebKit. A refusal about one field marks it `aria-invalid="true"` and names the notice in
   its `aria-describedby`, under the same `{{if .error}}` the notice renders under, which the guard
   reads as one branch; a handler whose form has several fields says which in `errorField`, and in
   the console reads it off the admin API's error code through `render.ErrorField`, or, for the API's

@@ -56,10 +56,13 @@
 }
 
 @layer base {
-  /* The root carries the page color too, so an overscroll shows the canvas rather than white. */
+  /* The root carries the page color too, so an overscroll shows the canvas rather than white. The
+     console's header height is here, where both the header and the page's scroll offset below
+     read it. */
   :root {
     color-scheme: light;
     background-color: var(--color-canvas);
+    --app-header-height: 4rem;
 
     @variant dark {
       color-scheme: dark;
@@ -1790,6 +1793,15 @@
     flex-direction: column;
   }
 
+  /* The header stays pinned to the top of the page, so the page reserves its height, and a gap the
+     focus ring fits in, above anything it scrolls to: a field reached by Tab or Shift+Tab, focus()
+     or scrollIntoView, the skip link's target. A focused field is never hidden under the header
+     (WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)). The auth server draws no header, so the rule
+     never matches there. */
+  html:has(.app-header) {
+    scroll-padding-top: calc(var(--app-header-height) + 0.5rem);
+  }
+
   /* The header and the sidebar's head are one height, so their lower borders meet where the
      sidebar's border crosses them. */
   .app-header {
@@ -1799,7 +1811,7 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    min-height: 4rem;
+    min-height: var(--app-header-height);
     padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--color-line);
     background-color: var(--color-surface);
@@ -1878,7 +1890,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    min-height: 4rem;
+    min-height: var(--app-header-height);
     padding: 0.5rem 0.75rem 0.5rem 1.25rem;
     border-bottom: 1px solid var(--color-line);
   }

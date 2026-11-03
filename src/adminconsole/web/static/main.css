@@ -495,6 +495,7 @@
   :root {
     color-scheme: light;
     background-color: var(--color-canvas);
+    --app-header-height: 4rem;
     @media (prefers-color-scheme: dark) {
       &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
         color-scheme: dark;
@@ -1849,6 +1850,9 @@
     min-height: 100dvh;
     flex-direction: column;
   }
+  html:has(.app-header) {
+    scroll-padding-top: calc(var(--app-header-height) + 0.5rem);
+  }
   .app-header {
     position: sticky;
     top: 0;
@@ -1856,7 +1860,7 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    min-height: 4rem;
+    min-height: var(--app-header-height);
     padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--color-line);
     background-color: var(--color-surface);
@@ -1920,7 +1924,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    min-height: 4rem;
+    min-height: var(--app-header-height);
     padding: 0.5rem 0.75rem 0.5rem 1.25rem;
     border-bottom: 1px solid var(--color-line);
   }

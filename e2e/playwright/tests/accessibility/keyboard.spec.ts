@@ -1,16 +1,12 @@
 // The journeys a person makes by keyboard alone, with Tab, typing, Enter and Escape and nothing
 // clicked: signing in on the auth server's form, the user menu, a console dialog left with Escape,
-// and a client's tabs. Every element reached shows its focus ring.
+// and a client's tabs. Every element reached shows its focus ring, and is not hidden under the
+// console's header (lib/focus.ts; focus-not-obscured.spec.ts scrolls fields under it on purpose).
 import type { Locator, Page } from "@playwright/test";
 import { clientUrl } from "../../lib/admin-console";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
-
-// The element has the focus, and shows the ring that says so.
-async function expectFocused(element: Locator) {
-  await expect(element).toBeFocused();
-  await expect(element).toHaveCSS("outline-style", "solid");
-}
+import { expectFocused } from "../../lib/focus";
 
 // Presses Tab until the element has the focus.
 async function tabTo(page: Page, element: Locator, limit = 60) {

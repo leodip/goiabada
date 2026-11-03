@@ -67,16 +67,19 @@ latest_release_tag() {
     python3 -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])'
 }
 
-# The Playwright suite's packages and Chromium, installed the first time and when package-lock.json
-# changes. Run from anywhere; leaves the working directory as it was.
+# The Playwright suite's packages, installed the first time and when package-lock.json changes, and its
+# browsers: Chromium, and Firefox and WebKit for the spec that keeps the focus clear of the console's
+# header. Playwright skips a browser already installed, so a machine that had only Chromium gets the
+# other two on its next run. WebKit also needs system libraries, installed once by hand (README.md).
+# Run from anywhere; leaves the working directory as it was.
 ensure_suite_packages() {
   command -v npm >/dev/null || die "npm is not installed"
   local suite="$E2E_DIR/playwright"
   if [[ ! -d "$suite/node_modules" || "$suite/package-lock.json" -nt "$suite/node_modules/.package-lock.json" ]]; then
     step "Installing the suite's packages"
     (cd "$suite" && npm ci --no-fund --no-audit) || die "npm ci failed"
-    (cd "$suite" && npx playwright install chromium) || die "could not install Chromium"
   fi
+  (cd "$suite" && npx playwright install chromium firefox webkit) || die "could not install Chromium, Firefox and WebKit"
 }
 
 # The e2e suite and the rate-limits suite each hold this for their run, so they never run at once: the

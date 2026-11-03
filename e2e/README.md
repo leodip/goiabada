@@ -63,10 +63,14 @@ e2e/wipe.sh [--all] [-y]        # remove the environment (asks first)
 With no tag, `run.sh` and `reset.sh` take the latest GitHub release. With `--source` they build what
 a release would ship from this checkout's `src/` instead, on the VPS: both servers' images from their
 Dockerfiles and the setup wizard, under the version `e2e-<commit>`, with `-dirty` when `src/` has
-uncommitted changes. `test.sh` and `test-rate-limits.sh` install the suites' packages and Chromium the
-first time, check their types (`npm run typecheck`), and pass their arguments to Playwright:
-`--headed`, `--ui`, or a folder such as `tests/admin-console`. The two never run at once: each holds
-`e2e/.state/suite.lock` for its run. Each script answers `--help`.
+uncommitted changes. `test.sh` and `test-rate-limits.sh` install the suites' packages the first time,
+and Chromium, Firefox and WebKit when missing, check their types (`npm run typecheck`), and pass their
+arguments to Playwright: `--headed`, `--ui`, or a folder such as `tests/admin-console`. The two never
+run at once: each holds `e2e/.state/suite.lock` for its run. Each script answers `--help`.
+
+WebKit needs system libraries that a desktop Linux often lacks (libsoup-3.0, libmanette, libenchant-2
+and others). Install them once, before the first run, from `e2e/playwright/`:
+`sudo npx playwright install-deps webkit`. Without them the WebKit project's tests fail to launch.
 
 They wrap the scripts in `infra/`, which can also be run on their own: `prepare.sh <tag | --source>`,
 `verify.sh [tag]` (check the environment again at any time), `rate-limiter.sh on | off | reset` and
@@ -133,7 +137,10 @@ pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc
 itself where no page reaches it (`oauth/`), the Turnstile challenge on the auth server's forms with
 Cloudflare's test keys (`turnstile/`), and accessibility (`accessibility/`: axe over every page and
 state of both applications in the light and the dark scheme, the layout at phone and tablet widths,
-and the main journeys by keyboard). They run eight at a time against an
+the main journeys by keyboard, and the focused field kept clear of the console's header). Every spec
+runs in Chromium; `tests/accessibility/focus-not-obscured.spec.ts` runs in Firefox and WebKit too, as
+the `firefox` and `webkit` projects, since how a browser scrolls a focused field into view is its
+engine's own code. They run eight at a time against an
 environment that stays up between runs, so every test keeps to these rules, which is what lets the
 suite run again and again without a reset:
 
@@ -159,9 +166,10 @@ suite run again and again without a reset:
   `browser.newContext()` starts from the test's options, which carry the administrator's session.
 - **Each worker signs the administrator in for itself**, in a browser of its own (`lib/fixtures.ts`).
   Every browser context is a device of its own through its own cookies, so no sign-in ends another
-  worker's session. A run signs the administrator in about fourteen times, and the rate-limits suite
+  worker's session. A run signs the administrator in about sixteen times, and the rate-limits suite
   once, under the seeded cap of 20 sessions per user, and the sessions the cap ends are the least
-  recently used, those earlier runs left.
+  recently used, those earlier runs left. The Firefox and WebKit projects add a worker each, since
+  their one spec runs its tests in order on one worker.
 - **It imports `test` from `lib/fixtures.ts`**, whose watcher fails a test in which a page of the auth
   server or the admin console reported a Content-Security-Policy violation, such as an inline script
   or an `eval` the servers' `script-src 'self'` refused, in any browser context the test or a helper
