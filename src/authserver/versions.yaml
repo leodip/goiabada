@@ -74,15 +74,15 @@
 tools:
   go: "1.27.3"
   tailwind: "4.3.3"
-  node: "26.12.1"
+  node: "26.13.0"
   golangci-lint: "2.15.0"
-  mockery: "3.8.1"
+  mockery: "3.9.0"
   staticcheck: "0.8.2"
   unparam: "0.0.0-20261011093844-7a2c2c0b7aa6"
   govulncheck: "1.9.0"
   alpine: "3.24"
-  trivy: "0.76.0"
-  grype: "0.120.1"
+  trivy: "0.76.1"
+  grype: "0.121.0"
   npm-check-updates: "23.1.1"
 
 # -----------------------------------------------------------------------------

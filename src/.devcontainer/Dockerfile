@@ -64,7 +64,7 @@ RUN GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/air-ve
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/vuln/cmd/govulncheck@v1.9.0 && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v mvdan.cc/unparam@v0.0.0-20261011093844-7a2c2c0b7aa6 && \
-    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.8.1
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.9.0
 
 # Add Go tools bin directory to PATH (tools are accessible but don't affect project GOPATH)
 ENV PATH="/usr/local/go-tools/bin:${PATH}"
@@ -75,8 +75,8 @@ RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
 # Install Node.js, the binary alone, which core/guard's script check runs acorn under
-RUN curl -sfL --retry 3 --retry-delay 5 https://nodejs.org/dist/v26.12.1/node-v26.12.1-linux-x64.tar.gz | \
-    tar -xz -C /usr/local --strip-components=1 --no-same-owner node-v26.12.1-linux-x64/bin/node && \
+RUN curl -sfL --retry 3 --retry-delay 5 https://nodejs.org/dist/v26.13.0/node-v26.13.0-linux-x64.tar.gz | \
+    tar -xz -C /usr/local --strip-components=1 --no-same-owner node-v26.13.0-linux-x64/bin/node && \
     node --version
 
 RUN mkdir -p /var/lib/sqlite

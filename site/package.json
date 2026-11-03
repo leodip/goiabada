@@ -11,9 +11,9 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/markdown-satteri": "^0.4.5",
-    "@astrojs/starlight": "^0.42.7",
-    "astro": "^7.4.2",
+    "@astrojs/markdown-satteri": "^0.4.6",
+    "@astrojs/starlight": "^0.42.8",
+    "astro": "^7.4.4",
     "hast-util-from-html": "^2.0.3",
     "hast-util-select": "^6.0.4",
     "hast-util-to-mdast": "^10.1.2",
@@ -23,7 +23,7 @@
     "mdast-util-gfm-task-list-item": "^2.0.0",
     "mdast-util-to-markdown": "^2.2.1",
     "mdast-util-to-string": "^4.0.0",
-    "satteri": "^0.11.5",
+    "satteri": "^0.11.6",
     "sharp": "^0.35.5",
     "starlight-links-validator": "^0.27.0",
     "starlight-openapi": "^0.27.0",
