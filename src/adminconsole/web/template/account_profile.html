@@ -51,7 +51,7 @@
 
       <div class="field">
         <label class="field-label" for="username">{{ T $.ctx "adminconsole.account.profile.field.username" }}</label>
-        <input class="control" id="username" type="text" name="username" value="{{ .user.Username }}" autocomplete="off" autocapitalize="none" spellcheck="false"{{ if .error }}{{ if eq .errorField "username" }} aria-invalid="true" aria-describedby="profile-error" autofocus{{ end }}{{ end }}>
+        <input class="control" id="username" type="text" name="username" value="{{ .user.Username }}" autocomplete="username" autocapitalize="none" spellcheck="false"{{ if .error }}{{ if eq .errorField "username" }} aria-invalid="true" aria-describedby="profile-error" autofocus{{ end }}{{ end }}>
       </div>
 
       <div class="field">

@@ -287,12 +287,86 @@ function setUpCopyButtons() {
 // the person types, accents and case aside, and the matches in a list below it, the WAI-ARIA
 // editable combobox with list autocomplete. The arrow keys move through the matches, Enter or a
 // click chooses one, Escape closes the list and puts back the choice, and leaving the field keeps
-// the option its text names or else puts back the choice too; an empty field chooses the select's
-// empty option, whose text becomes the field's placeholder. The select stays in the form, hidden,
-// and holds the value it posts; the field takes its id, so the label names it, and its
-// aria-invalid, aria-describedby and autofocus. Without JavaScript the select is what the page shows.
+// the option its text names by name (namedOption) or else puts back the choice too; an empty field
+// chooses the select's empty option, whose text becomes the field's placeholder. The select stays
+// in the form, hidden, and holds the value it posts; the field takes its id, so the label names it,
+// and its aria-invalid, aria-describedby and autofocus.
+//
+// The field also takes the select's autocomplete token, off where it declares none (WCAG 2.2 SC
+// 1.3.5), which the HTML Standard allows on a text input for each purpose the account pages use
+// (4.10.19.7.1, Autofill: country, language and tel-country-code are in its Text control group).
+// A browser's autofill then fills the field, not the hidden select, so a fill commits the option it
+// names (filledOption) to the select, whose change fires, and the field shows the choice. A fill
+// naming nothing, in a field without the focus, puts the choice back at once, so the field never
+// names a value the form will not send; in the focused field it filters the list as typing does.
+// Without JavaScript the select is what the page shows.
 function setUpSearchableSelects() {
   document.querySelectorAll("select[data-searchable]").forEach(makeSearchable);
+}
+
+// searchableName folds a searchable option's text, or text a person or a fill put in its field, to
+// the form names are compared in: accents and case aside, and without a leading flag and any dash
+// after it, since a country reads "🇵🇹 Portugal" and a phone country "🇵🇹 - Portugal (+351)" while
+// a person, or a browser, writes "Portugal". A flag is a pair of regional indicator symbols.
+function searchableName(text) {
+  return text.trim().replace(/^(?:\uD83C[\uDDE6-\uDDFF]){2}\s*(?:[-–—]\s*)?/, "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+// namedOption returns the index of the first of a searchable list's options, each {value, text,
+// callingCode}, whose name the text names (searchableName), or -1. A code is not a name: "PT" left
+// in the field is a search, and choosing Portugal for it, or Germany for "de" while the person
+// looks for Denmark, would be a guess.
+function namedOption(options, text) {
+  const name = searchableName(text);
+  if (name === "") {
+    return -1;
+  }
+  return options.findIndex(function (option) {
+    return searchableName(option.text) === name;
+  });
+}
+
+// filledOption returns the index of the option a browser's autofill of a searchable list's field
+// names, or -1, given the select's autocomplete purpose. A tel-country-code fill is a calling code,
+// "+" and digits (HTML Standard 4.10.19.7.1), matched exactly against each option's
+// data-calling-code, since the option's value is an internal identifier and its text is
+// translated; it names an option only when exactly one country has the code, as +44 or +1 name
+// several. Any other fill first names the option whose value equals it, case aside, which is the
+// form the standard gives country (an ISO 3166-1 alpha-2 code) and language (a BCP 47 tag), and
+// then the one its name names, which is what browsers fill for a country in practice.
+function filledOption(options, value, purpose) {
+  const filled = value.trim();
+  if (filled === "") {
+    return -1;
+  }
+  if (purpose === "tel-country-code") {
+    let found = -1;
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].callingCode === filled) {
+        if (found >= 0) {
+          return -1;
+        }
+        found = i;
+      }
+    }
+    return found;
+  }
+  const code = filled.toLowerCase();
+  const byValue = options.findIndex(function (option) {
+    return option.value !== "" && option.value.toLowerCase() === code;
+  });
+  return byValue >= 0 ? byValue : namedOption(options, filled);
+}
+
+// isAutofill tells a browser's fill of a field from a person typing in it, by the input event
+// each fires: Chromium and WebKit fill through a plain Event (Blink's
+// HTMLFormControlElementWithState::DispatchInputEvent, WebKit's Node::dispatchInputEvent), Firefox
+// through an InputEvent of inputType insertReplacementText (TextControlState::SetValue for
+// setUserInput), while typing, pasting and deleting fire InputEvents of their own input types.
+function isAutofill(event) {
+  return !(typeof InputEvent === "function" && event instanceof InputEvent) ||
+    event.inputType === "insertReplacementText";
 }
 
 function makeSearchable(select) {
@@ -311,7 +385,8 @@ function makeSearchable(select) {
   const input = document.createElement("input");
   input.type = "text";
   input.className = "control combobox-input";
-  input.autocomplete = "off";
+  const purpose = (select.getAttribute("autocomplete") || "").trim().toLowerCase();
+  input.autocomplete = purpose || "off";
   input.spellcheck = false;
   input.setAttribute("role", "combobox");
   input.setAttribute("aria-autocomplete", "list");
@@ -356,6 +431,9 @@ function makeSearchable(select) {
   if (blank) {
     input.placeholder = blank.item.textContent;
   }
+  const choices = entries.map(function (entry) {
+    return { value: entry.option.value, text: entry.item.textContent, callingCode: entry.option.dataset.callingCode || "" };
+  });
 
   let shown = entries;
   let active = -1;
@@ -441,13 +519,10 @@ function makeSearchable(select) {
     close();
   }
 
-  // commit keeps the option the field's text names, the empty one when the field is empty, and
-  // otherwise puts the choice back, and closes the list.
+  // commit keeps the option the field's text names by name, the empty one when the field is empty,
+  // and otherwise puts the choice back, and closes the list.
   function commit() {
-    const text = fold(input.value.trim());
-    const named = text === "" ? blank : entries.find(function (entry) {
-      return entry.key === text;
-    });
+    const named = input.value.trim() === "" ? blank : entries[namedOption(choices, input.value)];
     if (named) {
       choose(named);
     } else {
@@ -456,7 +531,24 @@ function makeSearchable(select) {
     }
   }
 
-  input.addEventListener("input", open);
+  // A fill commits the option it names. One naming nothing puts the choice back in a field
+  // without the focus, where nobody is typing; in the focused field it is text to search by, as
+  // typed text is, and leaving the field puts the choice back.
+  input.addEventListener("input", function (event) {
+    if (isAutofill(event)) {
+      const filled = entries[filledOption(choices, input.value, purpose.split(/\s+/).pop())];
+      if (filled) {
+        choose(filled);
+        return;
+      }
+      if (document.activeElement !== input) {
+        showChoice();
+        close();
+        return;
+      }
+    }
+    open();
+  });
   input.addEventListener("click", function () {
     if (popup.hidden) {
       open();

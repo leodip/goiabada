@@ -61,7 +61,11 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `showNotice`, not in a dialog, its failures too (`sendAjaxRequest`'s `statusRegion`); a removal
   asks first in a `modal_dialog` of type `confirm`, whose second button names the action; a button
   marked `data-copy-target` copies, a long `select` marked `data-searchable` becomes a `combobox`
-  that filters as the person types, the select kept hidden to post the value, an element marked
+  that filters as the person types, the select kept hidden to post the value, its field taking the
+  select's `autocomplete` (`off` where it has none) and committing a browser's fill to the select,
+  by option value, case aside, then by name, flag aside, or for `tel-country-code` by the one
+  option whose `data-calling-code` it is, a fill naming nothing in a field without the focus
+  putting the choice back, and leaving the field keeping the option its text names, an element marked
   `data-duration-for` says the seconds typed in a field as a duration, and a form marked
   `data-confirm-dialog` asks before a save whose consequences need saying, every one in one
   `modal_dialog` of type `confirm_change`, each from a control marked `data-confirm` against the
@@ -85,8 +89,11 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `focus()`, `scrollIntoView` and in-page links leave the element, focus ring included, below the
   header (SC 2.4.11); change the header's height only through the property, and give anything else
   pinned over the page a scroll offset of its own. `focus-not-obscured.spec.ts` checks it in
-  Chromium, Firefox and WebKit. A refusal about one field marks it `aria-invalid="true"` and names the notice in
-  its `aria-describedby`, under the same `{{if .error}}` the notice renders under, which the guard
+  Chromium, Firefox and WebKit. A field collecting the person's own data declares its purpose
+  (SC 1.3.5) with a token the HTML Standard allows on its control (Autofill, 4.10.19.7.1), and a
+  control a script draws in place of another keeps the purpose of the one it replaces; a page about
+  another user declares none, since autofill would fill in the administrator's own data. A refusal
+  about one field marks it `aria-invalid="true"` and names the notice in its `aria-describedby`, under the same `{{if .error}}` the notice renders under, which the guard
   reads as one branch; a handler whose form has several fields says which in `errorField`, and in
   the console reads it off the admin API's error code through `render.ErrorField`, or, for the API's
   `VALIDATION_ERROR`, which names no field, the first required field sent blank through
