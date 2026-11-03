@@ -190,6 +190,7 @@ key per cause, each a whole sentence.
 | `handler.settings_email.password_unencrypted` | (none) | The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS. |
 | `handler.settings_email.no_authentication` | (none) | SMTP credentials are configured but the server offers no authentication. |
 | `handler.settings_email.no_supported_mechanism` | (none) | The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5. |
+| `handler.settings_email.plain_credentials_unusable` | (none) | The SMTP username and password can't be used with the server's sign-in method: the password is empty, or one of them contains a null character. |
 | `handler.settings_email.tls_failed` | (none) | The TLS connection failed; check the encryption setting and the server's certificate. |
 | `handler.settings_email.authentication_rejected` | (none) | The SMTP server rejected the username or password. |
 | `handler.settings_email.message_refused` | (none) | The SMTP server refused the message. |

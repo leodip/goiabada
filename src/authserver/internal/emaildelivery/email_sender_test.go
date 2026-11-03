@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"mime/quotedprintable"
 	"net/mail"
@@ -19,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
 	"github.com/leodip/goiabada/core/hostport/hostporttest"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -593,6 +595,90 @@ func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
 	assert.False(t, f.hasLinePrefix("MAIL FROM:"), "no message may follow a login that failed")
 }
 
+// TestSendEmail_PlainCredentialsTheMechanismCanCarry holds RFC 4616 section 2: PLAIN's authcid and
+// passwd are each one or more UTF-8 characters other than NUL, and a client does not send a message
+// that breaks that. Credentials that break it, an empty password, a NUL or bytes that are not UTF-8
+// in either, are refused before any AUTH command, on the initial-response form and on the challenge
+// form a long password takes, and nothing reaches the relay. Each refusal sits beside the row it
+// would deliver under, differing in the one credential; the last rows show the check is PLAIN's
+// alone and that no username still means no authentication.
+func TestSendEmail_PlainCredentialsTheMechanismCanCarry(t *testing.T) {
+
+	// Long enough that the response no longer fits on the AUTH command line, so the challenge form
+	// carries it: TestSendEmail_PlainInitialResponseBoundary puts that boundary under 400.
+	long := strings.Repeat("p", 400)
+
+	tests := []struct {
+		name      string
+		authExt   string
+		username  string
+		password  string
+		challenge bool
+		refused   bool
+	}{
+		{name: "ordinary credentials, inline, deliver", username: fixtureUser, password: fixturePassword},
+		{name: "an empty password, refused", username: fixtureUser, password: "", refused: true},
+		{name: "a NUL in the password, refused", username: fixtureUser, password: "s3cret\x00p4ss", refused: true},
+		{name: "a NUL in the username, refused", username: "smtp-user\x00@example.com", password: fixturePassword, refused: true},
+		{name: "a password that is not UTF-8, refused", username: fixtureUser, password: "s3cret\xffp4ss", refused: true},
+		{name: "a username that is not UTF-8, refused", username: "smtp-user\xff@example.com", password: fixturePassword, refused: true},
+		{name: "a non-ASCII password in UTF-8, delivers", username: fixtureUser, password: "sénha-ü-密码"},
+
+		{name: "a long password, challenge form, delivers", username: fixtureUser, password: long, challenge: true},
+		{name: "a long password with a NUL, challenge form, refused", username: fixtureUser, password: long[1:] + "\x00", challenge: true, refused: true},
+		{name: "a long password that is not UTF-8, challenge form, refused", username: fixtureUser, password: long[1:] + "\xff", challenge: true, refused: true},
+		{name: "a NUL in the username, long password, challenge form, refused", username: "smtp-user\x00@example.com", password: long, challenge: true, refused: true},
+
+		{name: "an empty password through LOGIN, delivers", authExt: "AUTH LOGIN", username: fixtureUser, password: ""},
+		{name: "no username, sends unauthenticated", username: "", password: ""},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			authExt := test.authExt
+			if authExt == "" {
+				authExt = "AUTH PLAIN"
+			}
+			f := &fakeSMTP{ext: []string{authExt, "8BITMIME"}, maxCommandLine: smtpCommandLineLimit}
+			port := f.start(t)
+
+			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", test.username, test.password, "Goiabada")
+
+			err := sendTo(t, &Sender{dataCipher: testDataCipher}, smtpConfig)
+
+			if test.refused {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "unable to send SMTP message")
+				assertSendFailure(t, err, SendFailureUnusablePlainCredentials)
+				assert.False(t, f.hasLinePrefix("AUTH"), "the refusal has to precede any AUTH command")
+				assert.False(t, f.hasLinePrefix("MAIL FROM:"), "no message follows a refused login")
+				if test.password != "" {
+					assert.NotContains(t, err.Error(), test.password, "the error carries no credential")
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			assert.True(t, f.hasLinePrefix("MAIL FROM:"))
+			if test.username == "" {
+				assert.False(t, f.hasLinePrefix("AUTH"), "no username is no authentication")
+				return
+			}
+			gotUser, gotPassword := f.credentials()
+			assert.Equal(t, test.username, gotUser)
+			assert.Equal(t, test.password, gotPassword)
+			if test.authExt != "" {
+				return
+			}
+			if test.challenge {
+				assert.Contains(t, f.lines(), "AUTH PLAIN", "the credentials went on the challenge form")
+			} else {
+				assert.True(t, f.hasLinePrefix("AUTH PLAIN "), "the credentials went on the AUTH line")
+			}
+		})
+	}
+}
+
 // TestSendEmail_FailsClosed covers decisions 1, 2 and 4. Every refusal sits next to the row it
 // would succeed under, differing in one field, so the named gate is demonstrably the reason.
 func TestSendEmail_FailsClosed(t *testing.T) {
@@ -1073,6 +1159,85 @@ func TestSendEmail_FinalDataRejection(t *testing.T) {
 	assert.Contains(t, err.Error(), "550", "the relay's own refusal is what reaches the log")
 	assertSendFailure(t, err, SendFailureMessageRefused)
 	assert.NotEmpty(t, f.data(), "the whole message arrived; only the verdict on it was a refusal")
+}
+
+// The Warn record a QUIT failure after an accepted message writes, as an operator searches for it.
+const quitFailedAfterAcceptance = "unable to end the smtp session after the server accepted the message"
+
+// TestSendEmail_AcceptedMessageSurvivesAFailedQuit holds RFC 5321 sections 4.1.1.4 and 6.1: once
+// the relay answers the end of the data with a 250, it has taken responsibility for the message, so
+// a QUIT that fails afterwards, the connection closed or reset instead of the 221, still reports the
+// send as done. Reporting it failed would invite a retry that delivers the message twice. The
+// failure is not dropped: it is one Warn record, with the error under `error`. The first row is the
+// same conversation with the 221 answered, and writes nothing.
+func TestSendEmail_AcceptedMessageSurvivesAFailedQuit(t *testing.T) {
+
+	tests := []struct {
+		name     string
+		breakOn  string
+		breakHow connectionBreak
+		wantWarn bool
+	}{
+		{name: "QUIT answered 221, delivers with nothing logged"},
+		{name: "the connection closed at QUIT, delivers and warns", breakOn: "QUIT", breakHow: breakClose, wantWarn: true},
+		{name: "the connection reset at QUIT, delivers and warns", breakOn: "QUIT", breakHow: breakReset, wantWarn: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			capture := logtest.CaptureSlog(t)
+
+			f := &fakeSMTP{ext: []string{"8BITMIME"}, breakOn: test.breakOn, breakHow: test.breakHow}
+			port := f.start(t)
+
+			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+
+			err := sendTo(t, &Sender{dataCipher: testDataCipher}, smtpConfig)
+			require.NoError(t, err, "the relay accepted the message, so the send succeeded")
+			assert.NotEmpty(t, f.data(), "the message reached the relay")
+			assert.True(t, f.hasLinePrefix("QUIT"), "the client still ends the session")
+
+			warns := recordsAt(capture, slog.LevelWarn)
+			if !test.wantWarn {
+				assert.Empty(t, warns)
+				return
+			}
+			require.Len(t, warns, 1, "one Warn record per accepted send whose QUIT failed")
+			assert.Equal(t, quitFailedAfterAcceptance, warns[0].Message)
+			assert.NotNil(t, warns[0].Attrs["error"], "the QUIT failure rides under error")
+		})
+	}
+}
+
+// TestSendEmail_ALostReplyToTheDataIsAFailure is the other side of the line the test above draws:
+// the relay took the whole message and closed the connection without answering its terminator. No
+// reply is no acceptance, RFC 5321 section 4.1.1.4, so the send fails as a broken connection, and the
+// failure is the send's own error, not a Warn record about QUIT.
+func TestSendEmail_ALostReplyToTheDataIsAFailure(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+
+	f := &fakeSMTP{ext: []string{"8BITMIME"}, dropAfterData: true}
+	port := f.start(t)
+
+	err := sendTo(t, &Sender{dataCipher: testDataCipher}, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to send SMTP message")
+	assertSendFailure(t, err, SendFailureConnection)
+	assert.NotEmpty(t, f.data(), "the whole message arrived; only the relay's verdict on it was lost")
+	assert.False(t, f.hasLinePrefix("QUIT"), "a session whose message was not accepted is not ended with QUIT")
+	assert.Empty(t, recordsAt(capture, slog.LevelWarn))
+}
+
+// recordsAt is every record capture holds at level.
+func recordsAt(capture *logtest.SlogCapture, level slog.Level) []logtest.CapturedRecord {
+	var records []logtest.CapturedRecord
+	for _, record := range capture.Records() {
+		if record.Level == level {
+			records = append(records, record)
+		}
+	}
+	return records
 }
 
 // TestSendEmail_MessageID holds decision 5: RFC 5322 section 3.6.4's SHOULD, and that a failed

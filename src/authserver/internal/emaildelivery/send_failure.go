@@ -19,6 +19,10 @@ const (
 	SendFailureUnencryptedPassword
 	SendFailureNoAuthentication
 	SendFailureNoSupportedMechanism
+	// SendFailureUnusablePlainCredentials is a username or password PLAIN cannot carry under RFC
+	// 4616 section 2, refused before any AUTH command: an empty one, a NUL, or bytes that are not
+	// UTF-8 (#718 decision 2).
+	SendFailureUnusablePlainCredentials
 	// SendFailureTLS is a TLS handshake or certificate check that failed.
 	SendFailureTLS
 	// SendFailureAuthenticationRejected is the server refusing the username or password.

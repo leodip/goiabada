@@ -2022,6 +2022,7 @@
 "handler.settings_email.password_unencrypted" = "El servidor SMTP recibiría la contraseña sin cifrar. Selecciona STARTTLS o SSL/TLS."
 "handler.settings_email.no_authentication" = "Hay credenciales SMTP configuradas, pero el servidor no ofrece autenticación."
 "handler.settings_email.no_supported_mechanism" = "El servidor SMTP no ofrece ninguno de estos mecanismos: PLAIN, LOGIN o CRAM-MD5."
+"handler.settings_email.plain_credentials_unusable" = "El nombre de usuario y la contraseña SMTP no se pueden usar con el método de inicio de sesión del servidor: la contraseña está vacía o uno de los dos contiene un carácter nulo."
 "handler.settings_email.tls_failed" = "La conexión TLS falló. Comprueba la configuración de cifrado y el certificado del servidor."
 "handler.settings_email.authentication_rejected" = "El servidor SMTP rechazó el nombre de usuario o la contraseña."
 "handler.settings_email.message_refused" = "El servidor SMTP rechazó el mensaje."

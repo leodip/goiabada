@@ -2017,6 +2017,7 @@
 "handler.settings_email.password_unencrypted" = "The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."
 "handler.settings_email.no_authentication" = "SMTP credentials are configured but the server offers no authentication."
 "handler.settings_email.no_supported_mechanism" = "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."
+"handler.settings_email.plain_credentials_unusable" = "The SMTP username and password can't be used with the server's sign-in method: the password is empty, or one of them contains a null character."
 "handler.settings_email.tls_failed" = "The TLS connection failed; check the encryption setting and the server's certificate."
 "handler.settings_email.authentication_rejected" = "The SMTP server rejected the username or password."
 "handler.settings_email.message_refused" = "The SMTP server refused the message."

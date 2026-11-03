@@ -3,6 +3,8 @@ package emaildelivery
 import (
 	"encoding/base64"
 	"net/smtp"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -17,14 +19,29 @@ func plainResponse(username, password string) []byte {
 	return []byte("\x00" + username + "\x00" + password)
 }
 
+// plainCredentialsCarriable reports whether PLAIN can carry the username and password at all. RFC
+// 4616 section 2 makes the authcid and the passwd each one or more UTF-8 characters other than NUL:
+// NUL is the message's own separator, so one inside either would move the boundary the server reads.
+// A client does not send a message that breaks this, so SendEmail refuses it before any AUTH
+// command rather than letting the relay answer with a refusal that names nothing the operator can
+// fix. The authzid is always empty here, which the grammar allows (#718 decision 2).
+func plainCredentialsCarriable(username, password string) bool {
+	for _, value := range []string{username, password} {
+		if value == "" || !utf8.ValidString(value) || strings.ContainsRune(value, 0) {
+			return false
+		}
+	}
+	return true
+}
+
 // plainInitialResponseFits reports whether the credentials still fit on the AUTH command line.
 // smtp.PlainAuth always writes them there, as `AUTH PLAIN <base64>`, and RFC 4954 section 4 says
 // that "if use of the initial response argument would cause the AUTH command to exceed this
 // length, the client MUST NOT use the initial response parameter". apihandlers.HandleSettingsEmailPut
-// refuses a password over 256 bytes and a username over 60, so the longest AUTH line a save can
-// lead to is 437 octets and fits; a row written some other way, such as one saved before the
-// password was bounded, can still overrun the line against a server that enforces it, and the MUST
-// holds whatever wrote the row (#274, #410).
+// bounds the username at 254 characters and the password at 256 bytes, and those bounds do not keep
+// the line within 512 octets: an ASCII username and password at both limits make a 512-octet
+// response, 684 octets in base64, and an AUTH line of 697. So a configuration the save accepts can
+// take the challenge form, and the MUST holds whatever wrote the row (#274, #410, #718 decision 6).
 func plainInitialResponseFits(username, password string) bool {
 	encoded := base64.StdEncoding.EncodedLen(len(plainResponse(username, password)))
 	return len("AUTH PLAIN ")+encoded+len("\r\n") <= smtpCommandLineLimit

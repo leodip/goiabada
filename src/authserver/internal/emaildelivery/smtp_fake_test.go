@@ -49,10 +49,13 @@ type fakeSMTP struct {
 	rejectAfterData bool
 	// rejectRcpt answers RCPT TO with a 550, which is the relay refusing the recipient.
 	rejectRcpt bool
+	// dropAfterData takes the whole DATA block and closes the connection instead of answering its
+	// terminator, so the client never learns whether the relay accepted the message.
+	dropAfterData bool
 
-	// breakOn names the first command, EHLO or STARTTLS, the fake answers by breaking the
-	// connection the way breakHow says, rather than with a reply. Nothing reaches TLS first, so
-	// what the client sees is the TCP connection failing, never a handshake.
+	// breakOn names the first command, such as EHLO, STARTTLS or QUIT, the fake answers by breaking
+	// the connection the way breakHow says, rather than with a reply. Before STARTTLS nothing
+	// reaches TLS first, so what the client sees is the TCP connection failing, never a handshake.
 	breakOn  string
 	breakHow connectionBreak
 
@@ -333,6 +336,11 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 				// Never answer the terminator. The client blocks on the reply until its
 				// conversation deadline expires and closes the connection, which ends this read.
 				_, _ = io.Copy(io.Discard, r)
+				return
+			}
+			if f.dropAfterData {
+				// The message arrived whole, and the reply that would say whether it was
+				// accepted never comes.
 				return
 			}
 			if f.rejectAfterData {

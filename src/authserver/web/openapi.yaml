@@ -3320,6 +3320,11 @@ paths:
               mechanisms Goiabada does not implement, such as XOAUTH2: use a password the
               server accepts through one of these three, often called an app password or an
               SMTP key.
+            - "The SMTP username and password can't be used with the server's sign-in method: the password is empty, or one of them contains a null character."
+              The server offers PLAIN, and the stored credentials are ones it can't carry: a
+              username is set and the password is empty, or the username or password holds a
+              null character or bytes that aren't valid UTF-8. Nothing is sent to the server.
+              Set a password, or retype the username and password.
             - "The TLS connection failed; check the encryption setting and the server's certificate."
               SSL/TLS against a port that expects STARTTLS, such as 587; a certificate the auth
               server does not trust, that has expired, or that names a host other than

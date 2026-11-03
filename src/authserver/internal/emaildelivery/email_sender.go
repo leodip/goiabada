@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"log/slog"
 	"mime"
 	"mime/quotedprintable"
 	"net"
@@ -236,8 +237,13 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	if err := w.Close(); err != nil {
 		return replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
+	// The relay answered the end of the data with a positive reply, so it has taken responsibility
+	// for the message (RFC 5321 sections 4.1.1.4 and 6.1). Whatever happens to QUIT or to closing
+	// the connection, the send succeeded: reporting it failed would invite a retry that delivers the
+	// message twice. The failure is still logged. A lost reply to the data never reaches here: no
+	// reply is no acceptance, and w.Close returned it above (#718 decision 1).
 	if err := client.Quit(); err != nil {
-		return replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureOther)
+		slog.WarnContext(ctx, "unable to end the smtp session after the server accepted the message", "error", err)
 	}
 
 	return nil
@@ -324,6 +330,12 @@ func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, user
 	var auth smtp.Auth
 	switch mechanism {
 	case "PLAIN":
+		// Checked before either form below is chosen, so the challenge form a long password takes
+		// is held to it too.
+		if !plainCredentialsCarriable(username, password) {
+			return labelled(SendFailureUnusablePlainCredentials, errs.New(
+				"the SMTP username and password can't be sent with PLAIN: the password is empty, or one of them contains a null character or is not valid UTF-8"))
+		}
 		// The inline initial response is what smtp.PlainAuth writes and what all but a pathological
 		// password uses. One long enough to push the AUTH line past RFC 5321's 512 octets has to go
 		// through the challenge form instead, which RFC 4954 section 4 makes a MUST (#274).

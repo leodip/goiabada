@@ -138,6 +138,11 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			labelled(emaildelivery.SendFailureNoSupportedMechanism,
 				errs.New("the SMTP server offers none of PLAIN, LOGIN or CRAM-MD5 (offered: XOAUTH2 internal-banner.corp.example)")),
 			"The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."},
+		// The sender's error names nothing of the credentials, but the answer would not quote it
+		// if it did.
+		{"credentials PLAIN cannot carry",
+			labelled(emaildelivery.SendFailureUnusablePlainCredentials, serverText),
+			"The SMTP username and password can't be used with the server's sign-in method: the password is empty, or one of them contains a null character."},
 		// The TLS kind answers its own message even when the chain also reads as a refused
 		// connection: the kind decides, not the classification.
 		{"a failed TLS handshake",

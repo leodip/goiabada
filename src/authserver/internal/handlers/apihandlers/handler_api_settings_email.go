@@ -383,6 +383,8 @@ func sendFailureMessage(err error) *i18n.LocalizedError {
 		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailNoAuthentication, nil)
 	case emaildelivery.SendFailureNoSupportedMechanism:
 		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailNoSupportedMechanism, nil)
+	case emaildelivery.SendFailureUnusablePlainCredentials:
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailPlainCredentialsUnusable, nil)
 	case emaildelivery.SendFailureTLS:
 		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailTLSFailed, nil)
 	case emaildelivery.SendFailureAuthenticationRejected:
