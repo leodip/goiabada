@@ -1665,8 +1665,8 @@
 "adminconsole.admin_settings.email.subtitle" = "E-Mail"
 "adminconsole.admin_settings.email.lead" = "Der SMTP-Server, über den der Authentifizierungsserver seine E-Mails sendet."
 "adminconsole.admin_settings.email.field.smtp_enabled" = "E-Mails senden"
-"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "Der Authentifizierungsserver sendet E-Mails zum Zurücksetzen des Passworts, zur E-Mail-Bestätigung und zur Registrierung über den folgenden SMTP-Server."
-"adminconsole.admin_settings.email.disable_warning" = "Beim Deaktivieren des E-Mail-Versands werden alle SMTP-Einstellungen einschließlich des gespeicherten Passworts gelöscht. E-Mails zum Zurücksetzen des Passworts, zur E-Mail-Bestätigung und zur Registrierung werden dann nicht mehr gesendet."
+"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "Der Authentifizierungsserver sendet E-Mails zum Zurücksetzen des Passworts, zur E-Mail-Bestätigung und zur Registrierung über den folgenden SMTP-Server, ebenso die Benachrichtigungen, dass die E-Mail-Adresse oder das Passwort eines Kontos geändert wurde."
+"adminconsole.admin_settings.email.disable_warning" = "Beim Deaktivieren des E-Mail-Versands werden alle SMTP-Einstellungen einschließlich des gespeicherten Passworts gelöscht. E-Mails zum Zurücksetzen des Passworts, zur E-Mail-Bestätigung und zur Registrierung sowie die Benachrichtigungen über eine geänderte E-Mail-Adresse oder ein geändertes Passwort werden dann nicht mehr gesendet."
 "adminconsole.admin_settings.email.section_server" = "SMTP-Server"
 "adminconsole.admin_settings.email.field.host_or_ip" = "Hostname oder IP-Adresse"
 "adminconsole.admin_settings.email.field.port" = "Port"
@@ -2131,6 +2131,7 @@
 "email.verification.subject" = "E-Mail-Bestätigung – Code {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} – Passwort für Ihr neues Konto festlegen"
 "email.address_changed.subject" = "Ihre E-Mail-Adresse wurde geändert"
+"email.password_changed.subject" = "Ihr Passwort wurde geändert"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

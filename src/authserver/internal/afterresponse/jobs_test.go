@@ -237,9 +237,9 @@ func TestGo_AJobPastTheCapIsDroppedWithOneWarnRecord(t *testing.T) {
 	assert.Equal(t, "recovery", dropped[0].Attrs["class"], "the record names the budget that was full")
 }
 
-// Each class has a budget of its own: with recovery's 64 slots full, a registration job and an
-// account notice are admitted and run, and only the next recovery job is dropped. The notice is the
-// one that matters: without this, whoever held a stolen session could fill the budget through the
+// Each class has a budget of its own: with recovery's 64 slots full, a registration job, an
+// account notice and a security notice are admitted and run, and only the next recovery job is
+// dropped. The account notice is the one that matters most: without this, whoever held a stolen session could fill the budget through the
 // public forgot-password form, then change the address, and the mail warning the victim was the
 // one dropped (#394 review).
 func TestGo_AFullClassTakesNoSlotFromAnotherClass(t *testing.T) {
@@ -248,12 +248,12 @@ func TestGo_AFullClassTakesNoSlotFromAnotherClass(t *testing.T) {
 	release := make(chan struct{})
 	fillToTheCap(t, jobs, ClassRecovery, release)
 
-	ran := make(chan Class, 2)
-	for _, class := range []Class{ClassRegistration, ClassAccountNotice} {
+	ran := make(chan Class, 3)
+	for _, class := range []Class{ClassRegistration, ClassAccountNotice, ClassSecurityNotice} {
 		jobs.Go(context.Background(), class, func(context.Context) { ran <- class })
 	}
 	var seen []Class
-	for range 2 {
+	for range 3 {
 		select {
 		case class := <-ran:
 			seen = append(seen, class)
@@ -261,7 +261,7 @@ func TestGo_AFullClassTakesNoSlotFromAnotherClass(t *testing.T) {
 			t.Fatal("a job of another class was not run while recovery's budget was full")
 		}
 	}
-	assert.ElementsMatch(t, []Class{ClassRegistration, ClassAccountNotice}, seen)
+	assert.ElementsMatch(t, []Class{ClassRegistration, ClassAccountNotice, ClassSecurityNotice}, seen)
 	assert.Empty(t, warnings(capture), "the other classes' budgets are untouched")
 
 	jobs.Go(context.Background(), ClassRecovery, func(context.Context) {})

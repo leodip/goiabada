@@ -5,6 +5,7 @@ import { submitPassword } from "../../../lib/browser-sign-in";
 import { signInToConsole } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
+import { linksIn, waitForMail } from "../../../lib/mailpit";
 import { freshTotp, nextStepTotp, totp } from "../../../lib/totp";
 
 const wrongPassword = "That password isn't right. Try again.";
@@ -55,6 +56,30 @@ test("the user changes their password: the current one must be right, and the ne
   const again = await signInToConsole(browser, { ...user, password: "a-new-passphrase" });
   await expect(again.page).toHaveURL(`${env.adminUrl}/account/profile`);
   await again.context.close();
+});
+
+test("a password changed on the account page sends the user a notice, with no link and no password", async ({
+  browser,
+  request,
+  users,
+}) => {
+  // Verified, since a notice goes only to a verified address.
+  const user = await users.create({ emailVerified: true });
+  const next = "another-new-passphrase";
+  const own = await signInToConsole(browser, user, "/account/change-password");
+  await own.page.locator("#currentPassword").fill(user.password);
+  await own.page.locator("#newPassword").fill(next);
+  await own.page.locator("#newPasswordConfirmation").fill(next);
+  await own.page.getByRole("button", { name: "Change password" }).click();
+  await expect(own.page.getByText("Password changed.")).toBeVisible();
+  await own.context.close();
+
+  const notice = await waitForMail(request, user.email);
+  expect(notice.subject).toBe("Your password was changed");
+  expect(notice.html).toContain("If you didn't, someone else may be using your account.");
+  expect(linksIn(notice)).toEqual([]);
+  expect(notice.text + notice.html).not.toContain(next);
+  expect(notice.text + notice.html).not.toContain(user.password);
 });
 
 test("a password of bcrypt's whole bound, 72 bytes, is set and signs in, and nothing appended to it does", async ({ browser, users }) => {

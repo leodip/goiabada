@@ -1666,8 +1666,8 @@
 "adminconsole.admin_settings.email.subtitle" = "Correo electrónico"
 "adminconsole.admin_settings.email.lead" = "El servidor SMTP que usa el servidor de autenticación para enviar correo."
 "adminconsole.admin_settings.email.field.smtp_enabled" = "Enviar correo"
-"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "El servidor de autenticación envía los correos de restablecimiento de contraseña, verificación de correo y registro a través del servidor SMTP indicado a continuación."
-"adminconsole.admin_settings.email.disable_warning" = "Al desactivar el envío de correo se borrará toda la configuración SMTP, incluida la contraseña guardada, y dejarán de enviarse los correos de restablecimiento de contraseña, verificación y registro."
+"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "El servidor de autenticación envía los correos de restablecimiento de contraseña, verificación de correo y registro a través del servidor SMTP indicado a continuación, así como los avisos de que la dirección de correo electrónico o la contraseña de una cuenta han cambiado."
+"adminconsole.admin_settings.email.disable_warning" = "Al desactivar el envío de correo se borrará toda la configuración SMTP, incluida la contraseña guardada, y dejarán de enviarse los correos de restablecimiento de contraseña, verificación y registro, y los avisos de cambio de dirección de correo electrónico o de contraseña."
 "adminconsole.admin_settings.email.section_server" = "Servidor SMTP"
 "adminconsole.admin_settings.email.field.host_or_ip" = "Nombre de host o dirección IP"
 "adminconsole.admin_settings.email.field.port" = "Puerto"
@@ -2132,6 +2132,7 @@
 "email.verification.subject" = "Verificación del correo - código {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - crea una contraseña para tu nueva cuenta"
 "email.address_changed.subject" = "Tu dirección de correo electrónico ha cambiado"
+"email.password_changed.subject" = "Tu contraseña ha cambiado"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

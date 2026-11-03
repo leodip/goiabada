@@ -84,7 +84,7 @@ func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T
 		Return(i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": 6})).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}).
+	HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountPasswordRequest(t, map[string]interface{}{"sub": "the-subject"}, currentPassword, "next"))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -151,7 +151,7 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "sid": callerSid, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -212,7 +212,7 @@ func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -254,7 +254,7 @@ func TestHandleAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 		Return(int64(0), errors.New("increment failed")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": "the-subject", "sid": "sid-caller", "auth_time": float64(1)},
 		currentPassword, "N3wP4ss!word"))

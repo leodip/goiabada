@@ -47,6 +47,7 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 		{"email_newuser_set_password", "newuser_set_password", "Acme - crea una contraseña para tu nueva cuenta", "El enlace es válido durante 24 horas."},
 		{"email_verification", "verification", "Verificación del correo - código 123456", "Este es tu código de verificación"},
 		{"email_address_changed", "address_changed", "Tu dirección de correo electrónico ha cambiado", "puede que otra persona conozca tu contraseña."},
+		{"email_password_changed", "password_changed", "Tu contraseña ha cambiado", "puede que otra persona esté usando tu cuenta."},
 	} {
 		for _, locale := range []string{"es", "es-MX", "es-419"} {
 			t.Run(tc.body+" "+locale, func(t *testing.T) {
@@ -62,8 +63,11 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 				assert.Contains(t, buf.String(), `<html lang="es">`)
 				assert.Contains(t, buf.String(), tc.sentence)
 				assert.Contains(t, buf.String(), "Acme")
-				if tc.body != "email_address_changed" {
+				// A notice of a change carries no link.
+				if tc.body != "email_address_changed" && tc.body != "email_password_changed" {
 					assert.Contains(t, buf.String(), `href="https://example.com/continue"`)
+				} else {
+					assert.NotContains(t, buf.String(), "href")
 				}
 				if tc.body == "email_verification" {
 					assert.Contains(t, buf.String(), "123456")

@@ -38,7 +38,7 @@ func TestFrench_SignInPageUsesQueryOrCanadianHeader(t *testing.T) {
 	}
 }
 
-func TestFrench_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
+func TestFrench_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 	for _, locale := range []string{"fr", "fr-FR", "fr-CA", "fr-BE", "fr-CH"} {
 		for _, tc := range []struct{ name, subject, body string }{
 			{"forgot_password", "Réinitialisation du mot de passe", "Pour réinitialiser votre mot de passe"},
@@ -48,6 +48,7 @@ func TestFrench_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
 			{"verification", "Vérification de l’adresse e-mail - code 123456", "Voici votre code de vérification"},
 			{"newuser_set_password", "Test - créez un mot de passe pour votre nouveau compte", "Le lien est valable 24 heures."},
 			{"address_changed", "Votre adresse e-mail a été modifiée", "une autre personne connaît peut-être votre mot de passe."},
+			{"password_changed", "Votre mot de passe a été modifié", "Sinon, une autre personne utilise peut-être votre compte."},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)

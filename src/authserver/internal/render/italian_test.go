@@ -38,7 +38,7 @@ func TestItalian_SignInPageUsesQueryOrSwissHeader(t *testing.T) {
 	}
 }
 
-func TestItalian_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
+func TestItalian_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 	for _, locale := range []string{"it", "it-IT", "it-CH", "it-SM", "it-VA"} {
 		for _, tc := range []struct{ name, subject, body string }{
 			{"forgot_password", "Reimpostazione della password", "Per reimpostare la password"},
@@ -48,6 +48,7 @@ func TestItalian_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) 
 			{"verification", "Verifica email - codice 123456", "Ecco il tuo codice di verifica"},
 			{"newuser_set_password", "Test - crea una password per il tuo nuovo account", "Il link è valido per 24 ore."},
 			{"address_changed", "Il tuo indirizzo email è stato cambiato", "qualcun altro potrebbe conoscere la tua password."},
+			{"password_changed", "La tua password è stata cambiata", "Altrimenti, qualcun altro potrebbe usare il tuo account."},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)

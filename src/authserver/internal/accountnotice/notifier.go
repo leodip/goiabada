@@ -1,0 +1,173 @@
+// Package accountnotice is the one notifier that emails a user about a change to their account:
+// the email change's notice to the previous address (#404 decisions 9 and 11), and the security
+// notices that tell a user their password changed (#724).
+//
+// Every notice follows the same rules, which is why they live here once rather than beside each
+// handler. A handler calls Send after its change has committed, and only for the request whose
+// write landed. Send hands the notice to a job that runs after the response, so the change never
+// waits for the mail or fails with it. Nothing is sent with SMTP off, or to an address the account
+// has not verified: an address is verified only with a code read from its own mailbox, so a notice
+// cannot be used to mail an arbitrary address on demand (#404). The notice is written in the
+// recipient's language (i18n.WithRecipientLanguage), carries no link that acts on the account and
+// no password, code or secret, and says when through the email's own Date header. A notice that
+// cannot be rendered or sent is one Error record on the request's id, and writes no audit entry.
+package accountnotice
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/i18n"
+)
+
+// errUnknownNotice is a Notice that deliver has no page for, which only a new constant added
+// without its case can be.
+var errUnknownNotice = errors.New("no page for this notice")
+
+// Renderer renders a notice's body. The request it is handed carries the recipient's language and
+// the job's context; nothing else of it is read.
+type Renderer interface {
+	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
+		data map[string]interface{}) (*bytes.Buffer, error)
+}
+
+// Sender delivers one message, under the job's context, which carries the request's id. The SMTP
+// dial and conversation are bounded by the sender's own deadlines.
+type Sender interface {
+	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) (emaildelivery.SendResult, error)
+}
+
+// Jobs runs a job after the response, under the request's context detached from its cancellation.
+// The server's afterresponse.Jobs is the one implementation: past 64 jobs of one class in flight it
+// drops the job with a warning and counts it, rather than run it (#485).
+type Jobs interface {
+	Go(ctx context.Context, class afterresponse.Class, job func(ctx context.Context))
+}
+
+// Notice is one kind of notice. Its value names it in a log record, a closed set of literals.
+type Notice string
+
+const (
+	// EmailAddressChanged tells the address an account had that it was changed. It names neither
+	// the new address, which whoever reads the old mailbox has no business learning, nor carries a
+	// link. It keeps ClassAccountNotice, a budget of its own: once an attacker changes the address,
+	// every later notice goes to their own unverified address, so this one is the victim's only
+	// warning (#394 review, #724 decision 4).
+	EmailAddressChanged Notice = "email_address_changed"
+	// PasswordChanged tells a user their password was changed on the Account pages (#724).
+	PasswordChanged Notice = "password_changed"
+)
+
+// class is the job class whose budget the notice is admitted against: every notice but the email
+// change's is a security notice.
+func (notice Notice) class() afterresponse.Class {
+	if notice == EmailAddressChanged {
+		return afterresponse.ClassAccountNotice
+	}
+	return afterresponse.ClassSecurityNotice
+}
+
+// Recipient is the address a notice goes to and the user it is about. The address and its verified
+// flag are what the change's write matched, which for the email change is the address the account
+// had, not the one it has now.
+type Recipient struct {
+	UserId        int64
+	Email         string
+	EmailVerified bool
+	Name          string
+	// PageLanguage and Locale choose the notice's language: the page language, else the locale,
+	// else English.
+	PageLanguage string
+	Locale       string
+}
+
+// To is the account's own address, as user holds it.
+func To(user *record.User) Recipient {
+	return Recipient{
+		UserId:        user.Id,
+		Email:         user.Email,
+		EmailVerified: user.EmailVerified,
+		Name:          user.FullName(),
+		PageLanguage:  user.PageLanguage,
+		Locale:        user.Locale,
+	}
+}
+
+// Notifier sends the notices. routes.go builds the one the handlers take.
+type Notifier struct {
+	renderer Renderer
+	sender   Sender
+	jobs     Jobs
+}
+
+// New builds the notifier over the server's renderer, mail sender and after-response jobs.
+func New(renderer Renderer, sender Sender, jobs Jobs) *Notifier {
+	return &Notifier{renderer: renderer, sender: sender, jobs: jobs}
+}
+
+// Send hands notice to a job that sends it to to after the response, when the request's settings
+// have SMTP enabled and the address is verified, and does nothing otherwise. The caller calls it
+// once its change has committed.
+func (n *Notifier) Send(r *http.Request, notice Notice, to Recipient) {
+	settings, ok := reqctx.SettingsFrom(r.Context())
+	if !ok {
+		slog.ErrorContext(r.Context(), "unable to send an account notice",
+			"notice", string(notice), "user_id", to.UserId, "error", reqctx.ErrNoSettings)
+		return
+	}
+	if !settings.SMTPEnabled || !to.EmailVerified {
+		return
+	}
+
+	smtpConfig := emaildelivery.SMTPConfigFromSettings(settings)
+	n.jobs.Go(r.Context(), notice.class(), func(ctx context.Context) {
+		n.deliver(ctx, r, notice, to, smtpConfig)
+	})
+}
+
+// deliver renders and sends one notice, in the job. The page and subject are literals here, one
+// pair per notice, so the template guard can tell which page each renders.
+func (n *Notifier) deliver(ctx context.Context, r *http.Request, notice Notice, to Recipient,
+	smtpConfig emaildelivery.SMTPConfig) {
+	var page, subject string
+	switch notice {
+	case EmailAddressChanged:
+		page, subject = "/emails/email_address_changed.html", "email.address_changed.subject"
+	case PasswordChanged:
+		page, subject = "/emails/email_password_changed.html", "email.password_changed.subject"
+	default:
+		slog.ErrorContext(ctx, "unable to render an account notice",
+			"notice", string(notice), "user_id", to.UserId, "error", errUnknownNotice)
+		return
+	}
+
+	// The request is read for nothing but the renderer's inputs, under the job's context: the
+	// request's own is cancelled once the response has gone.
+	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, to.PageLanguage, to.Locale))
+	bind := map[string]interface{}{
+		"name": to.Name,
+	}
+	buf, err := n.renderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", page, bind)
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to render an account notice",
+			"notice", string(notice), "user_id", to.UserId, "error", err)
+		return
+	}
+
+	input := &emaildelivery.SendEmailInput{
+		To:       to.Email,
+		Subject:  i18n.T(emailReq.Context(), subject),
+		HtmlBody: buf.String(),
+	}
+	if _, err := n.sender.SendEmail(ctx, smtpConfig, input); err != nil {
+		slog.ErrorContext(ctx, "unable to send an account notice",
+			"notice", string(notice), "user_id", to.UserId, "error", err)
+	}
+}

@@ -3,9 +3,10 @@ package apihandlers
 import (
 	"bytes"
 	"context"
-	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
-	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -47,7 +48,7 @@ type PageRenderer interface {
 }
 
 // EmailSender delivers one message. The context is the request's, or the job's that a request
-// handed its mail to (AfterResponse); either way it carries the request's id. The SMTP dial and
+// handed its mail to; either way it carries the request's id. The SMTP dial and
 // conversation are bounded by the sender's own deadlines. A send that succeeded reports whether its
 // message went over TLS, which only the test send answers with.
 type EmailSender interface {
@@ -94,16 +95,12 @@ type OtpSecretGenerator interface {
 	GenerateKeyURL(email string, appName string) (string, error)
 }
 
-// AfterResponse runs work a handler hands off so that its response does not wait for it. The job
-// is given the context passed in, detached from its cancellation but keeping its values, so what it
-// logs carries the request's id. The server's afterresponse.Jobs is the one implementation, and
-// shutdown waits for the jobs it holds. The email change hands it the notice to the previous
-// address, which must never fail or hold up the change it reports (#404 decision 11).
-// Past 64 jobs of the same class in flight it drops the job with a warning rather than run it, so
-// a flood costs some genuine requests of that class their mail and never changes a response (#485).
-// The notice is ClassAccountNotice, a budget of its own that no public form can fill: with one
-// shared budget, whoever held a stolen session could fill it through forgot-password, then change
-// the address, and the mail warning the victim was the one dropped (#394 review).
-type AfterResponse interface {
-	Go(ctx context.Context, class afterresponse.Class, job func(ctx context.Context))
+// AccountNotifier emails a user about a change to their account, after the response: the email
+// change's notice to the previous address and the security notices, such as a changed password.
+// A handler calls it once the change has committed, and only for the request whose write landed.
+// The notifier decides the rest: nothing is sent with SMTP off or to an unverified address, and a
+// notice that cannot be rendered or sent is an Error record that never fails the change (#404
+// decision 11, #724). *accountnotice.Notifier is the one implementation.
+type AccountNotifier interface {
+	Send(r *http.Request, notice accountnotice.Notice, to accountnotice.Recipient)
 }

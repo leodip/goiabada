@@ -1661,8 +1661,8 @@
 "adminconsole.admin_settings.email.subtitle" = "Email"
 "adminconsole.admin_settings.email.lead" = "The SMTP server the auth server sends its emails through."
 "adminconsole.admin_settings.email.field.smtp_enabled" = "Send email"
-"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "The auth server sends password reset, email verification and registration emails through the SMTP server below."
-"adminconsole.admin_settings.email.disable_warning" = "Turning email off will clear every SMTP setting, the saved password included, and stop the password reset, email verification and registration emails."
+"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "The auth server sends password reset, email verification and registration emails through the SMTP server below, and the notices that tell users their email address or password was changed."
+"adminconsole.admin_settings.email.disable_warning" = "Turning email off will clear every SMTP setting, the saved password included, and stop the password reset, email verification and registration emails, and the notices of a changed email address or password."
 "adminconsole.admin_settings.email.section_server" = "SMTP server"
 "adminconsole.admin_settings.email.field.host_or_ip" = "Host name or IP address"
 "adminconsole.admin_settings.email.field.port" = "Port"
@@ -2127,6 +2127,7 @@
 "email.verification.subject" = "Email verification - code {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - create a password for your new account"
 "email.address_changed.subject" = "Your email address was changed"
+"email.password_changed.subject" = "Your password was changed"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -80,12 +79,13 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 
 	return &credentialEnv{
 		password: rateLimiter.LimitAccountPassword(
-			HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, rateLimiter)),
+			HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, rateLimiter,
+				heldNotifier(t, &heldJobs{}))),
 		otp: rateLimiter.LimitAccountPassword(
 			HandleAccountOTPPut(database, auditLogger, rateLimiter, testDataCipher)),
 		email: rateLimiter.LimitAccountPassword(
-			HandleAccountEmailPut(handlersmocks.NewPageRenderer(t), database, accountvalidation.NewEmailValidator(database),
-				accounthandlersmocks.NewEmailSender(t), auditLogger, rateLimiter, &heldJobs{})),
+			HandleAccountEmailPut(database, accountvalidation.NewEmailValidator(database),
+				auditLogger, rateLimiter, heldNotifier(t, &heldJobs{}))),
 		recoveryCodes: rateLimiter.LimitAccountPassword(
 			HandleAccountRecoveryCodesPost(database, auditLogger, rateLimiter)),
 		database: database,

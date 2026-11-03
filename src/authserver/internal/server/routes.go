@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
@@ -61,6 +62,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
 	httpHelper := render.New(s.templateFS, s.staticFS)
+	// The one notifier every account notice goes through, after its response (#724).
+	notifier := accountnotice.New(httpHelper, emailSender, s.jobs)
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 	legalDocuments := legaldocuments.NewReader(s.database)
 
@@ -459,7 +462,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// is taken, so every change counts on the account first, and a request that tier refuses
 		// never reaches the password check.
 		r.With(rateLimiter.LimitAccountEmailChange, rateLimiter.LimitAccountPassword).Put("/email",
-			apihandlers.HandleAccountEmailPut(httpHelper, s.database, emailValidator, emailSender, auditLogger, rateLimiter, s.jobs))
+			apihandlers.HandleAccountEmailPut(s.database, emailValidator, auditLogger, rateLimiter, notifier))
 		// The send counts every request on the account, beside its own five minute resend cooldown:
 		// the account chooses the address it mails, so each send is a mail to any address (#404).
 		r.With(rateLimiter.LimitEmailVerificationSend).Post("/email/verification/send",
@@ -474,7 +477,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// an attacker more guesses by alternating. The enrollment GET between them checks no
 		// credential.
 		r.With(rateLimiter.LimitAccountPassword).Put("/password",
-			apihandlers.HandleAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter))
+			apihandlers.HandleAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter, notifier))
 		r.Get("/otp/enrollment", apihandlers.HandleAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
 		r.With(rateLimiter.LimitAccountPassword).Put("/otp",
 			apihandlers.HandleAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher))

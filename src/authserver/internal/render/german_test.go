@@ -38,7 +38,7 @@ func TestGerman_SignInPageUsesQueryOrAustrianHeader(t *testing.T) {
 	}
 }
 
-func TestGerman_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
+func TestGerman_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 	for _, locale := range []string{"de", "de-DE", "de-AT", "de-CH", "de-LI"} {
 		for _, tc := range []struct{ name, subject, body string }{
 			{"forgot_password", "Passwort zurücksetzen", "um Ihr Passwort zurückzusetzen"},
@@ -48,6 +48,7 @@ func TestGerman_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
 			{"verification", "E-Mail-Bestätigung – Code 123456", "Mit diesem Code können Sie Ihre E-Mail-Adresse bestätigen"},
 			{"newuser_set_password", "Test – Passwort für Ihr neues Konto festlegen", "Der Link ist 24 Stunden gültig."},
 			{"address_changed", "Ihre E-Mail-Adresse wurde geändert", "Andernfalls kennt möglicherweise jemand Ihr Passwort."},
+			{"password_changed", "Ihr Passwort wurde geändert", "Andernfalls verwendet möglicherweise jemand anderes Ihr Konto."},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)

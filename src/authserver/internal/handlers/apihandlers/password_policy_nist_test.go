@@ -137,7 +137,8 @@ func TestHandleAccountPasswordPut_HoldsThePasswordToNist(t *testing.T) {
 			req = setTokenContextWithClaims(nistSettings(req), map[string]interface{}{"sub": "the-subject"})
 
 			rr := httptest.NewRecorder()
-			HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), unlimitedCredentials{}).
+			HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), unlimitedCredentials{},
+				heldNotifier(t, &heldJobs{})).
 				ServeHTTP(rr, req)
 
 			requireRefusal(t, rr, tc.code)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -36,6 +37,7 @@ func HandleAccountPasswordPut(
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtToken, subject, ok := accountCaller(w, r)
@@ -138,5 +140,11 @@ func HandleAccountPasswordPut(
 		// Response
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}
 		writeJSON(w, r, http.StatusOK, resp)
+
+		// The account's address is told, after the commit and the response, so a user whose
+		// password someone else changed learns of it (#724). The notifier sends only with SMTP
+		// on and to a verified address. A change refused or rolled back above returned before
+		// this, and tells nobody.
+		notifier.Send(r, accountnotice.PasswordChanged, accountnotice.To(user))
 	}
 }
