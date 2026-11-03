@@ -44,7 +44,8 @@ type reuseSessionPlan struct {
 	// refreshAuthTime writes the credential's instant onto the bound session.
 	refreshAuthTime bool
 	// replaceAuthentication writes this ceremony's level, methods and password instant onto the bound
-	// session, as the create arm would stamp them on a new one (#537).
+	// session, as the create arm would stamp them on a new one (#537), and records its answer to Keep
+	// me signed in in the browser session, as the create arm records it (#743).
 	replaceAuthentication bool
 	// promoteOtpConfigGeneration records the generation the session answered level 2 against (#242).
 	promoteOtpConfigGeneration bool

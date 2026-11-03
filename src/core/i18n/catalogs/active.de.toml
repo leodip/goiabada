@@ -75,6 +75,8 @@
 "auth.pwd.forgot_password" = "Passwort vergessen?"
 "auth.pwd.no_account_prompt" = "Sie haben noch kein Konto?"
 "auth.pwd.register_link" = "Konto erstellen"
+"auth.pwd.keep_signed_in" = "Angemeldet bleiben"
+"auth.pwd.keep_signed_in_note" = "Verwendet ein Cookie, damit Sie nach dem Schließen des Browsers angemeldet bleiben."
 
 # --- OTP verification (auth/otp) --------------------------------------------
 

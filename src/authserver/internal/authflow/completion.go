@@ -86,7 +86,12 @@ type completionBrowser interface {
 	ConfirmCeremony(ceremonyId string) error
 	// RegenerateSessionAndBind rotates the browser session's identifier and writes the user session
 	// named into it, the create arm's rotation, keeping no ceremony held for a user other than userId.
-	RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string) error
+	// It records keepSignedIn in the same write, as RecordKeepSignedIn does.
+	RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string, keepSignedIn *bool) error
+	// RecordKeepSignedIn records in the browser session the answer the password page's Keep me
+	// signed in box was given, which the session's cookie follows from then on: true or false, or
+	// none at all for nil (#743 decisions 2 and 5).
+	RecordKeepSignedIn(ceremonyId string, keepSignedIn *bool) error
 	// Device is the browser the request comes from: its device cookie's identifier, or a new one,
 	// and its display labels.
 	Device() usersession.Device
@@ -353,6 +358,10 @@ func restartCompletion(browser stepSaver, authContext *ceremony.AuthContext) Com
 //     it, and asks again whether the bind is stale and whether the ceremony's code still stands.
 //  3. Promotes the OTP configuration generation, when the plan says so.
 //  4. Audits the bump.
+//  5. When the plan replaces the session's authentication, the ceremony entered the password, so it
+//     records the answer the password was entered with to Keep me signed in (RecordKeepSignedIn),
+//     which replaces the session's: the session's cookie follows the latest password entry. A single
+//     sign-on entered none and leaves the session's answer as it is (#743 decision 2).
 //
 // The rotation comes before the bind, which commits before it returns: rotating after would leave the
 // identifier the browser arrived with naming a session already at the higher level, so an identifier
@@ -418,6 +427,12 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 		"user_id":   authContext.UserId,
 		"client_id": client.Id,
 	})
+
+	if plan.replaceAuthentication {
+		if err = browser.RecordKeepSignedIn(authContext.CeremonyId, authContext.KeepSignedIn); err != nil {
+			return nil, err
+		}
+	}
 	return boundSession, nil
 }
 
@@ -433,7 +448,8 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 //     and the termination, in that order and after the commit.
 //  3. Reads the browser's device and starts the new session (StartNewUserSession), replacing the
 //     arrived-with one when it is this user's. The start commits before it returns.
-//  4. Rotates the browser session's identifier, writing the new session into it, on condition it
+//  4. Rotates the browser session's identifier, writing the new session into it with the answer the
+//     ceremony entered its password with to Keep me signed in (#743 decision 2), on condition it
 //     still holds this ceremony (RegenerateSessionAndBind). A failure abandons the new session
 //     (AbandonUserSession): a ceremony the browser replaced meanwhile is Replaced, any other failure
 //     an error.
@@ -489,7 +505,7 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	}, authContext.AuthStateGeneration, authContext.OtpConfigGeneration, device, ipAddress, replacing, limits)
 	if err == nil {
 		if rotateErr := browser.RegenerateSessionAndBind(authContext.CeremonyId, authContext.UserId,
-			newSession.SessionIdentifier); rotateErr != nil {
+			newSession.SessionIdentifier, authContext.KeepSignedIn); rotateErr != nil {
 			err = o.sessions.AbandonUserSession(ctx, newSession,
 				errs.Wrap(rotateErr, "unable to rotate the browser session identifier"))
 		} else {

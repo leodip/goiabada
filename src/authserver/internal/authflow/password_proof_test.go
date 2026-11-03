@@ -52,7 +52,7 @@ func TestPasswordProof_RecordsThePasswordRotatesAndThenSaves(t *testing.T) {
 	user := &record.User{Id: 57, Email: "new@example.com", Enabled: true, AuthStateGeneration: 3, OtpConfigGeneration: 2}
 
 	before := time.Now().UTC()
-	result := NewPasswordProof(auditLogger).Record(context.Background(), browser, authContext, user)
+	result := NewPasswordProof(auditLogger).Record(context.Background(), browser, authContext, user, nil)
 
 	assert.Equal(t, PasswordProofResult{NextStep: "/auth/level1completed"}, result)
 	assert.Equal(t, []string{"rotate", "save"}, browser.steps, "the identifier is rotated before the save")
@@ -80,7 +80,7 @@ func TestPasswordProof_AFailedRotationIsNeverFollowedByTheSave(t *testing.T) {
 	authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "the-sign-in"}
 
 	result := NewPasswordProof(&fakeAuditLogger{}).Record(context.Background(), browser, authContext,
-		&record.User{Id: 57, Enabled: true})
+		&record.User{Id: 57, Enabled: true}, nil)
 
 	require.ErrorIs(t, result.SaveErr, ceremony.ErrCeremonyReplaced)
 	assert.Equal(t, []string{"rotate"}, browser.steps)
@@ -91,8 +91,27 @@ func TestPasswordProof_AFailedSaveIsAnswered(t *testing.T) {
 	authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "the-sign-in"}
 
 	result := NewPasswordProof(&fakeAuditLogger{}).Record(context.Background(), browser, authContext,
-		&record.User{Id: 57, Enabled: true})
+		&record.User{Id: 57, Enabled: true}, nil)
 
 	require.ErrorIs(t, result.SaveErr, ceremony.ErrCeremonyReplaced)
 	assert.Equal(t, []string{"rotate", "save"}, browser.steps)
+}
+
+// The answer the password page's Keep me signed in box was given is recorded with the password, on
+// the ceremony saved, and carried to /auth/completed; no box records no answer (#743 decision 2).
+func TestPasswordProof_RecordsTheKeepMeSignedInAnswer(t *testing.T) {
+	ticked, unticked := true, false
+	for name, answer := range map[string]*bool{"ticked": &ticked, "unticked": &unticked, "no box": nil} {
+		t.Run(name, func(t *testing.T) {
+			browser := &proofBrowser{}
+			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "the-sign-in"}
+
+			result := NewPasswordProof(&fakeAuditLogger{}).Record(context.Background(), browser, authContext,
+				&record.User{Id: 57, Enabled: true}, answer)
+
+			require.NoError(t, result.SaveErr)
+			require.NotNil(t, browser.saved)
+			assert.Equal(t, answer, browser.saved.KeepSignedIn)
+		})
+	}
 }

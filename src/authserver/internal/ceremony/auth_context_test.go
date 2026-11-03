@@ -1,6 +1,7 @@
 package ceremony
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -999,7 +1000,7 @@ func TestRecordPasswordVerified(t *testing.T) {
 				Scope:       "openid",
 			}
 
-			ac.RecordPasswordVerified(user, now)
+			ac.RecordPasswordVerified(user, now, nil)
 
 			assert.Equal(t, int64(42), ac.UserId)
 			assert.Equal(t, int64(3), ac.AuthStateGeneration, "captured from the user the password was checked against (#106)")
@@ -1021,6 +1022,44 @@ func TestRecordPasswordVerified(t *testing.T) {
 			user.OtpConfigGeneration = 6
 			assert.Equal(t, int64(5), *ac.OtpConfigGeneration)
 		})
+	}
+}
+
+// The answer the password page's Keep me signed in box was given is recorded with the password, and
+// replaces whatever an earlier password entry of the ceremony recorded: ticked, unticked, or no box
+// at all, which leaves the ceremony with no answer (#743 decisions 2 and 4).
+func TestRecordPasswordVerified_RecordsTheKeepMeSignedInAnswer(t *testing.T) {
+	ticked, unticked := true, false
+	for _, tc := range []struct {
+		name   string
+		answer *bool
+		want   *bool
+	}{
+		{"the box ticked", &ticked, &ticked},
+		{"the box left unticked", &unticked, &unticked},
+		{"no box shown", nil, nil},
+	} {
+		for _, earlier := range []*bool{nil, &ticked, &unticked} {
+			t.Run(fmt.Sprintf("%s, over %s", tc.name, describeAnswer(earlier)), func(t *testing.T) {
+				ac := &AuthContext{AuthState: AuthStateLevel1Password, KeepSignedIn: earlier}
+
+				ac.RecordPasswordVerified(&record.User{Id: 42}, time.Now(), tc.answer)
+
+				assert.Equal(t, tc.want, ac.KeepSignedIn)
+			})
+		}
+	}
+}
+
+// describeAnswer names a Keep me signed in answer for a subtest.
+func describeAnswer(answer *bool) string {
+	switch {
+	case answer == nil:
+		return "no answer"
+	case *answer:
+		return "a ticked answer"
+	default:
+		return "an unticked answer"
 	}
 }
 

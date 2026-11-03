@@ -333,7 +333,7 @@ func TestHandleAuthCompletedGet_ACreateArmRotationFindingItsCeremonyReplacedAnsw
 			userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
 				signedInAs(int64(1), "pwd", record.AcrLevel1, pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "",
 				(*record.UserSession)(nil), testSessionLimits).Return(started, removed, nil).Once()
-			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "the-new-user-session").
+			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "the-new-user-session", (*bool)(nil)).
 				Return(failure.err).Once()
 			userSessionManager.On("AbandonUserSession", theContextOf(req), started, mock.MatchedBy(func(cause error) bool {
 				return errors.Is(cause, failure.err)
@@ -498,7 +498,7 @@ func aNewDeviceOf(req *http.Request, minted *string) interface{} {
 // for userId, the user the ceremony signed in, whom no other user's ceremony outlives (#246).
 func expectNewSessionBound(ceremonyStore *handlersmocks.CeremonyStore, rr *httptest.ResponseRecorder, req *http.Request,
 	userId int64, userSessionIdentifier string) {
-	ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, userId, userSessionIdentifier).Return(nil).Once()
+	ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, userId, userSessionIdentifier, (*bool)(nil)).Return(nil).Once()
 }
 
 // expectCeremonyNoLongerActiveOnAnyRequest is expectCeremonyNoLongerActive for a handler that renders

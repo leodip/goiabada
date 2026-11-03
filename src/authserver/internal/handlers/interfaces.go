@@ -68,9 +68,14 @@ type CeremonyStore interface {
 	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error
 	// RegenerateSessionAndBind is RegenerateSession for /auth/completed's create arm, which also
 	// writes the new user session's identifier into the browser session as it rotates it (#266),
-	// on the same condition (#579 decision 4).
+	// on the same condition (#579 decision 4), and the answer the ceremony entered its password with
+	// to the Keep me signed in box, removing any earlier one when keepSignedIn is nil (#743).
 	RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64,
-		userSessionIdentifier string) error
+		userSessionIdentifier string, keepSignedIn *bool) error
+	// RecordKeepSignedIn records that answer in the browser session for /auth/completed's reuse arm,
+	// only while the session still holds the ceremony named, and otherwise answers
+	// ceremony.ErrCeremonyReplaced, writing nothing (#579, #743).
+	RecordKeepSignedIn(w http.ResponseWriter, r *http.Request, ceremonyId string, keepSignedIn *bool) error
 	// ConfirmCeremony answers nil while the browser session, read afresh, still holds the
 	// ceremony named, and ceremony.ErrCeremonyReplaced otherwise. It writes nothing (#579).
 	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error

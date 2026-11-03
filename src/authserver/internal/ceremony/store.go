@@ -403,14 +403,16 @@ func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremo
 // writes userSessionIdentifier, the user session the arm has just committed, into the browser
 // session, so no identifier that existed before the sign-in names the session it produced, and the
 // sign-in reaches the browser as one Set-Cookie. A planted identifier would otherwise name the row
-// the victim's sign-in fills in (session fixation, #266).
+// the victim's sign-in fills in (session fixation, #266). The same write records keepSignedIn, the
+// answer the ceremony entered its password with (putKeepSignedIn), so that one Set-Cookie already
+// carries the lifetime the answer asks for (#743 decisions 2 and 5).
 //
 // It keeps, as RegenerateSession does, no ceremony held for a user other than userId, the user the
 // session is bound to, and writes only while the browser session still holds the ceremony named,
 // answering ErrCeremonyReplaced, having written nothing and set no cookie, when it does not, or is
 // gone (#579 decision 4). The caller then abandons the user session it bound nothing to.
 func (s *Store) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string,
-	userId int64, userSessionIdentifier string) error {
+	userId int64, userSessionIdentifier string, keepSignedIn *bool) error {
 
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
@@ -423,8 +425,47 @@ func (s *Store) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request,
 			return err
 		}
 		values[sessionkeys.SessionIdentifier] = userSessionIdentifier
+		putKeepSignedIn(values, keepSignedIn)
 		return nil
 	}))
+}
+
+// RecordKeepSignedIn records keepSignedIn, the answer the ceremony named entered its password with,
+// in the browser session, only while the session still holds that ceremony, as a step's write does
+// (#579): /auth/completed's reuse arm, once a ceremony that entered the password has bound the
+// session the browser arrived with (prompt=login, max_age). The session is read afresh and written
+// on condition nothing wrote it in between, through ChangeAndSave, keeping its identifier and
+// everything else it holds; the write sends the cookie, which follows the answer (#743 decisions 2
+// and 5).
+//
+// It answers ErrCeremonyReplaced, writing nothing and setting no cookie, when the session does not
+// hold the ceremony, or is gone.
+func (s *Store) RecordKeepSignedIn(w http.ResponseWriter, r *http.Request, ceremonyId string, keepSignedIn *bool) error {
+	sess, err := s.sessionStore.Get(r, s.sessionName)
+	if err != nil {
+		return err
+	}
+
+	isHeld := holds(ceremonyId)
+	return goneIsReplaced(s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+		if heldErr := isHeld(values); heldErr != nil {
+			return heldErr
+		}
+		putKeepSignedIn(values, keepSignedIn)
+		return nil
+	}))
+}
+
+// putKeepSignedIn writes the answer the password page's Keep me signed in box was given into the
+// browser session's values, under sessionkeys.KeepSignedIn, the key the auth server's Keep users
+// signed in rule reads: true ticked, false unticked, and no key at all for a password entered with
+// no box, which counts as unticked (#743 decision 5).
+func putKeepSignedIn(values map[string]any, keepSignedIn *bool) {
+	if keepSignedIn == nil {
+		delete(values, sessionkeys.KeepSignedIn)
+		return
+	}
+	values[sessionkeys.KeepSignedIn] = *keepSignedIn
 }
 
 // errCeremonyConfirmed is the refusal ConfirmCeremony's change answers when the session holds its

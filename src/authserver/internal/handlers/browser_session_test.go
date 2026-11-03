@@ -222,13 +222,35 @@ func TestBrowserSession_RegenerateSessionAndBindCarriesTheHandlersWriterAndReque
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("RegenerateSessionAndBind", theWriter(rr), theRequest(req), testCeremonyId, int64(42), "the-new-user-session").
+	ticked := true
+	ceremonyStore.On("RegenerateSessionAndBind", theWriter(rr), theRequest(req), testCeremonyId, int64(42), "the-new-user-session",
+		&ticked).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(ceremony.ErrCeremonyReplaced).Once()
 
 	err := newSessionStartingBrowserSession(rr, req, ceremonyStore, NewDeviceCookie(false)).
-		RegenerateSessionAndBind(testCeremonyId, 42, "the-new-user-session")
+		RegenerateSessionAndBind(testCeremonyId, 42, "the-new-user-session", &ticked)
+
+	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
+	ceremonyStore.AssertExpectations(t)
+}
+
+// RecordKeepSignedIn hands the ceremony store the handler's own writer and request, the ceremony and
+// the answer, and answers what the store answered.
+func TestBrowserSession_RecordKeepSignedInCarriesTheHandlersWriterAndRequest(t *testing.T) {
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	rr := httptest.NewRecorder()
+	req := adapterRequest()
+
+	unticked := false
+	ceremonyStore.On("RecordKeepSignedIn", theWriter(rr), theRequest(req), testCeremonyId, &unticked).
+		Run(func(args mock.Arguments) {
+			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
+		}).Return(ceremony.ErrCeremonyReplaced).Once()
+
+	err := newSessionStartingBrowserSession(rr, req, ceremonyStore, NewDeviceCookie(false)).
+		RecordKeepSignedIn(testCeremonyId, &unticked)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 	ceremonyStore.AssertExpectations(t)

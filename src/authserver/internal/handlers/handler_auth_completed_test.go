@@ -744,7 +744,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
 				Return(started, tc.removed, nil)
 			rotateError := errors.New("the backend refused the write")
-			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "new-session-of-user-1").
+			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "new-session-of-user-1", (*bool)(nil)).
 				Return(rotateError).Once()
 			// The rotation's failure, wrapped, is the cause the abandonment is handed; what it answers is
 			// what the 500 carries.
@@ -1216,6 +1216,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 					a.PasswordAuthTime != nil && a.PasswordAuthTime.Equal(pwdAuthTime)
 			}), true, "").Return(&replaced, nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
+		// The password was entered with no Keep me signed in box, so the session is left with no
+		// answer (#743).
+		ceremonyStore.On("RecordKeepSignedIn", rr, req, testCeremonyId, (*bool)(nil)).Return(nil).Once()
 
 		user := &record.User{Id: 1, Enabled: true}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)

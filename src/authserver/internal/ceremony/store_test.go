@@ -1625,7 +1625,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		cookies, stepReq, _ := loadedStep(t, ceremonyStore)
 		rr := httptest.NewRecorder()
 
-		require.NoError(t, ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier))
+		require.NoError(t, ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier, nil))
 
 		rotated := rr.Result().Cookies()
 		require.Len(t, rotated, 1,
@@ -1651,7 +1651,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		backend.failLoad = true
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier)
+		err := ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier, nil)
 
 		require.ErrorIs(t, err, errLoadRefused)
 		require.NotErrorIs(t, err, ErrCeremonyReplaced, "a backend fault is not a ceremony the browser replaced")
@@ -1666,7 +1666,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		backend.failLoad = true
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.RegenerateSessionAndBind(rr, browserRequest(cookies), ceremonyA, userA, userSessionIdentifier)
+		err := ceremonyStore.RegenerateSessionAndBind(rr, browserRequest(cookies), ceremonyA, userA, userSessionIdentifier, nil)
 
 		require.ErrorIs(t, err, errLoadRefused)
 		require.NotErrorIs(t, err, ErrCeremonyReplaced)
@@ -1679,7 +1679,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		backend.failCreate = true
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier)
+		err := ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier, nil)
 
 		require.ErrorIs(t, err, errCreateRefused)
 		require.NotErrorIs(t, err, ErrCeremonyReplaced)
@@ -1697,7 +1697,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		addCeremony(t, ceremonyStore, cookies, ceremonyB)
 
 		rr := httptest.NewRecorder()
-		require.NoError(t, ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier))
+		require.NoError(t, ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier, nil))
 
 		rotated := rr.Result().Cookies()
 		require.Len(t, rotated, 1)
@@ -1716,7 +1716,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		created := backend.created
 
 		rr := httptest.NewRecorder()
-		err := ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier)
+		err := ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier, nil)
 
 		require.ErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies(), "a step that rotated nothing tells the browser nothing")
@@ -1734,7 +1734,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		created := backend.created
 
 		rr := httptest.NewRecorder()
-		err := ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier)
+		err := ceremonyStore.RegenerateSessionAndBind(rr, stepReq, ceremonyA, userA, userSessionIdentifier, nil)
 
 		require.ErrorIs(t, err, ErrCeremonyReplaced, "a gone session is a ceremony the browser no longer holds")
 		assert.Empty(t, rr.Result().Cookies())
@@ -1751,7 +1751,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		created := backend.created
 
 		rr := httptest.NewRecorder()
-		err := ceremonyStore.RegenerateSessionAndBind(rr, browserRequest(cookies), "", userA, userSessionIdentifier)
+		err := ceremonyStore.RegenerateSessionAndBind(rr, browserRequest(cookies), "", userA, userSessionIdentifier, nil)
 
 		require.ErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies())
@@ -1778,7 +1778,7 @@ func TestRotations_KeepNoOtherUsersCeremony(t *testing.T) {
 			return s.RegenerateSession(w, r, ceremonyA, userA)
 		},
 		"RegenerateSessionAndBind": func(s *Store, w http.ResponseWriter, r *http.Request) error {
-			return s.RegenerateSessionAndBind(w, r, ceremonyA, userA, "the-new-user-session")
+			return s.RegenerateSessionAndBind(w, r, ceremonyA, userA, "the-new-user-session", nil)
 		},
 	}
 	for name, rotate := range rotations {
@@ -2074,7 +2074,7 @@ func TestTheRetiredKey(t *testing.T) {
 		},
 		"a rotation that binds": func(t *testing.T, ceremonyStore *Store, cookies []*http.Cookie) []*http.Cookie {
 			rr := httptest.NewRecorder()
-			require.NoError(t, ceremonyStore.RegenerateSessionAndBind(rr, browserRequest(cookies), ceremonyB, userA, "user-session"))
+			require.NoError(t, ceremonyStore.RegenerateSessionAndBind(rr, browserRequest(cookies), ceremonyB, userA, "user-session", nil))
 			return rr.Result().Cookies()
 		},
 	}

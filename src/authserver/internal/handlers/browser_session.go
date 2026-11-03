@@ -79,9 +79,17 @@ func (b *browserSession) ConfirmCeremony(ceremonyId string) error {
 }
 
 // RegenerateSessionAndBind is CeremonyStore.RegenerateSessionAndBind, the create arm's conditional
-// rotation, which binds the user session it started to the browser session.
-func (b *browserSession) RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string) error {
-	return b.ceremonyStore.RegenerateSessionAndBind(b.w, b.r, ceremonyId, userId, userSessionIdentifier)
+// rotation, which binds the user session it started to the browser session and records the answer
+// the ceremony entered its password with.
+func (b *browserSession) RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string,
+	keepSignedIn *bool) error {
+	return b.ceremonyStore.RegenerateSessionAndBind(b.w, b.r, ceremonyId, userId, userSessionIdentifier, keepSignedIn)
+}
+
+// RecordKeepSignedIn is CeremonyStore.RecordKeepSignedIn, the reuse arm's conditional write of the
+// answer its ceremony entered the password with.
+func (b *browserSession) RecordKeepSignedIn(ceremonyId string, keepSignedIn *bool) error {
+	return b.ceremonyStore.RecordKeepSignedIn(b.w, b.r, ceremonyId, keepSignedIn)
 }
 
 // Device is the browser this request comes from, as its device cookie and headers say.

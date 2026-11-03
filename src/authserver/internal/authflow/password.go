@@ -114,15 +114,16 @@ type PasswordSubmissionResult struct {
 //     guess, audits EventAuthFailedPwd with the digest and the account, and answers PasswordRefused.
 //  4. A disabled account: audits EventUserDisabled and answers PasswordAccountDisabled. Not charged
 //     to the rate limiter: the password was right, so there is no guess to bound (#219).
-//  5. Accepted: records the proven password on the ceremony through PasswordProof, which audits
-//     EventAuthSuccessPwd, rotates the browser session's identifier, and only then saves the
-//     ceremony in level1_password_completed.
+//  5. Accepted: records the proven password on the ceremony through PasswordProof, with the answer
+//     keepSignedIn the handler read off the Keep me signed in box (nil when the page showed none),
+//     which audits EventAuthSuccessPwd, rotates the browser session's identifier, and only then
+//     saves the ceremony in level1_password_completed.
 //
 // The address is audited only as its digest: the form collects whatever anyone types, and the audit
 // table would otherwise keep every mistyped address and pasted password in plain text (#522
 // decision 10).
 func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmissionBrowser,
-	authContext *ceremony.AuthContext, email string, password string) (PasswordSubmissionResult, error) {
+	authContext *ceremony.AuthContext, email string, password string, keepSignedIn *bool) (PasswordSubmissionResult, error) {
 
 	user, err := o.database.GetUserByEmail(ctx, nil, email)
 	if err != nil {
@@ -167,7 +168,7 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 		return PasswordSubmissionResult{Answer: PasswordAccountDisabled, UserPageLanguage: user.PageLanguage}, nil
 	}
 
-	proven := o.proof.Record(ctx, browser, authContext, user)
+	proven := o.proof.Record(ctx, browser, authContext, user, keepSignedIn)
 	return PasswordSubmissionResult{
 		Answer:           PasswordAccepted,
 		UserPageLanguage: user.PageLanguage,
@@ -208,9 +209,12 @@ type PasswordProofResult struct {
 }
 
 // Record audits EventAuthSuccessPwd, records the verified password on the ceremony
-// (RecordPasswordVerified), rotates the browser session's identifier, and only then saves the
-// ceremony in level1_password_completed. The caller has established that user proved the password,
-// that the account is enabled, and that the ceremony is at the password step.
+// (RecordPasswordVerified) with the answer keepSignedIn the password was entered with, rotates the
+// browser session's identifier, and only then saves the ceremony in level1_password_completed. The
+// caller has established that user proved the password, that the account is enabled, and that the
+// ceremony is at the password step. keepSignedIn is the password page's Keep me signed in box,
+// ticked or not, and nil where no box was shown: under Always or Never, and on registration and
+// activation, which ask nothing (#743 decision 2).
 //
 // The rotation comes the instant the password is accepted, and before the save. The steps between
 // here and /auth/completed are GETs gated on the ceremony's state alone, so an attacker who planted
@@ -220,13 +224,13 @@ type PasswordProofResult struct {
 // planted identifier naming a password-completed ceremony (#266). Both land only while the browser
 // session still holds this ceremony (#579).
 func (o *PasswordProof) Record(ctx context.Context, browser passwordProofBrowser, authContext *ceremony.AuthContext,
-	user *record.User) PasswordProofResult {
+	user *record.User, keepSignedIn *bool) PasswordProofResult {
 
 	o.auditLogger.Log(ctx, audit.EventAuthSuccessPwd, map[string]interface{}{
 		"user_id": user.Id,
 	})
 
-	authContext.RecordPasswordVerified(user, time.Now())
+	authContext.RecordPasswordVerified(user, time.Now(), keepSignedIn)
 
 	result := PasswordProofResult{NextStep: "/auth/level1completed"}
 	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {

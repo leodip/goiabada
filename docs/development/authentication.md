@@ -434,6 +434,14 @@ When user has valid session (`UserSession` in DB + session cookie):
   `pageChain`): a row more than ten seconds stale is touched there, and a signed-in session's
   cookie is sent again with the row's new expiry. The files, protocol and API branches read the
   session without touching it, so no reissued cookie rides on a cacheable answer (#743)
+- Whether a signed-in cookie outlives the browser is the store's `KeepSignedIn` rule
+  (`sessionbackend.NewKeepSignedIn`), asked per cookie write. Under Let each user choose it reads the
+  password page's Keep me signed in answer from the browser session (`sessionkeys.KeepSignedIn`, a
+  bool; no key counts as unticked). The answer travels on the ceremony (`AuthContext.KeepSignedIn`,
+  written only by `RecordPasswordVerified`, nil when no box was shown), and `/auth/completed`
+  records it only when the ceremony entered the password: the create arm in `RegenerateSessionAndBind`'s
+  write, the reuse arm (`replaceAuthentication`) through `RecordKeepSignedIn` after the bind. A nil
+  answer deletes the key; an SSO pass leaves it as it is (#743)
 
 ## SSO and ACR/AMR Details
 
