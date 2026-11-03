@@ -2,7 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expectPasswordRules, expectRefusal, userUrl } from "../../../lib/admin-console";
 import { submitPassword } from "../../../lib/browser-sign-in";
-import { signInToConsole } from "../../../lib/console-user";
+import { signInToConsole, turnOnTwoFactor } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { linksIn, waitForMail } from "../../../lib/mailpit";
@@ -152,6 +152,33 @@ test("the user enrols an authenticator, is asked for its code at sign-in, and tu
 
   await page.goto(userUrl(user.id, "authentication"));
   await expect(page.getByText("The user hasn't set up two-factor authentication. Only they can, from their account.")).toBeVisible();
+});
+
+test("setting up an authenticator sends the user a notice that mentions its recovery codes, and turning it off sends another", async ({
+  browser,
+  request,
+  users,
+}) => {
+  // Verified, since a notice goes only to a verified address.
+  const user = await users.create({ emailVerified: true });
+  const { secret, recoveryCodes } = await turnOnTwoFactor(browser, user);
+
+  const setUp = await waitForMail(request, user.email);
+  expect(setUp.subject).toBe("Two-factor authentication was set up");
+  expect(setUp.html).toContain("It came with a new set of recovery codes");
+  expect(linksIn(setUp)).toEqual([]);
+  for (const code of recoveryCodes) expect(setUp.text + setUp.html).not.toContain(code);
+
+  const own = await signInToConsole(browser, { ...user, otpSecret: secret }, "/account/otp");
+  await own.page.locator("#password").fill(user.password);
+  await own.page.getByRole("button", { name: "Turn off two-factor authentication" }).click();
+  await expect(own.page.getByText("Two-factor authentication is off.")).toBeVisible();
+  await own.context.close();
+
+  const turnedOff = await waitForMail(request, user.email, 2);
+  expect(turnedOff.subject).toBe("Two-factor authentication was turned off");
+  expect(turnedOff.html).toContain("If you didn't, someone else may know your password.");
+  expect(linksIn(turnedOff)).toEqual([]);
 });
 
 test("the enrolment key's Copy key button copies it", async ({ browser, users }) => {

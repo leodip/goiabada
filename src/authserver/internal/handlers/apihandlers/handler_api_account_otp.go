@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -251,6 +252,7 @@ func HandleAccountOTPPut(
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 	dataCipher *encryption.DataCipher,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, subject, ok := accountCaller(w, r)
@@ -335,6 +337,8 @@ func HandleAccountOTPPut(
 
 		// The set of recovery codes an enable created, answered once; a disable answers none.
 		var recoveryCodes []string
+		// The notice the change landed, sent once it has been answered (#724).
+		var notice accountnotice.Notice
 
 		// Branch by operation
 		if req.Enabled {
@@ -465,6 +469,7 @@ func HandleAccountOTPPut(
 				"logged_in_user": subject,
 			})
 			recoveryCodes = codes
+			notice = accountnotice.OTPEnabled
 		} else {
 			// Disable OTP
 			if !user.OTPEnabled {
@@ -486,6 +491,7 @@ func HandleAccountOTPPut(
 				"user_id":        user.Id,
 				"logged_in_user": subject,
 			})
+			notice = accountnotice.OTPDisabled
 		}
 
 		// Nothing to flag on the caller's own session. Both branches above advanced
@@ -508,5 +514,12 @@ func HandleAccountOTPPut(
 
 		resp := api.UpdateAccountOTPResponse{User: *apimapping.ToUserResponse(updated), RecoveryCodes: recoveryCodes}
 		writeJSON(w, r, http.StatusOK, resp)
+
+		// The account's address is told, after the commit and the response, so a user whose
+		// authenticator someone else set up or removed learns of it (#724). The set-up notice
+		// mentions the recovery codes and carries none of them. The notifier sends only with
+		// SMTP on and to a verified address. A change refused, lost to a concurrent one or
+		// rolled back above returned before this, and tells nobody.
+		notifier.Send(r, notice, accountnotice.To(user))
 	}
 }

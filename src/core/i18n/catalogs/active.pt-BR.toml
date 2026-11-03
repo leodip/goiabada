@@ -2024,6 +2024,9 @@
 "email.password_changed.subject" = "Sua senha foi alterada"
 "email.password_changed_by_administrator.subject" = "Um administrador alterou a sua senha"
 "email.password_reset.subject" = "Sua senha foi redefinida"
+"email.otp_enabled.subject" = "A autenticação de dois fatores foi configurada"
+"email.otp_disabled.subject" = "A autenticação de dois fatores foi desativada"
+"email.otp_disabled_by_administrator.subject" = "Um administrador desativou a sua autenticação de dois fatores"
 
 # --- Bootstrap de JS --------------------------------------------------------
 

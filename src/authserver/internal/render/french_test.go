@@ -51,6 +51,9 @@ func TestFrench_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"password_changed", "Votre mot de passe a été modifié", "Sinon, une autre personne utilise peut-être votre compte."},
 			{"password_changed_by_administrator", "Un administrateur a modifié votre mot de passe", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
 			{"password_reset", "Votre mot de passe a été réinitialisé", "Sinon, une autre personne lit peut-être vos e-mails et utilise votre compte."},
+			{"otp_enabled", "L’authentification à deux facteurs a été configurée", "Un nouveau jeu de codes de récupération a été créé avec elle."},
+			{"otp_disabled", "L’authentification à deux facteurs a été désactivée", "configurez à nouveau l’authentification à deux facteurs"},
+			{"otp_disabled_by_administrator", "Un administrateur a désactivé votre authentification à deux facteurs", "Vous pouvez configurer une nouvelle application d’authentification"},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)

@@ -211,6 +211,19 @@ const (
 	OTPRecoveryCodeRefused
 )
 
+// OTPNotice is the account notice a submission's committed change calls for (#724). The operation
+// names it as a plain value and sends nothing: the handler hands it to the notifier once the
+// operation has returned, after the response.
+type OTPNotice int
+
+const (
+	// OTPNoNotice is a submission that changed nothing worth telling the user.
+	OTPNoNotice OTPNotice = iota
+	// OTPNoticeAuthenticatorSetUp is an enrolling user's authenticator stored, with the set of
+	// recovery codes it came with, committed.
+	OTPNoticeAuthenticatorSetUp
+)
+
 // OTPSubmissionResult is what OTPSubmission.Run did.
 type OTPSubmissionResult struct {
 	Answer OTPAnswer
@@ -229,6 +242,13 @@ type OTPSubmissionResult struct {
 	// OTPEnrolmentLost: ceremony.ErrCeremonyReplaced when the browser session no longer holds the
 	// ceremony. A failed rotation is never followed by the save.
 	SaveErr error
+
+	// Notice is the account notice the submission's committed change calls for, OTPNoNotice for
+	// none. It is set whatever SaveErr holds: the change committed before the rotation and the
+	// save were tried.
+	Notice OTPNotice
+	// NoticeTo is the user Notice is about, as the submission read them; nil with OTPNoNotice.
+	NoticeTo *record.User
 }
 
 // Run checks code, which the handler read from the submitted body, against the ceremony's user. In
@@ -256,7 +276,8 @@ type OTPSubmissionResult struct {
 //  8. An enrolling user: stores the key as the user's authenticator (otpcredential.Establish), which
 //     lands only while the user's OTP configuration generation is still the one read in step 2. A
 //     failed write is returned as an error; a write that did not land ends the lost enrolment
-//     (below). Audits EventEnabledOTP.
+//     (below). Audits EventEnabledOTP, and reports OTPNoticeAuthenticatorSetUp for the handler to
+//     send (#724).
 //  9. Accepted: audits EventAuthSuccessOtp, records the code on the ceremony (RecordOTPVerified) with
 //     the generation of the authenticator it was checked against, rotates the browser session's
 //     identifier, and only then saves the ceremony in authentication_completed, for /auth/completed.
@@ -364,6 +385,10 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		verifiedGeneration = generation
 		enrolled = true
 		recoveryCodes = codes
+		// Committed: the user is told once the handler has answered, whatever the rotation and
+		// the save then do (#724).
+		result.Notice = OTPNoticeAuthenticatorSetUp
+		result.NoticeTo = user
 
 		o.auditLogger.Log(ctx, audit.EventEnabledOTP, map[string]interface{}{
 			"user_id": user.Id,

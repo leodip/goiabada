@@ -251,7 +251,7 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			}
 			return serveAccount(http.MethodPut, "/api/v1/account/otp", body, settings, expect,
 				func(t *testing.T, database *datamocks.Database) http.Handler {
-					return HandleAccountOTPPut(database, handlersmocks.NewAuditLogger(t), unlimitedCredentials{}, testDataCipher)
+					return HandleAccountOTPPut(database, handlersmocks.NewAuditLogger(t), unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{}))
 				})(t, acceptLanguage)
 		}
 	}

@@ -60,6 +60,8 @@ At level 3, a user with no authenticator sets one up during the sign-in, on the 
 
 The authenticator app lists the account under the auth server's **App name** and the user's email address.
 
+Whenever email is set up and the user's address is verified, setting up an authenticator, or turning one off, emails the user. See [Emails about account changes](/reference/security/#emails-about-account-changes).
+
 ## The code
 
 The code is a time-based one-time password ([RFC 6238](https://www.rfc-editor.org/rfc/rfc6238)): six digits, a new one every 30 seconds. The auth server also accepts the code from the 30 seconds before, so a code that took a moment to type still works. The code from the 30 seconds after is refused: only a phone whose clock runs ahead shows it, so the user is told to check that the phone sets its time automatically, and it doesn't count as a wrong code. Keep the auth server's clock synchronized, since a server running slow makes every phone look ahead.

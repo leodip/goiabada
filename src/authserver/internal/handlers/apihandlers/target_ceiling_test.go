@@ -298,7 +298,7 @@ var userTargetWrites = []targetWrite{
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string) *httptest.ResponseRecorder {
 			r := targetRequest(http.MethodPut, "/api/v1/admin/users/52/otp", `{"enabled":false}`, scope, map[string]string{"id": "52"})
 			rr := httptest.NewRecorder()
-			HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, r)
+			HandleUserOTPPut(database, auditLogger, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, r)
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {

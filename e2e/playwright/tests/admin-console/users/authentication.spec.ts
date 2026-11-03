@@ -106,6 +106,31 @@ test("turning off a user's two-factor authentication asks first: Cancel keeps it
   await again.context.close();
 });
 
+test("turning off a user's two-factor authentication sends them a notice that an administrator did it", async ({
+  page,
+  browser,
+  request,
+  users,
+}) => {
+  // Verified, since a notice goes only to a verified address.
+  const user = await users.create({ emailVerified: true });
+  await enrolAuthenticator(browser, user);
+  // Setting it up sent its own notice, first.
+  await waitForMail(request, user.email);
+
+  await page.goto(userUrl(user.id, "authentication"));
+  await page.locator("#otpEnabled").uncheck();
+  await page.locator("#btnSave").click();
+  await confirmDialog(page, "You're turning off the user's two-factor authentication");
+  await expect(page.getByText("Changes saved.")).toBeVisible();
+
+  const notice = await waitForMail(request, user.email, 2);
+  expect(notice.subject).toBe("An administrator turned off your two-factor authentication");
+  expect(notice.html).toContain("An administrator turned off two-factor authentication for your");
+  expect(notice.html).toContain("If you weren't expecting it, contact your administrator.");
+  expect(linksIn(notice)).toEqual([]);
+});
+
 // The recovery the docs give for a disabled authenticator: a new password and two-factor turned off,
 // in one save. An enrolled authenticator takes the same save, so the disable need not be reached.
 test("a new password and two-factor turned off in one save: the old password no longer signs in", async ({ page, browser, users }) => {

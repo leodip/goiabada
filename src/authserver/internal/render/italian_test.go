@@ -51,6 +51,9 @@ func TestItalian_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"password_changed", "La tua password è stata cambiata", "Altrimenti, qualcun altro potrebbe usare il tuo account."},
 			{"password_changed_by_administrator", "Un amministratore ha cambiato la tua password", "Se non te lo aspettavi, contatta il tuo amministratore."},
 			{"password_reset", "La tua password è stata reimpostata", "Altrimenti, qualcun altro potrebbe leggere la tua email e usare il tuo account."},
+			{"otp_enabled", "L'autenticazione a due fattori è stata configurata", "Insieme è stato creato un nuovo set di codici di recupero"},
+			{"otp_disabled", "L'autenticazione a due fattori è stata disattivata", "configura di nuovo l'autenticazione a due fattori"},
+			{"otp_disabled_by_administrator", "Un amministratore ha disattivato la tua autenticazione a due fattori", "Puoi configurare una nuova app di autenticazione"}, //nolint:misspell // the it catalog's text: "configurare" is Italian, not a misspelling of "configure"
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)

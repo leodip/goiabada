@@ -322,7 +322,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(73)).Return(stored, nil).Once()
 			}
 			rr := httptest.NewRecorder()
-			HandleUserOTPPut(database, handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, userRequest(http.MethodPut, "/api/v1/admin/users/73/otp", body, acceptLanguage))
+			HandleUserOTPPut(database, handlersmocks.NewAuditLogger(t), heldNotifier(t, &heldJobs{})).ServeHTTP(rr, userRequest(http.MethodPut, "/api/v1/admin/users/73/otp", body, acceptLanguage))
 			return rr
 		}
 	}

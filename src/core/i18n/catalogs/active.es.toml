@@ -2135,6 +2135,9 @@
 "email.password_changed.subject" = "Tu contraseña ha cambiado"
 "email.password_changed_by_administrator.subject" = "Un administrador ha cambiado tu contraseña"
 "email.password_reset.subject" = "Tu contraseña se ha restablecido"
+"email.otp_enabled.subject" = "Se ha configurado la autenticación de dos factores"
+"email.otp_disabled.subject" = "Se ha desactivado la autenticación de dos factores"
+"email.otp_disabled_by_administrator.subject" = "Un administrador ha desactivado tu autenticación de dos factores"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

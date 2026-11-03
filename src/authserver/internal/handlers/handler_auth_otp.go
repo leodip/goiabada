@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/otp"
@@ -67,10 +68,20 @@ func HandleAuthOtpGet(
 	}
 }
 
+// AccountNotifier emails a user about a change to their account, after the response. The sign-in
+// code step calls it once the step's change has committed, for the notice the step reports (#724).
+// The notifier decides the rest: nothing is sent with SMTP off or to an unverified address, and a
+// notice that cannot be rendered or sent is an Error record that never fails the sign-in.
+// *accountnotice.Notifier is the one implementation.
+type AccountNotifier interface {
+	Send(r *http.Request, notice accountnotice.Notice, to accountnotice.Recipient)
+}
+
 // HandleAuthOtpPost is POST /auth/otp, which accepts level2_otp. It reads the code from the
 // submitted body and runs authflow.OTPSubmission on it, then answers what it did: the form again
 // beside a refusal, which for a code from the next step says to check the device's time (#142), the
-// lost-enrolment page, or the redirect to /auth/completed.
+// lost-enrolment page, or the redirect to /auth/completed. An authenticator set up by the
+// submission is then told to the user through notifier, after the response (#724).
 //
 // A body carrying the recovery-code form's field is that form's submission, and runs
 // OTPSubmission.RunRecoveryCode instead: the same ceremony boundary, state gate and otp limiter
@@ -85,6 +96,7 @@ func HandleAuthOtpPost(
 	ceremonyStore CeremonyStore,
 	credentialFailures CredentialFailureRecorder,
 	submission *authflow.OTPSubmission,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -129,6 +141,17 @@ func HandleAuthOtpPost(
 		case authflow.OTPAccepted:
 			boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 		}
+
+		sendOTPNotice(r, notifier, result)
+	}
+}
+
+// sendOTPNotice hands the notice the submission reported to the notifier, after the response:
+// the operation committed the change and names it as a plain value, and sends nothing itself
+// (#724). A submission that changed nothing, or lost its change, reports none.
+func sendOTPNotice(r *http.Request, notifier AccountNotifier, result authflow.OTPSubmissionResult) {
+	if result.Notice == authflow.OTPNoticeAuthenticatorSetUp {
+		notifier.Send(r, accountnotice.OTPEnabled, accountnotice.To(result.NoticeTo))
 	}
 }
 

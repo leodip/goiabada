@@ -236,6 +236,7 @@ func HandleUserPasswordPut(
 func HandleUserOTPPut(
 	database usersCrudDatabase,
 	auditLogger AuditLogger,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -323,6 +324,11 @@ func HandleUserOTPPut(
 
 		// Set content type and encode response
 		writeJSON(w, r, http.StatusOK, response)
+
+		// The account's address is told an administrator turned two-factor authentication off,
+		// after the commit and the response, naming no administrator (#724). A removal refused
+		// or lost to a concurrent change above returned before this, and tells nobody.
+		notifier.Send(r, accountnotice.OTPDisabledByAdministrator, accountnotice.To(user))
 	}
 }
 

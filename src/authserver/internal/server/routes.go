@@ -171,7 +171,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// (#642 decision 5).
 		r.With(handlers.RequirePasswordChallenge(ceremonyBoundary, httpHelper, passwordPrompt, s.challengeVerifier), rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, passwordPrompt, authflow.NewPasswordSubmission(s.database, auditLogger)))
 		r.Get("/otp", handlers.HandleAuthOtpGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewOTPPrompt(s.database, otpSecretGenerator)))
-		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher)))
+		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher), notifier))
 		// The set of recovery codes an authenticator set up during this sign-in came with, shown once
 		// after the accepted setup code, and the Continue that goes on to /auth/completed (#257
 		// decision 14). It checks no credential, so neither method is behind a limiter.
@@ -287,7 +287,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/email/verification-code", apihandlers.HandleUserEmailVerificationCodePost(s.database, auditLogger, s.dataCipher))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/phone", apihandlers.HandleUserPhonePut(s.database, phoneValidator, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleUserPasswordPut(s.database, passwordValidator, auditLogger, notifier))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleUserOTPPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleUserOTPPut(s.database, auditLogger, notifier))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/profile-picture", apihandlers.HandleUserProfilePictureGet(s.database, baseURL))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/profile-picture", apihandlers.HandleUserProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleUserProfilePictureDelete(s.database, auditLogger))
@@ -480,7 +480,7 @@ func (s *Server) initRoutes(branches appBranches) {
 			apihandlers.HandleAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter, notifier))
 		r.Get("/otp/enrollment", apihandlers.HandleAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
 		r.With(rateLimiter.LimitAccountPassword).Put("/otp",
-			apihandlers.HandleAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher))
+			apihandlers.HandleAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher, notifier))
 		// The count of unused recovery codes checks no credential; a new set takes the password,
 		// so it spends the same bucket as the changes above (#257 decision 8).
 		r.Get("/otp/recovery-codes", apihandlers.HandleAccountRecoveryCodesGet(s.database))

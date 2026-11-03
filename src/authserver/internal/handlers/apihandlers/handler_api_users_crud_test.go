@@ -320,7 +320,7 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
+	HandleUserOTPPut(database, auditLogger, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, []string{"begin", "remove", "reset", "delete-codes", "increment", "lower", "commit"}, calls,
@@ -377,7 +377,7 @@ func TestHandleUserOTPPut_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
 			})
 
 			rr := httptest.NewRecorder()
-			HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
+			HandleUserOTPPut(database, auditLogger, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, req)
 
 			assert.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
 			assert.Equal(t, tc.wantCode, errorCodeOf(t, rr))

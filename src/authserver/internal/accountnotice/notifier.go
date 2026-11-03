@@ -1,6 +1,7 @@
 // Package accountnotice is the one notifier that emails a user about a change to their account:
 // the email change's notice to the previous address (#404 decisions 9 and 11), and the security
-// notices that tell a user their password was changed, by them or an administrator, or reset (#724).
+// notices that tell a user their password was changed, by them or an administrator, or reset, and
+// that their two-factor authentication was set up or turned off (#724).
 //
 // Every notice follows the same rules, which is why they live here once rather than beside each
 // handler. A handler calls Send after its change has committed, and only for the request whose
@@ -70,6 +71,15 @@ const (
 	// PasswordReset tells a user their password was reset through a forgot-password link. The
 	// setup link an administrator emails a new user sets a first password and sends none (#724).
 	PasswordReset Notice = "password_reset"
+	// OTPEnabled tells a user an authenticator was set up for their account, on the Account pages
+	// or while signing in, and mentions the set of recovery codes it came with, so that one event
+	// sends one email (#724 decision 1). Only the user can set one up.
+	OTPEnabled Notice = "otp_enabled"
+	// OTPDisabled tells a user they turned two-factor authentication off on the Account pages.
+	OTPDisabled Notice = "otp_disabled"
+	// OTPDisabledByAdministrator tells a user an administrator turned their two-factor
+	// authentication off.
+	OTPDisabledByAdministrator Notice = "otp_disabled_by_administrator"
 )
 
 // class is the job class whose budget the notice is admitted against: every notice but the email
@@ -153,6 +163,12 @@ func (n *Notifier) deliver(ctx context.Context, r *http.Request, notice Notice, 
 		page, subject = "/emails/email_password_changed_by_administrator.html", "email.password_changed_by_administrator.subject"
 	case PasswordReset:
 		page, subject = "/emails/email_password_reset.html", "email.password_reset.subject"
+	case OTPEnabled:
+		page, subject = "/emails/email_otp_enabled.html", "email.otp_enabled.subject"
+	case OTPDisabled:
+		page, subject = "/emails/email_otp_disabled.html", "email.otp_disabled.subject"
+	case OTPDisabledByAdministrator:
+		page, subject = "/emails/email_otp_disabled_by_administrator.html", "email.otp_disabled_by_administrator.subject"
 	default:
 		slog.ErrorContext(ctx, "unable to render an account notice",
 			"notice", string(notice), "user_id", to.UserId, "error", errUnknownNotice)

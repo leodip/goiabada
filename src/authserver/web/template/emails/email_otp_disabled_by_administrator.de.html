@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} – Ihre Zwei-Faktor-Authentifizierung wurde von der Administration deaktiviert{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Guten Tag {{.name}},</p>
+
+    <p>Die Administration hat die Zwei-Faktor-Authentifizierung Ihres Kontos bei {{ .appName }} deaktiviert. Ihre Authenticator-App und Ihre Wiederherstellungscodes funktionieren für die Anmeldung nicht mehr.</p>
+
+    <p>Falls Sie darum gebeten haben, brauchen Sie nichts zu tun. In Ihren Kontoeinstellungen können Sie eine neue Authenticator-App einrichten.</p>
+
+    <p><strong>Falls Sie damit nicht gerechnet haben, wenden Sie sich an Ihre Administration.</strong> Sie können auch auf der Anmeldeseite über „Passwort vergessen?“ ein neues Passwort wählen, sich dann anmelden und Ihre Einstellungen zur Zwei-Faktor-Authentifizierung prüfen.</p>
+
+    <p>Mit freundlichen Grüßen<br />{{ .appName }}</p>
+</div>
+
+{{end}}
