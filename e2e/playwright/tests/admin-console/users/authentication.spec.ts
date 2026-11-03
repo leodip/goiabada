@@ -4,6 +4,7 @@ import { submitPassword } from "../../../lib/browser-sign-in";
 import { enterRecoveryCode, recoveryCodeRefused, signInToConsole, turnOnTwoFactor } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
+import { linksIn, waitForMail } from "../../../lib/mailpit";
 import { passwordToken } from "../../../lib/oauth";
 import { passwordGrantClient } from "../../../lib/test-clients";
 import { freshTotp } from "../../../lib/totp";
@@ -44,6 +45,27 @@ test("a password set here replaces the old one", async ({ page, request, clients
   expect((await signIn("a-brand-new-password")).status).toBe(200);
   const old = await signIn(user.password);
   expect(old.body.error).toBe("invalid_grant");
+});
+
+test("a password set here sends the user a notice that an administrator changed it, with no link and no password", async ({
+  page,
+  request,
+  users,
+}) => {
+  // Verified, since a notice goes only to a verified address.
+  const user = await users.create({ emailVerified: true });
+  await page.goto(userUrl(user.id, "authentication"));
+  await page.locator("#newPassword").fill("a-password-an-admin-chose");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Changes saved.")).toBeVisible();
+
+  const notice = await waitForMail(request, user.email);
+  expect(notice.subject).toBe("An administrator changed your password");
+  expect(notice.html).toContain("An administrator changed the password for your");
+  expect(notice.html).toContain("If you weren't expecting it, contact your administrator.");
+  expect(linksIn(notice)).toEqual([]);
+  expect(notice.text + notice.html).not.toContain("a-password-an-admin-chose");
+  expect(notice.text + notice.html).not.toContain(user.password);
 });
 
 test("a password under the policy is refused, and the old one still works", async ({ page, request, clients, users }) => {

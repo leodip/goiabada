@@ -49,6 +49,8 @@ func TestGerman_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"newuser_set_password", "Test – Passwort für Ihr neues Konto festlegen", "Der Link ist 24 Stunden gültig."},
 			{"address_changed", "Ihre E-Mail-Adresse wurde geändert", "Andernfalls kennt möglicherweise jemand Ihr Passwort."},
 			{"password_changed", "Ihr Passwort wurde geändert", "Andernfalls verwendet möglicherweise jemand anderes Ihr Konto."},
+			{"password_changed_by_administrator", "Ihr Passwort wurde von der Administration geändert", "Falls Sie damit nicht gerechnet haben, wenden Sie sich an Ihre Administration."},
+			{"password_reset", "Ihr Passwort wurde zurückgesetzt", "Andernfalls kann möglicherweise jemand anderes Ihre E-Mails lesen und Ihr Konto verwenden."},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)

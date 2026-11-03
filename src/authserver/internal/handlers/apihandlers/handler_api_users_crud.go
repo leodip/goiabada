@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -46,6 +47,7 @@ type usersCrudDatabase interface {
 	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
 }
@@ -97,6 +99,7 @@ func HandleUserPasswordPut(
 	database usersCrudDatabase,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -170,7 +173,18 @@ func HandleUserPasswordPut(
 		//
 		// Narrow write, not a full-row UpdateUser: the model was loaded before validation, so
 		// writing every column back would undo a concurrent disable (decision 14).
+		//
+		// The row the write replaces is read first, under its lock, for the notice below: whether
+		// the account had a password is decided from it, so a setup link completed while this
+		// request waited can't leave the answer stale (#724 decision 6). Assigned on every
+		// attempt, since a deadlock reruns the body.
+		var replaced *record.User
 		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
+			current, readErr := database.GetUserByIdForUpdate(r.Context(), tx, user.Id)
+			if readErr != nil {
+				return readErr
+			}
+			replaced = current
 			return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
 		})
 		if err != nil {
@@ -207,6 +221,14 @@ func HandleUserPasswordPut(
 
 		// Set content type and encode response
 		writeJSON(w, r, http.StatusOK, response)
+
+		// The account's address is told an administrator replaced its password, after the commit
+		// and the response (#724). A first password, on an account whose setup link is pending,
+		// replaces nothing and tells nobody (decision 6). The notifier sends only with SMTP on and
+		// to a verified address; a change refused or rolled back above returned before this.
+		if replaced != nil && replaced.PasswordHash != "" {
+			notifier.Send(r, accountnotice.PasswordChangedByAdministrator, accountnotice.To(replaced))
+		}
 	}
 }
 

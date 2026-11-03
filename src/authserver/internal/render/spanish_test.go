@@ -48,6 +48,8 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 		{"email_verification", "verification", "Verificación del correo - código 123456", "Este es tu código de verificación"},
 		{"email_address_changed", "address_changed", "Tu dirección de correo electrónico ha cambiado", "puede que otra persona conozca tu contraseña."},
 		{"email_password_changed", "password_changed", "Tu contraseña ha cambiado", "puede que otra persona esté usando tu cuenta."},
+		{"email_password_changed_by_administrator", "password_changed_by_administrator", "Un administrador ha cambiado tu contraseña", "Si no lo esperabas, contacta con tu administrador."},
+		{"email_password_reset", "password_reset", "Tu contraseña se ha restablecido", "puede que otra persona lea tu correo y esté usando tu cuenta."},
 	} {
 		for _, locale := range []string{"es", "es-MX", "es-419"} {
 			t.Run(tc.body+" "+locale, func(t *testing.T) {
@@ -64,7 +66,9 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 				assert.Contains(t, buf.String(), tc.sentence)
 				assert.Contains(t, buf.String(), "Acme")
 				// A notice of a change carries no link.
-				if tc.body != "email_address_changed" && tc.body != "email_password_changed" {
+				notice := map[string]bool{"email_address_changed": true, "email_password_changed": true,
+					"email_password_changed_by_administrator": true, "email_password_reset": true}
+				if !notice[tc.body] {
 					assert.Contains(t, buf.String(), `href="https://example.com/continue"`)
 				} else {
 					assert.NotContains(t, buf.String(), "href")

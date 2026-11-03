@@ -2022,6 +2022,8 @@
 "email.newuser_set_password.subject" = "{{.appName}} - crie uma senha para sua nova conta"
 "email.address_changed.subject" = "Seu endereço de e-mail foi alterado"
 "email.password_changed.subject" = "Sua senha foi alterada"
+"email.password_changed_by_administrator.subject" = "Um administrador alterou a sua senha"
+"email.password_reset.subject" = "Sua senha foi redefinida"
 
 # --- Bootstrap de JS --------------------------------------------------------
 

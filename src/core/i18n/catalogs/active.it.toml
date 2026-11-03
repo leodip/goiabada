@@ -2135,6 +2135,8 @@
 "email.newuser_set_password.subject" = "{{.appName}} - crea una password per il tuo nuovo account"
 "email.address_changed.subject" = "Il tuo indirizzo email è stato cambiato"
 "email.password_changed.subject" = "La tua password è stata cambiata"
+"email.password_changed_by_administrator.subject" = "Un amministratore ha cambiato la tua password"
+"email.password_reset.subject" = "La tua password è stata reimpostata"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

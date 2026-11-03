@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"net/http"
@@ -67,6 +68,16 @@ type PageRenderer interface {
 // message went over TLS, which only the test send answers with.
 type EmailSender interface {
 	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) (emaildelivery.SendResult, error)
+}
+
+// AccountNotifier emails a user about a change to their account, after the response: here, the
+// notice that their password was reset through a forgot-password link. The handler calls it once
+// the reset has committed, and only for the request whose claim landed. The notifier decides the
+// rest: nothing is sent with SMTP off or to an unverified address, and a notice that cannot be
+// rendered or sent is an Error record that never fails the reset (#724).
+// *accountnotice.Notifier is the one implementation.
+type AccountNotifier interface {
+	Send(r *http.Request, notice accountnotice.Notice, to accountnotice.Recipient)
 }
 
 // EmailValidator is the address check alone, which is the only validation self-registration

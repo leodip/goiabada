@@ -43,8 +43,10 @@ Goiabada emails a user when their sign-in details change, so someone who stole a
 |---|---|
 | Their email address, changed on the Account pages | The address the account had |
 | Their password, changed on the Account pages | The account's address |
+| Their password, changed by an administrator | The account's address |
+| Their password, reset with a **Forgot your password?** link | The account's address |
 
-A notice is sent only while **Send email** is on under **Admin**, **Email**, and only to an address the user has verified. An administrator changing a user's email address sends nothing.
+A notice is sent only while **Send email** is on under **Admin**, **Email**, and only to an address the user has verified. An administrator changing a user's email address sends nothing. Neither does a user's first password, whether they set it with the link an administrator emailed them or an administrator set it before they did.
 
 Each notice says what changed and what to do if the user didn't change it, in the user's language. It carries no link and no password or code, and the email's date says when. It's sent once, just after the change. If the mail server can't take it, it's lost and the auth server logs an `ERROR` record. If too many are already waiting, it's dropped, which [monitoring](/deploy/monitoring/#set-up-alerts) counts.
 

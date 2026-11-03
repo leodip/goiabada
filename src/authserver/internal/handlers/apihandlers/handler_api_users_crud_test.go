@@ -215,6 +215,8 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&record.User{Id: userId}, nil).Once()
+	// The row the write replaces, read under its lock for the notice (#724 decision 6).
+	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, userId).Return(&record.User{Id: userId}, nil).Once()
 
 	var savedHash string
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, userId, mock.Anything).
@@ -243,7 +245,7 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 		map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
 
 	rr := httptest.NewRecorder()
-	handler := HandleUserPasswordPut(database, passwordValidator, auditLogger)
+	handler := HandleUserPasswordPut(database, passwordValidator, auditLogger, heldNotifier(t, &heldJobs{}))
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)

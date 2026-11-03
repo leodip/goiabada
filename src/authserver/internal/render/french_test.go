@@ -49,6 +49,8 @@ func TestFrench_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"newuser_set_password", "Test - créez un mot de passe pour votre nouveau compte", "Le lien est valable 24 heures."},
 			{"address_changed", "Votre adresse e-mail a été modifiée", "une autre personne connaît peut-être votre mot de passe."},
 			{"password_changed", "Votre mot de passe a été modifié", "Sinon, une autre personne utilise peut-être votre compte."},
+			{"password_changed_by_administrator", "Un administrateur a modifié votre mot de passe", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
+			{"password_reset", "Votre mot de passe a été réinitialisé", "Sinon, une autre personne lit peut-être vos e-mails et utilise votre compte."},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
