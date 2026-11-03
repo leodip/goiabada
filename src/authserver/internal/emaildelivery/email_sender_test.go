@@ -48,7 +48,7 @@ func TestSendEmail(t *testing.T) {
 		HtmlBody: "<p>This is a test email</p>",
 	}
 
-	err := emailSender.SendEmail(context.Background(), smtpConfig, input)
+	_, err := emailSender.SendEmail(context.Background(), smtpConfig, input)
 	require.NoError(t, err)
 
 	sent := mailpit.New(mailpitURL).AssertEmailSent(t, recipient, "<p>This is a test email</p>")
@@ -143,25 +143,37 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 		ext          []string
 		tlsExt       []string
 		tlsFromStart bool
+		// wantEncrypted is what the sender reports: whether the message went over TLS.
+		wantEncrypted bool
 	}{
 		{
-			name:       "none",
+			name:       "none, the relay offering no STARTTLS",
 			encryption: "none",
 			ext:        []string{"AUTH PLAIN", "8BITMIME"},
+		},
+		{
+			// #718 decision 14: STARTTLS if available upgrades when the relay offers it.
+			name:          "none, the relay offering STARTTLS",
+			encryption:    "none",
+			ext:           []string{"STARTTLS", "8BITMIME"},
+			tlsExt:        []string{"AUTH PLAIN", "8BITMIME"},
+			wantEncrypted: true,
 		},
 		{
 			name:       "starttls",
 			encryption: "starttls",
 			// AUTH is advertised only after the handshake, which is what a relay that requires
 			// TLS for authentication actually does.
-			ext:    []string{"STARTTLS", "8BITMIME"},
-			tlsExt: []string{"AUTH PLAIN", "8BITMIME"},
+			ext:           []string{"STARTTLS", "8BITMIME"},
+			tlsExt:        []string{"AUTH PLAIN", "8BITMIME"},
+			wantEncrypted: true,
 		},
 		{
-			name:         "ssltls",
-			encryption:   "ssltls",
-			tlsExt:       []string{"AUTH PLAIN", "8BITMIME"},
-			tlsFromStart: true,
+			name:          "ssltls",
+			encryption:    "ssltls",
+			tlsExt:        []string{"AUTH PLAIN", "8BITMIME"},
+			tlsFromStart:  true,
+			wantEncrypted: true,
 		},
 	}
 
@@ -181,12 +193,13 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 			smtpConfig := relayConfig(t, "127.0.0.1", port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool}
 
-			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			result, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
 			})
 			require.NoError(t, err)
+			assert.Equal(t, SendResult{Encrypted: test.wantEncrypted}, result)
 
 			user, password := f.credentials()
 			assert.Equal(t, fixtureUser, user)
@@ -199,7 +212,7 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 			assert.True(t, f.hasLinePrefix("QUIT"))
 			assert.Contains(t, f.data(), "Subject: Test email\r\n")
 
-			if test.encryption == "starttls" {
+			if test.ext != nil && extensionOffered(test.ext, "STARTTLS") {
 				startTLS := f.indexOfLinePrefix("STARTTLS")
 				require.GreaterOrEqual(t, startTLS, 0, "the client never issued STARTTLS")
 				assert.Greater(t, f.indexOfLinePrefix("AUTH"), startTLS,
@@ -248,7 +261,7 @@ func TestSendEmail_IPv6Host(t *testing.T) {
 			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool}
 
-			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -328,7 +341,7 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 
 			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-			err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -374,7 +387,7 @@ func TestSendEmail_LoginOverProtectedConnection(t *testing.T) {
 
 	smtpConfig := relayConfig(t, fakeHostname(t), port, "starttls", fixtureUser, fixturePassword, "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -405,7 +418,7 @@ func TestSendEmail_LoginAnswersUnconventionalChallenges(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -430,7 +443,8 @@ func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
 		port := f.start(t)
 		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-		require.NoError(t, NewSender(testDataCipher, "").SendEmail(context.Background(), smtpConfig, input))
+		_, err := NewSender(testDataCipher, "").SendEmail(context.Background(), smtpConfig, input)
+		require.NoError(t, err)
 
 		_, password := f.credentials()
 		assert.Equal(t, fixturePassword, password)
@@ -444,7 +458,7 @@ func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
 		otherCipher, err := encryption.NewDataCipher([]byte("fedcba9876543210fedcba9876543210"))
 		require.NoError(t, err)
 
-		err = NewSender(otherCipher, "").SendEmail(context.Background(), smtpConfig, input)
+		_, err = NewSender(otherCipher, "").SendEmail(context.Background(), smtpConfig, input)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the SMTP password")
 		assertSendFailure(t, err, SendFailureOther)
@@ -492,7 +506,7 @@ func TestSendEmail_PlainInitialResponseBoundary(t *testing.T) {
 
 			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, password, "Goiabada")
 
-			err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -536,7 +550,7 @@ func TestSendEmail_PlainChallengeFormOverProtectedConnection(t *testing.T) {
 
 	smtpConfig := relayConfig(t, fakeHostname(t), port, "starttls", fixtureUser, longPassword, "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -573,7 +587,7 @@ func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, longPassword, "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -679,6 +693,10 @@ func TestSendEmail_PlainCredentialsTheMechanismCanCarry(t *testing.T) {
 	}
 }
 
+// passwordOnlyToThisMachine is the sender's refusal to hand a password to a relay off this machine
+// under STARTTLS if available (#718 decision 16).
+const passwordOnlyToThisMachine = "with STARTTLS if available, the password is sent only to a server on this machine; set the encryption to STARTTLS or SSL/TLS"
+
 // TestSendEmail_FailsClosed covers decisions 1, 2 and 4. Every refusal sits next to the row it
 // would succeed under, differing in one field, so the named gate is demonstrably the reason.
 func TestSendEmail_FailsClosed(t *testing.T) {
@@ -694,6 +712,8 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 		tlsExt     []string
 		wantError  string
 		wantKind   SendFailureKind
+		// wantTLS is a row whose session went through STARTTLS before the gate decided.
+		wantTLS bool
 	}{
 		{
 			name:       "starttls offered, delivers",
@@ -708,7 +728,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			encryption: "starttls",
 			host:       "127.0.0.1",
 			ext:        []string{"AUTH PLAIN", "8BITMIME"},
-			wantError:  "the SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS",
+			wantError:  "the SMTP server did not offer STARTTLS; check the port, or choose STARTTLS if available only if the server has no TLS",
 			wantKind:   SendFailureSTARTTLSNotOffered,
 		},
 		{
@@ -723,8 +743,49 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			encryption: "none",
 			host:       hostname,
 			ext:        []string{"AUTH PLAIN", "8BITMIME"},
-			wantError:  "the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS",
+			wantError:  passwordOnlyToThisMachine,
 			wantKind:   SendFailureUnencryptedPassword,
+		},
+		{
+			// #718 decision 15: the gate reads the configured mode, not the connection. The relay
+			// offers STARTTLS with a certificate the sender trusts, so the session is upgraded, and
+			// the password is refused all the same.
+			name:       "none upgraded through STARTTLS to a non-loopback host, PLAIN offered",
+			encryption: "none",
+			host:       hostname,
+			ext:        []string{"STARTTLS", "8BITMIME"},
+			tlsExt:     []string{"AUTH PLAIN", "8BITMIME"},
+			wantError:  passwordOnlyToThisMachine,
+			wantKind:   SendFailureUnencryptedPassword,
+			wantTLS:    true,
+		},
+		{
+			// The same upgraded session to a loopback host, which the gate lets through.
+			name:       "none upgraded through STARTTLS to a loopback host, PLAIN offered",
+			encryption: "none",
+			host:       "127.0.0.1",
+			ext:        []string{"STARTTLS", "8BITMIME"},
+			tlsExt:     []string{"AUTH PLAIN", "8BITMIME"},
+			wantTLS:    true,
+		},
+		{
+			// And to the non-loopback host by CRAM-MD5, which never sends the password.
+			name:       "none upgraded through STARTTLS to a non-loopback host, only CRAM-MD5 offered",
+			encryption: "none",
+			host:       hostname,
+			ext:        []string{"STARTTLS", "8BITMIME"},
+			tlsExt:     []string{"AUTH CRAM-MD5", "8BITMIME"},
+			wantTLS:    true,
+		},
+		{
+			name:       "none upgraded through STARTTLS to a non-loopback host, only LOGIN offered",
+			encryption: "none",
+			host:       hostname,
+			ext:        []string{"STARTTLS", "8BITMIME"},
+			tlsExt:     []string{"AUTH LOGIN", "8BITMIME"},
+			wantError:  passwordOnlyToThisMachine,
+			wantKind:   SendFailureUnencryptedPassword,
+			wantTLS:    true,
 		},
 		{
 			// The same refusal with PLAIN off the table, so net/smtp.PlainAuth's own guard
@@ -733,7 +794,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			encryption: "none",
 			host:       hostname,
 			ext:        []string{"AUTH LOGIN", "8BITMIME"},
-			wantError:  "the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS",
+			wantError:  passwordOnlyToThisMachine,
 			wantKind:   SendFailureUnencryptedPassword,
 		},
 		{
@@ -769,11 +830,17 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool}
 
-			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
 			})
+
+			if test.wantTLS {
+				startTLS := f.indexOfLinePrefix("STARTTLS")
+				require.GreaterOrEqual(t, startTLS, 0, "the session was meant to be upgraded")
+				assert.Equal(t, 1, f.connections(), "an upgraded session needs no second connection")
+			}
 
 			if test.wantError == "" {
 				require.NoError(t, err)
@@ -873,7 +940,7 @@ func TestSendEmail_CertificateVerification(t *testing.T) {
 
 			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 
-			err := (&Sender{dataCipher: testDataCipher, rootCAs: pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := (&Sender{dataCipher: testDataCipher, rootCAs: pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -945,7 +1012,8 @@ func send(t *testing.T, fromName string, input *SendEmailInput) sentMessage {
 	port := f.start(t)
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", fromName)
-	require.NoError(t, (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, input))
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, input)
+	require.NoError(t, err)
 
 	return parseMessage(t, f.data())
 }
@@ -1127,7 +1195,7 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 
 		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-		err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+		_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  strings.Repeat("s", longest+1),
 			HtmlBody: "<p>hello</p>",
@@ -1146,7 +1214,7 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 
 		// An address has no fold point inside it: "<" + 1000 + "@example.com>" on a continuation
 		// line is 1 + 1014 bytes.
-		err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+		_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       strings.Repeat("r", 1000) + "@example.com",
 			Subject:  "Test email",
 			HtmlBody: "<p>hello</p>",
@@ -1346,7 +1414,7 @@ func TestSendEmail_FinalDataRejection(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1460,11 +1528,12 @@ func TestSendEmail_MessageID(t *testing.T) {
 			f := &fakeSMTP{ext: []string{"8BITMIME"}}
 			port := f.start(t)
 			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-			require.NoError(t, sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  fmt.Sprintf("Test email %d", i),
 				HtmlBody: "<p>hello</p>",
-			}))
+			})
+			require.NoError(t, err)
 			seen = append(seen, parseMessage(t, f.data()).headers["Message-ID"])
 		}
 
@@ -1479,7 +1548,7 @@ func TestSendEmail_MessageID(t *testing.T) {
 		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 		sender := &Sender{dataCipher: testDataCipher, randReader: iotest.ErrReader(io.ErrUnexpectedEOF)}
 
-		err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+		_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  "Test email",
 			HtmlBody: "<p>hello</p>",
@@ -1567,7 +1636,7 @@ func TestSendEmail_InvalidRecipient(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       "not an address",
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1591,7 +1660,7 @@ func TestSendEmail_DialTimeout(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher, dialTimeout: -time.Second}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher, dialTimeout: -time.Second}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",

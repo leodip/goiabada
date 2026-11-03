@@ -614,12 +614,12 @@ func TestAPISettingsEmailSendTest_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
 
-	var okBody struct {
-		Success bool `json:"success"`
-	}
+	// Mailpit offers no STARTTLS, so STARTTLS if available sends the message unencrypted and the
+	// answer says so (#718 decision 16). Decoded into a map so an absent field is not read as false.
+	var okBody map[string]any
 	err := json.NewDecoder(resp.Body).Decode(&okBody)
 	require.NoError(t, err)
-	assert.True(t, okBody.Success)
+	assert.Equal(t, map[string]any{"success": true, "encrypted": false}, okBody)
 }
 
 func TestAPISettingsEmailSendTest_SMTPDisabled(t *testing.T) {

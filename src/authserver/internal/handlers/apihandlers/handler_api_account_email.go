@@ -187,7 +187,7 @@ func notifyPreviousAddress(r *http.Request, pageRenderer PageRenderer, emailSend
 			Subject:  i18n.T(emailReq.Context(), "email.address_changed.subject"),
 			HtmlBody: buf.String(),
 		}
-		if err := emailSender.SendEmail(ctx, smtpConfig, input); err != nil {
+		if _, err := emailSender.SendEmail(ctx, smtpConfig, input); err != nil {
 			slog.ErrorContext(ctx, "unable to send the email address change notice", "user_id", userId, "error", err)
 		}
 	})

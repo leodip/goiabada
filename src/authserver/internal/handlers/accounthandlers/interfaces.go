@@ -63,9 +63,10 @@ type PageRenderer interface {
 
 // EmailSender delivers one message. The context is the request's, or the job's that a request
 // handed its mail to (AfterResponse); either way it carries the request's id. The SMTP dial and
-// conversation are bounded by the sender's own deadlines.
+// conversation are bounded by the sender's own deadlines. A send that succeeded reports whether its
+// message went over TLS, which only the test send answers with.
 type EmailSender interface {
-	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error
+	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) (emaildelivery.SendResult, error)
 }
 
 // EmailValidator is the address check alone, which is the only validation self-registration

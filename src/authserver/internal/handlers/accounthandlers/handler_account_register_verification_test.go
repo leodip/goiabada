@@ -297,7 +297,7 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 		Run(func(args mock.Arguments) {
 			sent = args.Get(2).(*emaildelivery.SendEmailInput)
 			order = append(order, "send")
-		}).Return(nil).Once()
+		}).Return(emaildelivery.SendResult{}, nil).Once()
 
 	h.handler.ServeHTTP(rr, req)
 	assert.Nil(t, created, "the pending registration is written after the response")
@@ -390,7 +390,7 @@ func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguag
 			var sent *emaildelivery.SendEmailInput
 			h.emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
 				Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).
-				Return(nil).Once()
+				Return(emaildelivery.SendResult{}, nil).Once()
 
 			h.handler.ServeHTTP(rr, req)
 			h.jobs.runAll(t, afterresponse.ClassRegistration)
@@ -480,7 +480,7 @@ func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNoti
 				Run(func(args mock.Arguments) {
 					sent = args.Get(2).(*emaildelivery.SendEmailInput)
 					order = append(order, "send")
-				}).Return(nil).Once()
+				}).Return(emaildelivery.SendResult{}, nil).Once()
 
 			h.handler.ServeHTTP(rr, req)
 			h.jobs.runAll(t, afterresponse.ClassRegistration)
@@ -654,7 +654,7 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 		details, _ := captureRequestedRegistration(h.auditLogger, nil)
 		h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 			"/emails/email_register_activate.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
-		h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError).Once()
+		h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, assert.AnError).Once()
 
 		h.handler.ServeHTTP(rr, req)
 		h.jobs.runAll(t, afterresponse.ClassRegistration)
@@ -677,7 +677,7 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 		details, _ := captureRequestedRegistration(h.auditLogger, nil)
 		h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 			"/emails/email_register_existing_account.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
-		h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError).Once()
+		h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, assert.AnError).Once()
 
 		h.handler.ServeHTTP(rr, req)
 		h.jobs.runAll(t, afterresponse.ClassRegistration)

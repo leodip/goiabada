@@ -25,6 +25,13 @@ func assertSendFailure(t *testing.T, err error, want SendFailureKind) {
 
 func sendTo(t *testing.T, sender *Sender, smtpConfig SMTPConfig) error {
 	t.Helper()
+	_, err := sendReporting(t, sender, smtpConfig)
+	return err
+}
+
+// sendReporting is sendTo with what the sender reports about the send as well.
+func sendReporting(t *testing.T, sender *Sender, smtpConfig SMTPConfig) (SendResult, error) {
+	t.Helper()
 	return sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",

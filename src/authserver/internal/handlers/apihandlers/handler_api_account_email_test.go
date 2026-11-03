@@ -417,7 +417,7 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 				Run(func(args mock.Arguments) {
 					sendCtx = args.Get(0).(context.Context)
 					sent = args.Get(2).(*emaildelivery.SendEmailInput)
-				}).Return(nil).Once()
+				}).Return(emaildelivery.SendResult{}, nil).Once()
 
 			jobs.runAll(t)
 
@@ -541,7 +541,7 @@ func TestHandleAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse(t *tes
 			} else {
 				pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(&bytes.Buffer{}, nil).Once()
-				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(tc.sendErr).Once()
+				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, tc.sendErr).Once()
 			}
 			jobs.runAll(t)
 

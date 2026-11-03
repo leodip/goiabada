@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -237,7 +238,7 @@ func TestHandleRegisterPost_WithVerificationTheLinkCarriesTheSignIn(t *testing.T
 				Run(func(args mock.Arguments) { mailBind = args.Get(3).(map[string]interface{}) }).
 				Return(bytes.NewBufferString("activation mail"), nil).Once()
 			h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
-				Return(nil).Once()
+				Return(emaildelivery.SendResult{}, nil).Once()
 
 			h.handler.ServeHTTP(rr, req)
 			assert.Equal(t, map[string]interface{}{"email": registerSomeoneEmail}, *page,

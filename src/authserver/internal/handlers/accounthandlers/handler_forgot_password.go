@@ -299,7 +299,7 @@ func finishForgotPassword(
 		Subject:  i18n.T(emailReq.Context(), "email.forgot_password.subject"),
 		HtmlBody: buf.String(),
 	}
-	if err := emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
+	if _, err := emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
 		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.Id, "error", err)
 	}
 }

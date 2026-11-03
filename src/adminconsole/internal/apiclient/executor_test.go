@@ -2,7 +2,6 @@ package apiclient
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -278,7 +277,7 @@ func TestExecutor_TheCallsThatSendMailOutlastTenSeconds(t *testing.T) {
 				return
 			}
 			require.Error(t, err, "every other call ends on the general deadline")
-			assert.True(t, errors.Is(err, context.DeadlineExceeded), "a deadline, not another failure: %v", err)
+			require.ErrorIs(t, err, context.DeadlineExceeded, "a deadline, not another failure")
 			assert.GreaterOrEqual(t, elapsed, generalDeadline, "not before 10 seconds")
 			assert.Less(t, elapsed, answersAfter, "before the slow server answers")
 		})

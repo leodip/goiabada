@@ -71,7 +71,7 @@ func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing
 		PasswordEncrypted: []byte("ciphertext"),
 	}, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
 		return input.To == "admin@example.com" && input.Subject == "Test email"
-	})).Return(nil).Once()
+	})).Return(emaildelivery.SendResult{Encrypted: true}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventSentTestEmail, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -79,6 +79,34 @@ func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing
 		ServeHTTP(rr, sendTestEmailRequest(t, settings))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+}
+
+// A test send that succeeded answers whether its message went over TLS, as the sender reports it:
+// STARTTLS if available sends in plaintext when the relay offers no STARTTLS or its certificate is
+// not trusted, and the administrator has no other way to see which (#718 decision 16).
+func TestHandleSettingsEmailSendTestPost_AnswersWhetherTheMessageWentEncrypted(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		result emaildelivery.SendResult
+		want   string
+	}{
+		{"sent over TLS", emaildelivery.SendResult{Encrypted: true}, `{"success":true,"encrypted":true}`},
+		{"sent in plaintext", emaildelivery.SendResult{Encrypted: false}, `{"success":true,"encrypted":false}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(tc.result, nil).Once()
+			auditLogger.On("Log", mock.Anything, audit.EventSentTestEmail, mock.Anything).Return().Once()
+
+			rr := httptest.NewRecorder()
+			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
+				ServeHTTP(rr, sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true, SMTPEncryption: "none"}))
+
+			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			assert.JSONEq(t, tc.want, rr.Body.String())
+		})
+	}
 }
 
 // sendTestRequestId is the request id every failed test send case carries, as the request id
@@ -126,10 +154,10 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			"Unable to send the test email."},
 		{"STARTTLS not offered",
 			labelled(emaildelivery.SendFailureSTARTTLSNotOffered, serverText),
-			"The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS."},
+			"The SMTP server did not offer STARTTLS; check the port, or choose STARTTLS if available only if the server has no TLS."},
 		{"a password that would go unencrypted",
 			labelled(emaildelivery.SendFailureUnencryptedPassword, serverText),
-			"The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."},
+			"With STARTTLS if available, the password is sent only to a server on this machine; set the encryption to STARTTLS or SSL/TLS."},
 		{"credentials configured and no authentication offered",
 			labelled(emaildelivery.SendFailureNoAuthentication, serverText),
 			"SMTP credentials are configured but the server offers no authentication."},
@@ -167,7 +195,7 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			capture := logtest.CaptureSlog(t)
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(tc.err).Once()
+			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, tc.err).Once()
 
 			r := sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true})
 			r = r.WithContext(requestid.NewContext(r.Context(), sendTestRequestId))

@@ -2,7 +2,6 @@ package emaildelivery
 
 import (
 	"context"
-	"errors"
 	"net"
 	"strconv"
 	"strings"
@@ -74,7 +73,7 @@ func TestSendEmail_AStalledWriteEndsAtTheCommandLimit(t *testing.T) {
 	sender := &Sender{dataCipher: testDataCipher, commandTimeout: 300 * time.Millisecond, sendTimeout: 3 * time.Second}
 
 	started := time.Now()
-	err := sender.SendEmail(context.Background(), relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
+	_, err := sender.SendEmail(context.Background(), relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
 		To:      fixtureRecipient,
 		Subject: "Test email",
 		// About 20 MB, several times what the socket buffers between the two ends can hold: the dev
@@ -179,7 +178,7 @@ func TestSendEmail_ACancelledCallerEndsTheSend(t *testing.T) {
 	time.AfterFunc(cancelAfter, cancel)
 
 	started := time.Now()
-	err := sender.SendEmail(ctx, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
+	_, err := sender.SendEmail(ctx, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -187,7 +186,7 @@ func TestSendEmail_ACancelledCallerEndsTheSend(t *testing.T) {
 	elapsed := time.Since(started)
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, context.Canceled), "the caller's cancellation is not on the chain: %v", err)
+	require.ErrorIs(t, err, context.Canceled, "the caller's cancellation is not on the chain")
 	assertSendFailure(t, err, SendFailureConnection)
 	assert.NotEmpty(t, f.data(), "the cancellation came while waiting for the reply to the data")
 	assert.GreaterOrEqual(t, elapsed, cancelAfter, "the send ended before its caller gave up")

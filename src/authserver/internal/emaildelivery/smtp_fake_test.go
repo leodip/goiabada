@@ -65,6 +65,12 @@ type fakeSMTP struct {
 	// refuseEHLO answers EHLO with a 502, as a relay that predates the service extensions does, so
 	// the client has to fall back to HELO (RFC 5321 section 4.1.4).
 	refuseEHLO bool
+	// refuseSTARTTLS answers a STARTTLS the EHLO reply offered with RFC 3207 section 4's 454, TLS not
+	// available due to a temporary reason, and carries on in plaintext.
+	refuseSTARTTLS bool
+	// stallHandshake answers STARTTLS with its 220 and then reads nothing, so the client's handshake
+	// waits on the server's reply until its own deadline.
+	stallHandshake bool
 
 	// breakOn names the first command, such as EHLO, STARTTLS or QUIT, the fake answers by breaking
 	// the connection the way breakHow says, rather than with a reply. Before STARTTLS nothing
@@ -95,13 +101,13 @@ type fakeSMTP struct {
 	// stopped closes when the test ends, releasing a serve blocked without reading.
 	stopped chan struct{}
 
-	mu        sync.Mutex
-	log       []string
-	dataRaw   string
-	authUser  string
-	authPass  string
-	connected bool
-	conn      net.Conn
+	mu       sync.Mutex
+	log      []string
+	sessions [][]string
+	dataRaw  string
+	authUser string
+	authPass string
+	conns    []net.Conn
 }
 
 // connectionBreak is how the fake breaks a connection at breakOn.
@@ -116,10 +122,25 @@ const (
 	breakStall
 )
 
-func (f *fakeSMTP) record(line string) {
+// record keeps a line the client sent on connection session, counted from 0 in the order the fake
+// accepted them.
+func (f *fakeSMTP) record(session int, line string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.log = append(f.log, line)
+	f.sessions[session] = append(f.sessions[session], line)
+}
+
+// connectionLines returns every line the client sent on each connection, one slice per connection
+// in the order the fake accepted them.
+func (f *fakeSMTP) connectionLines() [][]string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([][]string, len(f.sessions))
+	for i, lines := range f.sessions {
+		out[i] = append([]string(nil), lines...)
+	}
+	return out
 }
 
 // lines returns every line the client sent, including the authentication responses.
@@ -143,9 +164,14 @@ func (f *fakeSMTP) credentials() (string, string) {
 }
 
 func (f *fakeSMTP) sawConnection() bool {
+	return f.connections() > 0
+}
+
+// connections is how many connections the fake has accepted.
+func (f *fakeSMTP) connections() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.connected
+	return len(f.conns)
 }
 
 // hasLinePrefix reports whether any recorded line starts with the given SMTP verb.
@@ -173,7 +199,7 @@ func (f *fakeSMTP) serverTLSConfig() *tls.Config {
 	return &tls.Config{Certificates: []tls.Certificate{f.cert.cert}}
 }
 
-func (f *fakeSMTP) serve(conn net.Conn) {
+func (f *fakeSMTP) serve(session int, conn net.Conn) {
 	defer func() { _ = conn.Close() }()
 	raw := conn
 
@@ -203,7 +229,7 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 			return
 		}
 		line = strings.TrimRight(line, "\r\n")
-		f.record(line)
+		f.record(session, line)
 		up := strings.ToUpper(line)
 
 		if f.breakOn != "" && strings.HasPrefix(up, f.breakOn) {
@@ -246,7 +272,17 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 				say("502 command not implemented")
 				continue
 			}
+			if f.refuseSTARTTLS {
+				say("454 4.7.0 TLS not available due to temporary reason")
+				continue
+			}
 			say("220 ready to start TLS")
+			if f.stallHandshake {
+				// The ClientHello arrives and nothing answers it. The read ends when the client
+				// gives up and closes the connection.
+				_, _ = io.Copy(io.Discard, conn)
+				return
+			}
 			tc := tls.Server(conn, f.serverTLSConfig())
 			if err := tc.Handshake(); err != nil {
 				return
@@ -269,7 +305,7 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 					return
 				}
 				payload = strings.TrimRight(next, "\r\n")
-				f.record(payload)
+				f.record(session, payload)
 			}
 			raw, err := base64.StdEncoding.DecodeString(payload)
 			if err != nil {
@@ -294,7 +330,7 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 				if err != nil {
 					return
 				}
-				f.record(strings.TrimRight(next, "\r\n"))
+				f.record(session, strings.TrimRight(next, "\r\n"))
 				say("535 5.7.8 authentication failed")
 				continue
 			}
@@ -306,12 +342,12 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 				challenges = []string{"Username:", "Password:"}
 			}
 			say("334 " + base64.StdEncoding.EncodeToString([]byte(challenges[0])))
-			user, err := f.readBase64Line(r)
+			user, err := f.readBase64Line(session, r)
 			if err != nil {
 				return
 			}
 			say("334 " + base64.StdEncoding.EncodeToString([]byte(challenges[1])))
-			pass, err := f.readBase64Line(r)
+			pass, err := f.readBase64Line(session, r)
 			if err != nil {
 				return
 			}
@@ -322,7 +358,7 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 
 		case up == "AUTH CRAM-MD5":
 			say("334 " + base64.StdEncoding.EncodeToString([]byte(fakeCRAMChallenge)))
-			answer, err := f.readBase64Line(r)
+			answer, err := f.readBase64Line(session, r)
 			if err != nil {
 				return
 			}
@@ -391,13 +427,13 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 	}
 }
 
-func (f *fakeSMTP) readBase64Line(r *bufio.Reader) (string, error) {
+func (f *fakeSMTP) readBase64Line(session int, r *bufio.Reader) (string, error) {
 	line, err := r.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
 	line = strings.TrimRight(line, "\r\n")
-	f.record(line)
+	f.record(session, line)
 	raw, err := base64.StdEncoding.DecodeString(line)
 	if err != nil {
 		return "", err
@@ -417,7 +453,8 @@ func extensionOffered(ext []string, name string) bool {
 
 // start binds the fake to an ephemeral port on every interface, because the rows for decision 1
 // reach it through os.Hostname(), which inside a container is the non-loopback address,
-// confirmed for #274. It serves exactly one connection.
+// confirmed for #274. It serves every connection it is given, one after another, each with the
+// same behavior: a fallback reconnect after a failed STARTTLS handshake is a second one.
 func (f *fakeSMTP) start(t *testing.T) int {
 	t.Helper()
 
@@ -433,34 +470,43 @@ func (f *fakeSMTP) start(t *testing.T) int {
 	}
 
 	f.stopped = make(chan struct{})
+	var served sync.WaitGroup
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		conn, err := ln.Accept()
-		if err != nil {
-			return
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			if f.stopReadingAtData {
+				// The smallest receive window, so the body cannot hide in this side's buffer.
+				_ = conn.(*net.TCPConn).SetReadBuffer(1)
+			}
+			f.mu.Lock()
+			session := len(f.conns)
+			f.conns = append(f.conns, conn)
+			f.sessions = append(f.sessions, nil)
+			f.mu.Unlock()
+			served.Add(1)
+			go func() {
+				defer served.Done()
+				f.serve(session, conn)
+			}()
 		}
-		if f.stopReadingAtData {
-			// The smallest receive window, so the body cannot hide in this side's buffer.
-			_ = conn.(*net.TCPConn).SetReadBuffer(1)
-		}
-		f.mu.Lock()
-		f.connected = true
-		f.conn = conn
-		f.mu.Unlock()
-		f.serve(conn)
 	}()
 
 	t.Cleanup(func() {
 		close(f.stopped)
 		_ = ln.Close()
+		<-done
 		f.mu.Lock()
-		conn := f.conn
+		conns := append([]net.Conn(nil), f.conns...)
 		f.mu.Unlock()
-		if conn != nil {
+		for _, conn := range conns {
 			_ = conn.Close()
 		}
-		<-done
+		served.Wait()
 	})
 
 	return ln.Addr().(*net.TCPAddr).Port

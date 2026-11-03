@@ -334,7 +334,8 @@ func HandleSettingsEmailSendTestPost(
 		// A failure answers the fixed message of its kind and the error goes to the log: the error
 		// carries addresses, operating-system strings and the server's own replies, and anyone who
 		// can point the host somewhere would read them back here (#410 decision 5).
-		if err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
+		result, err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
+		if err != nil {
 			slog.WarnContext(r.Context(), "unable to send the test email", "error", err)
 			writeLocalizedError(w, r, sendFailureMessage(err), "SEND_FAILED", http.StatusBadRequest)
 			return
@@ -345,7 +346,10 @@ func HandleSettingsEmailSendTestPost(
 			"to":             req.To,
 		})
 
-		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
+		// Whether the message went over TLS: STARTTLS if available sends in plaintext when the relay
+		// offers no STARTTLS or its certificate is not trusted, and this is where an administrator
+		// sees which (#718 decision 16).
+		writeJSON(w, r, http.StatusOK, api.SendTestEmailResponse{Success: true, Encrypted: result.Encrypted})
 	}
 }
 

@@ -856,7 +856,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 2525},
 			mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
 				return input.To == "test@example.com" && input.Subject == "Welcome!"
-			})).Return(nil)
+			})).Return(emaildelivery.SendResult{}, nil)
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
@@ -962,7 +962,7 @@ func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 			emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 2525},
 				mock.Anything).
 				Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).
-				Return(nil)
+				Return(emaildelivery.SendResult{}, nil)
 			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html",
 				mock.Anything).Return(nil)
 

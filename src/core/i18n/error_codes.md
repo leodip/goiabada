@@ -186,8 +186,8 @@ key per cause, each a whole sentence.
 | `handler.settings_email.send_failed_timed_out` | (none) | Unable to send the test email: connection timed out. |
 | `handler.settings_email.send_failed_refused` | (none) | Unable to send the test email: connection refused. |
 | `handler.settings_email.send_failed` | (none) | Unable to send the test email. |
-| `handler.settings_email.starttls_not_offered` | (none) | The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS. |
-| `handler.settings_email.password_unencrypted` | (none) | The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS. |
+| `handler.settings_email.starttls_not_offered` | (none) | The SMTP server did not offer STARTTLS; check the port, or choose STARTTLS if available only if the server has no TLS. |
+| `handler.settings_email.password_unencrypted` | (none) | With STARTTLS if available, the password is sent only to a server on this machine; set the encryption to STARTTLS or SSL/TLS. |
 | `handler.settings_email.no_authentication` | (none) | SMTP credentials are configured but the server offers no authentication. |
 | `handler.settings_email.no_supported_mechanism` | (none) | The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5. |
 | `handler.settings_email.plain_credentials_unusable` | (none) | The SMTP username and password can't be used with the server's sign-in method: the password is empty, or one of them contains a null character. |

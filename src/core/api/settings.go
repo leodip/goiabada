@@ -139,6 +139,13 @@ type SendTestEmailRequest struct {
 	To string `json:"to"`
 }
 
+// SendTestEmailResponse is a test send that succeeded. Encrypted is whether its message went over
+// TLS: always for SSL/TLS and STARTTLS, and for STARTTLS if available whether the upgrade held.
+type SendTestEmailResponse struct {
+	Success   bool `json:"success"`
+	Encrypted bool `json:"encrypted"`
+}
+
 // SettingsSessionsResponse represents the session settings returned by the API
 type SettingsSessionsResponse struct {
 	UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`

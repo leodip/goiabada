@@ -1,11 +1,12 @@
 // Package emaildelivery sends the auth server's mail: one message per call, over the SMTP relay
-// the settings row configures, with the connection's encryption and authentication refused rather
-// than downgraded. It renders nothing; the handlers build the HTML body from their templates and
-// pass the relay as an SMTPConfig.
+// the settings row configures. SSL/TLS and STARTTLS are refused rather than downgraded; STARTTLS if
+// available, the `none` mode, upgrades when it can and says when it could not. It renders nothing;
+// the handlers build the HTML body from their templates and pass the relay as an SMTPConfig.
 package emaildelivery
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
@@ -115,41 +116,81 @@ type SendEmailInput struct {
 	HtmlBody string
 }
 
+// SendResult is what a send that succeeded reports about how it went.
+type SendResult struct {
+	// Encrypted is whether the message went over TLS: always for SSL/TLS and STARTTLS, and for
+	// STARTTLS if available whether the upgrade held (#718 decision 16).
+	Encrypted bool
+}
+
 // SendEmail sends one message through the relay smtpConfig names. Every failure it returns carries
 // a *SendError labelling its kind, which SendFailureKindOf reads: the steps that can tell label their
 // own, and anything else is SendFailureOther (#410 decision 5).
 //
 // A caller whose ctx ends closes the connection, which ends the send; the failure then carries
 // ctx's error on its chain as well as the one the closed connection caused.
-func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *SendEmailInput) error {
-	err := e.send(ctx, smtpConfig, input)
+func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *SendEmailInput) (SendResult, error) {
+	result, err := e.send(ctx, smtpConfig, input)
 	if err == nil {
-		return nil
+		return result, nil
 	}
 	if ctxErr := ctx.Err(); ctxErr != nil && !errors.Is(err, ctxErr) {
 		err = errs.Join(err, ctxErr)
 	}
 	var sendErr *SendError
 	if errors.As(err, &sendErr) {
-		return err
+		return SendResult{}, err
 	}
-	return labelled(SendFailureOther, err)
+	return SendResult{}, labelled(SendFailureOther, err)
 }
 
-func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEmailInput) error {
+// The reasons logSentUnencrypted gives under `reason`.
+const (
+	unencryptedReasonSTARTTLSNotOffered = "starttls_not_offered"
+	unencryptedReasonSTARTTLSRefused    = "starttls_refused"
+	unencryptedReasonTLSFailed          = "tls_failed"
+)
+
+// logSentUnencrypted writes the one Info record a send under STARTTLS if available writes when it
+// goes in plaintext, with its reason and, for a STARTTLS that failed, how (#718 decision 14). Info
+// is the default log level, so a relay that stops offering STARTTLS, or an attacker who strips it,
+// can be seen.
+func logSentUnencrypted(ctx context.Context, reason string, cause error) {
+	if cause == nil {
+		slog.InfoContext(ctx, "sending the email unencrypted", "reason", reason)
+		return
+	}
+	slog.InfoContext(ctx, "sending the email unencrypted", "reason", reason, "error", cause)
+}
+
+// relayDial is how one send reaches its relay, the same for a fallback's second connection as for
+// the first.
+type relayDial struct {
+	addr      string
+	host      string
+	tlsConfig *tls.Config
+	// implicitTLS is the SSL/TLS mode: the handshake is part of the connect.
+	implicitTLS    bool
+	dialTimeout    time.Duration
+	commandTimeout time.Duration
+	// sendDeadline is when the whole send ends, however many connections it takes.
+	sendDeadline time.Time
+}
+
+func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEmailInput) (SendResult, error) {
 
 	var password string
 	if len(smtpConfig.PasswordEncrypted) > 0 {
 		decryptedPassword, err := e.dataCipher.Decrypt(smtpConfig.PasswordEncrypted)
 		if err != nil {
-			return errs.Wrap(err, "unable to decrypt the SMTP password")
+			return SendResult{}, errs.Wrap(err, "unable to decrypt the SMTP password")
 		}
 		password = decryptedPassword
 	}
 
 	smtpEnc, err := SMTPEncryptionFromString(smtpConfig.Encryption)
 	if err != nil {
-		return errs.Wrap(err, "unable to parse the SMTP encryption")
+		return SendResult{}, errs.Wrap(err, "unable to parse the SMTP encryption")
 	}
 
 	// Build the whole message before dialing, so a bad address or a failed entropy read costs no
@@ -157,11 +198,11 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	from := &mail.Address{Name: smtpConfig.FromName, Address: smtpConfig.FromEmail}
 	to, err := mail.ParseAddress(input.To)
 	if err != nil {
-		return errs.Wrap(err, "invalid recipient address")
+		return SendResult{}, errs.Wrap(err, "invalid recipient address")
 	}
 	message, err := e.buildMessage(from, to, input)
 	if err != nil {
-		return err
+		return SendResult{}, err
 	}
 
 	// The settings handler stores the host bare, but a row written some other way may carry
@@ -169,112 +210,99 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	// server name, the SMTP client's host, the local-host check -- and brackets name nothing in
 	// any of them (#424).
 	host := hostport.Unbracket(smtpConfig.Host)
-	addr := hostport.Join(host, smtpConfig.Port)
 
-	dialTimeout := e.dialTimeout
-	if dialTimeout == 0 {
-		dialTimeout = defaultDialTimeout
-	}
-	commandTimeout := e.commandTimeout
-	if commandTimeout == 0 {
-		commandTimeout = defaultCommandTimeout
-	}
-	sendTimeout := e.sendTimeout
-	if sendTimeout == 0 {
-		sendTimeout = defaultSendTimeout
+	dial := relayDial{
+		addr: hostport.Join(host, smtpConfig.Port),
+		host: host,
+		// One config for every TLS path. Certificate and hostname verification are never
+		// disabled: RFC 8314 section 3.3 requires the implicit-TLS client to validate, and a
+		// STARTTLS session that does not verify buys nothing over cleartext (#274), STARTTLS if
+		// available's upgrade included (#718 decision 14).
+		tlsConfig:      &tls.Config{ServerName: host, RootCAs: e.rootCAs},
+		implicitTLS:    smtpEnc == SMTPEncryptionSSLTLS,
+		dialTimeout:    cmp.Or(e.dialTimeout, defaultDialTimeout),
+		commandTimeout: cmp.Or(e.commandTimeout, defaultCommandTimeout),
 	}
 	// The send's budget runs from the start of the connect, so a slow connect or handshake leaves
 	// the conversation less of it.
-	sendDeadline := time.Now().Add(sendTimeout)
+	dial.sendDeadline = time.Now().Add(cmp.Or(e.sendTimeout, defaultSendTimeout))
 
-	// One config for both TLS paths. Certificate and hostname verification are never disabled:
-	// RFC 8314 section 3.3 requires the implicit-TLS client to validate, and a STARTTLS session
-	// that does not verify buys nothing over cleartext (#274).
-	tlsConfig := &tls.Config{ServerName: host, RootCAs: e.rootCAs}
-
-	// The dial timeout bounds the connect and, for implicit TLS, the handshake after it, as
-	// tls.Dialer bounds both with its NetDialer's timeout. The two are separate steps so that a
-	// failed handshake is told from a failed connect (#410 decision 5).
-	dialCtx, cancelDial := context.WithTimeout(ctx, dialTimeout)
-	defer cancelDial()
-	conn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", addr)
+	client, closeConnection, err := e.connect(ctx, dial)
 	if err != nil {
-		return labelled(SendFailureConnection, errs.Wrap(err, "unable to connect to SMTP server"))
+		return SendResult{}, err
 	}
-	// A caller that gives up ends its send: closing the TCP connection fails whatever read or write
-	// is waiting on it, the TLS layers above it included. The dial and the implicit-TLS handshake
-	// already end with ctx through dialCtx. The TCP connection is held in a variable of its own,
-	// since conn is rewrapped below and the close runs on another goroutine.
-	tcpConn := conn
-	stopClosingOnCancel := context.AfterFunc(ctx, func() { _ = tcpConn.Close() })
-	defer stopClosingOnCancel()
-	if smtpEnc == SMTPEncryptionSSLTLS {
-		tlsConn := tls.Client(conn, tlsConfig)
-		if handshakeErr := tlsConn.HandshakeContext(dialCtx); handshakeErr != nil {
-			_ = conn.Close()
-			return tlsFailure(errs.Wrap(handshakeErr, "unable to connect to SMTP server"))
-		}
-		conn = tlsConn
-	}
+	// Called through a closure, since a fallback replaces the connection.
+	defer func() { closeConnection() }()
 
-	// Wrapped outside the implicit TLS, and under the STARTTLS one net/smtp adds later, so every
-	// read and write the conversation makes, a STARTTLS handshake's included, has its own deadline.
-	conn = &deadlineConn{Conn: conn, commandTimeout: commandTimeout, sendDeadline: sendDeadline}
-
-	client, err := smtp.NewClient(conn, host)
-	if err != nil {
-		_ = conn.Close()
-		return replyFailure(errs.Wrap(err, "unable to connect to SMTP server"), SendFailureOther)
-	}
-	defer func() { _ = client.Close() }()
-
-	// The hello every command below would send first, sent here so its failure is seen: Extension
-	// swallows a failed hello and answers false, which would read a relay that broke or stalled at
-	// EHLO as one offering no STARTTLS or no authentication, and lose the error (#410 decision 5).
-	// net/smtp keeps the name for the HELO it falls back to when EHLO is refused and for the EHLO
-	// StartTLS repeats, so all three carry it (#718 decision 9).
-	if helloErr := client.Hello(e.helloName(tcpConn)); helloErr != nil {
-		return replyFailure(errs.Wrap(helloErr, "unable to send SMTP message"), SendFailureOther)
-	}
-
-	if smtpEnc == SMTPEncryptionSTARTTLS {
+	encrypted := smtpEnc != SMTPEncryptionNone
+	switch smtpEnc {
+	case SMTPEncryptionSTARTTLS:
 		// The operator asked for STARTTLS, so a server that does not offer it is refused rather
 		// than continued with in the clear. RFC 3207 section 4 leaves the choice to the client,
 		// and a silent downgrade here is indistinguishable from a STARTTLS-stripping attacker
 		// (#274).
 		if ok, _ := client.Extension("STARTTLS"); !ok {
-			return labelled(SendFailureSTARTTLSNotOffered, errs.Wrap(
-				errs.New("the SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS"),
+			return SendResult{}, labelled(SendFailureSTARTTLSNotOffered, errs.Wrap(
+				errs.New("the SMTP server did not offer STARTTLS; check the port, or choose STARTTLS if available only if the server has no TLS"),
 				"unable to send SMTP message"))
 		}
 		// StartTLS re-issues EHLO, per RFC 3207 section 4.2: everything learned before the
 		// handshake has to be discarded.
-		if startTLSErr := client.StartTLS(tlsConfig); startTLSErr != nil {
-			return tlsFailure(errs.Wrap(startTLSErr, "unable to send SMTP message"))
+		if startTLSErr := client.StartTLS(dial.tlsConfig); startTLSErr != nil {
+			return SendResult{}, tlsFailure(errs.Wrap(startTLSErr, "unable to send SMTP message"))
+		}
+	case SMTPEncryptionNone:
+		upgrade, upgradeErr := startTLSIfAvailable(client, dial.tlsConfig)
+		switch upgrade {
+		case upgraded:
+			encrypted = true
+		case upgradeNotOffered:
+			logSentUnencrypted(ctx, unencryptedReasonSTARTTLSNotOffered, nil)
+		case upgradeRefused:
+			// The relay answered STARTTLS with a refusal and the connection is still in
+			// plaintext, so the send carries on over it.
+			logSentUnencrypted(ctx, unencryptedReasonSTARTTLSRefused, upgradeErr)
+		case upgradeHandshakeFailed:
+			// The connection is part-way into a TLS session that did not hold, so nothing more
+			// can be said over it: the send reconnects once and does not try STARTTLS again,
+			// within the same budget. A caller who has given up is not reconnected for.
+			if ctx.Err() != nil {
+				return SendResult{}, tlsFailure(errs.Wrap(upgradeErr, "unable to send SMTP message"))
+			}
+			logSentUnencrypted(ctx, unencryptedReasonTLSFailed, upgradeErr)
+			closeConnection()
+			reconnected, closeReconnected, reconnectErr := e.connect(ctx, dial)
+			if reconnectErr != nil {
+				closeConnection = func() {}
+				return SendResult{}, reconnectErr
+			}
+			client, closeConnection = reconnected, closeReconnected
+		default:
+			return SendResult{}, tlsFailure(errs.Wrap(upgradeErr, "unable to send SMTP message"))
 		}
 	}
 
 	if len(smtpConfig.Username) > 0 {
 		if authenticateErr := authenticate(client, host, smtpEnc, smtpConfig.Username, password); authenticateErr != nil {
-			return errs.Wrap(authenticateErr, "unable to send SMTP message")
+			return SendResult{}, errs.Wrap(authenticateErr, "unable to send SMTP message")
 		}
 	}
 
 	if mailErr := client.Mail(from.Address); mailErr != nil {
-		return replyFailure(errs.Wrap(mailErr, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, replyFailure(errs.Wrap(mailErr, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	if rcptErr := client.Rcpt(to.Address); rcptErr != nil {
-		return replyFailure(errs.Wrap(rcptErr, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, replyFailure(errs.Wrap(rcptErr, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	w, err := client.Data()
 	if err != nil {
-		return replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	if _, err := w.Write(message); err != nil {
-		return replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	if err := w.Close(); err != nil {
-		return replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
 	}
 	// The relay answered the end of the data with a positive reply, so it has taken responsibility
 	// for the message (RFC 5321 sections 4.1.1.4 and 6.1). Whatever happens to QUIT or to closing
@@ -285,7 +313,113 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 		slog.WarnContext(ctx, "unable to end the smtp session after the server accepted the message", "error", err)
 	}
 
-	return nil
+	return SendResult{Encrypted: encrypted}, nil
+}
+
+// connect opens one connection to the relay, with its implicit-TLS handshake for SSL/TLS, and says
+// hello over it. The close it returns ends the SMTP client and stops ctx from closing the connection.
+func (e *Sender) connect(ctx context.Context, dial relayDial) (*smtp.Client, func(), error) {
+
+	// The dial timeout bounds the connect and, for implicit TLS, the handshake after it, as
+	// tls.Dialer bounds both with its NetDialer's timeout. The two are separate steps so that a
+	// failed handshake is told from a failed connect (#410 decision 5). A fallback's second connect
+	// is held to what is left of the send's budget as well.
+	dialDeadline := time.Now().Add(dial.dialTimeout)
+	if dialDeadline.After(dial.sendDeadline) {
+		dialDeadline = dial.sendDeadline
+	}
+	dialCtx, cancelDial := context.WithDeadline(ctx, dialDeadline)
+	defer cancelDial()
+	conn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", dial.addr)
+	if err != nil {
+		return nil, nil, labelled(SendFailureConnection, errs.Wrap(err, "unable to connect to SMTP server"))
+	}
+	// A caller that gives up ends its send: closing the TCP connection fails whatever read or write
+	// is waiting on it, the TLS layers above it included. The dial and the implicit-TLS handshake
+	// already end with ctx through dialCtx. The TCP connection is held in a variable of its own,
+	// since conn is rewrapped below and the close runs on another goroutine.
+	tcpConn := conn
+	stopClosingOnCancel := context.AfterFunc(ctx, func() { _ = tcpConn.Close() })
+	if dial.implicitTLS {
+		tlsConn := tls.Client(conn, dial.tlsConfig)
+		if handshakeErr := tlsConn.HandshakeContext(dialCtx); handshakeErr != nil {
+			stopClosingOnCancel()
+			_ = conn.Close()
+			return nil, nil, tlsFailure(errs.Wrap(handshakeErr, "unable to connect to SMTP server"))
+		}
+		conn = tlsConn
+	}
+
+	// Wrapped outside the implicit TLS, and under the STARTTLS one net/smtp adds later, so every
+	// read and write the conversation makes, a STARTTLS handshake's included, has its own deadline.
+	conn = &deadlineConn{Conn: conn, commandTimeout: dial.commandTimeout, sendDeadline: dial.sendDeadline}
+
+	client, err := smtp.NewClient(conn, dial.host)
+	if err != nil {
+		stopClosingOnCancel()
+		_ = conn.Close()
+		return nil, nil, replyFailure(errs.Wrap(err, "unable to connect to SMTP server"), SendFailureOther)
+	}
+	closeConnection := func() {
+		_ = client.Close()
+		stopClosingOnCancel()
+	}
+
+	// The hello every command after it would send first, sent here so its failure is seen:
+	// Extension swallows a failed hello and answers false, which would read a relay that broke or
+	// stalled at EHLO as one offering no STARTTLS or no authentication, and lose the error (#410
+	// decision 5). net/smtp keeps the name for the HELO it falls back to when EHLO is refused and
+	// for the EHLO StartTLS repeats, so all three carry it (#718 decision 9).
+	if helloErr := client.Hello(e.helloName(tcpConn)); helloErr != nil {
+		closeConnection()
+		return nil, nil, replyFailure(errs.Wrap(helloErr, "unable to send SMTP message"), SendFailureOther)
+	}
+	return client, closeConnection, nil
+}
+
+// upgradeOutcome is how STARTTLS if available's attempt at TLS ended.
+type upgradeOutcome int
+
+const (
+	// upgradeBroke is a connection that failed outside the handshake, which ends the send.
+	upgradeBroke upgradeOutcome = iota
+	upgraded
+	upgradeNotOffered
+	// upgradeRefused is a STARTTLS command the relay answered with a refusal, leaving the
+	// connection in plaintext and usable.
+	upgradeRefused
+	// upgradeHandshakeFailed is a TLS handshake that did not complete, a certificate or host name
+	// that did not verify included, leaving a connection nothing more can be said over.
+	upgradeHandshakeFailed
+)
+
+// startTLSIfAvailable upgrades the connection through STARTTLS when the relay offers it, verified
+// as the STARTTLS mode verifies (#718 decision 14), and says how the attempt ended. The error is the
+// reason for any outcome but upgraded and upgradeNotOffered.
+func startTLSIfAvailable(client *smtp.Client, tlsConfig *tls.Config) (upgradeOutcome, error) {
+	if ok, _ := client.Extension("STARTTLS"); !ok {
+		return upgradeNotOffered, nil
+	}
+	err := client.StartTLS(tlsConfig)
+	if err == nil {
+		return upgraded, nil
+	}
+	// net/smtp starts the TLS client only once the relay has answered STARTTLS with its 220, and
+	// the handshake then runs under the EHLO it repeats. So no TLS state is a STARTTLS command that
+	// failed, and TLS state without a completed handshake is the handshake failing, however it
+	// failed: a certificate, an alert, a stall, or a relay closing on a ClientHello it cannot take.
+	// Each of those works in plaintext today, so each falls back. A completed handshake whose EHLO
+	// then failed is an encrypted session that broke, which falls back to nothing.
+	state, tlsStarted := client.TLSConnectionState()
+	var reply *textproto.Error
+	switch {
+	case !tlsStarted && errors.As(err, &reply):
+		return upgradeRefused, err
+	case tlsStarted && !state.HandshakeComplete:
+		return upgradeHandshakeFailed, err
+	default:
+		return upgradeBroke, err
+	}
 }
 
 // helloName is the configured EHLO name or, with none, the local address of conn as an RFC 5321
@@ -326,14 +460,14 @@ type deadlineConn struct {
 }
 
 func (c *deadlineConn) Read(p []byte) (int, error) {
-	if err := c.Conn.SetReadDeadline(c.deadline()); err != nil {
+	if err := c.SetReadDeadline(c.deadline()); err != nil {
 		return 0, err
 	}
 	return c.Conn.Read(p)
 }
 
 func (c *deadlineConn) Write(p []byte) (int, error) {
-	if err := c.Conn.SetWriteDeadline(c.deadline()); err != nil {
+	if err := c.SetWriteDeadline(c.deadline()); err != nil {
 		return 0, err
 	}
 	return c.Conn.Write(p)
@@ -413,8 +547,11 @@ func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, user
 		}
 	}
 
-	// PLAIN and LOGIN both hand the password to the server in the clear, so they are refused on a
-	// connection that is not TLS unless the server is on this machine. RFC 4616 section 1 says a
+	// PLAIN and LOGIN both hand the password to the server in the clear, so they are refused under
+	// STARTTLS if available unless the server is on this machine. The gate reads the configured mode,
+	// not whether the upgrade held: a remote relay's authentication then fails closed at every send,
+	// rather than working or not connection by connection as a certificate expires or an attacker
+	// strips STARTTLS (#718 decision 15). RFC 4616 section 1 says a
 	// client SHOULD only use PLAIN with adequate data security in place, and RFC 4954 section 4
 	// requires the pairing on the server side. The gate covers both mechanisms here, before any
 	// AUTH command, rather than leaning on net/smtp.PlainAuth's own refusal, which loginAuth has
@@ -422,7 +559,7 @@ func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, user
 	secure := smtpEnc != SMTPEncryptionNone || isLocalHost(host)
 	if (mechanism == "PLAIN" || mechanism == "LOGIN") && !secure {
 		return labelled(SendFailureUnencryptedPassword,
-			errs.New("the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS"))
+			errs.New("with STARTTLS if available, the password is sent only to a server on this machine; set the encryption to STARTTLS or SSL/TLS"))
 	}
 
 	var auth smtp.Auth

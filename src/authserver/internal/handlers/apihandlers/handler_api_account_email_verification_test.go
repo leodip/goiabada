@@ -234,7 +234,7 @@ func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHande
 		Run(func(args mock.Arguments) {
 			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
 		}).Return(&bytes.Buffer{}, nil)
-	emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).Return(nil)
+	emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).Return(emaildelivery.SendResult{}, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
@@ -287,7 +287,7 @@ func TestHandleAccountEmailVerificationSendPost_IsWrittenInTheRecipientsLanguage
 			emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
 				Run(func(args mock.Arguments) {
 					sent = args.Get(2).(*emaildelivery.SendEmailInput)
-				}).Return(nil)
+				}).Return(emaildelivery.SendResult{}, nil)
 			auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return()
 
 			// The console asks in its page's language, German here, which loses to the recipient's.
@@ -385,7 +385,7 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&bytes.Buffer{}, nil).Once()
-		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return().Once()
 		database := datamocks.NewDatabase(t)
 		database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "anyone@example.com",
@@ -438,7 +438,7 @@ func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWri
 		Run(func(args mock.Arguments) {
 			mailedCode, _ = args.Get(3).(map[string]interface{})["verificationCode"].(string)
 		}).Return(&bytes.Buffer{}, nil).Once()
-	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return().Once()
 
 	before := time.Now().UTC()
