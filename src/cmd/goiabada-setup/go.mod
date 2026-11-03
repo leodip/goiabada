@@ -7,7 +7,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/leodip/goiabada/core v0.0.0
 	github.com/microsoft/go-mssqldb v1.11.2
-	go.yaml.in/yaml/v3 v3.0.5
+	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/term v0.47.0
 	sigs.k8s.io/kustomize/api v0.21.3
 	sigs.k8s.io/kustomize/kyaml v0.21.3
