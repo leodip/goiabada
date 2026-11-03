@@ -58,7 +58,7 @@ test("a test email from Settings - Email arrives", async ({ page, request }) => 
   // the page says so.
   await expect(
     page.getByText(
-      `Test email sent to ${to}. It was sent unencrypted: the SMTP server didn't offer STARTTLS, or its certificate isn't trusted. The auth server's log has the reason.`,
+      `Test email sent to ${to}. It was sent unencrypted: the SMTP server didn't offer STARTTLS, or the upgrade to TLS failed. The auth server's log has the reason.`,
       { exact: true },
     ),
   ).toBeVisible();

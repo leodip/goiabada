@@ -171,8 +171,8 @@ const (
 	encryptionNoneNoticeEN = "Emails are encrypted only if the SMTP server offers STARTTLS with a certificate the auth " +
 		"server trusts. Otherwise they're sent unencrypted, password reset and verification links included, and anyone " +
 		"on the network can force that. Choose this only for a server on this machine or on a network you trust."
-	sentUnencryptedEN = "It was sent unencrypted: the SMTP server didn't offer STARTTLS, or its certificate isn't " +
-		"trusted. The auth server's log has the reason."
+	sentUnencryptedEN = "It was sent unencrypted: the SMTP server didn't offer STARTTLS, or the upgrade to TLS " +
+		"failed. The auth server's log has the reason."
 )
 
 // The encryption select names each option by what it does, strongest first, with the mode the

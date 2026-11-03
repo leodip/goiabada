@@ -1601,7 +1601,7 @@
 "adminconsole.admin_settings.email_sendtest.destination_hint" = "Uma mensagem de teste curta é enviada para lá pelo servidor SMTP."
 "adminconsole.admin_settings.email_sendtest.smtp_disabled" = "O e-mail está desligado. Ligue-o e configure o servidor SMTP para enviar um e-mail de teste:"
 "adminconsole.admin_settings.email_sendtest.sent_successfully" = "E-mail de teste enviado para {{.address}}."
-"adminconsole.admin_settings.email_sendtest.sent_unencrypted" = "Ele foi enviado sem criptografia: o servidor SMTP não ofereceu STARTTLS, ou o certificado dele não é confiável. O log do servidor de autenticação registra o motivo."
+"adminconsole.admin_settings.email_sendtest.sent_unencrypted" = "Ele foi enviado sem criptografia: o servidor SMTP não ofereceu STARTTLS, ou a mudança para TLS falhou. O log do servidor de autenticação registra o motivo."
 "adminconsole.admin_settings.email_sendtest.send_button" = "Enviar e-mail de teste"
 "adminconsole.admin_settings.turnstile.page_title" = "Configurações do Turnstile"
 "adminconsole.admin_settings.turnstile.subtitle" = "Turnstile"

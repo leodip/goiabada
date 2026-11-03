@@ -7524,9 +7524,9 @@ components:
           type: boolean
           description: |
             Whether the message went to the SMTP server over TLS. Always `true` for `ssltls` and
-            `starttls`. For `none`, STARTTLS if available, `true` when the server offered STARTTLS
-            and its certificate was trusted, and `false` when the message was sent unencrypted; the
-            auth server's log has the reason.
+            `starttls`. For `none`, STARTTLS if available, `true` when the upgrade through STARTTLS
+            succeeded, and `false` when the server didn't offer STARTTLS or the upgrade failed, so
+            the message was sent unencrypted; the auth server's log has the reason.
       required:
         - success
         - encrypted
