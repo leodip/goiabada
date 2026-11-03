@@ -1661,6 +1661,14 @@
 "adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "Una sessione termina dopo questo intervallo dall'avvio, anche se è in uso."
 "adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "Numero massimo di sessioni per utente"
 "adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" = "Il numero massimo di sessioni per un utente, da 0 a 1000. Quando un accesso supererebbe il limite, vengono chiuse prima le sessioni scadute, poi quelle usate meno di recente. 0 significa nessun limite."
+"adminconsole.admin_settings.sessions.field.keep_signed_in" = "Mantieni gli utenti connessi dopo la chiusura del browser"
+"adminconsole.admin_settings.sessions.keep_signed_in_tooltip" = "Se un accesso sopravvive alla chiusura del browser. Le sessioni terminano comunque al timeout di inattività e alla durata massima."
+"adminconsole.admin_settings.sessions.keep_signed_in_always" = "Sempre"
+"adminconsole.admin_settings.sessions.keep_signed_in_always_hint" = "Ogni utente resta connesso dopo aver chiuso il browser, finché la sessione non termina."
+"adminconsole.admin_settings.sessions.keep_signed_in_ask" = "Lascia scegliere a ogni utente"
+"adminconsole.admin_settings.sessions.keep_signed_in_ask_hint" = "La pagina della password chiede a ogni utente, con una casella non selezionata, se restare connesso dopo aver chiuso il browser."
+"adminconsole.admin_settings.sessions.keep_signed_in_never" = "Mai"
+"adminconsole.admin_settings.sessions.keep_signed_in_never_hint" = "Ogni utente accede di nuovo dopo aver chiuso il browser."
 
 # --- Admin settings (email, keys, audit logs) -------------------------------
 
@@ -2004,6 +2012,8 @@
 "handler.settings_sessions.idle_timeout_above_max_lifetime" = "Il timeout di inattività non può superare la durata massima."
 "handler.settings_sessions.max_sessions_per_user_required" = "Inserisci il numero massimo di sessioni per utente."
 "handler.settings_sessions.max_sessions_per_user_out_of_range" = "Il numero massimo di sessioni per utente deve essere compreso tra 0 e {{.max}}."
+"handler.settings_sessions.keep_signed_in_required" = "Scegli se gli utenti restano connessi dopo la chiusura del browser."
+"handler.settings_sessions.keep_signed_in_invalid" = "Mantieni gli utenti connessi dopo la chiusura del browser deve essere always, ask o never."
 
 "handler.settings_tokens.token_expiration_not_positive" = "La durata del token deve essere maggiore di zero."
 "handler.settings_tokens.token_expiration_too_large" = "La durata del token non può superare {{.max}} secondi."

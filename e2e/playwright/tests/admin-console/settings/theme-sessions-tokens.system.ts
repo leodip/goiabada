@@ -100,6 +100,26 @@ test("session timeouts are saved, and refused when out of range or inconsistent"
   });
 });
 
+// Keep users signed in after the browser closes: three radio buttons, Let each user choose as seeded,
+// and each mode saved is the one the page shows chosen afterwards.
+const keepSignedInLabels = { always: "Always", ask: "Let each user choose", never: "Never" } as const;
+
+test("keep users signed in after the browser closes is saved as Always, Let each user choose or Never", async ({ page }) => {
+  await withSettingsRestored(page, sessionsPath, async () => {
+    const modes = page.getByRole("group", { name: "Keep users signed in after the browser closes" });
+    await expect(modes.getByRole("radio")).toHaveCount(3);
+    await expect(modes.getByRole("radio", { name: keepSignedInLabels.ask, exact: true })).toBeChecked();
+
+    for (const mode of ["always", "never", "ask"] as const) {
+      await page.goto(`${env.adminUrl}${sessionsPath}`);
+      await page.getByRole("radio", { name: keepSignedInLabels[mode], exact: true }).check();
+      await saveSettings(page);
+      await expect(page.getByRole("radio", { name: keepSignedInLabels[mode], exact: true })).toBeChecked();
+      expect(await readSettingsForm(page, sessionsPath)).toMatchObject({ keepSignedIn: mode });
+    }
+  });
+});
+
 test("a duration is read out in words under its field as it is typed", async ({ page }) => {
   // Nothing is saved: the readout is the page's own.
   await page.goto(`${env.adminUrl}${sessionsPath}`);

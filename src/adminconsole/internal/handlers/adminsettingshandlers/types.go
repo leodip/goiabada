@@ -27,6 +27,8 @@ var sessionsErrorFields = map[string]string{
 	i18n.ErrCodeSettingsSessionsMaxLifetimeTooLarge:          "userSessionMaxLifetimeInSeconds",
 	i18n.ErrCodeSettingsSessionsMaxSessionsPerUserRequired:   "maxUserSessionsPerUser",
 	i18n.ErrCodeSettingsSessionsMaxSessionsPerUserOutOfRange: "maxUserSessionsPerUser",
+	i18n.ErrCodeSettingsSessionsKeepSignedInRequired:         "keepSignedIn",
+	i18n.ErrCodeSettingsSessionsKeepSignedInInvalid:          "keepSignedIn",
 }
 
 // auditLogsErrorFields maps the audit logging settings' refusals to the retention, the one field
@@ -184,12 +186,14 @@ type SettingsSessionGet struct {
 	UserSessionIdleTimeoutInSeconds int
 	UserSessionMaxLifetimeInSeconds int
 	MaxUserSessionsPerUser          int
+	KeepSignedIn                    string
 }
 
 type SettingsSessionPost struct {
 	UserSessionIdleTimeoutInSeconds string
 	UserSessionMaxLifetimeInSeconds string
 	MaxUserSessionsPerUser          string
+	KeepSignedIn                    string
 }
 
 type SettingsTokenGet struct {

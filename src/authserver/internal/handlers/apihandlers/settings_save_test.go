@@ -119,12 +119,13 @@ func settingsSectionSaves() []settingsSectionSave {
 			name: "sessions",
 			path: "/api/v1/admin/settings/sessions",
 			body: func(*testing.T) string {
-				return `{"userSessionIdleTimeoutInSeconds":3000,"userSessionMaxLifetimeInSeconds":86000,"maxUserSessionsPerUser":7}`
+				return `{"userSessionIdleTimeoutInSeconds":3000,"userSessionMaxLifetimeInSeconds":86000,"maxUserSessionsPerUser":7,"keepSignedIn":"always"}`
 			},
 			handler: func(database settingsSaveDatabase, auditLogger AuditLogger) http.Handler {
 				return HandleSettingsSessionsPut(database, auditLogger)
 			},
-			owns: []string{"UserSessionIdleTimeoutInSeconds", "UserSessionMaxLifetimeInSeconds", "MaxUserSessionsPerUser"},
+			owns: []string{"UserSessionIdleTimeoutInSeconds", "UserSessionMaxLifetimeInSeconds", "MaxUserSessionsPerUser",
+				"KeepSignedIn"},
 		},
 		{
 			name: "tokens",
@@ -185,6 +186,7 @@ func settingsAsTheRequestLoadedThem() record.Settings {
 		UserSessionIdleTimeoutInSeconds:         600,
 		UserSessionMaxLifetimeInSeconds:         3600,
 		MaxUserSessionsPerUser:                  20,
+		KeepSignedIn:                            record.KeepSignedInAsk,
 		SMTPHost:                                "before.example.test",
 		SMTPPort:                                25,
 		SMTPUsername:                            "before",
@@ -218,6 +220,7 @@ func settingsSavedMeanwhile() record.Settings {
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
 		IncludeOpenIDConnectClaimsInIdToken:       true,
 		MaxUserSessionsPerUser:                    21,
+		KeepSignedIn:                              record.KeepSignedInNever,
 		AESEncryptionKeyLegacy:                    []byte("legacy"),
 		SMTPHost:                                  "meanwhile.example.test",
 		SMTPPort:                                  2525,
@@ -487,6 +490,7 @@ func TestSettingsSectionSaves_ConcurrentSavesOfDifferentSectionsAllSurvive(t *te
 		assert.Equal(t, record.PasswordPolicyMedium, row.PasswordPolicy, "round %d: the general save was lost", round)
 		assert.Equal(t, uithemes.Get()[0], row.UITheme, "round %d: the ui theme save was lost", round)
 		assert.Equal(t, 7, row.MaxUserSessionsPerUser, "round %d: the sessions save was lost", round)
+		assert.Equal(t, record.KeepSignedInAlways, row.KeepSignedIn, "round %d: the sessions save was lost", round)
 		assert.Equal(t, 3000, row.UserSessionIdleTimeoutInSeconds, "round %d: the sessions save was lost", round)
 		assert.Equal(t, 900, row.TokenExpirationInSeconds, "round %d: the tokens save was lost", round)
 		assert.Equal(t, 12, row.AuditLogRetentionDays, "round %d: the audit log save was lost", round)

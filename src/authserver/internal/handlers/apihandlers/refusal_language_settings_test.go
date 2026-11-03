@@ -89,6 +89,18 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 				return HandleSettingsSessionsPut(database, handlersmocks.NewAuditLogger(t))
 			})
 	}
+	// keepSignedIn sends valid lifetimes and cap and the mode given, which a nil leaves out.
+	keepSignedIn := func(mode any) func(*testing.T, string) *httptest.ResponseRecorder {
+		body := map[string]any{"userSessionIdleTimeoutInSeconds": 100, "userSessionMaxLifetimeInSeconds": 200,
+			"maxUserSessionsPerUser": 20}
+		if mode != nil {
+			body["keepSignedIn"] = mode
+		}
+		return settingsRefusal(http.MethodPut, "/api/v1/admin/settings/sessions", body, &record.Settings{}, nil,
+			func(t *testing.T, database *datamocks.Database) http.Handler {
+				return HandleSettingsSessionsPut(database, handlersmocks.NewAuditLogger(t))
+			})
+	}
 	tokens := func(expiration, idle, lifetime int) func(*testing.T, string) *httptest.ResponseRecorder {
 		body := map[string]any{
 			"tokenExpirationInSeconds":                expiration,
@@ -204,6 +216,22 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 			code:       "handler.settings_sessions.max_sessions_per_user_out_of_range",
 			english:    "The maximum sessions per user must be between 0 and 1000.",
 			portuguese: "O máximo de sessões por usuário precisa estar entre 0 e 1000.",
+		},
+		{
+			name:       "no keep signed in mode",
+			serve:      keepSignedIn(nil),
+			status:     http.StatusBadRequest,
+			code:       "handler.settings_sessions.keep_signed_in_required",
+			english:    "Choose whether users stay signed in after the browser closes.",
+			portuguese: "Escolha se os usuários continuam conectados depois de fechar o navegador.",
+		},
+		{
+			name:       "an unknown keep signed in mode",
+			serve:      keepSignedIn("sometimes"),
+			status:     http.StatusBadRequest,
+			code:       "handler.settings_sessions.keep_signed_in_invalid",
+			english:    "Keep users signed in after the browser closes must be always, ask or never.",
+			portuguese: "Manter usuários conectados depois de fechar o navegador precisa ser always, ask ou never.",
 		},
 		{
 			name:       "a token expiration of zero",

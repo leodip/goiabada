@@ -28,6 +28,7 @@ func (a *sessionsAPI) GetSettingsSessions(context.Context, string) (*api.Setting
 		UserSessionIdleTimeoutInSeconds: 7200,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		MaxUserSessionsPerUser:          20,
+		KeepSignedIn:                    "never",
 	}, nil
 }
 
@@ -39,8 +40,9 @@ func (a *sessionsAPI) UpdateSettingsSessions(_ context.Context, _ string, reques
 	return &api.SettingsSessionsResponse{}, nil
 }
 
-// The page shows the per-user session cap beside the two lifetimes (#564 decision 6).
-func TestHandleSessionsGet_ShowsTheCapBesideTheLifetimes(t *testing.T) {
+// The page shows the per-user session cap beside the two lifetimes (#564 decision 6), and whether
+// users stay signed in after the browser closes (#743 decision 4).
+func TestHandleSessionsGet_ShowsTheCapAndKeepSignedInBesideTheLifetimes(t *testing.T) {
 	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	var bind map[string]interface{}
@@ -57,6 +59,7 @@ func TestHandleSessionsGet_ShowsTheCapBesideTheLifetimes(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds: 7200,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		MaxUserSessionsPerUser:          20,
+		KeepSignedIn:                    "never",
 	}, bind["settings"])
 }
 
@@ -76,6 +79,7 @@ func TestHandleSessionsPost_AlwaysSendsTheCap(t *testing.T) {
 					"userSessionIdleTimeoutInSeconds": {"3600"},
 					"userSessionMaxLifetimeInSeconds": {"43200"},
 					"maxUserSessionsPerUser":          {entered.value},
+					"keepSignedIn":                    {"ask"},
 				}))
 			w := httptest.NewRecorder()
 			HandleSessionsPost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).ServeHTTP(w, req)
@@ -111,6 +115,7 @@ func TestHandleSessionsPost_RefusesAValueThatIsNotAWholeNumberAtItsField(t *test
 					"userSessionIdleTimeoutInSeconds": {"3600"},
 					"userSessionMaxLifetimeInSeconds": {"43200"},
 					"maxUserSessionsPerUser":          {"20"},
+					"keepSignedIn":                    {"ask"},
 				}
 				form.Set(tc.field, entered)
 
@@ -146,6 +151,7 @@ func TestHandleSessionsPost_ARefusedSaveRedrawsTheCapAsEntered(t *testing.T) {
 			"userSessionIdleTimeoutInSeconds": {"3600"},
 			"userSessionMaxLifetimeInSeconds": {"43200"},
 			"maxUserSessionsPerUser":          {"1001"},
+			"keepSignedIn":                    {"always"},
 		}))
 	HandleSessionsPost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
@@ -156,5 +162,56 @@ func TestHandleSessionsPost_ARefusedSaveRedrawsTheCapAsEntered(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds: "3600",
 		UserSessionMaxLifetimeInSeconds: "43200",
 		MaxUserSessionsPerUser:          "1001",
+		KeepSignedIn:                    "always",
 	}, bind["settings"])
+}
+
+// The save sends the mode chosen, as its wire value, for each of the three radio buttons.
+func TestHandleSessionsPost_SendsTheKeepSignedInModeChosen(t *testing.T) {
+	for _, mode := range []string{"always", "ask", "never"} {
+		t.Run(mode, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			apiClient := &sessionsAPI{}
+
+			req := handlertest.Request(http.MethodPost, "/admin/settings/sessions",
+				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
+					"userSessionIdleTimeoutInSeconds": {"3600"},
+					"userSessionMaxLifetimeInSeconds": {"43200"},
+					"maxUserSessionsPerUser":          {"20"},
+					"keepSignedIn":                    {mode},
+				}))
+			w := httptest.NewRecorder()
+			HandleSessionsPost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusFound, w.Code)
+			require.NotNil(t, apiClient.sent)
+			assert.Equal(t, mode, apiClient.sent.KeepSignedIn)
+		})
+	}
+}
+
+// With no mode chosen the save sends none, and the auth server's refusal comes back at the radio
+// buttons, with the other fields as entered.
+func TestHandleSessionsPost_ARefusedKeepSignedInIsMarkedAtItsRadioButtons(t *testing.T) {
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, mock.Anything, "/admin_settings_sessions.html").Once()
+	refusal := "Choose whether users stay signed in after the browser closes."
+	apiClient := &sessionsAPI{updateErr: &apiclient.APIError{Code: "handler.settings_sessions.keep_signed_in_required",
+		Message: refusal, StatusCode: http.StatusBadRequest}}
+
+	req := handlertest.Request(http.MethodPost, "/admin/settings/sessions",
+		handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
+			"userSessionIdleTimeoutInSeconds": {"3600"},
+			"userSessionMaxLifetimeInSeconds": {"43200"},
+			"maxUserSessionsPerUser":          {"20"},
+		}))
+	HandleSessionsPost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+
+	require.NotNil(t, apiClient.sent)
+	assert.Empty(t, apiClient.sent.KeepSignedIn, "no mode is chosen for the administrator")
+	bind := handlertest.Bind(t, httpHelper)
+	assert.Equal(t, refusal, bind["error"])
+	assert.Equal(t, "keepSignedIn", bind["errorField"])
 }

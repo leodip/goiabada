@@ -321,6 +321,8 @@ cause, each a whole sentence.
 | `handler.settings_sessions.idle_timeout_above_max_lifetime` | (none) | The idle timeout can't be longer than the maximum lifetime. |
 | `handler.settings_sessions.max_sessions_per_user_required` | (none) | Enter the maximum sessions per user. |
 | `handler.settings_sessions.max_sessions_per_user_out_of_range` | `max` (int) | The maximum sessions per user must be between 0 and {{.max}}. |
+| `handler.settings_sessions.keep_signed_in_required` | (none) | Choose whether users stay signed in after the browser closes. |
+| `handler.settings_sessions.keep_signed_in_invalid` | (none) | Keep users signed in after the browser closes must be always, ask or never. |
 | `handler.settings_tokens.token_expiration_not_positive` | (none) | The token lifetime must be greater than zero. |
 | `handler.settings_tokens.token_expiration_too_large` | `max` (int) | The token lifetime can't be more than {{.max}} seconds. |
 | `handler.settings_tokens.offline_idle_timeout_not_positive` | (none) | The offline idle timeout must be greater than zero. |

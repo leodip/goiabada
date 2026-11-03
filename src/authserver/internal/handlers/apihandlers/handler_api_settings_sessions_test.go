@@ -26,6 +26,7 @@ func storedSessionsSettings() *record.Settings {
 		UserSessionIdleTimeoutInSeconds: 7200,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		MaxUserSessionsPerUser:          20,
+		KeepSignedIn:                    record.KeepSignedInNever,
 	}
 }
 
@@ -38,8 +39,9 @@ func serveSessionsPut(database *datamocks.Database, auditLogger *handlersmocks.A
 	return rr
 }
 
-// The GET answers the per-user session cap beside the two lifetimes (#564 decision 6).
-func TestSettingsSessionsGet_AnswersTheCapBesideTheLifetimes(t *testing.T) {
+// The GET answers the per-user session cap beside the two lifetimes (#564 decision 6), and whether
+// users stay signed in after the browser closes (#743 decision 4).
+func TestSettingsSessionsGet_AnswersTheCapAndKeepSignedInBesideTheLifetimes(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/sessions", nil)
 	r = r.WithContext(reqctx.WithSettings(r.Context(), storedSessionsSettings()))
 	rr := httptest.NewRecorder()
@@ -50,7 +52,8 @@ func TestSettingsSessionsGet_AnswersTheCapBesideTheLifetimes(t *testing.T) {
 	assert.JSONEq(t, `{
 		"userSessionIdleTimeoutInSeconds": 7200,
 		"userSessionMaxLifetimeInSeconds": 86400,
-		"maxUserSessionsPerUser": 20
+		"maxUserSessionsPerUser": 20,
+		"keepSignedIn": "never"
 	}`, rr.Body.String())
 }
 
@@ -66,25 +69,25 @@ func TestSettingsSessionsPut_RefusesAMissingOrOutOfRangeCap(t *testing.T) {
 	}{
 		{
 			name:    "absent",
-			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200}`,
+			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"keepSignedIn":"ask"}`,
 			code:    "handler.settings_sessions.max_sessions_per_user_required",
 			message: "Enter the maximum sessions per user.",
 		},
 		{
 			name:    "null",
-			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":null}`,
+			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":null,"keepSignedIn":"ask"}`,
 			code:    "handler.settings_sessions.max_sessions_per_user_required",
 			message: "Enter the maximum sessions per user.",
 		},
 		{
 			name:    "below 0",
-			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":-1}`,
+			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":-1,"keepSignedIn":"ask"}`,
 			code:    "handler.settings_sessions.max_sessions_per_user_out_of_range",
 			message: "The maximum sessions per user must be between 0 and 1000.",
 		},
 		{
 			name:    "above 1000",
-			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":1001}`,
+			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":1001,"keepSignedIn":"ask"}`,
 			code:    "handler.settings_sessions.max_sessions_per_user_out_of_range",
 			message: "The maximum sessions per user must be between 0 and 1000.",
 		},
@@ -119,10 +122,11 @@ func TestSettingsSessionsPut_SavesACapAtEitherEndOfTheRange(t *testing.T) {
 				Return(nil).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedSessionsSettings, mock.Anything).Return().Once()
 
-			body, err := json.Marshal(map[string]int{
+			body, err := json.Marshal(map[string]any{
 				"userSessionIdleTimeoutInSeconds": 3600,
 				"userSessionMaxLifetimeInSeconds": 7200,
 				"maxUserSessionsPerUser":          value,
+				"keepSignedIn":                    "ask",
 			})
 			require.NoError(t, err)
 			rr := serveSessionsPut(database, auditLogger, string(body))
@@ -136,8 +140,8 @@ func TestSettingsSessionsPut_SavesACapAtEitherEndOfTheRange(t *testing.T) {
 	}
 }
 
-// updated_sessions_settings records who saved, each of the three values before the save under old
-// and each after it under new, in the shape updated_tokens_settings uses (#564 decision 10).
+// updated_sessions_settings records who saved, each of the four values before the save under old
+// and each after it under new, in the shape updated_tokens_settings uses (#564 decision 10, #743).
 func TestSettingsSessionsPut_TheEventRecordsTheCallerAndEachValueBeforeAndAfter(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -152,28 +156,100 @@ func TestSettingsSessionsPut_TheEventRecordsTheCallerAndEachValueBeforeAndAfter(
 			"user_session_idle_timeout_in_seconds": 7200,
 			"user_session_max_lifetime_in_seconds": 86400,
 			"max_user_sessions_per_user":           20,
+			"keep_signed_in":                       "never",
 		},
 		"new": map[string]interface{}{
 			"user_session_idle_timeout_in_seconds": 3600,
 			"user_session_max_lifetime_in_seconds": 43200,
 			"max_user_sessions_per_user":           5,
+			"keep_signed_in":                       "always",
 		},
 	}).Return().Once()
 
 	rr := serveSessionsPut(database, auditLogger, `{
 		"userSessionIdleTimeoutInSeconds": 3600,
 		"userSessionMaxLifetimeInSeconds": 43200,
-		"maxUserSessionsPerUser": 5
+		"maxUserSessionsPerUser": 5,
+		"keepSignedIn": "always"
 	}`)
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, 3600, saved.UserSessionIdleTimeoutInSeconds)
 	assert.Equal(t, 43200, saved.UserSessionMaxLifetimeInSeconds)
 	assert.Equal(t, 5, saved.MaxUserSessionsPerUser)
+	assert.Equal(t, record.KeepSignedInAlways, saved.KeepSignedIn)
 	assert.JSONEq(t, `{
 		"userSessionIdleTimeoutInSeconds": 3600,
 		"userSessionMaxLifetimeInSeconds": 43200,
-		"maxUserSessionsPerUser": 5
+		"maxUserSessionsPerUser": 5,
+		"keepSignedIn": "always"
 	}`, rr.Body.String())
 	auditLogger.AssertNumberOfCalls(t, "Log", 1)
+}
+
+// The PUT requires keepSignedIn, one of always, ask and never. Absent, null, empty and any other
+// value are refused, nothing saved and nothing audited: a caller that does not know the field must
+// not choose for the deployment by omission (#743 decision 4). The strict mocks are the assertion.
+func TestSettingsSessionsPut_RefusesAMissingOrUnknownKeepSignedIn(t *testing.T) {
+	const lifetimesAndCap = `"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":20`
+	required := struct{ code, message string }{
+		"handler.settings_sessions.keep_signed_in_required",
+		"Choose whether users stay signed in after the browser closes.",
+	}
+	invalid := struct{ code, message string }{
+		"handler.settings_sessions.keep_signed_in_invalid",
+		"Keep users signed in after the browser closes must be always, ask or never.",
+	}
+	testCases := []struct {
+		name          string
+		body          string
+		code, message string
+	}{
+		{"absent", `{` + lifetimesAndCap + `}`, required.code, required.message},
+		{"null", `{` + lifetimesAndCap + `,"keepSignedIn":null}`, required.code, required.message},
+		{"empty", `{` + lifetimesAndCap + `,"keepSignedIn":""}`, required.code, required.message},
+		{"another value", `{` + lifetimesAndCap + `,"keepSignedIn":"sometimes"}`, invalid.code, invalid.message},
+		{"a mode in another case", `{` + lifetimesAndCap + `,"keepSignedIn":"Always"}`, invalid.code, invalid.message},
+		{"a mode's console label", `{` + lifetimesAndCap + `,"keepSignedIn":"Let each user choose"}`, invalid.code, invalid.message},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			rr := serveSessionsPut(database, auditLogger, tc.body)
+
+			require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+			var refusal api.ErrorResponse
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &refusal))
+			assert.Equal(t, tc.code, refusal.ErrorCode)
+			assert.Equal(t, tc.message, refusal.ErrorDescription)
+		})
+	}
+}
+
+// Each of the three modes is saved and answered as given.
+func TestSettingsSessionsPut_SavesEachKeepSignedInMode(t *testing.T) {
+	for _, mode := range []record.KeepSignedIn{"always", "ask", "never"} {
+		t.Run(string(mode), func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			var saved record.Settings
+			expectSettingsSave(database)
+			database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).
+				Run(func(args mock.Arguments) { saved = *args.Get(2).(*record.Settings) }).
+				Return(nil).Once()
+			auditLogger.On("Log", mock.Anything, audit.EventUpdatedSessionsSettings, mock.Anything).Return().Once()
+
+			rr := serveSessionsPut(database, auditLogger, `{"userSessionIdleTimeoutInSeconds":3600,`+
+				`"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":20,"keepSignedIn":"`+string(mode)+`"}`)
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			assert.Equal(t, mode, saved.KeepSignedIn)
+			var answered api.SettingsSessionsResponse
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &answered))
+			assert.Equal(t, string(mode), answered.KeepSignedIn)
+		})
+	}
 }

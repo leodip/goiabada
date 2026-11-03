@@ -305,6 +305,8 @@ const (
 	ErrCodeSettingsSessionsIdleTimeoutAboveMaxLifetime  = "handler.settings_sessions.idle_timeout_above_max_lifetime"
 	ErrCodeSettingsSessionsMaxSessionsPerUserRequired   = "handler.settings_sessions.max_sessions_per_user_required"
 	ErrCodeSettingsSessionsMaxSessionsPerUserOutOfRange = "handler.settings_sessions.max_sessions_per_user_out_of_range" // Args: {"max": int}
+	ErrCodeSettingsSessionsKeepSignedInRequired         = "handler.settings_sessions.keep_signed_in_required"
+	ErrCodeSettingsSessionsKeepSignedInInvalid          = "handler.settings_sessions.keep_signed_in_invalid"
 
 	ErrCodeSettingsTokensTokenExpirationNotPositive    = "handler.settings_tokens.token_expiration_not_positive"
 	ErrCodeSettingsTokensTokenExpirationTooLarge       = "handler.settings_tokens.token_expiration_too_large" // Args: {"max": int}

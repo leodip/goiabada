@@ -1657,6 +1657,14 @@
 "adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "Une session se termine après cette durée depuis sa création, même si elle est utilisée."
 "adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "Nombre maximal de sessions par utilisateur"
 "adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" = "Le nombre maximal de sessions qu’un utilisateur peut détenir, de 0 à 1000. Si une connexion dépasse cette limite, les sessions expirées de l’utilisateur sont fermées en premier, puis les moins récemment utilisées. 0 signifie aucune limite."
+"adminconsole.admin_settings.sessions.field.keep_signed_in" = "Garder les utilisateurs connectés après la fermeture du navigateur"
+"adminconsole.admin_settings.sessions.keep_signed_in_tooltip" = "Si une connexion survit à la fermeture du navigateur. Les sessions se terminent toujours à leur délai d’inactivité et à leur durée maximale."
+"adminconsole.admin_settings.sessions.keep_signed_in_always" = "Toujours"
+"adminconsole.admin_settings.sessions.keep_signed_in_always_hint" = "Chaque utilisateur reste connecté après avoir fermé le navigateur, jusqu’à la fin de la session."
+"adminconsole.admin_settings.sessions.keep_signed_in_ask" = "Laisser chaque utilisateur choisir"
+"adminconsole.admin_settings.sessions.keep_signed_in_ask_hint" = "La page du mot de passe demande à chaque utilisateur, avec une case non cochée, s’il veut rester connecté après avoir fermé le navigateur."
+"adminconsole.admin_settings.sessions.keep_signed_in_never" = "Jamais"
+"adminconsole.admin_settings.sessions.keep_signed_in_never_hint" = "Chaque utilisateur se reconnecte après avoir fermé le navigateur."
 
 # --- Admin settings (email, keys, audit logs) -------------------------------
 
@@ -2000,6 +2008,8 @@
 "handler.settings_sessions.idle_timeout_above_max_lifetime" = "Le délai d’inactivité ne peut pas dépasser la durée maximale."
 "handler.settings_sessions.max_sessions_per_user_required" = "Saisissez le nombre maximal de sessions par utilisateur."
 "handler.settings_sessions.max_sessions_per_user_out_of_range" = "Le nombre maximal de sessions par utilisateur doit être compris entre 0 et {{.max}}."
+"handler.settings_sessions.keep_signed_in_required" = "Choisissez si les utilisateurs restent connectés après la fermeture du navigateur."
+"handler.settings_sessions.keep_signed_in_invalid" = "Garder les utilisateurs connectés après la fermeture du navigateur doit valoir always, ask ou never."
 
 "handler.settings_tokens.token_expiration_not_positive" = "La durée de validité des jetons doit être supérieure à zéro."
 "handler.settings_tokens.token_expiration_too_large" = "La durée de validité des jetons ne peut pas dépasser {{.max}} secondes."

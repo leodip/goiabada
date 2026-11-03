@@ -1654,6 +1654,14 @@
 "adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "A session ends this long after it started, even while in use."
 "adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "Maximum sessions per user"
 "adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" = "The most sessions one user can hold, from 0 to 1000. When a sign-in would go past it, the user's expired sessions end first, then the least recently used. 0 means no limit."
+"adminconsole.admin_settings.sessions.field.keep_signed_in" = "Keep users signed in after the browser closes"
+"adminconsole.admin_settings.sessions.keep_signed_in_tooltip" = "Whether a sign-in outlasts closing the browser. Sessions still end at their idle timeout and maximum lifetime."
+"adminconsole.admin_settings.sessions.keep_signed_in_always" = "Always"
+"adminconsole.admin_settings.sessions.keep_signed_in_always_hint" = "Every user stays signed in after closing the browser, until the session ends."
+"adminconsole.admin_settings.sessions.keep_signed_in_ask" = "Let each user choose"
+"adminconsole.admin_settings.sessions.keep_signed_in_ask_hint" = "The password page asks each user, with an unticked box, whether to stay signed in after closing the browser."
+"adminconsole.admin_settings.sessions.keep_signed_in_never" = "Never"
+"adminconsole.admin_settings.sessions.keep_signed_in_never_hint" = "Every user signs in again after closing the browser."
 
 # --- Admin settings (email, keys, audit logs) -------------------------------
 
@@ -1997,6 +2005,8 @@
 "handler.settings_sessions.idle_timeout_above_max_lifetime" = "The idle timeout can't be longer than the maximum lifetime."
 "handler.settings_sessions.max_sessions_per_user_required" = "Enter the maximum sessions per user."
 "handler.settings_sessions.max_sessions_per_user_out_of_range" = "The maximum sessions per user must be between 0 and {{.max}}."
+"handler.settings_sessions.keep_signed_in_required" = "Choose whether users stay signed in after the browser closes."
+"handler.settings_sessions.keep_signed_in_invalid" = "Keep users signed in after the browser closes must be always, ask or never."
 
 "handler.settings_tokens.token_expiration_not_positive" = "The token lifetime must be greater than zero."
 "handler.settings_tokens.token_expiration_too_large" = "The token lifetime can't be more than {{.max}} seconds."

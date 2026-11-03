@@ -24,6 +24,7 @@ func HandleSettingsSessionsGet() http.HandlerFunc {
 			UserSessionIdleTimeoutInSeconds: settings.UserSessionIdleTimeoutInSeconds,
 			UserSessionMaxLifetimeInSeconds: settings.UserSessionMaxLifetimeInSeconds,
 			MaxUserSessionsPerUser:          settings.MaxUserSessionsPerUser,
+			KeepSignedIn:                    string(settings.KeepSignedIn),
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)
@@ -87,6 +88,18 @@ func HandleSettingsSessionsPut(
 			return
 		}
 
+		// The mode is required, as the cap is, and is one of the three: a caller that does not know the
+		// field must not choose for the deployment by omission (#743 decision 4).
+		keepSignedIn := record.KeepSignedIn(req.KeepSignedIn)
+		if keepSignedIn == "" {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsKeepSignedInRequired, nil))
+			return
+		}
+		if !keepSignedIn.IsValid() {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsKeepSignedInInvalid, nil))
+			return
+		}
+
 		// Apply updates, onto the row as stored when the save runs (#407). The old values are that
 		// row's, read under the save's lock, which is what the save replaced.
 		var oldVals map[string]interface{}
@@ -95,6 +108,7 @@ func HandleSettingsSessionsPut(
 			stored.UserSessionIdleTimeoutInSeconds = req.UserSessionIdleTimeoutInSeconds
 			stored.UserSessionMaxLifetimeInSeconds = req.UserSessionMaxLifetimeInSeconds
 			stored.MaxUserSessionsPerUser = *req.MaxUserSessionsPerUser
+			stored.KeepSignedIn = keepSignedIn
 		})
 		if err != nil {
 			writeInternalServerError(w, r, err)
@@ -113,18 +127,20 @@ func HandleSettingsSessionsPut(
 			UserSessionIdleTimeoutInSeconds: saved.UserSessionIdleTimeoutInSeconds,
 			UserSessionMaxLifetimeInSeconds: saved.UserSessionMaxLifetimeInSeconds,
 			MaxUserSessionsPerUser:          saved.MaxUserSessionsPerUser,
+			KeepSignedIn:                    string(saved.KeepSignedIn),
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
 
-// sessionsSettingsAuditValues is the three session settings as updated_sessions_settings records
+// sessionsSettingsAuditValues is the four session settings as updated_sessions_settings records
 // them under old and new.
 func sessionsSettingsAuditValues(settings *record.Settings) map[string]interface{} {
 	return map[string]interface{}{
 		"user_session_idle_timeout_in_seconds": settings.UserSessionIdleTimeoutInSeconds,
 		"user_session_max_lifetime_in_seconds": settings.UserSessionMaxLifetimeInSeconds,
 		"max_user_sessions_per_user":           settings.MaxUserSessionsPerUser,
+		"keep_signed_in":                       string(settings.KeepSignedIn),
 	}
 }

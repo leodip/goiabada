@@ -42,13 +42,14 @@ To ask for a password every time, whatever the session, send [`prompt=login`](/c
 
 ## How long a session lasts
 
-A session's lifetimes, and how many sessions one user can hold, are under **Admin**, **Sessions** in the admin console, and apply to every client:
+A session's lifetimes, how many sessions one user can hold, and whether users stay signed in after closing the browser are under **Admin**, **Sessions** in the admin console, and apply to every client:
 
 | Setting | Default |
 |---|---|
 | **Idle timeout, in seconds** | 7200 (2 hours) |
 | **Maximum lifetime, in seconds** | 86400 (24 hours) |
 | **Maximum sessions per user** | 20 (0 means no limit) |
+| **Keep users signed in after the browser closes** | Let each user choose |
 
 A session can be used only while all of these hold:
 

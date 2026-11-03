@@ -22,6 +22,7 @@ func TestCreateSettings(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds:           1800,
 		UserSessionMaxLifetimeInSeconds:           43200,
 		MaxUserSessionsPerUser:                    35,
+		KeepSignedIn:                              record.KeepSignedInNever,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
 		IncludeOpenIDConnectClaimsInIdToken:       true,
 		AESEncryptionKeyLegacy:                    []byte("testaes"),
@@ -82,6 +83,7 @@ func TestUpdateSettings(t *testing.T) {
 	// 0 is no limit, a value of its own: it must be stored as 0, not replaced by the column's
 	// default of 20 (#564).
 	settings.MaxUserSessionsPerUser = 0
+	settings.KeepSignedIn = record.KeepSignedInAlways
 	settings.IncludeOpenIDConnectClaimsInAccessToken = false
 	settings.IncludeOpenIDConnectClaimsInIdToken = false
 	// AESEncryptionKeyLegacy is migration-only (dont-update); UpdateSettings must
@@ -155,6 +157,7 @@ func createTestSettings(t *testing.T) *record.Settings {
 		UserSessionIdleTimeoutInSeconds:           1800,
 		UserSessionMaxLifetimeInSeconds:           43200,
 		MaxUserSessionsPerUser:                    35,
+		KeepSignedIn:                              record.KeepSignedInNever,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
 		IncludeOpenIDConnectClaimsInIdToken:       true,
 		AESEncryptionKeyLegacy:                    []byte("testaes"),
@@ -217,6 +220,9 @@ func compareSettings(t *testing.T, expected, actual *record.Settings) {
 	}
 	if actual.MaxUserSessionsPerUser != expected.MaxUserSessionsPerUser {
 		t.Errorf("Expected MaxUserSessionsPerUser %d, got %d", expected.MaxUserSessionsPerUser, actual.MaxUserSessionsPerUser)
+	}
+	if actual.KeepSignedIn != expected.KeepSignedIn {
+		t.Errorf("Expected KeepSignedIn %q, got %q", expected.KeepSignedIn, actual.KeepSignedIn)
 	}
 	if actual.IncludeOpenIDConnectClaimsInAccessToken != expected.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken %v, got %v", expected.IncludeOpenIDConnectClaimsInAccessToken, actual.IncludeOpenIDConnectClaimsInAccessToken)

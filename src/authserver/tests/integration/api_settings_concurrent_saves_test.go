@@ -134,6 +134,7 @@ func TestAPISettingsSections_ConcurrentSavesOfDifferentSectionsAllSurvive(t *tes
 				UserSessionIdleTimeoutInSeconds: idleTimeout,
 				UserSessionMaxLifetimeInSeconds: 86400,
 				MaxUserSessionsPerUser:          &start.MaxUserSessionsPerUser,
+				KeepSignedIn:                    string(start.KeepSignedIn),
 			}},
 			{section: "tokens", route: "/api/v1/admin/settings/tokens", body: api.UpdateSettingsTokensRequest{
 				TokenExpirationInSeconds:                tokenExpiration,

@@ -1658,6 +1658,14 @@
 "adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "Eine Sitzung endet nach dieser Zeit ab ihrem Start, auch wenn sie noch verwendet wird."
 "adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "Maximale Sitzungen pro Konto"
 "adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" = "Die höchste Anzahl an Sitzungen pro Konto, von 0 bis 1000. Würde eine Anmeldung das Limit überschreiten, werden zuerst abgelaufene Sitzungen des Kontos beendet, dann die am längsten nicht verwendeten. 0 bedeutet unbegrenzt."
+"adminconsole.admin_settings.sessions.field.keep_signed_in" = "Nach dem Schließen des Browsers angemeldet bleiben"
+"adminconsole.admin_settings.sessions.keep_signed_in_tooltip" = "Ob eine Anmeldung das Schließen des Browsers übersteht. Sitzungen enden weiterhin nach ihrem Inaktivitätslimit und ihrer maximalen Dauer."
+"adminconsole.admin_settings.sessions.keep_signed_in_always" = "Immer"
+"adminconsole.admin_settings.sessions.keep_signed_in_always_hint" = "Alle bleiben nach dem Schließen des Browsers angemeldet, bis die Sitzung endet."
+"adminconsole.admin_settings.sessions.keep_signed_in_ask" = "Jede Person entscheiden lassen"
+"adminconsole.admin_settings.sessions.keep_signed_in_ask_hint" = "Die Passwortseite fragt jede Person mit einem nicht angehakten Kästchen, ob sie nach dem Schließen des Browsers angemeldet bleiben möchte."
+"adminconsole.admin_settings.sessions.keep_signed_in_never" = "Nie"
+"adminconsole.admin_settings.sessions.keep_signed_in_never_hint" = "Alle melden sich nach dem Schließen des Browsers erneut an."
 
 # --- Admin settings (email, keys, audit logs) -------------------------------
 
@@ -2001,6 +2009,8 @@
 "handler.settings_sessions.idle_timeout_above_max_lifetime" = "Das Inaktivitätslimit darf nicht länger als die maximale Gültigkeitsdauer sein."
 "handler.settings_sessions.max_sessions_per_user_required" = "Geben Sie die maximale Anzahl der Sitzungen pro Konto ein."
 "handler.settings_sessions.max_sessions_per_user_out_of_range" = "Die maximale Anzahl der Sitzungen pro Konto muss zwischen 0 und {{.max}} liegen."
+"handler.settings_sessions.keep_signed_in_required" = "Wählen Sie, ob Konten nach dem Schließen des Browsers angemeldet bleiben."
+"handler.settings_sessions.keep_signed_in_invalid" = "„Nach dem Schließen des Browsers angemeldet bleiben“ muss always, ask oder never sein."
 
 "handler.settings_tokens.token_expiration_not_positive" = "Die Token-Gültigkeitsdauer muss größer als null sein."
 "handler.settings_tokens.token_expiration_too_large" = "Die Token-Gültigkeitsdauer darf höchstens {{.max}} Sekunden betragen."
