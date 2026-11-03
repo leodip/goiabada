@@ -1614,7 +1614,7 @@
     flex-direction: column;
   }
   html:has(.app-header) {
-    scroll-padding-top: calc(var(--app-header-height) + 0.5rem);
+    scroll-padding-top: calc(var(--app-header-height) + 1.25rem);
   }
   .app-header {
     position: sticky;

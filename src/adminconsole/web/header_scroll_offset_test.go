@@ -33,7 +33,7 @@ func declarations(block, property string) []string {
 
 // The console's header stays pinned to the top of the page while the page scrolls, so a field the
 // keyboard moves the focus to could sit under it, focused and out of sight (WCAG 2.2 SC 2.4.11
-// Focus Not Obscured (Minimum)). The page reserves the header's height, plus a 0.5rem gap that
+// Focus Not Obscured (Minimum)). The page reserves the header's height, plus a 1.25rem gap that
 // keeps the focus ring whole below it, as scroll-padding-top, which every scroll to an element
 // honours: Tab and Shift+Tab, focus() and scrollIntoView, the skip link and in-page links. The
 // header's height is one custom property, which the header and the offset both read, so the two
@@ -63,8 +63,8 @@ func TestUICSS_ScrollPaddingKeepsTheFocusClearOfTheHeader(t *testing.T) {
 			}
 
 			page := cssRule(t, file.name, file.css, "html:has(.app-header)")
-			if got := declarations(page, "scroll-padding-top"); len(got) != 1 || got[0] != "calc(var(--app-header-height) + 0.5rem)" {
-				t.Errorf("%s: html:has(.app-header)'s scroll-padding-top is %q, want only calc(var(--app-header-height) + 0.5rem)", file.name, got)
+			if got := declarations(page, "scroll-padding-top"); len(got) != 1 || got[0] != "calc(var(--app-header-height) + 1.25rem)" {
+				t.Errorf("%s: html:has(.app-header)'s scroll-padding-top is %q, want only calc(var(--app-header-height) + 1.25rem)", file.name, got)
 			}
 		})
 	}

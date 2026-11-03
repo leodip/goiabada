@@ -7,6 +7,7 @@ import { userUrl } from "../../../lib/admin-console";
 import { signInToConsole, turnOnTwoFactor } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
+import { watchPasswordFieldsAsSent } from "../../../lib/submission";
 
 // The status region the script adds beside the field, right after the field's row.
 function statusOf(page: Page, fieldId: string): Locator {
@@ -104,14 +105,17 @@ test("Change password: sending the form puts every shown field back to dots befo
     return route.abort();
   });
   const sent = page.waitForRequest((request) => request.method() === "POST" && request.url() === `${env.adminUrl}/account/change-password`);
+  // Playwright reads no page while its navigation is held, so the page reports its own fields.
+  const asSent = await watchPasswordFieldsAsSent(page, fields);
   try {
     // The click does not wait for the navigation it starts, which the route holds until release.
     await page.getByRole("button", { name: "Change password" }).click({ noWaitAfter: true });
     await sent;
-    for (const id of fields) {
-      expect(await page.locator(`#${id}`).getAttribute("type"), id).toBe("password");
-    }
-    expect(await page.getByRole("button", { name: "Show new password", exact: true }).textContent()).toBe("Show");
+    expect(await asSent.state).toEqual({
+      currentPassword: { type: "password", buttonText: "Show", buttonName: "Show current password" },
+      newPassword: { type: "password", buttonText: "Show", buttonName: "Show new password" },
+      newPasswordConfirmation: { type: "password", buttonText: "Show", buttonName: "Show new password confirmation" },
+    });
     const dropped = page.waitForEvent("requestfailed");
     release();
     await dropped;

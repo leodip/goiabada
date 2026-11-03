@@ -89,9 +89,10 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
   is `aria-hidden="true"`, and a button showing one alone carries `sr-only` text; targets are at
   least 24 pixels. The console's sticky header is `--app-header-height` tall, and
-  `html:has(.app-header)` reserves that height plus 0.5rem as `scroll-padding-top`, so Tab,
+  `html:has(.app-header)` reserves that height plus 1.25rem as `scroll-padding-top`, so Tab,
   `focus()`, `scrollIntoView` and in-page links leave the element, focus ring included, below the
-  header (SC 2.4.11); change the header's height only through the property, and give anything else
+  header (SC 2.4.11). The gap is that wide because WebKit lines up a text field's caret, not its box,
+  with the edge; change the header's height only through the property, and give anything else
   pinned over the page a scroll offset of its own. `focus-not-obscured.spec.ts` checks it in
   Chromium, Firefox and WebKit. A field collecting the person's own data declares its purpose
   (SC 1.3.5) with a token the HTML Standard allows on its control (Autofill, 4.10.19.7.1), and a

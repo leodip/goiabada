@@ -70,7 +70,8 @@ run at once: each holds `e2e/.state/suite.lock` for its run. Each script answers
 
 WebKit needs system libraries that a desktop Linux often lacks (libsoup-3.0, libmanette, libenchant-2
 and others). Install them once, before the first run, from `e2e/playwright/`:
-`sudo npx playwright install-deps webkit`. Without them the WebKit project's tests fail to launch.
+`npx playwright install-deps webkit`, which asks for sudo itself; a `sudo` in front would not find an
+`npx` installed by nvm. Without them the WebKit project's tests fail to launch.
 
 They wrap the scripts in `infra/`, which can also be run on their own: `prepare.sh <tag | --source>`,
 `verify.sh [tag]` (check the environment again at any time), `rate-limiter.sh on | off | reset` and
