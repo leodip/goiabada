@@ -132,7 +132,7 @@ func newTestSessionStoreOver(backend sessionstore.ConditionalBackend) *sessionst
 		backend,
 		sessionkeys.SessionIdentifier,
 		false,
-		sessionstore.PersistentCookie,
+		sessionstore.PersistentCookie(sessiontest.KeepEverySignedInSession),
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),

@@ -458,11 +458,13 @@ func TestDeviceCookie_LivesTheMaxLifetimeInForce(t *testing.T) {
 
 // A max lifetime longer than 400 days gives the device cookie and the sign-in cookie a Max-Age of
 // 400 days, 34,560,000 seconds, the most RFC 6265bis lets a browser keep a cookie, where a browser
-// would otherwise cut it to a limit of its own (#743 decisions 1 and 6).
+// would otherwise cut it to a limit of its own (#743 decisions 1 and 6). Under Always, where the
+// sign-in cookie outlives the browser.
 func TestDeviceCookie_AndTheSignInCookieAskForAtMost400Days(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) {
 		settings.UserSessionIdleTimeoutInSeconds = 160000000
 		settings.UserSessionMaxLifetimeInSeconds = 160000000
+		settings.KeepSignedIn = record.KeepSignedInAlways
 	})
 	f := newDeviceFixture(t)
 	browser := newDeviceBrowser(t)

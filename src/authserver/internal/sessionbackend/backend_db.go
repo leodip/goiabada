@@ -242,24 +242,39 @@ func (b *dbBackend) expiryFor(ctx context.Context, hash string, authenticated bo
 	return sessionstore.ExpiresAt(now, createdAt, true, idleTimeout, maxLifetime), nil
 }
 
-// lifetimes returns the deployment's session deadlines.
+// lifetimes returns the deployment's session deadlines, from the settings settingsFor reads.
+func (b *dbBackend) lifetimes(ctx context.Context) (idleTimeout, maxLifetime time.Duration, err error) {
+	settings, err := settingsFor(ctx, b.database)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second,
+		time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second, nil
+}
+
+// settingsReader is what settingsFor reads the settings row through.
+type settingsReader interface {
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+}
+
+// settingsFor returns the deployment's settings for this request.
 //
 // The auth server's settings middleware has already read them for this request and put
 // them in the context, so the common path costs nothing; the fallback covers a caller
 // that has no request behind it. Both halves read the same settings, so which one runs
 // changes no outcome, only whether a read happens.
-func (b *dbBackend) lifetimes(ctx context.Context) (idleTimeout, maxLifetime time.Duration, err error) {
-	settings, ok := reqctx.SettingsFrom(ctx)
-	if !ok {
-		settings, err = b.database.GetSettingsById(ctx, nil, 1)
-		if err != nil {
-			return 0, 0, errs.Wrap(err, "unable to read the settings")
-		}
-		if settings == nil {
-			return 0, 0, errs.New("settings row is missing")
-		}
+func settingsFor(ctx context.Context, database settingsReader) (*record.Settings, error) {
+	if settings, ok := reqctx.SettingsFrom(ctx); ok {
+		return settings, nil
 	}
 
-	return time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second,
-		time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second, nil
+	settings, err := database.GetSettingsById(ctx, nil, 1)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to read the settings")
+	}
+	if settings == nil {
+		return nil, errs.New("settings row is missing")
+	}
+	return settings, nil
 }

@@ -115,7 +115,7 @@ func (s *ConditionalStore) ChangeAndSave(r *http.Request, w http.ResponseWriter,
 		}
 
 		session.Values = values
-		return s.setCookie(w, session, session.ID, expiresAt)
+		return s.setCookie(ctx, w, session, session.ID, expiresAt)
 	}
 
 	return s.outOfAttempts(ctx, session, change, "update")
@@ -180,7 +180,7 @@ func (s *ConditionalStore) ChangeAndRegenerate(w http.ResponseWriter, r *http.Re
 		session.ID = newId
 		session.IsNew = false
 		session.Values = values
-		return s.setCookie(w, session, newId, expiresAt)
+		return s.setCookie(ctx, w, session, newId, expiresAt)
 	}
 
 	return s.outOfAttempts(ctx, session, change, "rotate")
@@ -235,7 +235,8 @@ func (s *ConditionalStore) create(r *http.Request, w http.ResponseWriter, sessio
 		return err
 	}
 
-	expiresAt, err := s.conditional.Create(requestContext(r), id, []byte(encoded), s.valuesAreAuthenticated(values))
+	ctx := requestContext(r)
+	expiresAt, err := s.conditional.Create(ctx, id, []byte(encoded), s.valuesAreAuthenticated(values))
 	if err != nil {
 		return errs.Wrap(err, "unable to create the browser session")
 	}
@@ -243,7 +244,7 @@ func (s *ConditionalStore) create(r *http.Request, w http.ResponseWriter, sessio
 	session.ID = id
 	session.IsNew = false
 	session.Values = values
-	return s.setCookie(w, session, id, expiresAt)
+	return s.setCookie(ctx, w, session, id, expiresAt)
 }
 
 // lostTheRace is whether a conditional operation found the row not as it was read: changed, or

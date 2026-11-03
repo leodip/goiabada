@@ -27,7 +27,7 @@ func otpCeremonyBrowser(t *testing.T, held *ceremony.AuthContext) (*ceremony.Sto
 	t.Helper()
 	backend := sessiontest.NewMemoryBackend()
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
-		sessionstore.PersistentCookie, sessionstore.KeyPair{
+		sessionstore.PersistentCookie(sessiontest.KeepEverySignedInSession), sessionstore.KeyPair{
 			AuthenticationKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 			EncryptionKey:     []byte("0123456789abcdef0123456789abcdef"),
 		}, nil)

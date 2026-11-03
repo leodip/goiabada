@@ -875,7 +875,7 @@ func persistentStoreAtRefreshTestNow(t *testing.T, values map[string]any, lastAc
 
 	backend := newFakeBackend()
 	backend.expiresAt = refreshTestNow.Add(time.Minute)
-	store, err := NewServerSideStore(backend, "SessionIdentifier", false, PersistentCookie, storeTestPair(), nil)
+	store, err := NewServerSideStore(backend, "SessionIdentifier", false, PersistentCookie(keepEverySignedInSession), storeTestPair(), nil)
 	require.NoError(t, err)
 	store.now = func() time.Time { return refreshTestNow }
 
@@ -1225,7 +1225,7 @@ func TestServerSideStore_NegativeMaxAgeWithNoSessionTouchesNoBackend(t *testing.
 func TestServerSideStore_PersistentCookieFollowsTheRowsExpiry(t *testing.T) {
 	backend := newFakeBackend()
 	backend.expiresAt = time.Now().UTC().Add(2 * time.Hour)
-	store, err := NewServerSideStore(backend, "SessionIdentifier", false, PersistentCookie, storeTestPair(), nil)
+	store, err := NewServerSideStore(backend, "SessionIdentifier", false, PersistentCookie(keepEverySignedInSession), storeTestPair(), nil)
 	require.NoError(t, err)
 
 	cookie := saveNew(t, store, nil)
@@ -1255,7 +1255,7 @@ func TestServerSideStore_PersistentCookieAsksForAtMost400Days(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			backend := newFakeBackend()
 			backend.expiresAt = now.Add(test.rowLifetime)
-			store, err := NewServerSideStore(backend, "SessionIdentifier", false, PersistentCookie, storeTestPair(), nil)
+			store, err := NewServerSideStore(backend, "SessionIdentifier", false, PersistentCookie(keepEverySignedInSession), storeTestPair(), nil)
 			require.NoError(t, err)
 			store.now = func() time.Time { return now }
 
@@ -1848,7 +1848,7 @@ type matrixOwner struct {
 // holds the declarations to these literals, so a pair cannot drift apart with this matrix still
 // passing (#351, #385, #433, #440).
 var matrixOwners = []matrixOwner{
-	{"authserver", "authserver", "SessionIdentifier", PersistentCookie},
+	{"authserver", "authserver", "SessionIdentifier", PersistentCookie(keepEverySignedInSession)},
 	{"adminconsole", builtin.AdminConsoleSessionName, "Jwt", BrowserSessionCookie},
 }
 
@@ -1926,7 +1926,7 @@ func TestServerSideStore_CutoverMatrix(t *testing.T) {
 				assert.Equal(t, expectedName, cookie.Name)
 				assert.Equal(t, secure, cookie.Secure)
 
-				if owner.lifetime == PersistentCookie {
+				if owner.lifetime.persistent {
 					assert.Positive(t, cookie.MaxAge,
 						"the end user's cookie carries an expiry, so single sign-on survives a restart")
 				} else {

@@ -764,7 +764,7 @@ func newRealStore(t *testing.T) (*Store, *sessionstore.ServerSideStore, *armable
 	encKey := []byte("0123456789abcdef0123456789abcdef")
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend,
-		sessionkeys.SessionIdentifier, false, sessionstore.PersistentCookie,
+		sessionkeys.SessionIdentifier, false, sessionstore.PersistentCookie(sessiontest.KeepEverySignedInSession),
 		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
 	if err != nil {
 		// The keys are literals above and the derivation cannot fail on them, so this is
@@ -1430,7 +1430,7 @@ func (b *lastAttemptBackend) DeleteIfUnchanged(ctx context.Context, id string, e
 func storeOver(t *testing.T, backend sessionstore.ConditionalBackend) (*Store, *sessionstore.ServerSideStore) {
 	t.Helper()
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
-		sessionstore.PersistentCookie, sessionstore.KeyPair{
+		sessionstore.PersistentCookie(sessiontest.KeepEverySignedInSession), sessionstore.KeyPair{
 			AuthenticationKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 			EncryptionKey:     []byte("0123456789abcdef0123456789abcdef"),
 		}, nil)

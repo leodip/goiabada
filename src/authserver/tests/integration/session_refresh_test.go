@@ -60,7 +60,10 @@ func getWithSessionCookie(t *testing.T, target string, cookie *http.Cookie) *htt
 	return resp
 }
 
+// Under Always, where the sign-in cookie outlives the browser; TestKeepSignedIn_APageRefresh… holds
+// the other modes.
 func TestSessionRefresh_APageRequestPastTheThresholdSendsTheCookieWithTheRowsNewExpiry(t *testing.T) {
+	setKeepSignedIn(t, record.KeepSignedInAlways)
 	cookie, hash, _ := staleSignedInBrowserSession(t)
 	staleRow := readBrowserSessionRow(t, hash)
 

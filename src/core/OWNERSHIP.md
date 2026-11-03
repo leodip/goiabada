@@ -746,6 +746,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `ErrCookieValuesTooLong` | own-package | — |
 | `core/sessionstore` | `ErrNotFound` | kernel | — |
 | `core/sessionstore` | `ExpiresAt` | contract | The rule deciding when a browser session row stops being usable. The admin console's sessions live in rows the auth server's backend writes, so the rule is cross-process even though only the writing side calls it (#266). |
+| `core/sessionstore` | `KeepSignedIn` | reachable | — |
 | `core/sessionstore` | `KeyPair` | both-apps | — |
 | `core/sessionstore` | `MaxCookieMaxAgeInSeconds` | own-package | — |
 | `core/sessionstore` | `MaxCookieValuesBytes` | own-package | — |
@@ -756,7 +757,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `NewSession` | own-package | — |
 | `core/sessionstore` | `Options` | own-package | — |
 | `core/sessionstore` | `ParseKeys` | both-apps | — |
-| `core/sessionstore` | `PersistentCookie` | own-package | — |
+| `core/sessionstore` | `PersistentCookie` | contract | The auth server's cookie lifetime, beside `BrowserSessionCookie`, the admin console's: a sign-in in progress keeps its row's expiry, and a signed-in session keeps one only while the auth server's `KeepSignedIn` rule answers true (#743). Only the auth server passes it; it stays because the store decides each cookie's Max-Age with the session values only it can open, and the two lifetimes are one choice each binary makes at construction (#431). |
 | `core/sessionstore` | `PreAuthLifetime` | own-package | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
 | `core/sessionstore` | `PreviousKeysError` | both-apps | — |
 | `core/sessionstore` | `Record` | kernel | — |
@@ -766,6 +767,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `SessionIdBytes` | own-package | — |
 | `core/sessionstore` | `Store` | kernel | — |
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
+| `core/sessionstore/sessiontest` | `KeepEverySignedInSession` | test-support | Test support: the `KeepSignedIn` rule under Always, for the tests across the two servers that build the auth server's kind of store for something other than the setting (#743). Its own package precisely so no binary links it (#385). |
 | `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
 | `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
 | `core/sourceroot` | `FindSourceRoot` | kernel | — |

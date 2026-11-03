@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +44,7 @@ func newDatabaseCeremonyStore(t *testing.T) (*ceremony.Store, *sessionstore.Serv
 func ceremonyStoreOver(t *testing.T, backend sessionstore.ConditionalBackend) (*ceremony.Store, *sessionstore.ServerSideStore, sessionstore.ConditionalBackend) {
 	t.Helper()
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
-		sessionstore.PersistentCookie, sessionstore.KeyPair{
+		sessionstore.PersistentCookie(sessiontest.KeepEverySignedInSession), sessionstore.KeyPair{
 			AuthenticationKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 			EncryptionKey:     []byte("0123456789abcdef0123456789abcdef"),
 		}, nil)
