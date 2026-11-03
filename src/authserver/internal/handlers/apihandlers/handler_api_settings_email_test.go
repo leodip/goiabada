@@ -82,8 +82,8 @@ func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing
 }
 
 // A test send that succeeded answers whether its message went over TLS, as the sender reports it:
-// STARTTLS if available sends in plaintext when the relay offers no STARTTLS or its certificate is
-// not trusted, and the administrator has no other way to see which (#718 decision 16).
+// STARTTLS if available sends in plaintext when the relay offers no STARTTLS or the upgrade to TLS
+// fails, and the administrator has no other way to see which (#718 decision 16).
 func TestHandleSettingsEmailSendTestPost_AnswersWhetherTheMessageWentEncrypted(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

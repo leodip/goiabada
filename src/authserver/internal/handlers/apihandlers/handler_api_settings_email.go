@@ -347,8 +347,8 @@ func HandleSettingsEmailSendTestPost(
 		})
 
 		// Whether the message went over TLS: STARTTLS if available sends in plaintext when the relay
-		// offers no STARTTLS or its certificate is not trusted, and this is where an administrator
-		// sees which (#718 decision 16).
+		// offers no STARTTLS or the upgrade to TLS fails, and this is where an administrator sees
+		// which (#718 decision 16).
 		writeJSON(w, r, http.StatusOK, api.SendTestEmailResponse{Success: true, Encrypted: result.Encrypted})
 	}
 }
