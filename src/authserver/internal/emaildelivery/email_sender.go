@@ -340,19 +340,28 @@ func (e *Sender) connect(ctx context.Context, dial relayDial) (*smtp.Client, fun
 	// since conn is rewrapped below and the close runs on another goroutine.
 	tcpConn := conn
 	stopClosingOnCancel := context.AfterFunc(ctx, func() { _ = tcpConn.Close() })
+
+	// Wrapped directly around the TCP connection, under both the implicit TLS and the STARTTLS one
+	// net/smtp adds later, so every read and write the conversation makes, a STARTTLS handshake's
+	// included, has its own deadline. Under rather than over the implicit TLS because net/smtp
+	// recognizes TLS only by being handed the *tls.Conn itself: hidden inside a wrapper, the
+	// connection reads as plaintext, and smtp.PlainAuth refuses to send credentials over it to any
+	// relay but a loopback one.
+	deadlines := &deadlineConn{Conn: conn, commandTimeout: dial.commandTimeout, sendDeadline: dial.sendDeadline}
+	conn = deadlines
 	if dial.implicitTLS {
+		// The handshake is part of the connect, so it is held to the connect's deadline rather
+		// than given a fresh per-command one for each of its reads and writes.
+		deadlines.connectDeadline = dialDeadline
 		tlsConn := tls.Client(conn, dial.tlsConfig)
 		if handshakeErr := tlsConn.HandshakeContext(dialCtx); handshakeErr != nil {
 			stopClosingOnCancel()
-			_ = conn.Close()
+			_ = tcpConn.Close()
 			return nil, nil, tlsFailure(errs.Wrap(handshakeErr, "unable to connect to SMTP server"))
 		}
+		deadlines.connectDeadline = time.Time{}
 		conn = tlsConn
 	}
-
-	// Wrapped outside the implicit TLS, and under the STARTTLS one net/smtp adds later, so every
-	// read and write the conversation makes, a STARTTLS handshake's included, has its own deadline.
-	conn = &deadlineConn{Conn: conn, commandTimeout: dial.commandTimeout, sendDeadline: dial.sendDeadline}
 
 	client, err := smtp.NewClient(conn, dial.host)
 	if err != nil {
@@ -457,6 +466,9 @@ type deadlineConn struct {
 	net.Conn
 	commandTimeout time.Duration
 	sendDeadline   time.Time
+	// connectDeadline, while set, is every read's and write's deadline instead: the implicit-TLS
+	// handshake runs under it, as part of the connect.
+	connectDeadline time.Time
 }
 
 func (c *deadlineConn) Read(p []byte) (int, error) {
@@ -474,6 +486,9 @@ func (c *deadlineConn) Write(p []byte) (int, error) {
 }
 
 func (c *deadlineConn) deadline() time.Time {
+	if !c.connectDeadline.IsZero() {
+		return c.connectDeadline
+	}
 	next := time.Now().Add(c.commandTimeout)
 	if next.After(c.sendDeadline) {
 		return c.sendDeadline

@@ -2,6 +2,9 @@ package emaildelivery
 
 import (
 	"context"
+	"crypto/sha256"
+	"io"
+	"mime/quotedprintable"
 	"net"
 	"strconv"
 	"strings"
@@ -109,6 +112,59 @@ func TestSendEmail_SteadyProgressIsNotCutByTheCommandLimit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, f.data(), "Subject: Test email", "the message was delivered")
 	assert.GreaterOrEqual(t, elapsed, dribbledReplyLines*dribble, "the fake did not dribble its replies")
+}
+
+// A large body the relay takes slowly but steadily is not cut off by the per-command limit, which
+// each write renews: once the socket buffers fill, every write of the body waits on the relay, and
+// the transfer as a whole outlasts the limit. The relay takes the first 24 MiB at 128 KiB per 10 ms
+// pause, about 1.9 seconds, three times the 600 ms limit. Linux wakes a writer blocked on a full send
+// buffer only once about a third of the buffer has drained, about 1.3 MiB of the dev container's
+// 4 MiB, so each write waits about 150 ms, a quarter of the limit. The relay takes the body's last
+// 8 MiB, more than the buffers hold, as fast as it arrives, so the reply to the data waits on no
+// paced drain. The SSL/TLS row writes its body as TLS records through the same deadlines.
+func TestSendEmail_ASlowButSteadyBodyIsNotCutByTheCommandLimit(t *testing.T) {
+
+	cert := newFakeCert(t)
+	const line = "<p>hello, this line pads the body!</p>\n"
+	body := strings.Repeat(line, (32<<20)/len(line))
+
+	for _, mode := range []string{"none", "ssltls"} {
+		t.Run(mode, func(t *testing.T) {
+			f := &fakeSMTP{
+				ext:           []string{"8BITMIME"},
+				tlsExt:        []string{"8BITMIME"},
+				tlsFromStart:  mode == "ssltls",
+				cert:          cert,
+				paceData:      dribble / 5,
+				paceDataBytes: 24 << 20,
+			}
+			port := f.start(t)
+
+			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool, commandTimeout: 12 * dribble, sendTimeout: time.Minute}
+
+			started := time.Now()
+			result, err := sender.SendEmail(context.Background(), relayConfig(t, "127.0.0.1", port, mode, "", "", "Goiabada"), &SendEmailInput{
+				To:       fixtureRecipient,
+				Subject:  "Test email",
+				HtmlBody: body,
+			})
+			elapsed := time.Since(started)
+
+			require.NoError(t, err, "a write blocked on a relay that keeps taking the body is not a stall")
+			assert.Equal(t, SendResult{Encrypted: mode == "ssltls"}, result)
+			assert.Greater(t, f.dataDuration(), sender.commandTimeout,
+				"the body arrived within one command limit, so no write had to renew its deadline")
+			assert.Less(t, elapsed, sender.sendTimeout, "the send ran past its budget")
+
+			decoded, err := io.ReadAll(quotedprintable.NewReader(strings.NewReader(parseMessage(t, f.data()).body)))
+			require.NoError(t, err)
+			// The body ends at a line end, so the dot writer adds no line end of its own.
+			want := strings.ReplaceAll(body, "\n", "\r\n")
+			// Compared by digest, since a diff of 32 MB would bury the failure.
+			assert.Equal(t, sha256.Sum256([]byte(want)), sha256.Sum256(decoded),
+				"the body arrived altered: %d bytes decoded of %d", len(decoded), len(want))
+		})
+	}
 }
 
 // The send's budget ends a send that keeps making progress: the dribbled conversation needs more

@@ -568,6 +568,43 @@ func TestSendEmail_PlainChallengeFormOverProtectedConnection(t *testing.T) {
 	assert.True(t, f.hasLinePrefix("MAIL FROM:"))
 }
 
+// TestSendEmail_PlainOverProtectedConnection runs ordinary PLAIN, the initial-response form
+// smtp.PlainAuth writes, over each protected mode to a name that is not loopback: the shape of a
+// hosted relay. smtp.PlainAuth refuses to send unless net/smtp knows the connection is TLS, which
+// for implicit TLS it learns only from being handed the *tls.Conn itself, and every other SSL/TLS
+// row reaches the fake as 127.0.0.1, one of PlainAuth's loopback exceptions. Without this a
+// connection that hides its TLS from net/smtp would fail every hosted SSL/TLS relay offering PLAIN
+// and leave the suite green. STARTTLS, where net/smtp starts the TLS itself, is the control.
+func TestSendEmail_PlainOverProtectedConnection(t *testing.T) {
+
+	cert := newFakeCert(t)
+	host := fakeHostname(t)
+	require.False(t, isLocalHost(host), "the row needs a host outside PlainAuth's loopback exceptions")
+
+	for _, mode := range []string{"starttls", "ssltls"} {
+		t.Run(mode, func(t *testing.T) {
+			f := &fakeSMTP{
+				ext:          []string{"STARTTLS", "8BITMIME"},
+				tlsExt:       []string{"AUTH PLAIN", "8BITMIME"},
+				tlsFromStart: mode == "ssltls",
+				cert:         cert,
+			}
+			port := f.start(t)
+
+			result, err := sendReporting(t, &Sender{dataCipher: testDataCipher, rootCAs: cert.pool},
+				relayConfig(t, host, port, mode, fixtureUser, fixturePassword, "Goiabada"))
+			require.NoError(t, err, "a verified TLS connection carries ordinary PLAIN credentials")
+			assert.Equal(t, SendResult{Encrypted: true}, result)
+
+			assert.True(t, f.hasLinePrefix("AUTH PLAIN "), "ordinary credentials go in the initial response")
+			user, password := f.credentials()
+			assert.Equal(t, fixtureUser, user)
+			assert.Equal(t, fixturePassword, password)
+			assert.Contains(t, f.data(), "Subject: Test email\r\n", "the message was delivered")
+		})
+	}
+}
+
 // TestSendEmail_PlainRepeatedChallenge pins plainAuth's one-response cardinality. PLAIN carries
 // exactly one response (RFC 4616 section 2), so a server challenging again after it has taken that
 // response is broken or fishing, and the answer is an error rather than a second copy of the

@@ -51,6 +51,14 @@ type fakeSMTP struct {
 	// stopReadingAtData answers DATA with its 354 and then reads nothing more, so a large body
 	// fills the socket buffers and the client's write blocks until its own deadline.
 	stopReadingAtData bool
+	// paceData answers DATA with its 354 and then takes the first paceDataBytes of the body
+	// paceChunk bytes per pause of paceData, and the rest as fast as it arrives: a relay that is
+	// slow but steadily taking a large body, so once the socket buffers fill, the client's writes
+	// block and each completes as the relay frees room. The unpaced rest drains the buffers quickly
+	// once the client has written everything, so the wait for the reply to the data is no test of
+	// the pace.
+	paceData      time.Duration
+	paceDataBytes int
 	// handshakeDelay is a pause before the implicit-TLS handshake, which is part of the connect: a
 	// relay slow to start TLS, whose time counts against the send's budget.
 	handshakeDelay time.Duration
@@ -105,6 +113,8 @@ type fakeSMTP struct {
 	log      []string
 	sessions [][]string
 	dataRaw  string
+	// dataTook is how long the DATA block took to arrive, from the 354 to its terminator.
+	dataTook time.Duration
 	authUser string
 	authPass string
 	conns    []net.Conn
@@ -141,6 +151,13 @@ func (f *fakeSMTP) connectionLines() [][]string {
 		out[i] = append([]string(nil), lines...)
 	}
 	return out
+}
+
+// dataDuration is how long the DATA block took to arrive, from the 354 to its terminator.
+func (f *fakeSMTP) dataDuration() time.Duration {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.dataTook
 }
 
 // lines returns every line the client sent, including the authentication responses.
@@ -381,6 +398,12 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 				<-f.stopped
 				return
 			}
+			dataStarted := time.Now()
+			if f.paceData > 0 {
+				// Nothing follows the terminator until the reply to it, so the paced reader can
+				// take over the rest of the session without swallowing a command.
+				r = bufio.NewReaderSize(&pacedReader{r: r, pause: f.paceData, limit: f.paceDataBytes}, paceChunk)
+			}
 			var b strings.Builder
 			for {
 				l, err := r.ReadString('\n')
@@ -394,6 +417,7 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 			}
 			f.mu.Lock()
 			f.dataRaw = b.String()
+			f.dataTook = time.Since(dataStarted)
 			f.mu.Unlock()
 			if f.stallAfterData {
 				// Never answer the terminator. The client blocks on the reply until its read
@@ -425,6 +449,35 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 			say("250 2.0.0 ok")
 		}
 	}
+}
+
+// paceChunk is how much a pacedReader takes between two of its pauses.
+const paceChunk = 128 << 10
+
+// pacedReader reads from r as it arrives and, until it has taken limit bytes, pauses each time
+// another paceChunk bytes have been taken, so those arrive at a steady rate of about paceChunk per
+// pause.
+type pacedReader struct {
+	r     io.Reader
+	pause time.Duration
+	limit int
+	taken int
+}
+
+func (p *pacedReader) Read(b []byte) (int, error) {
+	if p.taken >= p.limit {
+		return p.r.Read(b)
+	}
+	if room := paceChunk - p.taken%paceChunk; len(b) > room {
+		b = b[:room]
+	}
+	n, err := p.r.Read(b)
+	before := p.taken
+	p.taken += n
+	if p.taken/paceChunk > before/paceChunk {
+		time.Sleep(p.pause)
+	}
+	return n, err
 }
 
 func (f *fakeSMTP) readBase64Line(session int, r *bufio.Reader) (string, error) {
