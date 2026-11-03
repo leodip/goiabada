@@ -57,12 +57,13 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `versions.yaml`, so each module's unit tier needs `node` on the path, as the dev container and the
   test jobs have it. The auth server's pages work with JavaScript off, except those three forms while the challenge
   is on, whose submission needs the token the widget's script writes; the console says it needs it.
+  In both servers a button marked `data-password-toggle` shows and hides the password field its
+  `aria-controls` names (each `utils.js`'s `passwordToggle`), and with JavaScript off it never shows.
   In the console a script answers an action in a live region the page draws empty, through
   `showNotice`, not in a dialog, its failures too (`sendAjaxRequest`'s `statusRegion`); a removal
   asks first in a `modal_dialog` of type `confirm`, whose second button names the action; a button
-  marked `data-copy-target` copies, a button marked `data-password-toggle` shows and hides the
-  password field its `aria-controls` names (`passwordToggle`, which a page script also calls on a
-  button it reaches by id, so an operator's older template keeps working), a long `select` marked `data-searchable` becomes a `combobox`
+  marked `data-copy-target` copies, a page script may call `passwordToggle` on a show/hide button it
+  reaches by id, so an operator's older template keeps working, a long `select` marked `data-searchable` becomes a `combobox`
   that filters as the person types, the select kept hidden to post the value, its field taking the
   select's `autocomplete` (`off` where it has none) and committing a browser's fill to the select,
   by option value, case aside, then by name, flag aside, or for `tel-country-code` by the one
@@ -95,12 +96,13 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   (SC 1.3.5) with a token the HTML Standard allows on its control (Autofill, 4.10.19.7.1), and a
   control a script draws in place of another keeps the purpose of the one it replaces; a page about
   another user declares none, since autofill would fill in the administrator's own data. Every
-  console password field carries `spellcheck="false"`, `autocapitalize="none"` and
+  password field, in both servers, carries `spellcheck="false"`, `autocapitalize="none"` and
   `autocorrect="off"`, so a shown password reaches no spell-check service and no keyboard rewrites
   it (HTML Standard 6.8.5, 6.8.7, 6.8.8), and sits in an `input-row` beside its show/hide button: a
   `button type="button"`, drawn `hidden` so it never shows without JavaScript, marked
   `data-password-toggle`, with `aria-controls` naming the field. Its visible word is
-  `adminconsole.password_toggle.show` and, in `data-hide-label`, `hide`; its name, in `aria-label`
+  `adminconsole.password_toggle.show` in the console and `common.password_toggle.show` in the auth
+  server, and, in `data-hide-label`, `hide`; its name, in `aria-label`
   and `data-hide-name`, is the `show_<kind>` and `hide_<kind>` pair of the field's kind, such as
   "Show new password", which contains the visible word in every catalog (SC 2.5.3); and
   `data-shown-status` and `data-hidden-status` carry the words the script writes into the

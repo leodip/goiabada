@@ -16,6 +16,14 @@
 "common.field.password" = "Senha"
 "common.field.password_confirmation" = "Confirme a senha"
 "common.link.sign_in_to_account" = "Entrar na sua conta"
+"common.password_toggle.show" = "Mostrar"
+"common.password_toggle.hide" = "Ocultar"
+"common.password_toggle.shown" = "Visível"
+"common.password_toggle.hidden" = "Não visível"
+"common.password_toggle.show_password" = "Mostrar senha"
+"common.password_toggle.hide_password" = "Ocultar senha"
+"common.password_toggle.show_password_confirmation" = "Mostrar confirmação da senha"
+"common.password_toggle.hide_password_confirmation" = "Ocultar confirmação da senha"
 
 # As regras de senha que um formulário que define uma senha mostra sob o campo, nos formulários de cadastro,
 # ativação e redefinição do servidor de autenticação e nas páginas de alteração de senha, novo usuário e aba

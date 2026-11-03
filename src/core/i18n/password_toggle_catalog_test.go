@@ -53,6 +53,32 @@ func TestCatalog_ConsolePasswordToggleWordsInEnglish(t *testing.T) {
 	}
 }
 
+// The auth server's show/hide buttons read "Show" or "Hide", a status region says "Shown" or
+// "Hidden", and each button is named after its field's kind, the password or its confirmation
+// (#722 decision 8).
+func TestCatalog_AuthServerPasswordToggleWordsInEnglish(t *testing.T) {
+	en := loadCatalogFlat(t, "active.en.toml")
+	want := map[string]string{
+		"common.password_toggle.show":                       "Show",
+		"common.password_toggle.hide":                       "Hide",
+		"common.password_toggle.shown":                      "Shown",
+		"common.password_toggle.hidden":                     "Hidden",
+		"common.password_toggle.show_password":              "Show password",
+		"common.password_toggle.hide_password":              "Hide password",
+		"common.password_toggle.show_password_confirmation": "Show password confirmation",
+		"common.password_toggle.hide_password_confirmation": "Hide password confirmation",
+	}
+	for key, value := range want {
+		assert.Equalf(t, value, en[key], "active.en.toml: %q", key)
+	}
+	for key := range en {
+		if strings.HasPrefix(key, "common.password_toggle.") {
+			_, ok := want[key]
+			assert.Truef(t, ok, "active.en.toml has %q, which no auth server show/hide button uses", key)
+		}
+	}
+}
+
 // Every show/hide button's accessible name contains the word the button shows, case aside, in every
 // built-in catalog: a person using speech input says what they see (WCAG 2.2 SC 2.5.3 Label in
 // Name). A translation that names the button with another verb than its visible word fails here.
@@ -78,8 +104,9 @@ func TestCatalog_PasswordToggleNamesContainTheirVisibleWord(t *testing.T) {
 				assert.Containsf(t, strings.ToLower(value), strings.ToLower(word),
 					"%s: the name %q (%s) does not contain its visible word %q (%s)", name, value, key, word, wordKey)
 			}
-			// The console's six kinds, a show and a hide name each, at the least.
-			assert.GreaterOrEqualf(t, checked, 12, "%s: %d show/hide names read", name, checked)
+			// The console's six kinds and the auth server's two, a show and a hide name each, at
+			// the least.
+			assert.GreaterOrEqualf(t, checked, 16, "%s: %d show/hide names read", name, checked)
 		})
 	}
 }

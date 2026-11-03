@@ -18,6 +18,14 @@
 "common.field.password" = "Password"
 "common.field.password_confirmation" = "Confirm password"
 "common.link.sign_in_to_account" = "Sign in to your account"
+"common.password_toggle.show" = "Show"
+"common.password_toggle.hide" = "Hide"
+"common.password_toggle.shown" = "Shown"
+"common.password_toggle.hidden" = "Hidden"
+"common.password_toggle.show_password" = "Show password"
+"common.password_toggle.hide_password" = "Hide password"
+"common.password_toggle.show_password_confirmation" = "Show password confirmation"
+"common.password_toggle.hide_password_confirmation" = "Hide password confirmation"
 
 # The password rules a form that sets a password shows under its field, on the auth server's registration,
 # activation and reset forms and the admin console's change-password, new user and Authentication tab pages.

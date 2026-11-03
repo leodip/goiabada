@@ -27,7 +27,10 @@
 
   <div class="field">
     <label class="field-label" for="password">{{ T $.ctx "auth.pwd.password_label" }}</label>
-    <input class="control" id="password" type="password" name="password" autocomplete="current-password"{{ if .error }}{{ if eq .errorField "password" }} aria-invalid="true" aria-describedby="pwd-error"{{ end }}{{ if ne .errorField "email" }} autofocus{{ end }}{{ end }}>
+    <div class="input-row">
+      <input class="control" id="password" type="password" name="password" autocomplete="current-password" spellcheck="false" autocapitalize="none" autocorrect="off"{{ if .error }}{{ if eq .errorField "password" }} aria-invalid="true" aria-describedby="pwd-error"{{ end }}{{ if ne .errorField "email" }} autofocus{{ end }}{{ end }}>
+      <button class="button" type="button" data-password-toggle aria-controls="password" aria-label="{{ T $.ctx "common.password_toggle.show_password" }}" data-hide-name="{{ T $.ctx "common.password_toggle.hide_password" }}" data-hide-label="{{ T $.ctx "common.password_toggle.hide" }}" data-shown-status="{{ T $.ctx "common.password_toggle.shown" }}" data-hidden-status="{{ T $.ctx "common.password_toggle.hidden" }}" hidden>{{ T $.ctx "common.password_toggle.show" }}</button>
+    </div>
     {{ if .smtpEnabled }}
     <p class="text-right text-sm"><a class="text-link" href="/forgot-password">{{ T $.ctx "auth.pwd.forgot_password" }}</a></p>
     {{ end }}
