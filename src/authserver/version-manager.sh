@@ -20,6 +20,7 @@
 # golangci-lint, mockery, staticcheck, unparam, govulncheck, the release
 # images' Alpine base, Trivy, Grype, npm-check-updates, cropperjs, acorn), and
 # the dependencies of the Go modules and of the npm projects in NPM_PROJECTS.
+# check also reports when the pinned sources of generate's data have moved.
 # It does NOT manage the product version.
 #
 # Workflow, for bumping a tool or CDN pin:
@@ -505,6 +506,86 @@ npm_project_updates() {
     done < <(echo "$latest" | yq -p json -r 'to_entries | .[] | .key + "\t" + .value')
 }
 
+# The data generators pin their upstream sources in their own code: a release or
+# commit, with the hash its bytes must have. check reads those pins to report
+# when upstream has moved; moving one is the generator's own steps, at the top
+# of its main.go, then ./version-manager.sh generate.
+TZ_GENERATOR="$BASE_DIR/src/core/timezones/generate/main.go"
+COUNTRIES_GENERATOR="$BASE_DIR/src/core/countries/generate/main.go"
+PASSWORDS_GENERATOR="$BASE_DIR/src/core/passwordblocklist/generate/main.go"
+
+# go_const prints the string a Go constant is set to in FILE, written as
+# NAME = "value" on a line of its own, as the generators write their pins.
+# Usage: go_const FILE NAME
+go_const() {
+    sed -n -E "s/^[[:space:]]*$2[[:space:]]*=[[:space:]]*\"([^\"]*)\".*/\1/p" "$1" | head -1
+}
+
+# The file names the password blocklist generator fetches, one per line.
+password_list_files() {
+    sed -n -E 's/^[[:space:]]*file:[[:space:]]*"([^"]+)".*/\1/p' "$PASSWORDS_GENERATOR"
+}
+
+# Reduce a GitHub commits API answer, read on stdin, one commit or a list of
+# them, to the first commit's SHA and committer time, separated by a space.
+# Prints nothing for an empty list, and fails on an answer that is not JSON.
+github_commit_fields() {
+    node -e '
+        const answer = JSON.parse(require("fs").readFileSync(0, "utf8"));
+        const commit = Array.isArray(answer) ? answer[0] : answer;
+        if (commit && commit.sha && commit.commit) console.log(commit.sha + " " + commit.commit.committer.date);
+    '
+}
+
+# get_github_path_change prints the newest commit of REPO that changed one of
+# PATHS after the commit PIN, as SHA and time, or nothing when none did. Fails
+# when GitHub does not answer.
+# Usage: get_github_path_change REPO PIN PATH...
+get_github_path_change() {
+    local repo="$1" pin="$2"
+    shift 2
+    local pinned pinned_time path change change_time newest="" newest_time=""
+    pinned=$(curl -sf --connect-timeout 10 "https://api.github.com/repos/${repo}/commits/${pin}" | github_commit_fields) || return 1
+    pinned_time=${pinned#* }
+    [ -n "$pinned_time" ] || return 1
+    for path in "$@"; do
+        change=$(curl -sf --connect-timeout 10 "https://api.github.com/repos/${repo}/commits?path=${path}&per_page=1" | github_commit_fields) || return 1
+        change_time=${change#* }
+        [ -n "$change" ] && [[ "$change_time" > "$pinned_time" ]] && [[ "$change_time" > "$newest_time" ]] || continue
+        newest=${change%% *}
+        newest_time=$change_time
+    done
+    [ -z "$newest" ] || echo "$newest $newest_time"
+}
+
+# Fetch IANA's newest tzdata release, with the time its tarball was published
+# (its Last-Modified, as RFC 3339 in UTC), separated by a space.
+get_tzdata_latest() {
+    local release modified
+    release=$(curl -sf --connect-timeout 10 "https://data.iana.org/time-zones/tzdb/version" 2>/dev/null | tr -d '[:space:]')
+    [ -n "$release" ] || return 0
+    modified=$(curl -sfI --connect-timeout 10 "https://data.iana.org/time-zones/releases/tzdata${release}.tar.gz" 2>/dev/null \
+        | tr -d '\r' | sed -n 's/^[Ll]ast-[Mm]odified: //p')
+    [ -n "$modified" ] && modified=$(date -u -d "$modified" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+    echo "$release $modified"
+}
+
+# check's lines for a data source pinned at a commit, given the newest commit
+# that changed what the generator reads, as get_github_path_change prints it.
+# Usage: report_data_commit NAME PIN CHANGE GENERATOR
+report_data_commit() {
+    local name="$1" pin="$2" change="$3" generator="$4"
+    local sha=${change%% *} time=${change#* }
+    if [ -z "$change" ]; then
+        print_success "Up to date (${pin:0:10})"
+    elif released_too_recently "$time"; then
+        held_back "${pin:0:10}" "${sha:0:10}" "$time"
+    else
+        echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+        data_updates+=("$name|${pin:0:10}|${sha:0:10}|${generator#"$BASE_DIR"/}")
+    fi
+}
+
 # =============================================================================
 # File Update Functions
 # =============================================================================
@@ -861,6 +942,49 @@ cmd_check() {
         done <<< "$found"
     done
 
+    # --- Data sources ---
+    # The pinned upstreams of ./version-manager.sh generate, held to the same
+    # RELEASE_MIN_AGE_DAYS.
+    local data_updates=()
+    echo -n "Checking tzdata (timezones)... "
+    local current_tz latest_tz published_tz
+    current_tz=$(go_const "$TZ_GENERATOR" pinnedRelease)
+    read -r latest_tz published_tz <<< "$(get_tzdata_latest)"
+    if [ -z "$current_tz" ] || [ -z "$latest_tz" ]; then
+        print_warning "Check failed"
+    elif version_lt "$current_tz" "$latest_tz" && released_too_recently "$published_tz"; then
+        held_back "$current_tz" "$latest_tz" "$published_tz"
+    elif version_lt "$current_tz" "$latest_tz"; then
+        echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+        data_updates+=("tzdata|$current_tz|$latest_tz|${TZ_GENERATOR#"$BASE_DIR"/}")
+    else
+        print_success "Up to date ($current_tz)"
+    fi
+
+    echo -n "Checking country-codes (countries)... "
+    local pin_countries change_countries
+    pin_countries=$(go_const "$COUNTRIES_GENERATOR" pinnedCommit)
+    if [ -n "$pin_countries" ] && change_countries=$(get_github_path_change "datasets/country-codes" "$pin_countries" "data/country-codes.csv"); then
+        report_data_commit "country-codes" "$pin_countries" "$change_countries" "$COUNTRIES_GENERATOR"
+    else
+        print_warning "Check failed"
+    fi
+
+    echo -n "Checking SecLists (passwordblocklist)... "
+    local pin_passwords change_passwords
+    local -a password_paths=()
+    local file
+    while read -r file; do
+        [ -n "$file" ] && password_paths+=("Passwords/Common-Credentials/$file")
+    done < <(password_list_files)
+    pin_passwords=$(go_const "$PASSWORDS_GENERATOR" pinnedCommit)
+    if [ -n "$pin_passwords" ] && [ ${#password_paths[@]} -gt 0 ] \
+        && change_passwords=$(get_github_path_change "danielmiessler/SecLists" "$pin_passwords" "${password_paths[@]}"); then
+        report_data_commit "SecLists" "$pin_passwords" "$change_passwords" "$PASSWORDS_GENERATOR"
+    else
+        print_warning "Check failed"
+    fi
+
     # --- Summary ---
     echo ""
     if [ ${#updates_available[@]} -gt 0 ]; then
@@ -896,7 +1020,18 @@ cmd_check() {
         echo ""
         print_info "deps leaves these: each is a change of its own, made in its package.json"
     fi
-    if [ ${#updates_available[@]} -eq 0 ] && [ ${#npm_updates[@]} -eq 0 ] && [ ${#npm_majors[@]} -eq 0 ]; then
+    if [ ${#data_updates[@]} -gt 0 ]; then
+        print_header "Data Source Updates"
+        printf "%-20s %-12s %-12s %s\n" "Source" "Current" "Latest" "Pinned in"
+        printf "%-20s %-12s %-12s %s\n" "------" "-------" "------" "---------"
+        for info in "${data_updates[@]}"; do
+            IFS='|' read -r name current latest url <<< "$info"
+            printf "${YELLOW}%-20s${NC} %-12s ${GREEN}%-12s${NC} ${BLUE}%s${NC}\n" "$name" "$current" "$latest" "$url"
+        done
+        echo ""
+        print_info "To update: follow the steps at the top of that file, then ./version-manager.sh generate"
+    fi
+    if [ ${#updates_available[@]} -eq 0 ] && [ ${#npm_updates[@]} -eq 0 ] && [ ${#npm_majors[@]} -eq 0 ] && [ ${#data_updates[@]} -eq 0 ]; then
         print_success "All dependencies are up to date!"
     fi
 }
