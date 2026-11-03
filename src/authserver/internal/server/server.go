@@ -745,12 +745,19 @@ func (s *Server) applicationChain(faults middleware.ServerFaults) []func(http.Ha
 	}
 }
 
-// pageChain is the page branch's middleware: the application chain, then the page language of the
-// user a page is drawn for, over what the locale middleware resolved (#631 decision 5). The other
-// branches answer protocol clients and the APIs, whose refusals keep the language the request asks
-// for.
+// pageChain is the page branch's middleware: the refresh of the browser session, the application
+// chain, then the page language of the user a page is drawn for, over what the locale middleware
+// resolved (#631 decision 5). The other branches answer protocol clients and the APIs, whose
+// refusals keep the language the request asks for.
+//
+// Only a page request refreshes the browser session, and the refresh sends the session cookie
+// again; on every other branch the session is read without moving its idle deadline. Every page is
+// no-store, while the files are answered cacheable and discovery and JWKS carry no directive, so a
+// reissued cookie never rides on an answer a shared cache may store and replay to other visitors
+// (#743 decision 9). It goes first, ahead of the cookie reset's first read of the session.
 func (s *Server) pageChain() []func(http.Handler) http.Handler {
-	return append(s.applicationChain(middleware.PageFaults()),
+	return append(append([]func(http.Handler) http.Handler{sessionstore.Refreshing},
+		s.applicationChain(middleware.PageFaults())...),
 		middleware.PageLanguage(ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName), s.database))
 }
 

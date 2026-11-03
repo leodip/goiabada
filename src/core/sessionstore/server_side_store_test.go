@@ -853,6 +853,170 @@ func TestServerSideStore_TouchFailurePropagates(t *testing.T) {
 	require.Error(t, err)
 }
 
+// --- the refresh: only a page request moves the row, and sends the cookie with it ---------
+
+// refreshTestNow is the fixed clock of the refresh tests, so the Max-Age a reissued cookie carries
+// is exact rather than within a delta.
+var refreshTestNow = time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+
+// signedInValues are the contents of a browser session that has signed in: the store's configured
+// authenticated key holds a session identifier.
+func signedInValues() map[string]any {
+	return map[string]any{"SessionIdentifier": "a-user-session"}
+}
+
+// persistentStoreAtRefreshTestNow is the auth server's kind of store, whose cookie outlives the
+// browser, on refreshTestNow's clock, holding one session saved with values whose row was last
+// accessed lastAccessedAgo before now. The backend's next touch moves the row's expiry to
+// touchedExpiry.
+func persistentStoreAtRefreshTestNow(t *testing.T, values map[string]any, lastAccessedAgo time.Duration,
+	touchedExpiry time.Time) (*ServerSideStore, *fakeBackend, *http.Cookie, string) {
+	t.Helper()
+
+	backend := newFakeBackend()
+	backend.expiresAt = refreshTestNow.Add(time.Minute)
+	store, err := NewServerSideStore(backend, "SessionIdentifier", false, PersistentCookie, storeTestPair(), nil)
+	require.NoError(t, err)
+	store.now = func() time.Time { return refreshTestNow }
+
+	cookie := saveNew(t, store, values)
+	id := decodeCookieId(t, store, cookie)
+	backend.rows[id].LastAccessed = refreshTestNow.Add(-lastAccessedAgo)
+	backend.expiresAt = touchedExpiry
+	return store, backend, cookie, id
+}
+
+// readSession answers req as a request whose middleware reads the browser session, through
+// Refreshing when refreshing, as the auth server's page branch does, and without it, as its files,
+// protocol and API branches do. It returns the session cookies the response carries.
+func readSession(t *testing.T, store *ServerSideStore, req *http.Request, refreshing bool) (*Session, []*http.Cookie) {
+	t.Helper()
+
+	var session *Session
+	var getErr error
+	var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, getErr = store.Get(r, storeTestName)
+		w.WriteHeader(http.StatusOK)
+	})
+	if refreshing {
+		handler = Refreshing(handler)
+	}
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	require.NoError(t, getErr)
+
+	var cookies []*http.Cookie
+	for _, cookie := range w.Result().Cookies() {
+		if cookie.Name == store.CookieName(storeTestName) {
+			cookies = append(cookies, cookie)
+		}
+	}
+	return session, cookies
+}
+
+// A page request that finds a signed-in session's row more than ten seconds stale moves the row's
+// idle deadline and sends the cookie again, naming the same session, with the row's new expiry as
+// its Max-Age: a browser that only ever reads, never saves, keeps its cookie as long as the row
+// lives (#743 decision 8).
+func TestServerSideStore_APageRequestThatRefreshesASignedInSessionSendsItsCookieAgain(t *testing.T) {
+	store, backend, cookie, id := persistentStoreAtRefreshTestNow(t, signedInValues(), 11*time.Second,
+		refreshTestNow.Add(2*time.Hour))
+
+	session, cookies := readSession(t, store, requestWith(cookie), true)
+
+	assert.Equal(t, 1, backend.touches, "the stale row is touched")
+	assert.Equal(t, id, session.ID, "the session is the one the cookie names")
+	require.Len(t, cookies, 1, "the touch sends the session cookie again")
+	assert.Equal(t, 7200, cookies[0].MaxAge, "with the row's new expiry, two hours from now")
+	assert.Equal(t, id, decodeCookieId(t, store, cookies[0]), "naming the same session")
+	assert.Equal(t, "/", cookies[0].Path)
+	assert.True(t, cookies[0].HttpOnly)
+	assert.Equal(t, http.SameSiteLaxMode, cookies[0].SameSite)
+}
+
+// The reissued cookie asks for at most 400 days, 34,560,000 seconds, as a saved one does (#743
+// decision 6).
+func TestServerSideStore_ARefreshedCookieAsksForAtMost400Days(t *testing.T) {
+	store, _, cookie, _ := persistentStoreAtRefreshTestNow(t, signedInValues(), time.Minute,
+		refreshTestNow.Add(400*24*time.Hour+time.Second))
+
+	_, cookies := readSession(t, store, requestWith(cookie), true)
+
+	require.Len(t, cookies, 1)
+	assert.Equal(t, 34560000, cookies[0].MaxAge)
+}
+
+// Within the ten-second threshold a page request neither touches the row nor sends a cookie: the
+// threshold is what keeps a page view from costing a write, and a cookie with no write behind it
+// would say nothing new.
+func TestServerSideStore_APageRequestWithinTheTouchThresholdSendsNothing(t *testing.T) {
+	store, backend, cookie, _ := persistentStoreAtRefreshTestNow(t, signedInValues(), 10*time.Second,
+		refreshTestNow.Add(2*time.Hour))
+
+	_, cookies := readSession(t, store, requestWith(cookie), true)
+
+	assert.Equal(t, 0, backend.touches)
+	assert.Empty(t, cookies)
+}
+
+// A request outside the page branch reads the session as it is and never moves its idle deadline,
+// however stale the row: the auth server answers the client logos, the profile pictures and the
+// OpenAPI document cacheable, and a refresh there would have to leave the cookie behind, or send
+// it on an answer a shared cache may store (#743 decision 9).
+func TestServerSideStore_ARequestThatDoesNotRefreshReadsTheSessionWithoutTouchingIt(t *testing.T) {
+	store, backend, cookie, id := persistentStoreAtRefreshTestNow(t, signedInValues(), time.Hour,
+		refreshTestNow.Add(2*time.Hour))
+	lastAccessed := backend.rows[id].LastAccessed
+
+	session, cookies := readSession(t, store, requestWith(cookie), false)
+
+	assert.Equal(t, id, session.ID, "the session is read")
+	assert.Equal(t, "a-user-session", session.Values["SessionIdentifier"], "with its contents")
+	assert.Equal(t, 0, backend.touches, "and its row is not touched")
+	assert.Equal(t, lastAccessed, backend.rows[id].LastAccessed)
+	assert.Empty(t, cookies)
+}
+
+// A sign-in in progress is refreshed on a page request as before, and its cookie is not sent
+// again: the reissue is for a signed-in session's cookie (#743 decision 8).
+func TestServerSideStore_APageRequestRefreshesASignInInProgressWithoutSendingItsCookie(t *testing.T) {
+	store, backend, cookie, _ := persistentStoreAtRefreshTestNow(t, map[string]any{"ceremony": "in progress"},
+		time.Minute, refreshTestNow.Add(PreAuthLifetime))
+
+	_, cookies := readSession(t, store, requestWith(cookie), true)
+
+	assert.Equal(t, 1, backend.touches)
+	assert.Empty(t, cookies)
+}
+
+// A row that went away between the read and the touch is no session, and no cookie names it.
+func TestServerSideStore_ARefreshThatFindsTheRowGoneSendsNoCookie(t *testing.T) {
+	store, backend, cookie, _ := persistentStoreAtRefreshTestNow(t, signedInValues(), time.Minute,
+		refreshTestNow.Add(2*time.Hour))
+	backend.touchErr = ErrNotFound
+
+	session, cookies := readSession(t, store, requestWith(cookie), true)
+
+	assert.True(t, session.IsNew, "a fresh session")
+	assert.Empty(t, cookies)
+}
+
+// The admin console's store, whose cookie ends with the browser and carries no Max-Age, still
+// touches a stale session on every request that reads it: it mounts no Refreshing, and its cookie
+// has no expiry a touch could leave behind.
+func TestServerSideStore_ABrowserSessionCookieStoreTouchesWithoutRefreshing(t *testing.T) {
+	backend := newFakeBackend()
+	store := newTestStore(backend, false)
+	cookie := saveNew(t, store, signedInValues())
+	id := decodeCookieId(t, store, cookie)
+	backend.rows[id].LastAccessed = time.Now().UTC().Add(-time.Minute)
+
+	_, cookies := readSession(t, store, requestWith(cookie), false)
+
+	assert.Equal(t, 1, backend.touches)
+	assert.Empty(t, cookies)
+}
+
 // --- saving an existing session ------------------------------------------------------
 
 // TestServerSideStore_GetSurvivesAStorageFailure drives Get rather than New, and that is

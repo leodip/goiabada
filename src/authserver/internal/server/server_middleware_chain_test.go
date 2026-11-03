@@ -79,10 +79,15 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/i18n.Locale.func1",
 	)
 
-	// The page branch alone then applies a known user's page language, over what the locale
-	// middleware resolved; the protocol endpoints and the APIs answer in the language asked for
-	// (#631 decision 5). The files branch answers faults as the page branch does, and draws no page.
-	wantPages := append(append([]string{}, wantApp...),
+	// The page branch alone refreshes the browser session, ahead of the first read of it, so the
+	// touch can send the session cookie again (#743 decisions 8 and 9). It then applies a known
+	// user's page language, over what the locale middleware resolved; the protocol endpoints and
+	// the APIs answer in the language asked for (#631 decision 5). The files branch answers faults
+	// as the page branch does, and draws no page.
+	wantPages := append(append(append([]string{}, wantRoot...),
+		"github.com/leodip/goiabada/core/sessionstore.Refreshing"),
+		wantApp[len(wantRoot):]...)
+	wantPages = append(wantPages,
 		"github.com/leodip/goiabada/authserver/internal/middleware.PageLanguage.func1",
 	)
 
@@ -133,4 +138,39 @@ func TestInitRoutes_ThePageLanguageRunsOnPagesOnly(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, len(fileRoutes), seen, "every file route is registered")
+}
+
+// Only the page routes of the real registrations refresh the browser session; the files, the
+// protocol endpoints and the APIs read it without moving its idle deadline. The client logos, the
+// profile pictures and the OpenAPI document are answered cacheable, and discovery and JWKS carry no
+// directive at all, so a session cookie sent again there could be stored by a shared cache and
+// replayed to other visitors; every page is no-store (#743 decision 9).
+func TestInitRoutes_OnlyPagesRefreshTheBrowserSession(t *testing.T) {
+	s := newFaultsTestServer(datamocks.NewDatabase(t))
+	const refreshing = "github.com/leodip/goiabada/core/sessionstore.Refreshing"
+
+	pages, others := 0, 0
+	err := s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		key := method + " " + route
+		if route == "/static/*" {
+			return nil
+		}
+		refreshes := false
+		for _, mounted := range middlewares {
+			if runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name() == refreshing {
+				refreshes = true
+			}
+		}
+		isPage := routeFormat(key) == "page" && !slices.Contains(fileRoutes, key)
+		if isPage {
+			pages++
+		} else {
+			others++
+		}
+		assert.Equal(t, isPage, refreshes, "%s refreshes the browser session", key)
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Positive(t, pages, "page routes are registered")
+	assert.Positive(t, others, "other routes are registered")
 }

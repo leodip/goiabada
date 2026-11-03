@@ -430,6 +430,10 @@ When user has valid session (`UserSession` in DB + session cookie):
   not overwritten by an older ceremony that resumed after it, and `/auth/completed` answers that
   ceremony with the "no longer active" page, since a newer authentication already describes the
   session
+- Only the page branch refreshes the browser session (`sessionstore.Refreshing`, first in
+  `pageChain`): a row more than ten seconds stale is touched there, and a signed-in session's
+  cookie is sent again with the row's new expiry. The files, protocol and API branches read the
+  session without touching it, so no reissued cookie rides on a cacheable answer (#743)
 
 ## SSO and ACR/AMR Details
 

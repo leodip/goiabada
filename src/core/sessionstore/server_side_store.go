@@ -253,9 +253,10 @@ const (
 	// console's. The zero value, so a store nobody chose for is the one that keeps least.
 	BrowserSessionCookie CookieLifetime = iota
 
-	// PersistentCookie carries a Max-Age set per save from the row's own expires_at, so
-	// single sign-on survives a browser restart and the browser never holds a handle
-	// that outlives what it names. The auth server's.
+	// PersistentCookie carries a Max-Age set per save, and per refresh of a signed-in session
+	// (see Refreshing), from the row's own expires_at, so single sign-on survives a browser
+	// restart and the browser never holds a handle that outlives what it names, nor drops one
+	// before it. The auth server's.
 	PersistentCookie
 )
 
@@ -474,7 +475,7 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 		return session, err
 	}
 
-	if err := s.touchIfStale(requestContext(r), session, record); err != nil {
+	if err := s.touchIfStale(r, session, record); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			// The row went away between the read and the touch, so the session is gone
 			// even though it was there a moment ago. A fresh session is the honest
@@ -496,8 +497,8 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 // request's memo: Get answers every later caller on a request from the session it loaded first
 // (#269), which is the copy the request began with and not the row another request may have
 // written since. It neither consults nor fills that memo, so the request's own session, the one
-// a later Save writes, is untouched, and it never writes, not even a touch: Get has touched the
-// session already on this request. Its outcomes are New's: no cookie, a cookie that does not
+// a later Save writes, is untouched, and it never writes, not even a touch: whether the request
+// touches its session is Get's to decide, once. Its outcomes are New's: no cookie, a cookie that does not
 // decode and a row gone are a fresh session; a lookup that failed is the error, beside a
 // non-nil session, and never a fresh session on its own (#266). The load runs on the request's
 // context, so a caller bounds it by handing in a request carrying its own deadline (#621).
@@ -570,16 +571,32 @@ func (s *ServerSideStore) freshSession(name string) *Session {
 // touchIfStale records that a live session was used, but only once the stored timestamp
 // has gone stale. Writing on every request would put a write in front of every page, and
 // on SQLite that is an fsync on the one connection the whole process shares.
-func (s *ServerSideStore) touchIfStale(ctx context.Context, session *Session, record *Record) error {
+//
+// A store whose cookie outlives the browser touches only on a request Refreshing wraps, and then
+// sends a signed-in session's cookie again with the row's new expiry, so the row and the cookie
+// move together; on any other request it reads without touching (#743 decisions 8 and 9). A store
+// whose cookie ends with the browser has no cookie expiry to keep up, and touches on every read.
+func (s *ServerSideStore) touchIfStale(r *http.Request, session *Session, record *Record) error {
 	if s.now().Sub(record.LastAccessed) <= TouchThreshold {
 		return nil
 	}
 
-	if _, err := s.backend.Touch(ctx, session.ID, s.isAuthenticated(session)); err != nil {
+	refreshTo := refreshWriter(r)
+	if s.lifetime == PersistentCookie && refreshTo == nil {
+		return nil
+	}
+
+	authenticated := s.isAuthenticated(session)
+	expiresAt, err := s.backend.Touch(requestContext(r), session.ID, authenticated)
+	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return err
 		}
 		return errs.Wrap(err, "unable to touch the browser session")
+	}
+
+	if s.lifetime == PersistentCookie && authenticated {
+		return s.setCookie(refreshTo, session, session.ID, expiresAt)
 	}
 	return nil
 }
