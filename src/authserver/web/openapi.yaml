@@ -4194,6 +4194,12 @@ paths:
         Enables or disables TOTP for the authenticated user. Requires password verification, and
         when enabling, a current code from the authenticator.
 
+        A wrong or blank password is refused with 400 (`AUTHENTICATION_FAILED`). A wrong password
+        counts against the `account_password` rate limit, shared with the account's password,
+        email and recovery-code changes. Every request counts against the
+        `account_credential_change` rate limit, 10 per hour per account, shared with the account's
+        password change and new sets of recovery codes.
+
         Enabling completes the enrollment issued by `GET /api/v1/account/otp/enrollment`: the code
         is verified against the seed the server issued and that seed is what gets enrolled. Call the
         enrollment endpoint first. Returns 400 if no enrollment is pending or the one started has
