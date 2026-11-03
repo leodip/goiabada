@@ -1137,6 +1137,203 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 		assertSendFailure(t, err, SendFailureOther)
 		assert.False(t, f.sawConnection(), "the message is built before the dial, so nothing should have connected")
 	})
+
+	t.Run("a recipient address too long for any line is refused before the dial", func(t *testing.T) {
+		f := &fakeSMTP{ext: []string{"8BITMIME"}}
+		port := f.start(t)
+
+		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+
+		// An address has no fold point inside it: "<" + 1000 + "@example.com>" on a continuation
+		// line is 1 + 1014 bytes.
+		err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			To:       strings.Repeat("r", 1000) + "@example.com",
+			Subject:  "Test email",
+			HtmlBody: "<p>hello</p>",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "the To header")
+		assert.Contains(t, err.Error(), "998-byte line limit")
+		assertSendFailure(t, err, SendFailureOther)
+		assert.False(t, f.sawConnection(), "the message is built before the dial, so nothing should have connected")
+	})
+}
+
+// fieldLines returns the raw lines of one header field as they crossed the wire: its first line and
+// every continuation line after it.
+func fieldLines(t *testing.T, m sentMessage, name string) []string {
+	t.Helper()
+
+	var lines []string
+	for _, line := range m.rawHeaders {
+		switch {
+		case strings.HasPrefix(line, name+":"):
+			lines = append(lines, line)
+		case len(lines) > 0 && strings.HasPrefix(line, " "):
+			lines = append(lines, line)
+		case len(lines) > 0:
+			return lines
+		}
+	}
+	require.NotEmpty(t, lines, "no %s header in %q", name, m.rawHeaders)
+	return lines
+}
+
+// TestSendEmail_HeaderFolding holds #718 decision 3. RFC 2047 section 2 limits each line of a header
+// field holding an encoded word to 76 characters, RFC 5322 section 2.1.1 asks for 78 on any other
+// line and requires 998 on every one, and From, To and Subject fold only at the whitespace between
+// encoded words or between a display name and its <address>. Each row is unfolded and decoded back
+// to the original with net/mail and mime.WordDecoder, and every raw line of the field is measured.
+func TestSendEmail_HeaderFolding(t *testing.T) {
+
+	// 40 CJK characters, within the settings' 60: the from-name the issue measured at 465
+	// characters on one line.
+	cjkName := strings.Repeat("認証サーバー通知", 5)
+	accentedName := "José Antônio Conceição Gonçalves de Araújo e Silva Júnior"
+	// Specials beside non-ASCII text make net/mail pick B encoding (RFC 2047 section 5.3).
+	specialsName := "Açúcar & Café, Ltda. (Atendimento ao Cliente)"
+	// Plain ASCII with a comma is a quoted string, which is not split; only the gap before the
+	// address is a fold point. 6 + 61 + 1 + 21 = 89 bytes would not fit on one 78-byte line.
+	quotedName := "D'Ippolito, Leonardo - Goiabada Identity Notifications Team"
+
+	tests := []struct {
+		name       string
+		fromName   string
+		to         string
+		subject    string
+		field      string
+		wantFolded bool
+	}{
+		{name: "cjk from-name", fromName: cjkName, field: "From", wantFolded: true},
+		{name: "accented from-name", fromName: accentedName, field: "From", wantFolded: true},
+		{name: "b-encoded from-name", fromName: specialsName, field: "From", wantFolded: true},
+		{name: "quoted ascii from-name folds before the address", fromName: quotedName, field: "From", wantFolded: true},
+		{name: "short from-name stays on one line", fromName: "Goiabada", field: "From"},
+		{
+			name:       "accented recipient name",
+			to:         (&mail.Address{Name: accentedName, Address: fixtureRecipient}).String(),
+			field:      "To",
+			wantFolded: true,
+		},
+		{name: "bare recipient stays on one line", to: fixtureRecipient, field: "To"},
+		{
+			// The issue's 77-character line: "Subject: " plus one 68-character encoded word fits
+			// 78 but not 76.
+			name:       "one encoded word too long for the first line",
+			subject:    strings.Repeat("a", 50) + "é",
+			field:      "Subject",
+			wantFolded: true,
+		},
+		{name: "cjk subject", subject: strings.Repeat("パスワード再設定のお知らせ", 4), field: "Subject", wantFolded: true},
+		{
+			name:       "accented subject",
+			subject:    "Verificação de endereço de e-mail: seu código de confirmação é 123456 — válido por 15 minutos",
+			field:      "Subject",
+			wantFolded: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fromName := test.fromName
+			if fromName == "" {
+				fromName = "Goiabada"
+			}
+			to := test.to
+			if to == "" {
+				to = fixtureRecipient
+			}
+			subject := test.subject
+			if subject == "" {
+				subject = "Test email"
+			}
+
+			m := send(t, fromName, &SendEmailInput{To: to, Subject: subject, HtmlBody: "<p>hello</p>"})
+
+			lines := fieldLines(t, m, test.field)
+			for _, line := range lines {
+				assert.LessOrEqual(t, len(line), 998, "RFC 5322 section 2.1.1: %q", line)
+				if strings.Contains(line, "=?") {
+					assert.LessOrEqual(t, len(line), 76,
+						"RFC 2047 section 2: a line holding an encoded word is at most 76 characters: %q", line)
+				} else {
+					assert.LessOrEqual(t, len(line), 78, "RFC 5322 section 2.1.1: %q", line)
+				}
+			}
+			assert.Equal(t, test.wantFolded, len(lines) > 1, "raw lines: %q", lines)
+
+			// Every continuation line starts at a fold point: an encoded word, or the address for
+			// From and To. A fold anywhere else would split a token.
+			for _, line := range lines[1:] {
+				if test.field == "Subject" {
+					assert.True(t, strings.HasPrefix(line, " =?"), "a fold inside an encoded word: %q", line)
+				} else {
+					assert.True(t, strings.HasPrefix(line, " =?") || strings.HasPrefix(line, " <"),
+						"a fold inside a display name or an address: %q", line)
+				}
+			}
+
+			value := m.headers[test.field]
+			switch test.field {
+			case "Subject":
+				decoded, err := new(mime.WordDecoder).DecodeHeader(value)
+				require.NoError(t, err)
+				assert.Equal(t, subject, decoded)
+			case "From":
+				address, err := mail.ParseAddress(value)
+				require.NoError(t, err, "the unfolded From header %q does not parse", value)
+				assert.Equal(t, fromName, address.Name)
+				assert.Equal(t, fixtureFromEmail, address.Address)
+			case "To":
+				address, err := mail.ParseAddress(value)
+				require.NoError(t, err, "the unfolded To header %q does not parse", value)
+				want, err := mail.ParseAddress(to)
+				require.NoError(t, err)
+				assert.Equal(t, want.Name, address.Name)
+				assert.Equal(t, fixtureRecipient, address.Address)
+			}
+		})
+	}
+
+	t.Run("a quoted display name is kept whole on its line", func(t *testing.T) {
+		m := send(t, quotedName, &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: "<p>hello</p>"})
+		assert.Equal(t, []string{
+			`From: "D'Ippolito, Leonardo - Goiabada Identity Notifications Team"`,
+			" <noreply@example.com>",
+		}, fieldLines(t, m, "From"))
+	})
+
+	t.Run("an ascii subject holding an encoded word keeps its whole line within 76", func(t *testing.T) {
+		// The encoder passes plain ASCII through, but a reader still decodes the encoded word in
+		// it, so the line holding it stays at 76 after plain words follow: 8 + 22 + 21 + 26 = 77.
+		subject := "=?UTF-8?q?caf=C3=A9?= " + strings.Repeat("a", 20) + " " + strings.Repeat("b", 25)
+		m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: subject, HtmlBody: "<p>hello</p>"})
+		assert.Equal(t, []string{
+			"Subject: =?UTF-8?q?caf=C3=A9?= " + strings.Repeat("a", 20),
+			" " + strings.Repeat("b", 25),
+		}, fieldLines(t, m, "Subject"))
+	})
+
+	t.Run("a run of spaces at a fold starts the continuation line", func(t *testing.T) {
+		// "Subject: " plus 68 bytes is 77, so the three spaces cannot end that line; moved whole
+		// onto the next, they leave no line of only whitespace and unfold to the same subject.
+		subject := strings.Repeat("a", 68) + "   b"
+		m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: subject, HtmlBody: "<p>hello</p>"})
+		assert.Equal(t, []string{"Subject: " + strings.Repeat("a", 68), "   b"}, fieldLines(t, m, "Subject"))
+		assert.Equal(t, subject, m.headers["Subject"])
+	})
+
+	t.Run("an encoded word that does not fit after the field name starts the next line", func(t *testing.T) {
+		m := send(t, "Goiabada", &SendEmailInput{
+			To:       fixtureRecipient,
+			Subject:  strings.Repeat("a", 50) + "é",
+			HtmlBody: "<p>hello</p>",
+		})
+		assert.Equal(t, []string{
+			"Subject:",
+			" =?UTF-8?q?" + strings.Repeat("a", 50) + "=C3=A9?=",
+		}, fieldLines(t, m, "Subject"))
+	})
 }
 
 // TestSendEmail_FinalDataRejection holds the last exchange in the conversation: the relay takes the

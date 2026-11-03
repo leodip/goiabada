@@ -35,6 +35,9 @@ import (
 const (
 	// RFC 5322 section 2.1.1: a line SHOULD be no more than 78 characters excluding the CRLF.
 	maxHeaderLineBytes = 78
+	// RFC 2047 section 2: each line of a header field that holds an encoded word is limited to 76
+	// characters. Every byte the encoders write is ASCII, so characters and bytes count the same.
+	maxEncodedWordLineBytes = 76
 	// The same sentence's other half, which is a MUST rather than a SHOULD: no more than 998
 	// characters, excluding the CRLF.
 	maxHeaderLineHardBytes = 998
@@ -382,10 +385,15 @@ func (e *Sender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]
 	var b bytes.Buffer
 	// From and To go through net/mail, which quotes or RFC 2047 encodes anything that would
 	// otherwise break the syntax, and Subject through mime.QEncoding, which encodes CR and LF.
-	// That is what makes a header value out of an operator-editable setting safe (#274).
-	writeHeader(&b, "From", from.String())
-	writeHeader(&b, "To", to.String())
-	if err := writeFoldedHeader(&b, "Subject", mime.QEncoding.Encode("UTF-8", input.Subject)); err != nil {
+	// That is what makes a header value out of an operator-editable setting safe (#274). All three
+	// then go through the one folding writer (#718 decision 3).
+	if err := writeFoldedHeader(&b, "From", addressTokens(from)); err != nil {
+		return nil, err
+	}
+	if err := writeFoldedHeader(&b, "To", addressTokens(to)); err != nil {
+		return nil, err
+	}
+	if err := writeFoldedHeader(&b, "Subject", unstructuredTokens(mime.QEncoding.Encode("UTF-8", input.Subject))); err != nil {
 		return nil, err
 	}
 	writeHeader(&b, "Date", time.Now().Format(time.RFC1123Z))
@@ -441,48 +449,123 @@ func writeHeader(b *bytes.Buffer, name, value string) {
 	b.WriteString("\r\n")
 }
 
-// writeFoldedHeader packs an already-encoded value onto lines of at most 78 bytes, RFC 5322
-// section 2.1.1's SHOULD. mime.QEncoding splits a long value into encoded-words joined by single
-// spaces and folds nothing itself, and Q encoding writes a space as '_', so every space in an
-// encoded value is a join and every one of them is a legal fold point. Plain ASCII values are
-// returned unchanged by the encoder and fold at their own spaces by the same rule.
+// addressTokens splits an address as net/mail writes it into the pieces a fold may separate: each
+// encoded word of the display name, or the display name's quoted string whole, and then the
+// <address>. Nothing inside a quoted string or an address is a fold point: a quoted local part may
+// itself hold a space.
+func addressTokens(a *mail.Address) []string {
+	angleAddr := (&mail.Address{Address: a.Address}).String()
+	if a.Name == "" {
+		return []string{angleAddr}
+	}
+	full := a.String()
+	displayName, found := strings.CutSuffix(full, " "+angleAddr)
+	if !found {
+		// net/mail always writes the name, one space, then the address; should that ever change,
+		// the field is written unfolded rather than split at a guess.
+		return []string{full}
+	}
+	// net/mail quotes a printable ASCII name and RFC 2047 encodes any other, and its encoded words
+	// are joined by single spaces and hold none themselves.
+	if strings.HasPrefix(displayName, `"`) {
+		return []string{displayName, angleAddr}
+	}
+	return append(strings.Split(displayName, " "), angleAddr)
+}
+
+// unstructuredTokens splits an encoded Subject at its spaces. mime.QEncoding joins its encoded
+// words with single spaces and writes a space inside one as '_', so every space of an encoded value
+// is a join between two of them. A value it returns unchanged is plain ASCII, which folds at its own
+// spaces as before. A run of spaces stays with the word after it, so no continuation line is only
+// whitespace, which RFC 5322 section 3.2.2 forbids; strings.Join(tokens, " ") is the value again.
+func unstructuredTokens(value string) []string {
+	var tokens []string
+	carry, carrying := "", false
+	for _, part := range strings.Split(value, " ") {
+		if carrying {
+			part = carry + " " + part
+		}
+		if strings.TrimLeft(part, " ") == "" {
+			carry, carrying = part, true
+			continue
+		}
+		tokens = append(tokens, part)
+		carrying = false
+	}
+	if carrying {
+		if len(tokens) > 0 {
+			tokens[len(tokens)-1] += " " + carry
+		} else {
+			tokens = append(tokens, carry)
+		}
+	}
+	return tokens
+}
+
+// isEncodedWord reports whether token reads as an RFC 2047 encoded word. A plain ASCII subject
+// shaped like one is passed through unencoded and a reader decodes it all the same, so it is held to
+// the same 76 characters.
+func isEncodedWord(token string) bool {
+	trimmed := strings.TrimSpace(token)
+	return strings.HasPrefix(trimmed, "=?") && strings.HasSuffix(trimmed, "?=")
+}
+
+// writeFoldedHeader writes a header field whose value is tokens joined by single spaces, folding
+// only at those spaces, so no encoded word, quoted name or address is ever split (#718 decision 3).
+// A line holding an encoded word is kept within RFC 2047 section 2's 76 characters and any other
+// within RFC 5322 section 2.1.1's 78, both counted without the CRLF.
 //
 // A fold replaces exactly one space: every token is written preceded by one space, either on the
-// current line or as the continuation line's leading whitespace. Unfolding per section 2.2.3,
-// which removes the CRLF and keeps the whitespace, therefore restores the value byte for byte,
-// double spaces included.
-func writeFoldedHeader(b *bytes.Buffer, name, value string) error {
+// current line or as the continuation line's leading whitespace. Unfolding per RFC 5322 section
+// 2.2.3, which removes the CRLF and keeps the whitespace, therefore restores the value byte for
+// byte, double spaces included.
+func writeFoldedHeader(b *bytes.Buffer, name string, tokens []string) error {
 	b.WriteString(name)
 	b.WriteString(":")
 	lineLen := len(name) + 1
-
-	firstLine := true
+	lineHasEncodedWord := false
 	tokensOnLine := 0
-	for _, token := range strings.Split(value, " ") {
-		// A token has no legal fold point inside it, so one too long for a line of its own cannot
-		// be emitted at all. 78 is a SHOULD and folding serves it; 998 is a MUST and nothing here
-		// can serve it, so this refuses rather than writing a line a conforming server may reject
-		// mid-DATA with a message the admin cannot act on. Every subject the callers pass is a
-		// catalog string with at most a 30-character app name in it, so this is a bound on the
-		// package's API rather than a path a deployment can reach (#274).
-		if 1+len(token) > maxHeaderLineHardBytes {
-			return errs.New("the " + name + " header contains a word of " +
-				strconv.Itoa(len(token)) + " bytes, which cannot be folded under RFC 5322 section 2.1.1's 998-byte line limit")
-		}
-		// Fold unless the line has nothing on it yet: a single token longer than a whole line
-		// cannot be split here, and folding before it would loop forever.
-		if lineLen+1+len(token) > maxHeaderLineBytes && (tokensOnLine > 0 || firstLine) {
-			b.WriteString("\r\n")
-			lineLen = 0
-			tokensOnLine = 0
-			firstLine = false
+
+	for _, token := range tokens {
+		encoded := isEncodedWord(token)
+		limit := lineLimit(lineHasEncodedWord || encoded)
+		if lineLen+1+len(token) > limit && strings.TrimLeft(token, " ") != "" {
+			// After a token, a fold always helps. On the field's first line, still empty, it
+			// helps only when the token then fits its own line, or when staying would pass 998.
+			ownLine := 1 + len(token)
+			if tokensOnLine > 0 || ownLine <= lineLimit(encoded) || lineLen+ownLine > maxHeaderLineHardBytes {
+				b.WriteString("\r\n")
+				lineLen = 0
+				lineHasEncodedWord = false
+				tokensOnLine = 0
+			}
 		}
 		b.WriteString(" ")
 		b.WriteString(token)
 		lineLen += 1 + len(token)
+		lineHasEncodedWord = lineHasEncodedWord || encoded
 		tokensOnLine++
+
+		// A token has no legal fold point inside it, so one too long for a line of its own cannot
+		// be written at all. 76 and 78 are what folding serves; 998 is a MUST that nothing here can
+		// serve, so this refuses rather than writing a line a conforming server may reject mid-DATA
+		// with a message the admin cannot act on. Every subject the callers pass is a catalog
+		// string with at most a 30-character app name in it, and the settings bound the sender, so
+		// this is a bound on the package's API rather than a path a deployment can reach (#274).
+		if lineLen > maxHeaderLineHardBytes {
+			return errs.New("the " + name + " header contains a word of " +
+				strconv.Itoa(len(token)) + " bytes, which cannot be folded under RFC 5322 section 2.1.1's 998-byte line limit")
+		}
 	}
 
 	b.WriteString("\r\n")
 	return nil
+}
+
+// lineLimit is the length a header line may reach before the line folds.
+func lineLimit(holdsEncodedWord bool) int {
+	if holdsEncodedWord {
+		return maxEncodedWordLineBytes
+	}
+	return maxHeaderLineBytes
 }
