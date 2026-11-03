@@ -73,7 +73,9 @@ func TestSendEmail_AStalledWriteEndsAtTheCommandLimit(t *testing.T) {
 	f := &fakeSMTP{ext: []string{"8BITMIME"}, stopReadingAtData: true}
 	port := f.start(t)
 
-	sender := &Sender{dataCipher: testDataCipher, commandTimeout: 300 * time.Millisecond, sendTimeout: 3 * time.Second}
+	// The budget is far beyond the limit because the elapsed time below also counts building and
+	// writing the large body, which under the race detector on a two-core CI runner took 3.7s.
+	sender := &Sender{dataCipher: testDataCipher, commandTimeout: 300 * time.Millisecond, sendTimeout: 30 * time.Second}
 
 	started := time.Now()
 	_, err := sender.SendEmail(context.Background(), relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
