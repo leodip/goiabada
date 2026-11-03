@@ -59,6 +59,8 @@ async function signInPostStatuses(page: Page, browser: Browser, request: APIRequ
   await tab.waitForURL((url) => url.href.startsWith(testRedirectUri));
 
   await context.close();
+  // Enrolling the authenticator sent the user its notice; the reset link is the mail after it.
+  expect((await waitForMail(request, user.email)).subject).toBe("Two-factor authentication was set up");
 
   // A browser with no session, as someone who forgot their password has.
   const signedOut = await emptyBrowser(browser);
@@ -67,7 +69,7 @@ async function signInPostStatuses(page: Page, browser: Browser, request: APIRequ
   await reset.locator('input[name="email"]').fill(user.email);
   await reset.getByRole("button", { name: "Send reset link" }).click();
   await expect(reset.getByText("If an account uses this address, we've sent it a link to reset your password:")).toBeVisible();
-  const link = linksIn(await waitForMail(request, user.email)).find((l) => l.startsWith(env.authUrl))!;
+  const link = linksIn(await waitForMail(request, user.email, 2)).find((l) => l.startsWith(env.authUrl))!;
   await reset.goto(link);
   await reset.locator('input[name="password"]').fill("a-reset-password");
   await reset.locator('input[name="passwordConfirmation"]').fill("a-reset-password");
