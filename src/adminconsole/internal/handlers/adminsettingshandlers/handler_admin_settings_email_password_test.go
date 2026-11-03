@@ -37,7 +37,7 @@ func (a *emailSettingsAPI) UpdateSettingsEmail(_ context.Context, _ string, requ
 	return &api.SettingsEmailResponse{}, nil
 }
 
-func (*emailSettingsAPI) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) error {
+func (*emailSettingsAPI) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
 	panic("unexpected call to SendTestEmail")
 }
 

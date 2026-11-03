@@ -19,7 +19,7 @@ import (
 // send.
 type settingsEmailAPI interface {
 	GetSettingsEmail(ctx context.Context, accessToken string) (*api.SettingsEmailResponse, error)
-	SendTestEmail(ctx context.Context, accessToken string, request *api.SendTestEmailRequest) error
+	SendTestEmail(ctx context.Context, accessToken string, request *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error)
 	UpdateSettingsEmail(ctx context.Context, accessToken string, request *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error)
 }
 
@@ -59,7 +59,18 @@ func HandleEmailGet(
 			SavedSMTPHost:   apiResp.SMTPHost,
 		}
 
-		if apiResp.SMTPPort == 0 {
+		switch {
+		case !apiResp.SMTPEnabled:
+			// A configuration made while email is off is a new one, and starts from SSL/TLS on 465,
+			// whatever the row holds: turning email off stores none and port 0 (#718 decisions 5
+			// and 11).
+			settingsInfo.SMTPEncryption = "ssltls"
+			settingsInfo.SMTPPort = 465
+		case apiResp.SMTPEncryption == "":
+			// The sender reads an empty mode as none, STARTTLS if available, so the page shows it so.
+			settingsInfo.SMTPEncryption = "none"
+		}
+		if settingsInfo.SMTPPort == 0 {
 			settingsInfo.SMTPPort = 587
 		}
 
@@ -219,9 +230,11 @@ func HandleEmailSendTestGet(
 			return
 		}
 
-		// The address the last test email went to, which the page names in saying it was sent.
+		// The address the last test email went to, which the page names in saying it was sent, and
+		// whether it went unencrypted, which the page then says too.
 		sentTo, sent := sess.TakeFlash("testEmailSentTo")
-		if sent {
+		_, sentUnencrypted := sess.TakeFlash("testEmailSentUnencrypted")
+		if sent || sentUnencrypted {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -237,8 +250,9 @@ func HandleEmailSendTestGet(
 		}
 
 		bind := map[string]interface{}{
-			"smtpEnabled": apiResp.SMTPEnabled,
-			"sentTo":      sentTo,
+			"smtpEnabled":     apiResp.SMTPEnabled,
+			"sentTo":          sentTo,
+			"sentUnencrypted": sentUnencrypted,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html", bind)
@@ -287,7 +301,7 @@ func HandleEmailSendTestPost(
 		}
 
 		// Call API to send test email (server validates SMTP enabled and email)
-		err := apiClient.SendTestEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, &api.SendTestEmailRequest{To: destinationEmail})
+		sendResp, err := apiClient.SendTestEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, &api.SendTestEmailRequest{To: destinationEmail})
 		if err != nil {
 			// Routed on status, as every other form is: a 400 or a 409 redraws the form with the
 			// API's sentence whatever its code. It routed on three codes, VALIDATION_ERROR,
@@ -307,6 +321,11 @@ func HandleEmailSendTestPost(
 		}
 
 		sess.SetFlash("testEmailSentTo", destinationEmail)
+		// Only this send's answer is said: an earlier send's, never shown, is dropped.
+		sess.TakeFlash("testEmailSentUnencrypted")
+		if !sendResp.Encrypted {
+			sess.SetFlash("testEmailSentUnencrypted", "true")
+		}
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

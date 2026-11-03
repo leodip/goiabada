@@ -33,8 +33,8 @@ type sendTestEmailAPI struct {
 	refusal error
 }
 
-func (a *sendTestEmailAPI) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) error {
-	return a.refusal
+func (a *sendTestEmailAPI) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
+	return nil, a.refusal
 }
 
 func (*sendTestEmailAPI) GetSettingsEmail(context.Context, string) (*api.SettingsEmailResponse, error) {

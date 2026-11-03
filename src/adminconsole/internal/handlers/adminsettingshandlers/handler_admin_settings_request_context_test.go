@@ -63,8 +63,8 @@ func (s *ctxRecordingApiClient) UpdateSettingsEmail(ctx context.Context, _ strin
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) SendTestEmail(ctx context.Context, _ string, _ *api.SendTestEmailRequest) error {
-	return s.record(ctx)
+func (s *ctxRecordingApiClient) SendTestEmail(ctx context.Context, _ string, _ *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
+	return nil, s.record(ctx)
 }
 
 func (s *ctxRecordingApiClient) GetSettingsGeneral(ctx context.Context, _ string) (*api.SettingsGeneralResponse, error) {

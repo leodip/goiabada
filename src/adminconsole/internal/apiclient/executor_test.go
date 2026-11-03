@@ -196,7 +196,8 @@ func TestExecutor_TheCallsThatSendMailOutlastTenSeconds(t *testing.T) {
 		{
 			name: "the test email",
 			call: func(ctx context.Context) error {
-				return client.SendTestEmail(ctx, charAccessToken, &api.SendTestEmailRequest{To: "jane@example.com"})
+				_, err := client.SendTestEmail(ctx, charAccessToken, &api.SendTestEmailRequest{To: "jane@example.com"})
+				return err
 			},
 			sendsMail: true,
 		},

@@ -54,7 +54,14 @@ test("a test email from Settings - Email arrives", async ({ page, request }) => 
   await expect(tabs.getByRole("link", { name: "Configuration", exact: true })).toHaveAttribute("href", "/admin/settings/email");
   await page.locator("#destinationEmail").fill(to);
   await page.getByRole("button", { name: "Send test email", exact: true }).click();
-  await expect(page.getByText(`Test email sent to ${to}.`, { exact: true })).toBeVisible();
+  // Mailpit offers no STARTTLS, so the baseline's STARTTLS if available sends in plaintext, and
+  // the page says so.
+  await expect(
+    page.getByText(
+      `Test email sent to ${to}. It was sent unencrypted: the SMTP server didn't offer STARTTLS, or its certificate isn't trusted. The auth server's log has the reason.`,
+      { exact: true },
+    ),
+  ).toBeVisible();
   const mail = await waitForMail(request, to);
   expect(mail.subject).toBeTruthy();
 });

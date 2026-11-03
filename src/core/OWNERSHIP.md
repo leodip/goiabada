@@ -189,7 +189,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `SearchUsersWithGroupAnnotationResponse` | both-apps | — |
 | `core/api` | `SearchUsersWithPermissionAnnotationResponse` | both-apps | — |
 | `core/api` | `SendTestEmailRequest` | both-apps | — |
-| `core/api` | `SendTestEmailResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
+| `core/api` | `SendTestEmailResponse` | both-apps | — |
 | `core/api` | `SessionClientResponse` | both-apps | — |
 | `core/api` | `SessionLoadRequest` | both-apps | — |
 | `core/api` | `SessionLoadResponse` | both-apps | — |

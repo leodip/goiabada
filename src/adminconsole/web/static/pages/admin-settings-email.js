@@ -4,12 +4,14 @@
 // removal are never sent together; the box keeps what was typed, should the removal be unticked.
 // A saved password reaches only the host it was saved for, so editing the host away from that one
 // needs the password again or its removal: the auth server refuses the save otherwise, and the
-// page says so before the save is sent.
+// page says so before the save is sent. While STARTTLS if available is the encryption, the notice
+// saying what it sends unencrypted shows.
 
 const smtpEnabled = document.getElementById("smtpEnabled");
 const hostOrIP = document.getElementById("hostOrIP");
 const password = document.getElementById("password");
 const clearSmtpPassword = document.getElementById("clearSmtpPassword");
+const smtpEncryption = document.getElementById("smtpEncryption");
 
 // normalizeHost is the host in the form the auth server compares it in: surrounding space trimmed,
 // one pair of brackets taken off an IPv6 literal, and without regard to case.
@@ -26,6 +28,8 @@ function showState() {
   document.querySelectorAll("[data-smtp-section]").forEach(function (section) {
     section.hidden = !enabled;
   });
+
+  document.getElementById("encryptionNoneNotice").hidden = smtpEncryption.value !== "none";
 
   const removing = clearSmtpPassword !== null && clearSmtpPassword.checked;
   password.disabled = removing;
@@ -44,6 +48,7 @@ smtpEnabled.addEventListener("change", showState);
 if (clearSmtpPassword) {
   clearSmtpPassword.addEventListener("change", showState);
 }
+smtpEncryption.addEventListener("change", showState);
 hostOrIP.addEventListener("input", showState);
 password.addEventListener("input", showState);
 // pageshow comes after the browser restores the form, as on Back, which fires no change.

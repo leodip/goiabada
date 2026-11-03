@@ -45,6 +45,50 @@ test("the sender email keeps the case of the part before the @, and its domain i
   });
 });
 
+test("the encryption options say what they do, strongest first, and STARTTLS if available shows its notice", async ({ page }) => {
+  // The baseline's Mailpit is stored as none, which the page names STARTTLS if available.
+  await page.goto(`${env.adminUrl}${email}`);
+  const encryption = page.locator("#smtpEncryption");
+  const options = encryption.locator("option");
+  await expect(options).toHaveText(["SSL/TLS", "STARTTLS", "STARTTLS if available"]);
+  expect(await options.evaluateAll((all) => all.map((o) => (o as HTMLOptionElement).value))).toEqual(["ssltls", "starttls", "none"]);
+  await expect(encryption).toHaveValue("none");
+  await expect(page.locator("#encryptionHint")).toHaveText(
+    "SSL/TLS usually runs on port 465, and STARTTLS on 587. With STARTTLS if available, a password is sent only to a server on this machine.",
+  );
+  const notice = page.locator("#encryptionNoneNotice");
+  await expect(notice).toHaveText(
+    "Emails are encrypted only if the SMTP server offers STARTTLS with a certificate the auth server trusts. Otherwise they're sent unencrypted, password reset and verification links included, and anyone on the network can force that. Choose this only for a server on this machine or on a network you trust.",
+  );
+  await expect(notice).toBeVisible();
+
+  await encryption.selectOption("starttls");
+  await expect(notice).toBeHidden();
+  await encryption.selectOption("ssltls");
+  await expect(notice).toBeHidden();
+  await encryption.selectOption("none");
+  await expect(notice).toBeVisible();
+
+  // Nothing was saved: loaded again, the stored none still reads STARTTLS if available.
+  await encryption.selectOption("starttls");
+  await page.goto(`${env.adminUrl}${email}`);
+  await expect(encryption.locator("option:checked")).toHaveText("STARTTLS if available");
+  await expect(notice).toBeVisible();
+});
+
+test("a configuration made while email is off starts from SSL/TLS on port 465", async ({ page }) => {
+  await withSettingsRestored(page, email, async () => {
+    await fillSettingsForm(page, { smtpEnabled: false });
+    await saveSettings(page);
+
+    await page.goto(`${env.adminUrl}${email}`);
+    await page.locator("#smtpEnabled").check();
+    await expect(page.locator("#smtpEncryption")).toHaveValue("ssltls");
+    await expect(page.locator("#port")).toHaveValue("465");
+    await expect(page.locator("#encryptionNoneNotice")).toBeHidden();
+  });
+});
+
 test("turning email off hides the server's settings and asks first, and Cancel keeps email on", async ({ page }) => {
   const before = await readSettingsForm(page, email);
   expect(before.smtpEnabled).toBe(true);

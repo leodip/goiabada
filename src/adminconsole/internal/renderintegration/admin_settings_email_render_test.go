@@ -1,6 +1,7 @@
 package renderintegration
 
 import (
+	"html"
 	"io/fs"
 	"regexp"
 	"strings"
@@ -155,4 +156,100 @@ func TestRender_AdminSettingsEmailSendTestNamesTheAddress(t *testing.T) {
 
 	assert.Contains(t, out, `E-mail de teste enviado para ana&#43;&#34;&gt;&lt;b&gt;x&lt;/b&gt;@example.com.`)
 	assert.NotContains(t, out, "<b>x</b>")
+}
+
+// encryptionOptionRe matches each option of the encryption select: its value, whether it is
+// selected, and its label.
+var encryptionOptionRe = regexp.MustCompile(`<option value="([a-z]*)"( selected)?>([^<]*)</option>`)
+
+// encryptionNoneNoticeRe matches the notice STARTTLS if available shows, and whether it is hidden.
+var encryptionNoneNoticeRe = regexp.MustCompile(`<div class="notice notice-caution" id="encryptionNoneNotice"( hidden)?>`)
+
+const (
+	encryptionHintEN = "SSL/TLS usually runs on port 465, and STARTTLS on 587. With STARTTLS if available, " +
+		"a password is sent only to a server on this machine."
+	encryptionNoneNoticeEN = "Emails are encrypted only if the SMTP server offers STARTTLS with a certificate the auth " +
+		"server trusts. Otherwise they're sent unencrypted, password reset and verification links included, and anyone " +
+		"on the network can force that. Choose this only for a server on this machine or on a network you trust."
+	sentUnencryptedEN = "It was sent unencrypted: the SMTP server didn't offer STARTTLS, or its certificate isn't " +
+		"trusted. The auth server's log has the reason."
+)
+
+// The encryption select names each option by what it does, strongest first, with the mode the
+// page was given selected; its hint says what STARTTLS if available does with a password, and the
+// notice about it is rendered, shown only while it is selected (#718 decisions 5 and 16).
+func TestRender_AdminSettingsEmailNamesEachEncryptionOptionByWhatItDoes(t *testing.T) {
+	// Each option is its value and its label.
+	wantOptions := [][2]string{{"ssltls", "SSL/TLS"}, {"starttls", "STARTTLS"}, {"none", "STARTTLS if available"}}
+
+	for _, mode := range []string{"ssltls", "starttls", "none"} {
+		t.Run(mode, func(t *testing.T) {
+			raw := renderMenuPageIn(t, "/admin_settings_email.html", map[string]interface{}{
+				"settings": adminsettingshandlers.SettingsEmailGet{SMTPEnabled: true, SMTPHost: "smtp.example.com",
+					SMTPPort: 587, SMTPEncryption: mode, SavedSMTPHost: "smtp.example.com"},
+			}, "en", true)
+			out := html.UnescapeString(raw)
+
+			var gotOptions [][2]string
+			var selected []string
+			for _, m := range encryptionOptionRe.FindAllStringSubmatch(out, -1) {
+				gotOptions = append(gotOptions, [2]string{m[1], m[3]})
+				if m[2] != "" {
+					selected = append(selected, m[1])
+				}
+			}
+			assert.Equal(t, wantOptions, gotOptions, "the options, strongest first")
+			assert.Equal(t, []string{mode}, selected, "the mode given is the one selected")
+
+			assert.Contains(t, out, `<p class="field-hint" id="encryptionHint">`+encryptionHintEN+`</p>`)
+
+			notice := encryptionNoneNoticeRe.FindStringSubmatch(raw)
+			require.NotNil(t, notice, "the notice is rendered whatever the mode, for the script to show")
+			assert.Equal(t, mode != "none", notice[1] != "", "hidden unless STARTTLS if available is selected")
+			assert.Contains(t, out, "<p>"+encryptionNoneNoticeEN+"</p>")
+		})
+	}
+}
+
+// The page's script shows the notice while STARTTLS if available is selected, as it does the
+// password-removal notice: it reads the select and sets the notice's hidden.
+func TestRender_AdminSettingsEmailScriptTogglesTheEncryptionNotice(t *testing.T) {
+	b, err := fs.ReadFile(web.StaticFS(), "pages/admin-settings-email.js")
+	require.NoError(t, err)
+	script := string(b)
+	assert.Contains(t, script, `getElementById("smtpEncryption")`)
+	assert.Contains(t, script, `getElementById("encryptionNoneNotice")`)
+	assert.Regexp(t, `smtpEncryption\.addEventListener\("change", showState\)`, script)
+}
+
+// The notice and the hint are in every catalog: rendered in each, the page shows no raw key.
+func TestRender_AdminSettingsEmailEncryptionTextsAreInEveryCatalog(t *testing.T) {
+	for _, locale := range []string{"en", "pt-BR", "es", "fr", "de", "it"} {
+		out := renderMenuPageIn(t, "/admin_settings_email.html", map[string]interface{}{
+			"settings": adminsettingshandlers.SettingsEmailGet{SMTPEnabled: true, SMTPEncryption: "none"},
+		}, locale, true)
+		assert.NotContains(t, out, "adminconsole.admin_settings.email.", locale)
+
+		sent := renderMenuPageIn(t, "/admin_settings_email_sendtest.html", map[string]interface{}{
+			"smtpEnabled": true, "sentTo": "ana@example.com", "sentUnencrypted": true,
+		}, locale, true)
+		assert.NotContains(t, sent, "adminconsole.admin_settings.email_sendtest.", locale)
+	}
+}
+
+// A test email the auth server sent unencrypted is said so after the address it went to; one sent
+// encrypted reads as before (#718 decision 16).
+func TestRender_AdminSettingsEmailSendTestSaysWhenItWentUnencrypted(t *testing.T) {
+	for _, unencrypted := range []bool{true, false} {
+		out := html.UnescapeString(renderMenuPageIn(t, "/admin_settings_email_sendtest.html", map[string]interface{}{
+			"smtpEnabled": true, "sentTo": "ana@example.com", "sentUnencrypted": unencrypted,
+		}, "en", true))
+
+		if unencrypted {
+			assert.Contains(t, out, `<p class="break-words">Test email sent to ana@example.com. `+sentUnencryptedEN+`</p>`)
+		} else {
+			assert.Contains(t, out, `<p class="break-words">Test email sent to ana@example.com.</p>`)
+			assert.NotContains(t, out, "sent unencrypted")
+		}
+	}
 }
