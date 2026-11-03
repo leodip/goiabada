@@ -295,6 +295,22 @@
 "adminconsole.paginator.label" = "Paginação"
 "adminconsole.paginator.previous" = "Página anterior"
 "adminconsole.paginator.next" = "Próxima página"
+"adminconsole.password_toggle.show" = "Mostrar"
+"adminconsole.password_toggle.hide" = "Ocultar"
+"adminconsole.password_toggle.shown" = "Visível"
+"adminconsole.password_toggle.hidden" = "Não visível"
+"adminconsole.password_toggle.show_password" = "Mostrar senha"
+"adminconsole.password_toggle.hide_password" = "Ocultar senha"
+"adminconsole.password_toggle.show_current_password" = "Mostrar senha atual"
+"adminconsole.password_toggle.hide_current_password" = "Ocultar senha atual"
+"adminconsole.password_toggle.show_new_password" = "Mostrar nova senha"
+"adminconsole.password_toggle.hide_new_password" = "Ocultar nova senha"
+"adminconsole.password_toggle.show_new_password_confirmation" = "Mostrar confirmação da nova senha"
+"adminconsole.password_toggle.hide_new_password_confirmation" = "Ocultar confirmação da nova senha"
+"adminconsole.password_toggle.show_client_secret" = "Mostrar segredo do cliente"
+"adminconsole.password_toggle.hide_client_secret" = "Ocultar segredo do cliente"
+"adminconsole.password_toggle.show_secret_key" = "Mostrar chave secreta"
+"adminconsole.password_toggle.hide_secret_key" = "Ocultar chave secreta"
 
 # --- Página de confirmação de saída (#411) ------------------------------------
 

@@ -282,6 +282,100 @@ function setUpCopyButtons() {
   });
 }
 
+// setUpPasswordToggles gives each button marked data-password-toggle the show/hide behaviour of the
+// password field its aria-controls names (passwordToggle).
+function setUpPasswordToggles() {
+  document.querySelectorAll("button[data-password-toggle]").forEach(function (button) {
+    passwordToggle(button);
+  });
+}
+
+// passwordToggles holds the controller of each show/hide button already wired, so shell.js and a
+// page's own script reaching the same button share one, and a press toggles the field once.
+const passwordToggles = new WeakMap();
+
+// passwordToggle wires a password field's show/hide button, once, and returns its controller, whose
+// show(true) shows the field as text and show(false) as dots. The button, a button of type button
+// drawn hidden, is shown, so without JavaScript it never appears. Pressing it switches the field's
+// type, its visible word between its own text and data-hide-label, and its name between its
+// aria-label and data-hide-name, such as "Show new password" and "Hide new password": a name that
+// changes, so no aria-pressed (WAI-ARIA Authoring Practices, Button pattern). The new state is also
+// written, data-shown-status or data-hidden-status, into a visually hidden role="status" region
+// created beside the field's row before anything is written to it, since a screen reader may not
+// speak a focused button's new name. A pointer press keeps the focus where it was, and the field's
+// caret and selection survive the change of type; a keyboard press leaves the focus on the button.
+// The field goes back to dots when its form is sent, a submission a confirmation holds back
+// included, and when the browser brings the page back, as on Back. A button without the name or
+// status attributes, as an operator's copy of an older template draws the client secret's, keeps
+// its own name and has no status region.
+function passwordToggle(button) {
+  let toggle = passwordToggles.get(button);
+  if (!toggle) {
+    toggle = makePasswordToggle(button);
+    passwordToggles.set(button, toggle);
+  }
+  return toggle;
+}
+
+function makePasswordToggle(button) {
+  const field = document.getElementById(button.getAttribute("aria-controls"));
+  if (!field) {
+    return { show: function () {} };
+  }
+  const showLabel = button.textContent;
+  const hideLabel = button.dataset.hideLabel || showLabel;
+  const showName = button.getAttribute("aria-label");
+  const hideName = button.dataset.hideName;
+  let status = null;
+  if (button.dataset.shownStatus && button.dataset.hiddenStatus) {
+    status = document.createElement("span");
+    status.className = "sr-only";
+    status.setAttribute("role", "status");
+    (button.parentElement || button).after(status);
+  }
+  let shown = false;
+
+  const show = function (on) {
+    if (on === shown) {
+      return;
+    }
+    shown = on;
+    const focused = document.activeElement === field;
+    const start = field.selectionStart;
+    const end = field.selectionEnd;
+    const direction = field.selectionDirection;
+    field.type = on ? "text" : "password";
+    if (focused && start !== null) {
+      field.setSelectionRange(start, end, direction || "none");
+    }
+    button.textContent = on ? hideLabel : showLabel;
+    if (showName && hideName) {
+      button.setAttribute("aria-label", on ? hideName : showName);
+    }
+    if (status) {
+      status.textContent = on ? button.dataset.shownStatus : button.dataset.hiddenStatus;
+    }
+  };
+
+  // A pointer press would move the focus to the button, out of the field the person types in.
+  button.addEventListener("mousedown", function (event) {
+    event.preventDefault();
+  });
+  button.addEventListener("click", function () {
+    show(!shown);
+  });
+  if (field.form) {
+    field.form.addEventListener("submit", function () {
+      show(false);
+    });
+  }
+  window.addEventListener("pageshow", function () {
+    show(false);
+  });
+  button.hidden = false;
+  return { show: show };
+}
+
 // setUpSearchableSelects turns each select marked data-searchable, a long list such as the time
 // zones, into a combobox: a field that filters the select's options by any part of their text as
 // the person types, accents and case aside, and the matches in a list below it, the WAI-ARIA

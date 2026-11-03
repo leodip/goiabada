@@ -96,15 +96,16 @@ test("the count, and a new set behind the password and a confirmation, after whi
   await expect(page.getByRole("heading", { name: "Recovery codes", exact: true })).toBeVisible();
   await expect(page.getByText("9 of your 10 recovery codes are unused.")).toBeVisible();
 
-  // The new set asks first; Cancel sends nothing.
+  // The new set asks first; Cancel sends nothing. The field is found by its exact label, since
+  // "Password" alone also matches its button, "Show password".
   const section = page.locator("form", { has: page.getByRole("heading", { name: "Recovery codes", exact: true }) });
-  await section.getByLabel("Password").fill(user.password);
+  await section.getByLabel("Password", { exact: true }).fill(user.password);
   await section.getByRole("button", { name: "Get new recovery codes" }).click();
   await cancelDialog(page, "Your current recovery codes stop working as soon as you get new ones");
   await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toHaveCount(0);
 
   // A wrong password is refused on the form, with nothing replaced.
-  await section.getByLabel("Password").fill("not-the-password");
+  await section.getByLabel("Password", { exact: true }).fill("not-the-password");
   await section.getByRole("button", { name: "Get new recovery codes" }).click();
   await confirmDialog(page, "Get new recovery codes?");
   await expect(page.locator("#recovery-codes-error")).toHaveText("That password isn't right. Try again.");
@@ -112,7 +113,7 @@ test("the count, and a new set behind the password and a confirmation, after whi
   await expect(page.getByText("9 of your 10 recovery codes are unused.")).toBeVisible();
 
   // With the password, the page shows the ten new codes once, and all ten are unused.
-  await section.getByLabel("Password").fill(user.password);
+  await section.getByLabel("Password", { exact: true }).fill(user.password);
   await section.getByRole("button", { name: "Get new recovery codes" }).click();
   await confirmDialog(page, "Get new recovery codes?");
   await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();

@@ -60,7 +60,9 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   In the console a script answers an action in a live region the page draws empty, through
   `showNotice`, not in a dialog, its failures too (`sendAjaxRequest`'s `statusRegion`); a removal
   asks first in a `modal_dialog` of type `confirm`, whose second button names the action; a button
-  marked `data-copy-target` copies, a long `select` marked `data-searchable` becomes a `combobox`
+  marked `data-copy-target` copies, a button marked `data-password-toggle` shows and hides the
+  password field its `aria-controls` names (`passwordToggle`, which a page script also calls on a
+  button it reaches by id, so an operator's older template keeps working), a long `select` marked `data-searchable` becomes a `combobox`
   that filters as the person types, the select kept hidden to post the value, its field taking the
   select's `autocomplete` (`off` where it has none) and committing a browser's fill to the select,
   by option value, case aside, then by name, flag aside, or for `tel-country-code` by the one
@@ -92,7 +94,18 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   Chromium, Firefox and WebKit. A field collecting the person's own data declares its purpose
   (SC 1.3.5) with a token the HTML Standard allows on its control (Autofill, 4.10.19.7.1), and a
   control a script draws in place of another keeps the purpose of the one it replaces; a page about
-  another user declares none, since autofill would fill in the administrator's own data. A refusal
+  another user declares none, since autofill would fill in the administrator's own data. Every
+  console password field carries `spellcheck="false"`, `autocapitalize="none"` and
+  `autocorrect="off"`, so a shown password reaches no spell-check service and no keyboard rewrites
+  it (HTML Standard 6.8.5, 6.8.7, 6.8.8), and sits in an `input-row` beside its show/hide button: a
+  `button type="button"`, drawn `hidden` so it never shows without JavaScript, marked
+  `data-password-toggle`, with `aria-controls` naming the field. Its visible word is
+  `adminconsole.password_toggle.show` and, in `data-hide-label`, `hide`; its name, in `aria-label`
+  and `data-hide-name`, is the `show_<kind>` and `hide_<kind>` pair of the field's kind, such as
+  "Show new password", which contains the visible word in every catalog (SC 2.5.3); and
+  `data-shown-status` and `data-hidden-status` carry the words the script writes into the
+  `role="status"` region it adds beside the field. The name changes with the state, so the button
+  has no `aria-pressed`. `ui.css` hides Edge's own reveal control beside a shown button. A refusal
   about one field marks it `aria-invalid="true"` and names the notice in its `aria-describedby`, under the same `{{if .error}}` the notice renders under, which the guard
   reads as one branch; a handler whose form has several fields says which in `errorField`, and in
   the console reads it off the admin API's error code through `render.ErrorField`, or, for the API's

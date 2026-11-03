@@ -2,8 +2,9 @@
 // opens the sidebar as a panel on narrow screens, and the user menu in the header. Both are
 // disclosures: a button whose aria-expanded says whether what it controls is shown. It also lays
 // out the tab bars, wrapping their tabs into rows where they do not fit, and wires the components
-// any page of the shell may hold, from utils.js: the copy buttons, the searchable lists, the
-// durations written under their fields and the saves that ask first.
+// any page of the shell may hold, from utils.js: the copy buttons, the password fields' show/hide
+// buttons, the searchable lists, the durations written under their fields and the saves that ask
+// first.
 
 // The sidebar panel. While it is open the rest of the page, the skip link included, is inert, so
 // neither the keyboard nor a screen reader reaches what is behind it, and focus moves into it;
@@ -132,6 +133,7 @@ setUpSidebar();
 setUpUserMenu();
 setUpTabBars();
 setUpCopyButtons();
+setUpPasswordToggles();
 setUpSearchableSelects();
 setUpDurations();
 setUpSaveConfirmations();

@@ -600,6 +600,9 @@
     width: auto;
     min-width: 0;
   }
+  .input-row:has(> [data-password-toggle]:not([hidden])) > input::-ms-reveal {
+    display: none;
+  }
   .choice {
     display: flex;
     align-items: flex-start;

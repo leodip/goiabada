@@ -312,6 +312,22 @@
 "adminconsole.paginator.label" = "Pagination"
 "adminconsole.paginator.previous" = "Previous page"
 "adminconsole.paginator.next" = "Next page"
+"adminconsole.password_toggle.show" = "Show"
+"adminconsole.password_toggle.hide" = "Hide"
+"adminconsole.password_toggle.shown" = "Shown"
+"adminconsole.password_toggle.hidden" = "Hidden"
+"adminconsole.password_toggle.show_password" = "Show password"
+"adminconsole.password_toggle.hide_password" = "Hide password"
+"adminconsole.password_toggle.show_current_password" = "Show current password"
+"adminconsole.password_toggle.hide_current_password" = "Hide current password"
+"adminconsole.password_toggle.show_new_password" = "Show new password"
+"adminconsole.password_toggle.hide_new_password" = "Hide new password"
+"adminconsole.password_toggle.show_new_password_confirmation" = "Show new password confirmation"
+"adminconsole.password_toggle.hide_new_password_confirmation" = "Hide new password confirmation"
+"adminconsole.password_toggle.show_client_secret" = "Show client secret"
+"adminconsole.password_toggle.hide_client_secret" = "Hide client secret"
+"adminconsole.password_toggle.show_secret_key" = "Show secret key"
+"adminconsole.password_toggle.hide_secret_key" = "Hide secret key"
 
 # --- Sign-out confirmation page (#411) ---------------------------------------
 

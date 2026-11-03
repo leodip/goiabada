@@ -9,12 +9,21 @@ test("a confidential client's secret is hidden until shown", async ({ page, clie
   const client = await clients.create();
   await page.goto(clientUrl(client.id, "authentication"));
   const secret = page.locator("#clientSecret");
+  // The status region the script adds after the secret's row, beside the tab's own two.
+  const status = page.locator('.input-row:has(#clientSecret) + [role="status"]');
   await expect(secret).toHaveAttribute("type", "password");
-  await page.getByRole("button", { name: "Show", exact: true }).click();
+  // The button says what it shows, and its visible word is in its name.
+  const show = page.getByRole("button", { name: "Show client secret", exact: true });
+  await expect(show).toHaveText("Show");
+  await show.click();
   await expect(secret).toHaveAttribute("type", "text");
-  await page.getByRole("button", { name: "Hide", exact: true }).click();
+  const hide = page.getByRole("button", { name: "Hide client secret", exact: true });
+  await expect(hide).toHaveText("Hide");
+  await expect(status).toHaveText("Shown");
+  await hide.click();
   await expect(secret).toHaveAttribute("type", "password");
-  await expect(page.getByRole("button", { name: "Show", exact: true })).toBeVisible();
+  await expect(show).toBeVisible();
+  await expect(status).toHaveText("Hidden");
 });
 
 test("Copy puts the secret on the clipboard", async ({ page, context, clients }) => {
@@ -40,8 +49,9 @@ test("a new secret replaces the old one: the old is refused at the token endpoin
   await page.goto(clientUrl(client.id, "authentication"));
   await page.getByRole("button", { name: "Generate a new secret" }).click();
   await expect(page.locator("#secret-status")).toContainText("New secret generated. Save to start using it; until then the current one keeps working.");
-  // The new secret is shown, to be copied before it is saved.
+  // The new secret is shown, to be copied before it is saved, and its button then reads Hide.
   await expect(page.locator("#clientSecret")).toHaveAttribute("type", "text");
+  await expect(page.getByRole("button", { name: "Hide client secret", exact: true })).toHaveText("Hide");
   await expect(page.locator("#clientSecret")).not.toHaveValue(oldSecret);
   const newSecret = await page.locator("#clientSecret").inputValue();
   await page.locator("#btnSave").click();

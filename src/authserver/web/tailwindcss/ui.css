@@ -470,6 +470,14 @@
     min-width: 0;
   }
 
+  /* A password field whose show/hide button the script has shown has one control for the job:
+     Edge's own reveal control is hidden beside it, and kept where the button never shows, as with
+     JavaScript off. A rule of its own, since a browser that does not know ::-ms-reveal drops the
+     whole selector list it is in. */
+  .input-row:has(> [data-password-toggle]:not([hidden])) > input::-ms-reveal {
+    display: none;
+  }
+
   /* A checkbox or radio with its label beside it. */
 
   .choice {

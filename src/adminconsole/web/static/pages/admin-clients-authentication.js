@@ -1,6 +1,8 @@
 // admin-clients-authentication.js is the client authentication tab's behaviour. The secret shows
 // only for a confidential client, and choosing confidential for a client with none generates one.
-// Show and Hide reveal the secret, which is drawn hidden, and Generate asks the console for a new
+// Show and Hide reveal the secret, which is drawn hidden, through utils.js's passwordToggle, which
+// wires the button by id here as well as by its data-password-toggle, so an operator's copy of the
+// template from before that attribute keeps a working button. Generate asks the console for a new
 // one, which the field then shows, saying so in the tab's status region, as it says a failure. A
 // type the browser restores, as on Back, is shown as chosen. The save, which asks first about a
 // change of type and about a new secret, is shell.js's.
@@ -11,12 +13,7 @@ const showButton = document.getElementById("showSecretBtn");
 const generateButton = document.getElementById("generateSecretBtn");
 const secretStatus = document.getElementById("secret-status");
 const confidentialRadio = document.getElementById("confidentialClientRadio");
-const showLabel = showButton.textContent;
-
-function showSecret(show) {
-  secretField.type = show ? "text" : "password";
-  showButton.textContent = show ? showButton.dataset.hideLabel : showLabel;
-}
+const secretToggle = passwordToggle(showButton);
 
 // One generation runs at a time, Generate disabled meanwhile, so neither a second press nor a page
 // restored from the back/forward cache mid-generation asks for a second secret that would replace
@@ -42,7 +39,7 @@ function generateSecret() {
       const hadSecret = secretField.value !== "";
       secretField.value = result.NewSecret;
       if (hadSecret) {
-        showSecret(true);
+        secretToggle.show(true);
         showNotice(secretStatus, "positive", secretStatus.dataset.generated);
       }
     }
@@ -61,7 +58,4 @@ document.querySelectorAll("input[name=publicConfidential]").forEach(function (ra
 });
 // pageshow comes after the browser restores the form, as on Back, which fires no change.
 window.addEventListener("pageshow", showType);
-showButton.addEventListener("click", function () {
-  showSecret(secretField.type === "password");
-});
 generateButton.addEventListener("click", generateSecret);
