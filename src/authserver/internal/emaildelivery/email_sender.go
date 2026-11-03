@@ -18,6 +18,7 @@ import (
 	"mime/quotedprintable"
 	"net"
 	"net/mail"
+	"net/netip"
 	"net/smtp"
 	"net/textproto"
 	"os"
@@ -69,10 +70,16 @@ type Sender struct {
 	// randReader is nil in production, meaning crypto/rand.Reader. It exists so a test can make
 	// the Message-ID's entropy read fail and show the send fails closed.
 	randReader io.Reader
+	// ehloName is the name the sender introduces itself by in EHLO, and in HELO to a relay that
+	// refuses EHLO. Empty, each connection uses the address of its own end, written as an address
+	// literal (#718 decision 9).
+	ehloName string
 }
 
-func NewSender(dataCipher *encryption.DataCipher) *Sender {
-	return &Sender{dataCipher: dataCipher}
+// NewSender builds the sender. ehloName is GOIABADA_AUTHSERVER_SMTP_EHLO_NAME as the configuration
+// validated it, a domain or an address literal, or empty for the connection's local address.
+func NewSender(dataCipher *encryption.DataCipher, ehloName string) *Sender {
+	return &Sender{dataCipher: dataCipher, ehloName: ehloName}
 }
 
 // SMTPConfig is the relay a message is sent through, as the settings row stores it. The password
@@ -223,9 +230,10 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 
 	// The hello every command below would send first, sent here so its failure is seen: Extension
 	// swallows a failed hello and answers false, which would read a relay that broke or stalled at
-	// EHLO as one offering no STARTTLS or no authentication, and lose the error. "localhost" is
-	// the name net/smtp says by default (#410 decision 5).
-	if helloErr := client.Hello("localhost"); helloErr != nil {
+	// EHLO as one offering no STARTTLS or no authentication, and lose the error (#410 decision 5).
+	// net/smtp keeps the name for the HELO it falls back to when EHLO is refused and for the EHLO
+	// StartTLS repeats, so all three carry it (#718 decision 9).
+	if helloErr := client.Hello(e.helloName(tcpConn)); helloErr != nil {
 		return replyFailure(errs.Wrap(helloErr, "unable to send SMTP message"), SendFailureOther)
 	}
 
@@ -278,6 +286,31 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	}
 
 	return nil
+}
+
+// helloName is the configured EHLO name or, with none, the local address of conn as an RFC 5321
+// section 4.1.3 address literal: `[192.0.2.10]`, or `[IPv6:2001:db8::10]` with any zone dropped,
+// which no literal can carry. An IPv4 address a dual-stack socket reports in its IPv6-mapped form
+// is written as IPv4. RFC 5321 section 4.1.4 has a client without a meaningful domain name send an
+// address literal, and the connection's own end is the address the relay sees (section 2.3.5).
+func (e *Sender) helloName(conn net.Conn) string {
+	if e.ehloName != "" {
+		return e.ehloName
+	}
+	var local netip.Addr
+	if tcpAddr, ok := conn.LocalAddr().(*net.TCPAddr); ok {
+		local = tcpAddr.AddrPort().Addr().Unmap().WithZone("")
+	}
+	switch {
+	case local.Is4():
+		return "[" + local.String() + "]"
+	case local.Is6():
+		return "[IPv6:" + local.String() + "]"
+	default:
+		// A dialed TCP connection always knows its local address; should it ever not, the
+		// unspecified address is still a literal a relay can parse, where a name would be a guess.
+		return "[0.0.0.0]"
+	}
 }
 
 // deadlineConn gives every read and every write its own deadline, commandTimeout from when it

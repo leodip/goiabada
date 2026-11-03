@@ -62,6 +62,9 @@ type fakeSMTP struct {
 	// dropAfterData takes the whole DATA block and closes the connection instead of answering its
 	// terminator, so the client never learns whether the relay accepted the message.
 	dropAfterData bool
+	// refuseEHLO answers EHLO with a 502, as a relay that predates the service extensions does, so
+	// the client has to fall back to HELO (RFC 5321 section 4.1.4).
+	refuseEHLO bool
 
 	// breakOn names the first command, such as EHLO, STARTTLS or QUIT, the fake answers by breaking
 	// the connection the way breakHow says, rather than with a reply. Before STARTTLS nothing
@@ -221,6 +224,9 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 		}
 
 		switch {
+		case strings.HasPrefix(up, "EHLO") && f.refuseEHLO:
+			say("502 5.5.1 command not recognized")
+
 		case strings.HasPrefix(up, "EHLO"), strings.HasPrefix(up, "HELO"):
 			if len(ext) == 0 {
 				say("250 fake greets you")

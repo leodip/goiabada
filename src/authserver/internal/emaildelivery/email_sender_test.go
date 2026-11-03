@@ -30,7 +30,7 @@ const mailpitURL = "http://mailpit:8025"
 
 func TestSendEmail(t *testing.T) {
 
-	emailSender := NewSender(testDataCipher)
+	emailSender := NewSender(testDataCipher, "")
 
 	smtpConfig := SMTPConfig{
 		Host:       "mailpit",
@@ -192,7 +192,7 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 			assert.Equal(t, fixtureUser, user)
 			assert.Equal(t, fixturePassword, password)
 
-			assert.True(t, f.hasLinePrefix("EHLO localhost"), "RFC 5321 4.1.1.1: the client has no name of its own, so it greets as localhost")
+			assert.True(t, f.hasLinePrefix("EHLO [127.0.0.1]"), "RFC 5321 4.1.4: with no EHLO name configured, the client greets as its own address's literal")
 			assert.True(t, f.hasLinePrefix("MAIL FROM:"))
 			assert.True(t, f.hasLinePrefix("RCPT TO:"))
 			assert.True(t, f.hasLinePrefix("DATA"))
@@ -430,7 +430,7 @@ func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
 		port := f.start(t)
 		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-		require.NoError(t, NewSender(testDataCipher).SendEmail(context.Background(), smtpConfig, input))
+		require.NoError(t, NewSender(testDataCipher, "").SendEmail(context.Background(), smtpConfig, input))
 
 		_, password := f.credentials()
 		assert.Equal(t, fixturePassword, password)
@@ -444,7 +444,7 @@ func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
 		otherCipher, err := encryption.NewDataCipher([]byte("fedcba9876543210fedcba9876543210"))
 		require.NoError(t, err)
 
-		err = NewSender(otherCipher).SendEmail(context.Background(), smtpConfig, input)
+		err = NewSender(otherCipher, "").SendEmail(context.Background(), smtpConfig, input)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the SMTP password")
 		assertSendFailure(t, err, SendFailureOther)

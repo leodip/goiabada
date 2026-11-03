@@ -130,8 +130,8 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 	}
 }
 
-// configVariables is every live GOIABADA_* variable this process loads: 28 auth server, the 2
-// admin console values it reads, 14 database and 5 top-level, of which 41 have a flag. The one
+// configVariables is every live GOIABADA_* variable this process loads: 29 auth server, the 2
+// admin console values it reads, 14 database and 5 top-level, of which 42 have a flag. The one
 // name Load mentions that is not live configuration is in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Auth server
@@ -212,6 +212,11 @@ var configVariables = []configVar{
 	intVar("GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS", "authserver-listen-port-metrics", 9190,
 		19190, 29190,
 		func(c *Config) any { return c.AuthServer.ListenPortMetrics }),
+	// The name the auth server introduces itself to the SMTP relay by; empty, the address of its
+	// own end of each connection (#718 decision 9).
+	strVar("GOIABADA_AUTHSERVER_SMTP_EHLO_NAME", "authserver-smtp-ehlo-name", "",
+		"mail-env.example.com", "mail-flag.example.com",
+		func(c *Config) any { return c.AuthServer.SMTPEHLOName }),
 	int64VarNoFlag("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024, 5*1024*1024,
 		func(c *Config) any { return c.AuthServer.ProfilePictureMaxSizeBytes }),
 	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
@@ -736,10 +741,11 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 // Seam 2: the registered flag set of this binary
 // -----------------------------------------------------------------------------
 
-// authServerFlags is the 41 flags the auth server registers: its own 22, the 14 database flags,
+// authServerFlags is the 42 flags the auth server registers: its own 23, the 14 database flags,
 // the 3 initial-setup flags, and the two admin console values it reads. 32 were what the split
 // left (#351); the four pool flags came after it (#394), the three metrics listener flags
-// after those (#400), and the two of the connection's TLS after those (#502).
+// after those (#400), the two of the connection's TLS after those (#502), and the SMTP EHLO
+// name after those (#718).
 //
 // It is written out rather than derived from configVariables, and that is the whole point. A
 // derived expectation cannot fail when a flag is dropped from the table and from config.go
@@ -770,6 +776,7 @@ var authServerFlags = []string{
 	"authserver-log-sql",
 	"authserver-metrics-enabled",
 	"authserver-ratelimiter-enabled",
+	"authserver-smtp-ehlo-name",
 	"authserver-staticdir",
 	"authserver-templatedir",
 	"authserver-trust-proxy-headers",
@@ -799,6 +806,7 @@ var flagsAddedAfterTheSplit = []string{
 	"authserver-listen-host-metrics",
 	"authserver-listen-port-metrics",
 	"authserver-metrics-enabled",
+	"authserver-smtp-ehlo-name",
 	"db-conn-max-idle-time",
 	"db-conn-max-lifetime",
 	"db-max-idle-conns",

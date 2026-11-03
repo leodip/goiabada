@@ -56,7 +56,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// counted on the metrics listener (#400 decision 5).
 	tokenMetrics := s.tokenMetrics
 	userCreator := usercreation.New(s.database)
-	emailSender := emaildelivery.NewSender(s.dataCipher)
+	emailSender := emaildelivery.NewSender(s.dataCipher, s.cfg.AuthServer.SMTPEHLOName)
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
