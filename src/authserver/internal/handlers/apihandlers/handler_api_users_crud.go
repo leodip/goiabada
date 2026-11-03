@@ -532,7 +532,7 @@ func HandleUserCreatePost(
 				Subject:  i18n.T(emailReq.Context(), "email.newuser_set_password.subject", map[string]any{"appName": settings.AppName}),
 				HtmlBody: buf.String(),
 			}
-			err = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
+			_, err = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return

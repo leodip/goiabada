@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"mime/quotedprintable"
 	"net/mail"
@@ -19,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
 	"github.com/leodip/goiabada/core/hostport/hostporttest"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +30,7 @@ const mailpitURL = "http://mailpit:8025"
 
 func TestSendEmail(t *testing.T) {
 
-	emailSender := NewSender(testDataCipher)
+	emailSender := NewSender(testDataCipher, "")
 
 	smtpConfig := SMTPConfig{
 		Host:       "mailpit",
@@ -46,7 +48,7 @@ func TestSendEmail(t *testing.T) {
 		HtmlBody: "<p>This is a test email</p>",
 	}
 
-	err := emailSender.SendEmail(context.Background(), smtpConfig, input)
+	_, err := emailSender.SendEmail(context.Background(), smtpConfig, input)
 	require.NoError(t, err)
 
 	sent := mailpit.New(mailpitURL).AssertEmailSent(t, recipient, "<p>This is a test email</p>")
@@ -141,25 +143,37 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 		ext          []string
 		tlsExt       []string
 		tlsFromStart bool
+		// wantEncrypted is what the sender reports: whether the message went over TLS.
+		wantEncrypted bool
 	}{
 		{
-			name:       "none",
+			name:       "none, the relay offering no STARTTLS",
 			encryption: "none",
 			ext:        []string{"AUTH PLAIN", "8BITMIME"},
+		},
+		{
+			// #718 decision 14: STARTTLS if available upgrades when the relay offers it.
+			name:          "none, the relay offering STARTTLS",
+			encryption:    "none",
+			ext:           []string{"STARTTLS", "8BITMIME"},
+			tlsExt:        []string{"AUTH PLAIN", "8BITMIME"},
+			wantEncrypted: true,
 		},
 		{
 			name:       "starttls",
 			encryption: "starttls",
 			// AUTH is advertised only after the handshake, which is what a relay that requires
 			// TLS for authentication actually does.
-			ext:    []string{"STARTTLS", "8BITMIME"},
-			tlsExt: []string{"AUTH PLAIN", "8BITMIME"},
+			ext:           []string{"STARTTLS", "8BITMIME"},
+			tlsExt:        []string{"AUTH PLAIN", "8BITMIME"},
+			wantEncrypted: true,
 		},
 		{
-			name:         "ssltls",
-			encryption:   "ssltls",
-			tlsExt:       []string{"AUTH PLAIN", "8BITMIME"},
-			tlsFromStart: true,
+			name:          "ssltls",
+			encryption:    "ssltls",
+			tlsExt:        []string{"AUTH PLAIN", "8BITMIME"},
+			tlsFromStart:  true,
+			wantEncrypted: true,
 		},
 	}
 
@@ -179,25 +193,26 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 			smtpConfig := relayConfig(t, "127.0.0.1", port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool}
 
-			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			result, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
 			})
 			require.NoError(t, err)
+			assert.Equal(t, SendResult{Encrypted: test.wantEncrypted}, result)
 
 			user, password := f.credentials()
 			assert.Equal(t, fixtureUser, user)
 			assert.Equal(t, fixturePassword, password)
 
-			assert.True(t, f.hasLinePrefix("EHLO localhost"), "RFC 5321 4.1.1.1: the client has no name of its own, so it greets as localhost")
+			assert.True(t, f.hasLinePrefix("EHLO [127.0.0.1]"), "RFC 5321 4.1.4: with no EHLO name configured, the client greets as its own address's literal")
 			assert.True(t, f.hasLinePrefix("MAIL FROM:"))
 			assert.True(t, f.hasLinePrefix("RCPT TO:"))
 			assert.True(t, f.hasLinePrefix("DATA"))
 			assert.True(t, f.hasLinePrefix("QUIT"))
 			assert.Contains(t, f.data(), "Subject: Test email\r\n")
 
-			if test.encryption == "starttls" {
+			if test.ext != nil && extensionOffered(test.ext, "STARTTLS") {
 				startTLS := f.indexOfLinePrefix("STARTTLS")
 				require.GreaterOrEqual(t, startTLS, 0, "the client never issued STARTTLS")
 				assert.Greater(t, f.indexOfLinePrefix("AUTH"), startTLS,
@@ -246,7 +261,7 @@ func TestSendEmail_IPv6Host(t *testing.T) {
 			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool}
 
-			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -326,7 +341,7 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 
 			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-			err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -372,7 +387,7 @@ func TestSendEmail_LoginOverProtectedConnection(t *testing.T) {
 
 	smtpConfig := relayConfig(t, fakeHostname(t), port, "starttls", fixtureUser, fixturePassword, "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -403,7 +418,7 @@ func TestSendEmail_LoginAnswersUnconventionalChallenges(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -428,7 +443,8 @@ func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
 		port := f.start(t)
 		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-		require.NoError(t, NewSender(testDataCipher).SendEmail(context.Background(), smtpConfig, input))
+		_, err := NewSender(testDataCipher, "").SendEmail(context.Background(), smtpConfig, input)
+		require.NoError(t, err)
 
 		_, password := f.credentials()
 		assert.Equal(t, fixturePassword, password)
@@ -442,7 +458,7 @@ func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
 		otherCipher, err := encryption.NewDataCipher([]byte("fedcba9876543210fedcba9876543210"))
 		require.NoError(t, err)
 
-		err = NewSender(otherCipher).SendEmail(context.Background(), smtpConfig, input)
+		_, err = NewSender(otherCipher, "").SendEmail(context.Background(), smtpConfig, input)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to decrypt the SMTP password")
 		assertSendFailure(t, err, SendFailureOther)
@@ -490,7 +506,7 @@ func TestSendEmail_PlainInitialResponseBoundary(t *testing.T) {
 
 			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, password, "Goiabada")
 
-			err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -534,7 +550,7 @@ func TestSendEmail_PlainChallengeFormOverProtectedConnection(t *testing.T) {
 
 	smtpConfig := relayConfig(t, fakeHostname(t), port, "starttls", fixtureUser, longPassword, "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -550,6 +566,43 @@ func TestSendEmail_PlainChallengeFormOverProtectedConnection(t *testing.T) {
 	assert.Greater(t, f.indexOfLinePrefix("AUTH PLAIN"), startTLS, "the credentials may only follow the handshake")
 	assert.Contains(t, f.lines(), "AUTH PLAIN", "the command carries no initial response at this length")
 	assert.True(t, f.hasLinePrefix("MAIL FROM:"))
+}
+
+// TestSendEmail_PlainOverProtectedConnection runs ordinary PLAIN, the initial-response form
+// smtp.PlainAuth writes, over each protected mode to a name that is not loopback: the shape of a
+// hosted relay. smtp.PlainAuth refuses to send unless net/smtp knows the connection is TLS, which
+// for implicit TLS it learns only from being handed the *tls.Conn itself, and every other SSL/TLS
+// row reaches the fake as 127.0.0.1, one of PlainAuth's loopback exceptions. Without this a
+// connection that hides its TLS from net/smtp would fail every hosted SSL/TLS relay offering PLAIN
+// and leave the suite green. STARTTLS, where net/smtp starts the TLS itself, is the control.
+func TestSendEmail_PlainOverProtectedConnection(t *testing.T) {
+
+	cert := newFakeCert(t)
+	host := fakeHostname(t)
+	require.False(t, isLocalHost(host), "the row needs a host outside PlainAuth's loopback exceptions")
+
+	for _, mode := range []string{"starttls", "ssltls"} {
+		t.Run(mode, func(t *testing.T) {
+			f := &fakeSMTP{
+				ext:          []string{"STARTTLS", "8BITMIME"},
+				tlsExt:       []string{"AUTH PLAIN", "8BITMIME"},
+				tlsFromStart: mode == "ssltls",
+				cert:         cert,
+			}
+			port := f.start(t)
+
+			result, err := sendReporting(t, &Sender{dataCipher: testDataCipher, rootCAs: cert.pool},
+				relayConfig(t, host, port, mode, fixtureUser, fixturePassword, "Goiabada"))
+			require.NoError(t, err, "a verified TLS connection carries ordinary PLAIN credentials")
+			assert.Equal(t, SendResult{Encrypted: true}, result)
+
+			assert.True(t, f.hasLinePrefix("AUTH PLAIN "), "ordinary credentials go in the initial response")
+			user, password := f.credentials()
+			assert.Equal(t, fixtureUser, user)
+			assert.Equal(t, fixturePassword, password)
+			assert.Contains(t, f.data(), "Subject: Test email\r\n", "the message was delivered")
+		})
+	}
 }
 
 // TestSendEmail_PlainRepeatedChallenge pins plainAuth's one-response cardinality. PLAIN carries
@@ -571,7 +624,7 @@ func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, longPassword, "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -593,6 +646,94 @@ func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
 	assert.False(t, f.hasLinePrefix("MAIL FROM:"), "no message may follow a login that failed")
 }
 
+// TestSendEmail_PlainCredentialsTheMechanismCanCarry holds RFC 4616 section 2: PLAIN's authcid and
+// passwd are each one or more UTF-8 characters other than NUL, and a client does not send a message
+// that breaks that. Credentials that break it, an empty password, a NUL or bytes that are not UTF-8
+// in either, are refused before any AUTH command, on the initial-response form and on the challenge
+// form a long password takes, and nothing reaches the relay. Each refusal sits beside the row it
+// would deliver under, differing in the one credential; the last rows show the check is PLAIN's
+// alone and that no username still means no authentication.
+func TestSendEmail_PlainCredentialsTheMechanismCanCarry(t *testing.T) {
+
+	// Long enough that the response no longer fits on the AUTH command line, so the challenge form
+	// carries it: TestSendEmail_PlainInitialResponseBoundary puts that boundary under 400.
+	long := strings.Repeat("p", 400)
+
+	tests := []struct {
+		name      string
+		authExt   string
+		username  string
+		password  string
+		challenge bool
+		refused   bool
+	}{
+		{name: "ordinary credentials, inline, deliver", username: fixtureUser, password: fixturePassword},
+		{name: "an empty password, refused", username: fixtureUser, password: "", refused: true},
+		{name: "a NUL in the password, refused", username: fixtureUser, password: "s3cret\x00p4ss", refused: true},
+		{name: "a NUL in the username, refused", username: "smtp-user\x00@example.com", password: fixturePassword, refused: true},
+		{name: "a password that is not UTF-8, refused", username: fixtureUser, password: "s3cret\xffp4ss", refused: true},
+		{name: "a username that is not UTF-8, refused", username: "smtp-user\xff@example.com", password: fixturePassword, refused: true},
+		{name: "a non-ASCII password in UTF-8, delivers", username: fixtureUser, password: "sénha-ü-密码"},
+
+		{name: "a long password, challenge form, delivers", username: fixtureUser, password: long, challenge: true},
+		{name: "a long password with a NUL, challenge form, refused", username: fixtureUser, password: long[1:] + "\x00", challenge: true, refused: true},
+		{name: "a long password that is not UTF-8, challenge form, refused", username: fixtureUser, password: long[1:] + "\xff", challenge: true, refused: true},
+		{name: "a NUL in the username, long password, challenge form, refused", username: "smtp-user\x00@example.com", password: long, challenge: true, refused: true},
+
+		{name: "an empty password through LOGIN, delivers", authExt: "AUTH LOGIN", username: fixtureUser, password: ""},
+		{name: "no username, sends unauthenticated", username: "", password: ""},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			authExt := test.authExt
+			if authExt == "" {
+				authExt = "AUTH PLAIN"
+			}
+			f := &fakeSMTP{ext: []string{authExt, "8BITMIME"}, maxCommandLine: smtpCommandLineLimit}
+			port := f.start(t)
+
+			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", test.username, test.password, "Goiabada")
+
+			err := sendTo(t, &Sender{dataCipher: testDataCipher}, smtpConfig)
+
+			if test.refused {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "unable to send SMTP message")
+				assertSendFailure(t, err, SendFailureUnusablePlainCredentials)
+				assert.False(t, f.hasLinePrefix("AUTH"), "the refusal has to precede any AUTH command")
+				assert.False(t, f.hasLinePrefix("MAIL FROM:"), "no message follows a refused login")
+				if test.password != "" {
+					assert.NotContains(t, err.Error(), test.password, "the error carries no credential")
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			assert.True(t, f.hasLinePrefix("MAIL FROM:"))
+			if test.username == "" {
+				assert.False(t, f.hasLinePrefix("AUTH"), "no username is no authentication")
+				return
+			}
+			gotUser, gotPassword := f.credentials()
+			assert.Equal(t, test.username, gotUser)
+			assert.Equal(t, test.password, gotPassword)
+			if test.authExt != "" {
+				return
+			}
+			if test.challenge {
+				assert.Contains(t, f.lines(), "AUTH PLAIN", "the credentials went on the challenge form")
+			} else {
+				assert.True(t, f.hasLinePrefix("AUTH PLAIN "), "the credentials went on the AUTH line")
+			}
+		})
+	}
+}
+
+// passwordOnlyToThisMachine is the sender's refusal to hand a password to a relay off this machine
+// under STARTTLS if available (#718 decision 16).
+const passwordOnlyToThisMachine = "with STARTTLS if available, the password is sent only to a server on this machine; set the encryption to STARTTLS or SSL/TLS"
+
 // TestSendEmail_FailsClosed covers decisions 1, 2 and 4. Every refusal sits next to the row it
 // would succeed under, differing in one field, so the named gate is demonstrably the reason.
 func TestSendEmail_FailsClosed(t *testing.T) {
@@ -608,6 +749,8 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 		tlsExt     []string
 		wantError  string
 		wantKind   SendFailureKind
+		// wantTLS is a row whose session went through STARTTLS before the gate decided.
+		wantTLS bool
 	}{
 		{
 			name:       "starttls offered, delivers",
@@ -622,7 +765,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			encryption: "starttls",
 			host:       "127.0.0.1",
 			ext:        []string{"AUTH PLAIN", "8BITMIME"},
-			wantError:  "the SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS",
+			wantError:  "the SMTP server did not offer STARTTLS; check the port, or choose STARTTLS if available only if the server has no TLS",
 			wantKind:   SendFailureSTARTTLSNotOffered,
 		},
 		{
@@ -637,8 +780,49 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			encryption: "none",
 			host:       hostname,
 			ext:        []string{"AUTH PLAIN", "8BITMIME"},
-			wantError:  "the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS",
+			wantError:  passwordOnlyToThisMachine,
 			wantKind:   SendFailureUnencryptedPassword,
+		},
+		{
+			// #718 decision 15: the gate reads the configured mode, not the connection. The relay
+			// offers STARTTLS with a certificate the sender trusts, so the session is upgraded, and
+			// the password is refused all the same.
+			name:       "none upgraded through STARTTLS to a non-loopback host, PLAIN offered",
+			encryption: "none",
+			host:       hostname,
+			ext:        []string{"STARTTLS", "8BITMIME"},
+			tlsExt:     []string{"AUTH PLAIN", "8BITMIME"},
+			wantError:  passwordOnlyToThisMachine,
+			wantKind:   SendFailureUnencryptedPassword,
+			wantTLS:    true,
+		},
+		{
+			// The same upgraded session to a loopback host, which the gate lets through.
+			name:       "none upgraded through STARTTLS to a loopback host, PLAIN offered",
+			encryption: "none",
+			host:       "127.0.0.1",
+			ext:        []string{"STARTTLS", "8BITMIME"},
+			tlsExt:     []string{"AUTH PLAIN", "8BITMIME"},
+			wantTLS:    true,
+		},
+		{
+			// And to the non-loopback host by CRAM-MD5, which never sends the password.
+			name:       "none upgraded through STARTTLS to a non-loopback host, only CRAM-MD5 offered",
+			encryption: "none",
+			host:       hostname,
+			ext:        []string{"STARTTLS", "8BITMIME"},
+			tlsExt:     []string{"AUTH CRAM-MD5", "8BITMIME"},
+			wantTLS:    true,
+		},
+		{
+			name:       "none upgraded through STARTTLS to a non-loopback host, only LOGIN offered",
+			encryption: "none",
+			host:       hostname,
+			ext:        []string{"STARTTLS", "8BITMIME"},
+			tlsExt:     []string{"AUTH LOGIN", "8BITMIME"},
+			wantError:  passwordOnlyToThisMachine,
+			wantKind:   SendFailureUnencryptedPassword,
+			wantTLS:    true,
 		},
 		{
 			// The same refusal with PLAIN off the table, so net/smtp.PlainAuth's own guard
@@ -647,7 +831,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			encryption: "none",
 			host:       hostname,
 			ext:        []string{"AUTH LOGIN", "8BITMIME"},
-			wantError:  "the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS",
+			wantError:  passwordOnlyToThisMachine,
 			wantKind:   SendFailureUnencryptedPassword,
 		},
 		{
@@ -683,11 +867,17 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool}
 
-			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
 			})
+
+			if test.wantTLS {
+				startTLS := f.indexOfLinePrefix("STARTTLS")
+				require.GreaterOrEqual(t, startTLS, 0, "the session was meant to be upgraded")
+				assert.Equal(t, 1, f.connections(), "an upgraded session needs no second connection")
+			}
 
 			if test.wantError == "" {
 				require.NoError(t, err)
@@ -787,7 +977,7 @@ func TestSendEmail_CertificateVerification(t *testing.T) {
 
 			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 
-			err := (&Sender{dataCipher: testDataCipher, rootCAs: pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := (&Sender{dataCipher: testDataCipher, rootCAs: pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -859,7 +1049,8 @@ func send(t *testing.T, fromName string, input *SendEmailInput) sentMessage {
 	port := f.start(t)
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", fromName)
-	require.NoError(t, (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, input))
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, input)
+	require.NoError(t, err)
 
 	return parseMessage(t, f.data())
 }
@@ -1041,7 +1232,7 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 
 		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-		err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+		_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  strings.Repeat("s", longest+1),
 			HtmlBody: "<p>hello</p>",
@@ -1050,6 +1241,203 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 		assert.Contains(t, err.Error(), "998-byte line limit")
 		assertSendFailure(t, err, SendFailureOther)
 		assert.False(t, f.sawConnection(), "the message is built before the dial, so nothing should have connected")
+	})
+
+	t.Run("a recipient address too long for any line is refused before the dial", func(t *testing.T) {
+		f := &fakeSMTP{ext: []string{"8BITMIME"}}
+		port := f.start(t)
+
+		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+
+		// An address has no fold point inside it: "<" + 1000 + "@example.com>" on a continuation
+		// line is 1 + 1014 bytes.
+		_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			To:       strings.Repeat("r", 1000) + "@example.com",
+			Subject:  "Test email",
+			HtmlBody: "<p>hello</p>",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "the To header")
+		assert.Contains(t, err.Error(), "998-byte line limit")
+		assertSendFailure(t, err, SendFailureOther)
+		assert.False(t, f.sawConnection(), "the message is built before the dial, so nothing should have connected")
+	})
+}
+
+// fieldLines returns the raw lines of one header field as they crossed the wire: its first line and
+// every continuation line after it.
+func fieldLines(t *testing.T, m sentMessage, name string) []string {
+	t.Helper()
+
+	var lines []string
+	for _, line := range m.rawHeaders {
+		switch {
+		case strings.HasPrefix(line, name+":"):
+			lines = append(lines, line)
+		case len(lines) > 0 && strings.HasPrefix(line, " "):
+			lines = append(lines, line)
+		case len(lines) > 0:
+			return lines
+		}
+	}
+	require.NotEmpty(t, lines, "no %s header in %q", name, m.rawHeaders)
+	return lines
+}
+
+// TestSendEmail_HeaderFolding holds #718 decision 3. RFC 2047 section 2 limits each line of a header
+// field holding an encoded word to 76 characters, RFC 5322 section 2.1.1 asks for 78 on any other
+// line and requires 998 on every one, and From, To and Subject fold only at the whitespace between
+// encoded words or between a display name and its <address>. Each row is unfolded and decoded back
+// to the original with net/mail and mime.WordDecoder, and every raw line of the field is measured.
+func TestSendEmail_HeaderFolding(t *testing.T) {
+
+	// 40 CJK characters, within the settings' 60: the from-name the issue measured at 465
+	// characters on one line.
+	cjkName := strings.Repeat("認証サーバー通知", 5)
+	accentedName := "José Antônio Conceição Gonçalves de Araújo e Silva Júnior"
+	// Specials beside non-ASCII text make net/mail pick B encoding (RFC 2047 section 5.3).
+	specialsName := "Açúcar & Café, Ltda. (Atendimento ao Cliente)"
+	// Plain ASCII with a comma is a quoted string, which is not split; only the gap before the
+	// address is a fold point. 6 + 61 + 1 + 21 = 89 bytes would not fit on one 78-byte line.
+	quotedName := "D'Ippolito, Leonardo - Goiabada Identity Notifications Team"
+
+	tests := []struct {
+		name       string
+		fromName   string
+		to         string
+		subject    string
+		field      string
+		wantFolded bool
+	}{
+		{name: "cjk from-name", fromName: cjkName, field: "From", wantFolded: true},
+		{name: "accented from-name", fromName: accentedName, field: "From", wantFolded: true},
+		{name: "b-encoded from-name", fromName: specialsName, field: "From", wantFolded: true},
+		{name: "quoted ascii from-name folds before the address", fromName: quotedName, field: "From", wantFolded: true},
+		{name: "short from-name stays on one line", fromName: "Goiabada", field: "From"},
+		{
+			name:       "accented recipient name",
+			to:         (&mail.Address{Name: accentedName, Address: fixtureRecipient}).String(),
+			field:      "To",
+			wantFolded: true,
+		},
+		{name: "bare recipient stays on one line", to: fixtureRecipient, field: "To"},
+		{
+			// The issue's 77-character line: "Subject: " plus one 68-character encoded word fits
+			// 78 but not 76.
+			name:       "one encoded word too long for the first line",
+			subject:    strings.Repeat("a", 50) + "é",
+			field:      "Subject",
+			wantFolded: true,
+		},
+		{name: "cjk subject", subject: strings.Repeat("パスワード再設定のお知らせ", 4), field: "Subject", wantFolded: true},
+		{
+			name:       "accented subject",
+			subject:    "Verificação de endereço de e-mail: seu código de confirmação é 123456 — válido por 15 minutos",
+			field:      "Subject",
+			wantFolded: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fromName := test.fromName
+			if fromName == "" {
+				fromName = "Goiabada"
+			}
+			to := test.to
+			if to == "" {
+				to = fixtureRecipient
+			}
+			subject := test.subject
+			if subject == "" {
+				subject = "Test email"
+			}
+
+			m := send(t, fromName, &SendEmailInput{To: to, Subject: subject, HtmlBody: "<p>hello</p>"})
+
+			lines := fieldLines(t, m, test.field)
+			for _, line := range lines {
+				assert.LessOrEqual(t, len(line), 998, "RFC 5322 section 2.1.1: %q", line)
+				if strings.Contains(line, "=?") {
+					assert.LessOrEqual(t, len(line), 76,
+						"RFC 2047 section 2: a line holding an encoded word is at most 76 characters: %q", line)
+				} else {
+					assert.LessOrEqual(t, len(line), 78, "RFC 5322 section 2.1.1: %q", line)
+				}
+			}
+			assert.Equal(t, test.wantFolded, len(lines) > 1, "raw lines: %q", lines)
+
+			// Every continuation line starts at a fold point: an encoded word, or the address for
+			// From and To. A fold anywhere else would split a token.
+			for _, line := range lines[1:] {
+				if test.field == "Subject" {
+					assert.True(t, strings.HasPrefix(line, " =?"), "a fold inside an encoded word: %q", line)
+				} else {
+					assert.True(t, strings.HasPrefix(line, " =?") || strings.HasPrefix(line, " <"),
+						"a fold inside a display name or an address: %q", line)
+				}
+			}
+
+			value := m.headers[test.field]
+			switch test.field {
+			case "Subject":
+				decoded, err := new(mime.WordDecoder).DecodeHeader(value)
+				require.NoError(t, err)
+				assert.Equal(t, subject, decoded)
+			case "From":
+				address, err := mail.ParseAddress(value)
+				require.NoError(t, err, "the unfolded From header %q does not parse", value)
+				assert.Equal(t, fromName, address.Name)
+				assert.Equal(t, fixtureFromEmail, address.Address)
+			case "To":
+				address, err := mail.ParseAddress(value)
+				require.NoError(t, err, "the unfolded To header %q does not parse", value)
+				want, err := mail.ParseAddress(to)
+				require.NoError(t, err)
+				assert.Equal(t, want.Name, address.Name)
+				assert.Equal(t, fixtureRecipient, address.Address)
+			}
+		})
+	}
+
+	t.Run("a quoted display name is kept whole on its line", func(t *testing.T) {
+		m := send(t, quotedName, &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: "<p>hello</p>"})
+		assert.Equal(t, []string{
+			`From: "D'Ippolito, Leonardo - Goiabada Identity Notifications Team"`,
+			" <noreply@example.com>",
+		}, fieldLines(t, m, "From"))
+	})
+
+	t.Run("an ascii subject holding an encoded word keeps its whole line within 76", func(t *testing.T) {
+		// The encoder passes plain ASCII through, but a reader still decodes the encoded word in
+		// it, so the line holding it stays at 76 after plain words follow: 8 + 22 + 21 + 26 = 77.
+		subject := "=?UTF-8?q?caf=C3=A9?= " + strings.Repeat("a", 20) + " " + strings.Repeat("b", 25)
+		m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: subject, HtmlBody: "<p>hello</p>"})
+		assert.Equal(t, []string{
+			"Subject: =?UTF-8?q?caf=C3=A9?= " + strings.Repeat("a", 20),
+			" " + strings.Repeat("b", 25),
+		}, fieldLines(t, m, "Subject"))
+	})
+
+	t.Run("a run of spaces at a fold starts the continuation line", func(t *testing.T) {
+		// "Subject: " plus 68 bytes is 77, so the three spaces cannot end that line; moved whole
+		// onto the next, they leave no line of only whitespace and unfold to the same subject.
+		subject := strings.Repeat("a", 68) + "   b"
+		m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: subject, HtmlBody: "<p>hello</p>"})
+		assert.Equal(t, []string{"Subject: " + strings.Repeat("a", 68), "   b"}, fieldLines(t, m, "Subject"))
+		assert.Equal(t, subject, m.headers["Subject"])
+	})
+
+	t.Run("an encoded word that does not fit after the field name starts the next line", func(t *testing.T) {
+		m := send(t, "Goiabada", &SendEmailInput{
+			To:       fixtureRecipient,
+			Subject:  strings.Repeat("a", 50) + "é",
+			HtmlBody: "<p>hello</p>",
+		})
+		assert.Equal(t, []string{
+			"Subject:",
+			" =?UTF-8?q?" + strings.Repeat("a", 50) + "=C3=A9?=",
+		}, fieldLines(t, m, "Subject"))
 	})
 }
 
@@ -1063,7 +1451,7 @@ func TestSendEmail_FinalDataRejection(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1073,6 +1461,85 @@ func TestSendEmail_FinalDataRejection(t *testing.T) {
 	assert.Contains(t, err.Error(), "550", "the relay's own refusal is what reaches the log")
 	assertSendFailure(t, err, SendFailureMessageRefused)
 	assert.NotEmpty(t, f.data(), "the whole message arrived; only the verdict on it was a refusal")
+}
+
+// The Warn record a QUIT failure after an accepted message writes, as an operator searches for it.
+const quitFailedAfterAcceptance = "unable to end the smtp session after the server accepted the message"
+
+// TestSendEmail_AcceptedMessageSurvivesAFailedQuit holds RFC 5321 sections 4.1.1.4 and 6.1: once
+// the relay answers the end of the data with a 250, it has taken responsibility for the message, so
+// a QUIT that fails afterwards, the connection closed or reset instead of the 221, still reports the
+// send as done. Reporting it failed would invite a retry that delivers the message twice. The
+// failure is not dropped: it is one Warn record, with the error under `error`. The first row is the
+// same conversation with the 221 answered, and writes nothing.
+func TestSendEmail_AcceptedMessageSurvivesAFailedQuit(t *testing.T) {
+
+	tests := []struct {
+		name     string
+		breakOn  string
+		breakHow connectionBreak
+		wantWarn bool
+	}{
+		{name: "QUIT answered 221, delivers with nothing logged"},
+		{name: "the connection closed at QUIT, delivers and warns", breakOn: "QUIT", breakHow: breakClose, wantWarn: true},
+		{name: "the connection reset at QUIT, delivers and warns", breakOn: "QUIT", breakHow: breakReset, wantWarn: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			capture := logtest.CaptureSlog(t)
+
+			f := &fakeSMTP{ext: []string{"8BITMIME"}, breakOn: test.breakOn, breakHow: test.breakHow}
+			port := f.start(t)
+
+			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+
+			err := sendTo(t, &Sender{dataCipher: testDataCipher}, smtpConfig)
+			require.NoError(t, err, "the relay accepted the message, so the send succeeded")
+			assert.NotEmpty(t, f.data(), "the message reached the relay")
+			assert.True(t, f.hasLinePrefix("QUIT"), "the client still ends the session")
+
+			warns := recordsAt(capture, slog.LevelWarn)
+			if !test.wantWarn {
+				assert.Empty(t, warns)
+				return
+			}
+			require.Len(t, warns, 1, "one Warn record per accepted send whose QUIT failed")
+			assert.Equal(t, quitFailedAfterAcceptance, warns[0].Message)
+			assert.NotNil(t, warns[0].Attrs["error"], "the QUIT failure rides under error")
+		})
+	}
+}
+
+// TestSendEmail_ALostReplyToTheDataIsAFailure is the other side of the line the test above draws:
+// the relay took the whole message and closed the connection without answering its terminator. No
+// reply is no acceptance, RFC 5321 section 4.1.1.4, so the send fails as a broken connection, and the
+// failure is the send's own error, not a Warn record about QUIT.
+func TestSendEmail_ALostReplyToTheDataIsAFailure(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+
+	f := &fakeSMTP{ext: []string{"8BITMIME"}, dropAfterData: true}
+	port := f.start(t)
+
+	err := sendTo(t, &Sender{dataCipher: testDataCipher}, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to send SMTP message")
+	assertSendFailure(t, err, SendFailureConnection)
+	assert.NotEmpty(t, f.data(), "the whole message arrived; only the relay's verdict on it was lost")
+	assert.False(t, f.hasLinePrefix("QUIT"), "a session whose message was not accepted is not ended with QUIT")
+	assert.Empty(t, recordsAt(capture, slog.LevelWarn))
+}
+
+// recordsAt is every record capture holds at level.
+func recordsAt(capture *logtest.SlogCapture, level slog.Level) []logtest.CapturedRecord {
+	var records []logtest.CapturedRecord
+	for _, record := range capture.Records() {
+		if record.Level == level {
+			records = append(records, record)
+		}
+	}
+	return records
 }
 
 // TestSendEmail_MessageID holds decision 5: RFC 5322 section 3.6.4's SHOULD, and that a failed
@@ -1098,11 +1565,12 @@ func TestSendEmail_MessageID(t *testing.T) {
 			f := &fakeSMTP{ext: []string{"8BITMIME"}}
 			port := f.start(t)
 			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-			require.NoError(t, sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+			_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  fmt.Sprintf("Test email %d", i),
 				HtmlBody: "<p>hello</p>",
-			}))
+			})
+			require.NoError(t, err)
 			seen = append(seen, parseMessage(t, f.data()).headers["Message-ID"])
 		}
 
@@ -1117,7 +1585,7 @@ func TestSendEmail_MessageID(t *testing.T) {
 		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 		sender := &Sender{dataCipher: testDataCipher, randReader: iotest.ErrReader(io.ErrUnexpectedEOF)}
 
-		err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+		_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  "Test email",
 			HtmlBody: "<p>hello</p>",
@@ -1205,7 +1673,7 @@ func TestSendEmail_InvalidRecipient(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       "not an address",
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1216,8 +1684,8 @@ func TestSendEmail_InvalidRecipient(t *testing.T) {
 	assert.False(t, f.sawConnection(), "the address is parsed before the dial, so nothing should have connected")
 }
 
-// TestSendEmail_DialTimeout holds decision 7's other half: the connect carries its own bound,
-// separate from the conversation deadline below. The seam is handed a duration already in the past,
+// TestSendEmail_DialTimeout holds decision 7's first number: the connect carries its own bound,
+// separate from the read and write deadlines smtp_deadline_test.go holds. The seam is handed a duration already in the past,
 // so the dial cannot complete however quickly the fake would have accepted it, and the default it
 // stands in for is asserted alongside.
 func TestSendEmail_DialTimeout(t *testing.T) {
@@ -1229,7 +1697,7 @@ func TestSendEmail_DialTimeout(t *testing.T) {
 
 	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&Sender{dataCipher: testDataCipher, dialTimeout: -time.Second}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+	_, err := (&Sender{dataCipher: testDataCipher, dialTimeout: -time.Second}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1239,35 +1707,4 @@ func TestSendEmail_DialTimeout(t *testing.T) {
 	assertSendFailure(t, err, SendFailureConnection)
 	assert.Equal(t, ConnectionCauseTimedOut, ClassifyConnectionError(err))
 	assert.Empty(t, f.data(), "nothing may be delivered once the dial has timed out")
-}
-
-// TestSendEmail_ConversationTimeout holds decision 7: one deadline covers EHLO through QUIT, so a
-// relay that stops answering cannot hang the request that is sending the mail. The seam sets that
-// deadline to a second. The stopwatch starts before the send, which sets the deadline after its
-// dial, so a send that ends at its deadline cannot be timed at under the second. A sender that ignored the seam would
-// run to defaultConversationTimeout, which is the ceiling, so only a stall of most of that could
-// fail a correct send.
-func TestSendEmail_ConversationTimeout(t *testing.T) {
-
-	f := &fakeSMTP{ext: []string{"8BITMIME"}, stallAfterData: true}
-	port := f.start(t)
-
-	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-	sender := &Sender{dataCipher: testDataCipher, convTimeout: time.Second}
-
-	started := time.Now()
-	err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
-		To:       fixtureRecipient,
-		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
-	})
-	elapsed := time.Since(started)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to send SMTP message")
-	// A connection that stalls after the dial is a connection failure too, with the same cause.
-	assertSendFailure(t, err, SendFailureConnection)
-	assert.Equal(t, ConnectionCauseTimedOut, ClassifyConnectionError(err))
-	assert.GreaterOrEqual(t, elapsed, sender.convTimeout, "the send ended before its deadline")
-	assert.Less(t, elapsed, defaultConversationTimeout, "the send ran on the default rather than the second set")
 }

@@ -68,8 +68,10 @@ func parseAPIError(resp *http.Response, body []byte) *APIError {
 // operator names the CA through GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE (#525).
 func NewAuthServerClient(authServerBaseURL string, rootCAs *x509.CertPool, upstream *upstreammetrics.Recorder) *AuthServerClient {
 	// The transport is the default one carrying the configured roots, so the file's authorities
-	// are trusted beside the system roots rather than in their place (#525).
-	client := &http.Client{Timeout: generalAPITimeout}
+	// are trusted beside the system roots rather than in their place (#525). The client carries no
+	// timeout of its own: the executor gives each call its deadline, ten seconds for all but the
+	// three that send mail (#718 decision 8).
+	client := &http.Client{}
 	if rootCAs != nil {
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 		transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}

@@ -66,7 +66,7 @@ func (settingsSaveAPI) GetSettingsEmail(context.Context, string) (*api.SettingsE
 	panic("unexpected call to GetSettingsEmail")
 }
 
-func (settingsSaveAPI) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) error {
+func (settingsSaveAPI) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
 	panic("unexpected call to SendTestEmail")
 }
 

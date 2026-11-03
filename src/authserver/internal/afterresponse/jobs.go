@@ -9,8 +9,8 @@
 // never fails the change (#404 decision 11).
 //
 // At most maxInFlight jobs of each class run at once. Once the response goes first, one keep-alive
-// connection can hand over jobs as fast as it writes requests, each holding up to about 40 seconds
-// of SMTP and a database connection for its writes, and with the pool capped that backlog queues in
+// connection can hand over jobs as fast as it writes requests, each holding up to 40 seconds of
+// SMTP and a database connection for its writes, and with the pool capped that backlog queues in
 // front of every sign-in (#485, #394 decision 8). The budget is per class rather than one for all,
 // because two of the three callers are public forms and the third is the notice that tells a user
 // their address was changed: with one shared budget, whoever held a stolen session could fill it
@@ -118,7 +118,8 @@ func (j *Jobs) inFlightSamples() []metrics.Sample {
 // net/http cancels a request's context the moment its handler returns, which is exactly when a job
 // starts, and the values are what carry the request id onto every record and audit entry the job
 // writes. The job therefore has no time bound of its own; it owes one through the work it does,
-// as the mail sender's dial and conversation deadlines bound a send (#404 decision 8).
+// as the mail sender's limits bound a send: 10 seconds to connect, 20 for each read or write on
+// the connection, and 40 in all from the start of the connect (#404 decision 8, #718 decision 7).
 //
 // A job that panics is no request's, so the request's recovery middleware cannot reach it and the
 // panic would end the process. It is recovered here as one Error record on the request's id.

@@ -149,11 +149,23 @@ func HandleSettingsEmailPut(
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPUsernameTooLong, map[string]any{"max": smtpUsernameMaxLength}))
 			return
 		}
+		// NUL is the one character RFC 4616 section 2 excludes from PLAIN's credentials, and one
+		// nobody can see on screen, so each field answers its own code. The sender checks again
+		// before AUTH, for a row written some other way. Invalid UTF-8 cannot arrive here: the JSON
+		// decoder replaces it.
+		if strings.ContainsRune(req.SMTPUsername, 0) {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPUsernameInvalidCharacter, nil))
+			return
+		}
 		// An application bound, measured in bytes because len(string) counts bytes. No
 		// PLAIN or LOGIN provider credential is known to exceed it, and it must not shrink
 		// to the sender name's 60: SendGrid's SMTP password is its 69-character API key.
 		if len(req.SMTPPassword) > smtpPasswordMaxBytes {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPasswordTooLong, map[string]any{"max": smtpPasswordMaxBytes}))
+			return
+		}
+		if strings.ContainsRune(req.SMTPPassword, 0) {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPasswordInvalidCharacter, nil))
 			return
 		}
 		if inputvalidation.TextLength(req.SMTPFromName) > smtpFromNameMaxLength {
@@ -234,7 +246,7 @@ func HandleSettingsEmailPut(
 		// Apply updates, onto the row as stored when the save runs (#407)
 		smtpUsername := strings.TrimSpace(req.SMTPUsername)
 		smtpFromName := strings.TrimSpace(req.SMTPFromName)
-		smtpFromEmail := strings.ToLower(req.SMTPFromEmail)
+		smtpFromEmail := senderAddressForStorage(req.SMTPFromEmail)
 		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
 			stored.SMTPEnabled = true
 			stored.SMTPHost = smtpHost
@@ -256,6 +268,14 @@ func HandleSettingsEmailPut(
 
 		writeJSON(w, r, http.StatusOK, settingsEmailResponse(saved))
 	}
+}
+
+// senderAddressForStorage is the sender address as stored: the part before the @ as typed, since
+// SMTP implementations must treat it as case-sensitive, and the domain, which is not, lowercased
+// (RFC 5321 section 2.4). The address has passed the email validator, so it holds exactly one @.
+func senderAddressForStorage(address string) string {
+	localPart, domain, _ := strings.Cut(address, "@")
+	return localPart + "@" + strings.ToLower(domain)
 }
 
 // settingsEmailResponse is the email settings as the API answers them, the password only as
@@ -314,7 +334,8 @@ func HandleSettingsEmailSendTestPost(
 		// A failure answers the fixed message of its kind and the error goes to the log: the error
 		// carries addresses, operating-system strings and the server's own replies, and anyone who
 		// can point the host somewhere would read them back here (#410 decision 5).
-		if err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
+		result, err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
+		if err != nil {
 			slog.WarnContext(r.Context(), "unable to send the test email", "error", err)
 			writeLocalizedError(w, r, sendFailureMessage(err), "SEND_FAILED", http.StatusBadRequest)
 			return
@@ -325,7 +346,10 @@ func HandleSettingsEmailSendTestPost(
 			"to":             req.To,
 		})
 
-		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
+		// Whether the message went over TLS: STARTTLS if available sends in plaintext when the relay
+		// offers no STARTTLS or the upgrade to TLS fails, and this is where an administrator sees
+		// which (#718 decision 16).
+		writeJSON(w, r, http.StatusOK, api.SendTestEmailResponse{Success: true, Encrypted: result.Encrypted})
 	}
 }
 
@@ -383,6 +407,8 @@ func sendFailureMessage(err error) *i18n.LocalizedError {
 		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailNoAuthentication, nil)
 	case emaildelivery.SendFailureNoSupportedMechanism:
 		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailNoSupportedMechanism, nil)
+	case emaildelivery.SendFailureUnusablePlainCredentials:
+		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailPlainCredentialsUnusable, nil)
 	case emaildelivery.SendFailureTLS:
 		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailTLSFailed, nil)
 	case emaildelivery.SendFailureAuthenticationRejected:

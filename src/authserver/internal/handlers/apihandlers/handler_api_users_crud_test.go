@@ -440,7 +440,7 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	var sent *emaildelivery.SendEmailInput
 	emailSender.On("SendEmail", mock.Anything,
 		emaildelivery.SMTPConfig{Host: "smtp.example.com", FromName: "Acme"}, mock.Anything).
-		Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).Return(nil)
+		Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).Return(emaildelivery.SendResult{}, nil)
 
 	before := time.Now().UTC()
 	rr := httptest.NewRecorder()
@@ -515,7 +515,7 @@ func TestHandleUserCreatePost_ASetupEmailThatFailsToSendKeepsTheUserAndItsCode(t
 		"/emails/email_newuser_set_password.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(mock.Arguments) { require.NotNil(t, input, "the create must finish before the mail is sent") }).
-		Return(errs.New("the relay refused the message")).Once()
+		Return(emaildelivery.SendResult{}, errs.New("the relay refused the message")).Once()
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -820,7 +820,7 @@ func TestHandleUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 				pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 					"/emails/email_newuser_set_password.html", mock.Anything).
 					Return(&bytes.Buffer{}, nil)
-				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil)
 			}
 
 			rr := httptest.NewRecorder()

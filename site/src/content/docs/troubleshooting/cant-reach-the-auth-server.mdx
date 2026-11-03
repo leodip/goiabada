@@ -72,7 +72,7 @@ The sign-in can end on **Sign-in failed** after the password, when the browser r
 
 The hop from the admin console to the auth server carries the admin console's client secret and administrators' tokens. With an `http` internal URL it's plain HTTP, which is sound on a network you trust, such as a Docker Compose network or a cluster's pod network. When the network isn't trusted, use an `https` internal URL to the auth server's own HTTPS listener, whose certificate names the host the admin console calls.
 
-The admin console waits up to 10 seconds for each call to the auth server.
+The admin console waits up to 10 seconds for each call to the auth server, and up to 50 seconds for a test email, a new user's setup email and an email verification code.
 
 ## Next steps
 

@@ -25,8 +25,8 @@ func (*sendTestRefusedAPI) GetSettingsEmail(context.Context, string) (*api.Setti
 	panic("unexpected call to GetSettingsEmail")
 }
 
-func (a *sendTestRefusedAPI) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) error {
-	return a.sendErr
+func (a *sendTestRefusedAPI) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
+	return nil, a.sendErr
 }
 
 func (*sendTestRefusedAPI) UpdateSettingsEmail(context.Context, string, *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error) {

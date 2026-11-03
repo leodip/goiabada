@@ -92,11 +92,11 @@ func messageSet(messages []string) map[string]bool {
 }
 
 // The sets read above are the ones the handler tests pin answer by answer: four dial messages, and
-// eleven send messages, three of them a connection's cause. A census that came up short would make
+// twelve send messages, three of them a connection's cause. A census that came up short would make
 // the checks below pass over a document missing the rest.
 func TestSettingsEmailDocs_TheCensusReachesEveryMessage(t *testing.T) {
 	assert.Len(t, dialFailureMessages(), 4)
-	assert.Len(t, sendFailureMessages(), 11)
+	assert.Len(t, sendFailureMessages(), 12)
 }
 
 // openapi.yaml lists every message each failure can answer, in the 400 of its operation. What is

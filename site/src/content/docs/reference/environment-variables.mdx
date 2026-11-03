@@ -138,6 +138,12 @@ Each server can serve Prometheus metrics on a listener of its own, which answers
 | `GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS`<br/>Flag: `--adminconsole-listen-host-metrics`<br/>Default: `0.0.0.0`<br/>Read by: admin console | The address the admin console's metrics listener binds. |
 | `GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS`<br/>Flag: `--adminconsole-listen-port-metrics`<br/>Default: `9191`<br/>Read by: admin console | The admin console's metrics port. |
 
+### Email
+
+| Variable | What it does |
+|---|---|
+| `GOIABADA_AUTHSERVER_SMTP_EHLO_NAME`<br/>Flag: `--authserver-smtp-ehlo-name`<br/>Default: empty<br/>Read by: auth server | The name the auth server introduces itself by to your SMTP server: a domain, such as `mail.example.com`, or an address in brackets, such as `[192.0.2.10]` or `[IPv6:2001:db8::10]`. Empty, it's the auth server's own address on each connection. The SMTP server may record the name in headers that recipients see. Behind NAT or in a container that's a private address, and anyone can have a password reset or registration email sent to themselves to read it. Set a public name when that address mustn't be seen. |
+
 ### Customization
 
 | Variable | What it does |

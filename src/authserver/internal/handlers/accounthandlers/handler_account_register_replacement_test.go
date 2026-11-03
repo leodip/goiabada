@@ -122,7 +122,7 @@ func TestHandleRegisterPost_WithVerificationADeadRowIsReplacedWithAFreshLink(t *
 		Run(func(args mock.Arguments) {
 			sent = args.Get(2).(*emaildelivery.SendEmailInput)
 			order = append(order, "send")
-		}).Return(nil).Once()
+		}).Return(emaildelivery.SendResult{}, nil).Once()
 
 	h.handler.ServeHTTP(rr, req)
 	assert.Empty(t, order, "the row is replaced after the response")

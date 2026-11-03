@@ -456,7 +456,8 @@ func serveAndDrain(ctx context.Context, listeners []listener) error {
 
 // httpShutdownTimeout bounds how long in-flight requests get to finish. The auth server's value: a
 // console request in flight is waiting on auth server calls deadlined at 10s each (apiclient's
-// generalAPITimeout), and 15s lets the one under way finish.
+// generalAPITimeout), and 15s lets the one under way finish. The three calls that send mail wait
+// up to 50s (apiclient's mailSendingAPITimeout), so a shutdown can cut one of them short.
 const httpShutdownTimeout = 15 * time.Second
 
 // newHTTPServer builds one of Start's listeners, unstarted. The address comes from hostport.Join,
@@ -496,8 +497,9 @@ const (
 	// writeTimeout must outlast the body read plus the slowest handler, because a handler that runs
 	// past it leaves the client with no response at all, not an error. net/http starts it when the
 	// header block has been read. One console page chains several auth server calls, each deadlined
-	// at 10s (apiclient's generalAPITimeout), and some of them reach the auth server's
-	// mail-sending handlers. It is never shorter than readTimeout, or a body the read deadline
+	// at 10s (apiclient's generalAPITimeout), but for the three that make the auth server send
+	// mail, deadlined at 50s (apiclient's mailSendingAPITimeout) so a slow relay's failure comes
+	// back as its message. It is never shorter than readTimeout, or a body the read deadline
 	// admits would lose its response.
 	writeTimeout = 60 * time.Second
 

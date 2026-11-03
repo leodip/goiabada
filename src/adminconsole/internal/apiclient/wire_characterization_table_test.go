@@ -1054,11 +1054,16 @@ func wireCharacterization() []wireCase {
 		{
 			name: "SendTestEmail",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.SendTestEmail(ctx, charAccessToken, charSendTestEmail)
+				got, err := c.SendTestEmail(ctx, charAccessToken, charSendTestEmail)
+				if err != nil {
+					return nil, err
+				}
+				return *got, nil
 			},
 			verb: "POST", path: "/api/v1/admin/settings/email/send-test", contentType: charJSON,
 			bodyOf:        charSendTestEmail,
-			successStatus: 200, reply: `{}`,
+			successStatus: 200, reply: `{"success":true,"encrypted":true}`,
+			want: api.SendTestEmailResponse{Success: true, Encrypted: true},
 		},
 
 		// --- settings_general.go ----------------------------------------------------------

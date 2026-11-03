@@ -525,7 +525,7 @@ func HandleRegisterPost(
 				Subject:  i18n.T(emailReq.Context(), "email.register_confirmation.subject"),
 				HtmlBody: buf.String(),
 			}
-			emailErr = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
+			_, emailErr = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
 			if emailErr != nil {
 				pageRenderer.InternalServerError(w, r, emailErr)
 				return
@@ -757,7 +757,7 @@ func issueActivationLink(
 		Subject:  i18n.T(emailReq.Context(), "email.register_activate.subject"),
 		HtmlBody: buf.String(),
 	}
-	err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
+	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to send the activation email", "pre_registration_id", preRegistration.Id, "error", err)
 	}
@@ -792,7 +792,7 @@ func sendExistingAccountNotice(
 		Subject:  i18n.T(emailReq.Context(), "email.register_existing_account.subject"),
 		HtmlBody: buf.String(),
 	}
-	err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
+	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to send the existing account notice", "user_id", user.Id, "error", err)
 	}

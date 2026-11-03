@@ -23,7 +23,7 @@ func (*refusingSettingsApiClient) GetSettingsEmail(context.Context, string) (*ap
 	panic("unexpected call to GetSettingsEmail")
 }
 
-func (*refusingSettingsApiClient) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) error {
+func (*refusingSettingsApiClient) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
 	panic("unexpected call to SendTestEmail")
 }
 

@@ -186,10 +186,11 @@ key per cause, each a whole sentence.
 | `handler.settings_email.send_failed_timed_out` | (none) | Unable to send the test email: connection timed out. |
 | `handler.settings_email.send_failed_refused` | (none) | Unable to send the test email: connection refused. |
 | `handler.settings_email.send_failed` | (none) | Unable to send the test email. |
-| `handler.settings_email.starttls_not_offered` | (none) | The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS. |
-| `handler.settings_email.password_unencrypted` | (none) | The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS. |
+| `handler.settings_email.starttls_not_offered` | (none) | The SMTP server did not offer STARTTLS; check the port, or choose STARTTLS if available only if the server has no TLS. |
+| `handler.settings_email.password_unencrypted` | (none) | With STARTTLS if available, the password is sent only to a server on this machine; set the encryption to STARTTLS or SSL/TLS. |
 | `handler.settings_email.no_authentication` | (none) | SMTP credentials are configured but the server offers no authentication. |
 | `handler.settings_email.no_supported_mechanism` | (none) | The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5. |
+| `handler.settings_email.plain_credentials_unusable` | (none) | The SMTP username and password can't be used with the server's sign-in method: the password is empty, or one of them contains a null character. |
 | `handler.settings_email.tls_failed` | (none) | The TLS connection failed; check the encryption setting and the server's certificate. |
 | `handler.settings_email.authentication_rejected` | (none) | The SMTP server rejected the username or password. |
 | `handler.settings_email.message_refused` | (none) | The SMTP server refused the message. |
@@ -334,7 +335,9 @@ cause, each a whole sentence.
 | `handler.settings_email.smtp_port_out_of_range` | (none) | SMTP port must be between 1 and 65535. |
 | `handler.settings_email.smtp_encryption_invalid` | (none) | Invalid SMTP encryption. |
 | `handler.settings_email.smtp_username_too_long` | `max` (int) | The SMTP username can't be longer than {{.max}} characters. |
+| `handler.settings_email.smtp_username_invalid_character` | (none) | The SMTP username can't contain a null character. |
 | `handler.settings_email.smtp_password_too_long` | `max` (int) | SMTP password must be at most {{.max}} bytes. |
+| `handler.settings_email.smtp_password_invalid_character` | (none) | The SMTP password can't contain a null character. |
 | `handler.settings_email.smtp_from_name_too_long` | `max` (int) | The sender name can't be longer than {{.max}} characters. |
 | `handler.settings_email.smtp_from_email_too_long` | `max` (int) | The sender email can't be longer than {{.max}} characters. |
 | `handler.settings_email.smtp_password_and_clear` | (none) | Send either a new SMTP password or clearSmtpPassword, not both. |

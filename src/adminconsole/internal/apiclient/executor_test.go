@@ -11,6 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/noredirect"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
@@ -148,17 +149,148 @@ func TestExecutor_ARequestDeadlineStopsACallTheAuthServerNeverAnswers(t *testing
 // kind, so a request the auth server accepted and then stopped answering held an admin console
 // handler goroutine for as long as the connection stayed open.
 //
-// The deadline is read off the client rather than waited out: the case above already shows that a
-// deadline of this kind cuts a request the server never answers, and proving the same thing again
-// at the real value would cost the suite ten seconds of sleeping on every run, forever, to observe
-// a contract net/http already holds.
+// The deadline is read off rather than waited out: the case above already shows that a deadline
+// of this kind cuts a request the server never answers, and proving the same thing again at the
+// real value would cost the suite ten seconds of sleeping on every run, forever. The executor sets
+// it on each call rather than on the client (#718 decision 8); the mail-sending calls' longer one
+// and the 10 seconds every other call keeps are held by the two cases below.
 func TestNewAuthServerClient_CarriesADeadline(t *testing.T) {
-	client := NewAuthServerClient("http://auth.example.com", nil, nil)
+	assert.Equal(t, 10*time.Second, apiRequest{method: "GET"}.deadline(),
+		"every request this client makes is bounded, by decision 6's value, matching the three request-path clients already in the tree")
+}
 
-	assert.Equal(t, generalAPITimeout, client.httpClient.Timeout,
-		"every request this client makes is bounded")
-	assert.Equal(t, 10*time.Second, generalAPITimeout,
-		"decision 6's value, matching the three request-path clients already in the tree")
+// #718 decision 8. The three calls that make the auth server send mail during the request wait
+// 50 seconds: the test email, creating a user with a setup email, and sending an email
+// verification code. Every other call keeps the console's 10 seconds.
+//
+// The slow server answers each call 10.75 seconds after it arrives, a little past the general
+// deadline and far inside the long one. The cases run side by side, so the whole test waits that
+// long once. A mail-sending call gets the server's answer; every other call, creating a user who
+// is given a password among them, ends on its 10-second deadline before the answer comes.
+func TestExecutor_TheCallsThatSendMailOutlastTenSeconds(t *testing.T) {
+	const generalDeadline = 10 * time.Second
+	const answersAfter = generalDeadline + 750*time.Millisecond
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(answersAfter):
+		case <-r.Context().Done():
+			return
+		}
+		if r.URL.Path == "/api/v1/admin/users/create" {
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"user":{"id":7,"email":"new@example.com"}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewAuthServerClient(server.URL, nil, nil)
+
+	cases := []struct {
+		name      string
+		call      func(ctx context.Context) error
+		sendsMail bool
+	}{
+		{
+			name: "the test email",
+			call: func(ctx context.Context) error {
+				_, err := client.SendTestEmail(ctx, charAccessToken, &api.SendTestEmailRequest{To: "jane@example.com"})
+				return err
+			},
+			sendsMail: true,
+		},
+		{
+			name: "creating a user with a setup email",
+			call: func(ctx context.Context) error {
+				_, err := client.CreateUserAdmin(ctx, charAccessToken, &api.CreateUserAdminRequest{
+					Email:           "new@example.com",
+					SetPasswordType: api.SetPasswordTypeEmail,
+				})
+				return err
+			},
+			sendsMail: true,
+		},
+		{
+			name: "sending an email verification code",
+			call: func(ctx context.Context) error {
+				_, err := client.SendAccountEmailVerification(ctx, charAccessToken)
+				return err
+			},
+			sendsMail: true,
+		},
+		{
+			name: "creating a user with a password",
+			call: func(ctx context.Context) error {
+				_, err := client.CreateUserAdmin(ctx, charAccessToken, &api.CreateUserAdminRequest{
+					Email:           "new@example.com",
+					SetPasswordType: api.SetPasswordTypeNow,
+					Password:        "a-long-enough-password",
+				})
+				return err
+			},
+		},
+		{
+			name: "creating a user without a password type",
+			call: func(ctx context.Context) error {
+				_, err := client.CreateUserAdmin(ctx, charAccessToken, &api.CreateUserAdminRequest{
+					Email:    "new@example.com",
+					Password: "a-long-enough-password",
+				})
+				return err
+			},
+		},
+		{
+			name: "saving the email settings",
+			call: func(ctx context.Context) error {
+				_, err := client.UpdateSettingsEmail(ctx, charAccessToken, &api.UpdateSettingsEmailRequest{})
+				return err
+			},
+		},
+		{
+			name: "verifying the email address",
+			call: func(ctx context.Context) error {
+				_, err := client.VerifyAccountEmail(ctx, charAccessToken, &api.VerifyAccountEmailRequest{})
+				return err
+			},
+		},
+		{
+			name: "reading the general settings",
+			call: func(ctx context.Context) error {
+				_, err := client.GetSettingsGeneral(ctx, charAccessToken)
+				return err
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			started := time.Now()
+			err := tc.call(context.Background())
+			elapsed := time.Since(started)
+
+			if tc.sendsMail {
+				require.NoError(t, err, "a call that sends mail waits past 10 seconds for the answer")
+				assert.GreaterOrEqual(t, elapsed, answersAfter, "the answer came after the general deadline")
+				return
+			}
+			require.Error(t, err, "every other call ends on the general deadline")
+			require.ErrorIs(t, err, context.DeadlineExceeded, "a deadline, not another failure")
+			assert.GreaterOrEqual(t, elapsed, generalDeadline, "not before 10 seconds")
+			assert.Less(t, elapsed, answersAfter, "before the slow server answers")
+		})
+	}
+}
+
+// The long deadline is read off rather than waited out, as TestNewAuthServerClient_CarriesADeadline
+// reads the general one: the case above shows the mail-sending calls take it, and sleeping 50
+// seconds on every run would show nothing more.
+func TestExecutor_TheMailSendingDeadlineIsFiftySeconds(t *testing.T) {
+	assert.Equal(t, 50*time.Second, mailSendingAPITimeout,
+		"decision 8's value: longer than the sender's 40 seconds, shorter than the console's 60-second write timeout")
 }
 
 // Every call the executor makes is recorded under the admin_api target, whatever method made it,

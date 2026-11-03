@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"math"
 	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -61,6 +62,10 @@ type AuthServerConfig struct {
 	ListenHostMetrics          string
 	ListenPortMetrics          int
 	ProfilePictureMaxSizeBytes int64
+	// SMTPEHLOName is the name the auth server introduces itself to the SMTP relay by: a domain or
+	// an address literal, held to RFC 5321 by Load, or empty for the address of each connection's
+	// own end (#718 decision 9).
+	SMTPEHLOName string
 	// I18nOverridesDir is the directory whose catalogs/ main merges over the embedded message
 	// catalogs, or empty for none. It has no flag, like the admin console's, so the one variable
 	// configures both servers the same way (#431).
@@ -247,6 +252,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			ListenHostMetrics:                getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS", "0.0.0.0"),
 			ListenPortMetrics:                getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS", 9190, &malformed),
 			ProfilePictureMaxSizeBytes:       getEnvAsUploadSize("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", defaultProfilePictureMaxSizeBytes, &malformed),
+			SMTPEHLOName:                     getEnv("GOIABADA_AUTHSERVER_SMTP_EHLO_NAME", ""),
 			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 		},
 		AdminConsole: AdminConsoleConfig{
@@ -305,6 +311,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.BoolVar(&c.AuthServer.MetricsEnabled, "authserver-metrics-enabled", c.AuthServer.MetricsEnabled, "Serve Prometheus metrics on the auth server's metrics listener")
 	fs.StringVar(&c.AuthServer.ListenHostMetrics, "authserver-listen-host-metrics", c.AuthServer.ListenHostMetrics, "Auth server metrics host")
 	fs.IntVar(&c.AuthServer.ListenPortMetrics, "authserver-listen-port-metrics", c.AuthServer.ListenPortMetrics, "Auth server metrics port")
+	fs.StringVar(&c.AuthServer.SMTPEHLOName, "authserver-smtp-ehlo-name", c.AuthServer.SMTPEHLOName, "Name the auth server introduces itself to the SMTP server by: a domain, or an address literal such as [192.0.2.10]; empty is the address of its end of each connection")
 
 	// Admin console: the two values this process reads, and nothing else. A flag the binary
 	// cannot act on is a trap rather than a courtesy, because it reads as having configured
@@ -362,6 +369,11 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 		malformed.addLine("GOIABADA_AUTHSERVER_BASEURL (--authserver-baseurl) is " + strconv.Quote(c.AuthServer.BaseURL) +
 			", longer than the issuer allows: at most " + strconv.Itoa(issuerlength.Max) + " characters")
 	}
+
+	// The EHLO name is held to RFC 5321 on the value the parse left, whichever side supplied it, and
+	// before `migrate` as well, as every setting only the server reads: a name the relay cannot
+	// parse would otherwise surface as a failed send, mid-request (#718 decision 9).
+	checkSMTPEHLOName(c.AuthServer.SMTPEHLOName, &malformed)
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.
@@ -736,6 +748,161 @@ func cannotBeRead(err error) string {
 		reason = pathErr.Err.Error()
 	}
 	return reason
+}
+
+const smtpEHLONameSetting = "GOIABADA_AUTHSERVER_SMTP_EHLO_NAME (--authserver-smtp-ehlo-name) is "
+
+// checkSMTPEHLOName records a malformed EHLO name. Empty is the default and accepted. The rest is
+// RFC 5321's: a Domain (section 4.1.2) under RFC 1123 section 2.1's label rules, or an address
+// literal (section 4.1.3), `[IPv4]` or `[IPv6:address]` without a zone. A bare IP address and a
+// general address literal each get a line of their own, the first saying how to write it.
+func checkSMTPEHLOName(name string, malformed *malformedValues) {
+	if name == "" || isEHLODomain(name) || isEHLOAddressLiteral(name) {
+		return
+	}
+	if addr, err := netip.ParseAddr(name); err == nil {
+		malformed.addLine(smtpEHLONameSetting + strconv.Quote(name) +
+			", an IP address: write it in brackets, as " + addressLiteral(addr.WithZone("")))
+		return
+	}
+	if inner, ok := bracketed(name); ok {
+		// Grammatically a general literal tagged with the address's first group, but plainly an
+		// IPv6 address whose tag was left out.
+		if addr, err := netip.ParseAddr(inner); err == nil && addr.Is6() {
+			malformed.addLine(smtpEHLONameSetting + strconv.Quote(name) +
+				", an IPv6 address without its tag: write it as " + addressLiteral(addr.WithZone("")))
+			return
+		}
+	}
+	if isGeneralAddressLiteral(name) {
+		malformed.addLine(smtpEHLONameSetting + strconv.Quote(name) +
+			", a general address literal: no tag but IPv6 is registered, so write [192.0.2.10] or [IPv6:2001:db8::10]")
+		return
+	}
+	malformed.addLine(smtpEHLONameSetting + strconv.Quote(name) +
+		", not a domain such as mail.example.com or an address literal such as [192.0.2.10] or [IPv6:2001:db8::10]")
+}
+
+// addressLiteral writes addr as RFC 5321 section 4.1.3 does.
+func addressLiteral(addr netip.Addr) string {
+	if addr.Is4() {
+		return "[" + addr.String() + "]"
+	}
+	return "[IPv6:" + addr.String() + "]"
+}
+
+// isEHLODomain reports whether name is an RFC 5321 section 4.1.2 Domain whose labels follow RFC
+// 1123 section 2.1: at most 255 characters, each label 1 to 63 letters, digits and hyphens with a
+// letter or digit at each end, and the last label not all digits, so no dotted IPv4 address reads
+// as a domain. No trailing dot: the grammar has none.
+func isEHLODomain(name string) bool {
+	if len(name) > 255 {
+		return false
+	}
+	labels := strings.Split(name, ".")
+	for _, label := range labels {
+		if len(label) < 1 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+		for i := 0; i < len(label); i++ {
+			if !isLetDig(label[i]) && label[i] != '-' {
+				return false
+			}
+		}
+	}
+	return strings.Trim(labels[len(labels)-1], "0123456789") != ""
+}
+
+func isLetDig(b byte) bool {
+	return 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9'
+}
+
+// isEHLOAddressLiteral reports whether name is `[IPv4-address-literal]` or
+// `[IPv6:IPv6-addr]`, the tag matched in any case as ABNF strings are, and the address holding no
+// zone, which RFC 5321's grammar has no room for.
+func isEHLOAddressLiteral(name string) bool {
+	inner, ok := bracketed(name)
+	if !ok {
+		return false
+	}
+	if len(inner) > len("IPv6:") && strings.EqualFold(inner[:len("IPv6:")], "IPv6:") {
+		return isRFC5321IPv6(inner[len("IPv6:"):])
+	}
+	return isRFC5321IPv4(inner)
+}
+
+// isRFC5321IPv4 is IPv4-address-literal: four Snum, each one to three digits from 0 to 255.
+func isRFC5321IPv4(s string) bool {
+	parts := strings.Split(s, ".")
+	if len(parts) != 4 {
+		return false
+	}
+	for _, part := range parts {
+		if len(part) < 1 || len(part) > 3 || strings.Trim(part, "0123456789") != "" {
+			return false
+		}
+		if n, err := strconv.Atoi(part); err != nil || n > 255 {
+			return false
+		}
+	}
+	return true
+}
+
+// isRFC5321IPv6 is IPv6-addr: an IPv6 address netip reads, with no zone and not an IPv4 address,
+// and in its compressed forms no more than six groups beside the "::", an IPv4 tail counting as
+// two, which RFC 5321's IPv6-comp and IPv6v4-comp allow where RFC 4291 allows seven.
+func isRFC5321IPv6(s string) bool {
+	addr, err := netip.ParseAddr(s)
+	if err != nil || !addr.Is6() || addr.Zone() != "" {
+		return false
+	}
+	head, tail, compressed := strings.Cut(s, "::")
+	if !compressed {
+		return true
+	}
+	groups := 0
+	for _, side := range []string{head, tail} {
+		if side == "" {
+			continue
+		}
+		for _, group := range strings.Split(side, ":") {
+			if strings.Contains(group, ".") {
+				groups += 2
+			} else {
+				groups++
+			}
+		}
+	}
+	return groups <= 6
+}
+
+// bracketed is name without the square brackets around it, and whether it had them.
+func bracketed(name string) (string, bool) {
+	inner, ok := strings.CutPrefix(name, "[")
+	if !ok {
+		return "", false
+	}
+	return strings.CutSuffix(inner, "]")
+}
+
+// isGeneralAddressLiteral reports whether name is RFC 5321 section 4.1.3's
+// General-address-literal: `[tag:content]`, the tag an Ldh-str other than IPv6: letters, digits
+// and hyphens ending in a letter or digit.
+func isGeneralAddressLiteral(name string) bool {
+	inner, ok := bracketed(name)
+	if !ok {
+		return false
+	}
+	tag, content, found := strings.Cut(inner, ":")
+	if !found || content == "" || tag == "" || strings.EqualFold(tag, "IPv6") || tag[len(tag)-1] == '-' {
+		return false
+	}
+	for i := 0; i < len(tag); i++ {
+		if !isLetDig(tag[i]) && tag[i] != '-' {
+			return false
+		}
+	}
+	return true
 }
 
 // publishedSampleDataKeyHex is the AES data key this repository's hand-written Compose samples

@@ -71,7 +71,7 @@ func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing
 		PasswordEncrypted: []byte("ciphertext"),
 	}, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
 		return input.To == "admin@example.com" && input.Subject == "Test email"
-	})).Return(nil).Once()
+	})).Return(emaildelivery.SendResult{Encrypted: true}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventSentTestEmail, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
@@ -79,6 +79,34 @@ func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing
 		ServeHTTP(rr, sendTestEmailRequest(t, settings))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+}
+
+// A test send that succeeded answers whether its message went over TLS, as the sender reports it:
+// STARTTLS if available sends in plaintext when the relay offers no STARTTLS or the upgrade to TLS
+// fails, and the administrator has no other way to see which (#718 decision 16).
+func TestHandleSettingsEmailSendTestPost_AnswersWhetherTheMessageWentEncrypted(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		result emaildelivery.SendResult
+		want   string
+	}{
+		{"sent over TLS", emaildelivery.SendResult{Encrypted: true}, `{"success":true,"encrypted":true}`},
+		{"sent in plaintext", emaildelivery.SendResult{Encrypted: false}, `{"success":true,"encrypted":false}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(tc.result, nil).Once()
+			auditLogger.On("Log", mock.Anything, audit.EventSentTestEmail, mock.Anything).Return().Once()
+
+			rr := httptest.NewRecorder()
+			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
+				ServeHTTP(rr, sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true, SMTPEncryption: "none"}))
+
+			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			assert.JSONEq(t, tc.want, rr.Body.String())
+		})
+	}
 }
 
 // sendTestRequestId is the request id every failed test send case carries, as the request id
@@ -126,10 +154,10 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			"Unable to send the test email."},
 		{"STARTTLS not offered",
 			labelled(emaildelivery.SendFailureSTARTTLSNotOffered, serverText),
-			"The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS."},
+			"The SMTP server did not offer STARTTLS; check the port, or choose STARTTLS if available only if the server has no TLS."},
 		{"a password that would go unencrypted",
 			labelled(emaildelivery.SendFailureUnencryptedPassword, serverText),
-			"The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."},
+			"With STARTTLS if available, the password is sent only to a server on this machine; set the encryption to STARTTLS or SSL/TLS."},
 		{"credentials configured and no authentication offered",
 			labelled(emaildelivery.SendFailureNoAuthentication, serverText),
 			"SMTP credentials are configured but the server offers no authentication."},
@@ -138,6 +166,11 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			labelled(emaildelivery.SendFailureNoSupportedMechanism,
 				errs.New("the SMTP server offers none of PLAIN, LOGIN or CRAM-MD5 (offered: XOAUTH2 internal-banner.corp.example)")),
 			"The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."},
+		// The sender's error names nothing of the credentials, but the answer would not quote it
+		// if it did.
+		{"credentials PLAIN cannot carry",
+			labelled(emaildelivery.SendFailureUnusablePlainCredentials, serverText),
+			"The SMTP username and password can't be used with the server's sign-in method: the password is empty, or one of them contains a null character."},
 		// The TLS kind answers its own message even when the chain also reads as a refused
 		// connection: the kind decides, not the classification.
 		{"a failed TLS handshake",
@@ -162,7 +195,7 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			capture := logtest.CaptureSlog(t)
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(tc.err).Once()
+			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, tc.err).Once()
 
 			r := sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true})
 			r = r.WithContext(requestid.NewContext(r.Context(), sendTestRequestId))
@@ -417,6 +450,111 @@ func TestHandleSettingsEmailPut_TheSenderAddressAndUsernameTakeUpTo254Characters
 			assert.Equal(t, c.code, code)
 			assert.Equal(t, c.description, description)
 			assert.Nil(t, written)
+		})
+	}
+}
+
+// The sender address keeps the case of its part before the @, which SMTP implementations must treat
+// as case-sensitive, and its domain, which is not, is lowercased: Notify@Example.COM is stored as
+// Notify@example.com (RFC 5321 section 2.4). The answer reads back what was stored.
+func TestHandleSettingsEmailPut_TheSenderAddressKeepsTheCaseOfItsLocalPart(t *testing.T) {
+	cases := []struct {
+		name, sent, stored string
+	}{
+		{name: "mixed case on both sides of the @", sent: "Notify@Example.COM", stored: "Notify@example.com"},
+		{name: "an uppercase local part", sent: "NO.REPLY+Alerts@example.com", stored: "NO.REPLY+Alerts@example.com"},
+		{name: "an uppercase domain", sent: "noreply@MAIL.EXAMPLE.ORG", stored: "noreply@mail.example.org"},
+		{name: "all lowercase", sent: "noreply@example.com", stored: "noreply@example.com"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rr, written := serveEmailSave(t, emailSaveSettings(t, "127.0.0.1", false),
+				emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), map[string]interface{}{"smtpFromEmail": c.sent}))
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.NotNil(t, written)
+			assert.Equal(t, c.stored, written.SMTPFromEmail)
+			var body struct {
+				SMTPFromEmail string `json:"smtpFromEmail"`
+			}
+			require.NoError(t, json.NewDecoder(rr.Body).Decode(&body))
+			assert.Equal(t, c.stored, body.SMTPFromEmail, "the answer reads back the stored spelling")
+		})
+	}
+}
+
+// A null character in the username or in a new password is refused with a code of its own, so the
+// console marks the field holding a character nobody can see, and nothing is written. Only NUL is
+// refused, the one character RFC 4616 section 2 excludes from PLAIN's credentials; each refusal sits
+// beside the save it differs from by that one character. A username with no password, which the
+// send-time check refuses for PLAIN, stays a save, as does a password kept from the stored row.
+func TestHandleSettingsEmailPut_ANullCharacterInTheUsernameOrANewPasswordIsRefused(t *testing.T) {
+	saves := []struct {
+		name         string
+		withPassword bool
+		extra        map[string]interface{}
+	}{
+		{name: "a username and a new password", extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": "pass-word"}},
+		{name: "a username with no password", extra: map[string]interface{}{
+			"smtpUsername": "relay-user"}},
+		{name: "a username, the stored password kept", withPassword: true, extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": ""}},
+		{name: "a username with other control characters", extra: map[string]interface{}{
+			"smtpUsername": "relay\x01user\x7f", "smtpPassword": "pass\tword"}},
+	}
+	for _, c := range saves {
+		t.Run(c.name+" saves", func(t *testing.T) {
+			rr, written := serveEmailSave(t, emailSaveSettings(t, "127.0.0.1", c.withPassword),
+				emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), c.extra))
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.NotNil(t, written)
+		})
+	}
+
+	const (
+		usernameCode        = "handler.settings_email.smtp_username_invalid_character"
+		usernameDescription = "The SMTP username can't contain a null character."
+		passwordCode        = "handler.settings_email.smtp_password_invalid_character"
+		passwordDescription = "The SMTP password can't contain a null character."
+	)
+	refusals := []struct {
+		name              string
+		withPassword      bool
+		extra             map[string]interface{}
+		code, description string
+	}{
+		{name: "a NUL in the username", extra: map[string]interface{}{
+			"smtpUsername": "relay\x00user", "smtpPassword": "pass-word"},
+			code: usernameCode, description: usernameDescription},
+		{name: "a username that is a NUL", extra: map[string]interface{}{
+			"smtpUsername": "\x00"},
+			code: usernameCode, description: usernameDescription},
+		{name: "a NUL in the username, the stored password kept", withPassword: true, extra: map[string]interface{}{
+			"smtpUsername": "relay\x00user", "smtpPassword": ""},
+			code: usernameCode, description: usernameDescription},
+		{name: "a NUL in the new password", extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": "pass\x00word"},
+			code: passwordCode, description: passwordDescription},
+		{name: "a NUL ending the new password", extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": "pass-word\x00"},
+			code: passwordCode, description: passwordDescription},
+		{name: "a NUL in the new password replacing a stored one", withPassword: true, extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": "pass\x00word"},
+			code: passwordCode, description: passwordDescription},
+	}
+	for _, c := range refusals {
+		t.Run(c.name+" is refused", func(t *testing.T) {
+			rr, written := serveEmailSave(t, emailSaveSettings(t, "127.0.0.1", c.withPassword),
+				emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), c.extra))
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, c.code, code)
+			assert.Equal(t, c.description, description)
+			assert.Nil(t, written, "nothing is written")
 		})
 	}
 }

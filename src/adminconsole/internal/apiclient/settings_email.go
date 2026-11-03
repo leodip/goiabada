@@ -26,13 +26,14 @@ func (c *AuthServerClient) UpdateSettingsEmail(ctx context.Context, accessToken 
 	})
 }
 
-func (c *AuthServerClient) SendTestEmail(ctx context.Context, accessToken string, request *api.SendTestEmailRequest) error {
-	_, err := c.do(ctx, accessToken, apiRequest{
+// SendTestEmail answers whether the test email went over TLS.
+func (c *AuthServerClient) SendTestEmail(ctx context.Context, accessToken string, request *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
+	return execute[api.SendTestEmailResponse](ctx, c, accessToken, apiRequest{
 		method:        "POST",
 		url:           c.baseURL + "/api/v1/admin/settings/email/send-test",
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
+		sendsMail:     true,
 	})
-	return err
 }

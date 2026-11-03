@@ -15,7 +15,8 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// generalAPITimeout bounds every request the general AuthServerClient makes. Ten seconds,
+// generalAPITimeout bounds every request the general AuthServerClient makes but the three that
+// send mail, which take mailSendingAPITimeout. Ten seconds,
 // matching oauthclient.TokenExchangeTimeout, sessionbackend's httpBackendTimeout and
 // publicsettings.Client's clientTimeout: all four sit on the admin console's page-load path, where a handler
 // goroutine held open by an auth server that accepted the connection and then stopped answering
@@ -25,6 +26,15 @@ import (
 // It is a constant rather than a setting because the two processes are deployed together, so the
 // latency between them is not something an operator varies (#386 decision 7).
 const generalAPITimeout = 10 * time.Second
+
+// mailSendingAPITimeout bounds the three calls that make the auth server send mail during the
+// request: the test email, creating a user with a setup email, and sending an email verification
+// code (#718 decision 8). Fifty seconds outlasts the auth server's SMTP sender, which gives a send
+// at most 40, so a slow relay's failure reaches the administrator as the message naming it rather
+// than as the console giving up; and the console giving up would cancel the send, so a setup email
+// or a verification code to a slow relay would stop being sent at all. It stays under the
+// console's 60-second write timeout, so the page still gets its answer.
+const mailSendingAPITimeout = 50 * time.Second
 
 // maxAPIResponseBytes is the ceiling on any single admin API response body. 1 MiB, the same value
 // as oauthclient.MaxTokenResponseBytes and MaxSessionWireBytes, so the tree has one number of this
@@ -83,6 +93,19 @@ type apiRequest struct {
 	// The ceiling is unaffected: the overrun is decided by byte count, not by a read error, so it
 	// still holds on all three.
 	readErrorIsNotAnError bool
+
+	// sendsMail gives the call mailSendingAPITimeout instead of generalAPITimeout. Set on
+	// SendTestEmail, SendAccountEmailVerification, and CreateUserAdmin when the new user is sent a
+	// setup email, and on nothing else (#718 decision 8).
+	sendsMail bool
+}
+
+// deadline is how long the call may take, its answer read included.
+func (r apiRequest) deadline() time.Duration {
+	if r.sendsMail {
+		return mailSendingAPITimeout
+	}
+	return generalAPITimeout
 }
 
 // execute performs r and decodes the success body into a fresh T.
@@ -113,6 +136,11 @@ func (c *AuthServerClient) do(ctx context.Context, accessToken string, r apiRequ
 	case r.rawBody != nil:
 		payload = bytes.NewBuffer(r.rawBody)
 	}
+
+	// The deadline is the call's, not the client's, because the three calls that send mail wait
+	// longer than the rest. It covers the answer's read, which happens before do returns.
+	ctx, cancel := context.WithTimeout(ctx, r.deadline())
+	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, r.method, r.url, payload)
 	if err != nil {

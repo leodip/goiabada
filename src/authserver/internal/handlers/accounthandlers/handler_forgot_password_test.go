@@ -281,7 +281,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 			emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 587, FromEmail: "noreply@example.com"},
 			mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
 				return input.To == "existing@example.com" && input.Subject == "Password reset"
-			})).Return(nil)
+			})).Return(emaildelivery.SendResult{}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["outcome"] == "code_issued" && details["user_id"] == int64(1)
@@ -488,7 +488,7 @@ func TestHandleForgotPasswordPost_WritesTheEmailInTheRecipientsLanguage(t *testi
 			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
 					sent = args.Get(2).(*emaildelivery.SendEmailInput)
-				}).Return(nil).Once()
+				}).Return(emaildelivery.SendResult{}, nil).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.Anything).Return().Once()
 
 			jobs.runAll(t, afterresponse.ClassRecovery)
@@ -719,7 +719,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 			"/emails/email_forgot_password.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
 		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(mock.Arguments) { order = append(order, "send") }).Return(nil).Once()
+			Run(func(mock.Arguments) { order = append(order, "send") }).Return(emaildelivery.SendResult{}, nil).Once()
 		expectLinkSentPage(pageRenderer, rr, req)
 		var details map[string]interface{}
 		var auditCtx context.Context
@@ -767,7 +767,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 			mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
 		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 			"/emails/email_forgot_password.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
-		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError).Once()
+		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, assert.AnError).Once()
 		bound := expectLinkSentPage(pageRenderer, rr, req)
 		details := captureRequestedPasswordReset(auditLogger)
 

@@ -25,6 +25,13 @@ func assertSendFailure(t *testing.T, err error, want SendFailureKind) {
 
 func sendTo(t *testing.T, sender *Sender, smtpConfig SMTPConfig) error {
 	t.Helper()
+	_, err := sendReporting(t, sender, smtpConfig)
+	return err
+}
+
+// sendReporting is sendTo with what the sender reports about the send as well.
+func sendReporting(t *testing.T, sender *Sender, smtpConfig SMTPConfig) (SendResult, error) {
+	t.Helper()
 	return sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
@@ -111,7 +118,7 @@ func TestSendEmail_AFailedHelloIsAConnectionFailure(t *testing.T) {
 				f := &fakeSMTP{ext: []string{"STARTTLS", "AUTH PLAIN"}, breakOn: "EHLO", breakHow: brk.how}
 				port := f.start(t)
 
-				err := sendTo(t, &Sender{dataCipher: testDataCipher, convTimeout: brk.deadline},
+				err := sendTo(t, &Sender{dataCipher: testDataCipher, commandTimeout: brk.deadline},
 					relayConfig(t, "127.0.0.1", port, mode.encryption, mode.username, mode.password, "Goiabada"))
 
 				require.Error(t, err)
@@ -135,7 +142,7 @@ func TestSendEmail_AConnectionBrokenAtSTARTTLSIsAConnectionFailure(t *testing.T)
 			f := &fakeSMTP{ext: []string{"STARTTLS"}, breakOn: "STARTTLS", breakHow: brk.how}
 			port := f.start(t)
 
-			err := sendTo(t, &Sender{dataCipher: testDataCipher, convTimeout: brk.deadline},
+			err := sendTo(t, &Sender{dataCipher: testDataCipher, commandTimeout: brk.deadline},
 				relayConfig(t, "127.0.0.1", port, "starttls", "", "", "Goiabada"))
 
 			require.Error(t, err)
@@ -148,7 +155,7 @@ func TestSendEmail_AConnectionBrokenAtSTARTTLSIsAConnectionFailure(t *testing.T)
 }
 
 // connectionBreaks are the three ways the fake breaks a connection, each with the cause it is read
-// as: a close and a reset name none, a stall runs into the conversation deadline. Each runs under
+// as: a close and a reset name none, a stall runs into the read's deadline. Each runs under
 // its own deadline: the stall's is short so that the test reaches it, and the close's and reset's
 // long, so that a slow machine cannot turn either into a timeout before the break arrives.
 var connectionBreaks = []struct {

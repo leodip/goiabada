@@ -463,6 +463,22 @@ func TestSettingsEmailRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			portuguese: "O nome de usuário SMTP não pode ter mais de 254 caracteres.",
 		},
 		{
+			name:       "a null character in the SMTP username",
+			serve:      save(unchanged, map[string]any{"smtpUsername": "relay\x00user"}),
+			status:     http.StatusBadRequest,
+			code:       "handler.settings_email.smtp_username_invalid_character",
+			english:    "The SMTP username can't contain a null character.",
+			portuguese: "O nome de usuário SMTP não pode conter um caractere nulo.",
+		},
+		{
+			name:       "a null character in a new SMTP password",
+			serve:      save(unchanged, map[string]any{"smtpPassword": "pass\x00word"}),
+			status:     http.StatusBadRequest,
+			code:       "handler.settings_email.smtp_password_invalid_character",
+			english:    "The SMTP password can't contain a null character.",
+			portuguese: "A senha SMTP não pode conter um caractere nulo.",
+		},
+		{
 			name:       "an SMTP password past the bound",
 			serve:      save(unchanged, map[string]any{"smtpPassword": strings.Repeat("p", 257)}),
 			status:     http.StatusBadRequest,
@@ -539,7 +555,7 @@ func TestSettingsEmailSendFailures_AreInTheRequestsLanguage(t *testing.T) {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
-				Return(errs.WithStack(&emaildelivery.SendError{Kind: kind, Err: cause})).Once()
+				Return(emaildelivery.SendResult{}, errs.WithStack(&emaildelivery.SendError{Kind: kind, Err: cause})).Once()
 			r := sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true})
 			rr := httptest.NewRecorder()
 			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, handlersmocks.NewAuditLogger(t)).
@@ -570,17 +586,20 @@ func TestSettingsEmailSendFailures_AreInTheRequestsLanguage(t *testing.T) {
 			"Unable to send the test email.",
 			"Não foi possível enviar o e-mail de teste."),
 		sendFailed("STARTTLS not offered", emaildelivery.SendFailureSTARTTLSNotOffered, serverText,
-			"The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS.",
-			"O servidor SMTP não ofereceu STARTTLS; defina a criptografia como Nenhuma apenas se o servidor não tiver TLS."),
+			"The SMTP server did not offer STARTTLS; check the port, or choose STARTTLS if available only if the server has no TLS.",
+			"O servidor SMTP não ofereceu STARTTLS; verifique a porta ou escolha STARTTLS se disponível apenas se o servidor não tiver TLS."),
 		sendFailed("a password that would go unencrypted", emaildelivery.SendFailureUnencryptedPassword, serverText,
-			"The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS.",
-			"O servidor SMTP receberia a senha sem criptografia; defina a criptografia como STARTTLS ou SSL/TLS."),
+			"With STARTTLS if available, the password is sent only to a server on this machine; set the encryption to STARTTLS or SSL/TLS.",
+			"Com STARTTLS se disponível, a senha só é enviada a um servidor nesta máquina; defina a criptografia como STARTTLS ou SSL/TLS."),
 		sendFailed("credentials configured and no authentication offered", emaildelivery.SendFailureNoAuthentication, serverText,
 			"SMTP credentials are configured but the server offers no authentication.",
 			"Há credenciais SMTP configuradas, mas o servidor não oferece autenticação."),
 		sendFailed("no supported mechanism", emaildelivery.SendFailureNoSupportedMechanism, serverText,
 			"The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5.",
 			"O servidor SMTP não oferece nenhum de PLAIN, LOGIN ou CRAM-MD5."),
+		sendFailed("credentials PLAIN cannot carry", emaildelivery.SendFailureUnusablePlainCredentials, serverText,
+			"The SMTP username and password can't be used with the server's sign-in method: the password is empty, or one of them contains a null character.",
+			"O nome de usuário e a senha SMTP não podem ser usados com o método de acesso do servidor: a senha está vazia ou um deles contém um caractere nulo."),
 		sendFailed("a failed TLS handshake", emaildelivery.SendFailureTLS, serverText,
 			"The TLS connection failed; check the encryption setting and the server's certificate.",
 			"A conexão TLS falhou; verifique a configuração de criptografia e o certificado do servidor."),

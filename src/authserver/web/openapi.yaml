@@ -3209,6 +3209,15 @@ paths:
         an IPv6 literal, and without regard to case. A change of port, username, encryption or
         sender keeps the stored password.
 
+        A null character in `smtpUsername` is refused with 400
+        `handler.settings_email.smtp_username_invalid_character`, and one in a new `smtpPassword`
+        with 400 `handler.settings_email.smtp_password_invalid_character`; nothing is written.
+        PLAIN sign-in can't carry that character (RFC 4616). An empty password with a username is
+        accepted.
+
+        `smtpFromEmail` is stored with the part before the @ as sent and the domain lowercased, so
+        `Notify@Example.COM` is stored and answered as `Notify@example.com`.
+
         Once every other check has passed, a save with `smtpEnabled: true` opens a TCP
         connection to `smtpHost` on `smtpPort`, with a 3-second timeout. It only checks that
         something answers there: it does not speak SMTP, negotiate TLS or authenticate, which is what
@@ -3271,10 +3280,24 @@ paths:
         Send a short message to `to` through the stored SMTP settings, the stored password
         included, to check what a save's connection does not: the encryption, the certificate,
         the credentials and the sender. Answers 200 once the SMTP server has accepted the
-        message.
+        message, with `encrypted` saying whether it went over TLS.
 
-        The send waits up to 10 seconds to connect, including the TLS handshake for SSL/TLS,
-        and up to 30 seconds for the rest of the conversation.
+        With `smtpEncryption` set to `none`, STARTTLS if available, the message is encrypted
+        only when the SMTP server offers STARTTLS with a certificate the auth server trusts for
+        `smtpHost`, and is sent unencrypted otherwise. A server that refuses the STARTTLS
+        command gets the message unencrypted over the same connection. A STARTTLS command left
+        without a valid reply, because the connection broke or timed out or the reply was
+        malformed, or a failed TLS handshake or certificate check, closes the connection, and the
+        message goes unencrypted over a second one, within the same time limits. Each unencrypted
+        send writes an Info record to the auth server's log, "sending the email unencrypted",
+        whose `reason` is `starttls_not_offered`, `starttls_refused`, `starttls_failed` or
+        `tls_failed`.
+
+        The send waits up to 10 seconds to connect, including the TLS handshake for SSL/TLS.
+        After that, each step of the SMTP conversation fails if the SMTP server sends or takes
+        nothing for 20 seconds, and the whole send ends 40 seconds after it started connecting.
+        These limits are much shorter than the 2 to 10 minutes per command that RFC 5321 section
+        4.5.3.2 recommends, because the request waits for the send.
       operationId: sendTestEmail
       requestBody:
         required: true
@@ -3288,7 +3311,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: '#/components/schemas/SendTestEmailResponse'
         '400':
           description: |
             error_code is SMTP_NOT_ENABLED while SMTP is disabled, INVALID_REQUEST_BODY for a
@@ -3302,29 +3325,36 @@ paths:
               for a save.
             - "Unable to send the test email: connection timed out." Check the port and any
               firewall, as for a save. A server that accepted the connection and then went
-              quiet also ends here, which is what STARTTLS or None against an SSL/TLS port
-              such as 465 looks like.
+              quiet also ends here, which is what STARTTLS or STARTTLS if available against an
+              SSL/TLS port such as 465 looks like.
             - "Unable to send the test email: connection refused." Check the port.
-            - "The SMTP server did not offer STARTTLS; set the encryption to None only if the server has no TLS."
+            - "The SMTP server did not offer STARTTLS; check the port, or choose STARTTLS if available only if the server has no TLS."
               The encryption is STARTTLS and the server does not offer it. Goiabada does not
               continue unencrypted.
-            - "The SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS."
-              The encryption is None, a username is set, and the server would be sent the
-              password in the clear by PLAIN or LOGIN. Only a server on `localhost`,
-              `127.0.0.1` or `::1` is exempt.
+            - "With STARTTLS if available, the password is sent only to a server on this machine; set the encryption to STARTTLS or SSL/TLS."
+              The encryption is STARTTLS if available, a username is set, and the server
+              offers PLAIN or LOGIN, which send the password itself. That is refused before
+              any AUTH command whether or not the connection was upgraded to TLS. Only a
+              server on `localhost`, `127.0.0.1` or `::1` is exempt.
             - "SMTP credentials are configured but the server offers no authentication." A
               username is set and the server offers no AUTH: the wrong host or port, or a
-              server that offers authentication only after STARTTLS, reached with the
-              encryption set to None.
+              server that offers authentication only over TLS, reached with STARTTLS if
+              available when the TLS handshake failed.
             - "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5." The server offers only
               mechanisms Goiabada does not implement, such as XOAUTH2: use a password the
               server accepts through one of these three, often called an app password or an
               SMTP key.
+            - "The SMTP username and password can't be used with the server's sign-in method: the password is empty, or one of them contains a null character."
+              The server offers PLAIN, and the stored credentials are ones it can't carry: a
+              username is set and the password is empty, or the username or password holds a
+              null character or bytes that aren't valid UTF-8. Nothing is sent to the server.
+              Set a password, or retype the username and password.
             - "The TLS connection failed; check the encryption setting and the server's certificate."
               SSL/TLS against a port that expects STARTTLS, such as 587; a certificate the auth
               server does not trust, that has expired, or that names a host other than
               `smtpHost`; or a server that refused the STARTTLS command. Certificates are
-              always verified.
+              always verified. With STARTTLS if available, these send the message unencrypted
+              instead.
             - "The SMTP server rejected the username or password." Check the username and
               password.
             - "The SMTP server refused the message." The server refused the sender, the
@@ -7359,6 +7389,10 @@ components:
           type: string
         smtpEncryption:
           type: string
+          enum: ['', none, ssltls, starttls]
+          description: |
+            How the connection to the SMTP server is encrypted; see the request's `smtpEncryption`.
+            Empty, which a configuration never saved with email on can hold, is `none`.
         smtpFromName:
           type: string
         smtpFromEmail:
@@ -7386,13 +7420,15 @@ components:
           type: integer
         smtpUsername:
           type: string
+          description: |
+            At most 254 characters, without a null character. Surrounding space is trimmed.
         smtpPassword:
           type: string
           description: |
-            A new SMTP password, at most 256 bytes. The stored password is never returned, only
-            `hasSmtpPassword`, so an absent or empty value keeps the stored password; a non-empty
-            value replaces it. Sending one together with `clearSmtpPassword: true` is refused with
-            400 `VALIDATION_ERROR` and nothing is written.
+            A new SMTP password, at most 256 bytes, without a null character. The stored password
+            is never returned, only `hasSmtpPassword`, so an absent or empty value keeps the stored
+            password; a non-empty value replaces it. Sending one together with
+            `clearSmtpPassword: true` is refused with 400 `VALIDATION_ERROR` and nothing is written.
         clearSmtpPassword:
           type: boolean
           default: false
@@ -7402,10 +7438,28 @@ components:
             Ignored when `smtpEnabled` is false, which clears every SMTP field, the password included.
         smtpEncryption:
           type: string
+          description: |
+            How the connection to the SMTP server is encrypted. Certificates are always verified,
+            against `smtpHost`.
+
+            - `ssltls`, SSL/TLS: TLS from the start of the connection, usually on port 465.
+            - `starttls`, STARTTLS: a plaintext connection upgraded with the STARTTLS command,
+              usually on port 587. A server that does not offer STARTTLS, or whose TLS fails, gets
+              no message.
+            - `none`, STARTTLS if available: upgraded with STARTTLS when the server offers it with
+              a certificate the auth server trusts, and sent unencrypted otherwise. A password is
+              sent only to a server on `localhost`, `127.0.0.1` or `::1`, upgraded or not.
+
+            Empty or absent is `none`. Any other value is refused with 400
+            `handler.settings_email.smtp_encryption_invalid`. A save with `smtpEnabled: false`
+            ignores this field and stores `none`.
         smtpFromName:
           type: string
         smtpFromEmail:
           type: string
+          description: |
+            The sender address. It is stored with the part before the @ as sent and the domain
+            lowercased.
 
     SettingsTurnstileResponse:
       type: object
@@ -7460,6 +7514,22 @@ components:
         to:
           type: string
           format: email
+
+    SendTestEmailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        encrypted:
+          type: boolean
+          description: |
+            Whether the message went to the SMTP server over TLS. Always `true` for `ssltls` and
+            `starttls`. For `none`, STARTTLS if available, `true` when the upgrade through STARTTLS
+            succeeded, and `false` when the server didn't offer STARTTLS or the upgrade failed, so
+            the message was sent unencrypted; the auth server's log has the reason.
+      required:
+        - success
+        - encrypted
 
     SettingsSessionsResponse:
       type: object

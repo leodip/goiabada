@@ -53,20 +53,29 @@ func (_m *EmailSender) EXPECT() *EmailSender_Expecter {
 }
 
 // SendEmail provides a mock function for the type EmailSender
-func (_mock *EmailSender) SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error {
+func (_mock *EmailSender) SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) (emaildelivery.SendResult, error) {
 	ret := _mock.Called(ctx, smtpConfig, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SendEmail")
 	}
 
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, emaildelivery.SMTPConfig, *emaildelivery.SendEmailInput) error); ok {
+	var r0 emaildelivery.SendResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, emaildelivery.SMTPConfig, *emaildelivery.SendEmailInput) (emaildelivery.SendResult, error)); ok {
+		return returnFunc(ctx, smtpConfig, input)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, emaildelivery.SMTPConfig, *emaildelivery.SendEmailInput) emaildelivery.SendResult); ok {
 		r0 = returnFunc(ctx, smtpConfig, input)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(emaildelivery.SendResult)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(context.Context, emaildelivery.SMTPConfig, *emaildelivery.SendEmailInput) error); ok {
+		r1 = returnFunc(ctx, smtpConfig, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // EmailSender_SendEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendEmail'
@@ -105,12 +114,12 @@ func (_c *EmailSender_SendEmail_Call) Run(run func(ctx context.Context, smtpConf
 	return _c
 }
 
-func (_c *EmailSender_SendEmail_Call) Return(err error) *EmailSender_SendEmail_Call {
-	_c.Call.Return(err)
+func (_c *EmailSender_SendEmail_Call) Return(sendResult emaildelivery.SendResult, err error) *EmailSender_SendEmail_Call {
+	_c.Call.Return(sendResult, err)
 	return _c
 }
 
-func (_c *EmailSender_SendEmail_Call) RunAndReturn(run func(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error) *EmailSender_SendEmail_Call {
+func (_c *EmailSender_SendEmail_Call) RunAndReturn(run func(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) (emaildelivery.SendResult, error)) *EmailSender_SendEmail_Call {
 	_c.Call.Return(run)
 	return _c
 }
