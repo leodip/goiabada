@@ -148,6 +148,7 @@ func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *Se
 const (
 	unencryptedReasonSTARTTLSNotOffered = "starttls_not_offered"
 	unencryptedReasonSTARTTLSRefused    = "starttls_refused"
+	unencryptedReasonSTARTTLSFailed     = "starttls_failed"
 	unencryptedReasonTLSFailed          = "tls_failed"
 )
 
@@ -262,14 +263,19 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 			// The relay answered STARTTLS with a refusal and the connection is still in
 			// plaintext, so the send carries on over it.
 			logSentUnencrypted(ctx, unencryptedReasonSTARTTLSRefused, upgradeErr)
-		case upgradeHandshakeFailed:
-			// The connection is part-way into a TLS session that did not hold, so nothing more
-			// can be said over it: the send reconnects once and does not try STARTTLS again,
-			// within the same budget. A caller who has given up is not reconnected for.
+		case upgradeCommandFailed, upgradeHandshakeFailed:
+			// The connection lost its STARTTLS command's reply, or is part-way into a TLS
+			// session that did not hold, so nothing more can be said over it: the send reconnects
+			// once and does not try STARTTLS again, within the same budget. A caller who has
+			// given up is not reconnected for.
 			if ctx.Err() != nil {
 				return SendResult{}, tlsFailure(errs.Wrap(upgradeErr, "unable to send SMTP message"))
 			}
-			logSentUnencrypted(ctx, unencryptedReasonTLSFailed, upgradeErr)
+			reason := unencryptedReasonTLSFailed
+			if upgrade == upgradeCommandFailed {
+				reason = unencryptedReasonSTARTTLSFailed
+			}
+			logSentUnencrypted(ctx, reason, upgradeErr)
 			closeConnection()
 			reconnected, closeReconnected, reconnectErr := e.connect(ctx, dial)
 			if reconnectErr != nil {
@@ -390,13 +396,18 @@ func (e *Sender) connect(ctx context.Context, dial relayDial) (*smtp.Client, fun
 type upgradeOutcome int
 
 const (
-	// upgradeBroke is a connection that failed outside the handshake, which ends the send.
+	// upgradeBroke is a TLS session whose handshake completed and that then failed, which ends the
+	// send.
 	upgradeBroke upgradeOutcome = iota
 	upgraded
 	upgradeNotOffered
 	// upgradeRefused is a STARTTLS command the relay answered with a refusal, leaving the
 	// connection in plaintext and usable.
 	upgradeRefused
+	// upgradeCommandFailed is a STARTTLS command with no usable reply: the connection closed,
+	// reset or stalled on it, or the relay answered with a line that is no SMTP reply. No TLS was
+	// attempted, but nothing more can be said over a connection in an unknown state.
+	upgradeCommandFailed
 	// upgradeHandshakeFailed is a TLS handshake that did not complete, a certificate or host name
 	// that did not verify included, leaving a connection nothing more can be said over.
 	upgradeHandshakeFailed
@@ -415,16 +426,21 @@ func startTLSIfAvailable(client *smtp.Client, tlsConfig *tls.Config) (upgradeOut
 	}
 	// net/smtp starts the TLS client only once the relay has answered STARTTLS with its 220, and
 	// the handshake then runs under the EHLO it repeats. So no TLS state is a STARTTLS command that
-	// failed, and TLS state without a completed handshake is the handshake failing, however it
-	// failed: a certificate, an alert, a stall, or a relay closing on a ClientHello it cannot take.
-	// Each of those works in plaintext today, so each falls back. A completed handshake whose EHLO
-	// then failed is an encrypted session that broke, which falls back to nothing.
+	// failed: refused with a reply, or lost to a connection that closed, reset or stalled, or to a
+	// line that is no reply. TLS state without a completed handshake is the handshake failing,
+	// however it failed: a certificate, an alert, a stall, or a relay closing on a ClientHello it
+	// cannot take. Each of those works in plaintext today, so each falls back; stripping STARTTLS
+	// from the EHLO reply already forces plaintext, so a lost command gives an attacker nothing
+	// more. A completed handshake whose EHLO then failed is an encrypted session that broke, which
+	// falls back to nothing.
 	state, tlsStarted := client.TLSConnectionState()
 	var reply *textproto.Error
 	switch {
 	case !tlsStarted && errors.As(err, &reply):
 		return upgradeRefused, err
-	case tlsStarted && !state.HandshakeComplete:
+	case !tlsStarted:
+		return upgradeCommandFailed, err
+	case !state.HandshakeComplete:
 		return upgradeHandshakeFailed, err
 	default:
 		return upgradeBroke, err

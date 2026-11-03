@@ -3285,11 +3285,13 @@ paths:
         With `smtpEncryption` set to `none`, STARTTLS if available, the message is encrypted
         only when the SMTP server offers STARTTLS with a certificate the auth server trusts for
         `smtpHost`, and is sent unencrypted otherwise. A server that refuses the STARTTLS
-        command gets the message unencrypted over the same connection. A failed TLS handshake
-        or certificate check closes the connection, and the message goes unencrypted over a
-        second one, within the same time limits. Each unencrypted send writes an Info record to
-        the auth server's log, "sending the email unencrypted", whose `reason` is
-        `starttls_not_offered`, `starttls_refused` or `tls_failed`.
+        command gets the message unencrypted over the same connection. A STARTTLS command left
+        without a valid reply, because the connection broke or timed out or the reply was
+        malformed, or a failed TLS handshake or certificate check, closes the connection, and the
+        message goes unencrypted over a second one, within the same time limits. Each unencrypted
+        send writes an Info record to the auth server's log, "sending the email unencrypted",
+        whose `reason` is `starttls_not_offered`, `starttls_refused`, `starttls_failed` or
+        `tls_failed`.
 
         The send waits up to 10 seconds to connect, including the TLS handshake for SSL/TLS.
         After that, each step of the SMTP conversation fails if the SMTP server sends or takes

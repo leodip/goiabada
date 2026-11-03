@@ -76,6 +76,9 @@ type fakeSMTP struct {
 	// refuseSTARTTLS answers a STARTTLS the EHLO reply offered with RFC 3207 section 4's 454, TLS not
 	// available due to a temporary reason, and carries on in plaintext.
 	refuseSTARTTLS bool
+	// garbleSTARTTLS answers a STARTTLS the EHLO reply offered with a line that is no SMTP reply,
+	// having no reply code, and then waits for the client's next line.
+	garbleSTARTTLS bool
 	// stallHandshake answers STARTTLS with its 220 and then reads nothing, so the client's handshake
 	// waits on the server's reply until its own deadline.
 	stallHandshake bool
@@ -291,6 +294,10 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 			}
 			if f.refuseSTARTTLS {
 				say("454 4.7.0 TLS not available due to temporary reason")
+				continue
+			}
+			if f.garbleSTARTTLS {
+				say("ready to start TLS")
 				continue
 			}
 			say("220 ready to start TLS")

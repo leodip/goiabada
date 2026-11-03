@@ -15,9 +15,10 @@ import (
 // The rows below hold #718 decision 14: the `none` mode, STARTTLS if available, upgrades through
 // STARTTLS when the relay offers it, with the certificate and host name verified as the STARTTLS
 // mode verifies them, and otherwise sends in plaintext. A refused STARTTLS command carries on over
-// the same connection; a handshake or certificate check that fails reconnects once and sends
-// without trying STARTTLS, within the send's budget. Every plaintext send writes one Info record
-// with its reason (RFC 8314 section 5.2's "most secure means available").
+// the same connection; a STARTTLS command with no usable reply, or a handshake or certificate check
+// that fails, reconnects once and sends without trying STARTTLS, within the send's budget. Every
+// plaintext send writes one Info record with its reason (RFC 8314 section 5.2's "most secure means
+// available").
 
 // sentUnencrypted is the Info record a plaintext send under STARTTLS if available writes, as an
 // operator searches for it.
@@ -27,6 +28,7 @@ const sentUnencrypted = "sending the email unencrypted"
 const (
 	reasonSTARTTLSNotOffered = "starttls_not_offered"
 	reasonSTARTTLSRefused    = "starttls_refused"
+	reasonSTARTTLSFailed     = "starttls_failed"
 	reasonTLSFailed          = "tls_failed"
 )
 
@@ -59,21 +61,27 @@ func TestSendEmail_STARTTLSIfAvailable(t *testing.T) {
 	// verify.
 	untrusted := newFakeCert(t)
 
-	tests := []struct {
+	type row struct {
 		name           string
 		host           string
 		ext            []string
 		tlsExt         []string
 		refuseSTARTTLS bool
+		garbleSTARTTLS bool
+		// breakHow, when breakSTARTTLS is set, is how the first connection breaks at STARTTLS.
+		breakSTARTTLS  bool
+		breakHow       connectionBreak
+		commandTimeout time.Duration
 		trusted        bool
 
 		wantEncrypted   bool
 		wantConnections int
 		// wantReason is the reason of the one Info record a plaintext send writes; empty, none.
 		wantReason string
-		// wantErrorIn is text the Info record's error carries.
+		// wantErrorIn is text the Info record's error carries; empty, any text.
 		wantErrorIn string
-	}{
+	}
+	tests := []row{
 		{
 			name:            "STARTTLS offered with a trusted certificate: upgraded",
 			host:            "127.0.0.1",
@@ -123,20 +131,53 @@ func TestSendEmail_STARTTLSIfAvailable(t *testing.T) {
 			wantReason:      reasonTLSFailed,
 			wantErrorIn:     "localhost",
 		},
+		{
+			name:            "STARTTLS answered with no reply code: plaintext over a second connection",
+			host:            "127.0.0.1",
+			ext:             []string{"STARTTLS", "8BITMIME"},
+			tlsExt:          []string{"8BITMIME"},
+			garbleSTARTTLS:  true,
+			trusted:         true,
+			wantConnections: 2,
+			wantReason:      reasonSTARTTLSFailed,
+			wantErrorIn:     "short response",
+		},
+	}
+	// A STARTTLS command whose connection breaks before any reply leaves nothing more to say over
+	// it, so the send reconnects, as for a failed handshake. A reset reads as a reset or as an EOF,
+	// depending on when it arrives, so its row names no text.
+	breakErrorIn := map[connectionBreak]string{breakClose: "EOF", breakStall: "i/o timeout"}
+	for _, brk := range connectionBreaks {
+		tests = append(tests, row{
+			name:            "a connection " + brk.name + " at STARTTLS: plaintext over a second connection",
+			host:            "127.0.0.1",
+			ext:             []string{"STARTTLS", "8BITMIME"},
+			tlsExt:          []string{"8BITMIME"},
+			breakSTARTTLS:   true,
+			breakHow:        brk.how,
+			commandTimeout:  brk.deadline,
+			trusted:         true,
+			wantConnections: 2,
+			wantReason:      reasonSTARTTLSFailed,
+			wantErrorIn:     breakErrorIn[brk.how],
+		})
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			capture := logtest.CaptureSlog(t)
 
-			f := &fakeSMTP{ext: test.ext, tlsExt: test.tlsExt, refuseSTARTTLS: test.refuseSTARTTLS, cert: cert}
+			f := &fakeSMTP{ext: test.ext, tlsExt: test.tlsExt, refuseSTARTTLS: test.refuseSTARTTLS, garbleSTARTTLS: test.garbleSTARTTLS, cert: cert}
+			if test.breakSTARTTLS {
+				f.breakOn, f.breakHow = "STARTTLS", test.breakHow
+			}
 			port := f.start(t)
 
 			pool := untrusted.pool
 			if test.trusted {
 				pool = cert.pool
 			}
-			sender := &Sender{dataCipher: testDataCipher, rootCAs: pool}
+			sender := &Sender{dataCipher: testDataCipher, rootCAs: pool, commandTimeout: test.commandTimeout}
 
 			result, err := sendReporting(t, sender, relayConfig(t, test.host, port, "none", "", "", "Goiabada"))
 			require.NoError(t, err, "STARTTLS if available sends whether or not TLS held")
@@ -167,7 +208,7 @@ func TestSendEmail_STARTTLSIfAvailable(t *testing.T) {
 			require.Len(t, infos, 1, "one Info record per plaintext send")
 			assert.Equal(t, sentUnencrypted, infos[0].Message)
 			assert.Equal(t, test.wantReason, infos[0].Attrs["reason"])
-			if test.wantErrorIn == "" {
+			if test.wantReason == reasonSTARTTLSNotOffered {
 				assert.NotContains(t, infos[0].Attrs, "error", "a relay offering no STARTTLS has no error to give")
 				return
 			}
@@ -205,56 +246,77 @@ func TestSendEmail_AStalledSTARTTLSHandshakeFallsBackWithinTheBudget(t *testing.
 	assert.Equal(t, reasonTLSFailed, infos[0].Attrs["reason"])
 }
 
-// The reconnect has no budget of its own: it runs within the send's, which runs from the first
-// connect. A handshake that stalls until the budget is spent leaves nothing for a second connection,
-// so the send fails as timed out without making one.
-func TestSendEmail_AFallbackReconnectHasNoBudgetOfItsOwn(t *testing.T) {
-
-	f := &fakeSMTP{ext: []string{"STARTTLS", "8BITMIME"}, tlsExt: []string{"8BITMIME"}, stallHandshake: true}
-	port := f.start(t)
-
-	sender := &Sender{dataCipher: testDataCipher, rootCAs: f.cert.pool, commandTimeout: 300 * time.Millisecond, sendTimeout: 300 * time.Millisecond}
-
-	started := time.Now()
-	err := sendTo(t, sender, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"))
-	elapsed := time.Since(started)
-
-	require.Error(t, err)
-	assertSendFailure(t, err, SendFailureConnection)
-	assert.Equal(t, ConnectionCauseTimedOut, ClassifyConnectionError(err))
-	assert.Equal(t, 1, f.connections(), "a spent budget makes no second connection")
-	assert.Empty(t, f.data())
-	assert.GreaterOrEqual(t, elapsed, sender.sendTimeout, "the send ended before its budget")
-	assert.Less(t, elapsed, 3*sender.sendTimeout, "the send ran well past its budget")
+// stalledUpgrades are the two places STARTTLS if available's upgrade can stall, each falling back
+// the same way: the STARTTLS command's reply, and the handshake after it.
+var stalledUpgrades = []struct {
+	name string
+	fake func() *fakeSMTP
+}{
+	{"STARTTLS command", func() *fakeSMTP {
+		return &fakeSMTP{ext: []string{"STARTTLS", "8BITMIME"}, tlsExt: []string{"8BITMIME"}, breakOn: "STARTTLS", breakHow: breakStall}
+	}},
+	{"handshake", func() *fakeSMTP {
+		return &fakeSMTP{ext: []string{"STARTTLS", "8BITMIME"}, tlsExt: []string{"8BITMIME"}, stallHandshake: true}
+	}},
 }
 
-// A caller who gives up during the handshake ends the send there: there is no reconnect, and no
+// The reconnect has no budget of its own: it runs within the send's, which runs from the first
+// connect. An upgrade that stalls until the budget is spent leaves nothing for a second connection,
+// so the send fails as timed out without making one.
+func TestSendEmail_AFallbackReconnectHasNoBudgetOfItsOwn(t *testing.T) {
+	for _, stall := range stalledUpgrades {
+		t.Run(stall.name, func(t *testing.T) {
+			f := stall.fake()
+			port := f.start(t)
+
+			sender := &Sender{dataCipher: testDataCipher, rootCAs: f.cert.pool, commandTimeout: 300 * time.Millisecond, sendTimeout: 300 * time.Millisecond}
+
+			started := time.Now()
+			err := sendTo(t, sender, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"))
+			elapsed := time.Since(started)
+
+			require.Error(t, err)
+			assertSendFailure(t, err, SendFailureConnection)
+			assert.Equal(t, ConnectionCauseTimedOut, ClassifyConnectionError(err))
+			assert.Equal(t, 1, f.connections(), "a spent budget makes no second connection")
+			assert.Empty(t, f.data())
+			assert.GreaterOrEqual(t, elapsed, sender.sendTimeout, "the send ended before its budget")
+			assert.Less(t, elapsed, 3*sender.sendTimeout, "the send ran well past its budget")
+		})
+	}
+}
+
+// A caller who gives up during the upgrade ends the send there: there is no reconnect, and no
 // record of a plaintext send that never happened.
 func TestSendEmail_ACancelledCallerIsNotFallenBackFor(t *testing.T) {
-	capture := logtest.CaptureSlog(t)
+	for _, stall := range stalledUpgrades {
+		t.Run(stall.name, func(t *testing.T) {
+			capture := logtest.CaptureSlog(t)
 
-	f := &fakeSMTP{ext: []string{"STARTTLS", "8BITMIME"}, tlsExt: []string{"8BITMIME"}, stallHandshake: true}
-	port := f.start(t)
+			f := stall.fake()
+			port := f.start(t)
 
-	sender := &Sender{dataCipher: testDataCipher, rootCAs: f.cert.pool, commandTimeout: 5 * time.Second, sendTimeout: 5 * time.Second}
-	const cancelAfter = 200 * time.Millisecond
+			sender := &Sender{dataCipher: testDataCipher, rootCAs: f.cert.pool, commandTimeout: 5 * time.Second, sendTimeout: 5 * time.Second}
+			const cancelAfter = 200 * time.Millisecond
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	time.AfterFunc(cancelAfter, cancel)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			time.AfterFunc(cancelAfter, cancel)
 
-	started := time.Now()
-	_, err := sender.SendEmail(ctx, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
-		To:       fixtureRecipient,
-		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
-	})
-	elapsed := time.Since(started)
+			started := time.Now()
+			_, err := sender.SendEmail(ctx, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
+				To:       fixtureRecipient,
+				Subject:  "Test email",
+				HtmlBody: "<p>hello</p>",
+			})
+			elapsed := time.Since(started)
 
-	require.Error(t, err)
-	require.ErrorIs(t, err, context.Canceled, "the caller's cancellation is not on the chain")
-	assert.Equal(t, 1, f.connections(), "a cancelled send makes no second connection")
-	assert.Empty(t, f.data())
-	assert.Less(t, elapsed, sender.commandTimeout, "a deadline ended the send, not the caller")
-	assert.Empty(t, recordsAt(capture, slog.LevelInfo), "nothing was sent unencrypted")
+			require.Error(t, err)
+			require.ErrorIs(t, err, context.Canceled, "the caller's cancellation is not on the chain")
+			assert.Equal(t, 1, f.connections(), "a cancelled send makes no second connection")
+			assert.Empty(t, f.data())
+			assert.Less(t, elapsed, sender.commandTimeout, "a deadline ended the send, not the caller")
+			assert.Empty(t, recordsAt(capture, slog.LevelInfo), "nothing was sent unencrypted")
+		})
+	}
 }
