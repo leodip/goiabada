@@ -334,6 +334,89 @@ func TestAPISettingsEmailPut_TheSenderAddressAndUsernameTakeUpTo254Characters(t 
 	}
 }
 
+// PUT: the sender address is stored with the part before the @ as sent and the domain lowercased,
+// and the GET reads that spelling back (RFC 5321 section 2.4).
+func TestAPISettingsEmailPut_TheSenderAddressKeepsTheCaseOfItsLocalPart(t *testing.T) {
+	restoreSettings(t)
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
+
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
+		SMTPEnabled:    true,
+		SMTPHost:       "mailpit",
+		SMTPPort:       1025,
+		SMTPEncryption: "none",
+		SMTPFromName:   "Goiabada",
+		SMTPFromEmail:  "Notify@Example.COM",
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body api.SettingsEmailResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, "Notify@example.com", body.SMTPFromEmail)
+
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	assert.Equal(t, "Notify@example.com", settings.SMTPFromEmail, "stored with its local part's case")
+
+	getResp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer func() { _ = getResp.Body.Close() }()
+	require.Equal(t, http.StatusOK, getResp.StatusCode)
+	var read api.SettingsEmailResponse
+	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&read))
+	assert.Equal(t, "Notify@example.com", read.SMTPFromEmail)
+}
+
+// PUT: a null character in the username or in a new password is refused with a code of its own and
+// writes nothing: the row keeps the username and the password the last save stored.
+func TestAPISettingsEmailPut_ANullCharacterInTheUsernameOrPasswordIsRefused(t *testing.T) {
+	restoreSettings(t)
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
+	save := func(username, password string) *http.Response {
+		return makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
+			SMTPEnabled:    true,
+			SMTPHost:       "mailpit",
+			SMTPPort:       1025,
+			SMTPEncryption: "none",
+			SMTPUsername:   username,
+			SMTPPassword:   password,
+			SMTPFromEmail:  "noreply@goiabada.dev",
+		})
+	}
+
+	resp := save("relay-user", "pass-word")
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	refusals := []struct {
+		name, username, password, code, description string
+	}{
+		{"a NUL in the username", "relay\x00user", "", "handler.settings_email.smtp_username_invalid_character",
+			"The SMTP username can't contain a null character."},
+		{"a NUL in the new password", "relay-user", "pass\x00word", "handler.settings_email.smtp_password_invalid_character",
+			"The SMTP password can't contain a null character."},
+	}
+	for _, c := range refusals {
+		t.Run(c.name, func(t *testing.T) {
+			resp := save(c.username, c.password)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var errBody api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&errBody))
+			assert.Equal(t, c.code, errBody.ErrorCode)
+			assert.Equal(t, c.description, errBody.ErrorDescription)
+
+			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			require.NoError(t, err)
+			assert.Equal(t, "relay-user", after.SMTPUsername, "nothing is written")
+			stored, err := dataCipher.Decrypt(after.SMTPPasswordEncrypted)
+			require.NoError(t, err)
+			assert.Equal(t, "pass-word", stored, "nothing is written")
+		})
+	}
+}
+
 // PUT: a refused dial answers the fixed message and its coarse cause, and names neither the address
 // nor the port it dialled (#410 decision 4). The server under test runs on this machine, so a port
 // closed here is closed to its dial.

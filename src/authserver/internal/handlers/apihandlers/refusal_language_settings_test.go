@@ -463,6 +463,22 @@ func TestSettingsEmailRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			portuguese: "O nome de usuário SMTP não pode ter mais de 254 caracteres.",
 		},
 		{
+			name:       "a null character in the SMTP username",
+			serve:      save(unchanged, map[string]any{"smtpUsername": "relay\x00user"}),
+			status:     http.StatusBadRequest,
+			code:       "handler.settings_email.smtp_username_invalid_character",
+			english:    "The SMTP username can't contain a null character.",
+			portuguese: "O nome de usuário SMTP não pode conter um caractere nulo.",
+		},
+		{
+			name:       "a null character in a new SMTP password",
+			serve:      save(unchanged, map[string]any{"smtpPassword": "pass\x00word"}),
+			status:     http.StatusBadRequest,
+			code:       "handler.settings_email.smtp_password_invalid_character",
+			english:    "The SMTP password can't contain a null character.",
+			portuguese: "A senha SMTP não pode conter um caractere nulo.",
+		},
+		{
 			name:       "an SMTP password past the bound",
 			serve:      save(unchanged, map[string]any{"smtpPassword": strings.Repeat("p", 257)}),
 			status:     http.StatusBadRequest,

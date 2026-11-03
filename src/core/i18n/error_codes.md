@@ -335,7 +335,9 @@ cause, each a whole sentence.
 | `handler.settings_email.smtp_port_out_of_range` | (none) | SMTP port must be between 1 and 65535. |
 | `handler.settings_email.smtp_encryption_invalid` | (none) | Invalid SMTP encryption. |
 | `handler.settings_email.smtp_username_too_long` | `max` (int) | The SMTP username can't be longer than {{.max}} characters. |
+| `handler.settings_email.smtp_username_invalid_character` | (none) | The SMTP username can't contain a null character. |
 | `handler.settings_email.smtp_password_too_long` | `max` (int) | SMTP password must be at most {{.max}} bytes. |
+| `handler.settings_email.smtp_password_invalid_character` | (none) | The SMTP password can't contain a null character. |
 | `handler.settings_email.smtp_from_name_too_long` | `max` (int) | The sender name can't be longer than {{.max}} characters. |
 | `handler.settings_email.smtp_from_email_too_long` | `max` (int) | The sender email can't be longer than {{.max}} characters. |
 | `handler.settings_email.smtp_password_and_clear` | (none) | Send either a new SMTP password or clearSmtpPassword, not both. |

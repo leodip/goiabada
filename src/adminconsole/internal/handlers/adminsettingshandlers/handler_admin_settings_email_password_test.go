@@ -226,3 +226,57 @@ func TestHandleEmailPost_ARefusedSaveIsRedrawnWithThePasswordAndTheSavedState(t 
 		})
 	}
 }
+
+// A null character cannot be seen on screen, so the auth server refuses one in the username or the
+// new password with a code of its own, and the redrawn page marks the field that holds it. The
+// password's neighbouring refusal, a password past its bound, marks the same field.
+func TestHandleEmailPost_ANullCharacterRefusalMarksItsField(t *testing.T) {
+	testCases := []struct {
+		name      string
+		code      string
+		message   string
+		wantField string
+	}{
+		{
+			name:      "a null character in the username",
+			code:      "handler.settings_email.smtp_username_invalid_character",
+			message:   "The SMTP username can't contain a null character.",
+			wantField: "username",
+		},
+		{
+			name:      "a null character in the password",
+			code:      "handler.settings_email.smtp_password_invalid_character",
+			message:   "The SMTP password can't contain a null character.",
+			wantField: "password",
+		},
+		{
+			name:      "a password past its bound",
+			code:      "handler.settings_email.smtp_password_too_long",
+			message:   "SMTP password must be at most 256 bytes.",
+			wantField: "password",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_email.html").Once()
+			apiClient := &emailSettingsAPI{saveErr: &apiclient.APIError{
+				Code: tc.code, Message: tc.message, StatusCode: http.StatusBadRequest,
+			}}
+			w := httptest.NewRecorder()
+
+			HandleEmailPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).
+				ServeHTTP(w, handlertest.Request(http.MethodPost, "/admin/settings/email",
+					handlertest.WithAccessToken(), handlertest.WithForm(emailForm(func(f url.Values) {
+						f.Set("password", "typed-secret")
+					}))))
+
+			assert.Empty(t, w.Header().Get("Location"), "a refused save is not redirected")
+			bind := handlertest.Bind(t, httpHelper)
+			assert.Equal(t, tc.message, bind["error"])
+			assert.Equal(t, tc.wantField, bind["errorField"])
+		})
+	}
+}

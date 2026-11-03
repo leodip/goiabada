@@ -426,6 +426,111 @@ func TestHandleSettingsEmailPut_TheSenderAddressAndUsernameTakeUpTo254Characters
 	}
 }
 
+// The sender address keeps the case of its part before the @, which SMTP implementations must treat
+// as case-sensitive, and its domain, which is not, is lowercased: Notify@Example.COM is stored as
+// Notify@example.com (RFC 5321 section 2.4). The answer reads back what was stored.
+func TestHandleSettingsEmailPut_TheSenderAddressKeepsTheCaseOfItsLocalPart(t *testing.T) {
+	cases := []struct {
+		name, sent, stored string
+	}{
+		{name: "mixed case on both sides of the @", sent: "Notify@Example.COM", stored: "Notify@example.com"},
+		{name: "an uppercase local part", sent: "NO.REPLY+Alerts@example.com", stored: "NO.REPLY+Alerts@example.com"},
+		{name: "an uppercase domain", sent: "noreply@MAIL.EXAMPLE.ORG", stored: "noreply@mail.example.org"},
+		{name: "all lowercase", sent: "noreply@example.com", stored: "noreply@example.com"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rr, written := serveEmailSave(t, emailSaveSettings(t, "127.0.0.1", false),
+				emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), map[string]interface{}{"smtpFromEmail": c.sent}))
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.NotNil(t, written)
+			assert.Equal(t, c.stored, written.SMTPFromEmail)
+			var body struct {
+				SMTPFromEmail string `json:"smtpFromEmail"`
+			}
+			require.NoError(t, json.NewDecoder(rr.Body).Decode(&body))
+			assert.Equal(t, c.stored, body.SMTPFromEmail, "the answer reads back the stored spelling")
+		})
+	}
+}
+
+// A null character in the username or in a new password is refused with a code of its own, so the
+// console marks the field holding a character nobody can see, and nothing is written. Only NUL is
+// refused, the one character RFC 4616 section 2 excludes from PLAIN's credentials; each refusal sits
+// beside the save it differs from by that one character. A username with no password, which the
+// send-time check refuses for PLAIN, stays a save, as does a password kept from the stored row.
+func TestHandleSettingsEmailPut_ANullCharacterInTheUsernameOrANewPasswordIsRefused(t *testing.T) {
+	saves := []struct {
+		name         string
+		withPassword bool
+		extra        map[string]interface{}
+	}{
+		{name: "a username and a new password", extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": "pass-word"}},
+		{name: "a username with no password", extra: map[string]interface{}{
+			"smtpUsername": "relay-user"}},
+		{name: "a username, the stored password kept", withPassword: true, extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": ""}},
+		{name: "a username with other control characters", extra: map[string]interface{}{
+			"smtpUsername": "relay\x01user\x7f", "smtpPassword": "pass\tword"}},
+	}
+	for _, c := range saves {
+		t.Run(c.name+" saves", func(t *testing.T) {
+			rr, written := serveEmailSave(t, emailSaveSettings(t, "127.0.0.1", c.withPassword),
+				emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), c.extra))
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.NotNil(t, written)
+		})
+	}
+
+	const (
+		usernameCode        = "handler.settings_email.smtp_username_invalid_character"
+		usernameDescription = "The SMTP username can't contain a null character."
+		passwordCode        = "handler.settings_email.smtp_password_invalid_character"
+		passwordDescription = "The SMTP password can't contain a null character."
+	)
+	refusals := []struct {
+		name              string
+		withPassword      bool
+		extra             map[string]interface{}
+		code, description string
+	}{
+		{name: "a NUL in the username", extra: map[string]interface{}{
+			"smtpUsername": "relay\x00user", "smtpPassword": "pass-word"},
+			code: usernameCode, description: usernameDescription},
+		{name: "a username that is a NUL", extra: map[string]interface{}{
+			"smtpUsername": "\x00"},
+			code: usernameCode, description: usernameDescription},
+		{name: "a NUL in the username, the stored password kept", withPassword: true, extra: map[string]interface{}{
+			"smtpUsername": "relay\x00user", "smtpPassword": ""},
+			code: usernameCode, description: usernameDescription},
+		{name: "a NUL in the new password", extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": "pass\x00word"},
+			code: passwordCode, description: passwordDescription},
+		{name: "a NUL ending the new password", extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": "pass-word\x00"},
+			code: passwordCode, description: passwordDescription},
+		{name: "a NUL in the new password replacing a stored one", withPassword: true, extra: map[string]interface{}{
+			"smtpUsername": "relay-user", "smtpPassword": "pass\x00word"},
+			code: passwordCode, description: passwordDescription},
+	}
+	for _, c := range refusals {
+		t.Run(c.name+" is refused", func(t *testing.T) {
+			rr, written := serveEmailSave(t, emailSaveSettings(t, "127.0.0.1", c.withPassword),
+				emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), c.extra))
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, c.code, code)
+			assert.Equal(t, c.description, description)
+			assert.Nil(t, written, "nothing is written")
+		})
+	}
+}
+
 // Pointing a stored password at another host needs the password again, or its removal, so a
 // stored password only ever reaches the host it was entered for. The refusal is answered before
 // the dial: the port here is one nothing listens on, which the dial would have answered instead

@@ -3209,6 +3209,15 @@ paths:
         an IPv6 literal, and without regard to case. A change of port, username, encryption or
         sender keeps the stored password.
 
+        A null character in `smtpUsername` is refused with 400
+        `handler.settings_email.smtp_username_invalid_character`, and one in a new `smtpPassword`
+        with 400 `handler.settings_email.smtp_password_invalid_character`; nothing is written.
+        PLAIN sign-in can't carry that character (RFC 4616). An empty password with a username is
+        accepted.
+
+        `smtpFromEmail` is stored with the part before the @ as sent and the domain lowercased, so
+        `Notify@Example.COM` is stored and answered as `Notify@example.com`.
+
         Once every other check has passed, a save with `smtpEnabled: true` opens a TCP
         connection to `smtpHost` on `smtpPort`, with a 3-second timeout. It only checks that
         something answers there: it does not speak SMTP, negotiate TLS or authenticate, which is what
@@ -7391,13 +7400,15 @@ components:
           type: integer
         smtpUsername:
           type: string
+          description: |
+            At most 254 characters, without a null character. Surrounding space is trimmed.
         smtpPassword:
           type: string
           description: |
-            A new SMTP password, at most 256 bytes. The stored password is never returned, only
-            `hasSmtpPassword`, so an absent or empty value keeps the stored password; a non-empty
-            value replaces it. Sending one together with `clearSmtpPassword: true` is refused with
-            400 `VALIDATION_ERROR` and nothing is written.
+            A new SMTP password, at most 256 bytes, without a null character. The stored password
+            is never returned, only `hasSmtpPassword`, so an absent or empty value keeps the stored
+            password; a non-empty value replaces it. Sending one together with
+            `clearSmtpPassword: true` is refused with 400 `VALIDATION_ERROR` and nothing is written.
         clearSmtpPassword:
           type: boolean
           default: false
@@ -7411,6 +7422,9 @@ components:
           type: string
         smtpFromEmail:
           type: string
+          description: |
+            The sender address. It is stored with the part before the @ as sent and the domain
+            lowercased.
 
     SettingsTurnstileResponse:
       type: object

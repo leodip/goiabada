@@ -34,6 +34,17 @@ test("SMTP settings are refused when incomplete, out of range, or unreachable", 
   });
 });
 
+test("the sender email keeps the case of the part before the @, and its domain is lowercased", async ({ page }) => {
+  await withSettingsRestored(page, email, async () => {
+    await page.goto(`${env.adminUrl}${email}`);
+    await fillSettingsForm(page, { fromEmail: "Notify@Example.COM" });
+    await saveSettings(page);
+
+    await page.goto(`${env.adminUrl}${email}`);
+    await expect(page.locator("#fromEmail")).toHaveValue("Notify@example.com");
+  });
+});
+
 test("turning email off hides the server's settings and asks first, and Cancel keeps email on", async ({ page }) => {
   const before = await readSettingsForm(page, email);
   expect(before.smtpEnabled).toBe(true);

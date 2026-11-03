@@ -313,18 +313,20 @@ const (
 	ErrCodeSettingsTokensOfflineMaxLifetimeNotPositive = "handler.settings_tokens.offline_max_lifetime_not_positive"
 	ErrCodeSettingsTokensOfflineMaxLifetimeTooLarge    = "handler.settings_tokens.offline_max_lifetime_too_large" // Args: {"max": int}
 
-	ErrCodeSettingsEmailSMTPHostRequired      = "handler.settings_email.smtp_host_required"
-	ErrCodeSettingsEmailSMTPPortRequired      = "handler.settings_email.smtp_port_required"
-	ErrCodeSettingsEmailSMTPFromEmailRequired = "handler.settings_email.smtp_from_email_required"
-	ErrCodeSettingsEmailSMTPHostTooLong       = "handler.settings_email.smtp_host_too_long" // Args: {"max": int}
-	ErrCodeSettingsEmailSMTPPortOutOfRange    = "handler.settings_email.smtp_port_out_of_range"
-	ErrCodeSettingsEmailSMTPEncryptionInvalid = "handler.settings_email.smtp_encryption_invalid"
-	ErrCodeSettingsEmailSMTPUsernameTooLong   = "handler.settings_email.smtp_username_too_long"   // Args: {"max": int}
-	ErrCodeSettingsEmailSMTPPasswordTooLong   = "handler.settings_email.smtp_password_too_long"   // Args: {"max": int}
-	ErrCodeSettingsEmailSMTPFromNameTooLong   = "handler.settings_email.smtp_from_name_too_long"  // Args: {"max": int}
-	ErrCodeSettingsEmailSMTPFromEmailTooLong  = "handler.settings_email.smtp_from_email_too_long" // Args: {"max": int}
-	ErrCodeSettingsEmailSMTPPasswordAndClear  = "handler.settings_email.smtp_password_and_clear"
-	ErrCodeSettingsEmailSMTPHostChanged       = "handler.settings_email.smtp_host_changed"
+	ErrCodeSettingsEmailSMTPHostRequired             = "handler.settings_email.smtp_host_required"
+	ErrCodeSettingsEmailSMTPPortRequired             = "handler.settings_email.smtp_port_required"
+	ErrCodeSettingsEmailSMTPFromEmailRequired        = "handler.settings_email.smtp_from_email_required"
+	ErrCodeSettingsEmailSMTPHostTooLong              = "handler.settings_email.smtp_host_too_long" // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPPortOutOfRange           = "handler.settings_email.smtp_port_out_of_range"
+	ErrCodeSettingsEmailSMTPEncryptionInvalid        = "handler.settings_email.smtp_encryption_invalid"
+	ErrCodeSettingsEmailSMTPUsernameTooLong          = "handler.settings_email.smtp_username_too_long" // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPUsernameInvalidCharacter = "handler.settings_email.smtp_username_invalid_character"
+	ErrCodeSettingsEmailSMTPPasswordTooLong          = "handler.settings_email.smtp_password_too_long" // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPPasswordInvalidCharacter = "handler.settings_email.smtp_password_invalid_character"
+	ErrCodeSettingsEmailSMTPFromNameTooLong          = "handler.settings_email.smtp_from_name_too_long"  // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPFromEmailTooLong         = "handler.settings_email.smtp_from_email_too_long" // Args: {"max": int}
+	ErrCodeSettingsEmailSMTPPasswordAndClear         = "handler.settings_email.smtp_password_and_clear"
+	ErrCodeSettingsEmailSMTPHostChanged              = "handler.settings_email.smtp_host_changed"
 
 	ErrCodeSettingsTurnstileSiteKeyRequired            = "handler.settings_turnstile.site_key_required"
 	ErrCodeSettingsTurnstileSecretKeyRequired          = "handler.settings_turnstile.secret_key_required"
