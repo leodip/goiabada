@@ -9,7 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "jose": "^6.2.12",
+    "jose": "^6.2.14",
     "next": "16.4.1",
     "openid-client": "^6.8.8",
     "react": "19.3.0",
