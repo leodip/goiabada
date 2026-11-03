@@ -15,7 +15,7 @@ about = "go vet in all four modules (core, authserver, adminconsole, setup); abo
 
 [commands.unit]
 run   = "$PLACIDO_REPO/.placido/stack.sh run --type modules --no-build"
-about = "Unit tests of authserver (internal and web), core, and adminconsole; also checks gofmt, about 40 seconds. Narrow with --type internal|core|adminconsole and --run '<regex>'; a pattern that matches no test fails the run."
+about = "Unit tests of authserver (internal and web), core, and adminconsole; also checks gofmt, about 40 seconds. Narrow with --type internal|core|adminconsole and --run '<regex>'; a pattern that matches no test fails the run. Add --race to run them under the race detector, as CI does (about 5 minutes); it turns cgo on for its own run."
 
 [commands.setup-wizard]
 run   = "$PLACIDO_REPO/.placido/stack.sh run --type setup"
@@ -43,7 +43,7 @@ about = "golangci-lint and unparam on every module, as CI's Lint job runs them, 
 
 [commands.exec]
 run   = "$PLACIDO_REPO/.placido/stack.sh exec"
-about = "One command in this issue's devcontainer, from src/authserver, with its environment, for what the other commands do not cover. Append it quoted, such as 'go test -count=1 -run TestName ./internal/oauth/...' for one package."
+about = "One command in this issue's devcontainer, from src/authserver, with its environment, for what the other commands do not cover. Append it quoted, such as 'go test -count=1 -run TestName ./internal/oauth/...' for one package. The devcontainer pins CGO_ENABLED=0, so go test -race cannot run here: use unit --race."
 
 [commands.mocks]
 run   = "$PLACIDO_REPO/.placido/stack.sh exec ./generate-mocks.sh"
