@@ -12,14 +12,15 @@
 #   show    - Display all versions from versions.yaml
 #   check   - Check online for newer versions of dependencies
 #   update  - Update version strings in all project files
-#   deps    - Update Go modules and npm packages
+#   deps    - Update Go modules and npm packages, and Playwright's browsers
 #   generate - Regenerate committed data files (timezones, countries, passwordblocklist)
 #   all     - Run all commands in sequence (check → update → deps)
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
 # golangci-lint, mockery, staticcheck, unparam, govulncheck, the release
-# images' Alpine base, Trivy, Grype, cropperjs, acorn). It does NOT
-# manage the product version.
+# images' Alpine base, Trivy, Grype, npm-check-updates, cropperjs, acorn), and
+# the dependencies of the Go modules and of the npm projects in NPM_PROJECTS.
+# It does NOT manage the product version.
 #
 # Workflow, for bumping a tool or CDN pin:
 #   1. Edit versions.yaml to set desired versions
@@ -37,7 +38,8 @@
 # Requirements:
 #   - mikefarah's yq (YAML parser) - installed in devcontainer
 #   - curl (for online version checks)
-#   - go, npm (for dependency updates)
+#   - go, node, npm (for dependency updates; npm-check-updates runs through npx
+#     at the version versions.yaml pins)
 # =============================================================================
 
 # Note: We don't use 'set -e' because arithmetic expressions like ((count++))
@@ -186,6 +188,7 @@ get_all_versions() {
         echo "tools.alpine=$(get_version 'tools.alpine')"
         echo "tools.trivy=$(get_version 'tools.trivy')"
         echo "tools.grype=$(get_version 'tools.grype')"
+        echo "tools.npm-check-updates=$(get_version 'tools."npm-check-updates"')"
         echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
         echo "vendored.acorn=$(get_version 'vendored.acorn')"
     }
@@ -268,11 +271,12 @@ alpine_latest_minor() {
         | tail -1
 }
 
-# The days GitHub must have recorded a release public before check suggests it.
-# A pin cannot be swapped once it is set, so the danger left is bumping to a
-# release that is already poisoned: Trivy's malicious v0.69.4 was public for
-# about 12 hours before it was pulled (#520).
-RELEASE_MIN_AGE_DAYS=7
+# The days a release must have been public before check suggests it or deps
+# upgrades to it: on GitHub for Trivy and Grype, on the npm registry for the npm
+# packages. A pin cannot be swapped once it is set, so the danger left is
+# bumping to a release that is already poisoned: Trivy's malicious v0.69.4 was
+# public for about 12 hours before it was pulled (#520).
+RELEASE_MIN_AGE_DAYS=3
 
 # utc_timestamp prints seconds since the epoch as GitHub writes a time,
 # 2026-10-21T11:18:34Z, which compares as text in time order. GNU date, then BSD.
@@ -347,15 +351,99 @@ get_alpine_latest() {
     fi
 }
 
-# Fetch latest version from npm registry
-# Usage: get_npm_latest "acorn"
-get_npm_latest() {
-    local package="$1"
+# Reduce `npm view <package> time versions --json`, read on stdin, to the newest
+# X.Y.Z release the registry records published at least RELEASE_MIN_AGE_DAYS
+# before NOW, given in seconds since the epoch, as Trivy's are chosen (#520).
+# Usage: npm_settled_release NOW < view.json
+#
+# Only a version still in versions counts: the time map keeps an unpublished
+# version's date. A prerelease is passed over. Prints nothing when no release
+# is old enough, and fails on an answer that is not that JSON.
+npm_settled_release() {
+    node -e '
+        const [now, days] = process.argv.slice(1).map(Number);
+        const view = JSON.parse(require("fs").readFileSync(0, "utf8"));
+        const cutoff = (now - days * 86400) * 1000;
+        const newer = (a, b) => (a[0] - b[0] || a[1] - b[1] || a[2] - b[2]) > 0;
+        let best = null;
+        for (const version of [].concat(view.versions || [])) {
+            if (!/^\d+\.\d+\.\d+$/.test(version)) continue;
+            if (!(Date.parse((view.time || {})[version]) <= cutoff)) continue;
+            const parts = version.split(".").map(Number);
+            if (!best || newer(parts, best)) best = parts;
+        }
+        if (best) console.log(best.join("."));
+    ' "$1" "$RELEASE_MIN_AGE_DAYS"
+}
+
+# Fetch the newest settled release of an npm package, as npm_settled_release
+# selects it.
+# Usage: get_npm_settled "acorn"
+get_npm_settled() {
     local response
-    response=$(curl -s --connect-timeout 10 "https://registry.npmjs.org/${package}/latest" 2>/dev/null)
-    if [ $? -eq 0 ] && [ -n "$response" ]; then
-        echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4
-    fi
+    response=$(npm view "$1" time versions --json 2>/dev/null) || return 0
+    [ -n "$response" ] && echo "$response" | npm_settled_release "$(date -u +%s)" 2>/dev/null
+}
+
+# The npm projects deps upgrades and check reports on, from the repository root.
+NPM_PROJECTS=(site e2e/playwright e2e/testapp)
+
+# run_ncu runs npm-check-updates, at the version versions.yaml pins, over the npm
+# project in DIR, considering only releases public for RELEASE_MIN_AGE_DAYS.
+# With no --target it looks up to the newest release, a new major version included.
+# Usage: run_ncu DIR [npm-check-updates options]
+run_ncu() {
+    local dir="$1"
+    shift
+    npx --yes "npm-check-updates@$(get_version 'tools."npm-check-updates"')" --cwd "$dir" \
+        --cooldown "$RELEASE_MIN_AGE_DAYS" --loglevel error "$@"
+}
+
+# The upgrade deps makes: within what a caret on the current version accepts, the
+# same major from 1.0.0 and the same minor below it, where a minor is a breaking
+# change. A new major version is a change of its own, with its own fixes.
+NCU_COMPATIBLE_CONFIG='module.exports = {
+  target: (name, semver) => (semver[0] && semver[0].major === "0" ? "patch" : "minor"),
+};'
+
+# run_ncu_compatible runs run_ncu with NCU_COMPATIBLE_CONFIG's target.
+# Usage: run_ncu_compatible DIR [npm-check-updates options]
+run_ncu_compatible() {
+    local dir="$1"
+    shift
+    local config status
+    config=$(mktemp -d) || return 1
+    printf '%s\n' "$NCU_COMPATIBLE_CONFIG" > "$config/.ncurc.cjs"
+    run_ncu "$dir" --configFilePath "$config" "$@"
+    status=$?
+    rm -rf "$config"
+    return $status
+}
+
+# npm_project_updates prints, for the npm project in DIR, a line per dependency
+# with a newer settled release: "update" and the release deps would move it to,
+# or "major" and a new major version, each as NAME, CURRENT and NEW range,
+# separated by tabs. Fails when npm-check-updates does.
+# Usage: npm_project_updates DIR
+npm_project_updates() {
+    local dir="$1" compatible latest
+    compatible=$(run_ncu_compatible "$dir" --jsonUpgraded) || return 1
+    latest=$(run_ncu "$dir" --jsonUpgraded) || return 1
+    local -A current=() wanted=()
+    local name range
+    while IFS=$'\t' read -r name range; do
+        [ -n "$name" ] && current[$name]=$range
+    done < <(yq -p json -r '(.dependencies // {}) * (.devDependencies // {}) | to_entries | .[] | .key + "\t" + .value' "$dir/package.json")
+    while IFS=$'\t' read -r name range; do
+        [ -n "$name" ] || continue
+        wanted[$name]=$range
+        printf 'update\t%s\t%s\t%s\n' "$name" "${current[$name]}" "$range"
+    done < <(echo "$compatible" | yq -p json -r 'to_entries | .[] | .key + "\t" + .value')
+    while IFS=$'\t' read -r name range; do
+        [ -n "$name" ] || continue
+        [ "${wanted[$name]:-}" = "$range" ] && continue
+        printf 'major\t%s\t%s\t%s\n' "$name" "${current[$name]}" "$range"
+    done < <(echo "$latest" | yq -p json -r 'to_entries | .[] | .key + "\t" + .value')
 }
 
 # =============================================================================
@@ -416,6 +504,7 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "alpine" "$(get_version 'tools.alpine')"
     printf "  %-23s ${GREEN}%s${NC}\n" "trivy" "$(get_version 'tools.trivy')"
     printf "  %-23s ${GREEN}%s${NC}\n" "grype" "$(get_version 'tools.grype')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "npm-check-updates" "$(get_version 'tools."npm-check-updates"')"
 
     # Vendored dependencies
     echo -e "\n${BOLD}Vendored dependencies:${NC}"
@@ -627,10 +716,28 @@ cmd_check() {
         print_warning "Check failed"
     fi
 
+    # --- npm-check-updates ---
+    # Run through npx at its pin by deps and by the npm packages' check below.
+    # It and the vendored packages after it are suggested under the same
+    # RELEASE_MIN_AGE_DAYS as Trivy (#520).
+    echo -n "Checking npm-check-updates... "
+    local current_ncu=$(get_version 'tools."npm-check-updates"')
+    local latest_ncu=$(get_npm_settled "npm-check-updates")
+    if [ -n "$latest_ncu" ]; then
+        if version_lt "$current_ncu" "$latest_ncu"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("npm-check-updates|$current_ncu|$latest_ncu|https://github.com/raineorshine/npm-check-updates/releases")
+        else
+            print_success "Up to date ($current_ncu)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
     # --- cropperjs ---
     echo -n "Checking cropperjs... "
     local current_cropper=$(get_version 'vendored.cropperjs')
-    local latest_cropper=$(get_npm_latest "cropperjs")
+    local latest_cropper=$(get_npm_settled "cropperjs")
     if [ -n "$latest_cropper" ]; then
         if version_lt "$current_cropper" "$latest_cropper"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
@@ -645,7 +752,7 @@ cmd_check() {
     # --- acorn ---
     echo -n "Checking acorn... "
     local current_acorn=$(get_version 'vendored.acorn')
-    local latest_acorn=$(get_npm_latest "acorn")
+    local latest_acorn=$(get_npm_settled "acorn")
     if [ -n "$latest_acorn" ]; then
         if version_lt "$current_acorn" "$latest_acorn"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
@@ -656,6 +763,31 @@ cmd_check() {
     else
         print_warning "Check failed"
     fi
+
+    # --- npm packages ---
+    # Each npm project's dependencies, through npm-check-updates. An update is
+    # one deps applies; a new major version is left for a change of its own.
+    local npm_updates=() npm_majors=()
+    local project kind name current latest found
+    for project in "${NPM_PROJECTS[@]}"; do
+        echo -n "Checking ${project}'s npm packages... "
+        if ! found=$(npm_project_updates "$BASE_DIR/$project" 2>/dev/null); then
+            print_warning "Check failed"
+            continue
+        fi
+        if [ -z "$found" ]; then
+            print_success "Up to date"
+            continue
+        fi
+        echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+        while IFS=$'\t' read -r kind name current latest; do
+            if [ "$kind" = "update" ]; then
+                npm_updates+=("$name ($project)|$current|$latest")
+            else
+                npm_majors+=("$name ($project)|$current|$latest")
+            fi
+        done <<< "$found"
+    done
 
     # --- Summary ---
     echo ""
@@ -669,7 +801,30 @@ cmd_check() {
         done
         echo ""
         print_info "To update: edit versions.yaml, then run ./version-manager.sh update"
-    else
+    fi
+    if [ ${#npm_updates[@]} -gt 0 ]; then
+        print_header "npm Package Updates"
+        printf "%-44s %-12s %s\n" "Package" "Current" "Latest"
+        printf "%-44s %-12s %s\n" "-------" "-------" "------"
+        for info in "${npm_updates[@]}"; do
+            IFS='|' read -r name current latest <<< "$info"
+            printf "${YELLOW}%-44s${NC} %-12s ${GREEN}%s${NC}\n" "$name" "$current" "$latest"
+        done
+        echo ""
+        print_info "To update: ./version-manager.sh deps"
+    fi
+    if [ ${#npm_majors[@]} -gt 0 ]; then
+        print_header "New Major Versions"
+        printf "%-44s %-12s %s\n" "Package" "Current" "Latest"
+        printf "%-44s %-12s %s\n" "-------" "-------" "------"
+        for info in "${npm_majors[@]}"; do
+            IFS='|' read -r name current latest <<< "$info"
+            printf "${YELLOW}%-44s${NC} %-12s ${GREEN}%s${NC}\n" "$name" "$current" "$latest"
+        done
+        echo ""
+        print_info "deps leaves these: each is a change of its own, made in its package.json"
+    fi
+    if [ ${#updates_available[@]} -eq 0 ] && [ ${#npm_updates[@]} -eq 0 ] && [ ${#npm_majors[@]} -eq 0 ]; then
         print_success "All dependencies are up to date!"
     fi
 }
@@ -939,7 +1094,14 @@ cmd_update() {
 # =============================================================================
 # Command: deps
 # =============================================================================
-# Update Go modules and npm packages
+# Update Go modules and npm packages, and the browsers the e2e suite's
+# Playwright needs.
+#
+# An npm project's dependencies move within what a caret on the current
+# version accepts (NCU_COMPATIBLE_CONFIG), to releases public for
+# RELEASE_MIN_AGE_DAYS; npm then resolves the lock file, and with npm update the
+# transitive dependencies, under the same cutoff. A new major version stays a
+# change of its own, which check lists.
 
 cmd_deps() {
     print_header "Updating Dependencies"
@@ -1007,6 +1169,55 @@ cmd_deps() {
             popd > /dev/null 2>&1
         fi
     done
+
+    # -------------------------------------------------------------------------
+    # npm Packages
+    # -------------------------------------------------------------------------
+    echo -e "\n${BOLD}npm Packages${NC}"
+
+    local cutoff
+    cutoff=$(utc_timestamp $(( $(date -u +%s) - RELEASE_MIN_AGE_DAYS * 86400 )))
+    local project dir
+    for project in "${NPM_PROJECTS[@]}"; do
+        dir="$BASE_DIR/$project"
+        [ -f "$dir/package.json" ] || continue
+        echo -e "\n${BOLD}Updating ${dir}${NC}"
+        if ! run_ncu_compatible "$dir" --upgrade; then
+            print_error "npm-check-updates failed"
+            continue
+        fi
+        if (cd "$dir" && npm install --before="$cutoff" --no-fund --no-audit); then
+            print_success "npm install"
+        else
+            print_error "npm install failed"
+            continue
+        fi
+        if (cd "$dir" && npm update --before="$cutoff" --no-fund --no-audit); then
+            print_success "npm update"
+        else
+            print_error "npm update failed"
+        fi
+    done
+
+    # -------------------------------------------------------------------------
+    # Playwright Browsers
+    # -------------------------------------------------------------------------
+    # The browser builds the e2e suite's Playwright expects, and the system
+    # libraries they need, which a new build can add to: installing those takes
+    # sudo, so this only says which command does it.
+    echo -e "\n${BOLD}Playwright Browsers${NC}"
+    local suite="$BASE_DIR/e2e/playwright"
+    if (cd "$suite" && npx playwright install); then
+        print_success "npx playwright install"
+    else
+        print_error "npx playwright install failed"
+    fi
+    if (cd "$suite" && npx playwright install-deps --dry-run 2>&1) | grep -q 'All system dependencies are installed'; then
+        print_success "The browsers' system libraries are installed"
+    else
+        print_warning "The browsers need system libraries this machine lacks. Install them with:"
+        echo "  (cd e2e/playwright && npx playwright install-deps)   # asks for sudo itself"
+    fi
 
     echo ""
     print_success "Dependency update complete"
@@ -1120,7 +1331,7 @@ show_help() {
     echo "  show    Display all versions from versions.yaml"
     echo "  check   Check online for newer versions"
     echo "  update  Update version strings in all project files"
-    echo "  deps    Update Go modules and npm packages"
+    echo "  deps    Update Go modules and npm packages, and Playwright's browsers"
     echo "  generate Regenerate committed data files (timezones, countries, passwordblocklist)"
     echo "  all     Run all commands in sequence"
     echo ""
@@ -1140,6 +1351,7 @@ show_help() {
     echo "  $0 show          # See current versions"
     echo "  $0 check         # Check for newer versions online"
     echo "  $0 update        # Apply versions from yaml to files"
+    echo "  $0 deps          # Update Go modules and npm packages"
     echo "  $0 generate      # Regenerate timezones, countries and passwordblocklist data files"
     echo ""
 }

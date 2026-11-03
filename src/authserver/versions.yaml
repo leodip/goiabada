@@ -34,6 +34,8 @@
 #                 packages, and in the weekly Image scan of the published images
 # grype:          Image scanner, built from source in the weekly Image scan of the
 #                 published images, beside Trivy
+# npm-check-updates: Upgrades the npm projects' dependencies (version-manager.sh
+#                 deps) and reports them (check), run through npx at this pin
 #
 # staticcheck, unparam and govulncheck are pinned because they gate CI. An
 # unpinned tool can turn every open PR red on an upstream release, with no
@@ -59,12 +61,16 @@
 # fixes what source a version is for everyone, which a takeover of the project's
 # accounts cannot rewrite. What the pin cannot prevent is bumping to a release
 # that is already poisoned, so `./version-manager.sh check` suggests a Trivy
-# release only once GitHub has recorded it public for 7 days; the malicious
+# release only once GitHub has recorded it public for 3 days; the malicious
 # v0.69.4 was public for about 12 hours (#520).
 #
 # grype is pinned, built and suggested the same way. It runs only in the weekly
 # Image scan, so a second vulnerability database catches an advisory Trivy's is
 # late on; the build-time gate stays Trivy's alone (#520).
+#
+# npm-check-updates, cropperjs and acorn are suggested under the same 3 days,
+# counted from when the npm registry records the release published, and deps
+# upgrades the npm projects' dependencies only to releases that old.
 tools:
   go: "1.27.3"
   tailwind: "4.3.3"
@@ -77,6 +83,7 @@ tools:
   alpine: "3.24"
   trivy: "0.76.0"
   grype: "0.120.1"
+  npm-check-updates: "23.1.1"
 
 # -----------------------------------------------------------------------------
 # Vendored dependencies

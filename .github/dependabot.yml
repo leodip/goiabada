@@ -5,8 +5,15 @@
 # mockery, staticcheck, unparam, govulncheck, Trivy, Grype and the CDN script tags.
 # Dependabot cannot see any of them -- they are shell downloads, `go install`s,
 # Dockerfile pins and script tags in HTML rather than package manifests. Those stay
-# `./version-manager.sh check` territory. The two tools are complementary, not
-# overlapping.
+# `./version-manager.sh check` territory. The two tools are complementary: what
+# they share is the Go and npm upgrades below, which `./version-manager.sh deps`
+# makes all at once on a maintainer's machine, where Dependabot opens a pull
+# request for each.
+#
+# Every entry waits 3 days after a release before proposing it, the age
+# `./version-manager.sh` holds its own suggestions and upgrades to: a release that
+# turns out poisoned is usually pulled within hours (#520). Security updates do
+# not wait.
 
 version: 2
 
@@ -31,6 +38,8 @@ updates:
       - /.github/actions/*
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: ci
 
@@ -40,6 +49,8 @@ updates:
     directory: /src/core
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: deps
 
@@ -47,6 +58,8 @@ updates:
     directory: /src/authserver
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: deps
 
@@ -54,6 +67,8 @@ updates:
     directory: /src/adminconsole
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: deps
 
@@ -61,6 +76,8 @@ updates:
     directory: /src/cmd/goiabada-setup
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: deps
 
@@ -71,5 +88,29 @@ updates:
     directory: /site
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: deps
+
+  # The e2e suite: Playwright, whose version sets the browser builds the suite
+  # runs, and its type checking.
+  - package-ecosystem: npm
+    directory: /e2e/playwright
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: deps
+
+  # The test app: a Next.js app that follows the guides, which the e2e suite
+  # signs in through as a web app, an SPA and an API.
+  - package-ecosystem: npm
+    directory: /e2e/testapp
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: deps

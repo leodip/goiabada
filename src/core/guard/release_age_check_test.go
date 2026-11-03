@@ -1,7 +1,7 @@
 package guard
 
 // version-manager.sh's check suggests a newer Trivy or Grype only once GitHub records the release
-// public for 7 days, so a bump cannot land on a release that is already poisoned: Trivy's malicious
+// public for 3 days, so a bump cannot land on a release that is already poisoned: Trivy's malicious
 // v0.69.4 was public for about 12 hours (#520). The selection is github_settled_release, a function of its own,
 // driven here with a clock over a copy of
 // https://api.github.com/repos/aquasecurity/trivy/releases?per_page=10 taken on 2026-10-24T14:43:27Z,
@@ -87,37 +87,42 @@ func trivyRelease(tag string, draft, prerelease bool, published string) string {
 		`"body":"\"tag_name\": \"v9.9.9\", \"published_at\": \"2020-01-01T00:00:00Z\""}`
 }
 
-func TestReleaseAgeCheck_TheNewestReleaseYoungerThanSevenDaysIsPassedOver(t *testing.T) {
-	assert.Equal(t, "0.76.0", settledRelease(t, trivyReleasesCaptured, trivyReleasesFixture),
-		"v0.76.1 was public for three days and v0.76.0 for ten when the fixture was taken")
+func TestReleaseAgeCheck_TheNewestReleaseYoungerThanThreeDaysIsPassedOver(t *testing.T) {
+	assert.Equal(t, "0.76.0", settledRelease(t, "2026-10-23T14:43:27Z", trivyReleasesFixture),
+		"a day before the fixture was taken, v0.76.1 had been public for two days and v0.76.0 for nine")
 }
 
-// At least 7 days: a release becomes the suggestion the second its seventh day ends.
-func TestReleaseAgeCheck_AReleaseExactlySevenDaysOldIsSuggested(t *testing.T) {
-	assert.Equal(t, "0.76.1", settledRelease(t, "2026-10-28T11:18:34Z", trivyReleasesFixture))
+func TestReleaseAgeCheck_TheNewestReleaseThreeDaysOldIsSuggested(t *testing.T) {
+	assert.Equal(t, "0.76.1", settledRelease(t, trivyReleasesCaptured, trivyReleasesFixture),
+		"v0.76.1 was public for three days when the fixture was taken")
 }
 
-func TestReleaseAgeCheck_ASecondShortOfSevenDaysIsNotEnough(t *testing.T) {
-	assert.Equal(t, "0.76.0", settledRelease(t, "2026-10-28T11:18:33Z", trivyReleasesFixture))
+// At least 3 days: a release becomes the suggestion the second its third day ends.
+func TestReleaseAgeCheck_AReleaseExactlyThreeDaysOldIsSuggested(t *testing.T) {
+	assert.Equal(t, "0.76.1", settledRelease(t, "2026-10-24T11:18:34Z", trivyReleasesFixture))
 }
 
-// v0.71.1 was tagged 2026-06-10 and published 2026-06-15: on 2026-06-21 its tag is eleven days old
-// and the release six, so it is not suggested and v0.71.0 is.
+func TestReleaseAgeCheck_ASecondShortOfThreeDaysIsNotEnough(t *testing.T) {
+	assert.Equal(t, "0.76.0", settledRelease(t, "2026-10-24T11:18:33Z", trivyReleasesFixture))
+}
+
+// v0.71.1 was tagged 2026-06-10 and published 2026-06-15: on 2026-06-17 its tag is seven days old
+// and the release under two, so it is not suggested and v0.71.0 is.
 func TestReleaseAgeCheck_ThePublicationTimeCountsNotTheTagDate(t *testing.T) {
-	assert.Equal(t, "0.71.0", settledRelease(t, "2026-06-21T00:00:00Z", trivyReleasesFixture))
+	assert.Equal(t, "0.71.0", settledRelease(t, "2026-06-17T00:00:00Z", trivyReleasesFixture))
 }
 
 func TestReleaseAgeCheck_APrereleaseIsIgnored(t *testing.T) {
 	file := trivyReleasesWith(t, trivyRelease("v0.77.0", false, true, `"2026-09-01T11:00:00Z"`))
-	assert.Equal(t, "0.76.0", settledRelease(t, trivyReleasesCaptured, file), "the prerelease v0.77.0 was suggested")
+	assert.Equal(t, "0.76.1", settledRelease(t, trivyReleasesCaptured, file), "the prerelease v0.77.0 was suggested")
 }
 
 // GitHub writes no publication time on a draft, but a draft is refused by its own flag.
 func TestReleaseAgeCheck_ADraftIsIgnored(t *testing.T) {
 	file := trivyReleasesWith(t, trivyRelease("v0.77.0", true, false, `"2026-09-01T11:00:00Z"`))
-	assert.Equal(t, "0.76.0", settledRelease(t, trivyReleasesCaptured, file), "the draft v0.77.0 was suggested")
+	assert.Equal(t, "0.76.1", settledRelease(t, trivyReleasesCaptured, file), "the draft v0.77.0 was suggested")
 	file = trivyReleasesWith(t, trivyRelease("v0.77.0", true, false, `null`))
-	assert.Equal(t, "0.76.0", settledRelease(t, trivyReleasesCaptured, file), "the draft v0.77.0 was suggested")
+	assert.Equal(t, "0.76.1", settledRelease(t, trivyReleasesCaptured, file), "the draft v0.77.0 was suggested")
 }
 
 // The variants' other releases are compacted, so this is also the selection over an answer without
@@ -131,11 +136,11 @@ func TestReleaseAgeCheck_AnOldEnoughReleaseAheadOfTheOthersIsSuggested(t *testin
 // A tag that is not vX.Y.Z is no release version, whatever its flags say.
 func TestReleaseAgeCheck_ATagThatIsNoVersionIsIgnored(t *testing.T) {
 	file := trivyReleasesWith(t, trivyRelease("v0.77.0-rc.1", false, false, `"2026-09-01T11:00:00Z"`))
-	assert.Equal(t, "0.76.0", settledRelease(t, trivyReleasesCaptured, file), "v0.77.0-rc.1 was suggested")
+	assert.Equal(t, "0.76.1", settledRelease(t, trivyReleasesCaptured, file), "v0.77.0-rc.1 was suggested")
 }
 
-// On 2026-04-20 the newest release in the answer, v0.70.0, had been public for three days, and the
-// answer holds nothing older, so check has nothing to suggest.
+// On 2026-04-20 the oldest release in the answer, v0.70.0, had been public for two days and
+// seventeen hours, and the answer holds nothing older, so check has nothing to suggest.
 func TestReleaseAgeCheck_NothingOldEnoughSuggestsNothing(t *testing.T) {
 	assert.Empty(t, settledRelease(t, "2026-04-20T00:00:00Z", trivyReleasesFixture))
 }
@@ -155,11 +160,10 @@ func TestReleaseAgeCheck_FieldsInAnotherOrderSuggestNothing(t *testing.T) {
 	assert.Empty(t, settledRelease(t, trivyReleasesCaptured, file))
 }
 
-// Grype's check is the same selection over its own repository's answer, which is how tools.grype came
-// to be 0.120.1 and not the newer v0.121.0.
-func TestReleaseAgeCheck_GrypesNewestReleaseIsSuggestedOnlyOnceSevenDaysOld(t *testing.T) {
-	assert.Equal(t, "0.120.1", settledRelease(t, grypeReleasesCaptured, grypeReleasesFixture),
+// Grype's check is the same selection over its own repository's answer.
+func TestReleaseAgeCheck_GrypesNewestReleaseIsSuggestedOnlyOnceThreeDaysOld(t *testing.T) {
+	assert.Equal(t, "0.120.1", settledRelease(t, "2026-10-22T20:32:55Z", grypeReleasesFixture))
+	assert.Equal(t, "0.121.0", settledRelease(t, "2026-10-22T20:32:56Z", grypeReleasesFixture))
+	assert.Equal(t, "0.121.0", settledRelease(t, grypeReleasesCaptured, grypeReleasesFixture),
 		"v0.121.0 was public for five days when the fixture was taken")
-	assert.Equal(t, "0.120.1", settledRelease(t, "2026-10-26T20:32:55Z", grypeReleasesFixture))
-	assert.Equal(t, "0.121.0", settledRelease(t, "2026-10-26T20:32:56Z", grypeReleasesFixture))
 }
