@@ -411,6 +411,9 @@ type RateLimiter struct {
 	emailVerificationSend *requestTier
 	// accountEmailChange bounds the email changes an account can ask for.
 	accountEmailChange *requestTier
+	// accountCredentialChange bounds the password changes, two-factor changes and new sets of
+	// recovery codes an account can make, together: each sends the user a notice.
+	accountCredentialChange *requestTier
 	// accountPassword bounds guessing at the account's own password, at the two account API
 	// routes that verify it. One tier rather than two because it is one secret.
 	accountPassword *failureTier
@@ -530,6 +533,18 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// replica: the count is held in the process, as every request tier's is, and a restart
 		// starts it again.
 		accountEmailChange: request("account_email_change", countedByTokenUser, "", 5, 60*time.Minute),
+		// per-subject: the password change, the two-factor change and a new set of recovery codes,
+		// one bucket for the three, every request counted, the refused ones included (#724
+		// decision 3). Each sends the user a notice after the response, and nothing else bounds
+		// how often an account holding its own password succeeds at them: removing an
+		// authenticator resets its used-code marker, so set-up and removal cycle without limit,
+		// and every notice is a job in the security_notice class, whose 64 in flight one account
+		// could fill and so get a victim's notice dropped. One bucket rather than three, so
+		// taking turns between the routes buys no more notices. 10 an hour is the email change's
+		// 5 doubled: room for a password change, an authenticator set up after a mistyped code or
+		// two, and a new set of codes in one sitting, and it holds one account to 240 notices a
+		// day on each replica.
+		accountCredentialChange: request("account_credential_change", countedByTokenUser, "", 10, 60*time.Minute),
 		// per-subject account password failures, one bucket for the three routes that check
 		// that password: PUT /api/v1/account/password, PUT /api/v1/account/otp and
 		// PUT /api/v1/account/email (#404). All three verify the same secret, so separate
@@ -935,6 +950,22 @@ func (m *RateLimiter) LimitAccountEmailChange(next http.Handler) http.Handler {
 	return m.limitRequests(next, m.accountEmailChange, rejectAPI)
 }
 
+// LimitAccountCredentialChange rate limits the account's own credential changes, on the subject of
+// the access token presented: PUT /api/v1/account/password, PUT /api/v1/account/otp and POST
+// /api/v1/account/otp/recovery-codes, one tier over the three, which is what makes the bucket
+// shared. Every request counts, whatever the password and whether it lands, since each change
+// that lands sends the user a notice and a failures-only bound, which LimitAccountPassword is,
+// leaves one holding the right password free to make as many as they like (#724 decision 3).
+// Mounted before LimitAccountPassword, so a request that tier refuses is still counted here, and
+// a request this refuses never reaches the password check.
+//
+// The subject for LimitEmailVerification's reason: the budget follows the account the notices go
+// to. A request with no readable token passes through to the handler, which answers it 500
+// before changing anything.
+func (m *RateLimiter) LimitAccountCredentialChange(next http.Handler) http.Handler {
+	return m.limitRequests(next, m.accountCredentialChange, rejectAPI)
+}
+
 // LimitAccountPassword rate limits the account's own password check, on the subject of the
 // access token presented. One middleware over four routes, PUT /api/v1/account/password,
 // PUT /api/v1/account/otp, PUT /api/v1/account/email (#404) and POST
@@ -946,9 +977,10 @@ func (m *RateLimiter) LimitAccountEmailChange(next http.Handler) http.Handler {
 // disable branch takes no OTP code, so guessing the password there is enough to strip 2FA
 // (#113, #219).
 //
-// The OTP code on the enable branch is deliberately outside this bound. It is verified
-// against the secret the caller supplied in the same request, so guessing it gains nothing
-// and only the password check spends the budget.
+// The OTP code on the enable branch is deliberately outside this bound. It is verified against
+// the seed this server issued to the same caller at GET /api/v1/account/otp/enrollment, which
+// their own access token entitles them to fetch outright, so guessing the code gains nothing that
+// asking for it would not, and only the password check spends the budget (#247).
 //
 // The subject rather than the client IP, for LimitEmailVerification's reason: the budget has
 // to follow the account being attacked, and reaching any of them needs a valid access token
@@ -970,9 +1002,9 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 
 // limitRequests writes the body of a limiter every request spends, keyed on what its one tier
 // counts by and refusing in the shape class names. LimitActivate, LimitResetPwd and LimitDCR are
-// this over a tier counted by the client block, and LimitEmailVerificationSend and
-// LimitAccountEmailChange over one counted by the token's user (#439). LimitRegister was too,
-// until it gained a per-address tier (#207).
+// this over a tier counted by the client block, and LimitEmailVerificationSend,
+// LimitAccountEmailChange and LimitAccountCredentialChange over one counted by the token's user
+// (#439). LimitRegister was too, until it gained a per-address tier (#207).
 //
 // A request with no subject of the tier's kind passes through to the handler, which answers it
 // itself, for limitFailuresPerSubject's reason; a client block is never absent.

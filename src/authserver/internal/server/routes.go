@@ -475,16 +475,18 @@ func (s *Server) initRoutes(branches appBranches) {
 		// One limiter over these PUTs and the email change above, which is what makes the
 		// failure budget shared: they verify the same password, so separate buckets would hand
 		// an attacker more guesses by alternating. The enrollment GET between them checks no
-		// credential.
-		r.With(rateLimiter.LimitAccountPassword).Put("/password",
+		// credential. Ahead of it, one more over these PUTs and the new set of recovery codes
+		// below counts every change, since each sends the user a notice: a request it refuses
+		// never reaches the password check, and one that check refuses is counted (#724).
+		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Put("/password",
 			apihandlers.HandleAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter, notifier))
 		r.Get("/otp/enrollment", apihandlers.HandleAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
-		r.With(rateLimiter.LimitAccountPassword).Put("/otp",
+		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Put("/otp",
 			apihandlers.HandleAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher, notifier))
 		// The count of unused recovery codes checks no credential; a new set takes the password,
 		// so it spends the same bucket as the changes above (#257 decision 8).
 		r.Get("/otp/recovery-codes", apihandlers.HandleAccountRecoveryCodesGet(s.database))
-		r.With(rateLimiter.LimitAccountPassword).Post("/otp/recovery-codes",
+		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Post("/otp/recovery-codes",
 			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter, notifier))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))

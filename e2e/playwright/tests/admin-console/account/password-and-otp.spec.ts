@@ -336,6 +336,46 @@ test("too many wrong current passwords are refused on the form, and on the OTP p
   await own.context.close();
 });
 
+// Password changes, two-factor changes and new sets of recovery codes share one budget of ten an
+// hour per user, every request counted, a wrong password included, whatever the rate limiter switch
+// says: each change sends the user a notice, so one account can't flood them (#724).
+test("the eleventh credential change in an hour is refused, the password and two-factor pages together", async ({ browser, users }) => {
+  // Up to a code step's wait for the authenticator, beside nine password changes.
+  test.setTimeout(120_000);
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/change-password");
+  const change = async (current: string, next: string) => {
+    await own.page.goto(`${env.adminUrl}/account/change-password`);
+    await own.page.locator("#currentPassword").fill(current);
+    await own.page.locator("#newPassword").fill(next);
+    await own.page.locator("#newPasswordConfirmation").fill(next);
+    await own.page.getByRole("button", { name: "Change password" }).click();
+  };
+
+  // The first is a wrong password, which counts like the others.
+  await change("not-the-password", "a-new-passphrase");
+  await expect(own.page.locator("#password-error")).toContainText(wrongPassword);
+  // The second to the ninth change it, back and forth between two new ones.
+  const passwords = [user.password, "first-new-passphrase", "second-new-passphrase"];
+  let current = 0;
+  for (let attempt = 2; attempt <= 9; attempt++) {
+    const next = current === 1 ? 2 : 1;
+    await change(passwords[current], passwords[next]);
+    await expect(own.page.getByText("Password changed.")).toBeVisible();
+    current = next;
+  }
+  // The tenth turns two-factor authentication on.
+  await own.page.goto(`${env.adminUrl}/account/otp`);
+  await turnOn(own.page, passwords[current]);
+
+  // The eleventh is refused before the password is compared, though it's right, and drawn on the form.
+  await change(passwords[current], "third-new-passphrase");
+  await expect(own.page.locator("#password-error")).toContainText(tooManyAttempts);
+  await expect(own.page.getByText("Password changed.")).toHaveCount(0);
+  await expect(own.page).toHaveURL(`${env.adminUrl}/account/change-password`);
+  await own.context.close();
+});
+
 test("an enrolment form left open while OTP is enabled in another tab leaves it enabled", async ({ page, browser, users }) => {
   const user = await users.create();
   // Tab A draws the enrolment form and is left open.

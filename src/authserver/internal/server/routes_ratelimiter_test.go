@@ -105,10 +105,14 @@ const (
 	emailVerificationSendWindow = 3600
 	accountEmailChangeBudget    = 5 // requests per 60 minutes per token subject
 	accountEmailChangeWindow    = 3600
-	accountPasswordBudget       = 5 // failures per 15 minutes per token subject, shared by two routes
-	accountPasswordWindow       = 900
-	otpBudget                   = 5 // failures per 15 minutes per user id
-	otpWindow                   = 900
+	// Requests per 60 minutes per token subject, shared by the password change, the two-factor
+	// change and a new set of recovery codes (#724 decision 3).
+	accountCredentialChangeBudget = 10
+	accountCredentialChangeWindow = 3600
+	accountPasswordBudget         = 5 // failures per 15 minutes per token subject, shared by two routes
+	accountPasswordWindow         = 900
+	otpBudget                     = 5 // failures per 15 minutes per user id
+	otpWindow                     = 900
 
 	routesTestClientId = "test-client"
 	// A public client the password grant is enabled for, so a password grant naming it reaches
@@ -682,6 +686,75 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		passwordBody := `{"currentPassword":"` + routesTestWrongPassword + `","newPassword":"a new password"}`
 		assert.True(t, reachesHandler(server, apiRequest(http.MethodPut, "/api/v1/account/password", passwordBody)),
 			"the shared password bucket keeps its own budget when the email change's is spent")
+	})
+
+	t.Run("the password, two-factor and recovery-code changes share one budget of every request", func(t *testing.T) {
+		// Each of the three sends the user a notice, so every request counts, on the three
+		// together (#724 decision 3). A blank password is refused before it is checked and
+		// spends nothing on account_password, which keeps the case about this tier. Taking turns
+		// over the routes, then refusing each of them, is what says all three are wrapped and
+		// share the one counter: an unwrapped route would reach its handler, and a route given a
+		// tier of its own would still have budget left. The email change's tier, which has the
+		// same window and class at half the budget, would refuse the sixth.
+		server := newRoutesTestServer(t)
+		changes := []func() *http.Request{
+			func() *http.Request {
+				return apiRequest(http.MethodPut, "/api/v1/account/password",
+					`{"currentPassword":"","newPassword":"a new password"}`)
+			},
+			func() *http.Request {
+				return apiRequest(http.MethodPut, "/api/v1/account/otp", `{"password":"","enabled":false}`)
+			},
+			func() *http.Request {
+				return apiRequest(http.MethodPost, "/api/v1/account/otp/recovery-codes", `{"password":""}`)
+			},
+		}
+		for i := 0; i < accountCredentialChangeBudget; i++ {
+			assert.NotEqual(t, http.StatusTooManyRequests, serve(server, changes[i%len(changes)]()).Code,
+				"change %d must reach the handler", i+1)
+		}
+		for _, change := range changes {
+			assertRefused(t, serve(server, change()), accountCredentialChangeWindow, shapeAPI)
+		}
+
+		assert.True(t, reachesHandler(server, apiRequest(http.MethodPut, "/api/v1/account/email",
+			`{"email":"probe@example.com","currentPassword":""}`)),
+			"the email change keeps its own budget when the credential changes' is spent")
+	})
+
+	t.Run("the credential changes' tier counts what account_password refuses, mounted ahead of it", func(t *testing.T) {
+		// Five wrong passwords spend account_password, which refuses the sixth to the tenth with
+		// its quarter hour. Counted ahead of it, those refusals spend this tier too, so the
+		// eleventh is refused with this tier's hour; mounted behind it, they would never reach
+		// this tier and the eleventh would carry the quarter hour again.
+		server := newRoutesTestServer(t)
+		wrongPassword := func() *http.Request {
+			return apiRequest(http.MethodPut, "/api/v1/account/password",
+				`{"currentPassword":"`+routesTestWrongPassword+`","newPassword":"a new password"}`)
+		}
+		for i := 0; i < accountPasswordBudget; i++ {
+			assert.NotEqual(t, http.StatusTooManyRequests, serve(server, wrongPassword()).Code,
+				"guess %d must reach the handler", i+1)
+		}
+		for i := accountPasswordBudget; i < accountCredentialChangeBudget; i++ {
+			assertRefused(t, serve(server, wrongPassword()), accountPasswordWindow, shapeAPI)
+		}
+		assertRefused(t, serve(server, wrongPassword()), accountCredentialChangeWindow, shapeAPI)
+	})
+
+	t.Run("the email change's budget is not the credential changes'", func(t *testing.T) {
+		// The mirror: the email change spends its own tier, and leaves the three credential
+		// changes theirs, so the email change wired to LimitAccountCredentialChange, or the
+		// credential changes to LimitAccountEmailChange, is caught by spending either.
+		server := newRoutesTestServer(t)
+		assertRefused(t, exhaust(t, server, accountEmailChangeBudget, func(attempt int) *http.Request {
+			return apiRequest(http.MethodPut, "/api/v1/account/email",
+				fmt.Sprintf(`{"email":"probe%d@example.com","currentPassword":""}`, attempt))
+		}), accountEmailChangeWindow, shapeAPI)
+
+		assert.True(t, reachesHandler(server, apiRequest(http.MethodPost, "/api/v1/account/otp/recovery-codes",
+			`{"password":""}`)),
+			"a new set of recovery codes keeps its budget when the email change's is spent")
 	})
 
 	// The cases above pin every registration whose window or reject class differs from its

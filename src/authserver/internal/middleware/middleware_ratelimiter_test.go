@@ -1963,6 +1963,146 @@ func TestLimitAccountEmailChange_PerSubject(t *testing.T) {
 	})
 }
 
+// runAccountCredentialChange drives one request through a credential change's chain as routes.go
+// mounts it, LimitAccountCredentialChange before LimitAccountPassword, and reports the status,
+// whether the handler ran, and the response. target is the route, and failed is whether the
+// handler found the password wrong. A blank subject carries no token.
+func runAccountCredentialChange(m *RateLimiter, target, subject string, failed bool) (int, bool, *httptest.ResponseRecorder) {
+	rr := httptest.NewRecorder()
+	reached := false
+	m.LimitAccountCredentialChange(m.LimitAccountPassword(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		if failed {
+			m.RecordCredentialFailure(r)
+		}
+		w.WriteHeader(http.StatusTeapot)
+	}))).ServeHTTP(rr, accountPasswordRequest(target, subject))
+	return rr.Code, reached, rr
+}
+
+// accountRecoveryCodesRoute is the third route of the credential change's tier, beside
+// accountPasswordRoute and accountOTPRoute.
+const accountRecoveryCodesRoute = "/api/v1/account/otp/recovery-codes"
+
+// credentialChangeRoutes takes turns over the three routes, so a run of changes spends the tier
+// from each of them.
+var credentialChangeRoutes = []string{accountPasswordRoute, accountOTPRoute, accountRecoveryCodesRoute}
+
+// TestLimitAccountCredentialChange_PerSubject is the tier the password change, the two-factor
+// change and a new set of recovery codes share, each of which sends the user a notice: 10 an hour
+// for the three together, every request counted, the refused ones included, refused in the API's
+// own envelope with the hour as Retry-After, and audited once with the subject (#724 decision 3).
+func TestLimitAccountCredentialChange_PerSubject(t *testing.T) {
+	const budget = 10
+	const subject = "88888888-8888-8888-8888-888888888888"
+
+	t.Run("the eleventh change is refused, taking turns over the three routes with the right password", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			route := credentialChangeRoutes[i%len(credentialChangeRoutes)]
+			if code, reached, _ := runAccountCredentialChange(m, route, subject, false); code != http.StatusTeapot || !reached {
+				t.Fatalf("change %d at %s: got code %d, handler reached %v; want %d and true",
+					i+1, route, code, reached, http.StatusTeapot)
+			}
+		}
+		for _, route := range credentialChangeRoutes {
+			code, reached, rr := runAccountCredentialChange(m, route, subject, false)
+			if code != http.StatusTooManyRequests || reached {
+				t.Fatalf("change past the budget at %s: got code %d, handler reached %v; want %d and false",
+					route, code, reached, http.StatusTooManyRequests)
+			}
+			if got := rr.Header().Get("Retry-After"); got != "3600" {
+				t.Errorf("Retry-After at %s = %q, want the hour the tier counts over", route, got)
+			}
+			if got := rr.Header().Get("Content-Type"); got != "application/json" {
+				t.Errorf("Content-Type at %s = %q, want the account API's JSON envelope", route, got)
+			}
+		}
+		if len(auditLog.events) != 1 {
+			t.Fatalf("got %d audit events, want 1", len(auditLog.events))
+		}
+		want := map[string]interface{}{"limiter": "account_credential_change", "logged_in_user": subject}
+		if !reflect.DeepEqual(auditLog.events[0].details, want) {
+			t.Errorf("audit details = %v, want %v", auditLog.events[0].details, want)
+		}
+	})
+
+	// Mounted ahead of account_password, so a change that tier refuses is still counted here. Five
+	// wrong passwords spend account_password, which refuses the sixth to the tenth with its own
+	// quarter hour; the eleventh is this tier's, with its hour.
+	t.Run("a change account_password refuses is counted too, and this tier is ahead of it", func(t *testing.T) {
+		m, auditLog := newAuditedTestMiddleware(nil, true)
+		for i := 0; i < 5; i++ {
+			if code, reached, _ := runAccountCredentialChange(m, accountPasswordRoute, subject, true); code != http.StatusTeapot || !reached {
+				t.Fatalf("wrong password %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		for i := 5; i < budget; i++ {
+			code, reached, rr := runAccountCredentialChange(m, accountPasswordRoute, subject, false)
+			if code != http.StatusTooManyRequests || reached || rr.Header().Get("Retry-After") != "900" {
+				t.Fatalf("change %d: got code %d, handler reached %v, Retry-After %q; want account_password's %d with 900",
+					i+1, code, reached, rr.Header().Get("Retry-After"), http.StatusTooManyRequests)
+			}
+		}
+		code, reached, rr := runAccountCredentialChange(m, accountPasswordRoute, subject, false)
+		if code != http.StatusTooManyRequests || reached {
+			t.Fatalf("change %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "3600" {
+			t.Errorf("Retry-After = %q, want this tier's hour, not account_password's quarter", got)
+		}
+		var limiters []interface{}
+		for _, e := range auditLog.events {
+			limiters = append(limiters, e.details["limiter"])
+		}
+		if !reflect.DeepEqual(limiters, []interface{}{"account_password", "account_credential_change"}) {
+			t.Errorf("audited limiters = %v, want account_password then account_credential_change", limiters)
+		}
+	})
+
+	t.Run("each subject has its own budget", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			runAccountCredentialChange(m, accountPasswordRoute, subject, false)
+		}
+		if code, _, _ := runAccountCredentialChange(m, accountPasswordRoute, subject, false); code != http.StatusTooManyRequests {
+			t.Fatalf("the exhausted subject got code %d, want %d", code, http.StatusTooManyRequests)
+		}
+		if code, reached, _ := runAccountCredentialChange(m, accountPasswordRoute, "99999999-9999-9999-9999-999999999999", false); code != http.StatusTeapot || !reached {
+			t.Errorf("second subject: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("a request carrying no token reaches the handler", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget*3; i++ {
+			if code, reached, _ := runAccountCredentialChange(m, accountPasswordRoute, "", false); code != http.StatusTeapot || !reached {
+				t.Fatalf("attempt %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+	})
+
+	// Counted by a user already authenticated, whom no stranger can spend it for, so it holds
+	// with the limiter off too (#542).
+	t.Run("the limiter switched off still limits credential changes", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget; i++ {
+			if code, reached, _ := runAccountCredentialChange(m, accountOTPRoute, subject, false); code != http.StatusTeapot || !reached {
+				t.Fatalf("change %d of a budget of %d with the limiter off: got code %d, handler reached %v",
+					i+1, budget, code, reached)
+			}
+		}
+		if code, reached, _ := runAccountCredentialChange(m, accountOTPRoute, subject, false); code != http.StatusTooManyRequests || reached {
+			t.Fatalf("change %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+}
+
 // accountPasswordRequest builds a request at one of the two routes LimitAccountPassword
 // covers, carrying the validated token the account API's authentication middleware leaves on
 // the context. target is what tells the two routes apart, and the cases below use it to show
@@ -2736,8 +2876,8 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 //
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
-// test can reach today are two of nineteen tiers, and the next tier is what this exists for (#320
-// decision 3). The nineteen are twelve request tiers, two of them the per-address ceilings on
+// test can reach today are two of twenty tiers, and the next tier is what this exists for (#320
+// decision 3). The twenty are thirteen request tiers, two of them the per-address ceilings on
 // password checks, and five failures-only ones, plus the two failures-only tiers of the password
 // gate, which ratelimit.AccountLimiter counts and accountTiers names (#439, #564).
 func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
@@ -2752,9 +2892,9 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// The count is asserted because a walk that silently stopped matching would pass over an
 	// empty set exactly as it passes over a conformant one. It counts instances rather than
 	// distinct names, so a second tier carrying a name an earlier one already used is a
-	// twentieth tier here rather than a replacement for the nineteenth.
-	if len(tiers) != 19 {
-		t.Fatalf("walked %d tiers, expected the 19 the constructor builds: %v", len(tiers), tiers)
+	// twenty-first tier here rather than a replacement for the twentieth.
+	if len(tiers) != 20 {
+		t.Fatalf("walked %d tiers, expected the 20 the constructor builds: %v", len(tiers), tiers)
 	}
 	for _, found := range tiers {
 		if found.keyField == "" {

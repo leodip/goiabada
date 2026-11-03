@@ -10,36 +10,37 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// TestRateLimiter_EveryTierDeclaresWhatItCountsBy holds each of the nineteen tiers the constructor
+// TestRateLimiter_EveryTierDeclaresWhatItCountsBy holds each of the twenty tiers the constructor
 // builds to the kind #522 decision 11 gives it: ten by IP address, three by the account a form
-// names, one by IP address and account, one by the signing-in user and four by the access token's
+// names, one by IP address and account, one by the signing-in user and five by the access token's
 // user. The kinds are written here rather than read from the constructor, because the rate-limit
 // table's Counted by column is held to the declaration, and a declaration changed by mistake would
 // carry the table with it through a regenerated reading.
 //
-// Found by walking the struct, as the conventional-key test beside it finds them, so a twentieth
+// Found by walking the struct, as the conventional-key test beside it finds them, so a twenty-first
 // tier fails the count rather than going unchecked.
 func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 	want := map[string]countedBy{
-		"pwd_ip":                  countedByIP,
-		"pwd_ip_requests":         countedByIP,
-		"activate":                countedByIP,
-		"register":                countedByIP,
-		"reset_pwd":               countedByIP,
-		"forgot_pwd_ip":           countedByIP,
-		"dcr":                     countedByIP,
-		"ropc_ip":                 countedByIP,
-		"ropc_ip_requests":        countedByIP,
-		"authorize":               countedByIP,
-		"pwd_account":             countedByAccount,
-		"register_email":          countedByAccount,
-		"forgot_pwd_email":        countedByAccount,
-		"pwd_account_net":         countedByIPAndAccount,
-		"otp":                     countedBySigningInUser,
-		"email_verification":      countedByTokenUser,
-		"email_verification_send": countedByTokenUser,
-		"account_email_change":    countedByTokenUser,
-		"account_password":        countedByTokenUser,
+		"pwd_ip":                    countedByIP,
+		"pwd_ip_requests":           countedByIP,
+		"activate":                  countedByIP,
+		"register":                  countedByIP,
+		"reset_pwd":                 countedByIP,
+		"forgot_pwd_ip":             countedByIP,
+		"dcr":                       countedByIP,
+		"ropc_ip":                   countedByIP,
+		"ropc_ip_requests":          countedByIP,
+		"authorize":                 countedByIP,
+		"pwd_account":               countedByAccount,
+		"register_email":            countedByAccount,
+		"forgot_pwd_email":          countedByAccount,
+		"pwd_account_net":           countedByIPAndAccount,
+		"otp":                       countedBySigningInUser,
+		"email_verification":        countedByTokenUser,
+		"email_verification_send":   countedByTokenUser,
+		"account_email_change":      countedByTokenUser,
+		"account_credential_change": countedByTokenUser,
+		"account_password":          countedByTokenUser,
 	}
 
 	var tiers []foundTier
@@ -51,7 +52,7 @@ func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 	for _, found := range tiers {
 		kind, ok := want[found.name]
 		if !ok {
-			t.Errorf("tier %q at %s is not one of the nineteen this test knows", found.name, found.where)
+			t.Errorf("tier %q at %s is not one of the twenty this test knows", found.name, found.where)
 			continue
 		}
 		if found.countedBy != kind {
