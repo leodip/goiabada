@@ -50,8 +50,8 @@ const (
 	// commit and refuses any other bytes, so the table moves only when a human
 	// moves these two (see the steps above). The upstream tip used to be
 	// resolved at run time, which made two runs of one tree disagree (#432).
-	pinnedCommit    = "cc23444f4314174e1571a9804e186c15f8e8ab2b"
-	pinnedCSVSHA256 = "67b009b529330b0a6043551189f43faa785c9c3cc0011ad2bdb4eac876356c43"
+	pinnedCommit    = "2d84034a0cae19ea5444b78c2131304a5c7f4bb9"
+	pinnedCSVSHA256 = "bb199ebc9636b9872705e8216f1f849359f136a7668ebfa23a3c58048462ab92"
 
 	// rawURLFmt is the immutable per-commit raw CSV URL (%s = commit SHA).
 	rawURLFmt = "https://raw.githubusercontent.com/datasets/country-codes/%s/data/country-codes.csv"
