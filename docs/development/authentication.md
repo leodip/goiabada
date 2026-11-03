@@ -430,10 +430,11 @@ When user has valid session (`UserSession` in DB + session cookie):
   not overwritten by an older ceremony that resumed after it, and `/auth/completed` answers that
   ceremony with the "no longer active" page, since a newer authentication already describes the
   session
-- Only the page branch refreshes the browser session (`sessionstore.Refreshing`, first in
-  `pageChain`): a row more than ten seconds stale is touched there, and a signed-in session's
-  cookie is sent again with the row's new expiry. The files, protocol and API branches read the
-  session without touching it, so no reissued cookie rides on a cacheable answer (#743)
+- Only the page branch refreshes the browser session (`sessionstore.Refreshing`, in `pageChain`
+  behind `middleware.NoStore`): a row more than ten seconds stale is touched there, and a signed-in
+  session's cookie is sent again with the row's new expiry. Every answer on that branch is
+  `no-store`, the router's 405 under a page group included, and the files, protocol and API branches
+  read the session without touching it, so no reissued cookie rides on a cacheable answer (#743)
 - Whether a signed-in cookie outlives the browser is the store's `KeepSignedIn` rule
   (`sessionbackend.NewKeepSignedIn`), asked per cookie write. Under Let each user choose it reads the
   password page's Keep me signed in answer from the browser session (`sessionkeys.KeepSignedIn`, a
@@ -441,7 +442,12 @@ When user has valid session (`UserSession` in DB + session cookie):
   written only by `RecordPasswordVerified`, nil when no box was shown), and `/auth/completed`
   records it only when the ceremony entered the password: the create arm in `RegenerateSessionAndBind`'s
   write, the reuse arm (`replaceAuthentication`) through `RecordKeepSignedIn` after the bind. A nil
-  answer deletes the key; an SSO pass leaves it as it is (#743)
+  answer deletes the key; an SSO pass leaves it as it is (#743). Each record stamps the answer with
+  its ceremony's `PasswordVerifiedAt` (`sessionkeys.KeepSignedInPasswordAt`), and `RecordKeepSignedIn`
+  leaves an answer stamped later as it is, checked in its conditional write: two held ceremonies can
+  bind in one order and record in the other, and the newer password entry's answer must stand. The
+  create arm records its own answer whatever the stamp, since the session it binds started from
+  that entry
 
 ## SSO and ACR/AMR Details
 

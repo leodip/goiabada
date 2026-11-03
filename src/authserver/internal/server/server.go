@@ -751,12 +751,15 @@ func (s *Server) applicationChain(faults middleware.ServerFaults) []func(http.Ha
 // refusals keep the language the request asks for.
 //
 // Only a page request refreshes the browser session, and the refresh sends the session cookie
-// again; on every other branch the session is read without moving its idle deadline. Every page is
-// no-store, while the files are answered cacheable and discovery and JWKS carry no directive, so a
-// reissued cookie never rides on an answer a shared cache may store and replay to other visitors
-// (#743 decision 9). It goes first, ahead of the cookie reset's first read of the session.
+// again; on every other branch the session is read without moving its idle deadline. The files are
+// answered cacheable and discovery and JWKS carry no directive, so a reissued cookie never rides on
+// an answer a shared cache may store and replay to other visitors (#743 decision 9). The refresh goes
+// ahead of the cookie reset's first read of the session, and NoStore goes ahead of the refresh, so
+// every answer on the branch is no-store whichever exit writes it: a rendered page, a redirect, or
+// the router's 405 for a path under a page group, which no renderer draws and RFC 9110 section
+// 15.5.6 makes heuristically cacheable.
 func (s *Server) pageChain() []func(http.Handler) http.Handler {
-	return append(append([]func(http.Handler) http.Handler{sessionstore.Refreshing},
+	return append(append([]func(http.Handler) http.Handler{middleware.NoStore(), sessionstore.Refreshing},
 		s.applicationChain(middleware.PageFaults())...),
 		middleware.PageLanguage(ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName), s.database))
 }

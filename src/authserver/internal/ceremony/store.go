@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/errs"
@@ -405,7 +406,10 @@ func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremo
 // sign-in reaches the browser as one Set-Cookie. A planted identifier would otherwise name the row
 // the victim's sign-in fills in (session fixation, #266). The same write records keepSignedIn, the
 // answer the ceremony entered its password with (putKeepSignedIn), so that one Set-Cookie already
-// carries the lifetime the answer asks for (#743 decisions 2 and 5).
+// carries the lifetime the answer asks for (#743 decisions 2 and 5). The answer is stamped with the
+// instant the held ceremony verified the password, which RecordKeepSignedIn orders a later answer
+// against: the session this rotation binds was started from that password entry, so its answer is
+// this one, whatever answer the browser session held before (putKeepSignedIn).
 //
 // It keeps, as RegenerateSession does, no ceremony held for a user other than userId, the user the
 // session is bound to, and writes only while the browser session still holds the ceremony named,
@@ -421,11 +425,15 @@ func (s *Store) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request,
 
 	rotation := heldRotation(ceremonyId, userId)
 	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, func(values map[string]any) error {
+		held, err := heldCeremony(values, ceremonyId)
+		if err != nil {
+			return err
+		}
 		if err := rotation(values); err != nil {
 			return err
 		}
 		values[sessionkeys.SessionIdentifier] = userSessionIdentifier
-		putKeepSignedIn(values, keepSignedIn)
+		putKeepSignedIn(values, keepSignedIn, held.PasswordVerifiedAt)
 		return nil
 	}))
 }
@@ -440,32 +448,95 @@ func (s *Store) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request,
 //
 // It answers ErrCeremonyReplaced, writing nothing and setting no cookie, when the session does not
 // hold the ceremony, or is gone.
+//
+// An older password entry never replaces a newer one's answer. Two ceremonies of one user can both
+// be held and both bind the session, and the bind and this write are separate, so an older
+// completion can reach this write after a newer one has made both: bind A, bind B, record B, record
+// A. The session row keeps B's authentication, the newer, and so must the browser session's answer,
+// or A's ticked box would make the cookie outlive the browser again after B's unticked one (#743
+// decision 2). The answer is therefore stamped with the instant the held ceremony verified the
+// password, and the write leaves an answer stamped later as it is, answering nil, writing nothing
+// and setting no cookie. The order is checked in the same conditional write that records the
+// answer, so no write lands between the check and the record. An answer with no stamp, or whose
+// stamp does not read, orders before every password entry; a ceremony with no password instant
+// orders before every stamped answer.
 func (s *Store) RecordKeepSignedIn(w http.ResponseWriter, r *http.Request, ceremonyId string, keepSignedIn *bool) error {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
 
-	isHeld := holds(ceremonyId)
-	return goneIsReplaced(s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
-		if heldErr := isHeld(values); heldErr != nil {
+	err = goneIsReplaced(s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+		held, heldErr := heldCeremony(values, ceremonyId)
+		if heldErr != nil {
 			return heldErr
 		}
-		putKeepSignedIn(values, keepSignedIn)
+		if answeredLater(values, held.PasswordVerifiedAt) {
+			return errNewerAnswerKept
+		}
+		putKeepSignedIn(values, keepSignedIn, held.PasswordVerifiedAt)
 		return nil
 	}))
+	if errors.Is(err, errNewerAnswerKept) {
+		return nil
+	}
+	return err
+}
+
+// errNewerAnswerKept is the refusal RecordKeepSignedIn's change answers when the browser session
+// holds the answer of a later password entry than its ceremony's, so the conditional write writes
+// nothing.
+var errNewerAnswerKept = errors.New("the browser session holds the answer of a later password entry")
+
+// heldCeremony is the ceremony ceremonyId names among those values hold, as a fresh read found them,
+// and ErrCeremonyReplaced when they hold none by that id, holds' condition.
+func heldCeremony(values map[string]any, ceremonyId string) (*AuthContext, error) {
+	ceremonies, err := heldIn(values)
+	if err != nil {
+		return nil, err
+	}
+	i := indexOf(ceremonies, ceremonyId)
+	if i < 0 {
+		return nil, errs.WithStack(ErrCeremonyReplaced)
+	}
+	return &ceremonies[i], nil
 }
 
 // putKeepSignedIn writes the answer the password page's Keep me signed in box was given into the
 // browser session's values, under sessionkeys.KeepSignedIn, the key the auth server's Keep users
 // signed in rule reads: true ticked, false unticked, and no key at all for a password entered with
-// no box, which counts as unticked (#743 decision 5).
-func putKeepSignedIn(values map[string]any, keepSignedIn *bool) {
+// no box, which counts as unticked (#743 decision 5). Beside it, under
+// sessionkeys.KeepSignedInPasswordAt, goes passwordVerifiedAt, the password entry the answer belongs
+// to, which RecordKeepSignedIn orders answers by; a nil instant leaves no stamp.
+func putKeepSignedIn(values map[string]any, keepSignedIn *bool, passwordVerifiedAt *time.Time) {
+	if passwordVerifiedAt == nil {
+		delete(values, sessionkeys.KeepSignedInPasswordAt)
+	} else {
+		values[sessionkeys.KeepSignedInPasswordAt] = passwordVerifiedAt.UTC().Format(time.RFC3339Nano)
+	}
 	if keepSignedIn == nil {
 		delete(values, sessionkeys.KeepSignedIn)
 		return
 	}
 	values[sessionkeys.KeepSignedIn] = *keepSignedIn
+}
+
+// answeredLater reports whether values hold the answer of a password entry later than
+// passwordVerifiedAt. An answer with no stamp, or one that does not read, is earlier than any; a
+// nil passwordVerifiedAt is earlier than any stamped answer. Equal instants are not later.
+func answeredLater(values map[string]any, passwordVerifiedAt *time.Time) bool {
+	stamp, ok := values[sessionkeys.KeepSignedInPasswordAt].(string)
+	if !ok {
+		return false
+	}
+	answeredAt, err := time.Parse(time.RFC3339Nano, stamp)
+	if err != nil {
+		return false
+	}
+	if passwordVerifiedAt == nil {
+		return true
+	}
+	return answeredAt.After(*passwordVerifiedAt)
 }
 
 // errCeremonyConfirmed is the refusal ConfirmCeremony's change answers when the session holds its

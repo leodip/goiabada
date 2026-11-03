@@ -80,11 +80,13 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	)
 
 	// The page branch alone refreshes the browser session, ahead of the first read of it, so the
-	// touch can send the session cookie again (#743 decisions 8 and 9). It then applies a known
-	// user's page language, over what the locale middleware resolved; the protocol endpoints and
-	// the APIs answer in the language asked for (#631 decision 5). The files branch answers faults
-	// as the page branch does, and draws no page.
+	// touch can send the session cookie again (#743 decisions 8 and 9), behind NoStore, so every
+	// answer that can carry that cookie is no-store, the router's 405 included. It then applies a
+	// known user's page language, over what the locale middleware resolved; the protocol endpoints
+	// and the APIs answer in the language asked for (#631 decision 5). The files branch answers
+	// faults as the page branch does, and draws no page.
 	wantPages := append(append(append([]string{}, wantRoot...),
+		"github.com/leodip/goiabada/authserver/internal/middleware.NoStore.func1",
 		"github.com/leodip/goiabada/core/sessionstore.Refreshing"),
 		wantApp[len(wantRoot):]...)
 	wantPages = append(wantPages,

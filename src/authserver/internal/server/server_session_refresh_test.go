@@ -125,3 +125,58 @@ func TestInitMiddleware_OnlyThePageBranchRefreshesTheSessionAndSendsItsCookie(t 
 		"with the row's new expiry as its Max-Age")
 	assert.InDelta(t, 3600, cookies[0].MaxAge, 2, "an hour, the in-memory backend's lifetime")
 }
+
+// Every answer on the page branch is no-store, whatever exit writes it: the refresh can send the
+// session cookie again on any of them, and no answer that carries it may be stored by a shared cache
+// (#743 decision 9). A page handler that writes no header of its own, and the 405 the router answers
+// GET /auth/token with behind the /auth group's chain, both carry the reissued cookie under
+// Cache-Control: no-store and Pragma: no-cache. A 405 is heuristically cacheable (RFC 9110 section
+// 15.5.6), and Set-Cookie does not stop a cache storing it (RFC 9111 section 7.3).
+func TestRegisterRoutes_EveryPageBranchAnswerCarryingARefreshedCookieIsNoStore(t *testing.T) {
+	database := newRoutingDatabase(t)
+	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "the-user-session").
+		Return(&record.UserSession{Id: 1, UserId: 1, SessionIdentifier: "the-user-session"}, nil).Maybe()
+	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil).Maybe()
+
+	backend := &staleBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
+	s := newStaticBranchTestServer(database)
+	s.sessionStore = newTestSessionStoreOver(backend)
+	s.registerRoutes()
+
+	saveReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	saveRec := httptest.NewRecorder()
+	session, err := s.sessionStore.Get(saveReq, sessionkeys.AuthServerSessionName)
+	require.NoError(t, err)
+	session.Values[sessionkeys.SessionIdentifier] = "the-user-session"
+	require.NoError(t, s.sessionStore.Save(saveReq, saveRec, session))
+	saved := saveRec.Result().Cookies()
+	require.Len(t, saved, 1)
+	sessionCookie := saved[0]
+
+	for _, request := range []struct {
+		method, target string
+		status         int
+	}{
+		{http.MethodGet, "/auth/token", http.StatusMethodNotAllowed},
+		{http.MethodPut, "/auth/pwd", http.StatusMethodNotAllowed},
+		{http.MethodGet, "/", http.StatusFound},
+	} {
+		touchesBefore := backend.touches
+		req := httptest.NewRequest(request.method, request.target, nil)
+		req.AddCookie(sessionCookie)
+		rec := httptest.NewRecorder()
+		s.router.ServeHTTP(rec, req)
+
+		require.Equal(t, request.status, rec.Code, "%s %s", request.method, request.target)
+		assert.Equal(t, touchesBefore+1, backend.touches, "%s %s touches the stale session", request.method, request.target)
+		var reissued []*http.Cookie
+		for _, cookie := range rec.Result().Cookies() {
+			if cookie.Name == sessionCookie.Name {
+				reissued = append(reissued, cookie)
+			}
+		}
+		require.Len(t, reissued, 1, "%s %s sends the session cookie again", request.method, request.target)
+		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"), "%s %s", request.method, request.target)
+		assert.Equal(t, "no-cache", rec.Header().Get("Pragma"), "%s %s", request.method, request.target)
+	}
+}

@@ -39,3 +39,10 @@ const LinkMarker string = "LinkMarker"
 // signed in before the setting existed; the store reads an absent answer as unticked, since no one
 // gave consent to a cookie that outlives the browser (#743 decisions 2 and 5).
 const KeepSignedIn string = "KeepSignedIn"
+
+// KeepSignedInPasswordAt holds the instant, RFC 3339 in UTC with nanoseconds, of the password entry
+// the answer under KeepSignedIn was given at, present whenever that entry's ceremony recorded one,
+// with or without an answer. An older completion that reaches the browser session after a newer one
+// leaves the newer answer as it is, ordered by this instant (#743 decision 2). Only ceremony.Store
+// reads or writes it.
+const KeepSignedInPasswordAt string = "KeepSignedInPasswordAt"

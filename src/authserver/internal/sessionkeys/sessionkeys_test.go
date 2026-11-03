@@ -27,4 +27,5 @@ func TestSessionKeys_AreStoredData(t *testing.T) {
 	assert.Equal(t, "AuthContext", RetiredAuthContext)
 	assert.Equal(t, "LinkMarker", LinkMarker)
 	assert.Equal(t, "KeepSignedIn", KeepSignedIn)
+	assert.Equal(t, "KeepSignedInPasswordAt", KeepSignedInPasswordAt)
 }

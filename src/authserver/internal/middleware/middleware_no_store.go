@@ -48,6 +48,11 @@ import "net/http"
 //
 // Handlers that set their own Cache-Control still win, since Header().Set
 // replaces. Nothing under /api/v1 sets one.
+//
+// It also heads the page branch's chain, ahead of the browser session's
+// refresh, which can send the session cookie again on any answer there: a
+// rendered page, a redirect, or the router's 405, so none of them can be
+// stored by a shared cache and replayed to another visitor (#743 decision 9).
 func NoStore() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
