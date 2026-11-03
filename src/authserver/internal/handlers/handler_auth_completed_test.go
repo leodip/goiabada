@@ -1450,6 +1450,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
+		assert.Equal(t, 43200, deviceCookieOf(t, rr).MaxAge, "the device cookie lives the max lifetime the session was started under, not the idle timeout")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))

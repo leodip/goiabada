@@ -90,8 +90,9 @@ type completionBrowser interface {
 	// Device is the browser the request comes from: its device cookie's identifier, or a new one,
 	// and its display labels.
 	Device() usersession.Device
-	// WriteDeviceCookie gives the browser its device identifier. It cannot fail.
-	WriteDeviceCookie(identifier string)
+	// WriteDeviceCookie gives the browser its device identifier, kept for maxLifetimeInSeconds, the
+	// User session max lifetime the new session started under, up to 400 days. It cannot fail.
+	WriteDeviceCookie(identifier string, maxLifetimeInSeconds int)
 }
 
 // Completion is GET /auth/completed, reached once a ceremony's authentication is complete
@@ -492,7 +493,7 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 			err = o.sessions.AbandonUserSession(ctx, newSession,
 				errs.Wrap(rotateErr, "unable to rotate the browser session identifier"))
 		} else {
-			browser.WriteDeviceCookie(device.Identifier)
+			browser.WriteDeviceCookie(device.Identifier, limits.MaxLifetimeInSeconds)
 		}
 	}
 

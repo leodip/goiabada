@@ -248,14 +248,15 @@ func TestBrowserSession_DeviceIsTheHandlersRequests(t *testing.T) {
 	assert.Equal(t, chromeUserAgent, device.UserAgent)
 }
 
-// The device cookie is written on the handler's own response.
+// The device cookie is written on the handler's own response, for the max lifetime it is given.
 func TestBrowserSession_WriteDeviceCookieLandsOnTheHandlersWriter(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	newSessionStartingBrowserSession(rr, adapterRequest(), handlersmocks.NewCeremonyStore(t), NewDeviceCookie(false)).
-		WriteDeviceCookie(thisDevice)
+		WriteDeviceCookie(thisDevice, 7200)
 
 	assert.Equal(t, thisDevice, deviceCookieOf(t, rr).Value)
+	assert.Equal(t, 7200, deviceCookieOf(t, rr).MaxAge)
 }
 
 // credentialFailureSpy records the requests the rate limiter's port is reached with. A spy here and

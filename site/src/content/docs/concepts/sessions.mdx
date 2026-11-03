@@ -105,7 +105,7 @@ A page that keeps sending a window it opened to sign in can push the user's sign
 
 The auth server gives each browser a cookie of its own, `__Host-authserver_device`, or `authserver_device` when its base URL is plain `http`, so a sign-in can tell which of the user's sessions came from that browser. It holds a random identifier that only the auth server reads, and it's used for nothing else: a first-party cookie the auth server needs to work, not a tracker.
 
-- **It's written when a sign-in starts a new session,** for 400 days, the longest a browser keeps a cookie. A browser that already has one keeps its identifier.
+- **It's written when a sign-in starts a new session,** for the maximum lifetime, 24 hours by default: as long as that session can last. The longest it asks for is 400 days, the most a browser keeps a cookie. A browser that already has one keeps its identifier.
 - **Signing out doesn't clear it,** and neither does an administrator ending a session: it names the browser, not a session.
 - **A session stores the identifier's SHA-256, never the identifier,** and neither is shown in the admin console, returned by an API or logged.
 - **A browser whose cookies were cleared counts as a new browser.** Its next sign-in leaves the old session alone, to expire or be ended by [the cap](#how-many-sessions-a-user-can-hold).
@@ -127,7 +127,7 @@ The cap catches pile-ups, such as a script that signs in with a fresh browser ev
 
 ## Closing the browser
 
-Closing the browser doesn't end a session with the auth server. The cookie lasts as long as the session does, so reopening the browser within the idle timeout signs the user straight back in, and a restarted machine or a laptop shut for lunch costs nobody a password.
+Closing the browser doesn't end a session with the auth server. The cookie lasts as long as the session does, up to 400 days, so reopening the browser within the idle timeout signs the user straight back in, and a restarted machine or a laptop shut for lunch costs nobody a password.
 
 The admin console does the opposite on purpose. Its own cookie lasts only until the browser closes, so reopening the browser asks an administrator to sign in to it again, even while the auth server still has their session. An administrator's browser reaches every part of the deployment, so one more sign-in is worth it to keep a lost or forgotten machine from still holding that access. Some browsers restore what was open after a crash or an update, and that can bring an admin console session back with it.
 

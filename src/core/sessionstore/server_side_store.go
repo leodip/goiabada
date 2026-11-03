@@ -45,6 +45,13 @@ const (
 	// the staleness observable to anyone (#266).
 	TouchThreshold = 10 * time.Second
 
+	// MaxCookieMaxAgeInSeconds is the longest Max-Age a persistent cookie of the auth server asks
+	// for: 400 days, the most RFC 6265bis lets a user agent keep a cookie, which reduces a longer
+	// one to its own limit. Past it the cookie's real lifetime would depend on the browser, so the
+	// sign-in cookie this store writes and the device cookie both stop here, and the session row's
+	// own expiry stays the one that decides (#743 decisions 1 and 6).
+	MaxCookieMaxAgeInSeconds = 400 * 24 * 60 * 60
+
 	// MaxSessionWireBytes bounds one whole session request or response body on the wire,
 	// the JSON envelope included. The session endpoint applies it to what it reads and
 	// the HTTP backend applies it to what it reads back, so it is the outermost of the
@@ -645,8 +652,9 @@ func (s *ServerSideStore) deleteSession(ctx context.Context, w http.ResponseWrit
 //
 // The cookie's own expiry follows the row's, for the module that keeps one: the browser
 // then never holds a handle that outlives what it names, and the operator's session
-// timeout governs both halves through one setting. The module that does not keep one
-// leaves MaxAge at zero, which net/http renders as neither Max-Age nor Expires, so the
+// timeout governs both halves through one setting. A row that lives longer than
+// MaxCookieMaxAgeInSeconds gets a cookie asking for that, which a browser keeps whole. The
+// module that does not keep one leaves MaxAge at zero, which net/http renders as neither Max-Age nor Expires, so the
 // browser drops the cookie when it closes and the tokens inside never reach disk.
 func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *Session, id string, expiresAt time.Time) error {
 	encodedId, err := seal(s.random, s.current.cookie, session.Name(), []byte(id))
@@ -662,10 +670,7 @@ func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *Session, id 
 	opts.MaxAge = 0
 	if s.lifetime == PersistentCookie {
 		remaining := int(expiresAt.Sub(s.now()).Seconds())
-		if remaining < 1 {
-			remaining = 1
-		}
-		opts.MaxAge = remaining
+		opts.MaxAge = max(1, min(remaining, MaxCookieMaxAgeInSeconds))
 	}
 
 	http.SetCookie(w, s.buildCookie(session.Name(), encodedId, &opts))

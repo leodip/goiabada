@@ -89,9 +89,10 @@ func (b *browserSession) Device() usersession.Device {
 	return b.deviceCookie.read(b.r)
 }
 
-// WriteDeviceCookie gives the browser its device identifier, on this request's response.
-func (b *browserSession) WriteDeviceCookie(identifier string) {
-	b.deviceCookie.write(b.w, identifier)
+// WriteDeviceCookie gives the browser its device identifier, on this request's response, for
+// maxLifetimeInSeconds up to 400 days.
+func (b *browserSession) WriteDeviceCookie(identifier string, maxLifetimeInSeconds int) {
+	b.deviceCookie.write(b.w, identifier, maxLifetimeInSeconds)
 }
 
 // RecordCredentialFailure is CredentialFailureRecorder.RecordCredentialFailure on this request, whose

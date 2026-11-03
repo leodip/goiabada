@@ -28,8 +28,12 @@ const thisDevice = "5f0c8e2a9d4b7163e8a1c0f9b2d3e4a5968778695a4b3c2d1e0f1a2b3c4d
 const chromeUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
 	"(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-// fourHundredDaysInSeconds is the cookie's Max-Age, the most RFC 6265bis lets a browser keep one.
-const fourHundredDaysInSeconds = 400 * 24 * 60 * 60
+// seededMaxLifetimeInSeconds is the User session max lifetime a deployment is seeded with, 24 hours.
+const seededMaxLifetimeInSeconds = 86400
+
+// fourHundredDaysInSeconds is the longest Max-Age either persistent cookie asks for, the most
+// RFC 6265bis lets a browser keep one.
+const fourHundredDaysInSeconds = 34560000
 
 var lowerHex64 = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
@@ -72,12 +76,12 @@ func readAndWrite(t *testing.T, deviceCookie *DeviceCookie, req *http.Request) (
 	t.Helper()
 	device := deviceCookie.read(req)
 	rr := httptest.NewRecorder()
-	deviceCookie.write(rr, device.Identifier)
+	deviceCookie.write(rr, device.Identifier, seededMaxLifetimeInSeconds)
 	return device, deviceCookieOf(t, rr)
 }
 
 // A browser with no device cookie gets one, with the session cookie's attributes on plain http and
-// 400 days to live, holding 32 random bytes, and the device is new.
+// the max lifetime to live, holding 32 random bytes, and the device is new.
 func TestDeviceCookie_ABrowserWithNoDeviceCookieGetsOne(t *testing.T) {
 	device, cookie := readAndWrite(t, NewDeviceCookie(false), browserRequest("", ""))
 
@@ -90,7 +94,7 @@ func TestDeviceCookie_ABrowserWithNoDeviceCookieGetsOne(t *testing.T) {
 	assert.True(t, cookie.HttpOnly)
 	assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
 	assert.False(t, cookie.Secure, "not Secure on plain http")
-	assert.Equal(t, fourHundredDaysInSeconds, cookie.MaxAge)
+	assert.Equal(t, 86400, cookie.MaxAge, "as long as a session can live")
 }
 
 // Two browsers with no cookie are two devices: each value is drawn afresh.
@@ -112,7 +116,7 @@ func TestDeviceCookie_OnHTTPSTheDeviceCookieIsAHostCookie(t *testing.T) {
 	assert.Empty(t, cookie.Domain)
 	assert.True(t, cookie.HttpOnly)
 	assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
-	assert.Equal(t, fourHundredDaysInSeconds, cookie.MaxAge)
+	assert.Equal(t, 86400, cookie.MaxAge)
 	assert.Equal(t, device.Identifier, cookie.Value)
 }
 
@@ -124,7 +128,31 @@ func TestDeviceCookie_ABrowserWithADeviceCookieKeepsIt(t *testing.T) {
 	assert.False(t, device.New)
 	assert.Equal(t, thisDevice, device.Identifier)
 	assert.Equal(t, thisDevice, cookie.Value)
-	assert.Equal(t, fourHundredDaysInSeconds, cookie.MaxAge, "the lifetime starts again")
+	assert.Equal(t, 86400, cookie.MaxAge, "the lifetime starts again")
+}
+
+// The cookie lives as long as a session can, the User session max lifetime it is written under (#743
+// decision 1), and asks for no more than 400 days however long that is.
+func TestDeviceCookie_ItLivesTheMaxLifetimeUpTo400Days(t *testing.T) {
+	for name, test := range map[string]struct {
+		maxLifetimeInSeconds int
+		wantMaxAge           int
+	}{
+		"the seeded 24 hours":             {maxLifetimeInSeconds: 86400, wantMaxAge: 86400},
+		"an hour":                         {maxLifetimeInSeconds: 3600, wantMaxAge: 3600},
+		"a second under 400 days":         {maxLifetimeInSeconds: 34559999, wantMaxAge: 34559999},
+		"exactly 400 days":                {maxLifetimeInSeconds: 34560000, wantMaxAge: 34560000},
+		"a second over 400 days":          {maxLifetimeInSeconds: 34560001, wantMaxAge: fourHundredDaysInSeconds},
+		"the longest the setting accepts": {maxLifetimeInSeconds: 160000000, wantMaxAge: fourHundredDaysInSeconds},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+
+			NewDeviceCookie(true).write(rr, thisDevice, test.maxLifetimeInSeconds)
+
+			assert.Equal(t, test.wantMaxAge, deviceCookieOf(t, rr).MaxAge)
+		})
+	}
 }
 
 // On https the identifier is read from the prefixed cookie, and a bare-named one, which anyone able

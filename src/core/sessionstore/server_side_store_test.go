@@ -1071,6 +1071,48 @@ func TestServerSideStore_PersistentCookieFollowsTheRowsExpiry(t *testing.T) {
 	assert.InDelta(t, 7200, cookie.MaxAge, 5)
 }
 
+// A row that lives longer than 400 days gets a cookie asking for 400 days, 34,560,000 seconds, the
+// most RFC 6265bis lets a browser keep one, on every write of it: past that the cookie's lifetime
+// would be whatever each browser cuts it to. The row keeps its own expiry, which stays the one
+// that decides (#743 decision 6). Under it the cookie follows the row to the second.
+func TestServerSideStore_PersistentCookieAsksForAtMost400Days(t *testing.T) {
+	now := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+	const fourHundredDays = 400 * 24 * time.Hour
+
+	for name, test := range map[string]struct {
+		rowLifetime time.Duration
+		wantMaxAge  int
+	}{
+		"a second under 400 days":                  {rowLifetime: fourHundredDays - time.Second, wantMaxAge: 34559999},
+		"exactly 400 days":                         {rowLifetime: fourHundredDays, wantMaxAge: 34560000},
+		"a second over 400 days":                   {rowLifetime: fourHundredDays + time.Second, wantMaxAge: 34560000},
+		"the longest max lifetime the setting has": {rowLifetime: 160000000 * time.Second, wantMaxAge: 34560000},
+	} {
+		t.Run(name, func(t *testing.T) {
+			backend := newFakeBackend()
+			backend.expiresAt = now.Add(test.rowLifetime)
+			store, err := NewServerSideStore(backend, "SessionIdentifier", false, PersistentCookie, storeTestPair(), nil)
+			require.NoError(t, err)
+			store.now = func() time.Time { return now }
+
+			created := saveNew(t, store, nil)
+			assert.Equal(t, test.wantMaxAge, created.MaxAge, "the save that creates the row")
+
+			req := requestWith(created)
+			session, err := store.Get(req, storeTestName)
+			require.NoError(t, err)
+			require.NotEmpty(t, session.ID, "the row is loaded")
+			w := httptest.NewRecorder()
+			require.NoError(t, store.Save(req, w, session))
+			cookies := w.Result().Cookies()
+			require.Len(t, cookies, 1)
+			assert.Equal(t, test.wantMaxAge, cookies[0].MaxAge, "the save that updates it")
+			assert.Equal(t, now.Add(test.rowLifetime), backend.rows[session.ID].ExpiresAt,
+				"the row keeps its own expiry")
+		})
+	}
+}
+
 func TestServerSideStore_NonPersistentCookieCarriesNoExpiry(t *testing.T) {
 	backend := newFakeBackend()
 	store, err := NewServerSideStore(backend, "SessionIdentifier", false, BrowserSessionCookie, storeTestPair(), nil)

@@ -745,6 +745,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `ErrNotFound` | kernel | — |
 | `core/sessionstore` | `ExpiresAt` | contract | The rule deciding when a browser session row stops being usable. The admin console's sessions live in rows the auth server's backend writes, so the rule is cross-process even though only the writing side calls it (#266). |
 | `core/sessionstore` | `KeyPair` | both-apps | — |
+| `core/sessionstore` | `MaxCookieMaxAgeInSeconds` | own-package | — |
 | `core/sessionstore` | `MaxCookieValuesBytes` | own-package | — |
 | `core/sessionstore` | `MaxSessionDataBytes` | own-package | — |
 | `core/sessionstore` | `MaxSessionWireBytes` | both-apps | — |
