@@ -133,7 +133,9 @@ func TestRender_PasswordPages_ShowTheNistHintUnderTheField(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			out := servePasswordPage(t, tc, nistRules)
 
-			assert.Regexp(t, regexp.QuoteMeta(inputRe(tc.field).FindString(out))+`\s*`+regexp.QuoteMeta(hint), out,
+			// The input's row holds it and its show/hide button, and the hint follows the row.
+			assert.Regexp(t, regexp.QuoteMeta(inputRe(tc.field).FindString(out))+
+				`\s*<button [^>]*aria-controls="`+tc.field+`"[^>]*>[^<]*</button>\s*</div>\s*`+regexp.QuoteMeta(hint), out,
 				"the hint is drawn right under the new password's input")
 			assert.Contains(t, " "+describedBy(t, out, tc.field)+" ", " password-rules ",
 				"the input names the hint in its aria-describedby")

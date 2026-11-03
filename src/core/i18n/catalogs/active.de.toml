@@ -22,6 +22,14 @@
 "common.field.password" = "Passwort"
 "common.field.password_confirmation" = "Passwort bestätigen"
 "common.link.sign_in_to_account" = "Bei Ihrem Konto anmelden"
+"common.password_toggle.show" = "Anzeigen"
+"common.password_toggle.hide" = "Ausblenden"
+"common.password_toggle.shown" = "Angezeigt"
+"common.password_toggle.hidden" = "Ausgeblendet"
+"common.password_toggle.show_password" = "Passwort anzeigen"
+"common.password_toggle.hide_password" = "Passwort ausblenden"
+"common.password_toggle.show_password_confirmation" = "Passwortbestätigung anzeigen"
+"common.password_toggle.hide_password_confirmation" = "Passwortbestätigung ausblenden"
 
 # The password rules a form that sets a password shows under its field, on the auth server's registration,
 # activation and reset forms and the admin console's change-password, new user and Authentication tab pages.
@@ -316,6 +324,22 @@
 "adminconsole.paginator.label" = "Seitennavigation"
 "adminconsole.paginator.previous" = "Vorherige Seite"
 "adminconsole.paginator.next" = "Nächste Seite"
+"adminconsole.password_toggle.show" = "Anzeigen"
+"adminconsole.password_toggle.hide" = "Ausblenden"
+"adminconsole.password_toggle.shown" = "Angezeigt"
+"adminconsole.password_toggle.hidden" = "Ausgeblendet"
+"adminconsole.password_toggle.show_password" = "Passwort anzeigen"
+"adminconsole.password_toggle.hide_password" = "Passwort ausblenden"
+"adminconsole.password_toggle.show_current_password" = "Aktuelles Passwort anzeigen"
+"adminconsole.password_toggle.hide_current_password" = "Aktuelles Passwort ausblenden"
+"adminconsole.password_toggle.show_new_password" = "Neues Passwort anzeigen"
+"adminconsole.password_toggle.hide_new_password" = "Neues Passwort ausblenden"
+"adminconsole.password_toggle.show_new_password_confirmation" = "Bestätigung des neuen Passworts anzeigen"
+"adminconsole.password_toggle.hide_new_password_confirmation" = "Bestätigung des neuen Passworts ausblenden"
+"adminconsole.password_toggle.show_client_secret" = "Client-Secret anzeigen"
+"adminconsole.password_toggle.hide_client_secret" = "Client-Secret ausblenden"
+"adminconsole.password_toggle.show_secret_key" = "Geheimen Schlüssel anzeigen"
+"adminconsole.password_toggle.hide_secret_key" = "Geheimen Schlüssel ausblenden"
 
 # --- Sign-out confirmation page (#411) ---------------------------------------
 

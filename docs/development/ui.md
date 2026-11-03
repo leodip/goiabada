@@ -57,11 +57,19 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `versions.yaml`, so each module's unit tier needs `node` on the path, as the dev container and the
   test jobs have it. The auth server's pages work with JavaScript off, except those three forms while the challenge
   is on, whose submission needs the token the widget's script writes; the console says it needs it.
+  In both servers a button marked `data-password-toggle` shows and hides the password field its
+  `aria-controls` names (each `utils.js`'s `passwordToggle`), and with JavaScript off it never shows.
   In the console a script answers an action in a live region the page draws empty, through
   `showNotice`, not in a dialog, its failures too (`sendAjaxRequest`'s `statusRegion`); a removal
   asks first in a `modal_dialog` of type `confirm`, whose second button names the action; a button
-  marked `data-copy-target` copies, a long `select` marked `data-searchable` becomes a `combobox`
-  that filters as the person types, the select kept hidden to post the value, an element marked
+  marked `data-copy-target` copies, a page script may call `passwordToggle` on a show/hide button it
+  reaches by id, so an operator's older template keeps working, a long `select` marked `data-searchable` becomes a `combobox`
+  that filters as the person types, the select kept hidden to post the value, its field taking the
+  select's `autocomplete` (`off` where it has none), turning `autocorrect` off, since a keyboard's
+  correction fires the input event Firefox's fill does, and committing a browser's fill to the select,
+  by option value, case aside, then by name, flag aside, or for `tel-country-code` by the one
+  option whose `data-calling-code` it is, a fill naming nothing in a field without the focus
+  putting the choice back, and leaving the field keeping the option its text names, an element marked
   `data-duration-for` says the seconds typed in a field as a duration, and a form marked
   `data-confirm-dialog` asks before a save whose consequences need saying, every one in one
   `modal_dialog` of type `confirm_change`, each from a control marked `data-confirm` against the
@@ -80,8 +88,29 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
   is `aria-hidden="true"`, and a button showing one alone carries `sr-only` text; targets are at
-  least 24 pixels. A refusal about one field marks it `aria-invalid="true"` and names the notice in
-  its `aria-describedby`, under the same `{{if .error}}` the notice renders under, which the guard
+  least 24 pixels. The console's sticky header is `--app-header-height` tall, and
+  `html:has(.app-header)` reserves that height plus 1.25rem as `scroll-padding-top`, so Tab,
+  `focus()`, `scrollIntoView` and in-page links leave the element, focus ring included, below the
+  header (SC 2.4.11). The gap is that wide because WebKit lines up a text field's caret, not its box,
+  with the edge; change the header's height only through the property, and give anything else
+  pinned over the page a scroll offset of its own. `focus-not-obscured.spec.ts` checks it in
+  Chromium, Firefox and WebKit. A field collecting the person's own data declares its purpose
+  (SC 1.3.5) with a token the HTML Standard allows on its control (Autofill, 4.10.19.7.1), and a
+  control a script draws in place of another keeps the purpose of the one it replaces; a page about
+  another user declares none, since autofill would fill in the administrator's own data. Every
+  password field, in both servers, carries `spellcheck="false"`, `autocapitalize="none"` and
+  `autocorrect="off"`, so a shown password reaches no spell-check service and no keyboard rewrites
+  it (HTML Standard 6.8.5, 6.8.7, 6.8.8), and sits in an `input-row` beside its show/hide button: a
+  `button type="button"`, drawn `hidden` so it never shows without JavaScript, marked
+  `data-password-toggle`, with `aria-controls` naming the field. Its visible word is
+  `adminconsole.password_toggle.show` in the console and `common.password_toggle.show` in the auth
+  server, and, in `data-hide-label`, `hide`; its name, in `aria-label`
+  and `data-hide-name`, is the `show_<kind>` and `hide_<kind>` pair of the field's kind, such as
+  "Show new password", which contains the visible word in every catalog (SC 2.5.3); and
+  `data-shown-status` and `data-hidden-status` carry the words the script writes into the
+  `role="status"` region it adds beside the field. The name changes with the state, so the button
+  has no `aria-pressed`. `ui.css` hides Edge's own reveal control beside a shown button. A refusal
+  about one field marks it `aria-invalid="true"` and names the notice in its `aria-describedby`, under the same `{{if .error}}` the notice renders under, which the guard
   reads as one branch; a handler whose form has several fields says which in `errorField`, and in
   the console reads it off the admin API's error code through `render.ErrorField`, or, for the API's
   `VALIDATION_ERROR`, which names no field, the first required field sent blank through

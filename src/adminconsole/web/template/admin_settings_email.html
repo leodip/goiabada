@@ -91,9 +91,12 @@
         <label class="field-label" for="password">{{ T $.ctx "adminconsole.admin_settings.email.field.password" }}
           {{- if .settings.HasSMTPPassword }} <span class="tag tag-positive -my-0.5">{{ T $.ctx "adminconsole.admin_settings.email.password_saved" }}</span>
           {{- else }} <span class="tag -my-0.5">{{ T $.ctx "adminconsole.admin_settings.email.password_not_set" }}</span>{{ end }}</label>
-        <input class="control" id="password" type="password" name="password" value="{{ .settings.SMTPPassword }}"{{ if .settings.HasSMTPPassword }} placeholder="{{ T $.ctx "adminconsole.admin_settings.email.password_keep_placeholder" }}"{{ end }} autocomplete="new-password"
-          {{- if .settings.HasSMTPPassword }} aria-describedby="{{ if .error }}{{ if eq .errorField "password" }}email-error {{ end }}{{ end }}passwordHint"{{ else }}{{ if .error }}{{ if eq .errorField "password" }} aria-describedby="email-error"{{ end }}{{ end }}{{ end }}
-          {{- if .error }}{{ if eq .errorField "password" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <div class="input-row">
+          <input class="control" id="password" type="password" name="password" value="{{ .settings.SMTPPassword }}"{{ if .settings.HasSMTPPassword }} placeholder="{{ T $.ctx "adminconsole.admin_settings.email.password_keep_placeholder" }}"{{ end }} autocomplete="new-password" spellcheck="false" autocapitalize="none" autocorrect="off"
+            {{- if .settings.HasSMTPPassword }} aria-describedby="{{ if .error }}{{ if eq .errorField "password" }}email-error {{ end }}{{ end }}passwordHint"{{ else }}{{ if .error }}{{ if eq .errorField "password" }} aria-describedby="email-error"{{ end }}{{ end }}{{ end }}
+            {{- if .error }}{{ if eq .errorField "password" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+          <button class="button" type="button" data-password-toggle aria-controls="password" aria-label="{{ T $.ctx "adminconsole.password_toggle.show_password" }}" data-hide-name="{{ T $.ctx "adminconsole.password_toggle.hide_password" }}" data-hide-label="{{ T $.ctx "adminconsole.password_toggle.hide" }}" data-shown-status="{{ T $.ctx "adminconsole.password_toggle.shown" }}" data-hidden-status="{{ T $.ctx "adminconsole.password_toggle.hidden" }}" hidden>{{ T $.ctx "adminconsole.password_toggle.show" }}</button>
+        </div>
         <input id="hasSmtpPassword" type="hidden" name="hasSmtpPassword" value="{{ if .settings.HasSMTPPassword }}true{{ end }}">
         {{- if .settings.HasSMTPPassword }}
         <p class="field-hint" id="passwordHint">{{ T $.ctx "adminconsole.admin_settings.email.password_tooltip" }}</p>

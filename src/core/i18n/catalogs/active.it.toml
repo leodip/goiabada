@@ -25,6 +25,14 @@
 "common.field.password" = "Password"
 "common.field.password_confirmation" = "Conferma password"
 "common.link.sign_in_to_account" = "Accedi al tuo account"
+"common.password_toggle.show" = "Mostra"
+"common.password_toggle.hide" = "Nascondi"
+"common.password_toggle.shown" = "Visibile"
+"common.password_toggle.hidden" = "Non visibile"
+"common.password_toggle.show_password" = "Mostra password"
+"common.password_toggle.hide_password" = "Nascondi password"
+"common.password_toggle.show_password_confirmation" = "Mostra conferma della password"
+"common.password_toggle.hide_password_confirmation" = "Nascondi conferma della password"
 
 # The password rules a form that sets a password shows under its field, on the auth server's registration,
 # activation and reset forms and the admin console's change-password, new user and Authentication tab pages.
@@ -319,6 +327,22 @@
 "adminconsole.paginator.label" = "Paginazione"
 "adminconsole.paginator.previous" = "Pagina precedente"
 "adminconsole.paginator.next" = "Pagina successiva"
+"adminconsole.password_toggle.show" = "Mostra"
+"adminconsole.password_toggle.hide" = "Nascondi"
+"adminconsole.password_toggle.shown" = "Visibile"
+"adminconsole.password_toggle.hidden" = "Non visibile"
+"adminconsole.password_toggle.show_password" = "Mostra password"
+"adminconsole.password_toggle.hide_password" = "Nascondi password"
+"adminconsole.password_toggle.show_current_password" = "Mostra password attuale"
+"adminconsole.password_toggle.hide_current_password" = "Nascondi password attuale"
+"adminconsole.password_toggle.show_new_password" = "Mostra nuova password"
+"adminconsole.password_toggle.hide_new_password" = "Nascondi nuova password"
+"adminconsole.password_toggle.show_new_password_confirmation" = "Mostra conferma della nuova password"
+"adminconsole.password_toggle.hide_new_password_confirmation" = "Nascondi conferma della nuova password"
+"adminconsole.password_toggle.show_client_secret" = "Mostra client secret"
+"adminconsole.password_toggle.hide_client_secret" = "Nascondi client secret"
+"adminconsole.password_toggle.show_secret_key" = "Mostra chiave segreta"
+"adminconsole.password_toggle.hide_secret_key" = "Nascondi chiave segreta"
 
 # --- Sign-out confirmation page (#411) ---------------------------------------
 

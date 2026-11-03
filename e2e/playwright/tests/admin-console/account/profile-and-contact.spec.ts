@@ -1,4 +1,5 @@
 // The user's own profile, email, phone and address pages, which the administrator sees the same way.
+import type { Locator } from "@playwright/test";
 import { expectRefusal, userUrl } from "../../../lib/admin-console";
 import { signInToConsole } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
@@ -250,4 +251,209 @@ test("the user saves their address, and the administrator sees it", async ({ pag
   await expect(page.locator("#addressLine1")).toHaveValue("Rua Augusta 100");
   await expect(page.locator("#addressPostalCode")).toHaveValue("1100-053");
   await expect(page.locator('select[name="addressCountry"]')).toHaveValue("PT");
+});
+
+// A browser's autofill writes a value into a field with no key press. Playwright cannot trigger a
+// real one, so autofill does what the engines do. Chromium fills a field the person is not in by
+// dispatching focus and keydown, setting the value with a plain input Event and a change, then
+// keyup and blur, while the focus stays where it was (WebFormControlElement::SetAutofillValue); it
+// fills the focused one with the input and change alone. Firefox fires an InputEvent of inputType
+// insertReplacementText, then change. Playwright's fill, by contrast, types: its input is an
+// InputEvent of inputType insertText.
+async function autofill(field: Locator, value: string, engine: "chromium" | "firefox" = "chromium") {
+  await field.evaluate((element, [text, kind]) => {
+    const input = element as HTMLInputElement;
+    const elsewhere = kind === "chromium" && document.activeElement !== input;
+    if (elsewhere) {
+      input.dispatchEvent(new FocusEvent("focus"));
+      input.dispatchEvent(new Event("keydown", { bubbles: true }));
+    }
+    input.value = text;
+    input.dispatchEvent(kind === "firefox"
+      ? new InputEvent("input", { bubbles: true, composed: true, inputType: "insertReplacementText", data: text })
+      : new Event("input", { bubbles: true, composed: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    if (elsewhere) {
+      input.dispatchEvent(new Event("keyup", { bubbles: true }));
+      input.dispatchEvent(new FocusEvent("blur"));
+    }
+  }, [value, engine] as const);
+}
+
+// The person's own fields say what they hold (WCAG 2.2 SC 1.3.5): the searchable lists' fields take
+// their select's purpose, and the time zone, which has none, stays off (#722). Each field turns
+// autocorrection off, since a correction arrives as the input event Firefox's fill fires.
+test("the account pages' fields declare their input purposes", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user);
+  await expect(own.page.getByLabel("Username", { exact: true })).toHaveAttribute("autocomplete", "username");
+  await expect(own.page.getByRole("combobox", { name: "Language and region" })).toHaveAttribute("autocomplete", "language");
+  await expect(own.page.getByRole("combobox", { name: "Time zone" })).toHaveAttribute("autocomplete", "off");
+  await expect(own.page.getByRole("combobox", { name: "Language and region" })).toHaveAttribute("autocorrect", "off");
+  await expect(own.page.getByRole("combobox", { name: "Time zone" })).toHaveAttribute("autocorrect", "off");
+  await own.page.goto(`${env.adminUrl}/account/address`);
+  await expect(own.page.getByRole("combobox", { name: "Country" })).toHaveAttribute("autocomplete", "country");
+  await expect(own.page.getByRole("combobox", { name: "Country" })).toHaveAttribute("autocorrect", "off");
+  await own.page.goto(`${env.adminUrl}/account/phone`);
+  await expect(own.page.getByRole("combobox", { name: "Country" })).toHaveAttribute("autocomplete", "tel-country-code");
+  await expect(own.page.getByRole("combobox", { name: "Country" })).toHaveAttribute("autocorrect", "off");
+  await own.context.close();
+});
+
+// A fill of the country, while the person is in another field, commits a country by its code or
+// its name at once and opens no list; one naming no country puts the stored one back in the field at
+// once, so the field never names a country Save would not store (#722 decision 3).
+test("a filled country code or name is saved, and a fill naming no country keeps the one stored", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/address");
+  const country = own.page.getByRole("combobox", { name: "Country" });
+  const list = own.page.getByRole("listbox", { name: "Country" });
+  const save = async () => {
+    await own.page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(own.page.getByText("Address saved.", { exact: true })).toBeVisible();
+    await own.page.reload();
+  };
+  await own.page.locator("#addressLine1").fill("Rua Augusta 100");
+
+  await own.page.locator("#addressLine1").focus();
+  await autofill(country, "Portugal");
+  await expect(country).toHaveValue("🇵🇹 Portugal");
+  await expect(list).toBeHidden();
+  await expect(own.page.locator("#addressLine1")).toBeFocused();
+  await save();
+  await expect(country).toHaveValue("🇵🇹 Portugal");
+
+  await country.fill("spain");
+  await country.press("Enter");
+  await save();
+  await expect(country).toHaveValue("🇪🇸 Spain");
+  await own.page.locator("#addressLine1").focus();
+  await autofill(country, "Portugália");
+  await expect(country).toHaveValue("🇪🇸 Spain");
+  await expect(list).toBeHidden();
+  await save();
+  await expect(country).toHaveValue("🇪🇸 Spain");
+
+  await own.page.locator("#addressLine1").focus();
+  await autofill(country, "PT");
+  await expect(country).toHaveValue("🇵🇹 Portugal");
+  await save();
+  await expect(country).toHaveValue("🇵🇹 Portugal");
+  await expect(own.page.locator('select[name="addressCountry"]')).toHaveValue("PT");
+
+  // Firefox's fill, of a lower-case code.
+  await country.fill("spain");
+  await country.press("Enter");
+  await own.page.locator("#addressLine1").focus();
+  await autofill(country, "pt", "firefox");
+  await expect(country).toHaveValue("🇵🇹 Portugal");
+  await expect(own.page.locator('select[name="addressCountry"]')).toHaveValue("PT");
+  await own.context.close();
+});
+
+// In the field the person is in, a fill naming no country is text to search by, as typed text is:
+// the list opens filtered to it, and leaving the field puts the choice back. One naming a country
+// commits it there too.
+test("a fill of the focused country field naming no country opens the list, and Tab puts the choice back", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/address");
+  const country = own.page.getByRole("combobox", { name: "Country" });
+  await country.fill("spain");
+  await country.press("Enter");
+  await expect(country).toHaveValue("🇪🇸 Spain");
+
+  await country.focus();
+  await autofill(country, "Portugália");
+  await expect(country).toHaveAttribute("aria-expanded", "true");
+  await expect(country).toHaveValue("Portugália");
+  await expect(own.page.getByText("No matches", { exact: true })).toBeVisible();
+  await country.press("Tab");
+  await expect(country).toHaveValue("🇪🇸 Spain");
+  await expect(own.page.locator('select[name="addressCountry"]')).toHaveValue("ES");
+
+  await country.focus();
+  await autofill(country, "PT");
+  await expect(country).toHaveValue("🇵🇹 Portugal");
+  await expect(country).toHaveAttribute("aria-expanded", "false");
+  await expect(own.page.locator('select[name="addressCountry"]')).toHaveValue("PT");
+  await own.context.close();
+});
+
+// Leaving the field keeps the country its typed text names, its flag aside; a typed code is a
+// search, not a choice, so leaving puts the choice back (#722 decision 5).
+test("a typed country name is kept on leaving the field, and a typed code is not", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/address");
+  const country = own.page.getByRole("combobox", { name: "Country" });
+  const countrySelect = own.page.locator('select[name="addressCountry"]');
+
+  await country.fill("PT");
+  await country.press("Tab");
+  await expect(country).toHaveValue("");
+  await expect(countrySelect).toHaveValue("");
+
+  await country.fill("Portugal");
+  await country.press("Tab");
+  await expect(country).toHaveValue("🇵🇹 Portugal");
+  await own.page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(own.page.getByText("Address saved.", { exact: true })).toBeVisible();
+  await own.page.reload();
+  await expect(country).toHaveValue("🇵🇹 Portugal");
+  await expect(countrySelect).toHaveValue("PT");
+  await own.context.close();
+});
+
+// The language takes a fill of its BCP 47 tag, case aside.
+test("a filled language tag is saved", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user);
+  const language = own.page.getByRole("combobox", { name: "Language and region" });
+  await own.page.locator("#givenName").focus();
+  await autofill(language, "en-gb");
+  await expect(language).toHaveValue(/^en-GB – /);
+  await own.page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(own.page.getByText("Profile saved.", { exact: true })).toBeVisible();
+  await own.page.reload();
+  await expect(language).toHaveValue(/^en-GB – /);
+  await expect(own.page.locator('select[name="locale"]')).toHaveValue("en-GB");
+  await own.context.close();
+});
+
+// The phone's country list takes a filled calling code when exactly one country has it. +44 is the
+// UK's and three Crown Dependencies': in a field the person is not in, the stored country stays; in
+// the focused field, the list shows the four to pick from (#722 decision 6).
+test("a filled calling code picks the one country that has it, and a shared one lists them", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/phone");
+  const country = own.page.getByRole("combobox", { name: "Country" });
+  const number = own.page.locator("#phoneNumber");
+  const list = own.page.getByRole("listbox", { name: "Country" });
+
+  await number.focus();
+  await autofill(country, "+351");
+  await expect(country).toHaveValue("🇵🇹 - Portugal (+351)");
+  await number.fill("912 345 678");
+  await own.page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(own.page.getByText("Phone number saved.", { exact: true })).toBeVisible();
+  await own.page.reload();
+  await expect(country).toHaveValue("🇵🇹 - Portugal (+351)");
+
+  await number.focus();
+  await autofill(country, "+44");
+  await expect(country).toHaveValue("🇵🇹 - Portugal (+351)");
+  await expect(list).toBeHidden();
+
+  await country.focus();
+  await autofill(country, "+44");
+  await expect(list).toBeVisible();
+  await expect(list.getByRole("option")).toHaveText([
+    "🇬🇬 - Guernsey (+44)",
+    "🇮🇲 - Isle of Man (+44)",
+    "🇯🇪 - Jersey (+44)",
+    "🇬🇧 - United Kingdom (+44)",
+  ]);
+  await country.press("Tab");
+  await expect(country).toHaveValue("🇵🇹 - Portugal (+351)");
+  await expect(own.page.locator('select[name="phoneCountryUniqueId"]')).toHaveValue("PRT_0");
+  await own.context.close();
 });

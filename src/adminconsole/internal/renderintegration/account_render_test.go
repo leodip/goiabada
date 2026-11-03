@@ -285,7 +285,9 @@ func TestRender_AccountOtp_TheRecoveryCodesSection(t *testing.T) {
 	assert.Contains(t, out, `<h2 class="panel-title" id="recovery-codes-section-title">Recovery codes</h2>`)
 	assert.Contains(t, out, `name="otpAction" value="recovery-codes"`)
 	assert.Contains(t, out, ">Get new recovery codes<")
-	assert.Contains(t, out, `id="recovery-codes-password" type="password" name="password" autocomplete="current-password"`)
+	assert.Contains(t, out, `id="recovery-codes-password" type="password" name="password" autocomplete="current-password" spellcheck="false" autocapitalize="none" autocorrect="off"`)
+	assert.Contains(t, out, `data-password-toggle aria-controls="recovery-codes-password" aria-label="Show password" data-hide-name="Hide password" data-hide-label="Hide" data-shown-status="Shown" data-hidden-status="Hidden" hidden>Show</button>`,
+		"the field's show/hide button is drawn hidden, named after its field")
 	assert.Contains(t, out, `data-confirm-dialog="confirmRecoveryCodes"`)
 	assert.Contains(t, out, `data-confirm-always="Your current recovery codes stop working as soon as you get new ones, including any you saved or printed."`)
 	assert.Contains(t, out, `id="confirmRecoveryCodes_modalDialog"`)
@@ -297,7 +299,7 @@ func TestRender_AccountOtp_TheRecoveryCodesSection(t *testing.T) {
 		"recoveryCodesError":     "That password isn't right. Try again.",
 	}, "en", true)
 	assert.Contains(t, refused, `id="recovery-codes-error"`)
-	assert.Contains(t, refused, `id="recovery-codes-password" type="password" name="password" autocomplete="current-password" aria-invalid="true" aria-describedby="recovery-codes-error" autofocus`)
+	assert.Contains(t, refused, `id="recovery-codes-password" type="password" name="password" autocomplete="current-password" spellcheck="false" autocapitalize="none" autocorrect="off" aria-invalid="true" aria-describedby="recovery-codes-error" autofocus`)
 	assert.NotContains(t, refused, `id="otp-error"`, "the disable form was not the one refused")
 
 	disabled := renderMenuPageIn(t, "/account_otp.html", map[string]interface{}{"otpEnabled": false}, "en", true)
