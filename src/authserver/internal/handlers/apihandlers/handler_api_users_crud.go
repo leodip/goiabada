@@ -192,6 +192,16 @@ func HandleUserPasswordPut(
 			return
 		}
 
+		// The account's address is told an administrator replaced its password, once this request
+		// has been answered, whatever the answer: the change has committed, so a failed read for
+		// the response below loses no notice (#724). A first password, on an account whose setup
+		// link is pending, replaces nothing and tells nobody (decision 6). It goes to the row the
+		// write replaced, as read under its lock. The notifier sends only with SMTP on and to a
+		// verified address; a change refused or rolled back above returned before this.
+		if replaced != nil && replaced.PasswordHash != "" {
+			defer notifier.Send(r, accountnotice.PasswordChangedByAdministrator, accountnotice.To(replaced))
+		}
+
 		// Get logged in user from access token
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
@@ -221,14 +231,6 @@ func HandleUserPasswordPut(
 
 		// Set content type and encode response
 		writeJSON(w, r, http.StatusOK, response)
-
-		// The account's address is told an administrator replaced its password, after the commit
-		// and the response (#724). A first password, on an account whose setup link is pending,
-		// replaces nothing and tells nobody (decision 6). The notifier sends only with SMTP on and
-		// to a verified address; a change refused or rolled back above returned before this.
-		if replaced != nil && replaced.PasswordHash != "" {
-			notifier.Send(r, accountnotice.PasswordChangedByAdministrator, accountnotice.To(replaced))
-		}
 	}
 }
 
@@ -292,7 +294,7 @@ func HandleUserOTPPut(
 		// Disable OTP. Clearing the secret, turning otp_enabled off and resetting the
 		// consumed-step marker are one atomic operation, shared with the account API's disable
 		// branch (#111 decisions 4 and 13); otpcredential.Remove carries the reasoning.
-		removed, err := otpcredential.Remove(r.Context(), database, user)
+		current, removed, err := otpcredential.Remove(r.Context(), database, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -303,6 +305,13 @@ func HandleUserOTPPut(
 			writeLostOTPChange(w, r, database, user.Id, false)
 			return
 		}
+
+		// The account's address is told an administrator turned two-factor authentication off,
+		// naming no administrator, once this request has been answered, whatever the answer: the
+		// removal has committed, so a failed read for the response below loses no notice (#724).
+		// It goes to the user's row as the removal's transaction read it under its lock. A removal
+		// refused or lost to a concurrent change above returned before this, and tells nobody.
+		defer notifier.Send(r, accountnotice.OTPDisabledByAdministrator, accountnotice.To(current))
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{
@@ -324,11 +333,6 @@ func HandleUserOTPPut(
 
 		// Set content type and encode response
 		writeJSON(w, r, http.StatusOK, response)
-
-		// The account's address is told an administrator turned two-factor authentication off,
-		// after the commit and the response, naming no administrator (#724). A removal refused
-		// or lost to a concurrent change above returned before this, and tells nobody.
-		notifier.Send(r, accountnotice.OTPDisabledByAdministrator, accountnotice.To(user))
 	}
 }
 

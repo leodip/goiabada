@@ -115,7 +115,7 @@ func HandleAccountRecoveryCodesPost(
 			return
 		}
 
-		codes, replaced, err := otpcredential.ReplaceRecoveryCodes(r.Context(), database, user)
+		codes, current, replaced, err := otpcredential.ReplaceRecoveryCodes(r.Context(), database, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -134,6 +134,9 @@ func HandleAccountRecoveryCodesPost(
 		})
 
 		writeJSON(w, r, http.StatusOK, api.CreateAccountRecoveryCodesResponse{RecoveryCodes: codes})
-		notifier.Send(r, accountnotice.RecoveryCodesReplaced, accountnotice.To(user))
+		// To the account as the replacement's transaction read it under the row's lock, not as
+		// read before the password was checked: an address changed or (un)verified meanwhile is
+		// the one the new set committed beside (#737).
+		notifier.Send(r, accountnotice.RecoveryCodesReplaced, accountnotice.To(current))
 	}
 }

@@ -56,6 +56,11 @@ Preserve the row locks that make security decisions atomic:
   it to a session or issuing it. Authenticator removal takes that row first and lowers sessions in
   the same transaction, so a removed authenticator's code cannot subsequently be bound or issued
   (#542).
+- A credential change that emails the user reads the user's row with `GetUserByIdForUpdate` in the
+  change's own transaction and addresses the notice to that row, not to a read from before it
+  (#724). A password write and a new set of recovery codes read it first; the authenticator's
+  establish, removal and disabling count read it after their write to that row; a recovery code's
+  claim takes it first, the order a removal and a new set take the user's row and the codes in.
 
 There is no additional global lock order. Concurrent transactions on the same account can still
 deadlock on MySQL, PostgreSQL or SQL Server; the loser rolls back and is retried. Add a test that

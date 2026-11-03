@@ -280,13 +280,13 @@ func TestOtpCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 
 		// Another enrolment wins from the same read.
 		winning := reloadUser(t, read.Id)
-		_, _, established, err := otpcredential.Establish(ctx, database, dataCipher, winning, enrolledSeed)
+		_, _, _, established, err := otpcredential.Establish(ctx, database, dataCipher, winning, enrolledSeed)
 		if err != nil || !established {
 			t.Fatalf("the first enrolment must land: established=%v err=%v", established, err)
 		}
 		won := reloadUser(t, read.Id)
 
-		generation, _, established, err := otpcredential.Establish(ctx, database, dataCipher, read, enrolledSeed)
+		generation, _, _, established, err := otpcredential.Establish(ctx, database, dataCipher, read, enrolledSeed)
 		if err != nil {
 			t.Fatalf("Establish failed: %v", err)
 		}
@@ -311,7 +311,7 @@ func TestOtpCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 			t.Fatalf("the pending enrolment must install: installed=%v err=%v", installed, err)
 		}
 
-		_, _, established, err := otpcredential.Establish(ctx, database, dataCipher, read, enrolledSeed)
+		_, _, _, established, err := otpcredential.Establish(ctx, database, dataCipher, read, enrolledSeed)
 		if err != nil || established {
 			t.Fatalf("Establish from a stale generation: established=%v err=%v, want false and no error", established, err)
 		}
@@ -329,7 +329,7 @@ func TestOtpCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 		advanceGenerationUnder(t, read.Id)
 		moved := reloadUser(t, read.Id)
 
-		removed, err := otpcredential.Remove(ctx, database, read)
+		_, removed, err := otpcredential.Remove(ctx, database, read)
 		if err != nil {
 			t.Fatalf("Remove failed: %v", err)
 		}

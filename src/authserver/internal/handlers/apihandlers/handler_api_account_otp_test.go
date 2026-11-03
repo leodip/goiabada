@@ -303,6 +303,7 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 	// The rebind's clear, in the enable's own transaction (#489).
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	// And the authenticator's recovery codes (#257 decision 1).
+	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id, mock.Anything).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "recovery-codes") }).Once()
 
@@ -428,6 +429,7 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 	// And the user's sessions are lowered to what a password alone earns, in the same transaction,
 	// so none goes on naming the authenticator once it is gone (#542 decision 1).
+	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, user.Id, "pwd").Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "lower") }).Once()
 
@@ -899,6 +901,7 @@ func TestHandleAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	database.On("ClearPendingOTPEnrollment", mock.Anything, tx, user.Id).Return(nil).Once()
 	// The rebind's clear, in the enable's own transaction (#489).
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, tx, user.Id).Return(nil).Once()
+	database.On("GetUserByIdForUpdate", mock.Anything, tx, user.Id).Return(user, nil).Once()
 	database.On("ReplaceUserRecoveryCodes", mock.Anything, tx, user.Id, mock.Anything).Return(nil).Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
@@ -1078,6 +1081,7 @@ func TestHandleAccountOTPPut_Enable_AnswersWithTheSetOfRecoveryCodes(t *testing.
 	database.On("ClearPendingOTPEnrollment", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	var stored []string
+	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id, mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) { stored = args.Get(3).([]string) }).Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
@@ -1126,6 +1130,7 @@ func TestHandleAccountOTPPut_Disable_AnswersWithNoRecoveryCodes(t *testing.T) {
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	database.On("DeleteUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).Once()
+	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, user.Id, "pwd").Return(nil).Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()

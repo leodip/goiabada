@@ -131,7 +131,7 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 	enrolled := func(t *testing.T) int64 {
 		t.Helper()
 		user := otpStateUser(t, false)
-		_, _, established, err := otpcredential.Establish(ctx, database, dataCipher, user, firstSeed)
+		_, _, _, established, err := otpcredential.Establish(ctx, database, dataCipher, user, firstSeed)
 		if err != nil || !established {
 			t.Fatalf("the first authenticator must establish: established=%v err=%v", established, err)
 		}
@@ -154,11 +154,11 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 		userId := enrolled(t)
 		read := reloadUser(t, userId)
 
-		removed, err := otpcredential.Remove(ctx, database, reloadUser(t, userId))
+		_, removed, err := otpcredential.Remove(ctx, database, reloadUser(t, userId))
 		if err != nil || !removed {
 			t.Fatalf("the removal must land: removed=%v err=%v", removed, err)
 		}
-		_, _, established, err := otpcredential.Establish(ctx, database, dataCipher, reloadUser(t, userId), replacementSeed)
+		_, _, _, established, err := otpcredential.Establish(ctx, database, dataCipher, reloadUser(t, userId), replacementSeed)
 		if err != nil || !established {
 			t.Fatalf("the replacement must establish: established=%v err=%v", established, err)
 		}

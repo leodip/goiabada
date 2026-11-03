@@ -84,6 +84,8 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 					mock.Anything, int64(3)).Return(false, nil).Once()
 			}
 			// The count's statement reports that this call is the one that reached the limit.
+			expectOTPWriteTransactions(database)
+			expectUserRowLocked(database, &record.User{Id: 1})
 			database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1), int64(3)).
 				Return(true, nil).Once()
 

@@ -122,6 +122,9 @@ func HandleAuthOtpPost(
 			newCredentialCheckingBrowserSession(w, r, ceremonyStore, credentialFailures), authContext, code)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
+			// A change that committed before the error is told all the same: the refusal that
+			// disabled the authenticator, whose client block then failed to load (#724 decision 7).
+			sendOTPNotice(r, notifier, result)
 			return
 		}
 
@@ -151,8 +154,12 @@ func HandleAuthOtpPost(
 
 // sendOTPNotice hands the notice the submission reported to the notifier, after the response:
 // the operation committed the change and names it as a plain value, and sends nothing itself
-// (#724). A submission that changed nothing, or lost its change, reports none.
+// (#724). A submission that changed nothing, or lost its change, reports none. The recipient is the
+// user's row as the committing transaction read it, which a committed change always has.
 func sendOTPNotice(r *http.Request, notifier AccountNotifier, result authflow.OTPSubmissionResult) {
+	if result.NoticeTo == nil {
+		return
+	}
 	switch result.Notice {
 	case authflow.OTPNoticeAuthenticatorSetUp:
 		notifier.Send(r, accountnotice.OTPEnabled, accountnotice.To(result.NoticeTo))
@@ -174,6 +181,7 @@ func answerRecoveryCode(w http.ResponseWriter, r *http.Request, boundary *Ceremo
 		newCredentialCheckingBrowserSession(w, r, ceremonyStore, credentialFailures), authContext, code)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
+		sendOTPNotice(r, notifier, result)
 		return
 	}
 

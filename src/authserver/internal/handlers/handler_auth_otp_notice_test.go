@@ -104,6 +104,7 @@ func stubSignInEnrolment(database *datamocks.Database, auditLogger *handlersmock
 	database.On("ClearPendingOTPEnrollment", mock.Anything, otpEnrolTx, user.Id).Return(nil).Once()
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpEnrolTx, user.Id).Return(nil).Once()
 	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpEnrolTx, user.Id, mock.Anything).Return(nil).Once()
+	database.On("GetUserByIdForUpdate", mock.Anything, otpEnrolTx, user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()

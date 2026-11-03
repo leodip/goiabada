@@ -876,6 +876,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		// A refused code against the enrolled authenticator advances the consecutive
 		// count (#489).
+		expectOTPWriteTransactions(database)
 		database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(false, nil).Once()
 
@@ -1280,6 +1281,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				calls = append(calls, "recovery-codes")
 				storedHashes = args.Get(3).([]string)
 			}).Once()
+		// The row the enrolment holds, read in its transaction for the set-up notice (#724).
+		database.On("GetUserByIdForUpdate", mock.Anything, otpEnrolTx, int64(1)).
+			Return(&record.User{Id: 1, OTPEnabled: true}, nil).Once()
 
 		auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return()
 		// The set is audited beside the enable, naming the user and nothing of the codes.
@@ -1553,6 +1557,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// A refused code against the enrolled authenticator advances the consecutive
 		// count, a replay as much as a wrong code, against the authenticator the code was
 		// checked against (#489).
+		expectOTPWriteTransactions(database)
 		database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1), int64(3)).
 			Return(false, nil).Once()
 
@@ -2025,6 +2030,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			// A refused code against the enrolled authenticator advances the consecutive
 			// count, a replay as much as a wrong code (#489); the enrollment half below
 			// verifies a supplied seed, which counts nothing.
+			expectOTPWriteTransactions(database)
 			database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1),
 				user.OtpConfigGeneration).
 				Return(false, nil).Maybe()

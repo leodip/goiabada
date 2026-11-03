@@ -105,7 +105,9 @@ func (notice Notice) class() afterresponse.Class {
 
 // Recipient is the address a notice goes to and the user it is about. The address and its verified
 // flag are what the change's write matched, which for the email change is the address the account
-// had, not the one it has now.
+// had, not the one it has now. For every other notice it is the user's row as the transaction that
+// committed the change read it under the row's lock, never a read from before it, so an address
+// changed, verified or unverified while the request ran is answered as the change found it.
 type Recipient struct {
 	UserId        int64
 	Email         string

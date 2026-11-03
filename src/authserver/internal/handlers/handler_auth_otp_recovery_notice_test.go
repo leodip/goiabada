@@ -77,6 +77,8 @@ func otpNoticeCeremony() *ceremony.AuthContext {
 func stubAcceptedRecoveryCode(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	user *record.User, remaining int) {
 	database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
+	expectOTPWriteTransactions(database)
+	expectUserRowLocked(database, user)
 	database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, user.Id,
 		recoveryCodeHashForTest(recoveryCodeNormalized)).Return(true, nil).Once()
 	database.On("CountUnusedUserRecoveryCodes", mock.Anything, mock.Anything, user.Id).Return(remaining, nil).Once()
@@ -191,6 +193,8 @@ func TestHandleAuthOtpPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T)
 				database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer) {
 				database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
+				expectOTPWriteTransactions(database)
+				expectUserRowLocked(database, user)
 				database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(false, nil).Once()
 				database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(false, nil).Once()
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
@@ -204,6 +208,8 @@ func TestHandleAuthOtpPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T)
 				database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer) {
 				database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
+				expectOTPWriteTransactions(database)
+				expectUserRowLocked(database, user)
 				database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(false, nil).Once()
 				database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(true, nil).Once()
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
@@ -289,6 +295,8 @@ func stubRefusedCode(database *datamocks.Database, auditLogger *handlersmocks.Au
 			user.OtpConfigGeneration).Return(false, nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected, mock.Anything).Return().Once()
 	}
+	expectOTPWriteTransactions(database)
+	expectUserRowLocked(database, user)
 	database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, user.Id, user.OtpConfigGeneration).
 		Return(reachesLimit, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, mock.Anything).Return().Once()

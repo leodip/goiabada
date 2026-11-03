@@ -579,12 +579,16 @@ Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, ac
 and email changes, email verification and its resend, forgot/reset password, self-registration,
 activation, DCR, and the authorization endpoint, both methods of which share one admission budget
 per client block, #504). Credential checks count failures only, so a successful attempt spends
-nothing; the email change counts every request beside its password check, since past the password
-it says whether another account holds the address (#683). The limits counted by a user or by an
+nothing. Two tiers count every request beside a credential check: the email change's, since past
+the password it says whether another account holds the address (#683), and
+`account_credential_change`, 10 an hour per account shared by the Account API's password change,
+two-factor change and new set of recovery codes, mounted ahead of `account_password` so it counts
+refused requests too. Without it nothing bounds how often one account succeeds at those changes,
+and each sends a security notice (#724 decision 3). The limits counted by a user or by an
 email apply whatever
 `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` says: those counted by a user something has already
-authenticated, the signing-in user or a token's subject (OTP, account password, email change, email
-verification and its resend), since no stranger can spend them (#542), and those counted by an email anyone can
+authenticated, the signing-in user or a token's subject (OTP, account password, credential change,
+email change, email verification and its resend), since no stranger can spend them (#542), and those counted by an email anyone can
 type (wrong passwords per account, 100 an hour shared by the sign-in form and the password grant,
 and reset mails and registration notices per address), since only Goiabada can count them (#503).
 The switch governs only the tiers that read the client's address, those counted by an IP address and

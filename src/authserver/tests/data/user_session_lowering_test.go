@@ -108,7 +108,7 @@ func TestRemove_WaitsForABindHoldingTheUserRowAndLowersWhatItWrote(t *testing.T)
 
 	removal := goBlocked(t, "the removal", tx, func(reached func()) error {
 		reached()
-		removed, removeErr := otpcredential.Remove(ctx, other, user)
+		_, removed, removeErr := otpcredential.Remove(ctx, other, user)
 		if removeErr == nil && !removed {
 			return errors.New("the removal matched no authenticator")
 		}
