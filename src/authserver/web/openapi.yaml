@@ -3282,8 +3282,11 @@ paths:
         the credentials and the sender. Answers 200 once the SMTP server has accepted the
         message.
 
-        The send waits up to 10 seconds to connect, including the TLS handshake for SSL/TLS,
-        and up to 30 seconds for the rest of the conversation.
+        The send waits up to 10 seconds to connect, including the TLS handshake for SSL/TLS.
+        After that, each step of the SMTP conversation fails if the SMTP server sends or takes
+        nothing for 20 seconds, and the whole send ends 40 seconds after it started connecting.
+        These limits are much shorter than the 2 to 10 minutes per command that RFC 5321 section
+        4.5.3.2 recommends, because the request waits for the send.
       operationId: sendTestEmail
       requestBody:
         required: true

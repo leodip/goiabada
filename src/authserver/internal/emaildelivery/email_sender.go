@@ -42,10 +42,18 @@ const (
 	// characters, excluding the CRLF.
 	maxHeaderLineHardBytes = 998
 
-	defaultDialTimeout = 10 * time.Second
-	// One deadline covers EHLO through QUIT rather than a per-command one, so a slow relay is not
-	// cut off mid-DATA on a large HTML body (#274).
-	defaultConversationTimeout = 30 * time.Second
+	// How long a send may wait on the relay (#718 decision 7). The connect, the implicit-TLS
+	// handshake included, has 10 seconds. After it every read and every write on the connection has
+	// a fresh 20 seconds, so a relay that stalls on one step is given up on while one that is slow
+	// but making progress, such as on a large HTML body, is not cut off mid-DATA. However it
+	// progresses, the send ends 40 seconds after the connect began. These are far shorter than RFC
+	// 5321 section 4.5.3.2's recommended minima, 2 to 10 minutes per command (a SHOULD), because a
+	// send can hold a browser request open: 40 seconds stays under the server's 60-second HTTP
+	// write timeout, and bounds the after-response jobs that send mail. They are constants, not
+	// settings; longer tolerances belong to an outbox (#731).
+	defaultDialTimeout    = 10 * time.Second
+	defaultCommandTimeout = 20 * time.Second
+	defaultSendTimeout    = 40 * time.Second
 )
 
 type Sender struct {
@@ -55,8 +63,9 @@ type Sender struct {
 	// their fake server's certificate so the TLS paths can be exercised with verification left on.
 	rootCAs *x509.CertPool
 	// Zero means the defaults above.
-	dialTimeout time.Duration
-	convTimeout time.Duration
+	dialTimeout    time.Duration
+	commandTimeout time.Duration
+	sendTimeout    time.Duration
 	// randReader is nil in production, meaning crypto/rand.Reader. It exists so a test can make
 	// the Message-ID's entropy read fail and show the send fails closed.
 	randReader io.Reader
@@ -102,10 +111,16 @@ type SendEmailInput struct {
 // SendEmail sends one message through the relay smtpConfig names. Every failure it returns carries
 // a *SendError labelling its kind, which SendFailureKindOf reads: the steps that can tell label their
 // own, and anything else is SendFailureOther (#410 decision 5).
+//
+// A caller whose ctx ends closes the connection, which ends the send; the failure then carries
+// ctx's error on its chain as well as the one the closed connection caused.
 func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *SendEmailInput) error {
 	err := e.send(ctx, smtpConfig, input)
 	if err == nil {
 		return nil
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil && !errors.Is(err, ctxErr) {
+		err = errs.Join(err, ctxErr)
 	}
 	var sendErr *SendError
 	if errors.As(err, &sendErr) {
@@ -153,10 +168,17 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	if dialTimeout == 0 {
 		dialTimeout = defaultDialTimeout
 	}
-	convTimeout := e.convTimeout
-	if convTimeout == 0 {
-		convTimeout = defaultConversationTimeout
+	commandTimeout := e.commandTimeout
+	if commandTimeout == 0 {
+		commandTimeout = defaultCommandTimeout
 	}
+	sendTimeout := e.sendTimeout
+	if sendTimeout == 0 {
+		sendTimeout = defaultSendTimeout
+	}
+	// The send's budget runs from the start of the connect, so a slow connect or handshake leaves
+	// the conversation less of it.
+	sendDeadline := time.Now().Add(sendTimeout)
 
 	// One config for both TLS paths. Certificate and hostname verification are never disabled:
 	// RFC 8314 section 3.3 requires the implicit-TLS client to validate, and a STARTTLS session
@@ -172,6 +194,13 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	if err != nil {
 		return labelled(SendFailureConnection, errs.Wrap(err, "unable to connect to SMTP server"))
 	}
+	// A caller that gives up ends its send: closing the TCP connection fails whatever read or write
+	// is waiting on it, the TLS layers above it included. The dial and the implicit-TLS handshake
+	// already end with ctx through dialCtx. The TCP connection is held in a variable of its own,
+	// since conn is rewrapped below and the close runs on another goroutine.
+	tcpConn := conn
+	stopClosingOnCancel := context.AfterFunc(ctx, func() { _ = tcpConn.Close() })
+	defer stopClosingOnCancel()
 	if smtpEnc == SMTPEncryptionSSLTLS {
 		tlsConn := tls.Client(conn, tlsConfig)
 		if handshakeErr := tlsConn.HandshakeContext(dialCtx); handshakeErr != nil {
@@ -181,10 +210,9 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 		conn = tlsConn
 	}
 
-	if setDeadlineErr := conn.SetDeadline(time.Now().Add(convTimeout)); setDeadlineErr != nil {
-		_ = conn.Close()
-		return labelled(SendFailureConnection, errs.Wrap(setDeadlineErr, "unable to connect to SMTP server"))
-	}
+	// Wrapped outside the implicit TLS, and under the STARTTLS one net/smtp adds later, so every
+	// read and write the conversation makes, a STARTTLS handshake's included, has its own deadline.
+	conn = &deadlineConn{Conn: conn, commandTimeout: commandTimeout, sendDeadline: sendDeadline}
 
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
@@ -250,6 +278,40 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	}
 
 	return nil
+}
+
+// deadlineConn gives every read and every write its own deadline, commandTimeout from when it
+// starts, but never later than sendDeadline (#718 decision 7). A deadline renewed per call rather
+// than per SMTP command still bounds each command, whose reply is at least one read, and lets a
+// long reply or a large body that keeps arriving or leaving run past commandTimeout. net/smtp
+// writes the body through a buffered writer in chunks of a few kilobytes, so each chunk is a write
+// of its own.
+type deadlineConn struct {
+	net.Conn
+	commandTimeout time.Duration
+	sendDeadline   time.Time
+}
+
+func (c *deadlineConn) Read(p []byte) (int, error) {
+	if err := c.Conn.SetReadDeadline(c.deadline()); err != nil {
+		return 0, err
+	}
+	return c.Conn.Read(p)
+}
+
+func (c *deadlineConn) Write(p []byte) (int, error) {
+	if err := c.Conn.SetWriteDeadline(c.deadline()); err != nil {
+		return 0, err
+	}
+	return c.Conn.Write(p)
+}
+
+func (c *deadlineConn) deadline() time.Time {
+	next := time.Now().Add(c.commandTimeout)
+	if next.After(c.sendDeadline) {
+		return c.sendDeadline
+	}
+	return next
 }
 
 // labelled is err labelled with kind. The label sits under a frameless errs wrapper, so %+v still

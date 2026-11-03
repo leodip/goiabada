@@ -44,6 +44,16 @@ type fakeSMTP struct {
 	// stallAfterData swallows the DATA block and never answers its terminator, so the client has
 	// to reach its own deadline.
 	stallAfterData bool
+	// dribble is a pause before every reply line the fake writes, the greeting and each line of a
+	// multi-line reply included: a relay that is slow but steadily making progress, so every read
+	// the client makes returns within it, and a long reply takes many of them.
+	dribble time.Duration
+	// stopReadingAtData answers DATA with its 354 and then reads nothing more, so a large body
+	// fills the socket buffers and the client's write blocks until its own deadline.
+	stopReadingAtData bool
+	// handshakeDelay is a pause before the implicit-TLS handshake, which is part of the connect: a
+	// relay slow to start TLS, whose time counts against the send's budget.
+	handshakeDelay time.Duration
 	// rejectAfterData answers the DATA terminator with a 550 instead of a 250, which is the relay
 	// deciding it does not want the finished message.
 	rejectAfterData bool
@@ -78,6 +88,9 @@ type fakeSMTP struct {
 	expectPassword string
 
 	cert *fakeCert
+
+	// stopped closes when the test ends, releasing a serve blocked without reading.
+	stopped chan struct{}
 
 	mu        sync.Mutex
 	log       []string
@@ -163,6 +176,7 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 
 	ext := f.ext
 	if f.tlsFromStart {
+		time.Sleep(f.handshakeDelay)
 		tc := tls.Server(conn, f.serverTLSConfig())
 		if err := tc.Handshake(); err != nil {
 			return
@@ -173,7 +187,10 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 
 	r := bufio.NewReader(conn)
 	var w io.Writer = conn
-	say := func(s string) { _, _ = fmt.Fprint(w, s+"\r\n") }
+	say := func(s string) {
+		time.Sleep(f.dribble)
+		_, _ = fmt.Fprint(w, s+"\r\n")
+	}
 
 	say("220 fake ESMTP")
 
@@ -318,6 +335,10 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 
 		case strings.HasPrefix(up, "DATA"):
 			say("354 end data with <CR><LF>.<CR><LF>")
+			if f.stopReadingAtData {
+				<-f.stopped
+				return
+			}
 			var b strings.Builder
 			for {
 				l, err := r.ReadString('\n')
@@ -333,8 +354,8 @@ func (f *fakeSMTP) serve(conn net.Conn) {
 			f.dataRaw = b.String()
 			f.mu.Unlock()
 			if f.stallAfterData {
-				// Never answer the terminator. The client blocks on the reply until its
-				// conversation deadline expires and closes the connection, which ends this read.
+				// Never answer the terminator. The client blocks on the reply until its read
+				// deadline expires and closes the connection, which ends this read.
 				_, _ = io.Copy(io.Discard, r)
 				return
 			}
@@ -405,12 +426,17 @@ func (f *fakeSMTP) start(t *testing.T) int {
 		t.Fatalf("unable to listen: %v", err)
 	}
 
+	f.stopped = make(chan struct{})
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		conn, err := ln.Accept()
 		if err != nil {
 			return
+		}
+		if f.stopReadingAtData {
+			// The smallest receive window, so the body cannot hide in this side's buffer.
+			_ = conn.(*net.TCPConn).SetReadBuffer(1)
 		}
 		f.mu.Lock()
 		f.connected = true
@@ -420,6 +446,7 @@ func (f *fakeSMTP) start(t *testing.T) int {
 	}()
 
 	t.Cleanup(func() {
+		close(f.stopped)
 		_ = ln.Close()
 		f.mu.Lock()
 		conn := f.conn

@@ -1578,8 +1578,8 @@ func TestSendEmail_InvalidRecipient(t *testing.T) {
 	assert.False(t, f.sawConnection(), "the address is parsed before the dial, so nothing should have connected")
 }
 
-// TestSendEmail_DialTimeout holds decision 7's other half: the connect carries its own bound,
-// separate from the conversation deadline below. The seam is handed a duration already in the past,
+// TestSendEmail_DialTimeout holds decision 7's first number: the connect carries its own bound,
+// separate from the read and write deadlines smtp_deadline_test.go holds. The seam is handed a duration already in the past,
 // so the dial cannot complete however quickly the fake would have accepted it, and the default it
 // stands in for is asserted alongside.
 func TestSendEmail_DialTimeout(t *testing.T) {
@@ -1601,35 +1601,4 @@ func TestSendEmail_DialTimeout(t *testing.T) {
 	assertSendFailure(t, err, SendFailureConnection)
 	assert.Equal(t, ConnectionCauseTimedOut, ClassifyConnectionError(err))
 	assert.Empty(t, f.data(), "nothing may be delivered once the dial has timed out")
-}
-
-// TestSendEmail_ConversationTimeout holds decision 7: one deadline covers EHLO through QUIT, so a
-// relay that stops answering cannot hang the request that is sending the mail. The seam sets that
-// deadline to a second. The stopwatch starts before the send, which sets the deadline after its
-// dial, so a send that ends at its deadline cannot be timed at under the second. A sender that ignored the seam would
-// run to defaultConversationTimeout, which is the ceiling, so only a stall of most of that could
-// fail a correct send.
-func TestSendEmail_ConversationTimeout(t *testing.T) {
-
-	f := &fakeSMTP{ext: []string{"8BITMIME"}, stallAfterData: true}
-	port := f.start(t)
-
-	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-	sender := &Sender{dataCipher: testDataCipher, convTimeout: time.Second}
-
-	started := time.Now()
-	err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
-		To:       fixtureRecipient,
-		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
-	})
-	elapsed := time.Since(started)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to send SMTP message")
-	// A connection that stalls after the dial is a connection failure too, with the same cause.
-	assertSendFailure(t, err, SendFailureConnection)
-	assert.Equal(t, ConnectionCauseTimedOut, ClassifyConnectionError(err))
-	assert.GreaterOrEqual(t, elapsed, sender.convTimeout, "the send ended before its deadline")
-	assert.Less(t, elapsed, defaultConversationTimeout, "the send ran on the default rather than the second set")
 }
