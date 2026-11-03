@@ -149,6 +149,8 @@ func (c *AuthServerClient) CreateUserAdmin(ctx context.Context, accessToken stri
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusCreated,
+		// Only a user given a setup email waits for a send; an absent type means a password now.
+		sendsMail: request.SetPasswordType == api.SetPasswordTypeEmail,
 	})
 	if err != nil {
 		return nil, err

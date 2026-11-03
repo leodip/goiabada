@@ -109,6 +109,7 @@ func (c *AuthServerClient) SendAccountEmailVerification(ctx context.Context, acc
 		rawBody:       []byte("{}"),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
+		sendsMail:     true,
 	})
 }
 

@@ -33,6 +33,7 @@ func (c *AuthServerClient) SendTestEmail(ctx context.Context, accessToken string
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
+		sendsMail:     true,
 	})
 	return err
 }
