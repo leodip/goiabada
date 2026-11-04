@@ -339,12 +339,13 @@ func logBootstrapCredentialsNotConfigured() {
 
 // newSessionStore builds the admin console's browser session store over backend.
 //
-// Its cookie carries no expiry, which is the half of the split the auth server does not take:
-// that cookie carries one so single sign-on survives a browser restart, and this one carries
-// none so the browser drops it when it closes. An administrator pays one extra sign-in after a
-// browser restart, and in exchange the handle to the deployment's most privileged session is
-// not left sitting on the disk of a machine that can be stolen. Browser session restore can
-// still bring such a cookie back, so this is real protection rather than a guarantee (#266).
+// Its cookie carries no expiry, so the browser drops it when it closes and the handle to the
+// deployment's most privileged session is not left sitting on the disk of a machine that can be
+// stolen. Browser session restore can still bring such a cookie back, so this is real protection
+// rather than a guarantee (#266). Whether a reopened browser then asks the administrator for a
+// password is not this cookie's to decide: the console signs in through the auth server without
+// prompt=login or max_age, so the auth server's cookie decides, which outlives the browser only
+// as its Keep users signed in after the browser closes setting answers for that sign-in (#743).
 // It also retired a defect: the store this replaced set a one year cookie expiry with no
 // resolver, so a machine held a handle for a year for contents that stopped working in
 // minutes.
