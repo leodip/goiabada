@@ -545,6 +545,7 @@ func TestRun_RefusesAnAdminEmailThatIsNotASingleAddressInBothModes(t *testing.T)
 	}{
 		{"two addresses", "first@example.com, second@example.com", []string{"first@example.com", "second@example.com"}},
 		{"an address with a display name", "Admin <admin@example.com>", []string{"admin@example.com"}},
+		{"an address in angle brackets", "<admin@example.com>", []string{"admin@example.com"}},
 		{"no address", "admin", []string{"admin@"}},
 	}
 	for _, mode := range modes {
