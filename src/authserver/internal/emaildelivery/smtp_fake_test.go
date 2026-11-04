@@ -8,6 +8,7 @@ package emaildelivery
 
 import (
 	"bufio"
+	"cmp"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
@@ -67,6 +68,9 @@ type fakeSMTP struct {
 	rejectAfterData bool
 	// rejectRcpt answers RCPT TO with a 550, which is the relay refusing the recipient.
 	rejectRcpt bool
+	// refusal, when set, is the whole reply line rejectRcpt and rejectAfterData answer with in
+	// place of their own, such as a refusal that quotes the recipient.
+	refusal string
 	// dropAfterData takes the whole DATA block and closes the connection instead of answering its
 	// terminator, so the client never learns whether the relay accepted the message.
 	dropAfterData bool
@@ -440,13 +444,13 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 			if f.rejectAfterData {
 				// The relay took the whole message and then refused it. Only the reply to the
 				// terminator says so, which is the response net/smtp surfaces from Close.
-				say("550 5.7.1 message rejected by the fake")
+				say(cmp.Or(f.refusal, "550 5.7.1 message rejected by the fake"))
 				continue
 			}
 			say("250 2.0.0 queued")
 
 		case f.rejectRcpt && strings.HasPrefix(up, "RCPT TO:"):
-			say("550 5.1.1 no such user here")
+			say(cmp.Or(f.refusal, "550 5.1.1 no such user here"))
 
 		case strings.HasPrefix(up, "QUIT"):
 			say("221 2.0.0 bye")

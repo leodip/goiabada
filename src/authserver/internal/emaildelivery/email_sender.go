@@ -23,6 +23,7 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -297,21 +298,26 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 		}
 	}
 
+	// A relay that refuses the sender, the recipient or the message may quote the recipient's
+	// address in its reply, which every send-failure log line would then record (#779 decision 4).
+	messageRefused := func(err error) error {
+		return replyFailure(errs.Wrap(withoutRecipient(err, to.Address), "unable to send SMTP message"), SendFailureMessageRefused)
+	}
 	if mailErr := client.Mail(from.Address); mailErr != nil {
-		return SendResult{}, replyFailure(errs.Wrap(mailErr, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(mailErr)
 	}
 	if rcptErr := client.Rcpt(to.Address); rcptErr != nil {
-		return SendResult{}, replyFailure(errs.Wrap(rcptErr, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(rcptErr)
 	}
 	w, err := client.Data()
 	if err != nil {
-		return SendResult{}, replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(err)
 	}
 	if _, err := w.Write(message); err != nil {
-		return SendResult{}, replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(err)
 	}
 	if err := w.Close(); err != nil {
-		return SendResult{}, replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(err)
 	}
 	// The relay answered the end of the data with a positive reply, so it has taken responsibility
 	// for the message (RFC 5321 sections 4.1.1.4 and 6.1). Whatever happens to QUIT or to closing
@@ -535,6 +541,24 @@ func replyFailure(err error, refused SendFailureKind) error {
 	default:
 		return labelled(SendFailureOther, err)
 	}
+}
+
+// recipientPlaceholder is what a relay's reply shows in place of the recipient's address.
+const recipientPlaceholder = "<recipient>"
+
+// withoutRecipient is err with every occurrence of address in the relay's reply, matched
+// case-insensitively, replaced with recipientPlaceholder. The reply stays a *textproto.Error with
+// its code, so replyFailure labels it as before and errors.As still reaches it. net/smtp returns a
+// reply as the error itself, so the copy takes err's place; any other error, which carries no
+// reply, is returned as it is. The match is best-effort: an address the relay quotes in another
+// form, such as encoded, stays.
+func withoutRecipient(err error, address string) error {
+	var reply *textproto.Error
+	if !errors.As(err, &reply) || address == "" {
+		return err
+	}
+	quoted := regexp.MustCompile("(?i)" + regexp.QuoteMeta(address))
+	return &textproto.Error{Code: reply.Code, Msg: quoted.ReplaceAllLiteralString(reply.Msg, recipientPlaceholder)}
 }
 
 // tlsFailure labels a failed STARTTLS or handshake. Every failure there is the TLS connection's,

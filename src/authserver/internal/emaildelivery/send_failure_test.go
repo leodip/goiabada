@@ -3,8 +3,11 @@ package emaildelivery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"net/textproto"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,6 +81,39 @@ func TestSendEmail_ARefusedRecipientIsTheMessageRefused(t *testing.T) {
 	assert.Contains(t, err.Error(), "550")
 	assertSendFailure(t, err, SendFailureMessageRefused)
 	assert.Empty(t, f.data(), "no message follows a refused recipient")
+}
+
+// A relay's refusal that quotes the recipient's address reaches the error, and so every send-failure
+// log line, with each occurrence replaced by <recipient>, whatever case the relay wrote it in (#779
+// decision 4). The rest of the reply stays, the error still unwraps to it, and the refusal is still
+// the message refused.
+func TestSendEmail_ARefusalQuotingTheRecipientDoesNotCarryTheAddress(t *testing.T) {
+	const refusal = "550 5.1.1 <RCPT@Example.COM>: Recipient address rejected: rcpt@example.com is unknown"
+	const redacted = "5.1.1 <<recipient>>: Recipient address rejected: <recipient> is unknown"
+	steps := []struct {
+		name string
+		fake *fakeSMTP
+	}{
+		{"recipient refused", &fakeSMTP{ext: []string{"8BITMIME"}, rejectRcpt: true, refusal: refusal}},
+		{"finished message refused", &fakeSMTP{ext: []string{"8BITMIME"}, rejectAfterData: true, refusal: refusal}},
+	}
+	for _, step := range steps {
+		t.Run(step.name, func(t *testing.T) {
+			port := step.fake.start(t)
+
+			err := sendTo(t, &Sender{dataCipher: testDataCipher}, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"))
+
+			require.Error(t, err)
+			assert.Equal(t, `unable to send SMTP message: 550 "`+redacted+`"`, err.Error())
+			assert.NotContains(t, strings.ToLower(err.Error()), "rcpt@example.com")
+			assert.NotContains(t, strings.ToLower(fmt.Sprintf("%+v", err)), "rcpt@example.com")
+			var reply *textproto.Error
+			require.ErrorAs(t, err, &reply, "the error still unwraps to the relay's reply")
+			assert.Equal(t, 550, reply.Code)
+			assert.Equal(t, redacted, reply.Msg)
+			assertSendFailure(t, err, SendFailureMessageRefused)
+		})
+	}
 }
 
 // SSL/TLS against a server that speaks plain SMTP fails in the handshake, before any certificate is
