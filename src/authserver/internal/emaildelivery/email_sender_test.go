@@ -1666,22 +1666,40 @@ func assertNoInjectedHeader(t *testing.T, m sentMessage, value string) {
 	}
 }
 
+// A recipient the parser refuses fails the send before any connection, and the error holds no part
+// of it: the parser's own error quotes what it could not take, and every send failure reaches a log
+// line (#779 decision 4). A list of two addresses is one such recipient, stored by a first start
+// before it checked the address's shape.
 func TestSendEmail_InvalidRecipient(t *testing.T) {
+	cases := []struct {
+		name  string
+		to    string
+		parts []string
+	}{
+		{"not an address", "not an address", []string{"not an address"}},
+		{"two addresses", "first@example.com, second@example.com", []string{"first@example.com", "second@example.com"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := &fakeSMTP{ext: []string{"8BITMIME"}}
+			port := f.start(t)
 
-	f := &fakeSMTP{ext: []string{"8BITMIME"}}
-	port := f.start(t)
+			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-
-	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
-		To:       "not an address",
-		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid recipient address")
-	assertSendFailure(t, err, SendFailureOther)
-	assert.False(t, f.sawConnection(), "the address is parsed before the dial, so nothing should have connected")
+			_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
+				To:       c.to,
+				Subject:  "Test email",
+				HtmlBody: "<p>hello</p>",
+			})
+			require.Error(t, err)
+			assert.Equal(t, "invalid recipient address", err.Error())
+			for _, part := range c.parts {
+				assert.NotContains(t, fmt.Sprintf("%+v", err), part)
+			}
+			assertSendFailure(t, err, SendFailureOther)
+			assert.False(t, f.sawConnection(), "the address is parsed before the dial, so nothing should have connected")
+		})
+	}
 }
 
 // TestSendEmail_DialTimeout holds decision 7's first number: the connect carries its own bound,

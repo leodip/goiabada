@@ -445,8 +445,8 @@ func adminAddressOfLength(n int) string {
 }
 
 // GOIABADA_ADMIN_EMAIL may be up to 254 characters, the longest address an account holds, counted
-// after the seed trims it, and only its length is checked: an address with no dot in its domain
-// seeds as it always has (#632 decision 4).
+// after the seed trims it, and its shape is the email sender's parser's, not the account forms'
+// stricter rule: an address with no dot in its domain seeds as it always has (#632 decision 4).
 func TestRun_AdminEmailOfUpTo254CharactersSeeds(t *testing.T) {
 	address254 := adminAddressOfLength(254)
 	require.Len(t, address254, 254)
@@ -522,6 +522,64 @@ func TestRun_RefusesAnAdminEmailPast254CharactersInBothModes(t *testing.T) {
 			assert.Equal(t, mode.outcome, outcome)
 			assertSeeded(t, db, cfg)
 		})
+	}
+}
+
+// A first start refuses a GOIABADA_ADMIN_EMAIL that is not a single bare address in both bootstrap
+// modes, as it refuses one past 254 characters: before any write and before the bootstrap file is
+// staged, naming the variable without quoting its value, which the startup log would then record
+// (#779). Without it a list of two addresses seeded, and every email to the administrator failed.
+func TestRun_RefusesAnAdminEmailThatIsNotASingleAddressInBothModes(t *testing.T) {
+	modes := []struct {
+		name    string
+		config  func(t *testing.T) Config
+		outcome Outcome
+	}{
+		{"single-step", func(*testing.T) Config { return singleStepConfig() }, Continue},
+		{"two-step", twoStepConfig, Exit},
+	}
+	values := []struct {
+		name  string
+		email string
+		parts []string
+	}{
+		{"two addresses", "first@example.com, second@example.com", []string{"first@example.com", "second@example.com"}},
+		{"an address with a display name", "Admin <admin@example.com>", []string{"admin@example.com"}},
+		{"no address", "admin", []string{"admin@"}},
+	}
+	for _, mode := range modes {
+		for _, value := range values {
+			t.Run(mode.name+", "+value.name, func(t *testing.T) {
+				db := newSeedDB(t)
+				cfg := mode.config(t)
+				cfg.AdminEmail = value.email
+				faults := &faultDB{runDatabase: db}
+
+				outcome, err := testRunner(faults, cfg).run(context.Background())
+
+				require.Error(t, err)
+				assert.Equal(t, Refused, outcome)
+				assert.Contains(t, err.Error(), "GOIABADA_ADMIN_EMAIL cannot be the first administrator's email address: it is not a single email address")
+				for _, part := range value.parts {
+					assert.NotContains(t, strings.ToLower(fmt.Sprintf("%+v", err)), part)
+				}
+				assert.Zero(t, faults.writes, "no write was attempted")
+				isEmpty, err := db.IsEmpty(context.Background())
+				require.NoError(t, err)
+				assert.True(t, isEmpty, "the next start sees an empty database")
+				if cfg.BootstrapEnvOutFile != "" {
+					assert.NoDirExists(t, filepath.Dir(cfg.BootstrapEnvOutFile),
+						"refused before the bootstrap file is staged, so not even its directory exists")
+				}
+
+				cfg.AdminEmail = "admin@localhost"
+				outcome, err = testRunner(db, cfg).run(context.Background())
+
+				require.NoError(t, err, "the next start, with the variable fixed, seeds")
+				assert.Equal(t, mode.outcome, outcome)
+				assertSeeded(t, db, cfg)
+			})
+		}
 	}
 }
 

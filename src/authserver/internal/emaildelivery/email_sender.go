@@ -203,7 +203,10 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	from := &mail.Address{Name: smtpConfig.FromName, Address: smtpConfig.FromEmail}
 	to, err := mail.ParseAddress(input.To)
 	if err != nil {
-		return SendResult{}, errs.Wrap(err, "invalid recipient address")
+		// The parser's error quotes what it could not take, which is the recipient's address or a
+		// part of it, and a send failure reaches a log line, so its text is left out (#779
+		// decision 4).
+		return SendResult{}, errs.New("invalid recipient address")
 	}
 	message, err := e.buildMessage(from, to, input)
 	if err != nil {
