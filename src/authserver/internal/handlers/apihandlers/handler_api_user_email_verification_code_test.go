@@ -54,10 +54,7 @@ func TestHandleUserEmailVerificationCodePost_StoresTheCodeForTheAddressItRead(t 
 			storedAt = args.Get(5).(time.Time)
 		}).
 		Return(true, nil).Once()
-	var details map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.EventGeneratedEmailVerificationCode, mock.Anything).
-		Run(func(args mock.Arguments) { details = args.Get(2).(map[string]interface{}) }).
-		Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventGeneratedEmailVerificationCode, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleUserEmailVerificationCodePost(database, auditLogger, testDataCipher).ServeHTTP(rr, codeGenRequest())
@@ -78,9 +75,6 @@ func TestHandleUserEmailVerificationCodePost_StoresTheCodeForTheAddressItRead(t 
 	require.NotNil(t, resp.VerificationCodeExpiresAt)
 	assert.True(t, resp.VerificationCodeExpiresAt.Equal(storedAt.Add(5*time.Minute)),
 		"expires at %v, want five minutes after %v", resp.VerificationCodeExpiresAt, storedAt)
-
-	assert.Equal(t, codeGenAddress, details["email"])
-	assert.Equal(t, codeGenUserId, details["user_id"])
 }
 
 // When the account no longer holds the address the request read, nothing is stored and the

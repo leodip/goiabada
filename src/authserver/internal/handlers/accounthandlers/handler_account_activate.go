@@ -550,11 +550,16 @@ func HandleActivatePost(
 			return
 		}
 
+		// The account is named by its id and its address only by its digest, so the entries keep
+		// no address once the account is deleted (#779 decision 1).
+		emailDigest := hashutil.HashString(createdUser.Email)
 		auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
-			"email": createdUser.Email,
+			"user_id":      createdUser.Id,
+			"email_digest": emailDigest,
 		})
 		auditLogger.Log(r.Context(), audit.EventActivatedAccount, map[string]interface{}{
-			"email": createdUser.Email,
+			"user_id":      createdUser.Id,
+			"email_digest": emailDigest,
 		})
 
 		// Hygiene, and not the thing that makes the marker single-use: the deletion above is. A

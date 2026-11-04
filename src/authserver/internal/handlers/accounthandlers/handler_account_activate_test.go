@@ -892,12 +892,15 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 		}).
 		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
 
-	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["email"] == activateTestEmail
-	})).Run(func(mock.Arguments) { steps = append(steps, audit.EventCreatedUser) }).Return().Once()
-	auditLogger.On("Log", mock.Anything, audit.EventActivatedAccount, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["email"] == activateTestEmail
-	})).Run(func(mock.Arguments) { steps = append(steps, audit.EventActivatedAccount) }).Return().Once()
+	var createdDetails, activatedDetails map[string]interface{}
+	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Run(func(args mock.Arguments) {
+		createdDetails = args.Get(2).(map[string]interface{})
+		steps = append(steps, audit.EventCreatedUser)
+	}).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventActivatedAccount, mock.Anything).Run(func(args mock.Arguments) {
+		activatedDetails = args.Get(2).(map[string]interface{})
+		steps = append(steps, audit.EventActivatedAccount)
+	}).Return().Once()
 	pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 		"/account_register_activation_result.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			_, expired := data["linkHasExpired"]
@@ -912,6 +915,14 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, []string{"begin", "create account", "consume", "commit",
 		audit.EventCreatedUser, audit.EventActivatedAccount}, steps)
+	// Both entries name the new account by its id and its address by the digest, never the
+	// address itself (#779 decision 1).
+	wantDetails := map[string]interface{}{
+		"user_id":      int64(3),
+		"email_digest": lowercaseAddressDigest("user+tag@example.com"),
+	}
+	assert.Equal(t, wantDetails, createdDetails)
+	assert.Equal(t, wantDetails, activatedDetails)
 	database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 
 	// The account gets the password typed into this form, whoever registered the address: the

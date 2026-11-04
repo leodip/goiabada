@@ -501,7 +501,8 @@ func HandleRegisterPost(
 		}
 
 		auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
-			"email": email,
+			"user_id":      user.Id,
+			"email_digest": hashutil.HashString(user.Email),
 		})
 
 		if settings.SMTPEnabled {

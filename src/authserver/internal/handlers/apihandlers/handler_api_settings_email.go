@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/inputvalidation"
@@ -341,9 +342,11 @@ func HandleSettingsEmailSendTestPost(
 			return
 		}
 
+		// The recipient is typed, so it is normalized as stored addresses are before it is digested:
+		// the digest then matches every other entry about that address (#779 decision 1).
 		auditLogger.Log(r.Context(), audit.EventSentTestEmail, map[string]interface{}{
 			"logged_in_user": callerSubject(r),
-			"to":             req.To,
+			"email_digest":   hashutil.HashString(strings.ToLower(strings.TrimSpace(req.To))),
 		})
 
 		// Whether the message went over TLS: STARTTLS if available sends in plaintext when the relay

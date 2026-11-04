@@ -117,7 +117,7 @@ While the [Turnstile challenge](/guides/require-a-turnstile-challenge/) is on, t
 
 - **Secrets are encrypted** in the database with AES-256-GCM, under `GOIABADA_AES_ENCRYPTION_KEY`: client secrets, the SMTP password, the Turnstile secret key, authenticator seeds, emailed codes and the keys that sign tokens. See [Secrets](/deploy/secrets/#what-each-secret-protects).
 - **Authorization codes are stored as a digest.** The database holds each code's SHA-256, so a copy of it holds no code anyone could redeem. The identifier in a session cookie is stored the same way.
-- **The audit log leaves out what users type.** An email address typed into the sign-in, registration or forgot-password form is recorded only as a digest, unless it becomes an account's address, as when registering creates the account: `created_user` names it. See [the audit log's details](/concepts/audit-log/#details).
+- **The audit log records no email address.** An address typed into the sign-in, registration or forgot-password form, an account's address and a test email's recipient are each recorded only as a digest, and an entry about an account names it by its id. See [the audit log's details](/concepts/audit-log/#details).
 
 ## The network
 

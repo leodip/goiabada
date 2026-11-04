@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -139,9 +140,9 @@ func HandleAccountEmailVerificationSendPost(
 
 		// Audit
 		auditLogger.Log(r.Context(), audit.EventSentEmailVerificationMessage, map[string]interface{}{
-			"user_id":           user.Id,
-			"email_destination": user.Email,
-			"logged_in_user":    subject,
+			"user_id":        user.Id,
+			"email_digest":   hashutil.HashString(user.Email),
+			"logged_in_user": subject,
 		})
 
 		// Response

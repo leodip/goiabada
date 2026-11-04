@@ -3,7 +3,9 @@ package accounthandlers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -32,6 +34,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// lowercaseAddressDigest is the SHA-256 hex digest of an address the test writes already
+// lowercased and trimmed, computed here rather than by the production hash helper.
+func lowercaseAddressDigest(lowercaseAddress string) string {
+	sum := sha256.Sum256([]byte(lowercaseAddress))
+	return hex.EncodeToString(sum[:])
+}
 
 // assertSelfRegistrationDisabledLogged holds a refusal while self-registration is off to its one
 // record: a refused request is Warn, not the error-level record the 500 page used to write
@@ -770,11 +779,12 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
-		})).Return(&record.User{}, nil)
+		})).Return(&record.User{Id: 12, Email: "test@example.com"}, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["email"] == "test@example.com"
-		})).Return()
+		var createdDetails map[string]interface{}
+		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).
+			Run(func(args mock.Arguments) { createdDetails = args.Get(2).(map[string]interface{}) }).
+			Return().Once()
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
@@ -784,6 +794,12 @@ func TestHandleRegisterPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
+		// The account is named by its id and its address by the digest, never the address itself
+		// (#779 decision 1).
+		assert.Equal(t, map[string]interface{}{
+			"user_id":      int64(12),
+			"email_digest": lowercaseAddressDigest("test@example.com"),
+		}, createdDetails)
 
 		database.AssertExpectations(t)
 		emailValidator.AssertExpectations(t)
@@ -842,11 +858,12 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
-		})).Return(&record.User{}, nil)
+		})).Return(&record.User{Id: 12, Email: "test@example.com"}, nil)
 
-		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["email"] == "test@example.com"
-		})).Return()
+		var createdDetails map[string]interface{}
+		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).
+			Run(func(args mock.Arguments) { createdDetails = args.Get(2).(map[string]interface{}) }).
+			Return().Once()
 
 		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			link, ok := data["link"].(string)
@@ -866,6 +883,12 @@ func TestHandleRegisterPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
+		// The account is named by its id and its address by the digest, never the address itself
+		// (#779 decision 1).
+		assert.Equal(t, map[string]interface{}{
+			"user_id":      int64(12),
+			"email_digest": lowercaseAddressDigest("test@example.com"),
+		}, createdDetails)
 
 		database.AssertExpectations(t)
 		emailValidator.AssertExpectations(t)
