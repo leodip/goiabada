@@ -38,7 +38,7 @@ func TestFrench_SignInPageUsesQueryOrCanadianHeader(t *testing.T) {
 	}
 }
 
-func TestFrench_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
+func TestFrench_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 	for _, locale := range []string{"fr", "fr-FR", "fr-CA", "fr-BE", "fr-CH"} {
 		for _, tc := range []struct{ name, subject, body string }{
 			{"forgot_password", "Réinitialisation du mot de passe", "Pour réinitialiser votre mot de passe"},
@@ -48,6 +48,15 @@ func TestFrench_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
 			{"verification", "Vérification de l’adresse e-mail - code 123456", "Voici votre code de vérification"},
 			{"newuser_set_password", "Test - créez un mot de passe pour votre nouveau compte", "Le lien est valable 24 heures."},
 			{"address_changed", "Votre adresse e-mail a été modifiée", "une autre personne connaît peut-être votre mot de passe."},
+			{"password_changed", "Votre mot de passe a été modifié", "Sinon, une autre personne utilise peut-être votre compte."},
+			{"password_changed_by_administrator", "Un administrateur a modifié votre mot de passe", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
+			{"password_reset", "Votre mot de passe a été réinitialisé", "Sinon, une autre personne lit peut-être vos e-mails et utilise votre compte."},
+			{"otp_enabled", "L’authentification à deux facteurs a été configurée", "Un nouveau jeu de codes de récupération a été créé avec elle."},
+			{"otp_disabled", "L’authentification à deux facteurs a été désactivée", "configurez à nouveau l’authentification à deux facteurs"},
+			{"otp_disabled_by_administrator", "Un administrateur a désactivé votre authentification à deux facteurs", "Vous pouvez configurer une nouvelle application d’authentification"},
+			{"recovery_code_used", "Un code de récupération a été utilisé pour vous connecter", "Il vous reste 3 codes de récupération inutilisés."},
+			{"recovery_codes_replaced", "Vos codes de récupération ont été remplacés", "Vos anciens codes de récupération ne fonctionnent plus"},
+			{"otp_lockout", "Votre application d’authentification a été bloquée après trop de codes erronés", "Connectez-vous avec l’un de vos codes de récupération"},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -58,7 +67,7 @@ func TestFrench_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
 				assert.Equal(t, tc.subject, i18n.T(ctx, "email."+tc.name+".subject", map[string]any{"code": "123456", "appName": "Test"}))
 				buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
 					"layouts/email_layout.html", "emails/email_"+tc.name+".html",
-					map[string]interface{}{"name": "Camille", "link": "https://example.com/continue", "verificationCode": "123456"})
+					map[string]interface{}{"name": "Camille", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3})
 				require.NoError(t, err)
 				assert.Contains(t, buf.String(), `<html lang="fr">`)
 				assert.Contains(t, buf.String(), tc.body)

@@ -25,8 +25,9 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 
 	t.Run("a wrong code advances the count", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
+		datamocks.ExpectRunInTransaction(database, otpTx)
 		database.EXPECT().
-			IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId, otpReadGeneration).
+			IncrementUserOtpConsecutiveFailures(mock.Anything, otpTx, otpUserId, otpReadGeneration).
 			Return(false, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), "000000", now)
@@ -58,15 +59,25 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 					TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
 					Return(false, nil).Once()
 			}
+			var calls []string
+			datamocks.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
 			database.EXPECT().
-				IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId, otpReadGeneration).
-				Return(true, nil).Once()
+				IncrementUserOtpConsecutiveFailures(mock.Anything, otpTx, otpUserId, otpReadGeneration).
+				RunAndReturn(func(context.Context, *sql.Tx, int64, int64) (bool, error) {
+					calls = append(calls, "increment")
+					return true, nil
+				}).Once()
+			expectHeldRead(database, &calls)
 
 			result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), arm.code(), now)
 
 			require.NoError(t, err)
 			assert.Equal(t, arm.outcome, result.Outcome, "the submitter is answered as for any refused code")
 			assert.True(t, result.Disabled, "the call that reached the limit reports it, so its caller audits it")
+			assert.Equal(t, heldRow(), result.Current,
+				"the lockout notice goes to the row the disabling write holds, not the user read before it (#724)")
+			assert.Equal(t, []string{"begin", "increment", "read", "commit"}, calls,
+				"the row is read in the disabling write's own transaction, under its lock")
 		})
 
 		t.Run(arm.name+" whose count cannot be written is an error, not a refusal", func(t *testing.T) {
@@ -77,8 +88,9 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 					TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
 					Return(false, nil).Once()
 			}
+			datamocks.ExpectRunInTransaction(database, otpTx)
 			database.EXPECT().
-				IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId, otpReadGeneration).
+				IncrementUserOtpConsecutiveFailures(mock.Anything, otpTx, otpUserId, otpReadGeneration).
 				Return(false, writeErr).Once()
 
 			result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), arm.code(), now)
@@ -94,8 +106,9 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 		database.EXPECT().
 			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
 			Return(false, nil).Once()
+		datamocks.ExpectRunInTransaction(database, otpTx)
 		database.EXPECT().
-			IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId, otpReadGeneration).
+			IncrementUserOtpConsecutiveFailures(mock.Anything, otpTx, otpUserId, otpReadGeneration).
 			Return(false, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
@@ -103,6 +116,8 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, OutcomeReplayed, result.Outcome)
 		assert.False(t, result.Disabled)
+		assert.Nil(t, result.Current, "a refusal short of the limit reads no row")
+		database.AssertNotCalled(t, "GetUserByIdForUpdate", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("a matched code advances nothing: the claim's own statement clears", func(t *testing.T) {
@@ -165,8 +180,9 @@ func TestEstablish_ClearsTheConsecutiveFailuresCountInTheRebind(t *testing.T) {
 			return nil
 		}).Once()
 	database.EXPECT().ReplaceUserRecoveryCodes(mock.Anything, otpTx, otpUserId, mock.Anything).Return(nil).Once()
+	expectHeldRead(database, nil)
 
-	_, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
+	_, _, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
 
 	require.NoError(t, err)
 	assert.True(t, established)
@@ -190,7 +206,7 @@ func TestEstablish_AFailedCountClearEstablishesNothing(t *testing.T) {
 	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserId).Return(nil).Once()
 	database.EXPECT().ClearUserOtpConsecutiveFailures(mock.Anything, otpTx, otpUserId).Return(clearErr).Once()
 
-	generation, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
+	generation, _, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
 
 	require.ErrorIs(t, err, clearErr)
 	require.ErrorIs(t, stub.BodyErr, clearErr, "the body hands the error to the helper, which rolls back")

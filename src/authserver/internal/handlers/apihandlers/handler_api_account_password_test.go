@@ -84,7 +84,7 @@ func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T
 		Return(i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": 6})).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}).
+	HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountPasswordRequest(t, map[string]interface{}{"sub": "the-subject"}, currentPassword, "next"))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -113,6 +113,7 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	var savedHash string
+	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, int64(42)).Return(&record.User{Id: int64(42)}, nil).Once()
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).
 		Run(func(args mock.Arguments) {
 			savedHash = args.Get(3).(string)
@@ -151,7 +152,7 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "sid": callerSid, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -201,6 +202,7 @@ func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
 		Return(&record.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
+	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, int64(42)).Return(&record.User{Id: int64(42)}, nil).Once()
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	stubSweep(database, 42, 8)
 
@@ -212,7 +214,7 @@ func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -249,12 +251,13 @@ func TestHandleAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
 		Return(&record.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
+	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, int64(42)).Return(&record.User{Id: int64(42)}, nil).Once()
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).
 		Return(int64(0), errors.New("increment failed")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{})
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": "the-subject", "sid": "sid-caller", "auth_time": float64(1)},
 		currentPassword, "N3wP4ss!word"))

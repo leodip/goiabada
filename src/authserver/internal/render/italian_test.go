@@ -38,7 +38,7 @@ func TestItalian_SignInPageUsesQueryOrSwissHeader(t *testing.T) {
 	}
 }
 
-func TestItalian_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
+func TestItalian_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 	for _, locale := range []string{"it", "it-IT", "it-CH", "it-SM", "it-VA"} {
 		for _, tc := range []struct{ name, subject, body string }{
 			{"forgot_password", "Reimpostazione della password", "Per reimpostare la password"},
@@ -48,6 +48,15 @@ func TestItalian_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) 
 			{"verification", "Verifica email - codice 123456", "Ecco il tuo codice di verifica"},
 			{"newuser_set_password", "Test - crea una password per il tuo nuovo account", "Il link è valido per 24 ore."},
 			{"address_changed", "Il tuo indirizzo email è stato cambiato", "qualcun altro potrebbe conoscere la tua password."},
+			{"password_changed", "La tua password è stata cambiata", "Altrimenti, qualcun altro potrebbe usare il tuo account."},
+			{"password_changed_by_administrator", "Un amministratore ha cambiato la tua password", "Se non te lo aspettavi, contatta il tuo amministratore."},
+			{"password_reset", "La tua password è stata reimpostata", "Altrimenti, qualcun altro potrebbe leggere la tua email e usare il tuo account."},
+			{"otp_enabled", "L'autenticazione a due fattori è stata configurata", "Insieme è stato creato un nuovo set di codici di recupero"},
+			{"otp_disabled", "L'autenticazione a due fattori è stata disattivata", "configura di nuovo l'autenticazione a due fattori"},
+			{"otp_disabled_by_administrator", "Un amministratore ha disattivato la tua autenticazione a due fattori", "Puoi configurare una nuova app di autenticazione"}, //nolint:misspell // the it catalog's text: "configurare" is Italian, not a misspelling of "configure"
+			{"recovery_code_used", "È stato usato un codice di recupero per accedere", "Ti restano 3 codici di recupero inutilizzati."},
+			{"recovery_codes_replaced", "I tuoi codici di recupero sono stati sostituiti", "I codici di recupero precedenti non funzionano più"},
+			{"otp_lockout", "La tua app di autenticazione è stata bloccata dopo troppi codici errati", "Accedi con uno dei tuoi codici di recupero"},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -58,7 +67,7 @@ func TestItalian_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) 
 				assert.Equal(t, tc.subject, i18n.T(ctx, "email."+tc.name+".subject", map[string]any{"code": "123456", "appName": "Test"}))
 				buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
 					"layouts/email_layout.html", "emails/email_"+tc.name+".html",
-					map[string]interface{}{"name": "Andrea", "link": "https://example.com/continue", "verificationCode": "123456"})
+					map[string]interface{}{"name": "Andrea", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3})
 				require.NoError(t, err)
 				assert.Contains(t, buf.String(), `<html lang="it">`)
 				assert.Contains(t, buf.String(), tc.body)

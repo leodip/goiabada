@@ -5,15 +5,15 @@
 // every well-formed request answers alike: a request that waited for the code write, the render and
 // the SMTP round trip, or answered 500 when the mail failed, only for a real, eligible account
 // would tell an observer which addresses are live accounts (#404 decisions 7 and 8). The
-// self-service email change sends its notice to the previous address here too, so a mail that fails
-// never fails the change (#404 decision 11).
+// account notices are sent here too, the email change's notice to the previous address and the
+// security notices, so a mail that fails never fails the change (#404 decision 11, #724).
 //
 // At most maxInFlight jobs of each class run at once. Once the response goes first, one keep-alive
 // connection can hand over jobs as fast as it writes requests, each holding up to 40 seconds of
 // SMTP and a database connection for its writes, and with the pool capped that backlog queues in
 // front of every sign-in (#485, #394 decision 8). The budget is per class rather than one for all,
-// because two of the three callers are public forms and the third is the notice that tells a user
-// their address was changed: with one shared budget, whoever held a stolen session could fill it
+// because two of the callers are public forms and another is the notice that tells a user their
+// address was changed: with one shared budget, whoever held a stolen session could fill it
 // through the forgot-password form at no cost, then change the address, and the one mail that
 // would have warned the victim was the one dropped (#394 review).
 package afterresponse
@@ -48,11 +48,17 @@ const (
 	// ClassAccountNotice is the self-service email change's notice to the previous address: behind a
 	// bearer token, and the one job whose loss benefits whoever holds a stolen session.
 	ClassAccountNotice Class = "account_notice"
+	// ClassSecurityNotice is the notices that tell a user their password or two-factor
+	// authentication changed (#724). They have a budget apart from ClassAccountNotice, so a flood of
+	// them, such as password resets on accounts an attacker owns, never takes the slot of the
+	// notice to an address an attacker has just changed away from, which once the address is theirs
+	// is the victim's only warning (#724 decision 4).
+	ClassSecurityNotice Class = "security_notice"
 )
 
 // classes is every class declared above, the closed set the metrics' class label takes (#400
 // decision 4). A class missing from it would be reported as other.
-var classes = []Class{ClassRecovery, ClassRegistration, ClassAccountNotice}
+var classes = []Class{ClassRecovery, ClassRegistration, ClassAccountNotice, ClassSecurityNotice}
 
 // Jobs runs jobs after their responses and counts the ones in flight. The zero value is not used;
 // New builds one, and the server holds the one the routes hand to their handlers.

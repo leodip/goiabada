@@ -4,18 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/leodip/goiabada/authserver/internal/afterresponse"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -34,13 +31,11 @@ type accountEmailValidator interface {
 
 // HandleAccountEmailPut - PUT /api/v1/account/email
 func HandleAccountEmailPut(
-	pageRenderer PageRenderer,
 	database accountEmailDatabase,
 	emailValidator accountEmailValidator,
-	emailSender EmailSender,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
-	afterResponse AfterResponse,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, subject, ok := accountCaller(w, r)
@@ -133,62 +128,19 @@ func HandleAccountEmailPut(
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}
 		writeJSON(w, r, http.StatusOK, resp)
 
-		// Only a verified address is told. Any caller may set an address they do not hold and then
-		// change away from it, so an unverified one would let them mail any address on demand, one
-		// password-checked request per message. An address is verified only with a code read from
-		// its own mailbox, and every change clears the flag, so each notice costs a code read from
-		// the address it goes to (#404).
-		if previousEmailVerified {
-			notifyPreviousAddress(r, pageRenderer, emailSender, afterResponse, previousEmail, user)
-		}
+		// The notice goes to the address the account had, which is what warns an account holder
+		// whose password was stolen (#404 decisions 9 and 11). It names neither the new address,
+		// which whoever reads the old mailbox has no business learning, nor carries a link. The
+		// notifier sends only to a verified address: any caller may set an address they do not
+		// hold and then change away from it, so an unverified one would let them mail any address
+		// on demand, one password-checked request per message (#404).
+		notifier.Send(r, accountnotice.EmailAddressChanged, accountnotice.Recipient{
+			UserId:        user.Id,
+			Email:         previousEmail,
+			EmailVerified: previousEmailVerified,
+			Name:          user.FullName(),
+			PageLanguage:  user.PageLanguage,
+			Locale:        user.Locale,
+		})
 	}
-}
-
-// notifyPreviousAddress tells the address the account had that it was changed, which is what warns
-// an account holder whose password was stolen (#404 decisions 9 and 11). It is sent only to a
-// verified address, which the caller decides, and only when SMTP is enabled, and after the response, so the change neither waits for the mail nor fails with it:
-// a notice that cannot be rendered or sent is an Error record on the request's id, and writes no
-// audit entry of its own.
-//
-// The notice names neither the new address, which whoever reads the old mailbox has no business
-// learning, nor carries a link. It is rendered in the user's page language, else their stored
-// locale, else English, as every email to a user is (i18n.WithRecipientLanguage).
-func notifyPreviousAddress(r *http.Request, pageRenderer PageRenderer, emailSender EmailSender,
-	afterResponse AfterResponse, previousEmail string, user *record.User) {
-
-	settings, ok := reqctx.SettingsFrom(r.Context())
-	if !ok {
-		slog.ErrorContext(r.Context(), "unable to notify the previous email address", "user_id", user.Id, "error", reqctx.ErrNoSettings)
-		return
-	}
-	if !settings.SMTPEnabled {
-		return
-	}
-
-	userId := user.Id
-	bind := map[string]interface{}{
-		"name": user.FullName(),
-	}
-	pageLanguage, locale := user.PageLanguage, user.Locale
-	smtpConfig := emaildelivery.SMTPConfigFromSettings(settings)
-
-	afterResponse.Go(r.Context(), afterresponse.ClassAccountNotice, func(ctx context.Context) {
-		// The request is read for nothing but the renderer's inputs, under the job's context:
-		// the request's own is cancelled once the response has gone.
-		emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, pageLanguage, locale))
-		buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_address_changed.html", bind)
-		if err != nil {
-			slog.ErrorContext(ctx, "unable to render the email address change notice", "user_id", userId, "error", err)
-			return
-		}
-
-		input := &emaildelivery.SendEmailInput{
-			To:       previousEmail,
-			Subject:  i18n.T(emailReq.Context(), "email.address_changed.subject"),
-			HtmlBody: buf.String(),
-		}
-		if _, err := emailSender.SendEmail(ctx, smtpConfig, input); err != nil {
-			slog.ErrorContext(ctx, "unable to send the email address change notice", "user_id", userId, "error", err)
-		}
-	})
 }

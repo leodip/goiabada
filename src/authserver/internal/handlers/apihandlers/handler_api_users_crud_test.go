@@ -215,8 +215,9 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&record.User{Id: userId}, nil).Once()
-
 	var savedHash string
+	// The row the write replaces, read under its lock for the notice (#724 decision 6).
+	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, userId).Return(&record.User{Id: userId}, nil).Once()
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, userId, mock.Anything).
 		Run(func(args mock.Arguments) {
 			savedHash = args.Get(3).(string)
@@ -243,7 +244,7 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 		map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
 
 	rr := httptest.NewRecorder()
-	handler := HandleUserPasswordPut(database, passwordValidator, auditLogger)
+	handler := HandleUserPasswordPut(database, passwordValidator, auditLogger, heldNotifier(t, &heldJobs{}))
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -296,6 +297,7 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 	// And the user's sessions are lowered to what a password alone earns, in the same transaction,
 	// so none goes on naming the authenticator once it is gone (#542 decision 1).
+	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, userId).Return(user, nil).Once()
 	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, userId, "pwd").Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "lower") }).Once()
 
@@ -318,7 +320,7 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
+	HandleUserOTPPut(database, auditLogger, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, []string{"begin", "remove", "reset", "delete-codes", "increment", "lower", "commit"}, calls,
@@ -375,7 +377,7 @@ func TestHandleUserOTPPut_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
 			})
 
 			rr := httptest.NewRecorder()
-			HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, req)
+			HandleUserOTPPut(database, auditLogger, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, req)
 
 			assert.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
 			assert.Equal(t, tc.wantCode, errorCodeOf(t, rr))

@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Um administrador desativou a sua autenticação de dois fatores{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Olá {{.name}},</p>
+
+    <p>Um administrador desativou a autenticação de dois fatores da sua conta {{ .appName }}. O seu aplicativo autenticador e os seus códigos de recuperação não servem mais para entrar.</p>
+
+    <p>Se você pediu essa alteração, não é preciso fazer nada. Você pode configurar um novo autenticador nas configurações da sua conta.</p>
+
+    <p><strong>Se você não esperava por isso, entre em contato com o administrador.</strong> Você também pode escolher uma nova senha em "Esqueceu sua senha?" na página de entrada, depois entrar na sua conta e conferir as configurações de autenticação de dois fatores.</p>
+
+    <p>Atenciosamente,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

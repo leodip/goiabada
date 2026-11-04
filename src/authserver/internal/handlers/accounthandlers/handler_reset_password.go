@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
@@ -428,6 +429,7 @@ func HandleResetPasswordPost(
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 	adminConsoleBaseURL string,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -544,7 +546,12 @@ func HandleResetPasswordPost(
 		// Reset revokes everything, with no exceptSid: whoever is resetting a forgotten
 		// password is not necessarily the person holding the live sessions, which is the
 		// stolen-laptop case this issue exists for.
+		//
+		// The same read under the user's row decides the notice after the response: whether the
+		// account had a password is read from the row the claim replaces, so a password set while
+		// this request waited can't leave the answer stale (#724 decision 6).
 		var wasVerified bool
+		var replaced *record.User
 		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
 			// The claim below also marks the address verified, and whether that verified it, the
 			// verified_email entry, is read here, under the user's row: taken first, as a
@@ -561,6 +568,7 @@ func HandleResetPasswordPost(
 				return readErr
 			}
 			wasVerified = current == nil || current.EmailVerified
+			replaced = current
 
 			claimed, consumeErr := database.TryConsumeForgotPasswordCode(r.Context(), tx, user.Id, marker.CodeHash, passwordHash)
 			if consumeErr != nil {
@@ -616,7 +624,18 @@ func HandleResetPasswordPost(
 		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
-			return
+		}
+
+		// The account's address is told its password was reset, after the commit and the page
+		// (#724), so a user whose mailbox someone else reads learns of it. The setup link an
+		// administrator emails a new user sets the account's first password, which replaces
+		// nothing and tells nobody (decision 6). The claim marked the address verified, so the
+		// notice goes to it as the verified address it now is. The notifier sends only with SMTP
+		// on; a reset refused or rolled back above returned before this.
+		if replaced != nil && replaced.PasswordHash != "" {
+			to := accountnotice.To(replaced)
+			to.EmailVerified = true
+			notifier.Send(r, accountnotice.PasswordReset, to)
 		}
 	}
 }

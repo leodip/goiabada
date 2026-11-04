@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -18,8 +19,8 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// accountPasswordDatabase is what the account password endpoint needs: the caller's user row and
-// the hash write.
+// accountPasswordDatabase is what the account password endpoint needs: the caller's user row, read
+// again under its lock in the write's transaction for the notice, and the hash write.
 //
 // It embeds the revocation port because a password change revokes the credentials issued under
 // the old one.
@@ -27,6 +28,7 @@ type accountPasswordDatabase interface {
 	revocation.Database
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
+	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 }
 
@@ -36,6 +38,7 @@ func HandleAccountPasswordPut(
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtToken, subject, ok := accountCaller(w, r)
@@ -116,8 +119,18 @@ func HandleAccountPasswordPut(
 		// Narrow write, not a full-row UpdateUser: the user model was loaded before the
 		// password was validated, so writing every column back would undo a concurrent admin
 		// disable (decision 14).
+		//
+		// The row the write replaces is read first, under its lock, for the notice below: it goes to
+		// the address the account has as the change commits, not the one read before the password
+		// was checked, which a concurrent address change or verification may have moved (#724).
+		// Assigned on every attempt, since a deadlock reruns the body.
+		var current *record.User
 		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, exceptSid,
 			func(tx *sql.Tx) error {
+				var readErr error
+				if current, readErr = database.GetUserByIdForUpdate(r.Context(), tx, user.Id); readErr != nil {
+					return readErr
+				}
 				return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
 			})
 		if err != nil {
@@ -138,5 +151,11 @@ func HandleAccountPasswordPut(
 		// Response
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}
 		writeJSON(w, r, http.StatusOK, resp)
+
+		// The account's address is told, after the commit and the response, so a user whose
+		// password someone else changed learns of it (#724). The notifier sends only with SMTP
+		// on and to a verified address. A change refused or rolled back above returned before
+		// this, and tells nobody.
+		notifier.Send(r, accountnotice.PasswordChanged, accountnotice.To(current))
 	}
 }

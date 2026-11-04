@@ -211,6 +211,26 @@ const (
 	OTPRecoveryCodeRefused
 )
 
+// OTPNotice is the account notice a submission's committed change calls for (#724). The operation
+// names it as a plain value and sends nothing: the handler hands it to the notifier once the
+// operation has returned, after the response.
+type OTPNotice int
+
+const (
+	// OTPNoNotice is a submission that changed nothing worth telling the user.
+	OTPNoNotice OTPNotice = iota
+	// OTPNoticeAuthenticatorSetUp is an enrolling user's authenticator stored, with the set of
+	// recovery codes it came with, committed.
+	OTPNoticeAuthenticatorSetUp
+	// OTPNoticeAuthenticatorLockedOut is the refused code whose count reached
+	// record.OtpConsecutiveFailureLimit, which disabled the authenticator. Only that refusal reports
+	// it, so it is told once per lockout (#724 decision 7).
+	OTPNoticeAuthenticatorLockedOut
+	// OTPNoticeRecoveryCodeUsed is a recovery code claimed, with NoticeRecoveryCodesLeft unused
+	// codes left (#737).
+	OTPNoticeRecoveryCodeUsed
+)
+
 // OTPSubmissionResult is what OTPSubmission.Run did.
 type OTPSubmissionResult struct {
 	Answer OTPAnswer
@@ -229,6 +249,20 @@ type OTPSubmissionResult struct {
 	// OTPEnrolmentLost: ceremony.ErrCeremonyReplaced when the browser session no longer holds the
 	// ceremony. A failed rotation is never followed by the save.
 	SaveErr error
+
+	// Notice is the account notice the submission's committed change calls for, OTPNoNotice for
+	// none. It is set whatever SaveErr holds: the change committed before the rotation and the
+	// save were tried. It is also the one field set beside an error returned after the change
+	// committed, the client block's read for the refusal that disabled the authenticator, so the
+	// handler tells the user whatever it answers (#724 decision 7).
+	Notice OTPNotice
+	// NoticeTo is the user Notice is about, as the committing transaction read their row under its
+	// lock, so the notice goes to the address the change committed beside, not one read before
+	// (#724); nil with OTPNoNotice.
+	NoticeTo *record.User
+	// NoticeRecoveryCodesLeft is how many of the set's codes are unused after the one claimed, with
+	// OTPNoticeRecoveryCodeUsed.
+	NoticeRecoveryCodesLeft int
 }
 
 // Run checks code, which the handler read from the submitted body, against the ceremony's user. In
@@ -250,13 +284,15 @@ type OTPSubmissionResult struct {
 //     EventAuthFailedOtp, and answers OTPRefused. A wrong code: charges it, audits
 //     EventAuthFailedOtp, and answers OTPRefused. Every wrong code is a guess the OTP budget bounds
 //     (#219). The refusal that disabled the authenticator also audits EventOTPAuthenticatorDisabled,
-//     after the others (#489). A code from the next step: audits EventAuthFailedOtp with the reason
+//     after the others (#489), and reports OTPNoticeAuthenticatorLockedOut for the handler to send
+//     (#724 decision 7). A code from the next step: audits EventAuthFailedOtp with the reason
 //     clock_ahead and answers OTPClockAhead, charging nothing, since only the authenticator can
 //     produce it (#142).
 //  8. An enrolling user: stores the key as the user's authenticator (otpcredential.Establish), which
 //     lands only while the user's OTP configuration generation is still the one read in step 2. A
 //     failed write is returned as an error; a write that did not land ends the lost enrolment
-//     (below). Audits EventEnabledOTP.
+//     (below). Audits EventEnabledOTP, and reports OTPNoticeAuthenticatorSetUp for the handler to
+//     send (#724).
 //  9. Accepted: audits EventAuthSuccessOtp, records the code on the ceremony (RecordOTPVerified) with
 //     the generation of the authenticator it was checked against, rotates the browser session's
 //     identifier, and only then saves the ceremony in authentication_completed, for /auth/completed.
@@ -266,8 +302,9 @@ type OTPSubmissionResult struct {
 //
 // An answer that shows the form again, OTPAccountDisabled, OTPCodeMissing, OTPRefused or
 // OTPClockAhead, loads the client block for it last (refuse), after everything else that answer
-// does; a failed read, or a client not found, is returned as an error. An accepted code redirects
-// and a lost enrolment ends on a page of its own, so neither reads the client.
+// does; a failed read, or a client not found, is returned as an error, with the lockout's notice
+// still on the result when the refusal disabled the authenticator. An accepted code redirects and a
+// lost enrolment ends on a page of its own, so neither reads the client.
 //
 // A lost enrolment (#471 decision 2, #144) logs a warn record and clears the ceremony, answering
 // OTPEnrolmentLost: nothing was stored, so the ceremony has no second factor to claim. Nothing is
@@ -331,14 +368,14 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
 			"user_id": user.Id,
 		})
-		o.auditDisabled(ctx, verified, user.Id)
+		result = o.reportDisabled(ctx, verified, user, result)
 		return o.refuse(ctx, authContext, result, OTPRefused)
 	case otpcredential.OutcomeWrong:
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
 			"user_id": user.Id,
 		})
-		o.auditDisabled(ctx, verified, user.Id)
+		result = o.reportDisabled(ctx, verified, user, result)
 		return o.refuse(ctx, authContext, result, OTPRefused)
 	case otpcredential.OutcomeClockAhead:
 		// Not charged to the rate limiter, and not counted against the authenticator by
@@ -354,7 +391,7 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 	enrolled := false
 	var recoveryCodes []string
 	if !user.OTPEnabled {
-		generation, codes, established, establishErr := otpcredential.Establish(ctx, o.database, o.dataCipher, user, secret)
+		generation, codes, current, established, establishErr := otpcredential.Establish(ctx, o.database, o.dataCipher, user, secret)
 		if establishErr != nil {
 			return OTPSubmissionResult{}, establishErr
 		}
@@ -364,6 +401,10 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		verifiedGeneration = generation
 		enrolled = true
 		recoveryCodes = codes
+		// Committed: the user is told once the handler has answered, whatever the rotation and
+		// the save then do (#724).
+		result.Notice = OTPNoticeAuthenticatorSetUp
+		result.NoticeTo = current
 
 		o.auditLogger.Log(ctx, audit.EventEnabledOTP, map[string]interface{}{
 			"user_id": user.Id,
@@ -412,11 +453,12 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 //     OTPRecoveryCodeRefused. A wrong code, one of a replaced set included, and any code of a user
 //     with no authenticator: charges it, audits EventAuthFailedRecoveryCode, and answers the same.
 //     The otp tier is the budget an authenticator code spends, so alternating buys no extra guesses.
-//  7. Accepted: audits EventAuthSuccessRecoveryCode with the unused codes left, records
-//     recovery_code on the ceremony (RecordRecoveryCodeVerified) with the generation of the
-//     authenticator the user was read with, rotates the browser session's identifier, and only then
-//     saves the ceremony in authentication_completed. It goes on to /auth/completed with no extra
-//     page (decision 7).
+//  7. Accepted: audits EventAuthSuccessRecoveryCode with the unused codes left, and reports
+//     OTPNoticeRecoveryCodeUsed with that count for the handler to send (#737), whatever the rotation
+//     and the save then do: the code is spent. Records recovery_code on the ceremony
+//     (RecordRecoveryCodeVerified) with the generation of the authenticator the user was read with,
+//     rotates the browser session's identifier, and only then saves the ceremony in
+//     authentication_completed. It goes on to /auth/completed with no extra page (decision 7).
 //
 // An answer that shows a form again loads the client block for it last, as Run's do. Neither the
 // code nor its hash reaches an audit record or a log.
@@ -467,6 +509,9 @@ func (o *OTPSubmission) RunRecoveryCode(ctx context.Context, browser otpSubmissi
 		"user_id":   user.Id,
 		"remaining": used.Remaining,
 	})
+	result.Notice = OTPNoticeRecoveryCodeUsed
+	result.NoticeTo = used.Current
+	result.NoticeRecoveryCodesLeft = used.Remaining
 
 	authContext.RecordRecoveryCodeVerified(time.Now(), user.OtpConfigGeneration)
 
@@ -480,29 +525,36 @@ func (o *OTPSubmission) RunRecoveryCode(ctx context.Context, browser otpSubmissi
 }
 
 // refuse answers a submission whose form is shown again, with the client block for it, loaded now
-// (loadClientDisplay): a failed read, or a client not found, is returned as an error.
+// (loadClientDisplay): a failed read, or a client not found, is returned as an error. The error
+// comes with nothing of result but its notice: the refusal that disabled the authenticator
+// committed before the read, and its notice is told whatever the read did (#724 decision 7).
 func (o *OTPSubmission) refuse(ctx context.Context, authContext *ceremony.AuthContext, result OTPSubmissionResult,
 	answer OTPAnswer) (OTPSubmissionResult, error) {
 
 	display, err := loadClientDisplay(ctx, o.database, authContext)
 	if err != nil {
-		return OTPSubmissionResult{}, err
+		return OTPSubmissionResult{Notice: result.Notice, NoticeTo: result.NoticeTo}, err
 	}
 	result.Answer = answer
 	result.Display = display
 	return result, nil
 }
 
-// auditDisabled audits EventOTPAuthenticatorDisabled when the refusal is the one that disabled the
-// authenticator. Only the call whose count reached the limit reports it, so it is audited once; the
-// submitter is answered as for any other refused code (#489).
-func (o *OTPSubmission) auditDisabled(ctx context.Context, verified otpcredential.VerifyResult, userId int64) {
+// reportDisabled audits EventOTPAuthenticatorDisabled, and reports OTPNoticeAuthenticatorLockedOut
+// on result, when the refusal is the one that disabled the authenticator. Only the call whose count
+// reached the limit reports it, so it is audited and told once; the submitter is answered as for
+// any other refused code (#489, #724 decision 7).
+func (o *OTPSubmission) reportDisabled(ctx context.Context, verified otpcredential.VerifyResult, user *record.User,
+	result OTPSubmissionResult) OTPSubmissionResult {
 	if !verified.Disabled {
-		return
+		return result
 	}
 	o.auditLogger.Log(ctx, audit.EventOTPAuthenticatorDisabled, map[string]interface{}{
-		"user_id": userId,
+		"user_id": user.Id,
 	})
+	result.Notice = OTPNoticeAuthenticatorLockedOut
+	result.NoticeTo = verified.Current
+	return result
 }
 
 // endLostEnrolment logs the lost enrolment and clears the ceremony, answering OTPEnrolmentLost with

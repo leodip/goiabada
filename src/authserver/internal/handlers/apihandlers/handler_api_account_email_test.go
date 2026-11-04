@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -87,8 +88,15 @@ func accountEmailHandler(t *testing.T, database *datamocks.Database, auditLogger
 func accountEmailHandlerWith(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	credentials CredentialFailureRecorder, jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer,
 	emailSender *accounthandlersmocks.EmailSender) http.Handler {
-	return HandleAccountEmailPut(pageRenderer, database, accountvalidation.NewEmailValidator(database),
-		emailSender, auditLogger, credentials, jobs)
+	return HandleAccountEmailPut(database, accountvalidation.NewEmailValidator(database),
+		auditLogger, credentials, accountnotice.New(pageRenderer, emailSender, jobs))
+}
+
+// heldNotifier is the notifier as routes.go builds it, over jobs and a renderer and a sender that
+// expect nothing, for a case that runs no notice it hands off.
+func heldNotifier(t *testing.T, jobs *heldJobs) *accountnotice.Notifier {
+	t.Helper()
+	return accountnotice.New(handlersmocks.NewPageRenderer(t), accounthandlersmocks.NewEmailSender(t), jobs)
 }
 
 // heldJobs is the after-response runner as these tests drive it: it holds every job handed to it
@@ -107,13 +115,13 @@ func (h *heldJobs) Go(ctx context.Context, class afterresponse.Class, job func(c
 	h.jobs = append(h.jobs, job)
 }
 
-// runAll runs every job held and requires exactly one: an email change hands off the one notice
-// or nothing.
-func (h *heldJobs) runAll(t *testing.T) {
+// runAll runs every job held and requires exactly one, admitted against class: a completed change
+// hands off its one notice or nothing.
+func (h *heldJobs) runAll(t *testing.T, class afterresponse.Class) {
 	t.Helper()
 	require.Len(t, h.jobs, 1, "a completed change hands exactly one job to run after its response")
 	for i, job := range h.jobs {
-		assert.Equal(t, afterresponse.ClassAccountNotice, h.classes[i], "an email change is admitted against its own budget (#394 review)")
+		assert.Equal(t, class, h.classes[i], "the notice is admitted against its class's budget")
 		job(h.ctxs[i])
 	}
 }
@@ -419,7 +427,7 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 					sent = args.Get(2).(*emaildelivery.SendEmailInput)
 				}).Return(emaildelivery.SendResult{}, nil).Once()
 
-			jobs.runAll(t)
+			jobs.runAll(t, afterresponse.ClassAccountNotice)
 
 			require.NotNil(t, sent)
 			assert.Equal(t, "old@example.com", sent.To, "the notice goes to the address the account had")
@@ -543,7 +551,7 @@ func TestHandleAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse(t *tes
 					Return(&bytes.Buffer{}, nil).Once()
 				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, tc.sendErr).Once()
 			}
-			jobs.runAll(t)
+			jobs.runAll(t, afterresponse.ClassAccountNotice)
 
 			records := capture.Records()
 			require.Len(t, records, 1, capture.Text())

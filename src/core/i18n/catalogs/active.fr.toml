@@ -1664,8 +1664,8 @@
 "adminconsole.admin_settings.email.subtitle" = "E-mails"
 "adminconsole.admin_settings.email.lead" = "Le serveur SMTP par lequel le serveur d’authentification envoie ses e-mails."
 "adminconsole.admin_settings.email.field.smtp_enabled" = "Envoyer des e-mails"
-"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "Le serveur d’authentification envoie les e-mails de réinitialisation de mot de passe, de vérification d’adresse et d’inscription via le serveur SMTP ci-dessous."
-"adminconsole.admin_settings.email.disable_warning" = "Désactiver les e-mails effacera tous les paramètres SMTP, y compris le mot de passe enregistré, et arrêtera l’envoi des e-mails de réinitialisation de mot de passe, de vérification d’adresse et d’inscription."
+"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "Le serveur d’authentification envoie les e-mails de réinitialisation de mot de passe, de vérification d’adresse et d’inscription via le serveur SMTP ci-dessous, ainsi que les avis indiquant que l’adresse e-mail, le mot de passe, l’authentification à deux facteurs ou les codes de récupération d’un compte ont été modifiés, ou qu’un code de récupération a été utilisé pour se connecter."
+"adminconsole.admin_settings.email.disable_warning" = "Désactiver les e-mails effacera tous les paramètres SMTP, y compris le mot de passe enregistré, et arrêtera l’envoi des e-mails de réinitialisation de mot de passe, de vérification d’adresse et d’inscription, ainsi que des avis de modification d’adresse e-mail, de mot de passe, d’authentification à deux facteurs ou de codes de récupération, ou d’utilisation d’un code de récupération pour se connecter."
 "adminconsole.admin_settings.email.section_server" = "Serveur SMTP"
 "adminconsole.admin_settings.email.field.host_or_ip" = "Nom d’hôte ou adresse IP"
 "adminconsole.admin_settings.email.field.port" = "Port"
@@ -2130,6 +2130,15 @@
 "email.verification.subject" = "Vérification de l’adresse e-mail - code {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - créez un mot de passe pour votre nouveau compte"
 "email.address_changed.subject" = "Votre adresse e-mail a été modifiée"
+"email.password_changed.subject" = "Votre mot de passe a été modifié"
+"email.password_changed_by_administrator.subject" = "Un administrateur a modifié votre mot de passe"
+"email.password_reset.subject" = "Votre mot de passe a été réinitialisé"
+"email.otp_enabled.subject" = "L’authentification à deux facteurs a été configurée"
+"email.otp_disabled.subject" = "L’authentification à deux facteurs a été désactivée"
+"email.otp_disabled_by_administrator.subject" = "Un administrateur a désactivé votre authentification à deux facteurs"
+"email.recovery_code_used.subject" = "Un code de récupération a été utilisé pour vous connecter"
+"email.recovery_codes_replaced.subject" = "Vos codes de récupération ont été remplacés"
+"email.otp_lockout.subject" = "Votre application d’authentification a été bloquée après trop de codes erronés"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

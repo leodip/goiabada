@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Two-factor authentication was set up{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Hello {{.name}},</p>
+
+    <p>Two-factor authentication was set up on your {{ .appName }} account. Signing in to apps that use two-factor authentication now asks for a code from the authenticator app that was set up. It came with a new set of recovery codes, which sign you in if you lose that app.</p>
+
+    <p>If you set it up, you don't need to do anything. Keep your recovery codes somewhere safe.</p>
+
+    <p><strong>If you didn't, someone else may know your password.</strong> Choose a new password with "Forgot your password?" on the sign-in page, then sign in and check your two-factor authentication settings, or contact your administrator.</p>
+
+    <p>Best regards,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

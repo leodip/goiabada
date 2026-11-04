@@ -285,7 +285,7 @@ var userTargetWrites = []targetWrite{
 			r := targetRequest(http.MethodPut, "/api/v1/admin/users/52/password", `{"newPassword":"a new password to sign in with"}`, scope,
 				map[string]string{"id": "52"})
 			rr := httptest.NewRecorder()
-			HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger).ServeHTTP(rr, withPasswordSettings(r))
+			HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, withPasswordSettings(r))
 			return rr
 		},
 		expectReads:      func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
@@ -298,7 +298,7 @@ var userTargetWrites = []targetWrite{
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string) *httptest.ResponseRecorder {
 			r := targetRequest(http.MethodPut, "/api/v1/admin/users/52/otp", `{"enabled":false}`, scope, map[string]string{"id": "52"})
 			rr := httptest.NewRecorder()
-			HandleUserOTPPut(database, auditLogger).ServeHTTP(rr, r)
+			HandleUserOTPPut(database, auditLogger, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, r)
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
@@ -885,7 +885,7 @@ func TestTargetCeiling_TheWritesAnswerTheirOwnFourHundredsFirst(t *testing.T) {
 
 		r := targetRequest(http.MethodPut, "/api/v1/admin/users/52/password", `{"newPassword":"x"}`, granularScopeOfTarget, map[string]string{"id": "52"})
 		rr := httptest.NewRecorder()
-		HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger).ServeHTTP(rr, withPasswordSettings(r))
+		HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, withPasswordSettings(r))
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		assertNoTargetPolicyRead(t, database)

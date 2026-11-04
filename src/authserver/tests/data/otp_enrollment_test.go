@@ -277,7 +277,7 @@ func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
 	// including the clear must roll back with it.
 	broken := reloadUser(t, user.Id)
 	broken.Id = 0
-	_, _, _, err = otpcredential.Establish(context.Background(), database, dataCipher, broken, enrolledSeed)
+	_, _, _, _, err = otpcredential.Establish(context.Background(), database, dataCipher, broken, enrolledSeed)
 	require.Error(t, err, "Establish must fail on a user with id 0")
 
 	assert.Equal(t, ciphertext, reloadUser(t, user.Id).OtpEnrollmentSecretEncrypted,
@@ -286,7 +286,7 @@ func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
 
 	enrolling := reloadUser(t, user.Id)
 	assert.Equal(t, 0, unusedRecoveryCodes(t, user.Id), "the failed enable stored no recovery codes")
-	generation, codes, established, err := otpcredential.Establish(context.Background(), database, dataCipher, enrolling, enrolledSeed)
+	generation, codes, _, established, err := otpcredential.Establish(context.Background(), database, dataCipher, enrolling, enrolledSeed)
 	require.NoError(t, err, "Establish")
 	require.True(t, established, "Establish from a fresh read must land")
 	assert.EqualValues(t, 1, generation, "the counter advance still happens")

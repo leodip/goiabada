@@ -1668,8 +1668,8 @@
 "adminconsole.admin_settings.email.subtitle" = "Email"
 "adminconsole.admin_settings.email.lead" = "Il server SMTP tramite cui il server di autenticazione invia le email."
 "adminconsole.admin_settings.email.field.smtp_enabled" = "Invia email"
-"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "Il server di autenticazione invia le email di reimpostazione password, verifica email e registrazione tramite il server SMTP qui sotto."
-"adminconsole.admin_settings.email.disable_warning" = "Disattivando l'invio di email verranno cancellate tutte le impostazioni SMTP, compresa la password salvata, e non verranno più inviate email di reimpostazione password, verifica email e registrazione."
+"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "Il server di autenticazione invia le email di reimpostazione password, verifica email e registrazione tramite il server SMTP qui sotto, e gli avvisi che l'indirizzo email, la password, l'autenticazione a due fattori o i codici di recupero di un account sono stati cambiati, o che è stato usato un codice di recupero per accedere."
+"adminconsole.admin_settings.email.disable_warning" = "Disattivando l'invio di email verranno cancellate tutte le impostazioni SMTP, compresa la password salvata, e non verranno più inviate email di reimpostazione password, verifica email e registrazione, né gli avvisi di cambio dell'indirizzo email, della password, dell'autenticazione a due fattori o dei codici di recupero, o di uso di un codice di recupero per accedere."
 "adminconsole.admin_settings.email.section_server" = "Server SMTP"
 "adminconsole.admin_settings.email.field.host_or_ip" = "Nome host o indirizzo IP"
 "adminconsole.admin_settings.email.field.port" = "Porta"
@@ -2134,6 +2134,15 @@
 "email.verification.subject" = "Verifica email - codice {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - crea una password per il tuo nuovo account"
 "email.address_changed.subject" = "Il tuo indirizzo email è stato cambiato"
+"email.password_changed.subject" = "La tua password è stata cambiata"
+"email.password_changed_by_administrator.subject" = "Un amministratore ha cambiato la tua password"
+"email.password_reset.subject" = "La tua password è stata reimpostata"
+"email.otp_enabled.subject" = "L'autenticazione a due fattori è stata configurata"
+"email.otp_disabled.subject" = "L'autenticazione a due fattori è stata disattivata"
+"email.otp_disabled_by_administrator.subject" = "Un amministratore ha disattivato la tua autenticazione a due fattori"
+"email.recovery_code_used.subject" = "È stato usato un codice di recupero per accedere"
+"email.recovery_codes_replaced.subject" = "I tuoi codici di recupero sono stati sostituiti"
+"email.otp_lockout.subject" = "La tua app di autenticazione è stata bloccata dopo troppi codici errati"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

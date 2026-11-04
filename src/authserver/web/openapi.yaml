@@ -4123,7 +4123,10 @@ paths:
       description: |
         Change the password. Requires the current password: a wrong one is a 400 with error_code
         AUTHENTICATION_FAILED that counts against the failure limit shared with the email and OTP
-        changes. The new password must meet the configured password policy.
+        changes. The new password must meet the configured password policy. The operation is also
+        limited to 10 requests per hour per account, together with the OTP change and new sets of
+        recovery codes, answered 429, whether or not the password was right, and whether or not
+        the rate limiter (GOIABADA_AUTHSERVER_RATELIMITER_ENABLED) is on.
       operationId: updateAccountPassword
       requestBody:
         required: true
@@ -4190,6 +4193,12 @@ paths:
       description: |
         Enables or disables TOTP for the authenticated user. Requires password verification, and
         when enabling, a current code from the authenticator.
+
+        A wrong or blank password is refused with 400 (`AUTHENTICATION_FAILED`). A wrong password
+        counts against the `account_password` rate limit, shared with the account's password,
+        email and recovery-code changes. Every request counts against the
+        `account_credential_change` rate limit, 10 per hour per account, shared with the account's
+        password change and new sets of recovery codes.
 
         Enabling completes the enrollment issued by `GET /api/v1/account/otp/enrollment`: the code
         is verified against the seed the server issued and that seed is what gets enrolled. Call the
@@ -4290,7 +4299,8 @@ paths:
         A wrong or blank password is refused with 400 (`AUTHENTICATION_FAILED`), and a user without
         an authenticator with 400 (`OTP_NOT_ENABLED`). A wrong password counts against the
         `account_password` rate limit, shared with the account's password, two-factor and email
-        changes.
+        changes. Every request counts against the `account_credential_change` rate limit, 10 per
+        hour per account, shared with the account's password and two-factor changes.
       operationId: createAccountRecoveryCodes
       requestBody:
         required: true

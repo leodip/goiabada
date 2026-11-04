@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - È stato usato un codice di recupero per accedere{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Ciao {{.name}},</p>
+
+    <p>Uno dei tuoi codici di recupero è stato usato per accedere al tuo account {{ .appName }}, al posto di un codice dell'app di autenticazione. Ogni codice di recupero funziona una sola volta, quindi quello non funziona più. {{if eq .remaining 0}}Non ti resta nessun codice di recupero inutilizzato.{{else if eq .remaining 1}}Ti resta 1 codice di recupero inutilizzato.{{else}}Ti restano {{ .remaining }} codici di recupero inutilizzati.{{end}}</p>
+
+    <p>Se l'hai usato tu e non hai più l'app di autenticazione, disattiva l'autenticazione a due fattori dalle impostazioni del tuo account e configura una nuova app di autenticazione, che include un nuovo set di codici di recupero. Se hai ancora l'app, {{if eq .remaining 0}}ottieni subito lì un nuovo set di codici di recupero, per poter accedere se la perdi.{{else}}puoi ottenere lì un nuovo set di codici di recupero prima di esaurirli.{{end}}</p>
+
+    <p><strong>Altrimenti, qualcun altro potrebbe conoscere la tua password e avere i tuoi codici di recupero.</strong> Scegli una nuova password con «Hai dimenticato la password?» nella pagina di accesso, poi accedi, disattiva l'autenticazione a due fattori e configura una nuova app di autenticazione, oppure contatta il tuo amministratore.</p>
+
+    <p>Un saluto,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

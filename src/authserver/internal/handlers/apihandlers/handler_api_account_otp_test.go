@@ -152,7 +152,7 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -192,7 +192,7 @@ func TestHandleAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
 		Return(false, errors.New("the database is unwell")).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -220,7 +220,7 @@ func TestHandleAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, wrongButWellFormedCode(t)))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -252,7 +252,7 @@ func TestHandleAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead(t
 	}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, otptest.NextStepCode(t, otpTestSecret)))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -303,6 +303,7 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 	// The rebind's clear, in the enable's own transaction (#489).
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	// And the authenticator's recovery codes (#257 decision 1).
+	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id, mock.Anything).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "recovery-codes") }).Once()
 
@@ -314,7 +315,7 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -356,7 +357,7 @@ func TestHandleAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 		Return(int64(0), errors.New("the database is unwell")).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -428,6 +429,7 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 	// And the user's sessions are lowered to what a password alone earns, in the same transaction,
 	// so none goes on naming the authenticator once it is gone (#542 decision 1).
+	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, user.Id, "pwd").Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "lower") }).Once()
 
@@ -438,7 +440,7 @@ func TestHandleAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 	}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -470,7 +472,7 @@ func TestHandleAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 		Return(errors.New("the database is unwell")).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -512,7 +514,7 @@ func wrongCodeDescription(t *testing.T) string {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, wrongButWellFormedCode(t)))
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	return descriptionOf(t, rr)
@@ -731,7 +733,7 @@ func TestHandleAccountOTPPut_SecretKeyIsRefused(t *testing.T) {
 			})
 
 			rr := httptest.NewRecorder()
-			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).ServeHTTP(rr, req)
+			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.Equal(t, "SECRET_KEY_NOT_ACCEPTED", errorCodeOf(t, rr))
@@ -754,7 +756,7 @@ func TestHandleAccountOTPPut_SecretKeyIsRefusedOnDisableToo(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).ServeHTTP(rr, req)
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "SECRET_KEY_NOT_ACCEPTED", errorCodeOf(t, rr))
@@ -802,7 +804,7 @@ func TestHandleAccountOTPPut_OversizedBodyIsRefused(t *testing.T) {
 		"the body must actually exceed the cap, or this case proves nothing")
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, limiter, testDataCipher).ServeHTTP(rr, req)
+	HandleAccountOTPPut(database, auditLogger, limiter, testDataCipher, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "INVALID_REQUEST_BODY", errorCodeOf(t, rr))
@@ -856,7 +858,7 @@ func TestHandleAccountOTPPut_Enable_RefusedWithoutALivePendingEnrollment(t *test
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 			rr := httptest.NewRecorder()
-			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 				ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -899,13 +901,14 @@ func TestHandleAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	database.On("ClearPendingOTPEnrollment", mock.Anything, tx, user.Id).Return(nil).Once()
 	// The rebind's clear, in the enable's own transaction (#489).
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, tx, user.Id).Return(nil).Once()
+	database.On("GetUserByIdForUpdate", mock.Anything, tx, user.Id).Return(user, nil).Once()
 	database.On("ReplaceUserRecoveryCodes", mock.Anything, tx, user.Id, mock.Anything).Return(nil).Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -930,7 +933,7 @@ func TestHandleAccountOTPPut_Enable_BlankCodeIsRefusedByName(t *testing.T) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, "   "))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -990,7 +993,7 @@ func TestHandleAccountOTPPut_Enable_ALostCompareAndSetIsAnsweredFromARead(t *tes
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(tc.reread, nil).Once()
 
 			rr := httptest.NewRecorder()
-			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 				ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 			assert.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
@@ -1044,7 +1047,7 @@ func TestHandleAccountOTPPut_Disable_ALostCompareAndSetIsAnsweredFromARead(t *te
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(tc.reread, nil).Once()
 
 			rr := httptest.NewRecorder()
-			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 				ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 			assert.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
@@ -1078,6 +1081,7 @@ func TestHandleAccountOTPPut_Enable_AnswersWithTheSetOfRecoveryCodes(t *testing.
 	database.On("ClearPendingOTPEnrollment", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	var stored []string
+	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id, mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) { stored = args.Get(3).([]string) }).Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
@@ -1091,7 +1095,7 @@ func TestHandleAccountOTPPut_Enable_AnswersWithTheSetOfRecoveryCodes(t *testing.
 	}).Return().Run(func(mock.Arguments) { events = append(events, audit.EventRecoveryCodesCreated) }).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -1126,12 +1130,13 @@ func TestHandleAccountOTPPut_Disable_AnswersWithNoRecoveryCodes(t *testing.T) {
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	database.On("DeleteUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).Once()
+	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, user.Id, "pwd").Return(nil).Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, accountOTPDisableRequest(t, subject, password))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())

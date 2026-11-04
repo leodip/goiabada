@@ -69,13 +69,14 @@ func TestEstablish_CreatesASetOfRecoveryCodesInItsTransaction(t *testing.T) {
 			stored = hashes
 			return nil
 		}).Once()
+	expectHeldRead(database, &calls)
 
-	generation, codes, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
+	generation, codes, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
 
 	require.NoError(t, err)
 	assert.True(t, established)
 	assert.EqualValues(t, 9, generation)
-	assert.Equal(t, []string{"begin", "establish", "increment", "clear", "clear-count", "recovery-codes", "commit"}, calls,
+	assert.Equal(t, []string{"begin", "establish", "increment", "clear", "clear-count", "recovery-codes", "read", "commit"}, calls,
 		"the set is created in the authenticator's own transaction, so no committed state has one without the other")
 
 	require.Len(t, codes, 10, "a set is ten codes")
@@ -100,8 +101,9 @@ func TestEstablish_DrawsANewSetEachTime(t *testing.T) {
 		datamocks.ExpectRunInTransaction(database, otpTx)
 		expectEstablishWrites(database, &calls)
 		database.EXPECT().ReplaceUserRecoveryCodes(mock.Anything, otpTx, otpUserId, mock.Anything).Return(nil).Once()
+		expectHeldRead(database, nil)
 
-		_, codes, established, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
+		_, codes, _, established, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
 		require.NoError(t, err)
 		require.True(t, established)
 		for _, code := range codes {
@@ -124,7 +126,7 @@ func TestEstablish_ARefusedSetEstablishesNothing(t *testing.T) {
 	expectEstablishWrites(database, &calls)
 	database.EXPECT().ReplaceUserRecoveryCodes(mock.Anything, otpTx, otpUserId, mock.Anything).Return(writeErr).Once()
 
-	generation, codes, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
+	generation, codes, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
 
 	require.ErrorIs(t, err, writeErr)
 	require.ErrorIs(t, stub.BodyErr, writeErr, "the body hands the error to the helper, which rolls back")
@@ -143,8 +145,9 @@ func TestEstablish_ACommitFailureYieldsNoRecoveryCodes(t *testing.T) {
 	datamocks.ExpectRunInTransactionThenFail(database, otpTx, commitErr)
 	expectEstablishWrites(database, &calls)
 	database.EXPECT().ReplaceUserRecoveryCodes(mock.Anything, otpTx, otpUserId, mock.Anything).Return(nil).Once()
+	expectHeldRead(database, nil)
 
-	_, codes, established, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
+	_, codes, _, established, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
 
 	require.ErrorIs(t, err, commitErr)
 	assert.False(t, established)
@@ -160,7 +163,7 @@ func TestEstablish_ALostCompareAndSetCreatesNoRecoveryCodes(t *testing.T) {
 	database.EXPECT().TryEstablishUserOTP(mock.Anything, otpTx, otpUserId, otpReadGeneration, mock.Anything).
 		Return(false, nil).Once()
 
-	_, codes, established, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
+	_, codes, _, established, err := Establish(context.Background(), database, testDataCipher, enrollableUser(), otpSeed)
 
 	require.NoError(t, err)
 	assert.False(t, established)
@@ -202,12 +205,13 @@ func TestRemove_DeletesTheRecoveryCodesInItsTransaction(t *testing.T) {
 			calls = append(calls, "lower")
 			return nil
 		}).Once()
+	expectHeldRead(database, &calls)
 
-	removed, err := Remove(context.Background(), database, user)
+	_, removed, err := Remove(context.Background(), database, user)
 
 	require.NoError(t, err)
 	assert.True(t, removed)
-	assert.Equal(t, []string{"begin", "remove", "reset", "delete-codes", "increment", "lower", "commit"}, calls)
+	assert.Equal(t, []string{"begin", "remove", "reset", "delete-codes", "increment", "lower", "read", "commit"}, calls)
 }
 
 // A deletion the engine refuses fails the removal: committed without it, the codes of an

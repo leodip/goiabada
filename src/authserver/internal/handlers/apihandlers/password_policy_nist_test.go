@@ -74,7 +74,7 @@ func TestHandleUserPasswordPut_HoldsThePasswordToNist(t *testing.T) {
 				map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
 
 			rr := httptest.NewRecorder()
-			HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, req)
+			HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), heldNotifier(t, &heldJobs{})).ServeHTTP(rr, req)
 
 			requireRefusal(t, rr, tc.code)
 			database.AssertNotCalled(t, "SetUserPasswordHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -137,7 +137,8 @@ func TestHandleAccountPasswordPut_HoldsThePasswordToNist(t *testing.T) {
 			req = setTokenContextWithClaims(nistSettings(req), map[string]interface{}{"sub": "the-subject"})
 
 			rr := httptest.NewRecorder()
-			HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), unlimitedCredentials{}).
+			HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), unlimitedCredentials{},
+				heldNotifier(t, &heldJobs{})).
 				ServeHTTP(rr, req)
 
 			requireRefusal(t, rr, tc.code)

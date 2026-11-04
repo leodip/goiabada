@@ -33,7 +33,7 @@ func TestAccountHandlers_ACallerWithoutATokenOrSubjectIsAWiringFault(t *testing.
 			return HandleAccountConsentDelete(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t))
 		},
 		"HandleAccountEmailPut": func(t *testing.T) http.HandlerFunc {
-			return HandleAccountEmailPut(nil, datamocks.NewDatabase(t), nil, nil, handlersmocks.NewAuditLogger(t), nil, nil)
+			return HandleAccountEmailPut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t), nil, nil)
 		},
 		"HandleAccountEmailVerificationSendPost": func(t *testing.T) http.HandlerFunc {
 			return HandleAccountEmailVerificationSendPost(nil, datamocks.NewDatabase(t), nil,
@@ -49,10 +49,10 @@ func TestAccountHandlers_ACallerWithoutATokenOrSubjectIsAWiringFault(t *testing.
 			return HandleAccountOTPEnrollmentGet(datamocks.NewDatabase(t), nil, testDataCipher)
 		},
 		"HandleAccountOTPPut": func(t *testing.T) http.HandlerFunc {
-			return HandleAccountOTPPut(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), nil, testDataCipher)
+			return HandleAccountOTPPut(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), nil, testDataCipher, heldNotifier(t, &heldJobs{}))
 		},
 		"HandleAccountPasswordPut": func(t *testing.T) http.HandlerFunc {
-			return HandleAccountPasswordPut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t), nil)
+			return HandleAccountPasswordPut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t), nil, nil)
 		},
 		"HandleAccountPhonePut": func(t *testing.T) http.HandlerFunc {
 			return HandleAccountPhonePut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t))

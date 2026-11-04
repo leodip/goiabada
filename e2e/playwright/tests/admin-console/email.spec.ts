@@ -120,6 +120,11 @@ test("a user created with an emailed link sets their password through it, and si
 
     const { client, secret } = await passwordGrantClient(page, clients);
     expect((await passwordToken(request, client.identifier, secret, email, "a-chosen-password", "openid")).status).toBe(200);
+
+    // The link set the account's first password, which replaced none, so no notice follows the
+    // setup mail, after giving it time to arrive.
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    expect(await mailTo(request, email)).toHaveLength(1);
   } finally {
     await deleteUser(page, id);
   }
@@ -156,6 +161,14 @@ test("forgot password: the emailed link sets a new password, and the old one sto
   const { client, secret } = await passwordGrantClient(page, clients);
   expect((await passwordToken(request, client.identifier, secret, user.email, "a-reset-password", "openid")).status).toBe(200);
   expect((await passwordToken(request, client.identifier, secret, user.email, user.password, "openid")).body.error).toBe("invalid_grant");
+
+  // After the reset link, the address is told its password was reset, with no link and no password.
+  const notice = await waitForMail(request, user.email, 2);
+  expect(notice.subject).toBe("Your password was reset");
+  expect(notice.html).toContain("If you didn't, someone else may be able to read your email and use your account.");
+  expect(linksIn(notice)).toEqual([]);
+  expect(notice.text + notice.html).not.toContain("a-reset-password");
+  expect(notice.text + notice.html).not.toContain(user.password);
 });
 
 test("the reset form refuses a password too short or not confirmed, and the link still sets one after", async ({

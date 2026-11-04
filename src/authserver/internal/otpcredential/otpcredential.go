@@ -53,6 +53,10 @@ import (
 // between them and leave each consumer choosing which to embed.
 type Database interface {
 	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error
+	// GetUserByIdForUpdate reads the user's row, which the operation's own write already holds,
+	// after that write: the account as the change commits it, which a caller notifying the user
+	// addresses (#724).
+	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
 	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error
 	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
@@ -106,17 +110,23 @@ const (
 // Disabled is true on the one refusal that moved the consecutive-failure count to
 // record.OtpConsecutiveFailureLimit, disabling the authenticator until it is rebound, so the
 // caller audits the disable exactly once (#489). It never changes what the submitter is told.
+// Current, beside it, is the user's row as the disabling transaction read it under the lock its
+// write holds, which the lockout notice addresses (#724 decision 7); nil otherwise.
 type VerifyResult struct {
 	Outcome  VerifyOutcome
 	Step     int64
 	Disabled bool
+	Current  *record.User
 }
 
 // Establish installs a user's authenticator: it encrypts the seed at rest and, only while OTP is
 // still off at the otp_config_generation user was read with, stores it and turns otp_enabled on,
 // advances the generation and discards any pending enrolment. It reports whether it did and, when
-// it did, the generation that landed and the set of recovery codes created with the authenticator,
-// which the caller shows once: only their hashes are stored (#257 decision 1).
+// it did, the generation that landed, the set of recovery codes created with the authenticator,
+// which the caller shows once: only their hashes are stored (#257 decision 1), and the user's row
+// as the committing transaction read it after its writes, under the lock they hold. A caller that
+// tells the user addresses that row rather than user, which was read before the transaction: an
+// address changed, verified or unverified meanwhile is the one the change committed beside (#724).
 //
 // **A compare-and-set on the authenticator, not on the flag** (#471 decision 2). The write names
 // only the seed and otp_enabled, so it cannot undo a disable or a password change made since the
@@ -148,24 +158,25 @@ type VerifyResult struct {
 // /auth/level2, and promoting that at /auth/completed would leave a session that just enrolled
 // and verified owing another second-factor prompt at once.
 func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User,
-	seed string) (generation int64, recoveryCodes []string, established bool, err error) {
+	seed string) (generation int64, recoveryCodes []string, current *record.User, established bool, err error) {
 
 	encrypted, err := encryptSecret(dataCipher, seed)
 	if err != nil {
-		return 0, nil, false, err
+		return 0, nil, nil, false, err
 	}
 	// Drawn before the transaction opens, so a deadlocked attempt's rerun stores the same set it
 	// returns rather than a set nobody was shown.
 	codes, codeHashes, err := newRecoveryCodes()
 	if err != nil {
-		return 0, nil, false, err
+		return 0, nil, nil, false, err
 	}
 
 	// Opened through RunInTransaction, so a deadlock reruns the writes together (#301).
 	// Safe to rerun: the ciphertext and the generation compared are fixed above, before this
-	// opened, and established and generation are the committing attempt's.
+	// opened, and established, generation and current are the committing attempt's.
 	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		generation = 0
+		current = nil
 		var writeErr error
 		established, writeErr = db.TryEstablishUserOTP(ctx, tx, user.Id, user.OtpConfigGeneration, encrypted)
 		if writeErr != nil {
@@ -204,19 +215,24 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 		// The new authenticator's recovery codes, replacing any set the user still had, in the
 		// same transaction: whatever the path, a committed authenticator comes with its set and a
 		// rolled back one leaves none behind (#257 decision 1). Only their hashes are stored.
-		return db.ReplaceUserRecoveryCodes(ctx, tx, user.Id, codeHashes)
+		if writeErr = db.ReplaceUserRecoveryCodes(ctx, tx, user.Id, codeHashes); writeErr != nil {
+			return writeErr
+		}
+		// The row the establish holds, read last, so it is the account the change commits beside.
+		current, writeErr = db.GetUserByIdForUpdate(ctx, tx, user.Id)
+		return writeErr
 	})
 	if err != nil {
-		return 0, nil, false, err
+		return 0, nil, nil, false, err
 	}
 	if !established {
-		return 0, nil, false, nil
+		return 0, nil, nil, false, nil
 	}
 
 	user.OTPSecretEncrypted = encrypted
 	user.OTPEnabled = true
 	user.OtpConfigGeneration = generation
-	return generation, codes, true, nil
+	return generation, codes, current, true, nil
 }
 
 // Remove removes a user's authenticator: only while OTP is still on at the otp_config_generation
@@ -275,25 +291,32 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 //
 // Shared by the two sites decision 4 names, HandleAccountOTPPut's disable branch and
 // HandleUserOTPPut. There is no third: the browser flow enrolls but never disables.
-func Remove(ctx context.Context, db Database, user *record.User) (removed bool, err error) {
+func Remove(ctx context.Context, db Database, user *record.User) (current *record.User, removed bool, err error) {
 	// Opened through RunInTransaction, so a deadlock reruns the writes together (#301).
-	// Safe to rerun: the generation compared is the request's read, and removed is the committing
-	// attempt's; the reset and the increment carry no state between attempts.
+	// Safe to rerun: the generation compared is the request's read, and removed and current are
+	// the committing attempt's; the reset and the increment carry no state between attempts.
 	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		current = nil
 		var writeErr error
 		removed, writeErr = RemoveTx(ctx, db, tx, user)
+		if writeErr != nil || !removed {
+			return writeErr
+		}
+		// The row the removal holds, read last; RemoveTx leaves it out, since the recover command
+		// tells nobody.
+		current, writeErr = db.GetUserByIdForUpdate(ctx, tx, user.Id)
 		return writeErr
 	})
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	if !removed {
-		return false, nil
+		return nil, false, nil
 	}
 
 	user.OTPSecretEncrypted = nil
 	user.OTPEnabled = false
-	return true, nil
+	return current, true, nil
 }
 
 // RemoveTx is Remove's four writes on a transaction the caller opened and will commit. Remove
@@ -391,12 +414,28 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 	// attempt the caller audits and the otp tier charges -- against the authenticator the
 	// code was checked against, the generation read with the seed. The statement stops at
 	// the limit, so grinding a disabled authenticator moves no row.
+	//
+	// In a transaction of its own so the refusal that disables the authenticator reads the user's
+	// row under the lock its write holds, for the lockout notice's address (#724 decision 7).
+	// Safe to rerun: disabled and current are the committing attempt's.
 	if result.Outcome == OutcomeWrong || result.Outcome == OutcomeReplayed {
-		disabled, err := db.IncrementUserOtpConsecutiveFailures(ctx, nil, user.Id, user.OtpConfigGeneration)
+		var disabled bool
+		var current *record.User
+		err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+			current = nil
+			var writeErr error
+			disabled, writeErr = db.IncrementUserOtpConsecutiveFailures(ctx, tx, user.Id, user.OtpConfigGeneration)
+			if writeErr != nil || !disabled {
+				return writeErr
+			}
+			current, writeErr = db.GetUserByIdForUpdate(ctx, tx, user.Id)
+			return writeErr
+		})
 		if err != nil {
 			return VerifyResult{}, err
 		}
 		result.Disabled = disabled
+		result.Current = current
 	}
 	return result, nil
 }

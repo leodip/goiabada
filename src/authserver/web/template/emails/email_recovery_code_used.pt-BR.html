@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Um código de recuperação foi usado para entrar{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Olá {{.name}},</p>
+
+    <p>Um dos seus códigos de recuperação foi usado para entrar na sua conta {{ .appName }}, no lugar de um código do aplicativo autenticador. Cada código de recuperação funciona uma única vez, então esse não funciona mais. {{if eq .remaining 0}}Você não tem mais nenhum código de recuperação sem uso.{{else if eq .remaining 1}}Resta 1 código de recuperação sem uso.{{else}}Restam {{ .remaining }} códigos de recuperação sem uso.{{end}}</p>
+
+    <p>Se foi você e você não tem mais o aplicativo autenticador, desative a autenticação de dois fatores nas configurações da sua conta e configure um novo autenticador, que vem com um novo conjunto de códigos de recuperação. Se você ainda tem o aplicativo, {{if eq .remaining 0}}gere lá agora um novo conjunto de códigos de recuperação, para poder entrar se perdê-lo.{{else}}pode gerar lá um novo conjunto de códigos de recuperação antes que eles acabem.{{end}}</p>
+
+    <p><strong>Se não foi você, outra pessoa pode saber a sua senha e ter os seus códigos de recuperação.</strong> Escolha uma nova senha em "Esqueceu sua senha?" na página de entrada, depois entre na sua conta, desative a autenticação de dois fatores e configure um novo autenticador, ou entre em contato com o administrador.</p>
+
+    <p>Atenciosamente,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

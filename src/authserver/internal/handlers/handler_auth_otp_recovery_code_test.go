@@ -123,6 +123,8 @@ func TestHandleAuthOtpPost_AnAcceptedRecoveryCodeSignsIn(t *testing.T) {
 	authContext.AuthMethods = "pwd"
 	m.armUser(enrolledUserForRecovery(t))
 
+	expectOTPWriteTransactions(m.database)
+	expectUserRowLocked(m.database, &record.User{Id: 1})
 	m.database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1),
 		recoveryCodeHashForTest(recoveryCodeNormalized)).Return(true, nil).Once()
 	m.database.On("CountUnusedUserRecoveryCodes", mock.Anything, mock.Anything, int64(1)).Return(9, nil).Once()
@@ -170,6 +172,8 @@ func TestHandleAuthOtpPost_ARecoveryCodeWorksWhileTheAuthenticatorIsDisabled(t *
 		user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit
 		m.armUser(user)
 
+		expectOTPWriteTransactions(m.database)
+		expectUserRowLocked(m.database, &record.User{Id: 1})
 		m.database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(true, nil).Once()
 		m.database.On("CountUnusedUserRecoveryCodes", mock.Anything, mock.Anything, int64(1)).Return(4, nil).Once()
@@ -192,6 +196,8 @@ func TestHandleAuthOtpPost_ARecoveryCodeWorksWhileTheAuthenticatorIsDisabled(t *
 		m.armUser(user)
 		m.armClient()
 
+		expectOTPWriteTransactions(m.database)
+		expectUserRowLocked(m.database, &record.User{Id: 1})
 		m.database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(false, nil).Once()
 		m.database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, int64(1), mock.Anything).
@@ -233,6 +239,8 @@ func TestHandleAuthOtpPost_ARefusedRecoveryCode(t *testing.T) {
 			m.armClient()
 
 			hash := recoveryCodeHashForTest(recoveryCodeNormalized)
+			expectOTPWriteTransactions(m.database)
+			expectUserRowLocked(m.database, &record.User{Id: 1})
 			m.database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1), hash).
 				Return(false, nil).Once()
 			m.database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, int64(1), hash).
@@ -368,6 +376,8 @@ func TestHandleAuthOtpPost_RecoveryCodesSpendTheOtpBudgetOnFailuresOnly(t *testi
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(enrolledUserForRecovery(t), nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&record.Client{ClientIdentifier: "test-client"}, nil).Maybe()
+		expectOTPWriteTransactions(database)
+		expectUserRowLocked(database, &record.User{Id: 1})
 		database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1), mock.Anything).Return(used, nil)
 		database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(exists, nil).Maybe()

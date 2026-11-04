@@ -1595,8 +1595,8 @@
 "adminconsole.admin_settings.email.subtitle" = "E-mail"
 "adminconsole.admin_settings.email.lead" = "O servidor SMTP pelo qual o servidor de autenticação envia seus e-mails."
 "adminconsole.admin_settings.email.field.smtp_enabled" = "Enviar e-mail"
-"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "O servidor de autenticação envia os e-mails de redefinição de senha, de verificação de e-mail e de cadastro pelo servidor SMTP abaixo."
-"adminconsole.admin_settings.email.disable_warning" = "Desligar o e-mail apagará todas as configurações SMTP, incluindo a senha salva, e interromperá os e-mails de redefinição de senha, de verificação de e-mail e de cadastro."
+"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "O servidor de autenticação envia os e-mails de redefinição de senha, de verificação de e-mail e de cadastro pelo servidor SMTP abaixo, e os avisos de que o endereço de e-mail, a senha, a autenticação de dois fatores ou os códigos de recuperação de uma conta foram alterados, ou de que um código de recuperação foi usado para entrar."
+"adminconsole.admin_settings.email.disable_warning" = "Desligar o e-mail apagará todas as configurações SMTP, incluindo a senha salva, e interromperá os e-mails de redefinição de senha, de verificação de e-mail e de cadastro, e os avisos de alteração de endereço de e-mail, de senha, de autenticação de dois fatores ou de códigos de recuperação, ou de uso de um código de recuperação para entrar."
 "adminconsole.admin_settings.email.section_server" = "Servidor SMTP"
 "adminconsole.admin_settings.email.field.host_or_ip" = "Nome do host ou endereço IP"
 "adminconsole.admin_settings.email.field.port" = "Porta"
@@ -2021,6 +2021,15 @@
 "email.verification.subject" = "Verificação de e-mail - código {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - crie uma senha para sua nova conta"
 "email.address_changed.subject" = "Seu endereço de e-mail foi alterado"
+"email.password_changed.subject" = "Sua senha foi alterada"
+"email.password_changed_by_administrator.subject" = "Um administrador alterou a sua senha"
+"email.password_reset.subject" = "Sua senha foi redefinida"
+"email.otp_enabled.subject" = "A autenticação de dois fatores foi configurada"
+"email.otp_disabled.subject" = "A autenticação de dois fatores foi desativada"
+"email.otp_disabled_by_administrator.subject" = "Um administrador desativou a sua autenticação de dois fatores"
+"email.recovery_code_used.subject" = "Um código de recuperação foi usado para entrar"
+"email.recovery_codes_replaced.subject" = "Seus códigos de recuperação foram substituídos"
+"email.otp_lockout.subject" = "Seu aplicativo autenticador foi bloqueado após muitos códigos errados"
 
 # --- Bootstrap de JS --------------------------------------------------------
 

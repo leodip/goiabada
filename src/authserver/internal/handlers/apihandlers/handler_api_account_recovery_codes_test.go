@@ -119,7 +119,7 @@ func TestHandleAccountRecoveryCodesPost_ReplacesTheSetAndAnswersItOnce(t *testin
 
 	credentials := &countingCredentials{}
 	rr := httptest.NewRecorder()
-	HandleAccountRecoveryCodesPost(database, auditLogger, credentials).
+	HandleAccountRecoveryCodesPost(database, auditLogger, credentials, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, recoveryCodesPostRequest(t, recoveryCodesPassword))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -147,7 +147,7 @@ func TestHandleAccountRecoveryCodesPost_WrongPasswordIsRefusedAndCharged(t *test
 
 	credentials := &countingCredentials{}
 	rr := httptest.NewRecorder()
-	HandleAccountRecoveryCodesPost(database, auditLogger, credentials).
+	HandleAccountRecoveryCodesPost(database, auditLogger, credentials, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, recoveryCodesPostRequest(t, "Wr0ng!pass"))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -164,7 +164,7 @@ func TestHandleAccountRecoveryCodesPost_BlankPasswordIsRefusedUncharged(t *testi
 
 	credentials := &countingCredentials{}
 	rr := httptest.NewRecorder()
-	HandleAccountRecoveryCodesPost(database, auditLogger, credentials).
+	HandleAccountRecoveryCodesPost(database, auditLogger, credentials, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, recoveryCodesPostRequest(t, "  "))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -182,7 +182,7 @@ func TestHandleAccountRecoveryCodesPost_NoAuthenticatorIsRefused(t *testing.T) {
 
 	credentials := &countingCredentials{}
 	rr := httptest.NewRecorder()
-	HandleAccountRecoveryCodesPost(database, auditLogger, credentials).
+	HandleAccountRecoveryCodesPost(database, auditLogger, credentials, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, recoveryCodesPostRequest(t, recoveryCodesPassword))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -204,7 +204,7 @@ func TestHandleAccountRecoveryCodesPost_AnAuthenticatorRemovedMeanwhileStoresNot
 	database.On("GetUserByIdForUpdate", mock.Anything, recoveryCodesTx, user.Id).Return(&removed, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountRecoveryCodesPost(database, auditLogger, &countingCredentials{}).
+	HandleAccountRecoveryCodesPost(database, auditLogger, &countingCredentials{}, heldNotifier(t, &heldJobs{})).
 		ServeHTTP(rr, recoveryCodesPostRequest(t, recoveryCodesPassword))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -218,7 +218,7 @@ func TestHandleAccountRecoveryCodesPost_InvalidBodyIsRefused(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/otp/recovery-codes", strings.NewReader("{"))
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": recoveryCodesSubject})
 	rr := httptest.NewRecorder()
-	HandleAccountRecoveryCodesPost(database, auditLogger, &countingCredentials{}).ServeHTTP(rr, req)
+	HandleAccountRecoveryCodesPost(database, auditLogger, &countingCredentials{}, heldNotifier(t, &heldJobs{})).ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "INVALID_REQUEST_BODY", errorCodeOf(t, rr))

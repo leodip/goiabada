@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
@@ -61,6 +62,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
 	httpHelper := render.New(s.templateFS, s.staticFS)
+	// The one notifier every account notice goes through, after its response (#724).
+	notifier := accountnotice.New(httpHelper, emailSender, s.jobs)
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 	legalDocuments := legaldocuments.NewReader(s.database)
 
@@ -109,7 +112,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// The two endpoints an emailed link points at register from the constants the links are
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
 	pages.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
-	pages.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL))
+	pages.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL, notifier))
 	// One discovery document at both well-known addresses, OIDC Discovery 1.0's and RFC 8414's, so
 	// the two cannot disagree: RFC 8414 section 3 allows more than one address and section 3.2 fields
 	// beyond its own. RFC 8414 section 3.1's path-suffixed form has no route; a reverse proxy serving
@@ -168,7 +171,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// (#642 decision 5).
 		r.With(handlers.RequirePasswordChallenge(ceremonyBoundary, httpHelper, passwordPrompt, s.challengeVerifier), rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, passwordPrompt, authflow.NewPasswordSubmission(s.database, auditLogger)))
 		r.Get("/otp", handlers.HandleAuthOtpGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewOTPPrompt(s.database, otpSecretGenerator)))
-		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher)))
+		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher), notifier))
 		// The set of recovery codes an authenticator set up during this sign-in came with, shown once
 		// after the accepted setup code, and the Continue that goes on to /auth/completed (#257
 		// decision 14). It checks no credential, so neither method is behind a limiter.
@@ -283,8 +286,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/email", apihandlers.HandleUserEmailPut(s.database, emailValidator, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/email/verification-code", apihandlers.HandleUserEmailVerificationCodePost(s.database, auditLogger, s.dataCipher))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/phone", apihandlers.HandleUserPhonePut(s.database, phoneValidator, auditLogger))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleUserPasswordPut(s.database, passwordValidator, auditLogger))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleUserOTPPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleUserPasswordPut(s.database, passwordValidator, auditLogger, notifier))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleUserOTPPut(s.database, auditLogger, notifier))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/profile-picture", apihandlers.HandleUserProfilePictureGet(s.database, baseURL))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/profile-picture", apihandlers.HandleUserProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleUserProfilePictureDelete(s.database, auditLogger))
@@ -459,7 +462,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// is taken, so every change counts on the account first, and a request that tier refuses
 		// never reaches the password check.
 		r.With(rateLimiter.LimitAccountEmailChange, rateLimiter.LimitAccountPassword).Put("/email",
-			apihandlers.HandleAccountEmailPut(httpHelper, s.database, emailValidator, emailSender, auditLogger, rateLimiter, s.jobs))
+			apihandlers.HandleAccountEmailPut(s.database, emailValidator, auditLogger, rateLimiter, notifier))
 		// The send counts every request on the account, beside its own five minute resend cooldown:
 		// the account chooses the address it mails, so each send is a mail to any address (#404).
 		r.With(rateLimiter.LimitEmailVerificationSend).Post("/email/verification/send",
@@ -472,17 +475,19 @@ func (s *Server) initRoutes(branches appBranches) {
 		// One limiter over these PUTs and the email change above, which is what makes the
 		// failure budget shared: they verify the same password, so separate buckets would hand
 		// an attacker more guesses by alternating. The enrollment GET between them checks no
-		// credential.
-		r.With(rateLimiter.LimitAccountPassword).Put("/password",
-			apihandlers.HandleAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter))
+		// credential. Ahead of it, one more over these PUTs and the new set of recovery codes
+		// below counts every change, since each sends the user a notice: a request it refuses
+		// never reaches the password check, and one that check refuses is counted (#724).
+		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Put("/password",
+			apihandlers.HandleAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter, notifier))
 		r.Get("/otp/enrollment", apihandlers.HandleAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
-		r.With(rateLimiter.LimitAccountPassword).Put("/otp",
-			apihandlers.HandleAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher))
+		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Put("/otp",
+			apihandlers.HandleAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher, notifier))
 		// The count of unused recovery codes checks no credential; a new set takes the password,
 		// so it spends the same bucket as the changes above (#257 decision 8).
 		r.Get("/otp/recovery-codes", apihandlers.HandleAccountRecoveryCodesGet(s.database))
-		r.With(rateLimiter.LimitAccountPassword).Post("/otp/recovery-codes",
-			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter))
+		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Post("/otp/recovery-codes",
+			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter, notifier))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
 		// The legal document versions the caller accepted (#622 decision 10).

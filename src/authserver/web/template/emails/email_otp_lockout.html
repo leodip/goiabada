@@ -1,0 +1,17 @@
+{{define "title"}}{{ .appName }} - Your authenticator was disabled after too many wrong codes{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Hello {{.name}},</p>
+
+    <p>The authenticator app of your {{ .appName }} account was disabled after too many wrong codes in a row were entered while signing in. Its codes are no longer accepted, even the right ones.</p>
+
+    <p><strong>Those codes could only be entered after your password, so someone else may know it.</strong> Sign in with one of your recovery codes, change your password in your account settings, then turn two-factor authentication off and set up a new authenticator. If you have no recovery codes left, contact your administrator.</p>
+
+    <p>Best regards,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

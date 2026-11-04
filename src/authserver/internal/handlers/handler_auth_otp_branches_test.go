@@ -388,6 +388,7 @@ func TestHandleAuthOtpPost_AClientReadFailingOnARefusalAnswers500AfterTheCodeIsC
 	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true,
 		OTPSecretEncrypted: encryptOTPForTest(t, "test-secret")})
 	// A refused code against the enrolled authenticator advances the consecutive count (#489).
+	expectOTPWriteTransactions(m.database)
 	m.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
 	m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, map[string]interface{}{"user_id": int64(1)}).

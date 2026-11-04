@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -251,6 +252,7 @@ func HandleAccountOTPPut(
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 	dataCipher *encryption.DataCipher,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, subject, ok := accountCaller(w, r)
@@ -335,6 +337,15 @@ func HandleAccountOTPPut(
 
 		// The set of recovery codes an enable created, answered once; a disable answers none.
 		var recoveryCodes []string
+
+		// The account's address is told of a change that committed, so a user whose authenticator
+		// someone else set up or removed learns of it (#724). Each branch defers the notice as soon
+		// as its change has committed, so it is handed off after the response, the success or the
+		// error a failed read for it answers. It goes to the user's row as the change's own
+		// transaction read it under its lock, not as read before the password was checked. The
+		// set-up notice mentions the recovery codes and carries none of them. The notifier sends
+		// only with SMTP on and to a verified address. A change refused, lost to a concurrent one or
+		// rolled back returns before its branch defers anything, and tells nobody.
 
 		// Branch by operation
 		if req.Enabled {
@@ -443,7 +454,7 @@ func HandleAccountOTPPut(
 			// pre-enrollment value earlier in the same ceremony, has a use for it. The recovery
 			// codes created with the authenticator are answered below and nowhere else: this
 			// response is the one time they are shown (#257 decisions 1 and 8).
-			_, codes, established, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, pendingSecret)
+			_, codes, current, established, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, pendingSecret)
 			if establishErr != nil {
 				writeInternalServerError(w, r, establishErr)
 				return
@@ -454,6 +465,7 @@ func HandleAccountOTPPut(
 				writeLostOTPChange(w, r, database, user.Id, true)
 				return
 			}
+			defer notifier.Send(r, accountnotice.OTPEnabled, accountnotice.To(current))
 
 			auditLogger.Log(r.Context(), audit.EventEnabledOTP, map[string]interface{}{
 				"user_id":        user.Id,
@@ -472,7 +484,7 @@ func HandleAccountOTPPut(
 				return
 			}
 
-			removed, removeErr := otpcredential.Remove(r.Context(), database, user)
+			current, removed, removeErr := otpcredential.Remove(r.Context(), database, user)
 			if removeErr != nil {
 				writeInternalServerError(w, r, removeErr)
 				return
@@ -481,6 +493,7 @@ func HandleAccountOTPPut(
 				writeLostOTPChange(w, r, database, user.Id, false)
 				return
 			}
+			defer notifier.Send(r, accountnotice.OTPDisabled, accountnotice.To(current))
 
 			auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{
 				"user_id":        user.Id,

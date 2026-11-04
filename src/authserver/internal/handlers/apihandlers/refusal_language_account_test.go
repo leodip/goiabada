@@ -87,15 +87,16 @@ func TestAccountEmailAndPasswordRefusals_AreInTheRequestsLanguage(t *testing.T) 
 	email := func(body api.UpdateAccountEmailRequest, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {
 		return serveAccount(http.MethodPut, "/api/v1/account/email", body, smtpOn, expect,
 			func(t *testing.T, database *datamocks.Database) http.Handler {
-				return HandleAccountEmailPut(handlersmocks.NewPageRenderer(t), database, accountvalidation.NewEmailValidator(database),
-					accounthandlersmocks.NewEmailSender(t), handlersmocks.NewAuditLogger(t), unlimitedCredentials{}, &heldJobs{})
+				return HandleAccountEmailPut(database, accountvalidation.NewEmailValidator(database),
+					handlersmocks.NewAuditLogger(t), unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
 			})
 	}
 	passwordChange := func(current, next string, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {
 		body := api.UpdateAccountPasswordRequest{CurrentPassword: current, NewPassword: next}
 		return serveAccount(http.MethodPut, "/api/v1/account/password", body, &record.Settings{PasswordPolicy: record.PasswordPolicyLow}, expect,
 			func(t *testing.T, database *datamocks.Database) http.Handler {
-				return HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), unlimitedCredentials{})
+				return HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), unlimitedCredentials{},
+					heldNotifier(t, &heldJobs{}))
 			})
 	}
 	send := func(settings *record.Settings, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {
@@ -250,7 +251,7 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			}
 			return serveAccount(http.MethodPut, "/api/v1/account/otp", body, settings, expect,
 				func(t *testing.T, database *datamocks.Database) http.Handler {
-					return HandleAccountOTPPut(database, handlersmocks.NewAuditLogger(t), unlimitedCredentials{}, testDataCipher)
+					return HandleAccountOTPPut(database, handlersmocks.NewAuditLogger(t), unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{}))
 				})(t, acceptLanguage)
 		}
 	}

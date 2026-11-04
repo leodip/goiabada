@@ -46,9 +46,11 @@ func TestJobs_TheScrapeReportsTheJobsInFlightAndDroppedByClass(t *testing.T) {
 		`goiabada_after_response_jobs_dropped_total{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="recovery"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="registration"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="security_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="recovery"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="registration"} 0`,
+		`goiabada_after_response_jobs_in_flight{class="security_notice"} 0`,
 	}, jobSamples(t, reg))
 
 	// Recovery at its cap, one registration job running, and two recovery jobs past the cap.
@@ -68,9 +70,11 @@ func TestJobs_TheScrapeReportsTheJobsInFlightAndDroppedByClass(t *testing.T) {
 		`goiabada_after_response_jobs_dropped_total{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="recovery"} 2`,
 		`goiabada_after_response_jobs_dropped_total{class="registration"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="security_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="recovery"} 64`,
 		`goiabada_after_response_jobs_in_flight{class="registration"} 1`,
+		`goiabada_after_response_jobs_in_flight{class="security_notice"} 0`,
 	}, jobSamples(t, reg))
 
 	// Once they finish, nothing is in flight, and what was dropped stays counted.
@@ -80,8 +84,10 @@ func TestJobs_TheScrapeReportsTheJobsInFlightAndDroppedByClass(t *testing.T) {
 		`goiabada_after_response_jobs_dropped_total{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="recovery"} 2`,
 		`goiabada_after_response_jobs_dropped_total{class="registration"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="security_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="account_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="recovery"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="registration"} 0`,
+		`goiabada_after_response_jobs_in_flight{class="security_notice"} 0`,
 	}, jobSamples(t, reg))
 }

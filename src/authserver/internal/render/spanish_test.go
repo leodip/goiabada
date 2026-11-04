@@ -47,6 +47,15 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 		{"email_newuser_set_password", "newuser_set_password", "Acme - crea una contraseña para tu nueva cuenta", "El enlace es válido durante 24 horas."},
 		{"email_verification", "verification", "Verificación del correo - código 123456", "Este es tu código de verificación"},
 		{"email_address_changed", "address_changed", "Tu dirección de correo electrónico ha cambiado", "puede que otra persona conozca tu contraseña."},
+		{"email_password_changed", "password_changed", "Tu contraseña ha cambiado", "puede que otra persona esté usando tu cuenta."},
+		{"email_password_changed_by_administrator", "password_changed_by_administrator", "Un administrador ha cambiado tu contraseña", "Si no lo esperabas, contacta con tu administrador."},
+		{"email_password_reset", "password_reset", "Tu contraseña se ha restablecido", "puede que otra persona lea tu correo y esté usando tu cuenta."},
+		{"email_otp_enabled", "otp_enabled", "Se ha configurado la autenticación de dos factores", "Viene con un nuevo conjunto de códigos de recuperación"},                                                    //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
+		{"email_otp_disabled", "otp_disabled", "Se ha desactivado la autenticación de dos factores", "vuelve a configurar la autenticación de dos factores"},                                                    //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
+		{"email_otp_disabled_by_administrator", "otp_disabled_by_administrator", "Un administrador ha desactivado tu autenticación de dos factores", "Puedes configurar una nueva aplicación de autenticación"}, //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
+		{"email_recovery_code_used", "recovery_code_used", "Se ha usado un código de recuperación para iniciar sesión", "Te quedan 3 códigos de recuperación sin usar."},
+		{"email_recovery_codes_replaced", "recovery_codes_replaced", "Se han sustituido tus códigos de recuperación", "Tus códigos de recuperación anteriores ya no sirven"},
+		{"email_otp_lockout", "otp_lockout", "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos", "Inicia sesión con uno de tus códigos de recuperación"},
 	} {
 		for _, locale := range []string{"es", "es-MX", "es-419"} {
 			t.Run(tc.body+" "+locale, func(t *testing.T) {
@@ -56,14 +65,21 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 				assert.Equal(t, tc.subject, i18n.T(r.Context(), "email."+tc.key+".subject", map[string]any{"code": "123456", "appName": "Acme"}))
 				buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(r,
 					"layouts/email_layout.html", "emails/"+tc.body+".html", map[string]interface{}{
-						"name": "Ana", "link": "https://example.com/continue", "verificationCode": "123456",
+						"name": "Ana", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3,
 					})
 				require.NoError(t, err)
 				assert.Contains(t, buf.String(), `<html lang="es">`)
 				assert.Contains(t, buf.String(), tc.sentence)
 				assert.Contains(t, buf.String(), "Acme")
-				if tc.body != "email_address_changed" {
+				// A notice of a change carries no link.
+				notice := map[string]bool{"email_address_changed": true, "email_password_changed": true,
+					"email_password_changed_by_administrator": true, "email_password_reset": true,
+					"email_otp_enabled": true, "email_otp_disabled": true, "email_otp_disabled_by_administrator": true,
+					"email_recovery_code_used": true, "email_recovery_codes_replaced": true, "email_otp_lockout": true}
+				if !notice[tc.body] {
 					assert.Contains(t, buf.String(), `href="https://example.com/continue"`)
+				} else {
+					assert.NotContains(t, buf.String(), "href")
 				}
 				if tc.body == "email_verification" {
 					assert.Contains(t, buf.String(), "123456")

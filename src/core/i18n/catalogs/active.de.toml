@@ -1665,8 +1665,8 @@
 "adminconsole.admin_settings.email.subtitle" = "E-Mail"
 "adminconsole.admin_settings.email.lead" = "Der SMTP-Server, über den der Authentifizierungsserver seine E-Mails sendet."
 "adminconsole.admin_settings.email.field.smtp_enabled" = "E-Mails senden"
-"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "Der Authentifizierungsserver sendet E-Mails zum Zurücksetzen des Passworts, zur E-Mail-Bestätigung und zur Registrierung über den folgenden SMTP-Server."
-"adminconsole.admin_settings.email.disable_warning" = "Beim Deaktivieren des E-Mail-Versands werden alle SMTP-Einstellungen einschließlich des gespeicherten Passworts gelöscht. E-Mails zum Zurücksetzen des Passworts, zur E-Mail-Bestätigung und zur Registrierung werden dann nicht mehr gesendet."
+"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "Der Authentifizierungsserver sendet E-Mails zum Zurücksetzen des Passworts, zur E-Mail-Bestätigung und zur Registrierung über den folgenden SMTP-Server, ebenso die Benachrichtigungen, dass die E-Mail-Adresse, das Passwort, die Zwei-Faktor-Authentifizierung oder die Wiederherstellungscodes eines Kontos geändert wurden oder dass ein Wiederherstellungscode zur Anmeldung verwendet wurde."
+"adminconsole.admin_settings.email.disable_warning" = "Beim Deaktivieren des E-Mail-Versands werden alle SMTP-Einstellungen einschließlich des gespeicherten Passworts gelöscht. E-Mails zum Zurücksetzen des Passworts, zur E-Mail-Bestätigung und zur Registrierung sowie die Benachrichtigungen über eine geänderte E-Mail-Adresse, ein geändertes Passwort, eine geänderte Zwei-Faktor-Authentifizierung, neue Wiederherstellungscodes oder einen zur Anmeldung verwendeten Wiederherstellungscode werden dann nicht mehr gesendet."
 "adminconsole.admin_settings.email.section_server" = "SMTP-Server"
 "adminconsole.admin_settings.email.field.host_or_ip" = "Hostname oder IP-Adresse"
 "adminconsole.admin_settings.email.field.port" = "Port"
@@ -2131,6 +2131,15 @@
 "email.verification.subject" = "E-Mail-Bestätigung – Code {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} – Passwort für Ihr neues Konto festlegen"
 "email.address_changed.subject" = "Ihre E-Mail-Adresse wurde geändert"
+"email.password_changed.subject" = "Ihr Passwort wurde geändert"
+"email.password_changed_by_administrator.subject" = "Ihr Passwort wurde von der Administration geändert"
+"email.password_reset.subject" = "Ihr Passwort wurde zurückgesetzt"
+"email.otp_enabled.subject" = "Die Zwei-Faktor-Authentifizierung wurde eingerichtet"
+"email.otp_disabled.subject" = "Die Zwei-Faktor-Authentifizierung wurde deaktiviert"
+"email.otp_disabled_by_administrator.subject" = "Ihre Zwei-Faktor-Authentifizierung wurde von der Administration deaktiviert"
+"email.recovery_code_used.subject" = "Für die Anmeldung wurde ein Wiederherstellungscode verwendet"
+"email.recovery_codes_replaced.subject" = "Ihre Wiederherstellungscodes wurden ersetzt"
+"email.otp_lockout.subject" = "Ihre Authenticator-App wurde nach zu vielen falschen Codes gesperrt"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

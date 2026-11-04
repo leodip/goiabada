@@ -1666,8 +1666,8 @@
 "adminconsole.admin_settings.email.subtitle" = "Correo electrónico"
 "adminconsole.admin_settings.email.lead" = "El servidor SMTP que usa el servidor de autenticación para enviar correo."
 "adminconsole.admin_settings.email.field.smtp_enabled" = "Enviar correo"
-"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "El servidor de autenticación envía los correos de restablecimiento de contraseña, verificación de correo y registro a través del servidor SMTP indicado a continuación."
-"adminconsole.admin_settings.email.disable_warning" = "Al desactivar el envío de correo se borrará toda la configuración SMTP, incluida la contraseña guardada, y dejarán de enviarse los correos de restablecimiento de contraseña, verificación y registro."
+"adminconsole.admin_settings.email.smtp_enabled_tooltip" = "El servidor de autenticación envía los correos de restablecimiento de contraseña, verificación de correo y registro a través del servidor SMTP indicado a continuación, así como los avisos de que la dirección de correo electrónico, la contraseña, la autenticación de dos factores o los códigos de recuperación de una cuenta han cambiado, o de que se ha usado un código de recuperación para iniciar sesión."
+"adminconsole.admin_settings.email.disable_warning" = "Al desactivar el envío de correo se borrará toda la configuración SMTP, incluida la contraseña guardada, y dejarán de enviarse los correos de restablecimiento de contraseña, verificación y registro, y los avisos de cambio de dirección de correo electrónico, de contraseña, de autenticación de dos factores o de códigos de recuperación, o de uso de un código de recuperación para iniciar sesión."
 "adminconsole.admin_settings.email.section_server" = "Servidor SMTP"
 "adminconsole.admin_settings.email.field.host_or_ip" = "Nombre de host o dirección IP"
 "adminconsole.admin_settings.email.field.port" = "Puerto"
@@ -2132,6 +2132,15 @@
 "email.verification.subject" = "Verificación del correo - código {{.code}}"
 "email.newuser_set_password.subject" = "{{.appName}} - crea una contraseña para tu nueva cuenta"
 "email.address_changed.subject" = "Tu dirección de correo electrónico ha cambiado"
+"email.password_changed.subject" = "Tu contraseña ha cambiado"
+"email.password_changed_by_administrator.subject" = "Un administrador ha cambiado tu contraseña"
+"email.password_reset.subject" = "Tu contraseña se ha restablecido"
+"email.otp_enabled.subject" = "Se ha configurado la autenticación de dos factores"
+"email.otp_disabled.subject" = "Se ha desactivado la autenticación de dos factores"
+"email.otp_disabled_by_administrator.subject" = "Un administrador ha desactivado tu autenticación de dos factores"
+"email.recovery_code_used.subject" = "Se ha usado un código de recuperación para iniciar sesión"
+"email.recovery_codes_replaced.subject" = "Se han sustituido tus códigos de recuperación"
+"email.otp_lockout.subject" = "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

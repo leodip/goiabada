@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
@@ -144,19 +145,21 @@ func buildAuthOtpGet(d authOtpGetDeps) http.HandlerFunc {
 		d.pageRenderer, d.ceremonyStore, authflow.NewOTPPrompt(d.database, d.otpSecretGenerator))
 }
 
-// authOtpPostDeps.credentialFailures left out records nothing (noCredentialFailures).
+// authOtpPostDeps.credentialFailures left out records nothing (noCredentialFailures), and
+// notifier left out sends nothing (noNotices).
 type authOtpPostDeps struct {
 	pageRenderer       PageRenderer
 	ceremonyStore      CeremonyStore
 	database           *datamocks.Database
 	auditLogger        AuditLogger
 	credentialFailures CredentialFailureRecorder
+	notifier           AccountNotifier
 }
 
 func buildAuthOtpPost(d authOtpPostDeps) http.HandlerFunc {
 	return HandleAuthOtpPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		d.pageRenderer, d.ceremonyStore, credentialFailuresOrNone(d.credentialFailures),
-		authflow.NewOTPSubmission(d.database, d.auditLogger, testDataCipher))
+		authflow.NewOTPSubmission(d.database, d.auditLogger, testDataCipher), notifierOrNone(d.notifier))
 }
 
 type authRecoveryCodesGetDeps struct {
@@ -254,6 +257,20 @@ func buildIssueGet(d issueGetDeps) http.HandlerFunc {
 		d.pageRenderer, d.ceremonyStore,
 		authflow.NewIssuance(d.database, d.codeIssuer, d.implicitTokenIssuer, d.userSessionManager,
 			d.permissionChecker, d.auditLogger, tokenMetrics))
+}
+
+// noNotices is the notifier a test that is not about notices builds with: it sends nothing.
+type noNotices struct{}
+
+func (noNotices) Send(*http.Request, accountnotice.Notice, accountnotice.Recipient) {}
+
+func (noNotices) SendRecoveryCodeUsed(*http.Request, accountnotice.Recipient, int) {}
+
+func notifierOrNone(notifier AccountNotifier) AccountNotifier {
+	if notifier == nil {
+		return noNotices{}
+	}
+	return notifier
 }
 
 func credentialFailuresOrNone(credentialFailures CredentialFailureRecorder) CredentialFailureRecorder {

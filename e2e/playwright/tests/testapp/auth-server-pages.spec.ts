@@ -1,12 +1,13 @@
 // The auth server's own pages a user of the test app meets beyond the steps the other files drive:
 // the two-factor setup page's key, for an authenticator app that cannot scan the QR code, and its
 // Copy key; the page after it showing the new authenticator's recovery codes once, and its Copy
-// codes; two tabs signing in side by side, and the page a sign-in pushed out meets; and the not
-// found page.
+// codes, and the notice the setup sends; two tabs signing in side by side, and the page a sign-in
+// pushed out meets; and the not found page.
 import type { Browser, BrowserContextOptions } from "@playwright/test";
 import { submitPassword } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, type TestUser, test } from "../../lib/fixtures";
+import { linksIn, waitForMail } from "../../lib/mailpit";
 import { expectResult, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
 import { freshTotp } from "../../lib/totp";
 
@@ -81,6 +82,24 @@ test("after two-factor setup, the recovery codes are shown once, Copy codes copi
   await page.waitForURL(testapp.web.url);
   await expectResult(page, "Signed in");
   await context.close();
+});
+
+test("two-factor setup during a sign-in sends the user a notice that mentions the recovery codes", async ({ browser, request, users }) => {
+  // Verified, since a notice goes only to a verified address.
+  const user = await users.create({ emailVerified: true });
+  const { context, page, key } = await openTwoFactorSetup(browser, user);
+  await page.locator('input[name="otp"]').fill(await freshTotp(key));
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page).toHaveURL(/\/auth\/recovery-codes/);
+  const shown = (await page.getByRole("list", { name: "Recovery codes" }).getByRole("listitem").allInnerTexts()).map((c) => c.trim());
+  expect(shown).toHaveLength(10);
+  await context.close();
+
+  const notice = await waitForMail(request, user.email);
+  expect(notice.subject).toBe("Two-factor authentication was set up");
+  expect(notice.html).toContain("It came with a new set of recovery codes");
+  expect(linksIn(notice)).toEqual([]);
+  for (const code of shown) expect(notice.text + notice.html).not.toContain(code);
 });
 
 // A browser holds up to five sign-ins side by side, each finishing on its own, so a user signing in

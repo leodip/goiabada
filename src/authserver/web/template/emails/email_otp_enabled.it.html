@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - L'autenticazione a due fattori è stata configurata{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Ciao {{.name}},</p>
+
+    <p>L'autenticazione a due fattori è stata configurata sul tuo account {{ .appName }}. Ora l'accesso alle app che usano l'autenticazione a due fattori chiede un codice dell'app di autenticazione configurata. Insieme è stato creato un nuovo set di codici di recupero, che ti permettono di accedere se perdi quell'app.</p>
+
+    <p>Se l'hai configurata tu, non devi fare nulla. Conserva i codici di recupero in un posto sicuro.</p>
+
+    <p><strong>Altrimenti, qualcun altro potrebbe conoscere la tua password.</strong> Scegli una nuova password con «Hai dimenticato la password?» nella pagina di accesso, poi accedi e controlla le impostazioni dell'autenticazione a due fattori, oppure contatta il tuo amministratore.</p>
+
+    <p>Un saluto,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

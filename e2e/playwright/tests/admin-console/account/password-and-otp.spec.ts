@@ -2,9 +2,10 @@
 import type { Page } from "@playwright/test";
 import { expectPasswordRules, expectRefusal, userUrl } from "../../../lib/admin-console";
 import { submitPassword } from "../../../lib/browser-sign-in";
-import { signInToConsole } from "../../../lib/console-user";
+import { signInToConsole, turnOnTwoFactor } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
+import { linksIn, waitForMail } from "../../../lib/mailpit";
 import { freshTotp, nextStepTotp, totp } from "../../../lib/totp";
 
 const wrongPassword = "That password isn't right. Try again.";
@@ -55,6 +56,30 @@ test("the user changes their password: the current one must be right, and the ne
   const again = await signInToConsole(browser, { ...user, password: "a-new-passphrase" });
   await expect(again.page).toHaveURL(`${env.adminUrl}/account/profile`);
   await again.context.close();
+});
+
+test("a password changed on the account page sends the user a notice, with no link and no password", async ({
+  browser,
+  request,
+  users,
+}) => {
+  // Verified, since a notice goes only to a verified address.
+  const user = await users.create({ emailVerified: true });
+  const next = "another-new-passphrase";
+  const own = await signInToConsole(browser, user, "/account/change-password");
+  await own.page.locator("#currentPassword").fill(user.password);
+  await own.page.locator("#newPassword").fill(next);
+  await own.page.locator("#newPasswordConfirmation").fill(next);
+  await own.page.getByRole("button", { name: "Change password" }).click();
+  await expect(own.page.getByText("Password changed.")).toBeVisible();
+  await own.context.close();
+
+  const notice = await waitForMail(request, user.email);
+  expect(notice.subject).toBe("Your password was changed");
+  expect(notice.html).toContain("If you didn't, someone else may be using your account.");
+  expect(linksIn(notice)).toEqual([]);
+  expect(notice.text + notice.html).not.toContain(next);
+  expect(notice.text + notice.html).not.toContain(user.password);
 });
 
 test("a password of bcrypt's whole bound, 72 bytes, is set and signs in, and nothing appended to it does", async ({ browser, users }) => {
@@ -127,6 +152,33 @@ test("the user enrols an authenticator, is asked for its code at sign-in, and tu
 
   await page.goto(userUrl(user.id, "authentication"));
   await expect(page.getByText("The user hasn't set up two-factor authentication. Only they can, from their account.")).toBeVisible();
+});
+
+test("setting up an authenticator sends the user a notice that mentions its recovery codes, and turning it off sends another", async ({
+  browser,
+  request,
+  users,
+}) => {
+  // Verified, since a notice goes only to a verified address.
+  const user = await users.create({ emailVerified: true });
+  const { secret, recoveryCodes } = await turnOnTwoFactor(browser, user);
+
+  const setUp = await waitForMail(request, user.email);
+  expect(setUp.subject).toBe("Two-factor authentication was set up");
+  expect(setUp.html).toContain("It came with a new set of recovery codes");
+  expect(linksIn(setUp)).toEqual([]);
+  for (const code of recoveryCodes) expect(setUp.text + setUp.html).not.toContain(code);
+
+  const own = await signInToConsole(browser, { ...user, otpSecret: secret }, "/account/otp");
+  await own.page.locator("#password").fill(user.password);
+  await own.page.getByRole("button", { name: "Turn off two-factor authentication" }).click();
+  await expect(own.page.getByText("Two-factor authentication is off.")).toBeVisible();
+  await own.context.close();
+
+  const turnedOff = await waitForMail(request, user.email, 2);
+  expect(turnedOff.subject).toBe("Two-factor authentication was turned off");
+  expect(turnedOff.html).toContain("If you didn't, someone else may know your password.");
+  expect(linksIn(turnedOff)).toEqual([]);
 });
 
 test("the enrolment key's Copy key button copies it", async ({ browser, users }) => {
@@ -281,6 +333,46 @@ test("too many wrong current passwords are refused on the form, and on the OTP p
   await expect(own.page.getByRole("heading", { name: "Something went wrong" })).toHaveCount(0);
   await expect(own.page.getByText("Two-factor authentication is off.")).toBeVisible();
   await expect(qrCode).toBeVisible();
+  await own.context.close();
+});
+
+// Password changes, two-factor changes and new sets of recovery codes share one budget of ten an
+// hour per user, every request counted, a wrong password included, whatever the rate limiter switch
+// says: each change sends the user a notice, so one account can't flood them (#724).
+test("the eleventh credential change in an hour is refused, the password and two-factor pages together", async ({ browser, users }) => {
+  // Up to a code step's wait for the authenticator, beside nine password changes.
+  test.setTimeout(120_000);
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/change-password");
+  const change = async (current: string, next: string) => {
+    await own.page.goto(`${env.adminUrl}/account/change-password`);
+    await own.page.locator("#currentPassword").fill(current);
+    await own.page.locator("#newPassword").fill(next);
+    await own.page.locator("#newPasswordConfirmation").fill(next);
+    await own.page.getByRole("button", { name: "Change password" }).click();
+  };
+
+  // The first is a wrong password, which counts like the others.
+  await change("not-the-password", "a-new-passphrase");
+  await expect(own.page.locator("#password-error")).toContainText(wrongPassword);
+  // The second to the ninth change it, back and forth between two new ones.
+  const passwords = [user.password, "first-new-passphrase", "second-new-passphrase"];
+  let current = 0;
+  for (let attempt = 2; attempt <= 9; attempt++) {
+    const next = current === 1 ? 2 : 1;
+    await change(passwords[current], passwords[next]);
+    await expect(own.page.getByText("Password changed.")).toBeVisible();
+    current = next;
+  }
+  // The tenth turns two-factor authentication on.
+  await own.page.goto(`${env.adminUrl}/account/otp`);
+  await turnOn(own.page, passwords[current]);
+
+  // The eleventh is refused before the password is compared, though it's right, and drawn on the form.
+  await change(passwords[current], "third-new-passphrase");
+  await expect(own.page.locator("#password-error")).toContainText(tooManyAttempts);
+  await expect(own.page.getByText("Password changed.")).toHaveCount(0);
+  await expect(own.page).toHaveURL(`${env.adminUrl}/account/change-password`);
   await own.context.close();
 });
 

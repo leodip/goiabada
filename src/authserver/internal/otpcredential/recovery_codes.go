@@ -111,14 +111,18 @@ const (
 )
 
 // RecoveryCodeResult is the outcome and, on RecoveryCodeAccepted, how many of the set's codes are
-// left unused after it, which the caller audits.
+// left unused after it, which the caller audits, and the user's row as the claim's transaction
+// read it under the row's lock, which the recovery-code notice addresses (#737).
 type RecoveryCodeResult struct {
 	Outcome   RecoveryCodeOutcome
 	Remaining int
+	Current   *record.User
 }
 
 // RecoveryCodeDatabase is what UseRecoveryCode reads and writes. data.Database satisfies it.
 type RecoveryCodeDatabase interface {
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
 	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
 	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error)
@@ -138,6 +142,11 @@ type RecoveryCodeDatabase interface {
 // A refused claim is looked up once more, to tell a used code of the current set, which the caller
 // audits as a replay, from a wrong one. The submitter is told the same for both.
 //
+// The claim and the count of codes left run in one transaction that takes the user's row first,
+// the order a removal and a new set take the row and the codes in, so an accepted code answers the
+// account as it stood when the claim committed: the address its notice goes to is that row's, not
+// one user read before (#737).
+//
 // The caller records the claim against the generation of the authenticator user was read with: the
 // codes are deleted in the removal's transaction and the generation moves with it, so a code
 // accepted from a set whose authenticator is removed meanwhile stands for nothing at
@@ -148,7 +157,22 @@ func UseRecoveryCode(ctx context.Context, db RecoveryCodeDatabase, user *record.
 	}
 
 	codeHash := HashRecoveryCode(code)
-	used, err := db.TryUseUserRecoveryCode(ctx, nil, user.Id, codeHash)
+	// Safe to rerun: used, remaining and current are the committing attempt's.
+	var used bool
+	var remaining int
+	var current *record.User
+	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		used, remaining, current = false, 0, nil
+		var txErr error
+		if current, txErr = db.GetUserByIdForUpdate(ctx, tx, user.Id); txErr != nil {
+			return txErr
+		}
+		if used, txErr = db.TryUseUserRecoveryCode(ctx, tx, user.Id, codeHash); txErr != nil || !used {
+			return txErr
+		}
+		remaining, txErr = db.CountUnusedUserRecoveryCodes(ctx, tx, user.Id)
+		return txErr
+	})
 	if err != nil {
 		return RecoveryCodeResult{}, err
 	}
@@ -162,12 +186,7 @@ func UseRecoveryCode(ctx context.Context, db RecoveryCodeDatabase, user *record.
 		}
 		return RecoveryCodeResult{Outcome: RecoveryCodeWrong}, nil
 	}
-
-	remaining, err := db.CountUnusedUserRecoveryCodes(ctx, nil, user.Id)
-	if err != nil {
-		return RecoveryCodeResult{}, err
-	}
-	return RecoveryCodeResult{Outcome: RecoveryCodeAccepted, Remaining: remaining}, nil
+	return RecoveryCodeResult{Outcome: RecoveryCodeAccepted, Remaining: remaining, Current: current}, nil
 }
 
 // IsBlankRecoveryCode reports whether code holds nothing once spaces and hyphens are taken out: a
@@ -185,8 +204,9 @@ type ReplaceRecoveryCodesDatabase interface {
 }
 
 // ReplaceRecoveryCodes gives the user a new set of recovery codes, which replaces the set they had,
-// used and unused codes alike, and answers it as shown; replaced is false, with nothing written,
-// when the user has no authenticator by the time the write lands (#257 decision 8).
+// used and unused codes alike, and answers it as shown, with the user's row as read under the lock
+// the replacement held, which the notice of the new set addresses (#737); replaced is false, with
+// nothing written, when the user has no authenticator by the time the write lands (#257 decision 8).
 //
 // The user's row is taken first and read again under the lock, the order a removal takes it in
 // (RemoveTx's first write is to that row), so a removal committed meanwhile is seen and no set is
@@ -198,17 +218,18 @@ type ReplaceRecoveryCodesDatabase interface {
 // reached /auth/completed yet or not; refusing it in flight alone would end nothing, since one that
 // went straight on keeps its session. Changing the password advances auth_state_generation, which
 // ends both.
-func ReplaceRecoveryCodes(ctx context.Context, db ReplaceRecoveryCodesDatabase, user *record.User) (codes []string, replaced bool, err error) {
+func ReplaceRecoveryCodes(ctx context.Context, db ReplaceRecoveryCodesDatabase, user *record.User) (codes []string, current *record.User, replaced bool, err error) {
 	// Drawn before the transaction opens, so a deadlocked attempt's rerun stores the same set it
 	// returns rather than a set nobody was shown.
 	codes, codeHashes, err := newRecoveryCodes()
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 
 	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		replaced = false
-		current, readErr := db.GetUserByIdForUpdate(ctx, tx, user.Id)
+		var readErr error
+		current, readErr = db.GetUserByIdForUpdate(ctx, tx, user.Id)
 		if readErr != nil {
 			return readErr
 		}
@@ -222,10 +243,10 @@ func ReplaceRecoveryCodes(ctx context.Context, db ReplaceRecoveryCodesDatabase, 
 		return nil
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	if !replaced {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
-	return codes, true, nil
+	return codes, current, true, nil
 }

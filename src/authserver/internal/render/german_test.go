@@ -38,7 +38,7 @@ func TestGerman_SignInPageUsesQueryOrAustrianHeader(t *testing.T) {
 	}
 }
 
-func TestGerman_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
+func TestGerman_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 	for _, locale := range []string{"de", "de-DE", "de-AT", "de-CH", "de-LI"} {
 		for _, tc := range []struct{ name, subject, body string }{
 			{"forgot_password", "Passwort zurücksetzen", "um Ihr Passwort zurückzusetzen"},
@@ -48,6 +48,15 @@ func TestGerman_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
 			{"verification", "E-Mail-Bestätigung – Code 123456", "Mit diesem Code können Sie Ihre E-Mail-Adresse bestätigen"},
 			{"newuser_set_password", "Test – Passwort für Ihr neues Konto festlegen", "Der Link ist 24 Stunden gültig."},
 			{"address_changed", "Ihre E-Mail-Adresse wurde geändert", "Andernfalls kennt möglicherweise jemand Ihr Passwort."},
+			{"password_changed", "Ihr Passwort wurde geändert", "Andernfalls verwendet möglicherweise jemand anderes Ihr Konto."},
+			{"password_changed_by_administrator", "Ihr Passwort wurde von der Administration geändert", "Falls Sie damit nicht gerechnet haben, wenden Sie sich an Ihre Administration."},
+			{"password_reset", "Ihr Passwort wurde zurückgesetzt", "Andernfalls kann möglicherweise jemand anderes Ihre E-Mails lesen und Ihr Konto verwenden."},
+			{"otp_enabled", "Die Zwei-Faktor-Authentifizierung wurde eingerichtet", "Dazu wurde ein neuer Satz Wiederherstellungscodes erstellt"},
+			{"otp_disabled", "Die Zwei-Faktor-Authentifizierung wurde deaktiviert", "richten Sie die Zwei-Faktor-Authentifizierung erneut ein."},
+			{"otp_disabled_by_administrator", "Ihre Zwei-Faktor-Authentifizierung wurde von der Administration deaktiviert", "In Ihren Kontoeinstellungen können Sie eine neue Authenticator-App einrichten."},
+			{"recovery_code_used", "Für die Anmeldung wurde ein Wiederherstellungscode verwendet", "Sie haben noch 3 unbenutzte Wiederherstellungscodes."},
+			{"recovery_codes_replaced", "Ihre Wiederherstellungscodes wurden ersetzt", "Ihre bisherigen Wiederherstellungscodes funktionieren nicht mehr"},
+			{"otp_lockout", "Ihre Authenticator-App wurde nach zu vielen falschen Codes gesperrt", "Melden Sie sich mit einem Ihrer Wiederherstellungscodes an"},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -58,7 +67,7 @@ func TestGerman_AllSevenEmailSubjectsAndBodiesFollowTheRecipient(t *testing.T) {
 				assert.Equal(t, tc.subject, i18n.T(ctx, "email."+tc.name+".subject", map[string]any{"code": "123456", "appName": "Test"}))
 				buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
 					"layouts/email_layout.html", "emails/email_"+tc.name+".html",
-					map[string]interface{}{"name": "Alex", "link": "https://example.com/continue", "verificationCode": "123456"})
+					map[string]interface{}{"name": "Alex", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3})
 				require.NoError(t, err)
 				assert.Contains(t, buf.String(), `<html lang="de">`)
 				assert.Contains(t, buf.String(), tc.body)

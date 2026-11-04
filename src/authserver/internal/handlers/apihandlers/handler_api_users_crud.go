@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -46,6 +47,7 @@ type usersCrudDatabase interface {
 	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
 }
@@ -97,6 +99,7 @@ func HandleUserPasswordPut(
 	database usersCrudDatabase,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -170,12 +173,33 @@ func HandleUserPasswordPut(
 		//
 		// Narrow write, not a full-row UpdateUser: the model was loaded before validation, so
 		// writing every column back would undo a concurrent disable (decision 14).
+		//
+		// The row the write replaces is read first, under its lock, for the notice below: whether
+		// the account had a password is decided from it, so a setup link completed while this
+		// request waited can't leave the answer stale (#724 decision 6). Assigned on every
+		// attempt, since a deadlock reruns the body.
+		var replaced *record.User
 		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
+			current, readErr := database.GetUserByIdForUpdate(r.Context(), tx, user.Id)
+			if readErr != nil {
+				return readErr
+			}
+			replaced = current
 			return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
 		})
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
+		}
+
+		// The account's address is told an administrator replaced its password, once this request
+		// has been answered, whatever the answer: the change has committed, so a failed read for
+		// the response below loses no notice (#724). A first password, on an account whose setup
+		// link is pending, replaces nothing and tells nobody (decision 6). It goes to the row the
+		// write replaced, as read under its lock. The notifier sends only with SMTP on and to a
+		// verified address; a change refused or rolled back above returned before this.
+		if replaced != nil && replaced.PasswordHash != "" {
+			defer notifier.Send(r, accountnotice.PasswordChangedByAdministrator, accountnotice.To(replaced))
 		}
 
 		// Get logged in user from access token
@@ -214,6 +238,7 @@ func HandleUserPasswordPut(
 func HandleUserOTPPut(
 	database usersCrudDatabase,
 	auditLogger AuditLogger,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -269,7 +294,7 @@ func HandleUserOTPPut(
 		// Disable OTP. Clearing the secret, turning otp_enabled off and resetting the
 		// consumed-step marker are one atomic operation, shared with the account API's disable
 		// branch (#111 decisions 4 and 13); otpcredential.Remove carries the reasoning.
-		removed, err := otpcredential.Remove(r.Context(), database, user)
+		current, removed, err := otpcredential.Remove(r.Context(), database, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -280,6 +305,13 @@ func HandleUserOTPPut(
 			writeLostOTPChange(w, r, database, user.Id, false)
 			return
 		}
+
+		// The account's address is told an administrator turned two-factor authentication off,
+		// naming no administrator, once this request has been answered, whatever the answer: the
+		// removal has committed, so a failed read for the response below loses no notice (#724).
+		// It goes to the user's row as the removal's transaction read it under its lock. A removal
+		// refused or lost to a concurrent change above returned before this, and tells nobody.
+		defer notifier.Send(r, accountnotice.OTPDisabledByAdministrator, accountnotice.To(current))
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{

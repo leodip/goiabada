@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Your recovery codes were replaced{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Hello {{.name}},</p>
+
+    <p>A new set of recovery codes was made for your {{ .appName }} account from your account settings. Your previous recovery codes no longer work, used or not.</p>
+
+    <p>If you made it, you don't need to do anything. Keep the new codes somewhere safe.</p>
+
+    <p><strong>If you didn't, someone else may know your password.</strong> Choose a new password with "Forgot your password?" on the sign-in page, then sign in and get a new set of recovery codes in your account settings, or contact your administrator.</p>
+
+    <p>Best regards,<br />{{ .appName }}</p>
+</div>
+
+{{end}}
