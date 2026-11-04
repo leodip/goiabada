@@ -228,11 +228,14 @@ export default defineConfig({
 		}),
 		// After Starlight, so its checks read the finished pages. The repository's
 		// src/ is beside this directory, in a checkout and in the docs image's build.
-		// It also writes /llms.txt and /llms-full.txt, which llms heads, and checks the
-		// links into the generated API reference.
+		// It also writes /llms.txt and /llms-full.txt, which llms heads, checks the
+		// links into the generated API reference, that no page loads anything from
+		// another site, and that every page carries the consent prompt and the
+		// footer's links to the Privacy page and Cookie settings.
 		buildChecks({
 			srcDir: fileURLToPath(new URL('../src/', import.meta.url)),
 			apiReferences,
+			privacyPage: '/about/privacy/',
 			llms: {
 				title: 'Goiabada',
 				summary: 'An open-source OAuth2 and OpenID Connect server for simple, secure authentication.',

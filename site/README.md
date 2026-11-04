@@ -59,6 +59,20 @@ and errors are handwritten pages beside the generated ones, in `src/content/docs
   is missing from either file, an entry names no page, or an entry lacks text its page renders.
   This step is ours, in `checks/llms.mjs`. The project title and summary that head `llms.txt`
   are in `astro.config.mjs`, and its sections follow the sidebar.
+- **A page or stylesheet loads anything from another site:** a script, a stylesheet, a preload,
+  modulepreload, prefetch, preconnect or dns-prefetch link, an icon or manifest, an image or
+  `srcset` candidate, a frame, media or an embedded object, or a CSS `url()` or `@import` in a
+  built stylesheet, a `<style>` element or a `style` attribute, naming another origin. Serve it
+  from the site instead. Links that load nothing, such as `canonical`, `sitemap` and `<a href>`,
+  are allowed, and so are `data:` URLs. Google's tag passes because the consent prompt's script adds
+  it after Accept, and the check doesn't read scripts.
+- **A page lacks the consent prompt or the footer's links:** every page, the 404 page included,
+  must load the consent prompt's script and carry a Privacy link to `/about/privacy/` and the
+  Cookie settings button. Both come from the `Footer` override in `src/components/Footer.astro`,
+  so a page that doesn't render Starlight's footer fails. So does moving the Privacy page without
+  updating the link.
+
+These two checks are ours, in `checks/privacy.mjs`, run from `checks/build-checks.mjs`.
 
 `npm test` runs the checks' tests on small fixtures with Node's built-in test runner.
 
