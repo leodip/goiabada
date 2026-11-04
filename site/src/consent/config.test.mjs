@@ -109,7 +109,9 @@ test('accepting Analytics loads Google\'s tag once, with the minimum settings', 
 	assert.deepEqual(queued[1], ['config', 'G-CYZXDTHNB1', {
 		allow_google_signals: false,
 		allow_ad_personalization_signals: false,
-		// 390 days: thirteen months whichever months they span is at least 393.
+		// 390 days: thirteen months whichever months they span is at least 393. No
+		// cookie_update: Google's default renews the cookies on each page view, which
+		// the Privacy page and Cookie settings state.
 		cookie_expires: 33696000,
 	}]);
 });

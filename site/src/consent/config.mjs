@@ -7,12 +7,15 @@
 
 export const googleAnalyticsId = 'G-CYZXDTHNB1';
 
-// Google's cookies last 390 days: thirteen months, whichever months they span, is
-// at least 393 days, so they never outlive the thirteen months the Privacy page says.
+// Google's cookies last 390 days from the latest page view: gtag renews them on each
+// one, as its cookie_update default does, so the Privacy page and Cookie settings say
+// the thirteen months count from the latest visit. Thirteen months, whichever months
+// they span, is at least 393 days, so the cookies never outlive what those pages say.
 const googleCookieSeconds = 390 * 24 * 60 * 60;
 
 // Adds Google's tag to the page, once, set to keep as little as it can: no Google
-// signals, no ads personalization, and cookies of at most thirteen months.
+// signals, no ads personalization, and cookies that last at most thirteen months
+// after the latest visit.
 export function loadGoogleTag(window) {
 	if (window.googleTagLoaded) return;
 	window.googleTagLoaded = true;
@@ -100,7 +103,7 @@ export function consentConfig(window) {
 								title: 'Analytics',
 								description:
 									'Google Analytics counts page views, where visitors came from and how long they stayed. ' +
-									'Its cookies last up to 13 months, and what it collects is never used for ads.',
+									'Its cookies last up to 13 months after your latest visit, and what it collects is never used for ads.',
 								linkedCategory: 'analytics',
 							},
 							{
