@@ -72,7 +72,9 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 	adminEmail := r.cfg.AdminEmail
 	if len(adminEmail) == 0 {
 		const defaultAdminEmail = "admin@example.com"
-		slog.WarnContext(ctx, "admin email is not set, defaulting it", "email", defaultAdminEmail)
+		// The default is named in the message rather than in an attribute: it is the built-in value,
+		// and no record carries an address (#779 decision 3).
+		slog.WarnContext(ctx, "admin email is not set, defaulting it to admin@example.com")
 		adminEmail = defaultAdminEmail
 	}
 	// Lowercased at the write, exactly as every other path that stores an email does.
@@ -210,7 +212,6 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 	// those announced rows a rollback then removed, and would repeat on a deadlock rerun.
 	slog.InfoContext(ctx, "database seeded",
 		"client_identifier", builtin.AdminConsoleClientIdentifier,
-		"email", adminEmail,
 		"current_key_identifier", currentKey.KeyIdentifier,
 		"next_key_identifier", nextKey.KeyIdentifier)
 

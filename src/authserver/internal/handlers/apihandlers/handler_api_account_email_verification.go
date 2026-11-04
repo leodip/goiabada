@@ -134,7 +134,7 @@ func HandleAccountEmailVerificationSendPost(
 			HtmlBody: buf.String(),
 		}
 		if _, err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "Failed to send verification email"), "user_id", user.Id, "email", user.Email)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to send verification email"), "user_id", user.Id)
 			return
 		}
 

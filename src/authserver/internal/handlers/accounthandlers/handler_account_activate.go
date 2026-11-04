@@ -567,7 +567,7 @@ func HandleActivatePost(
 		// been created and telling the caller the activation failed would be false.
 		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r, marker.ContinuationId); clearLinkMarkerErr != nil {
 			slog.ErrorContext(r.Context(), "unable to clear the account activation link marker after a completed activation",
-				"email", createdUser.Email, "error", clearLinkMarkerErr)
+				"user_id", createdUser.Id, "error", clearLinkMarkerErr)
 		}
 
 		ceremonyId := registrationCeremonyId(r)

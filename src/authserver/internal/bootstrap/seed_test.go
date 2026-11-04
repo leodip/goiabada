@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -887,14 +889,56 @@ func TestRun_WritesOneSeededRecord(t *testing.T) {
 	for _, key := range keys {
 		byState[key.State] = key.KeyIdentifier
 	}
-	assert.Equal(t, builtin.AdminConsoleClientIdentifier, seeded[0].Attrs["client_identifier"])
-	assert.Equal(t, "admin@example.com", seeded[0].Attrs["email"])
-	assert.Equal(t, byState[record.KeyStateCurrent.String()], seeded[0].Attrs["current_key_identifier"])
-	assert.Equal(t, byState[record.KeyStateNext.String()], seeded[0].Attrs["next_key_identifier"])
+	// The whole attribute set, so an address added back under any key fails (#779 decision 3).
+	assert.Equal(t, map[string]any{
+		"client_identifier":      builtin.AdminConsoleClientIdentifier,
+		"current_key_identifier": byState[record.KeyStateCurrent.String()],
+		"next_key_identifier":    byState[record.KeyStateNext.String()],
+	}, seeded[0].Attrs)
+	for _, logRecord := range logs.Records() {
+		assert.NotContains(t, strings.ToLower(logRecord.Message), "admin@example.com",
+			"no record names the first administrator's address: %s", logRecord.Message)
+		for key, value := range logRecord.Attrs {
+			assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), "admin@example.com",
+				"%s carries the address under %s", logRecord.Message, key)
+		}
+	}
 
 	messages := recordMessages(logs)
 	assert.Contains(t, messages, "app name is not set, defaulting it")
 	assert.Contains(t, messages, "using pre-generated OAuth client secret from environment")
+}
+
+// An unset GOIABADA_ADMIN_EMAIL is named in the warning's message, the operator's own
+// configuration, with no attribute holding it (#779 decision 3).
+func TestRun_DefaultAdminEmailWarningCarriesNoAttribute(t *testing.T) {
+	db := newSeedDB(t)
+	cfg := singleStepConfig()
+	cfg.AdminEmail = ""
+	logs := logtest.CaptureSlog(t)
+
+	_, err := testRunner(db, cfg).run(context.Background())
+	require.NoError(t, err)
+
+	var warnings []logtest.CapturedRecord
+	for _, logRecord := range logs.Records() {
+		if strings.HasPrefix(logRecord.Message, "admin email is not set") {
+			warnings = append(warnings, logRecord)
+		}
+	}
+	require.Len(t, warnings, 1)
+	assert.Equal(t, slog.LevelWarn, warnings[0].Level)
+	assert.Equal(t, "admin email is not set, defaulting it to admin@example.com", warnings[0].Message)
+	assert.Empty(t, warnings[0].Attrs)
+
+	for _, logRecord := range logs.Records() {
+		if logRecord.Message == "database seeded" {
+			for key, value := range logRecord.Attrs {
+				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), "admin@example.com",
+					"database seeded carries the default address under %s", key)
+			}
+		}
+	}
 }
 
 // TestRun_AStopDuringTheSeedLetsItFinish and the case after it are #390 decision 9 for the seed: a

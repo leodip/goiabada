@@ -2907,7 +2907,8 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 				"key; the record would carry a name nothing else in the tree spells that way",
 				found.name, found.where, found.keyField)
 		}
-		if found.keyField == "request_id" || found.keyField == "request-id" || found.keyField == "err" {
+		if found.keyField == "request_id" || found.keyField == "request-id" || found.keyField == "err" ||
+			found.keyField == "email" {
 			t.Errorf("tier %q at %s logs its bucket under the reserved key %q",
 				found.name, found.where, found.keyField)
 		}

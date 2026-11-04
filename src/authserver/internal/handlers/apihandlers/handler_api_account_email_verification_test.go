@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,7 +20,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -640,4 +643,53 @@ func TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) 
 			assert.Equal(t, 0, credentials.failures, "a right code that lost the row is not a guess")
 		})
 	}
+}
+
+// A verification email the relay refuses is logged naming the account by its id, never by its
+// address (#779).
+func TestHandleAccountEmailVerificationSendPost_SendFailureNamesUserIdOnly(t *testing.T) {
+	const address = "someone@example.com"
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	handler := HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
+		testDataCipher, testAdminConsoleBaseURL)
+
+	user := &record.User{Id: 7, Subject: verificationSubject, Email: address}
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
+	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), address,
+		mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+		"/emails/email_verification.html", mock.Anything).Return(&bytes.Buffer{}, nil)
+	emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
+		Return(emaildelivery.SendResult{}, errs.New("the relay is unreachable"))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": verificationSubject})
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true, SMTPHost: "smtp.example.com"}))
+	logs := logtest.CaptureSlog(t)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+	var failures []logtest.CapturedRecord
+	for _, logRecord := range logs.Records() {
+		if logRecord.Message == "internal server error" {
+			failures = append(failures, logRecord)
+		}
+	}
+	require.Len(t, failures, 1)
+	assert.Equal(t, int64(7), failures[0].Attrs["user_id"])
+	assert.NotContains(t, failures[0].Attrs, "email")
+	for _, logRecord := range logs.Records() {
+		assert.NotContains(t, strings.ToLower(logRecord.Message), address)
+		for key, value := range logRecord.Attrs {
+			assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), address,
+				"%s carries the address under %s", logRecord.Message, key)
+		}
+	}
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything)
 }

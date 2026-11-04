@@ -2,6 +2,7 @@ package accounthandlers
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1333,4 +1334,70 @@ func TestHandleActivatePost_SelfRegistrationDisabled(t *testing.T) {
 	database.AssertNotCalled(t, "GetPreRegistrationByVerificationCodeHash", mock.Anything, mock.Anything, mock.Anything)
 	userCreator.AssertNotCalled(t, "CreateUserInTransaction", mock.Anything, mock.Anything, mock.Anything)
 	pageRenderer.AssertExpectations(t)
+}
+
+// unclearableSessionStore reads the browser session from the store it wraps and refuses every
+// write, so a completed activation cannot clear its link marker.
+type unclearableSessionStore struct {
+	*sessionstore.ConditionalStore
+	err error
+}
+
+func (s unclearableSessionStore) ChangeAndSave(*http.Request, http.ResponseWriter, *sessionstore.Session,
+	func(map[string]any) error) error {
+	return s.err
+}
+
+// A link marker that cannot be cleared after the account is created is logged, naming the new
+// account by its id and never by its address (#779).
+func TestHandleActivatePost_LinkMarkerCleanupFailureNamesUserId(t *testing.T) {
+	const code = "the-emitted-code"
+	const chosenPassword = "Str0ngP4ss!"
+
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewTransactionalUserCreator(t)
+	passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	store := newMarkerTestStore()
+
+	preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
+	database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
+	passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
+	datamocks.ExpectRunInTransaction(database, activationTx)
+	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(true, nil).Once()
+	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
+		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventActivatedAccount, mock.Anything).Return().Once()
+	pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
+		"/account_register_activation_result.html", mock.Anything).Return(nil).Once()
+
+	sent := postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash)
+	clearErr := errs.New("the session backend is unavailable")
+	handler := HandleActivatePost(pageRenderer, unclearableSessionStore{ConditionalStore: store, err: clearErr},
+		heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+	logs := logtest.CaptureSlog(t)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, sent)
+
+	assert.Equal(t, http.StatusOK, rr.Code, "the account was created, so the activation is not answered as failed")
+	var failures []logtest.CapturedRecord
+	for _, logRecord := range logs.Records() {
+		if logRecord.Message == "unable to clear the account activation link marker after a completed activation" {
+			failures = append(failures, logRecord)
+		}
+	}
+	require.Len(t, failures, 1)
+	assert.Equal(t, int64(3), failures[0].Attrs["user_id"])
+	assert.Contains(t, fmt.Sprint(failures[0].Attrs["error"]), "the session backend is unavailable")
+	assert.NotContains(t, failures[0].Attrs, "email")
+	for _, logRecord := range logs.Records() {
+		assert.NotContains(t, strings.ToLower(logRecord.Message), activateTestEmail)
+		for key, value := range logRecord.Attrs {
+			assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), activateTestEmail,
+				"%s carries the address under %s", logRecord.Message, key)
+		}
+	}
 }
