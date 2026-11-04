@@ -140,9 +140,10 @@ func TestKeepSignedIn_ASessionsNextCookieWriteFollowsASwitchedSetting(t *testing
 }
 
 // A page request past the touch threshold refreshes a signed-in session in every mode, and sends its
-// cookie again only under Always: one that ends with the browser has no expiry to keep up (#743
-// decision 8).
-func TestKeepSignedIn_APageRefreshSendsTheCookieAgainOnlyWhenItOutlivesTheBrowser(t *testing.T) {
+// cookie again as the mode answers: under Always with the row's expiry, and otherwise with neither
+// Max-Age nor Expires, which replaces a cookie the browser still holds from before a stricter
+// setting or an upgrade (#743 decision 8).
+func TestKeepSignedIn_APageRefreshSendsTheCookieAgainAsTheSettingAnswers(t *testing.T) {
 	for _, mode := range keepSignedInModes {
 		t.Run(string(mode), func(t *testing.T) {
 			setKeepSignedIn(t, mode)
@@ -160,11 +161,13 @@ func TestKeepSignedIn_APageRefreshSendsTheCookieAgainOnlyWhenItOutlivesTheBrowse
 					reissued = append(reissued, set)
 				}
 			}
+			require.Len(t, reissued, 1, "the cookie is sent again")
 			if mode == record.KeepSignedInAlways {
-				require.Len(t, reissued, 1, "the cookie is sent again")
 				assert.InDelta(t, time.Until(row.ExpiresAt).Seconds(), reissued[0].MaxAge, 3, "and expires with the row")
 			} else {
-				assert.Empty(t, reissued, "no cookie is sent")
+				assert.True(t, endsWithTheBrowser(reissued[0]),
+					"and ends with the browser: Max-Age %d, Expires %q", reissued[0].MaxAge, reissued[0].RawExpires)
+				assert.NotEmpty(t, reissued[0].Value, "still naming the session")
 			}
 		})
 	}

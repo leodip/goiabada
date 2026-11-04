@@ -594,11 +594,12 @@ func (s *ServerSideStore) freshSession(name string) *Session {
 // on SQLite that is an fsync on the one connection the whole process shares.
 //
 // A store whose cookie can outlive the browser touches only on a request Refreshing wraps, and then
-// sends a signed-in session's cookie again with the row's new expiry, so the row and the cookie
-// move together; on any other request it reads without touching (#743 decisions 8 and 9). A
-// signed-in session whose cookie ends with the browser, as its KeepSignedIn answers, is touched and
-// sent nothing: its cookie has no expiry to keep up. A store whose cookie always ends with the
-// browser touches on every read.
+// sends a signed-in session's cookie again, as its KeepSignedIn answers now: with the row's new
+// expiry, so the row and the cookie move together, or with neither Max-Age nor Expires. The second
+// is sent too because the browser may still hold a cookie written under an earlier answer, from
+// before an upgrade or a stricter setting, and only a cookie of the same name and path replaces it.
+// On any other request it reads without touching (#743 decisions 8 and 9). A store whose cookie
+// always ends with the browser touches on every read.
 func (s *ServerSideStore) touchIfStale(r *http.Request, session *Session, record *Record) error {
 	if s.now().Sub(record.LastAccessed) <= TouchThreshold {
 		return nil
@@ -623,7 +624,7 @@ func (s *ServerSideStore) touchIfStale(r *http.Request, session *Session, record
 		return nil
 	}
 	maxAge, err := s.cookieMaxAge(ctx, session, expiresAt)
-	if err != nil || maxAge == 0 {
+	if err != nil {
 		return err
 	}
 	return s.writeCookie(refreshTo, session, session.ID, maxAge)

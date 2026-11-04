@@ -432,7 +432,9 @@ When user has valid session (`UserSession` in DB + session cookie):
   session
 - Only the page branch refreshes the browser session (`sessionstore.Refreshing`, in `pageChain`
   behind `middleware.NoStore`): a row more than ten seconds stale is touched there, and a signed-in
-  session's cookie is sent again with the row's new expiry. Every answer on that branch is
+  session's cookie is sent again as `KeepSignedIn` answers now, with the row's new expiry or with
+  neither Max-Age nor Expires. The second replaces a cookie that outlives the browser, written before
+  an upgrade or a stricter setting, without waiting for a sign-in. Every answer on that branch is
   `no-store`, the router's 405 under a page group included, and the files, protocol and API branches
   read the session without touching it, so no reissued cookie rides on a cacheable answer (#743)
 - Whether a signed-in cookie outlives the browser is the store's `KeepSignedIn` rule

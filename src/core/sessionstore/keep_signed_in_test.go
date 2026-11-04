@@ -218,11 +218,21 @@ func TestServerSideStore_ARuleThatCannotAnswerFailsTheSaveAndSendsNoCookie(t *te
 	assert.Empty(t, w.Result().Header.Values("Set-Cookie"))
 }
 
+// assertEndsWithTheBrowser checks a Set-Cookie of the session carried neither Max-Age nor Expires,
+// in the raw header, since net/http parses an absent Max-Age and a Max-Age of zero alike.
+func assertEndsWithTheBrowser(t *testing.T, cookie *http.Cookie) {
+	t.Helper()
+	assert.NotEmpty(t, cookie.Value, "the cookie still names the session")
+	assert.NotContains(t, cookie.Raw, "Max-Age", "the cookie ends with the browser")
+	assert.NotContains(t, cookie.Raw, "Expires")
+}
+
 // A page request that refreshes a signed-in session the rule does not keep still moves the row's
-// idle deadline, and sends no cookie: one that ends with the browser has no expiry to keep up
-// (#743 decision 8). One the rule keeps is sent again, as TestServerSideStore_APageRequestThat…
+// idle deadline, and sends the cookie again with neither Max-Age nor Expires: the browser may hold
+// one written under an earlier answer that outlives it, and only this one replaces it (#743
+// decision 8). One the rule keeps is sent with the row's expiry, as TestServerSideStore_APageRequestThat…
 // pins.
-func TestServerSideStore_ARefreshOfASessionTheRuleDoesNotKeepSendsNoCookie(t *testing.T) {
+func TestServerSideStore_ARefreshOfASessionTheRuleDoesNotKeepSendsACookieThatEndsWithTheBrowser(t *testing.T) {
 	backend := newFakeBackend()
 	backend.expiresAt = refreshTestNow.Add(time.Minute)
 	store, err := NewServerSideStore(backend, "SessionIdentifier", false, PersistentCookie(keepNoSignedInSession), storeTestPair(), nil)
@@ -237,11 +247,39 @@ func TestServerSideStore_ARefreshOfASessionTheRuleDoesNotKeepSendsNoCookie(t *te
 
 	assert.Equal(t, id, session.ID)
 	assert.Equal(t, 1, backend.touches, "the stale row is touched")
-	assert.Empty(t, cookies, "and no cookie is sent")
+	require.Len(t, cookies, 1, "and the cookie is sent again")
+	assertEndsWithTheBrowser(t, cookies[0])
+	assert.Equal(t, id, decodeCookieId(t, store, cookies[0]), "naming the same session")
+}
+
+// A browser holds a cookie that outlives it, written while the rule kept its session, and the rule
+// stops keeping it, as when an upgrade or an administrator moves the deployment to a stricter
+// setting. The next page refresh replaces that cookie with one that ends with the browser, so a
+// restart no longer brings the session back.
+func TestServerSideStore_ARefreshReplacesACookieThatOutlivesTheBrowserOnceTheRuleStopsKeepingIt(t *testing.T) {
+	keep := true
+	backend := newFakeBackend()
+	backend.expiresAt = refreshTestNow.Add(time.Minute)
+	store, err := NewServerSideStore(backend, "SessionIdentifier", false,
+		PersistentCookie(func(context.Context, map[string]any) (bool, error) { return keep, nil }), storeTestPair(), nil)
+	require.NoError(t, err)
+	store.now = func() time.Time { return refreshTestNow }
+	cookie := saveNew(t, store, signedInValues())
+	require.Equal(t, 60, cookie.MaxAge, "written while the rule keeps it, the cookie outlives the browser")
+	id := decodeCookieId(t, store, cookie)
+
+	keep = false
+	backend.rows[id].LastAccessed = refreshTestNow.Add(-time.Minute)
+	backend.expiresAt = refreshTestNow.Add(2 * time.Hour)
+	_, cookies := readSession(t, store, requestWith(cookie), true)
+
+	require.Len(t, cookies, 1, "the refresh sends the cookie again")
+	assertEndsWithTheBrowser(t, cookies[0])
 }
 
 // The rule decides for the values the session holds when it is refreshed, which is what the
-// session recorded at its last password entry: answered keep, the cookie is sent again.
+// session recorded at its last password entry: answered keep, the cookie is sent again with the
+// row's expiry, and otherwise with neither Max-Age nor Expires.
 func TestServerSideStore_ARefreshAsksTheRuleAboutTheSessionsValues(t *testing.T) {
 	backend := newFakeBackend()
 	backend.expiresAt = refreshTestNow.Add(time.Minute)
@@ -254,10 +292,10 @@ func TestServerSideStore_ARefreshAsksTheRuleAboutTheSessionsValues(t *testing.T)
 	store.now = func() time.Time { return refreshTestNow }
 
 	for name, test := range map[string]struct {
-		values     map[string]any
-		wantCookie bool
+		values             map[string]any
+		outlivesTheBrowser bool
 	}{
-		"ticked":   {values: map[string]any{"SessionIdentifier": "a-user-session", "KeepSignedIn": true}, wantCookie: true},
+		"ticked":   {values: map[string]any{"SessionIdentifier": "a-user-session", "KeepSignedIn": true}, outlivesTheBrowser: true},
 		"unticked": {values: map[string]any{"SessionIdentifier": "a-user-session", "KeepSignedIn": false}},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -269,11 +307,11 @@ func TestServerSideStore_ARefreshAsksTheRuleAboutTheSessionsValues(t *testing.T)
 
 			_, cookies := readSession(t, store, requestWith(cookie), true)
 
-			if test.wantCookie {
-				require.Len(t, cookies, 1)
+			require.Len(t, cookies, 1)
+			if test.outlivesTheBrowser {
 				assert.Equal(t, 7200, cookies[0].MaxAge)
 			} else {
-				assert.Empty(t, cookies)
+				assertEndsWithTheBrowser(t, cookies[0])
 			}
 		})
 	}
