@@ -194,6 +194,70 @@ func TestRefreshing_TheCookieGoesOutOnTheAnswerToAPanic(t *testing.T) {
 	assertEndsWithTheBrowser(t, cookies[0])
 }
 
+// An informational answer, such as 103 Early Hints, is not the answer the cookie waits for: net/http
+// sends the headers with it and keeps them for the final one. The cookie stays held through it, so
+// a rotation by another request after the 103 still keeps it off the final answer, and with nothing
+// in between it goes out on the final answer. Through a real server, since a recorder takes the
+// first status it is given for the final one.
+func TestRefreshing_AnInformationalAnswerLeavesTheCookieHeld(t *testing.T) {
+	for name, test := range map[string]struct {
+		rotate     bool
+		wantCookie bool
+	}{
+		"another request rotates the session after the 103": {rotate: true},
+		"nothing happens after the 103":                     {wantCookie: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store, _, cookie, id := staleSignedInSession(t, keepEverySignedInSession)
+			handlerErr := make(chan error, 1)
+			server := httptest.NewServer(Refreshing(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if _, err := store.Get(r, storeTestName); err != nil {
+					handlerErr <- err
+					return
+				}
+				w.Header().Set("Link", "</styles.css>; rel=preload; as=style")
+				w.WriteHeader(http.StatusEarlyHints)
+				if test.rotate {
+					other := requestWith(cookie)
+					session, err := store.Get(other, storeTestName)
+					if err == nil {
+						err = store.ChangeAndRegenerate(httptest.NewRecorder(), other, session, func(map[string]any) error { return nil })
+					}
+					if err != nil {
+						handlerErr <- err
+						return
+					}
+				}
+				w.WriteHeader(http.StatusOK)
+				handlerErr <- nil
+			})))
+			defer server.Close()
+
+			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+			require.NoError(t, err)
+			req.AddCookie(cookie)
+			resp, err := server.Client().Do(req)
+			require.NoError(t, err)
+			_ = resp.Body.Close()
+			require.NoError(t, <-handlerErr)
+
+			require.Equal(t, http.StatusOK, resp.StatusCode, "the final answer")
+			var cookies []*http.Cookie
+			for _, set := range resp.Cookies() {
+				if set.Name == store.CookieName(storeTestName) {
+					cookies = append(cookies, set)
+				}
+			}
+			if test.wantCookie {
+				require.Len(t, cookies, 1)
+				assert.Equal(t, id, decodeCookieId(t, store.ServerSideStore, cookies[0]))
+			} else {
+				assert.Empty(t, cookies, "no cookie names the rotated-away row")
+			}
+		})
+	}
+}
+
 // When the row cannot be read before the headers go out, no cookie is sent: the browser keeps the
 // one it has, where a cookie naming a removed row would sign it out. The failure is logged, unless
 // the browser abandoned the request, which ends its reads too and is no fault.

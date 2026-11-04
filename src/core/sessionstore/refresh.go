@@ -97,9 +97,14 @@ func wroteCookie(header http.Header, name string) bool {
 	return false
 }
 
-// WriteHeader releases the held cookies before the headers go out.
+// WriteHeader releases the held cookies before the headers of the final answer go out. An
+// informational status passes on and leaves them held: net/http sends the headers with it and keeps
+// them for the final answer, which may come after another request rotated the session. 101 is
+// final, since the connection is the handler's after it.
 func (w *refreshWriter) WriteHeader(code int) {
-	w.release()
+	if code < 100 || code > 199 || code == http.StatusSwitchingProtocols {
+		w.release()
+	}
 	w.ResponseWriter.WriteHeader(code)
 }
 
