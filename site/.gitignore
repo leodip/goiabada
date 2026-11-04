@@ -22,3 +22,7 @@ pnpm-debug.log*
 
 # the API reference documents, split from openapi.yaml at build
 .openapi/
+
+# the browser tests (checks/docs-browser.sh)
+test-results/
+playwright-report/

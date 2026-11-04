@@ -101,6 +101,31 @@ site's 404 page, with its search and sidebar, for any other path, a 301 to the r
 without it, `charset=utf-8` on text, and `X-Frame-Options` and `X-Content-Type-Options` on every answer, static
 assets included. The 404 page's text is `src/content/docs/404.md`.
 
-CI's Check workflow runs the checks' tests, the build and the image's answers on every pull
-request. The Docs workflow builds and pushes the image when `site/` or
-`src/authserver/web/openapi.yaml` changes on `main`, and on every release.
+## The site in a browser
+
+`checks/docs-browser.sh` starts a docs image and opens it in Chromium with
+[Playwright](https://playwright.dev), from `browser/`:
+
+```sh
+(cd site && npx playwright install chromium)   # once for each Playwright version
+site/checks/docs-browser.sh goiabada-docs
+```
+
+It fails on any Content-Security-Policy violation while it opens the home page, a page with code
+blocks and tabs, an Admin API operation page and the Privacy page, searches each, switches its
+theme and, on the home page, enlarges a screenshot. It also fails when anything reaches Google
+before the visitor accepts Analytics, when Google's tag isn't requested after Accept, or when
+anything is sent after the visitor withdraws from Cookie settings or rejects, or from a browser
+sending Global Privacy Control. Google's requests are answered with a stand-in, so a run sends
+nothing to Analytics. These are what a dependency update can break without failing the build:
+search stopping, code losing its colours, Analytics refused after Accept. After a failure,
+`npx playwright show-report` in `site/` opens the traces.
+
+`@playwright/test` is pinned to the e2e suite's version.
+
+## CI
+
+CI's Check workflow runs the checks' tests, the build, the image's answers and the browser tests on
+every pull request, and uploads the browser tests' report when they fail. The Docs workflow builds
+and pushes the image when `site/` or `src/authserver/web/openapi.yaml` changes on `main`, and on
+every release.
