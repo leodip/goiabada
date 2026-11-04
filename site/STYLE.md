@@ -110,7 +110,7 @@ Deploy           Running Goiabada in production: choosing a method, the setup wi
 Reference        Endpoints, the API, environment variables, security
 Troubleshooting  One short page per problem
 Legacy flows     Implicit, ROPC
-About            Contributing, contact, license
+About            Contributing, contact, license, privacy
 ```
 
 A group appears in the sidebar once it has a page.

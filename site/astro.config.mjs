@@ -12,8 +12,6 @@ import buildChecks from './checks/build-checks.mjs';
 import { fullFile, indexFile } from './checks/llms.mjs';
 import { tableCodeWords } from './plugins/table-code-words.mjs';
 
-const googleAnalyticsId = 'G-CYZXDTHNB1'
-
 // The Admin API and the Account API reference, rendered from the auth server's
 // openapi.yaml, the same file it serves at /openapi.yaml. It is split into the
 // two documents first, the internal Browser Sessions operations left out.
@@ -66,27 +64,15 @@ export default defineConfig({
 				}),
 			],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/leodip/goiabada' }],
-			components: { SocialIcons: './src/components/SocialIcons.astro' },
+			// The Footer override adds the Privacy and Cookie settings links to every page, and
+			// mounts the consent prompt that holds Google Analytics back until the visitor
+			// accepts it (src/consent/config.mjs).
+			components: {
+				Footer: './src/components/Footer.astro',
+				SocialIcons: './src/components/SocialIcons.astro',
+			},
 			favicon: '/favicon.ico',
 			customCss: ['./src/styles/custom.css'],
-			head: [
-				{
-					tag: 'script',
-					attrs: {
-						src: `https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`,
-					},
-				},
-				{
-					tag: 'script',
-					content: `
-					window.dataLayer = window.dataLayer || [];
-					function gtag(){dataLayer.push(arguments);}
-					gtag('js', new Date());
-
-					gtag('config', '${googleAnalyticsId}');
-					`,
-				},
-			],
 			// Organized by task. A page's URL is its group's path and its own label, so the
 			// two read alike: Deploy > Monitoring is /deploy/monitoring/.
 			sidebar: [
@@ -235,6 +221,7 @@ export default defineConfig({
 						{ label: 'About', slug: 'about' },
 						{ label: 'Contributing', slug: 'about/contributing' },
 						{ label: 'License', slug: 'about/license' },
+						{ label: 'Privacy', slug: 'about/privacy' },
 					],
 				},
 			],

@@ -12,3 +12,18 @@
 .sl-markdown-content .code-word {
 	white-space: nowrap;
 }
+
+/* The Privacy page's Cookie settings button, which reopens the consent choice, reads as a
+   link in the text around it. */
+.sl-markdown-content .cookie-settings-link {
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	color: var(--sl-color-text-accent);
+	text-decoration: underline;
+	cursor: pointer;
+}
+.sl-markdown-content .cookie-settings-link:hover {
+	color: var(--sl-color-white);
+}

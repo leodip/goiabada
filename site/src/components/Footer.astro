@@ -1,0 +1,88 @@
+---
+// Every page's footer: Starlight's own, then the links to the Privacy page and to
+// Cookie settings, which reopens the consent choice. It also mounts the consent
+// prompt, so every page has it. src/consent/config.mjs holds the prompt's rules.
+import Default from '@astrojs/starlight/components/Footer.astro';
+---
+
+<Default />
+<nav class="site-links" aria-label="Privacy">
+	<a href="/about/privacy/">Privacy</a>
+	<button type="button" class="cookie-settings" data-cc="show-preferencesModal">Cookie settings</button>
+</nav>
+
+<script>
+	import 'vanilla-cookieconsent/dist/cookieconsent.css';
+	import * as CookieConsent from 'vanilla-cookieconsent';
+	import { consentConfig } from '../consent/config.mjs';
+
+	CookieConsent.run(consentConfig(window));
+</script>
+
+<style>
+	.site-links {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.5rem 1.5rem;
+		margin-top: 1.5rem;
+		font-size: var(--sl-text-xs);
+	}
+	.site-links a,
+	.cookie-settings {
+		padding: 0;
+		border: 0;
+		background: none;
+		font: inherit;
+		color: var(--sl-color-gray-3);
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.site-links a:hover,
+	.cookie-settings:hover {
+		color: var(--sl-color-white);
+	}
+</style>
+
+<style is:global>
+	/* The prompt in the site's colours: Starlight's variables change with the theme, so
+	   these follow it in light and dark alike. */
+	#cc-main {
+		--cc-font-family: var(--sl-font);
+		--cc-bg: var(--sl-color-bg-nav);
+		--cc-primary-color: var(--sl-color-white);
+		--cc-secondary-color: var(--sl-color-gray-2);
+		--cc-link-color: var(--sl-color-text-accent);
+		--cc-btn-primary-bg: var(--sl-color-accent);
+		--cc-btn-primary-color: var(--sl-color-text-invert);
+		--cc-btn-primary-border-color: var(--sl-color-accent);
+		--cc-btn-primary-hover-bg: var(--sl-color-accent-high);
+		--cc-btn-primary-hover-color: var(--sl-color-text-invert);
+		--cc-btn-primary-hover-border-color: var(--sl-color-accent-high);
+		--cc-btn-secondary-bg: var(--sl-color-gray-6);
+		--cc-btn-secondary-color: var(--sl-color-white);
+		--cc-btn-secondary-border-color: var(--sl-color-gray-5);
+		--cc-btn-secondary-hover-bg: var(--sl-color-gray-5);
+		--cc-btn-secondary-hover-color: var(--sl-color-white);
+		--cc-btn-secondary-hover-border-color: var(--sl-color-gray-4);
+		--cc-separator-border-color: var(--sl-color-hairline);
+		--cc-toggle-on-bg: var(--sl-color-accent);
+		--cc-toggle-off-bg: var(--sl-color-gray-4);
+		--cc-toggle-on-knob-bg: var(--sl-color-bg);
+		--cc-toggle-off-knob-bg: var(--sl-color-bg);
+		--cc-toggle-enabled-icon-color: var(--sl-color-accent);
+		--cc-toggle-disabled-icon-color: var(--sl-color-gray-4);
+		--cc-section-category-border: var(--sl-color-hairline);
+		--cc-cookie-category-block-bg: var(--sl-color-gray-6);
+		--cc-cookie-category-block-border: var(--sl-color-hairline);
+		--cc-cookie-category-block-hover-bg: var(--sl-color-gray-5);
+		--cc-cookie-category-block-hover-border: var(--sl-color-gray-5);
+		--cc-cookie-category-expanded-block-bg: transparent;
+		--cc-cookie-category-expanded-block-hover-bg: var(--sl-color-gray-6);
+		--cc-webkit-scrollbar-bg: var(--sl-color-gray-5);
+		--cc-webkit-scrollbar-hover-bg: var(--sl-color-gray-4);
+		--cc-footer-bg: var(--sl-color-gray-6);
+		--cc-footer-color: var(--sl-color-gray-2);
+		--cc-footer-border-color: var(--sl-color-hairline);
+	}
+</style>

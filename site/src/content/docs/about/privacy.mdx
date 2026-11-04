@@ -1,0 +1,61 @@
+---
+title: Privacy
+description: What goiabada.dev stores in your browser, what Google Analytics collects if you accept it, what the servers log, and how to ask about it.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page tells you what goiabada.dev keeps about your visit, for how long, and how to ask about it.
+
+The short version: nothing from Google loads, and the site sets no cookie, unless you accept Analytics. Either way, the servers keep a short log of each request.
+
+<button type="button" class="cookie-settings-link" data-cc="show-preferencesModal">Cookie settings</button> opens your choice again at any time. It's also at the bottom of every page.
+
+## Who runs this site
+
+goiabada.dev is run by **Leonardo D'Ippolito**, who makes Goiabada. You can reach him at [contact@leodip.com](mailto:contact@leodip.com).
+
+## What your browser stores
+
+Until you accept Analytics, the site stores only these, and none of them is ever sent to a server:
+
+| What | Where | How long |
+|---|---|---|
+| Your Analytics choice, so you're not asked on every page | Local storage, as `cc_cookie` | 182 days, then you're asked again |
+| The light or dark theme you picked | Local storage | Until you clear it |
+| The tab you picked in a set of tabs, such as Docker or Kubernetes | Local storage | Until you clear it |
+| The code sample you picked on an API reference page | Local storage | Until you clear it |
+| Which sidebar groups you opened | Session storage | Until you close the tab |
+
+## Google Analytics
+
+If you accept, Google Analytics shows us which pages people read, where they came from and how long they stayed. That's how we know which docs to improve. If you don't accept, it never loads.
+
+- **Who gets it:** Google, which may process it outside your country, including in the United States.
+- **Cookies:** Google sets `_ga` and `_ga_CYZXDTHNB1` on this site. They last up to 13 months.
+- **How long the data is kept:** 2 months for the detailed data. Google's standard reports keep totals, such as views per page, after that.
+- **What it's not used for:** ads. Google signals and ads personalization are off, and the data isn't shared with Google for its own products.
+- **Your IP address:** Google Analytics doesn't log or store it.
+
+You can change your mind at any time with **Cookie settings**. Turning Analytics off deletes its cookies and reloads the page, so it stops at once. If your browser sends Global Privacy Control, the site treats it as a no and doesn't ask; you can still turn Analytics on from Cookie settings.
+
+## What the servers log
+
+Every request to the site is logged, whatever you chose above, to keep it running and secure. Each log line holds your IP address, the time, the page, the page you came from, and your browser. The logs are deleted after 14 days.
+
+The site is served through [Cloudflare](https://www.cloudflare.com), which handles each request on its way to our servers. Its [privacy policy](https://www.cloudflare.com/privacypolicy/) says what it keeps.
+
+## Ask a question or make a request
+
+Email [contact@leodip.com](mailto:contact@leodip.com) to ask what we hold about you, or to have it corrected or deleted. You can also complain to your data protection authority.
+
+## Goiabada servers run by others
+
+This page covers goiabada.dev only. A Goiabada server someone else runs is theirs to explain: see their privacy notice. If you run one, [Publish legal documents](/guides/publish-legal-documents/) shows you how to publish yours.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="About" description="Why Goiabada exists and how to get in touch." href="/about/" />
+  <LinkCard title="Publish legal documents" description="Publish your own privacy notice and terms of use in Goiabada." href="/guides/publish-legal-documents/" />
+</CardGrid>
