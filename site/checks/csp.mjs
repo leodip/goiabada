@@ -4,6 +4,12 @@
 // hashes of that page's inline scripts and style elements, so exactly what the
 // build produced runs, and nothing injected later. A <meta> policy cannot carry
 // frame-ancestors or reporting; nginx's X-Frame-Options covers framing.
+//
+// HTML requires a page's charset declaration within its first 1024 bytes, which a
+// policy of that length ahead of it would push it past. So the step takes out the
+// page's <meta charset> and starts the page with a UTF-8 byte order mark instead,
+// which declares the encoding before any byte of the page and outranks the
+// Content-Type header (https://html.spec.whatwg.org/multipage/semantics.html#charset).
 
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -37,14 +43,19 @@ export const directives = [
 	['form-action', ["'self'"]],
 ];
 
+// HTML's limit on where a charset declaration may end, in bytes from the start.
+const charsetLimit = 1024;
+const byteOrderMark = '\uFEFF';
+
 // Writes into every page built in distDir its policy, as the first element of its
-// head, and stops when there is no page. Returns how many pages it wrote.
+// head, replacing its charset declaration with a byte order mark, and stops when
+// there is no page. Returns how many pages it wrote.
 export function writeContentSecurityPolicy({ distDir }) {
 	const pages = builtFiles(distDir, '.html');
 	if (pages.length === 0) throw new Error(`found no built page in ${distDir}: the step reached nothing`);
 	for (const file of pages) {
 		const path = join(distDir, file);
-		const html = readFileSync(path, 'utf8');
+		let { html } = readPage(path);
 		const tree = fromHtml(html);
 		const scripts = new Set();
 		const styles = new Set();
@@ -56,22 +67,39 @@ export function writeContentSecurityPolicy({ distDir }) {
 			})
 			.join('; ');
 		const meta = `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(policy)}">`;
-		const at = headStart(tree, html);
-		writeFileSync(path, html.slice(0, at) + meta + html.slice(at));
+		let at = headStart(tree, html);
+		for (const { start, end } of charsetDeclarations(tree).reverse()) {
+			html = html.slice(0, start) + html.slice(end);
+			if (end <= at) at -= end - start;
+		}
+		writeFileSync(path, byteOrderMark + html.slice(0, at) + meta + html.slice(at));
 	}
 	return pages.length;
 }
 
 // Throws an error naming every page built in distDir whose policy is not the first
 // element of its head, whose policy leaves out the hash of one of its inline
-// scripts or style elements, or that has an inline event handler, which no hash
-// allows. Stops when there is no page. Returns how many pages it read.
+// scripts or style elements, that has an inline event handler, which no hash
+// allows, or whose charset declaration ends past its first 1024 bytes or that has
+// none, neither a byte order mark nor a <meta charset>. Stops when there is no
+// page. Returns how many pages it read.
 export function assertContentSecurityPolicy({ distDir }) {
 	const pages = builtFiles(distDir, '.html');
 	if (pages.length === 0) throw new Error(`found no built page in ${distDir}: the check reached nothing`);
 	const findings = [];
 	for (const file of pages) {
-		const tree = fromHtml(readFileSync(join(distDir, file), 'utf8'));
+		const { html, bom } = readPage(join(distDir, file));
+		const tree = fromHtml(html);
+		const declarations = charsetDeclarations(tree);
+		if (!bom && declarations.length === 0) {
+			findings.push(`  ${file}: no character encoding declaration, neither a UTF-8 byte order mark nor a <meta charset>`);
+		}
+		for (const { end } of declarations) {
+			const endByte = (bom ? Buffer.byteLength(byteOrderMark) : 0) + Buffer.byteLength(html.slice(0, end));
+			if (endByte > charsetLimit) {
+				findings.push(`  ${file}: the character encoding declaration ends at byte ${endByte}, past the first ${charsetLimit}`);
+			}
+		}
 		const headElements = (headOf(tree)?.children ?? []).filter((node) => node.type === 'element');
 		const meta = headElements.find(isPolicyMeta);
 		if (meta === undefined) {
@@ -95,10 +123,31 @@ export function assertContentSecurityPolicy({ distDir }) {
 
 	if (findings.length > 0) {
 		throw new Error(
-			`${findings.length} Content-Security-Policy problem(s): every page must carry its policy as the first element of its head, listing the hash of each of its inline scripts and style elements, and have no inline event handler:\n${findings.join('\n')}`,
+			`${findings.length} Content-Security-Policy problem(s): every page must carry its policy as the first element of its head, listing the hash of each of its inline scripts and style elements, have no inline event handler, and declare its character encoding within its first ${charsetLimit} bytes:\n${findings.join('\n')}`,
 		);
 	}
 	return pages.length;
+}
+
+// A built page's text, without the byte order mark that starts it, if one does,
+// as a browser reads it: the HTML parser would take the mark for text.
+function readPage(path) {
+	const text = readFileSync(path, 'utf8');
+	const bom = text.startsWith(byteOrderMark);
+	return { html: bom ? text.slice(byteOrderMark.length) : text, bom };
+}
+
+// Where each of the page's charset declarations is in its text, in document order:
+// a <meta charset>, or a <meta http-equiv="content-type">, which declares one too.
+function charsetDeclarations(tree) {
+	const declarations = [];
+	walk(tree, (node) => {
+		if (node.tagName !== 'meta' || !node.position) return;
+		const httpEquiv = [node.properties?.httpEquiv ?? []].flat().join(' ').toLowerCase();
+		if (node.properties?.charSet === undefined && httpEquiv !== 'content-type') return;
+		declarations.push({ start: node.position.start.offset, end: node.position.end.offset });
+	});
+	return declarations;
 }
 
 // The script types a browser runs, and so a policy governs; any other type is a

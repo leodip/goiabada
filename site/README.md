@@ -78,7 +78,10 @@ and errors are handwritten pages beside the generated ones, in `src/content/docs
   elements, so the browser runs what the build produced and nothing injected later. It then reads
   every page back, and fails when the policy is not the head's first element or leaves out an
   inline script or style element, or when a page has an `onclick`-style attribute, which no hash
-  allows: use a script instead. Inline `style` attributes are allowed. No step may change a page
+  allows: use a script instead. Inline `style` attributes are allowed. A policy that long would
+  push the page's `<meta charset>` past the first 1024 bytes, where HTML requires it, so the step
+  takes it out and starts the page with a UTF-8 byte order mark instead; the check fails a page
+  whose charset declaration ends later, or that declares no encoding. No step may change a page
   after this one, or its hashes go stale.
 
 These last three checks are ours, in `checks/privacy.mjs` and `checks/csp.mjs`, run from
@@ -116,7 +119,9 @@ blocks and tabs, an Admin API operation page and the Privacy page, searches each
 theme and, on the home page, enlarges a screenshot. It also fails when anything reaches Google
 before the visitor accepts Analytics, when Google's tag isn't requested after Accept, or when
 anything is sent after the visitor withdraws from Cookie settings or rejects, or from a browser
-sending Global Privacy Control. Google's requests are answered with a stand-in, so a run sends
+sending Global Privacy Control. It checks that the prompt's Accept and Reject sit side by side on
+a wide screen and a phone, and that the consent buttons' text has at least 4.5:1 contrast in both
+themes, under the pointer too. Google's requests are answered with a stand-in, so a run sends
 nothing to Analytics. These are what a dependency update can break without failing the build:
 search stopping, code losing its colours, Analytics refused after Accept. After a failure,
 `npx playwright show-report` in `site/` opens the traces.

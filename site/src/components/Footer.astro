@@ -53,12 +53,13 @@ import Default from '@astrojs/starlight/components/Footer.astro';
 		--cc-primary-color: var(--sl-color-white);
 		--cc-secondary-color: var(--sl-color-gray-2);
 		--cc-link-color: var(--sl-color-text-accent);
-		--cc-btn-primary-bg: var(--sl-color-accent);
+		/* Starlight's pairs for text on a colour: at least 4.5:1 in both themes. */
+		--cc-btn-primary-bg: var(--sl-color-bg-accent);
 		--cc-btn-primary-color: var(--sl-color-text-invert);
-		--cc-btn-primary-border-color: var(--sl-color-accent);
-		--cc-btn-primary-hover-bg: var(--sl-color-accent-high);
-		--cc-btn-primary-hover-color: var(--sl-color-text-invert);
-		--cc-btn-primary-hover-border-color: var(--sl-color-accent-high);
+		--cc-btn-primary-border-color: var(--sl-color-bg-accent);
+		--cc-btn-primary-hover-bg: var(--sl-color-white);
+		--cc-btn-primary-hover-color: var(--sl-color-black);
+		--cc-btn-primary-hover-border-color: var(--sl-color-white);
 		--cc-btn-secondary-bg: var(--sl-color-gray-6);
 		--cc-btn-secondary-color: var(--sl-color-white);
 		--cc-btn-secondary-border-color: var(--sl-color-gray-5);
@@ -84,5 +85,24 @@ import Default from '@astrojs/starlight/components/Footer.astro';
 		--cc-footer-bg: var(--sl-color-gray-6);
 		--cc-footer-color: var(--sl-color-gray-2);
 		--cc-footer-border-color: var(--sl-color-hairline);
+	}
+
+	/* Accept and Reject side by side and the same size: a gap between them, where the
+	   library's margin on the second button leaves it narrower. */
+	#cc-main .cm--inline .cm__btn-group {
+		gap: 0.375rem;
+	}
+	#cc-main .cm--inline .cm__btn + .cm__btn {
+		margin: 0 !important;
+	}
+	/* The library stacks them on a narrow screen; they are short enough to stay side by
+	   side, as on a wide one. */
+	@media screen and (max-width: 640px) {
+		#cc-main .cm--inline .cm__btn-group {
+			flex-direction: row !important;
+		}
+		#cc-main .cm--inline .cm__btn {
+			flex: 1 1 0 !important;
+		}
 	}
 </style>

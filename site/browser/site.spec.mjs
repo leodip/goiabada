@@ -158,6 +158,103 @@ test('a browser sending Global Privacy Control gets no prompt and nothing from G
 	await expect(page.getByRole('dialog', { name: 'Cookie settings' })).toBeVisible();
 });
 
+for (const { width, height } of [
+	{ width: 1280, height: 900 },
+	{ width: 375, height: 667 },
+]) {
+	test(`Accept and Reject sit side by side, alike, ${width} pixels wide`, async ({ page }) => {
+		await page.setViewportSize({ width, height });
+		await page.goto('/');
+		const prompt = consentPrompt(page);
+		await expect(prompt).toBeVisible();
+		// Measured once the prompt has finished sliding in, both at the same moment.
+		await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)));
+		const boxes = await page.evaluate(() =>
+			['Accept', 'Reject'].map((name) => {
+				const button = [...document.querySelectorAll('#cc-main .cm button')].find((b) => b.textContent.trim() === name);
+				const { x, y, width, height } = button.getBoundingClientRect();
+				return { x, y, width, height };
+			}),
+		);
+		const [accept, reject] = boxes;
+		await expect(prompt.getByRole('button', { name: 'Accept' })).toBeVisible();
+		await expect(prompt.getByRole('button', { name: 'Reject' })).toBeVisible();
+
+		expect(Math.abs(accept.y - reject.y), 'Accept and Reject on one line').toBeLessThan(1);
+		const [left, right] = accept.x < reject.x ? [accept, reject] : [reject, accept];
+		expect(left.x + left.width, 'Accept and Reject apart').toBeLessThanOrEqual(right.x);
+		expect(Math.abs(accept.width - reject.width), 'Accept and Reject the same width').toBeLessThan(1);
+		expect(accept.height).toBe(reject.height);
+		for (const box of [accept, reject]) {
+			expect(box.x).toBeGreaterThanOrEqual(0);
+			expect(box.x + box.width).toBeLessThanOrEqual(width);
+		}
+	});
+}
+
+// WCAG 2.2's 1.4.3: text at least 4.5:1 against its background, which the prompt's and Cookie
+// settings' buttons meet in both themes, as they are and under the pointer.
+for (const theme of ['light', 'dark']) {
+	test(`the consent buttons' text has at least 4.5:1 contrast in the ${theme} theme`, async ({ page }) => {
+		await page.goto('/');
+		await page.getByRole('combobox', { name: 'Select theme' }).selectOption(theme);
+		await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+
+		const prompt = consentPrompt(page);
+		await expect(prompt).toBeVisible();
+		for (const name of ['Accept', 'Reject']) await expectContrast(page, prompt.getByRole('button', { name }), `prompt's ${name}`);
+
+		await cookieSettings(page).click();
+		const settings = page.getByRole('dialog', { name: 'Cookie settings' });
+		await expect(settings).toBeVisible();
+		for (const name of ['Accept', 'Reject', 'Save']) {
+			await expectContrast(page, settings.getByRole('button', { name, exact: true }), `Cookie settings' ${name}`);
+		}
+	});
+}
+
+async function expectContrast(page, button, what) {
+	// Its colours change at once under the pointer, not through a transition half-way.
+	await button.evaluate((element) => {
+		element.style.transition = 'none';
+	});
+	await page.mouse.move(0, 0);
+	expect(contrast(await colours(button)), `${what}'s contrast`).toBeGreaterThanOrEqual(4.5);
+	await button.hover();
+	expect(contrast(await colours(button)), `${what}'s contrast under the pointer`).toBeGreaterThanOrEqual(4.5);
+}
+
+// The button's text colour and the first opaque background behind it, as [r, g, b] each.
+function colours(button) {
+	return button.evaluate((element) => {
+		const rgb = (value) => {
+			const [r, g, b, a = 1] = value.match(/[\d.]+/g).map(Number);
+			return { rgb: [r, g, b], a };
+		};
+		let node = element;
+		let background = rgb(getComputedStyle(node).backgroundColor);
+		while (background.a === 0 && node.parentElement) {
+			node = node.parentElement;
+			background = rgb(getComputedStyle(node).backgroundColor);
+		}
+		if (background.a !== 1) throw new Error(`a translucent background behind the button: ${getComputedStyle(node).backgroundColor}`);
+		return { text: rgb(getComputedStyle(element).color).rgb, background: background.rgb };
+	});
+}
+
+// WCAG's contrast ratio of two sRGB colours, from their relative luminance.
+function contrast({ text, background }) {
+	const luminance = (rgb) => {
+		const [r, g, b] = rgb.map((channel) => {
+			const c = channel / 255;
+			return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+		});
+		return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+	};
+	const [lighter, darker] = [luminance(text), luminance(background)].sort((a, b) => b - a);
+	return (lighter + 0.05) / (darker + 0.05);
+}
+
 // A region rather than a dialog: the prompt doesn't stop the visitor reading.
 function consentPrompt(page) {
 	return page.getByRole('region', { name: 'Can we count your visit?' });

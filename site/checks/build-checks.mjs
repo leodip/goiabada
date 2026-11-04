@@ -17,8 +17,9 @@ import { assertShippedLinks } from './shipped-links.mjs';
 // given, is the Privacy page's path, and every page must carry the consent prompt
 // and the footer's links to it and to Cookie settings. Last, every page gets its
 // Content-Security-Policy, holding the hashes of its inline scripts and style
-// elements, so no step may change a page after this one; the check then reads the
-// policies back.
+// elements, and starts with a byte order mark in place of its charset meta, which
+// the policy would push past HTML's first 1024 bytes; so no step may change a page
+// after this one. The check then reads the policies back.
 export default function buildChecks({ srcDir, llms, apiReferences, privacyPage }) {
 	let site;
 	return {
@@ -53,7 +54,7 @@ export default function buildChecks({ srcDir, llms, apiReferences, privacyPage }
 
 				writeContentSecurityPolicy({ distDir });
 				const cspPages = assertContentSecurityPolicy({ distDir });
-				logger.info(`${cspPages} pages carry a Content-Security-Policy that lists each of their inline scripts and style elements`);
+				logger.info(`${cspPages} pages carry a Content-Security-Policy that lists each of their inline scripts and style elements, and declare their encoding in time`);
 			},
 		},
 	};

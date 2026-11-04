@@ -1,6 +1,7 @@
 // The step that writes each page's Content-Security-Policy, and the checks that
 // every page carries it first in its head, that it covers every inline script and
-// style element, and that no page has an inline event handler, on fixture builds.
+// style element, that no page has an inline event handler, and that each page
+// declares its encoding within its first 1024 bytes, on fixture builds.
 // Each hash below was computed apart from the code, with
 // `printf '%s' '<text>' | openssl dgst -sha256 -binary | base64`.
 
@@ -25,8 +26,17 @@ function builtSite(files) {
 	return dist;
 }
 
+// A page as Astro writes it, its charset declaration first in its head.
 function page(head, body = '') {
 	return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>${head}</head><body><h1 id="_top">A page</h1>${body}</body></html>`;
+}
+
+// The UTF-8 byte order mark, which declares a page's encoding before its first byte.
+const bom = '\uFEFF';
+
+// A page as the step leaves it: the byte order mark in place of its charset declaration.
+function written(head, body = '') {
+	return `${bom}<!DOCTYPE html><html lang="en"><head>${head}</head><body><h1 id="_top">A page</h1>${body}</body></html>`;
 }
 
 const themeScript = 'document.documentElement.dataset.theme="dark";';
@@ -89,8 +99,9 @@ test("the step writes each page's policy first in its head, with the hashes of t
 	const expectedIndexPolicy = policy([themeHash, moduleHash, emptyHash], [styleHash, svgStyleHash]);
 	assert.equal(
 		index,
-		page(
+		written(
 			[
+				policyMeta(expectedIndexPolicy),
 				`<script aria-hidden="true">${themeScript}</script>`,
 				'<script type="module" src="/_astro/page.js"></script>',
 				`<style>${style}</style>`,
@@ -103,11 +114,11 @@ test("the step writes each page's policy first in its head, with the hashes of t
 				'<script type="application/ld+json">{"@type":"WebSite"}</script>',
 				'<p style="--sl-icon-size: 1.5em">text</p>',
 			].join(''),
-		).replace('<head>', `<head>${policyMeta(expectedIndexPolicy)}`),
+		),
 	);
 	assert.equal(
 		readFileSync(join(dist, '404.html'), 'utf8'),
-		page('<link rel="stylesheet" href="/_astro/index.css">').replace('<head>', `<head>${policyMeta(policy([], []))}`),
+		written(`${policyMeta(policy([], []))}<link rel="stylesheet" href="/_astro/index.css">`),
 	);
 	assert.equal(readFileSync(join(dist, '_astro/index.css'), 'utf8'), '.b{color:blue}');
 });
@@ -137,7 +148,7 @@ test('a page whose head tag has attributes gets the policy just after it', (t) =
 
 	assert.equal(
 		readFileSync(join(dist, 'index.html'), 'utf8'),
-		`<!doctype html><html><head data-x="a>b">${policyMeta(policy([], []))}<title>A</title></head><body></body></html>`,
+		`${bom}<!doctype html><html><head data-x="a>b">${policyMeta(policy([], []))}<title>A</title></head><body></body></html>`,
 	);
 });
 
@@ -152,10 +163,71 @@ test('a page that leaves out its head tag, or its html tag too, gets the policy 
 	writeContentSecurityPolicy({ distDir: dist });
 
 	const meta = policyMeta(policy([], []));
-	assert.equal(readFileSync(join(dist, 'index.html'), 'utf8'), `<!doctype html><html lang="en">${meta}<title>A</title><h1>A</h1>`);
-	assert.equal(readFileSync(join(dist, '404.html'), 'utf8'), `<!doctype html>${meta}<meta name="description" content="Not found."><h1>404</h1>`);
-	assert.equal(readFileSync(join(dist, 'bare.html'), 'utf8'), `${meta}<h1>Bare</h1>`);
+	assert.equal(readFileSync(join(dist, 'index.html'), 'utf8'), `${bom}<!doctype html><html lang="en">${meta}<title>A</title><h1>A</h1>`);
+	assert.equal(readFileSync(join(dist, '404.html'), 'utf8'), `${bom}<!doctype html>${meta}<meta name="description" content="Not found."><h1>404</h1>`);
+	assert.equal(readFileSync(join(dist, 'bare.html'), 'utf8'), `${bom}${meta}<h1>Bare</h1>`);
 	assert.equal(assertContentSecurityPolicy({ distDir: dist }), 3);
+});
+
+test("the step takes out a page's charset declarations, however written, and starts it with the byte order mark once", (t) => {
+	const dist = builtSite({
+		'index.html': '<!DOCTYPE html><html><head>\n<META CharSet=UTF-8>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>é</title></head><body></body></html>',
+		// A page that starts with the mark already keeps the one.
+		'404.html': `${bom}<!DOCTYPE html><html><head><meta charset="utf-8"><title>404</title></head></html>`,
+	});
+	t.after(() => rmSync(dist, { recursive: true, force: true }));
+
+	writeContentSecurityPolicy({ distDir: dist });
+
+	const meta = policyMeta(policy([], []));
+	const index = readFileSync(join(dist, 'index.html'));
+	assert.deepEqual([...index.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+	assert.equal(index.toString('utf8'), `${bom}<!DOCTYPE html><html><head>${meta}\n\n<title>é</title></head><body></body></html>`);
+	assert.equal(readFileSync(join(dist, '404.html'), 'utf8'), `${bom}<!DOCTYPE html><html><head>${meta}<title>404</title></head></html>`);
+	assert.equal(assertContentSecurityPolicy({ distDir: dist }), 2);
+});
+
+test('a page whose policy pushes its charset declaration past byte 1024 passes once the step has written it', (t) => {
+	// Ten script hashes, as a Starlight page has, make a policy over a thousand bytes long.
+	const scripts = Array.from({ length: 10 }, (_, n) => `<script>var n=${n};</script>`).join('');
+	const dist = builtSite({ 'index.html': page(scripts) });
+	t.after(() => rmSync(dist, { recursive: true, force: true }));
+
+	writeContentSecurityPolicy({ distDir: dist });
+
+	const html = readFileSync(join(dist, 'index.html'), 'utf8');
+	assert.ok(Buffer.byteLength(html.slice(0, html.indexOf('<script>'))) > 1024, 'the policy is over 1024 bytes');
+	assert.ok(!/<meta charset/i.test(html), html);
+	assert.equal(assertContentSecurityPolicy({ distDir: dist }), 1);
+});
+
+test('a page whose charset declaration ends past its first 1024 bytes, or that declares no encoding, fails the build, naming the page and the byte', (t) => {
+	// A head whose first 1002 bytes are the policy and a <meta> padded with é, two bytes
+	// each, so a check counting characters rather than bytes would pass every page here.
+	const head = `<!DOCTYPE html><html><head>${policyMeta(policy([], []))}<meta name="x" content="">`;
+	const padding = 1002 - Buffer.byteLength(head);
+	const lead = head.replace('content=""', `content="${'é'.repeat(Math.floor(padding / 2))}${'a'.repeat(padding % 2)}"`);
+	assert.equal(Buffer.byteLength(lead), 1002);
+	const dist = builtSite({
+		// Its 22-byte declaration ends at byte 1024 exactly: within the limit.
+		'about/index.html': `${lead}<meta charset="utf-8"></head></html>`,
+		// The same page after the 3 bytes of a byte order mark ends at 1027, past it.
+		'guides/a/index.html': `${bom}${lead}<meta charset="utf-8"></head></html>`,
+		// A 67-byte <meta http-equiv="content-type"> is a declaration too.
+		'guides/b/index.html': `${lead}<meta http-equiv="content-type" content="text/html; charset=utf-8"></head></html>`,
+		// No byte order mark and no <meta charset>.
+		'index.html': `<!DOCTYPE html><html><head>${policyMeta(policy([], []))}<title>A</title></head></html>`,
+	});
+	t.after(() => rmSync(dist, { recursive: true, force: true }));
+
+	assert.throws(() => assertContentSecurityPolicy({ distDir: dist }), {
+		message: [
+			'3 Content-Security-Policy problem(s): every page must carry its policy as the first element of its head, listing the hash of each of its inline scripts and style elements, have no inline event handler, and declare its character encoding within its first 1024 bytes:',
+			'  guides/a/index.html: the character encoding declaration ends at byte 1027, past the first 1024',
+			'  guides/b/index.html: the character encoding declaration ends at byte 1069, past the first 1024',
+			'  index.html: no character encoding declaration, neither a UTF-8 byte order mark nor a <meta charset>',
+		].join('\n'),
+	});
 });
 
 test('pages whose policy is first in their head and covers their inline scripts and style elements pass, counted', (t) => {
@@ -208,7 +280,7 @@ test('a page without its policy first in its head, or with an inline script or s
 
 	assert.throws(() => assertContentSecurityPolicy({ distDir: dist }), {
 		message: [
-			'10 Content-Security-Policy problem(s): every page must carry its policy as the first element of its head, listing the hash of each of its inline scripts and style elements, and have no inline event handler:',
+			'10 Content-Security-Policy problem(s): every page must carry its policy as the first element of its head, listing the hash of each of its inline scripts and style elements, have no inline event handler, and declare its character encoding within its first 1024 bytes:',
 			'  about/index.html: the Content-Security-Policy is not the first element of the head',
 			'  about/license/index.html: no Content-Security-Policy in the head',
 			`  guides/a/index.html: inline script not in the policy, ${moduleHash}: import "/_astro/page.js";`,
@@ -271,7 +343,7 @@ test('the build writes every page its policy and checks it', async () => {
 		'dist/index.html': starlightPage('Home', `<script>${themeScript}</script>`, ''),
 	});
 	assert.equal(error, undefined);
-	assert.ok(index.startsWith(`<!doctype html><html><head>${policyMeta(policy([themeHash], []))}<meta property="og:title"`), index);
+	assert.ok(index.startsWith(`${bom}<!doctype html><html><head>${policyMeta(policy([themeHash], []))}<meta property="og:title"`), index);
 });
 
 test('the build fails on a page with an inline event handler', async () => {

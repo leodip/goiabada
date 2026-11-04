@@ -49,8 +49,10 @@ export function consentConfig(window) {
 			useLocalStorage: true,
 			expiresAfterDays: 182,
 		},
+		// Accept and Reject side by side, alike, in a box that doesn't stop the visitor
+		// reading; the Footer override keeps them side by side on a phone too.
 		guiOptions: {
-			consentModal: { layout: 'box', position: 'bottom right', equalWeightButtons: true },
+			consentModal: { layout: 'box inline', position: 'bottom right', equalWeightButtons: true },
 			preferencesModal: { layout: 'box', equalWeightButtons: true },
 		},
 		categories: {
