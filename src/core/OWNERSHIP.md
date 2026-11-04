@@ -761,7 +761,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `PreAuthLifetime` | own-package | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
 | `core/sessionstore` | `PreviousKeysError` | both-apps | — |
 | `core/sessionstore` | `Record` | kernel | — |
-| `core/sessionstore` | `Refreshing` | contract | The middleware that makes a request activity on its browser session, so the first read of it touches a stale row and a signed-in session's persistent cookie is sent again with the row's new expiry (#743). Only the auth server mounts it, on its page branch; it stays because the reissue seals the identifier and sets the cookie with the keys and codec this package keeps private, and because the rule it switches, that a persistent-cookie store touches only where it can send the cookie, is the store's own. |
+| `core/sessionstore` | `Refreshing` | contract | The middleware that makes a request activity on its browser session, so the first read of it touches a stale row and a signed-in session's cookie is sent again, as the store's KeepSignedIn answers, once the response's headers go out and only while the request wrote none of its own and the row is still there (#743). Only the auth server mounts it, on its page branch; it stays because the reissue seals the identifier and sets the cookie with the keys and codec this package keeps private, and because the rule it switches, that a persistent-cookie store touches only where it can send the cookie, is the store's own. |
 | `core/sessionstore` | `ServerSideStore` | own-package | — |
 | `core/sessionstore` | `Session` | both-apps | — |
 | `core/sessionstore` | `SessionIdBytes` | own-package | — |

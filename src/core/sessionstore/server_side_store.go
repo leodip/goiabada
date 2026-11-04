@@ -598,15 +598,16 @@ func (s *ServerSideStore) freshSession(name string) *Session {
 // expiry, so the row and the cookie move together, or with neither Max-Age nor Expires. The second
 // is sent too because the browser may still hold a cookie written under an earlier answer, from
 // before an upgrade or a stricter setting, and only a cookie of the same name and path replaces it.
-// On any other request it reads without touching (#743 decisions 8 and 9). A store whose cookie
-// always ends with the browser touches on every read.
+// The cookie is sealed here, so a failure is this read's, and sent when the response's headers go
+// out, as Refreshing describes. On any other request it reads without touching (#743 decisions 8
+// and 9). A store whose cookie always ends with the browser touches on every read.
 func (s *ServerSideStore) touchIfStale(r *http.Request, session *Session, record *Record) error {
 	if s.now().Sub(record.LastAccessed) <= TouchThreshold {
 		return nil
 	}
 
-	refreshTo := refreshWriter(r)
-	if s.lifetime.persistent && refreshTo == nil {
+	refresh := refreshFor(r)
+	if s.lifetime.persistent && refresh == nil {
 		return nil
 	}
 
@@ -627,7 +628,30 @@ func (s *ServerSideStore) touchIfStale(r *http.Request, session *Session, record
 	if err != nil {
 		return err
 	}
-	return s.writeCookie(refreshTo, session, session.ID, maxAge)
+	cookie, err := s.sessionCookie(session, session.ID, maxAge)
+	if err != nil {
+		return err
+	}
+	id := session.ID
+	refresh.hold(cookie, func() bool { return s.stillLive(ctx, id) })
+	return nil
+}
+
+// stillLive reports whether the row id names is still there, which a refreshed cookie is sent only
+// while: another request of the browser may have rotated the session away or ended it since this
+// one touched it. A read that fails sends no cookie either, since the browser then keeps the one it
+// has, where a cookie naming a removed row would sign it out; the failure is logged, unless the
+// request was abandoned, which ends its reads too.
+func (s *ServerSideStore) stillLive(ctx context.Context, id string) bool {
+	_, err := s.backend.Load(ctx, id)
+	if err == nil {
+		return true
+	}
+	if !errors.Is(err, ErrNotFound) && ctx.Err() == nil {
+		slog.WarnContext(ctx, "unable to read the browser session before sending its refreshed cookie, sending none",
+			"error", err)
+	}
+	return false
 }
 
 // Save writes the session to the backend and names it with a cookie.
@@ -737,19 +761,28 @@ func (s *ServerSideStore) cookieMaxAge(ctx context.Context, session *Session, ex
 // writeCookie seals the identifier and writes it into the browser with maxAge, zero for a cookie
 // that ends with the browser.
 func (s *ServerSideStore) writeCookie(w http.ResponseWriter, session *Session, id string, maxAge int) error {
+	cookie, err := s.sessionCookie(session, id, maxAge)
+	if err != nil {
+		return err
+	}
+	http.SetCookie(w, cookie)
+	return nil
+}
+
+// sessionCookie is the cookie naming id, sealed, with session's options and maxAge.
+func (s *ServerSideStore) sessionCookie(session *Session, id string, maxAge int) (*http.Cookie, error) {
 	encodedId, err := seal(s.random, s.current.cookie, session.Name(), []byte(id))
 	if err != nil {
 		// The row is already written at this point, so the session exists and the
 		// browser is about to be told nothing about it. That is reported rather than
 		// logged: a save that returns nil having issued no cookie looks like success
 		// and behaves like a silent sign-out on the very next request.
-		return errs.Wrap(err, "unable to encode the browser session identifier")
+		return nil, errs.Wrap(err, "unable to encode the browser session identifier")
 	}
 
 	opts := *session.Options
 	opts.MaxAge = maxAge
-	http.SetCookie(w, s.buildCookie(session.Name(), encodedId, &opts))
-	return nil
+	return s.buildCookie(session.Name(), encodedId, &opts), nil
 }
 
 // DeletionCookie is the cookie that removes name from the browser.

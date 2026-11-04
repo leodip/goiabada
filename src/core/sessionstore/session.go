@@ -131,9 +131,9 @@ type registryEntry struct {
 type registry struct {
 	sessions map[string]registryEntry
 
-	// refreshTo is the response a touch of this request sends the session cookie on, set by
+	// refresh is the response a touch of this request holds the session cookie on, set by
 	// Refreshing, or nil on a request that does not count as activity on its session.
-	refreshTo http.ResponseWriter
+	refresh *refreshWriter
 }
 
 // registryFor returns the request's session cache, installing one if the request does
@@ -156,38 +156,4 @@ func registryFor(r *http.Request) *registry {
 	reg := &registry{sessions: make(map[string]registryEntry)}
 	*r = *r.WithContext(context.WithValue(r.Context(), registryKey{}, reg))
 	return reg
-}
-
-// Refreshing marks every request it wraps as activity on its browser session: the first Get of
-// the session on the request touches its row once the row is more than TouchThreshold stale, as it
-// always has, and a store whose cookie outlives the browser sends a signed-in session's cookie
-// again on w, with the row's new expiry, so the browser keeps the cookie as long as the row lives.
-//
-// On a request it does not wrap, such a store reads the session without moving its idle deadline:
-// a touch there would either leave the cookie expiring before its row, or send the cookie on an
-// answer that may be cacheable. The auth server mounts it on its page branch alone, whose answers
-// are no-store, so a reissued cookie never rides on a client logo, a profile picture, the OpenAPI
-// document, discovery or JWKS, which a shared cache could store and replay to other visitors (#743
-// decisions 8 and 9). The admin console's store, whose cookie ends with the browser, touches on
-// every read as before and mounts nothing.
-//
-// It must run before anything reads the session on the request: Get memoises its answer, so a
-// session read before it is not read again.
-func Refreshing(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		registryFor(r).refreshTo = w
-		next.ServeHTTP(w, r)
-	})
-}
-
-// refreshWriter is the response a touch on r sends the session cookie on, or nil when no
-// Refreshing wraps r.
-func refreshWriter(r *http.Request) http.ResponseWriter {
-	if r == nil {
-		return nil
-	}
-	if reg, ok := r.Context().Value(registryKey{}).(*registry); ok {
-		return reg.refreshTo
-	}
-	return nil
 }
