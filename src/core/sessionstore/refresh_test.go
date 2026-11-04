@@ -105,6 +105,46 @@ func TestRefreshing_SendsNoCookieForASessionAnotherRequestRotatedOrEndedMeanwhil
 	}
 }
 
+// While the page request works, another request of the same browser writes the session anew under
+// the same identifier, as a password entry in another tab does when it records an unticked Keep me
+// signed in box, and answers first with a cookie that ends with the browser. The page request read
+// the ticked answer, so its refreshed cookie would outlive the browser, and arriving last it would
+// keep the session past a restart the user just declined. It sends none: the row no longer holds
+// what the refresh read.
+func TestRefreshing_SendsNoCookieBuiltFromContentsAnotherRequestRewroteMeanwhile(t *testing.T) {
+	store, backend := keepTestStore(t, func(_ context.Context, values map[string]any) (bool, error) {
+		ticked, _ := values["KeepSignedIn"].(bool)
+		return ticked, nil
+	})
+	cookie := saveNew(t, store.ServerSideStore, map[string]any{"SessionIdentifier": "a-user-session", "KeepSignedIn": true})
+	id := decodeCookieId(t, store.ServerSideStore, cookie)
+	backend.rows[id].LastAccessed = keepTestNow.Add(-time.Minute)
+	var otherCookies []*http.Cookie
+
+	w := serveRefreshing(t, store, requestWith(cookie), func(w http.ResponseWriter, _ *http.Request) error {
+		r := requestWith(cookie)
+		session, err := store.Get(r, storeTestName)
+		if err != nil {
+			return err
+		}
+		other := httptest.NewRecorder()
+		if err := store.ChangeAndSave(r, other, session, func(values map[string]any) error {
+			values["KeepSignedIn"] = false
+			return nil
+		}); err != nil {
+			return err
+		}
+		otherCookies = sessionCookies(store, other)
+		w.WriteHeader(http.StatusOK)
+		return nil
+	})
+
+	require.Len(t, otherCookies, 1, "the other request names the session itself")
+	assertEndsWithTheBrowser(t, otherCookies[0])
+	require.Contains(t, backend.rows, id, "under the same identifier")
+	assert.Empty(t, sessionCookies(store, w))
+}
+
 // A request that writes the session's cookie itself, as a save does when a password entry records
 // a new Keep me signed in answer, answers with that cookie alone: the refreshed one, held until the
 // headers go out, would otherwise follow it and the browser would keep the older answer's.

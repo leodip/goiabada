@@ -435,10 +435,12 @@ When user has valid session (`UserSession` in DB + session cookie):
   session's cookie is sent again as `KeepSignedIn` answers now, with the row's new expiry or with
   neither Max-Age nor Expires. The second replaces a cookie that outlives the browser, written before
   an upgrade or a stricter setting, without waiting for a sign-in. The touch happens at the
-  session's first read, before the handler, but the cookie is held until the answer's headers go
-  out and dropped if the request wrote the session's cookie itself or the row is gone by then:
-  another request of the browser that rotated or ended the session and answered first would
-  otherwise be undone by a cookie naming the removed row. Every answer on that branch is
+  session's first read, before the handler, but the cookie is held until the final answer's
+  headers go out (an informational status leaves it held, and a panic's 500 carries it) and
+  dropped if the request wrote the session's cookie itself or the row no longer holds the contents
+  the read found: another request of the browser that rotated, ended or rewrote the session and
+  answered first would otherwise be undone by a cookie naming the removed row or built from the
+  older contents, such as a Keep me signed in answer just replaced. Every answer on that branch is
   `no-store`, the router's 405 under a page group included, and the files, protocol and API branches
   read the session without touching it, so no reissued cookie rides on a cacheable answer (#743)
 - Whether a signed-in cookie outlives the browser is the store's `KeepSignedIn` rule

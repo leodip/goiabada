@@ -632,20 +632,22 @@ func (s *ServerSideStore) touchIfStale(r *http.Request, session *Session, record
 	if err != nil {
 		return err
 	}
-	id := session.ID
-	refresh.hold(cookie, func() bool { return s.stillLive(ctx, id) })
+	id, data := session.ID, record.Data
+	refresh.hold(cookie, func() bool { return s.stillAsRead(ctx, id, data) })
 	return nil
 }
 
-// stillLive reports whether the row id names is still there, which a refreshed cookie is sent only
-// while: another request of the browser may have rotated the session away or ended it since this
-// one touched it. A read that fails sends no cookie either, since the browser then keeps the one it
-// has, where a cookie naming a removed row would sign it out; the failure is logged, unless the
-// request was abandoned, which ends its reads too.
-func (s *ServerSideStore) stillLive(ctx context.Context, id string) bool {
-	_, err := s.backend.Load(ctx, id)
+// stillAsRead reports whether the row id names is still there holding data, the contents the
+// refresh read, which a refreshed cookie is sent only while: another request of the browser may
+// have rotated the session away, ended it, or written it anew since this one read it, and answered
+// with a cookie of its own. Every write seals with a fresh nonce, so any write in between changes
+// the contents, while a touch leaves them as they are. A read that fails sends no cookie either,
+// since the browser then keeps the one it has; the failure is logged, unless the request was
+// abandoned, which ends its reads too.
+func (s *ServerSideStore) stillAsRead(ctx context.Context, id string, data []byte) bool {
+	record, err := s.backend.Load(ctx, id)
 	if err == nil {
-		return true
+		return bytes.Equal(record.Data, data)
 	}
 	if !errors.Is(err, ErrNotFound) && ctx.Err() == nil {
 		slog.WarnContext(ctx, "unable to read the browser session before sending its refreshed cookie, sending none",

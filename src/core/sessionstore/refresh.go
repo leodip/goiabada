@@ -11,12 +11,15 @@ import (
 // the row lives, or stops keeping one past its restart once the answer changes.
 //
 // The cookie is held until the response's headers go out, and sent then only while the request
-// has written no cookie of that name itself and the row the cookie names is still there. The touch
-// happens when the session is first read, before the handler runs, and while the handler works
-// another request of the same browser can rotate the session or end it and answer first: a cookie
-// sent from the read would then reach the browser last and name a row that is gone, signing the
-// browser out. A cookie the request writes itself, from a save, a rotation or a sign-out, says
-// more than the refresh and stands alone (#743).
+// has written no cookie of that name itself and the row the cookie names still holds what the read
+// found. The touch happens when the session is first read, before the handler runs, and while the
+// handler works another request of the same browser can rotate the session, end it, or write it
+// anew, as a password entry recording a new Keep me signed in answer does, and answer first with a
+// cookie of its own. A cookie sent from the read would then reach the browser last: naming a row
+// that is gone, it signs the browser out, and built from the older contents, it undoes the newer
+// answer, keeping a cookie past the browser's restart that the user just declined. A cookie the
+// request writes itself, from a save, a rotation or a sign-out, says more than the refresh and
+// stands alone (#743).
 //
 // On a request it does not wrap, such a store reads the session without moving its idle deadline:
 // a touch there would either leave the cookie expiring before its row, or send the cookie on an
@@ -48,10 +51,11 @@ type refreshWriter struct {
 	released bool
 }
 
-// heldCookie is one refreshed session cookie, and whether the row it names is still there.
+// heldCookie is one refreshed session cookie, and whether the row it names still holds what the
+// refresh read.
 type heldCookie struct {
-	cookie    *http.Cookie
-	stillLive func() bool
+	cookie      *http.Cookie
+	stillAsRead func() bool
 }
 
 // refreshFor is the writer a refresh on r holds its cookie on, or nil when no Refreshing wraps r.
@@ -66,9 +70,9 @@ func refreshFor(r *http.Request) *refreshWriter {
 }
 
 // hold keeps cookie for the response's headers, to be sent then only while the request wrote no
-// cookie of its name and stillLive answers true.
-func (w *refreshWriter) hold(cookie *http.Cookie, stillLive func() bool) {
-	w.held = append(w.held, heldCookie{cookie: cookie, stillLive: stillLive})
+// cookie of its name and stillAsRead answers true.
+func (w *refreshWriter) hold(cookie *http.Cookie, stillAsRead func() bool) {
+	w.held = append(w.held, heldCookie{cookie: cookie, stillAsRead: stillAsRead})
 }
 
 // release puts the held cookies that still stand onto the headers, once: the first write, status
@@ -79,7 +83,7 @@ func (w *refreshWriter) release() {
 	}
 	w.released = true
 	for _, held := range w.held {
-		if wroteCookie(w.Header(), held.cookie.Name) || !held.stillLive() {
+		if wroteCookie(w.Header(), held.cookie.Name) || !held.stillAsRead() {
 			continue
 		}
 		http.SetCookie(w.ResponseWriter, held.cookie)
