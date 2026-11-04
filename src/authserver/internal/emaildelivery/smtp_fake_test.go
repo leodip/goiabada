@@ -71,6 +71,10 @@ type fakeSMTP struct {
 	// refusal, when set, is the whole reply line rejectRcpt and rejectAfterData answer with in
 	// place of their own, such as a refusal that quotes the recipient.
 	refusal string
+	// replies, keyed by greeting, EHLO, STARTTLS, AUTH or QUIT, is the whole reply line the fake
+	// answers that step with in place of its own: the greeting; a refusal of EHLO and of the HELO
+	// that follows it; refuseSTARTTLS's refusal; a failed authentication; the reply to QUIT.
+	replies map[string]string
 	// dropAfterData takes the whole DATA block and closes the connection instead of answering its
 	// terminator, so the client never learns whether the relay accepted the message.
 	dropAfterData bool
@@ -245,7 +249,7 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 		_, _ = fmt.Fprint(w, s+"\r\n")
 	}
 
-	say("220 fake ESMTP")
+	say(cmp.Or(f.replies["greeting"], "220 fake ESMTP"))
 
 	for {
 		line, err := r.ReadString('\n')
@@ -274,6 +278,9 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 		}
 
 		switch {
+		case (strings.HasPrefix(up, "EHLO") || strings.HasPrefix(up, "HELO")) && f.replies["EHLO"] != "":
+			say(f.replies["EHLO"])
+
 		case strings.HasPrefix(up, "EHLO") && f.refuseEHLO:
 			say("502 5.5.1 command not recognized")
 
@@ -297,7 +304,7 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 				continue
 			}
 			if f.refuseSTARTTLS {
-				say("454 4.7.0 TLS not available due to temporary reason")
+				say(cmp.Or(f.replies["STARTTLS"], "454 4.7.0 TLS not available due to temporary reason"))
 				continue
 			}
 			if f.garbleSTARTTLS {
@@ -359,7 +366,7 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 					return
 				}
 				f.record(session, strings.TrimRight(next, "\r\n"))
-				say("535 5.7.8 authentication failed")
+				say(cmp.Or(f.replies["AUTH"], "535 5.7.8 authentication failed"))
 				continue
 			}
 			say("235 2.7.0 authentication succeeded")
@@ -395,7 +402,7 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 			mac.Write([]byte(fakeCRAMChallenge))
 			want := hex.EncodeToString(mac.Sum(nil))
 			if !found || digest != want {
-				say("535 5.7.8 authentication failed")
+				say(cmp.Or(f.replies["AUTH"], "535 5.7.8 authentication failed"))
 				continue
 			}
 			f.mu.Lock()
@@ -453,7 +460,7 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 			say(cmp.Or(f.refusal, "550 5.1.1 no such user here"))
 
 		case strings.HasPrefix(up, "QUIT"):
-			say("221 2.0.0 bye")
+			say(cmp.Or(f.replies["QUIT"], "221 2.0.0 bye"))
 			return
 
 		default:

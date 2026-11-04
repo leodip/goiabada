@@ -104,7 +104,7 @@ Every key is snake_case, and a key means the same thing in every event that carr
 
 Events are about people and clients, so details carry ids, not secrets. A refresh token appears only as its `jti`, and an authenticator code only as its time step.
 
-No entry records an email address. An entry about one records `email_digest`, the SHA-256 hex digest of the address lowercased and trimmed, the form every account's address is stored in. That covers a failed sign-in, a refused password grant, a registration, a forgot-password request, a rate limit on any of them, an account created or activated, an email verification code, and the recipient of a test email. One digest therefore finds every entry about an address. To find the entries about an address you know, compute its digest with `printf '%s' 'ana@example.com' | sha256sum`, the address in lowercase. Anyone holding a candidate address can do the same, so treat the digest as a pseudonym, not a secret. An entry about an account also names it by `user_id`.
+No entry records an email address. An entry about one records `email_digest`, the SHA-256 hex digest of the address in lowercase. That covers a failed sign-in, a refused password grant, a registration, a forgot-password request, a rate limit on any of them, an account created or activated, an email verification code, and the recipient of a test email. Each address is also trimmed of surrounding spaces, the form every account's address is stored in, except on a forgot-password request, whose digest is of the address as that form looks it up. To find the entries about an address you know, compute its digest with `printf '%s' 'ana@example.com' | sha256sum`, the address in lowercase. Anyone holding a candidate address can do the same, so treat the digest as a pseudonym, not a secret. An entry about an account also names it by `user_id`.
 
 | Key | Meaning |
 |---|---|
@@ -124,7 +124,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `code_id` | The row id of an authorization code. |
 | `command` | `goiabada-authserver recover`, on every entry the `recover` command writes. An entry an API request made names its token's subject under `logged_in_user` instead. |
 | `consent_id` | The row id of a consent a user gave a client. |
-| `email_digest` | The SHA-256 hex digest of the email address the entry is about, lowercased and trimmed: one typed into a form or named by a password grant, an account's, or a test email's recipient. |
+| `email_digest` | The SHA-256 hex digest of the email address the entry is about, in lowercase and, except on a forgot-password request, trimmed: one typed into a form or named by a password grant, an account's, or a test email's recipient. |
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
 | `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
 | `grant_id` | The grant a client revoked: the `jti` of its first refresh token, which its access tokens carry as `grant_id`. |

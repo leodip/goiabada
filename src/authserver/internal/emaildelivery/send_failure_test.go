@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/textproto"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,6 +114,111 @@ func TestSendEmail_ARefusalQuotingTheRecipientDoesNotCarryTheAddress(t *testing.
 			assert.Equal(t, 550, reply.Code)
 			assert.Equal(t, redacted, reply.Msg)
 			assertSendFailure(t, err, SendFailureMessageRefused)
+		})
+	}
+}
+
+// Every reply the relay sends passes through the same redaction before it reaches the send's error,
+// not only a refusal of the sender, the recipient or the message (#779 decision 4). AUTH may echo a
+// username that is also the recipient, and a reply that is no SMTP reply at all reaches the error
+// as its raw line. The greeting, EHLO and STARTTLS come before anything names the address, and are
+// held to it all the same. Each failure keeps its kind.
+func TestSendEmail_NoRelayReplyInTheErrorCarriesTheRecipient(t *testing.T) {
+	tests := []struct {
+		name     string
+		fake     *fakeSMTP
+		mode     string
+		username string
+		want     SendFailureKind
+	}{
+		{
+			name: "greeting refused",
+			fake: &fakeSMTP{replies: map[string]string{"greeting": "554 5.3.2 not taking mail for RCPT@Example.COM"}},
+			mode: "none", want: SendFailureOther,
+		},
+		{
+			name: "EHLO and HELO refused",
+			fake: &fakeSMTP{replies: map[string]string{"EHLO": "550 5.7.1 RCPT@Example.COM may not say hello"}},
+			mode: "none", want: SendFailureOther,
+		},
+		{
+			name: "STARTTLS refused",
+			fake: &fakeSMTP{ext: []string{"STARTTLS"}, refuseSTARTTLS: true,
+				replies: map[string]string{"STARTTLS": "454 4.7.0 no TLS for RCPT@Example.COM"}},
+			mode: "starttls", want: SendFailureTLS,
+		},
+		{
+			name: "authentication rejected",
+			fake: &fakeSMTP{ext: []string{"AUTH CRAM-MD5", "8BITMIME"}, expectPassword: "a-different-password",
+				replies: map[string]string{"AUTH": "535 5.7.8 Authentication rejected for RCPT@Example.COM"}},
+			mode: "none", username: fixtureUser, want: SendFailureAuthenticationRejected,
+		},
+		{
+			name: "a recipient answered with a line that is no SMTP reply",
+			fake: &fakeSMTP{ext: []string{"8BITMIME"}, rejectRcpt: true, refusal: "rejected RCPT@Example.COM"},
+			mode: "none", want: SendFailureOther,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			port := test.fake.start(t)
+			password := ""
+			if test.username != "" {
+				password = fixturePassword
+			}
+
+			err := sendTo(t, &Sender{dataCipher: testDataCipher},
+				relayConfig(t, "127.0.0.1", port, test.mode, test.username, password, "Goiabada"))
+
+			require.Error(t, err)
+			assert.NotContains(t, strings.ToLower(err.Error()), "rcpt@example.com")
+			assert.NotContains(t, strings.ToLower(fmt.Sprintf("%+v", err)), "rcpt@example.com")
+			assert.Contains(t, err.Error(), "<recipient>", "the rest of the reply stays")
+			assertSendFailure(t, err, test.want)
+		})
+	}
+}
+
+// The two relay replies a send that goes on logs rather than returns are held to the same
+// redaction: a refused STARTTLS under STARTTLS if available, which carries on in plaintext, and a
+// failed QUIT after the relay accepted the message (#779 decision 4). Both sends still succeed.
+func TestSendEmail_NoLoggedRelayReplyCarriesTheRecipient(t *testing.T) {
+	tests := []struct {
+		name    string
+		fake    *fakeSMTP
+		level   slog.Level
+		message string
+	}{
+		{
+			name: "STARTTLS refused, sent unencrypted",
+			fake: &fakeSMTP{ext: []string{"STARTTLS", "8BITMIME"}, refuseSTARTTLS: true,
+				replies: map[string]string{"STARTTLS": "454 4.7.0 no TLS for RCPT@Example.COM"}},
+			level: slog.LevelInfo, message: "sending the email unencrypted",
+		},
+		{
+			name: "QUIT failed after the message was accepted",
+			fake: &fakeSMTP{ext: []string{"8BITMIME"},
+				replies: map[string]string{"QUIT": "421 4.3.0 closing after delivery to RCPT@Example.COM"}},
+			level: slog.LevelWarn, message: quitFailedAfterAcceptance,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			capture := logtest.CaptureSlog(t)
+			port := test.fake.start(t)
+
+			err := sendTo(t, &Sender{dataCipher: testDataCipher},
+				relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"))
+
+			require.NoError(t, err)
+			records := recordsAt(capture, test.level)
+			require.Len(t, records, 1)
+			assert.Equal(t, test.message, records[0].Message)
+			logged := records[0].Attrs["error"]
+			require.NotNil(t, logged, "the reply rides under error")
+			assert.NotContains(t, strings.ToLower(fmt.Sprint(logged)), "rcpt@example.com")
+			assert.NotContains(t, strings.ToLower(fmt.Sprintf("%+v", logged)), "rcpt@example.com")
+			assert.Contains(t, fmt.Sprint(logged), "<recipient>")
 		})
 	}
 }
