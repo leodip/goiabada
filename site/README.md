@@ -71,8 +71,18 @@ and errors are handwritten pages beside the generated ones, in `src/content/docs
   Cookie settings button. Both come from the `Footer` override in `src/components/Footer.astro`,
   so a page that doesn't render Starlight's footer fails. So does moving the Privacy page without
   updating the link.
+- **A page's Content-Security-Policy is missing, misplaced or incomplete, or a page has an inline
+  event handler:** the build's last step writes into every page a
+  `<meta http-equiv="Content-Security-Policy">` as the first element of its `<head>`, with the
+  directives in `checks/csp.mjs` and the SHA-256 hashes of that page's inline scripts and `<style>`
+  elements, so the browser runs what the build produced and nothing injected later. It then reads
+  every page back, and fails when the policy is not the head's first element or leaves out an
+  inline script or style element, or when a page has an `onclick`-style attribute, which no hash
+  allows: use a script instead. Inline `style` attributes are allowed. No step may change a page
+  after this one, or its hashes go stale.
 
-These two checks are ours, in `checks/privacy.mjs`, run from `checks/build-checks.mjs`.
+These last three checks are ours, in `checks/privacy.mjs` and `checks/csp.mjs`, run from
+`checks/build-checks.mjs`.
 
 `npm test` runs the checks' tests on small fixtures with Node's built-in test runner.
 

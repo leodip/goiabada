@@ -4,6 +4,7 @@
 import { fileURLToPath } from 'node:url';
 
 import { assertApiReferenceLinks } from './api-reference-links.mjs';
+import { assertContentSecurityPolicy, writeContentSecurityPolicy } from './csp.mjs';
 import { assertLlmsFiles, writeLlmsFiles } from './llms.mjs';
 import { assertConsentOnEveryPage, assertNoOffSiteLoads } from './privacy.mjs';
 import { assertShippedLinks } from './shipped-links.mjs';
@@ -14,7 +15,10 @@ import { assertShippedLinks } from './shipped-links.mjs';
 // published under, and every link into one is checked against the built pages.
 // No page or stylesheet may load anything from another site. privacyPage, when
 // given, is the Privacy page's path, and every page must carry the consent prompt
-// and the footer's links to it and to Cookie settings.
+// and the footer's links to it and to Cookie settings. Last, every page gets its
+// Content-Security-Policy, holding the hashes of its inline scripts and style
+// elements, so no step may change a page after this one; the check then reads the
+// policies back.
 export default function buildChecks({ srcDir, llms, apiReferences, privacyPage }) {
 	let site;
 	return {
@@ -46,6 +50,10 @@ export default function buildChecks({ srcDir, llms, apiReferences, privacyPage }
 					const consentPages = assertConsentOnEveryPage({ distDir, site, privacyPage });
 					logger.info(`${consentPages} pages carry the consent prompt and the footer's Privacy and Cookie settings links`);
 				}
+
+				writeContentSecurityPolicy({ distDir });
+				const cspPages = assertContentSecurityPolicy({ distDir });
+				logger.info(`${cspPages} pages carry a Content-Security-Policy that lists each of their inline scripts and style elements`);
 			},
 		},
 	};

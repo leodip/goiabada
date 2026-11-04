@@ -265,20 +265,20 @@ function servedUrl(origin, file) {
 
 // Calls visit with every element in the tree, in document order, a template's
 // content included.
-function walk(node, visit) {
+export function walk(node, visit) {
 	if (node.type === 'element') visit(node);
 	for (const child of node.children ?? []) walk(child, visit);
 	if (node.content) walk(node.content, visit);
 }
 
-function textOf(node) {
+export function textOf(node) {
 	if (node.type === 'text') return node.value;
 	return (node.children ?? []).map(textOf).join('');
 }
 
 // The files under distDir ending in extension, as sorted paths from distDir with
 // forward slashes.
-function builtFiles(distDir, extension) {
+export function builtFiles(distDir, extension) {
 	const files = [];
 	const visit = (dir) => {
 		for (const entry of readdirSync(dir, { withFileTypes: true })) {
