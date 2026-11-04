@@ -977,16 +977,20 @@ func TestServerSideStore_ARequestThatDoesNotRefreshReadsTheSessionWithoutTouchin
 	assert.Empty(t, cookies)
 }
 
-// A sign-in in progress is refreshed on a page request as before, and its cookie is not sent
-// again: the reissue is for a signed-in session's cookie (#743 decision 8).
-func TestServerSideStore_APageRequestRefreshesASignInInProgressWithoutSendingItsCookie(t *testing.T) {
-	store, backend, cookie, _ := persistentStoreAtRefreshTestNow(t, map[string]any{"ceremony": "in progress"},
+// A sign-in in progress is refreshed on a page request, and its cookie is sent again with the
+// renewed 30 minutes its row now has: a sign-in whose pages keep being loaded would otherwise lose
+// its cookie 30 minutes after its last save while the row lives on, and its next step would find
+// no sign-in (#743 decision 8).
+func TestServerSideStore_APageRequestRefreshesASignInInProgressAndSendsItsCookieAgain(t *testing.T) {
+	store, backend, cookie, id := persistentStoreAtRefreshTestNow(t, map[string]any{"ceremony": "in progress"},
 		time.Minute, refreshTestNow.Add(PreAuthLifetime))
 
 	_, cookies := readSession(t, store, requestWith(cookie), true)
 
 	assert.Equal(t, 1, backend.touches)
-	assert.Empty(t, cookies)
+	require.Len(t, cookies, 1)
+	assert.Equal(t, id, decodeCookieId(t, store, cookies[0]))
+	assert.Equal(t, int(PreAuthLifetime.Seconds()), cookies[0].MaxAge)
 }
 
 // A row that went away between the read and the touch is no session, and no cookie names it.

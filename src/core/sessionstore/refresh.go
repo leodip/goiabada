@@ -6,9 +6,10 @@ import (
 
 // Refreshing marks every request it wraps as activity on its browser session: the first Get of
 // the session on the request touches its row once the row is more than TouchThreshold stale, as it
-// always has, and a store whose cookie can outlive the browser sends a signed-in session's cookie
-// again on the response, as its KeepSignedIn answers, so the browser keeps the cookie as long as
-// the row lives, or stops keeping one past its restart once the answer changes.
+// always has, and a store whose cookie can outlive the browser sends the session's cookie again on
+// the response, so the browser keeps the cookie as long as the row lives: a sign-in in progress for
+// its renewed 30 minutes, and a signed-in session as its KeepSignedIn answers, which also stops a
+// cookie outliving the browser once the answer changes.
 //
 // The cookie is held until the response's headers go out, and sent then only while the request
 // has written no cookie of that name itself and the row the cookie names still holds what the read

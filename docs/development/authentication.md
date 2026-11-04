@@ -431,10 +431,12 @@ When user has valid session (`UserSession` in DB + session cookie):
   ceremony with the "no longer active" page, since a newer authentication already describes the
   session
 - Only the page branch refreshes the browser session (`sessionstore.Refreshing`, in `pageChain`
-  behind `middleware.NoStore`): a row more than ten seconds stale is touched there, and a signed-in
-  session's cookie is sent again as `KeepSignedIn` answers now, with the row's new expiry or with
-  neither Max-Age nor Expires. The second replaces a cookie that outlives the browser, written before
-  an upgrade or a stricter setting, without waiting for a sign-in. The touch happens at the
+  behind `middleware.NoStore`): a row more than ten seconds stale is touched there, and the
+  session's cookie is sent again. A sign-in in progress gets the renewed 30 minutes its row has, so
+  reloading a sign-in's pages does not leave its cookie expiring before the row. A signed-in
+  session's cookie goes as `KeepSignedIn` answers now, with the row's new expiry or with neither
+  Max-Age nor Expires. The second replaces a cookie that outlives the browser, written before an
+  upgrade or a stricter setting, without waiting for a sign-in. The touch happens at the
   session's first read, before the handler, but the cookie is held until the final answer's
   headers go out (an informational status leaves it held, and a panic's 500 carries it) and
   dropped if the request wrote the session's cookie itself or the row no longer holds the contents

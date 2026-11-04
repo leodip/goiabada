@@ -89,6 +89,47 @@ func TestSessionRefresh_APageRequestPastTheThresholdSendsTheCookieWithTheRowsNew
 		"and the cookie expires with the row")
 }
 
+// A sign-in in progress whose row has gone stale gets its cookie again on a page request, with the
+// 30 minutes the touch gave its row, in every mode of the Keep users signed in setting: a user who
+// keeps loading a sign-in's pages does not lose its cookie while the row lives on.
+func TestSessionRefresh_APageRequestSendsASignInInProgressItsCookieWithTheRowsNewExpiry(t *testing.T) {
+	for _, mode := range keepSignedInModes {
+		t.Run(string(mode), func(t *testing.T) {
+			setKeepSignedIn(t, mode)
+			client, redirectUri := newClientAndRedirectUri(t, record.AcrLevel1)
+			httpClient := createHttpClient(t)
+			_ = beginAuthorize(t, httpClient, client, redirectUri).Body.Close()
+			cookie := requireSessionCookie(t, httpClient)
+			hash := hashutil.HashString(decodeSessionIdentifier(t, cookie))
+			now := time.Now().UTC()
+			touched, err := database.TouchBrowserSession(context.Background(), nil, sessionkeys.AuthServerSessionName, hash,
+				now.Add(-time.Minute), now.Add(5*time.Minute))
+			require.NoError(t, err)
+			require.True(t, touched, "the sign-in in progress has a row")
+			staleRow := readBrowserSessionRow(t, hash)
+
+			resp := getWithSessionCookie(t, appConfig.AuthServer.BaseURL+"/auth/logout/declined", cookie)
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			var reissued []*http.Cookie
+			for _, set := range resp.Cookies() {
+				if set.Name == browserSessionCookieName() {
+					reissued = append(reissued, set)
+				}
+			}
+			require.Len(t, reissued, 1, "the page answer sends the sign-in's cookie again")
+			assert.Equal(t, decodeSessionIdentifier(t, cookie), decodeSessionIdentifier(t, reissued[0]),
+				"naming the same sign-in")
+			assert.InDelta(t, 1800, reissued[0].MaxAge, 3, "for the 30 minutes a sign-in in progress has")
+
+			row := readBrowserSessionRow(t, hash)
+			assert.True(t, row.LastAccessed.After(staleRow.LastAccessed), "the row was touched")
+			assert.InDelta(t, time.Until(row.ExpiresAt).Seconds(), reissued[0].MaxAge, 3,
+				"and the cookie expires with the row")
+		})
+	}
+}
+
 // A client logo is answered cacheable, and the consent page loads one with the user's cookie: its
 // answer carries no Set-Cookie and the row does not move, however stale. Discovery, on the protocol
 // branch, the same.

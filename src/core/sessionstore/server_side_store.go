@@ -594,13 +594,16 @@ func (s *ServerSideStore) freshSession(name string) *Session {
 // on SQLite that is an fsync on the one connection the whole process shares.
 //
 // A store whose cookie can outlive the browser touches only on a request Refreshing wraps, and then
-// sends a signed-in session's cookie again, as its KeepSignedIn answers now: with the row's new
-// expiry, so the row and the cookie move together, or with neither Max-Age nor Expires. The second
-// is sent too because the browser may still hold a cookie written under an earlier answer, from
-// before an upgrade or a stricter setting, and only a cookie of the same name and path replaces it.
-// The cookie is sealed here, so a failure is this read's, and sent when the response's headers go
-// out, as Refreshing describes. On any other request it reads without touching (#743 decisions 8
-// and 9). A store whose cookie always ends with the browser touches on every read.
+// sends the session's cookie again, with the Max-Age cookieMaxAge decides from the row's new expiry.
+// A sign-in in progress gets its renewed PreAuthLifetime, so a sign-in whose pages keep being loaded
+// does not lose its cookie while its row lives on. A signed-in session gets what its KeepSignedIn
+// answers now: the row's new expiry, so the row and the cookie move together, or neither Max-Age nor
+// Expires. The second is sent too because the browser may still hold a cookie written under an
+// earlier answer, from before an upgrade or a stricter setting, and only a cookie of the same name
+// and path replaces it. The cookie is sealed here, so a failure is this read's, and sent when the
+// response's headers go out, as Refreshing describes. On any other request it reads without
+// touching (#743 decisions 8 and 9). A store whose cookie always ends with the browser touches on
+// every read.
 func (s *ServerSideStore) touchIfStale(r *http.Request, session *Session, record *Record) error {
 	if s.now().Sub(record.LastAccessed) <= TouchThreshold {
 		return nil
@@ -621,7 +624,7 @@ func (s *ServerSideStore) touchIfStale(r *http.Request, session *Session, record
 		return errs.Wrap(err, "unable to touch the browser session")
 	}
 
-	if !s.lifetime.persistent || !authenticated {
+	if !s.lifetime.persistent {
 		return nil
 	}
 	maxAge, err := s.cookieMaxAge(ctx, session, expiresAt)
