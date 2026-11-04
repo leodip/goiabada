@@ -56,10 +56,12 @@ func RequirePasswordChallenge(boundary *CeremonyBoundary, pageRenderer PageRende
 				return
 			}
 			// Normalized as the handler normalizes it, so the address shown again is the one a
-			// refusal by the password check would show.
+			// refusal by the password check would show, and the Keep me signed in box as the user
+			// left it (#743).
 			email := strings.ToLower(strings.TrimSpace(r.PostFormValue("email")))
 			renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo,
-				i18n.NewLocalizedError(i18n.ErrCodeChallengeFailed, nil), "", email)
+				i18n.NewLocalizedError(i18n.ErrCodeChallengeFailed, nil), "", email,
+				r.PostFormValue(keepSignedInField) == keepSignedInTicked)
 		})
 	}
 }

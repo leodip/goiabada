@@ -48,6 +48,7 @@ func HandleSessionsGet(
 			UserSessionIdleTimeoutInSeconds: apiResp.UserSessionIdleTimeoutInSeconds,
 			UserSessionMaxLifetimeInSeconds: apiResp.UserSessionMaxLifetimeInSeconds,
 			MaxUserSessionsPerUser:          apiResp.MaxUserSessionsPerUser,
+			KeepSignedIn:                    apiResp.KeepSignedIn,
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
@@ -98,6 +99,7 @@ func HandleSessionsPost(
 			UserSessionIdleTimeoutInSeconds: r.FormValue("userSessionIdleTimeoutInSeconds"),
 			UserSessionMaxLifetimeInSeconds: r.FormValue("userSessionMaxLifetimeInSeconds"),
 			MaxUserSessionsPerUser:          r.FormValue("maxUserSessionsPerUser"),
+			KeepSignedIn:                    r.FormValue("keepSignedIn"),
 		}
 
 		renderError := func(message, errorField string) {
@@ -136,6 +138,9 @@ func HandleSessionsPost(
 			UserSessionIdleTimeoutInSeconds: idleInt,
 			UserSessionMaxLifetimeInSeconds: maxInt,
 			MaxUserSessionsPerUser:          &maxSessionsInt,
+			// Sent as chosen, none included: the auth server refuses a missing or unknown mode, and
+			// the refusal comes back at the radio buttons.
+			KeepSignedIn: settingsInfo.KeepSignedIn,
 		}
 
 		_, err = apiClient.UpdateSettingsSessions(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)

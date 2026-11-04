@@ -37,6 +37,7 @@ func TestAPISettingsSessionsGet_Success(t *testing.T) {
 	assert.Equal(t, settings.UserSessionIdleTimeoutInSeconds, body.UserSessionIdleTimeoutInSeconds)
 	assert.Equal(t, settings.UserSessionMaxLifetimeInSeconds, body.UserSessionMaxLifetimeInSeconds)
 	assert.Equal(t, settings.MaxUserSessionsPerUser, body.MaxUserSessionsPerUser)
+	assert.Equal(t, string(settings.KeepSignedIn), body.KeepSignedIn)
 }
 
 // PUT /api/v1/admin/settings/sessions - success
@@ -48,6 +49,7 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 7200,
 		MaxUserSessionsPerUser:          sessionCapOf(7),
+		KeepSignedIn:                    "never",
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/sessions"
@@ -64,6 +66,7 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 	assert.Equal(t, req.UserSessionIdleTimeoutInSeconds, body.UserSessionIdleTimeoutInSeconds)
 	assert.Equal(t, req.UserSessionMaxLifetimeInSeconds, body.UserSessionMaxLifetimeInSeconds)
 	assert.Equal(t, 7, body.MaxUserSessionsPerUser)
+	assert.Equal(t, "never", body.KeepSignedIn)
 
 	// Verify DB persisted
 	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
@@ -71,6 +74,7 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 	assert.Equal(t, req.UserSessionIdleTimeoutInSeconds, settings.UserSessionIdleTimeoutInSeconds)
 	assert.Equal(t, req.UserSessionMaxLifetimeInSeconds, settings.UserSessionMaxLifetimeInSeconds)
 	assert.Equal(t, 7, settings.MaxUserSessionsPerUser)
+	assert.Equal(t, record.KeepSignedIn("never"), settings.KeepSignedIn)
 }
 
 // PUT /api/v1/admin/settings/sessions - validation errors
@@ -84,6 +88,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds: 0,
 		UserSessionMaxLifetimeInSeconds: 10,
 		MaxUserSessionsPerUser:          sessionCapOf(20),
+		KeepSignedIn:                    "ask",
 	})
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
@@ -96,6 +101,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds: 10,
 		UserSessionMaxLifetimeInSeconds: 0,
 		MaxUserSessionsPerUser:          sessionCapOf(20),
+		KeepSignedIn:                    "ask",
 	})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -108,6 +114,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds: 11,
 		UserSessionMaxLifetimeInSeconds: 10,
 		MaxUserSessionsPerUser:          sessionCapOf(20),
+		KeepSignedIn:                    "ask",
 	})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
@@ -120,6 +127,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds: 160000001,
 		UserSessionMaxLifetimeInSeconds: 160000001,
 		MaxUserSessionsPerUser:          sessionCapOf(20),
+		KeepSignedIn:                    "ask",
 	})
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
@@ -132,6 +140,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 		UserSessionIdleTimeoutInSeconds: 10,
 		UserSessionMaxLifetimeInSeconds: 160000001,
 		MaxUserSessionsPerUser:          sessionCapOf(20),
+		KeepSignedIn:                    "ask",
 	})
 	defer func() { _ = resp5.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
@@ -220,13 +229,13 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 		code    string
 		message string
 	}{
-		{"absent", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200}`,
+		{"absent", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"keepSignedIn":"ask"}`,
 			"handler.settings_sessions.max_sessions_per_user_required", "Enter the maximum sessions per user."},
-		{"null", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":null}`,
+		{"null", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":null,"keepSignedIn":"ask"}`,
 			"handler.settings_sessions.max_sessions_per_user_required", "Enter the maximum sessions per user."},
-		{"below 0", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":-1}`,
+		{"below 0", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":-1,"keepSignedIn":"ask"}`,
 			"handler.settings_sessions.max_sessions_per_user_out_of_range", "The maximum sessions per user must be between 0 and 1000."},
-		{"above 1000", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":1001}`,
+		{"above 1000", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":1001,"keepSignedIn":"ask"}`,
 			"handler.settings_sessions.max_sessions_per_user_out_of_range", "The maximum sessions per user must be between 0 and 1000."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -256,6 +265,7 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 7200,
 			MaxUserSessionsPerUser:          sessionCapOf(0),
+			KeepSignedIn:                    "ask",
 		})
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -265,14 +275,15 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 	})
 }
 
-// updated_sessions_settings records who saved and the three values before and after the save, under
-// old and new (#564 decision 10).
+// updated_sessions_settings records who saved and the four values before and after the save, under
+// old and new (#564 decision 10, #743).
 func TestAPISettingsSessionsPut_TheEventRecordsEachValueBeforeAndAfter(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) {
 		settings.AuditLogsInDatabaseEnabled = true
 		settings.UserSessionIdleTimeoutInSeconds = 7200
 		settings.UserSessionMaxLifetimeInSeconds = 86400
 		settings.MaxUserSessionsPerUser = 20
+		settings.KeepSignedIn = record.KeepSignedInAsk
 	})
 	accessToken, adminClient := createAdminClientWithToken(t)
 
@@ -280,6 +291,7 @@ func TestAPISettingsSessionsPut_TheEventRecordsEachValueBeforeAndAfter(t *testin
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 43200,
 		MaxUserSessionsPerUser:          sessionCapOf(5),
+		KeepSignedIn:                    "never",
 	})
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
@@ -291,11 +303,81 @@ func TestAPISettingsSessionsPut_TheEventRecordsEachValueBeforeAndAfter(t *testin
 			"user_session_idle_timeout_in_seconds": float64(7200),
 			"user_session_max_lifetime_in_seconds": float64(86400),
 			"max_user_sessions_per_user":           float64(20),
+			"keep_signed_in":                       "ask",
 		},
 		"new": map[string]any{
 			"user_session_idle_timeout_in_seconds": float64(3600),
 			"user_session_max_lifetime_in_seconds": float64(43200),
 			"max_user_sessions_per_user":           float64(5),
+			"keep_signed_in":                       "never",
 		},
 	}}, auditRows(t, accessToken, "updated_sessions_settings", requestId))
+}
+
+// PUT /api/v1/admin/settings/sessions requires keepSignedIn, one of always, ask and never, and
+// refuses any other value, saving nothing (#743 decision 4); each of the three is saved as given and
+// answered by the next GET. The body is raw JSON here, so an absent field is absent.
+func TestAPISettingsSessionsPut_KeepSignedInIsRequiredAndOneOfThreeModes(t *testing.T) {
+	before := changeSettings(t, func(settings *record.Settings) { settings.KeepSignedIn = record.KeepSignedInAsk })
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/sessions"
+	const lifetimesAndCap = `"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":20`
+
+	for _, tc := range []struct {
+		name    string
+		body    string
+		code    string
+		message string
+	}{
+		{"absent", `{` + lifetimesAndCap + `}`,
+			"handler.settings_sessions.keep_signed_in_required", "Choose whether users stay signed in after the browser closes."},
+		{"empty", `{` + lifetimesAndCap + `,"keepSignedIn":""}`,
+			"handler.settings_sessions.keep_signed_in_required", "Choose whether users stay signed in after the browser closes."},
+		{"another value", `{` + lifetimesAndCap + `,"keepSignedIn":"sometimes"}`,
+			"handler.settings_sessions.keep_signed_in_invalid", "Keep users signed in after the browser closes must be always, ask or never."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPut, url, strings.NewReader(tc.body))
+			require.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer "+accessToken)
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := createHttpClient(t).Do(req)
+			require.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var refusal api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&refusal))
+			assert.Equal(t, tc.code, refusal.ErrorCode)
+			assert.Equal(t, tc.message, refusal.ErrorDescription)
+
+			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			require.NoError(t, err)
+			assert.Equal(t, before.UserSessionIdleTimeoutInSeconds, after.UserSessionIdleTimeoutInSeconds, "nothing is saved")
+			assert.Equal(t, record.KeepSignedIn("ask"), after.KeepSignedIn, "nothing is saved")
+		})
+	}
+
+	for _, mode := range []string{"always", "never", "ask"} {
+		t.Run(mode+" is saved", func(t *testing.T) {
+			resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
+				UserSessionIdleTimeoutInSeconds: 3600,
+				UserSessionMaxLifetimeInSeconds: 7200,
+				MaxUserSessionsPerUser:          sessionCapOf(20),
+				KeepSignedIn:                    mode,
+			})
+			defer func() { _ = resp.Body.Close() }()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			require.NoError(t, err)
+			assert.Equal(t, record.KeepSignedIn(mode), after.KeepSignedIn)
+
+			got := makeAPIRequest(t, "GET", url, accessToken, nil)
+			defer func() { _ = got.Body.Close() }()
+			var body api.SettingsSessionsResponse
+			require.NoError(t, json.NewDecoder(got.Body).Decode(&body))
+			assert.Equal(t, mode, body.KeepSignedIn, "the GET answers what was saved")
+		})
+	}
 }

@@ -7,6 +7,7 @@ import { signInThroughClient, submitPassword, testRedirectUri } from "../../../l
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { authorizeAgain, expectSessionDeleted, sessionIds } from "../../../lib/sessions";
+import { readSettingsForm } from "../../../lib/settings";
 import { browserSignInClient } from "../../../lib/test-clients";
 
 // On https the cookie carries the __Host- prefix: secure, host-only, path /.
@@ -33,9 +34,11 @@ test("a browser keeps its device cookie, and signing in again in it replaces its
   const device = await deviceCookieOf(signIn.context);
   expect(device, `no ${deviceCookie} cookie`).toBeDefined();
   expect(device).toMatchObject({ domain: new URL(env.authUrl).hostname, path: "/", httpOnly: true, secure: true, sameSite: "Lax" });
-  // Kept for 400 days, the longest a browser keeps a cookie.
-  expect(device!.expires * 1000).toBeGreaterThan(Date.now() + 399 * 86_400_000);
-  expect(device!.expires * 1000).toBeLessThan(Date.now() + 401 * 86_400_000);
+  // Kept as long as a session can live, the deployment's User session max lifetime, not 400 days.
+  const maxLifetime = Number((await readSettingsForm(page, "/admin/settings/sessions")).userSessionMaxLifetimeInSeconds);
+  expect(maxLifetime).toBeGreaterThan(0);
+  expect(device!.expires * 1000).toBeGreaterThan(Date.now() + (maxLifetime - 600) * 1000);
+  expect(device!.expires * 1000).toBeLessThan(Date.now() + (maxLifetime + 60) * 1000);
   const [first] = await sessionIds(page, user.id);
   expect(first).toBeDefined();
 

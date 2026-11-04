@@ -24,7 +24,7 @@ func newSessionIdentifierTestStore(t *testing.T) *sessionstore.ConditionalStore 
 	t.Helper()
 	backend := sessiontest.NewMemoryBackend()
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
-		sessionstore.PersistentCookie, sessionstore.KeyPair{
+		sessionstore.PersistentCookie(sessiontest.KeepEverySignedInSession), sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
 		}, nil)

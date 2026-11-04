@@ -222,13 +222,35 @@ func TestBrowserSession_RegenerateSessionAndBindCarriesTheHandlersWriterAndReque
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("RegenerateSessionAndBind", theWriter(rr), theRequest(req), testCeremonyId, int64(42), "the-new-user-session").
+	ticked := true
+	ceremonyStore.On("RegenerateSessionAndBind", theWriter(rr), theRequest(req), testCeremonyId, int64(42), "the-new-user-session",
+		&ticked).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(ceremony.ErrCeremonyReplaced).Once()
 
 	err := newSessionStartingBrowserSession(rr, req, ceremonyStore, NewDeviceCookie(false)).
-		RegenerateSessionAndBind(testCeremonyId, 42, "the-new-user-session")
+		RegenerateSessionAndBind(testCeremonyId, 42, "the-new-user-session", &ticked)
+
+	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
+	ceremonyStore.AssertExpectations(t)
+}
+
+// RecordKeepSignedIn hands the ceremony store the handler's own writer and request, the ceremony and
+// the answer, and answers what the store answered.
+func TestBrowserSession_RecordKeepSignedInCarriesTheHandlersWriterAndRequest(t *testing.T) {
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	rr := httptest.NewRecorder()
+	req := adapterRequest()
+
+	unticked := false
+	ceremonyStore.On("RecordKeepSignedIn", theWriter(rr), theRequest(req), testCeremonyId, &unticked).
+		Run(func(args mock.Arguments) {
+			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
+		}).Return(ceremony.ErrCeremonyReplaced).Once()
+
+	err := newSessionStartingBrowserSession(rr, req, ceremonyStore, NewDeviceCookie(false)).
+		RecordKeepSignedIn(testCeremonyId, &unticked)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 	ceremonyStore.AssertExpectations(t)
@@ -248,14 +270,15 @@ func TestBrowserSession_DeviceIsTheHandlersRequests(t *testing.T) {
 	assert.Equal(t, chromeUserAgent, device.UserAgent)
 }
 
-// The device cookie is written on the handler's own response.
+// The device cookie is written on the handler's own response, for the max lifetime it is given.
 func TestBrowserSession_WriteDeviceCookieLandsOnTheHandlersWriter(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	newSessionStartingBrowserSession(rr, adapterRequest(), handlersmocks.NewCeremonyStore(t), NewDeviceCookie(false)).
-		WriteDeviceCookie(thisDevice)
+		WriteDeviceCookie(thisDevice, 7200)
 
 	assert.Equal(t, thisDevice, deviceCookieOf(t, rr).Value)
+	assert.Equal(t, 7200, deviceCookieOf(t, rr).MaxAge)
 }
 
 // credentialFailureSpy records the requests the rate limiter's port is reached with. A spy here and

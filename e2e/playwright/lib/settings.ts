@@ -95,7 +95,12 @@ const baseline: Record<string, FormValues> = {
     ropcFlowEnabled: false,
   },
   "/admin/settings/ui-theme": { themeSelection: "" },
-  "/admin/settings/sessions": { userSessionIdleTimeoutInSeconds: "7200", userSessionMaxLifetimeInSeconds: "86400", maxUserSessionsPerUser: "20" },
+  "/admin/settings/sessions": {
+    userSessionIdleTimeoutInSeconds: "7200",
+    userSessionMaxLifetimeInSeconds: "86400",
+    maxUserSessionsPerUser: "20",
+    keepSignedIn: "ask",
+  },
   "/admin/settings/tokens": {
     tokenExpirationInSeconds: "300",
     refreshTokenOfflineIdleTimeoutInSeconds: "2592000",

@@ -46,6 +46,7 @@ var defaultsSections = []defaultsSection{
 		"Idle timeout, in seconds",
 		"Maximum lifetime, in seconds",
 		"Maximum sessions per user",
+		"Keep users signed in after the browser closes",
 	}},
 	{"site/src/content/docs/concepts/self-registration.mdx", "## Who can register", []string{
 		"User registration",
@@ -66,8 +67,17 @@ var passwordPolicyNames = map[record.PasswordPolicy]string{
 	record.PasswordPolicyNist:   "NIST SP 800-63B",
 }
 
+// keepSignedInNames is each Keep users signed in mode's radio button under Admin, Sessions, which
+// is how a page names a mode.
+var keepSignedInNames = map[record.KeepSignedIn]string{
+	"always": "Always",
+	"ask":    "Let each user choose",
+	"never":  "Never",
+}
+
 // seededDefaults is the value a seeded settings row holds for each admin console label: a number
-// of seconds as digits, a switch as On or Off, a password policy as its card's name.
+// of seconds as digits, a switch as On or Off, a password policy as its card's name, and a Keep
+// users signed in mode as its radio button's.
 func seededDefaults(settings *record.Settings) map[string]string {
 	onOff := map[bool]string{false: "Off", true: "On"}
 	return map[string]string{
@@ -79,6 +89,7 @@ func seededDefaults(settings *record.Settings) map[string]string {
 		"Idle timeout, in seconds":                          strconv.Itoa(settings.UserSessionIdleTimeoutInSeconds),
 		"Maximum lifetime, in seconds":                      strconv.Itoa(settings.UserSessionMaxLifetimeInSeconds),
 		"Maximum sessions per user":                         strconv.Itoa(settings.MaxUserSessionsPerUser),
+		"Keep users signed in after the browser closes":     keepSignedInNames[settings.KeepSignedIn],
 		"User registration":                                 onOff[settings.SelfRegistrationEnabled],
 		"Require email verification":                        onOff[settings.SelfRegistrationRequiresEmailVerification],
 		"Password policy":                                   passwordPolicyNames[settings.PasswordPolicy],

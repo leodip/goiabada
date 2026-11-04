@@ -214,6 +214,37 @@ func TestTurnstileChallenge_ARefusedSignInRedrawsTheFormAndSpendsNothing(t *test
 	})
 }
 
+// A refusal by the challenge draws the Keep me signed in box again as the user left it, as a refusal
+// by the password check does (#743).
+func TestTurnstileChallenge_ARefusalRedrawsTheKeepMeSignedInBoxAsLeft(t *testing.T) {
+	for _, tick := range []bool{true, false} {
+		t.Run(map[bool]string{true: "ticked", false: "unticked"}[tick], func(t *testing.T) {
+			server, _ := newTurnstileRoutesTestServer(t, turnstile.Refused)
+			cookie := pwdCeremonyCookie(t, server)
+			form := url.Values{"ceremonyId": {routesTestCeremonyId}, "email": {"victim@example.com"},
+				"password": {"the account's real password"}, turnstile.ResponseField: {turnstileTestToken}}
+			if tick {
+				form.Set("keepSignedIn", "true")
+			}
+			settings := turnstileSettings()
+			settings.KeepSignedIn = record.KeepSignedInAsk
+			r := browserForm(http.MethodPost, "/auth/pwd", form.Encode())
+			r = r.WithContext(reqctx.WithSettings(r.Context(), settings))
+			r.AddCookie(cookie)
+
+			rr := serveSecured(server, r)
+
+			assertSignInFormRedrawn(t, rr, challengeRefusal, "victim@example.com")
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(rr.Body.String()))
+			require.NoError(t, err)
+			box := doc.Find(`form input[name="keepSignedIn"]`)
+			require.Equal(t, 1, box.Length(), "the box is drawn again")
+			_, checked := box.Attr("checked")
+			assert.Equal(t, tick, checked)
+		})
+	}
+}
+
 // A pass, and each way the challenge fails open, go on to the limiter and the password check
 // exactly as with the challenge off: the wrong password is compared, refused with the password
 // check's own message, and spends the account's budget.

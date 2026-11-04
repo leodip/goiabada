@@ -45,6 +45,13 @@ const (
 	// the staleness observable to anyone (#266).
 	TouchThreshold = 10 * time.Second
 
+	// MaxCookieMaxAgeInSeconds is the longest Max-Age a persistent cookie of the auth server asks
+	// for: 400 days, the most RFC 6265bis lets a user agent keep a cookie, which reduces a longer
+	// one to its own limit. Past it the cookie's real lifetime would depend on the browser, so the
+	// sign-in cookie this store writes and the device cookie both stop here, and the session row's
+	// own expiry stays the one that decides (#743 decisions 1 and 6).
+	MaxCookieMaxAgeInSeconds = 400 * 24 * 60 * 60
+
 	// MaxSessionWireBytes bounds one whole session request or response body on the wire,
 	// the JSON envelope included. The session endpoint applies it to what it reads and
 	// the HTTP backend applies it to what it reads back, so it is the outermost of the
@@ -236,21 +243,39 @@ type ServerSideStore struct {
 // swapped at a call site, and each binary states its choice where it builds its store (#431).
 //
 // The trade is argued in full in #266: the cost of no expiry is paid by everyone every
-// working day, and the gain is paid out once, to whoever loses a laptop. So the end user's
-// cookie persists and the administrator's does not.
-type CookieLifetime int
+// working day, and the gain is paid out once, to whoever loses a laptop. So the administrator's
+// cookie never persists, and whether the end user's does is the deployment's setting and, where
+// it lets them, the user's own answer, decided per write by the store's KeepSignedIn (#743
+// decisions 2 and 5).
+type CookieLifetime struct {
+	persistent   bool
+	keepSignedIn KeepSignedIn
+}
 
-const (
-	// BrowserSessionCookie carries neither Max-Age nor Expires, so the browser drops it
-	// when it closes and the tokens it names are never a handle left on disk. The admin
-	// console's. The zero value, so a store nobody chose for is the one that keeps least.
-	BrowserSessionCookie CookieLifetime = iota
+// BrowserSessionCookie carries neither Max-Age nor Expires, so the browser drops it when it
+// closes and the tokens it names are never a handle left on disk. The admin console's. The zero
+// value, so a store nobody chose for is the one that keeps least.
+var BrowserSessionCookie = CookieLifetime{}
 
-	// PersistentCookie carries a Max-Age set per save from the row's own expires_at, so
-	// single sign-on survives a browser restart and the browser never holds a handle
-	// that outlives what it names. The auth server's.
-	PersistentCookie
-)
+// PersistentCookie is the auth server's lifetime. A sign-in in progress always carries a Max-Age
+// from its row's own expires_at, the flat PreAuthLifetime, so a browser restart mid-sign-in keeps
+// the steps already done. A signed-in session carries one, set per save and per refresh (see
+// Refreshing) from its row's expires_at, only while keepSignedIn answers true for it; otherwise
+// its cookie carries neither Max-Age nor Expires and ends with the browser. A persistent cookie
+// therefore never holds a handle that outlives what it names, nor drops one before it.
+//
+// keepSignedIn must not be nil: NewServerSideStore refuses the lifetime without it rather than
+// choose for the deployment.
+func PersistentCookie(keepSignedIn KeepSignedIn) CookieLifetime {
+	return CookieLifetime{persistent: true, keepSignedIn: keepSignedIn}
+}
+
+// KeepSignedIn answers, for a signed-in session whose cookie is about to be written, whether that
+// cookie outlives the browser. It is handed the request's context and the session's values, which
+// only the store can open, so a binary decides from its own settings and from what the session
+// recorded without the store knowing either. An error refuses the write of the cookie, as any
+// other failure to name a session does.
+type KeepSignedIn func(ctx context.Context, values map[string]any) (bool, error)
 
 // NewServerSideStore builds a store over the given backend.
 //
@@ -266,6 +291,10 @@ const (
 // Everything the store is configured with arrives here; nothing is set on it afterwards.
 func NewServerSideStore(backend Backend, authenticatedKey string, secure bool, lifetime CookieLifetime,
 	current KeyPair, previous *KeyPair) (*ServerSideStore, error) {
+
+	if lifetime.persistent && lifetime.keepSignedIn == nil {
+		return nil, errs.New("a persistent session cookie needs the rule deciding whether a signed-in session's cookie outlives the browser")
+	}
 
 	currentSealer, err := newSealer(current)
 	if err != nil {
@@ -467,7 +496,7 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 		return session, err
 	}
 
-	if err := s.touchIfStale(requestContext(r), session, record); err != nil {
+	if err := s.touchIfStale(r, session, record); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			// The row went away between the read and the touch, so the session is gone
 			// even though it was there a moment ago. A fresh session is the honest
@@ -489,8 +518,8 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 // request's memo: Get answers every later caller on a request from the session it loaded first
 // (#269), which is the copy the request began with and not the row another request may have
 // written since. It neither consults nor fills that memo, so the request's own session, the one
-// a later Save writes, is untouched, and it never writes, not even a touch: Get has touched the
-// session already on this request. Its outcomes are New's: no cookie, a cookie that does not
+// a later Save writes, is untouched, and it never writes, not even a touch: whether the request
+// touches its session is Get's to decide, once. Its outcomes are New's: no cookie, a cookie that does not
 // decode and a row gone are a fresh session; a lookup that failed is the error, beside a
 // non-nil session, and never a fresh session on its own (#266). The load runs on the request's
 // context, so a caller bounds it by handing in a request carrying its own deadline (#621).
@@ -563,18 +592,71 @@ func (s *ServerSideStore) freshSession(name string) *Session {
 // touchIfStale records that a live session was used, but only once the stored timestamp
 // has gone stale. Writing on every request would put a write in front of every page, and
 // on SQLite that is an fsync on the one connection the whole process shares.
-func (s *ServerSideStore) touchIfStale(ctx context.Context, session *Session, record *Record) error {
+//
+// A store whose cookie can outlive the browser touches only on a request Refreshing wraps, and then
+// sends the session's cookie again, with the Max-Age cookieMaxAge decides from the row's new expiry.
+// A sign-in in progress gets its renewed PreAuthLifetime, so a sign-in whose pages keep being loaded
+// does not lose its cookie while its row lives on. A signed-in session gets what its KeepSignedIn
+// answers now: the row's new expiry, so the row and the cookie move together, or neither Max-Age nor
+// Expires. The second is sent too because the browser may still hold a cookie written under an
+// earlier answer, from before an upgrade or a stricter setting, and only a cookie of the same name
+// and path replaces it. The cookie is sealed here, so a failure is this read's, and sent when the
+// response's headers go out, as Refreshing describes. On any other request it reads without
+// touching (#743 decisions 8 and 9). A store whose cookie always ends with the browser touches on
+// every read.
+func (s *ServerSideStore) touchIfStale(r *http.Request, session *Session, record *Record) error {
 	if s.now().Sub(record.LastAccessed) <= TouchThreshold {
 		return nil
 	}
 
-	if _, err := s.backend.Touch(ctx, session.ID, s.isAuthenticated(session)); err != nil {
+	refresh := refreshFor(r)
+	if s.lifetime.persistent && refresh == nil {
+		return nil
+	}
+
+	ctx := requestContext(r)
+	authenticated := s.isAuthenticated(session)
+	expiresAt, err := s.backend.Touch(ctx, session.ID, authenticated)
+	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return err
 		}
 		return errs.Wrap(err, "unable to touch the browser session")
 	}
+
+	if !s.lifetime.persistent {
+		return nil
+	}
+	maxAge, err := s.cookieMaxAge(ctx, session, expiresAt)
+	if err != nil {
+		return err
+	}
+	cookie, err := s.sessionCookie(session, session.ID, maxAge)
+	if err != nil {
+		return err
+	}
+	id, data := session.ID, record.Data
+	refresh.hold(cookie, func() bool { return s.stillAsRead(ctx, id, data) })
 	return nil
+}
+
+// stillAsRead reports whether the row id names is still there holding data, the contents the
+// refresh read, which a refreshed cookie is sent only while: another request of the browser may
+// have rotated the session away, ended it, or written it anew since this one read it, and answered
+// with a cookie of its own. Every write seals with a fresh nonce, so any write in between changes
+// the contents, while a touch leaves them as they are. A read that fails sends no cookie either,
+// since the browser then keeps the one it has; the failure is logged, unless the request was
+// abandoned, which ends its reads too.
+func (s *ServerSideStore) stillAsRead(ctx context.Context, id string, data []byte) bool {
+	record, err := s.backend.Load(ctx, id)
+	if err == nil {
+		return bytes.Equal(record.Data, data)
+	}
+	if !errors.Is(err, ErrNotFound) && ctx.Err() == nil {
+		slog.WarnContext(ctx, "unable to read the browser session before sending its refreshed cookie, sending none",
+			"error", err)
+	}
+	return false
 }
 
 // Save writes the session to the backend and names it with a cookie.
@@ -613,7 +695,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 		}
 
 		session.ID = id
-		return s.setCookie(w, session, id, expiresAt)
+		return s.setCookie(ctx, w, session, id, expiresAt)
 	}
 
 	expiresAt, err := s.backend.Update(ctx, session.ID, []byte(encoded), authenticated)
@@ -621,7 +703,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 		return errs.Wrap(err, "unable to update the browser session")
 	}
 
-	return s.setCookie(w, session, session.ID, expiresAt)
+	return s.setCookie(ctx, w, session, session.ID, expiresAt)
 }
 
 // deleteSession removes the row and expires the cookie. Emptying the values and saving
@@ -641,35 +723,71 @@ func (s *ServerSideStore) deleteSession(ctx context.Context, w http.ResponseWrit
 	return nil
 }
 
-// setCookie writes the identifier into the browser.
+// setCookie writes the identifier into the browser, with the Max-Age cookieMaxAge decides.
+func (s *ServerSideStore) setCookie(ctx context.Context, w http.ResponseWriter, session *Session, id string, expiresAt time.Time) error {
+	maxAge, err := s.cookieMaxAge(ctx, session, expiresAt)
+	if err != nil {
+		return err
+	}
+	return s.writeCookie(w, session, id, maxAge)
+}
+
+// cookieMaxAge decides whether the cookie naming session outlives the browser, and for how long.
 //
-// The cookie's own expiry follows the row's, for the module that keeps one: the browser
-// then never holds a handle that outlives what it names, and the operator's session
-// timeout governs both halves through one setting. The module that does not keep one
-// leaves MaxAge at zero, which net/http renders as neither Max-Age nor Expires, so the
-// browser drops the cookie when it closes and the tokens inside never reach disk.
-func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *Session, id string, expiresAt time.Time) error {
+// The cookie's own expiry follows the row's, when it has one: the browser then never holds a
+// handle that outlives what it names, and the operator's session timeout governs both halves
+// through one setting. A row that lives longer than MaxCookieMaxAgeInSeconds gets a cookie asking
+// for that, which a browser keeps whole. A sign-in in progress always has one under a persistent
+// lifetime, its flat PreAuthLifetime, and a signed-in session only while the lifetime's
+// KeepSignedIn answers true for the values it holds (#743 decisions 2 and 5). Otherwise the answer
+// is zero, which net/http renders as neither Max-Age nor Expires, so the browser drops the cookie
+// when it closes and the tokens inside never reach disk.
+func (s *ServerSideStore) cookieMaxAge(ctx context.Context, session *Session, expiresAt time.Time) (int, error) {
+	if !s.lifetime.persistent {
+		return 0, nil
+	}
+
+	if s.isAuthenticated(session) {
+		keep, err := s.lifetime.keepSignedIn(ctx, session.Values)
+		if err != nil {
+			// Reported rather than guessed, for the reason writeCookie reports a failed seal: the row
+			// is written, and a save that returns nil having issued no cookie looks like success.
+			return 0, errs.Wrap(err, "unable to decide whether the browser session cookie outlives the browser")
+		}
+		if !keep {
+			return 0, nil
+		}
+	}
+
+	remaining := int(expiresAt.Sub(s.now()).Seconds())
+	return max(1, min(remaining, MaxCookieMaxAgeInSeconds)), nil
+}
+
+// writeCookie seals the identifier and writes it into the browser with maxAge, zero for a cookie
+// that ends with the browser.
+func (s *ServerSideStore) writeCookie(w http.ResponseWriter, session *Session, id string, maxAge int) error {
+	cookie, err := s.sessionCookie(session, id, maxAge)
+	if err != nil {
+		return err
+	}
+	http.SetCookie(w, cookie)
+	return nil
+}
+
+// sessionCookie is the cookie naming id, sealed, with session's options and maxAge.
+func (s *ServerSideStore) sessionCookie(session *Session, id string, maxAge int) (*http.Cookie, error) {
 	encodedId, err := seal(s.random, s.current.cookie, session.Name(), []byte(id))
 	if err != nil {
 		// The row is already written at this point, so the session exists and the
 		// browser is about to be told nothing about it. That is reported rather than
 		// logged: a save that returns nil having issued no cookie looks like success
 		// and behaves like a silent sign-out on the very next request.
-		return errs.Wrap(err, "unable to encode the browser session identifier")
+		return nil, errs.Wrap(err, "unable to encode the browser session identifier")
 	}
 
 	opts := *session.Options
-	opts.MaxAge = 0
-	if s.lifetime == PersistentCookie {
-		remaining := int(expiresAt.Sub(s.now()).Seconds())
-		if remaining < 1 {
-			remaining = 1
-		}
-		opts.MaxAge = remaining
-	}
-
-	http.SetCookie(w, s.buildCookie(session.Name(), encodedId, &opts))
-	return nil
+	opts.MaxAge = maxAge
+	return s.buildCookie(session.Name(), encodedId, &opts), nil
 }
 
 // DeletionCookie is the cookie that removes name from the browser.

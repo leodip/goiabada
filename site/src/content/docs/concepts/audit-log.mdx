@@ -145,6 +145,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `issue_access_token` | Whether the implicit flow issued an access token. |
 | `issue_id_token` | Whether the implicit flow issued an ID token. |
 | `jti` | The `jti` of an access token a client revoked. |
+| `keep_signed_in` | Under `old` and `new`: whether users stay signed in after the browser closes, `always`, `ask` (each user chooses) or `never`. |
 | `key_id` | The key id (`kid`) of a deleted signing key. |
 | `kind` | A legal document's kind: `must_accept` for terms users must accept, `for_information` for a privacy notice. |
 | `legal_document_id` | The legal document's row id. |
@@ -411,7 +412,7 @@ These come from the Account API, which users reach through the admin console's a
 |---|---|
 | `updated_general_settings` | An administrator saved the **General** settings. |
 | `updated_ui_theme_settings` | An administrator changed the **Theme** settings. The entry names the old and the new theme. |
-| `updated_sessions_settings` | An administrator changed the session settings: the idle timeout, the maximum lifetime, or the most sessions one user can hold. The entry holds the old and the new values. |
+| `updated_sessions_settings` | An administrator changed the session settings: the idle timeout, the maximum lifetime, the most sessions one user can hold, or whether users stay signed in after the browser closes. The entry holds the old and the new values. |
 | `updated_tokens_settings` | An administrator changed the default token settings. The entry holds the old and the new values. |
 | `updated_smtp_settings` | An administrator changed the **Email** settings, including turning email on or off. |
 | `sent_test_email` | An administrator sent a test email, and the mail server accepted it. |

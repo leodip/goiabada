@@ -52,6 +52,40 @@
         <p class="field-hint" id="maxSessionsHint">{{ T $.ctx "adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" }}</p>
       </div>
     </div>
+
+    {{/* Keep users signed in after the browser closes: the mode's wire value is the radio button's
+         value. A refusal of the mode, such as none chosen, marks the three and focuses the first. */}}
+    {{ $keep := .settings.KeepSignedIn }}
+    <fieldset aria-describedby="{{ if .error }}{{ if eq .errorField "keepSignedIn" }}sessions-error {{ end }}{{ end }}keepSignedInHint">
+      <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_settings.sessions.field.keep_signed_in" }}</legend>
+      <p class="field-hint mb-3" id="keepSignedInHint">{{ T $.ctx "adminconsole.admin_settings.sessions.keep_signed_in_tooltip" }}</p>
+      <div class="grid gap-3">
+        <label class="option-card">
+          <input type="radio" id="keepSignedInAlways" name="keepSignedIn" value="always"{{ if eq $keep "always" }} checked{{ end }} aria-labelledby="keep-signed-in-name-always" aria-describedby="keep-signed-in-hint-always"
+            {{- if .error }}{{ if eq .errorField "keepSignedIn" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label" id="keep-signed-in-name-always">{{ T $.ctx "adminconsole.admin_settings.sessions.keep_signed_in_always" }}</span>
+            <span class="field-hint" id="keep-signed-in-hint-always">{{ T $.ctx "adminconsole.admin_settings.sessions.keep_signed_in_always_hint" }}</span>
+          </span>
+        </label>
+        <label class="option-card">
+          <input type="radio" id="keepSignedInAsk" name="keepSignedIn" value="ask"{{ if eq $keep "ask" }} checked{{ end }} aria-labelledby="keep-signed-in-name-ask" aria-describedby="keep-signed-in-hint-ask"
+            {{- if .error }}{{ if eq .errorField "keepSignedIn" }} aria-invalid="true"{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label" id="keep-signed-in-name-ask">{{ T $.ctx "adminconsole.admin_settings.sessions.keep_signed_in_ask" }}</span>
+            <span class="field-hint" id="keep-signed-in-hint-ask">{{ T $.ctx "adminconsole.admin_settings.sessions.keep_signed_in_ask_hint" }}</span>
+          </span>
+        </label>
+        <label class="option-card">
+          <input type="radio" id="keepSignedInNever" name="keepSignedIn" value="never"{{ if eq $keep "never" }} checked{{ end }} aria-labelledby="keep-signed-in-name-never" aria-describedby="keep-signed-in-hint-never"
+            {{- if .error }}{{ if eq .errorField "keepSignedIn" }} aria-invalid="true"{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label" id="keep-signed-in-name-never">{{ T $.ctx "adminconsole.admin_settings.sessions.keep_signed_in_never" }}</span>
+            <span class="field-hint" id="keep-signed-in-hint-never">{{ T $.ctx "adminconsole.admin_settings.sessions.keep_signed_in_never_hint" }}</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
   </div>
   <div class="panel-footer">
     <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>

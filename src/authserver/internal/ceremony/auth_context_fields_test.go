@@ -55,6 +55,7 @@ var attemptFields = []string{
 	"OtpClaimGeneration",
 	"AdoptedSessionAuthTime",
 	"RecoveryCodes",
+	"KeepSignedIn",
 }
 
 // restartedTo names the two attempt fields a restart does not leave at their zero value: the
@@ -111,6 +112,9 @@ func fillEveryField(t *testing.T, ac *AuthContext) {
 		case field.Type() == reflect.TypeOf(new(int64)):
 			number := int64(100 + i)
 			field.Set(reflect.ValueOf(&number))
+		case field.Type() == reflect.TypeOf(new(bool)):
+			answer := true
+			field.Set(reflect.ValueOf(&answer))
 		case field.Type() == reflect.TypeOf([]string{}):
 			field.Set(reflect.ValueOf([]string{name + "-a", name + "-b"}))
 		default:

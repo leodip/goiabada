@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // The device cookie names a browser rather than a session, so that a sign-in can tell the user's
@@ -19,9 +20,6 @@ const (
 	// subdomain cannot plant a value (RFC 6265bis section 4.1.3.2), as on the session cookie (#266).
 	deviceCookieName = "authserver_device"
 	hostCookiePrefix = "__Host-"
-
-	// deviceCookieMaxAge is 400 days, the longest RFC 6265bis lets a browser keep a cookie.
-	deviceCookieMaxAge = 400 * 24 * 60 * 60
 
 	// deviceIdBytes is how many bytes of the CSPRNG an identifier holds, hex encoded in the cookie.
 	deviceIdBytes = 32
@@ -73,14 +71,18 @@ func isDeviceIdentifier(value string) bool {
 	return err == nil && len(decoded) == deviceIdBytes && hex.EncodeToString(decoded) == value
 }
 
-// write gives the browser identifier for another 400 days, with the session cookie's attributes.
-func (d *DeviceCookie) write(w http.ResponseWriter, identifier string) {
+// write gives the browser identifier with the session cookie's attributes, for as long as a session
+// can live: maxLifetimeInSeconds, the User session max lifetime the new session started under. The
+// cookie only matters while an earlier session from this browser can still be alive, and the one it
+// was written for lives at most that long from its start, just before (#743 decision 1). It asks for
+// no more than sessionstore.MaxCookieMaxAgeInSeconds, 400 days, as the session cookie does.
+func (d *DeviceCookie) write(w http.ResponseWriter, identifier string, maxLifetimeInSeconds int) {
 	//nolint:gosec // G124: HttpOnly and SameSite are set; Secure follows the base URL's scheme, as on the session cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     d.name(),
 		Value:    identifier,
 		Path:     "/",
-		MaxAge:   deviceCookieMaxAge,
+		MaxAge:   min(maxLifetimeInSeconds, sessionstore.MaxCookieMaxAgeInSeconds),
 		HttpOnly: true,
 		Secure:   d.secure,
 		SameSite: http.SameSiteLaxMode,

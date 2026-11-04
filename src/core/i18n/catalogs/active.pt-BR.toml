@@ -68,6 +68,8 @@
 "auth.pwd.forgot_password" = "Esqueceu sua senha?"
 "auth.pwd.no_account_prompt" = "Não tem uma conta?"
 "auth.pwd.register_link" = "Criar uma conta"
+"auth.pwd.keep_signed_in" = "Manter-me conectado"
+"auth.pwd.keep_signed_in_note" = "Usa um cookie para manter você conectado depois de fechar o navegador."
 
 # --- Verificação OTP (auth/otp) ----------------------------------------------
 
@@ -1590,6 +1592,14 @@
 "adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "A sessão termina esse tempo depois de iniciada, mesmo em uso."
 "adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "Máximo de sessões por usuário"
 "adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" = "O número máximo de sessões que um usuário pode ter, de 0 a 1000. Quando um login ultrapassar esse limite, as sessões expiradas do usuário são encerradas primeiro, e depois as usadas há mais tempo. 0 significa sem limite."
+"adminconsole.admin_settings.sessions.field.keep_signed_in" = "Manter usuários conectados depois de fechar o navegador"
+"adminconsole.admin_settings.sessions.keep_signed_in_tooltip" = "Se uma entrada continua valendo depois que o navegador é fechado. As sessões ainda terminam no tempo limite de inatividade e na duração máxima."
+"adminconsole.admin_settings.sessions.keep_signed_in_always" = "Sempre"
+"adminconsole.admin_settings.sessions.keep_signed_in_always_hint" = "Todo usuário continua conectado depois de fechar o navegador, até a sessão terminar."
+"adminconsole.admin_settings.sessions.keep_signed_in_ask" = "Deixar cada usuário escolher"
+"adminconsole.admin_settings.sessions.keep_signed_in_ask_hint" = "A página de senha pergunta a cada usuário, com uma caixa desmarcada, se quer continuar conectado depois de fechar o navegador."
+"adminconsole.admin_settings.sessions.keep_signed_in_never" = "Nunca"
+"adminconsole.admin_settings.sessions.keep_signed_in_never_hint" = "Todo usuário entra de novo depois de fechar o navegador."
 
 "adminconsole.admin_settings.email.page_title" = "Configurações de e-mail"
 "adminconsole.admin_settings.email.subtitle" = "E-mail"
@@ -1909,6 +1919,8 @@
 "handler.settings_sessions.idle_timeout_above_max_lifetime" = "O tempo limite de inatividade não pode ser maior que a duração máxima."
 "handler.settings_sessions.max_sessions_per_user_required" = "Informe o máximo de sessões por usuário."
 "handler.settings_sessions.max_sessions_per_user_out_of_range" = "O máximo de sessões por usuário precisa estar entre 0 e {{.max}}."
+"handler.settings_sessions.keep_signed_in_required" = "Escolha se os usuários continuam conectados depois de fechar o navegador."
+"handler.settings_sessions.keep_signed_in_invalid" = "Manter usuários conectados depois de fechar o navegador precisa ser always, ask ou never."
 
 "handler.settings_tokens.token_expiration_not_positive" = "A duração do token precisa ser maior que zero."
 "handler.settings_tokens.token_expiration_too_large" = "A duração do token não pode passar de {{.max}} segundos."

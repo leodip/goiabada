@@ -161,7 +161,7 @@ func TestPasswordSubmission_Refusals(t *testing.T) {
 				ClientId:   "test-client",
 			}
 
-			result, err := operation.Run(context.Background(), browser, authContext, tt.email, tt.password)
+			result, err := operation.Run(context.Background(), browser, authContext, tt.email, tt.password, nil)
 
 			require.NoError(t, err)
 			assert.Equal(t, PasswordSubmissionResult{Answer: PasswordRefused}, result)
@@ -199,7 +199,7 @@ func TestPasswordSubmission_AcceptedWithTheConstructorsVerifier(t *testing.T) {
 	}
 
 	result, err := NewPasswordSubmission(database, auditLogger).
-		Run(context.Background(), browser, authContext, "alice@example.com", "the-right-password")
+		Run(context.Background(), browser, authContext, "alice@example.com", "the-right-password", nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, PasswordSubmissionResult{
@@ -213,4 +213,30 @@ func TestPasswordSubmission_AcceptedWithTheConstructorsVerifier(t *testing.T) {
 	assert.Equal(t, map[string]interface{}{"user_id": int64(31)}, auditLogger.entries[0].details)
 	assert.Equal(t, 1, browser.rotations)
 	assert.Equal(t, []*ceremony.AuthContext{authContext}, browser.saves)
+}
+
+// The answer the password page's Keep me signed in box was given reaches the ceremony the accepted
+// submission saves; a refused one saves nothing (#743 decision 2).
+func TestPasswordSubmission_SavesTheKeepMeSignedInAnswerWithThePassword(t *testing.T) {
+	passwordHash, err := passwordhash.Hash("the-right-password")
+	require.NoError(t, err)
+	ticked, unticked := true, false
+
+	for name, answer := range map[string]*bool{"ticked": &ticked, "unticked": &unticked, "no box": nil} {
+		t.Run(name, func(t *testing.T) {
+			database := &fakePasswordSubmissionDatabase{
+				user: &record.User{Id: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true},
+			}
+			browser := &fakePasswordSubmissionBrowser{}
+			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "ceremony-id"}
+
+			result, err := NewPasswordSubmission(database, &fakeAuditLogger{}).
+				Run(context.Background(), browser, authContext, "alice@example.com", "the-right-password", answer)
+
+			require.NoError(t, err)
+			require.Equal(t, PasswordAccepted, result.Answer)
+			require.Len(t, browser.saves, 1)
+			assert.Equal(t, answer, browser.saves[0].KeepSignedIn)
+		})
+	}
 }

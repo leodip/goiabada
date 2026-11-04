@@ -44,7 +44,7 @@ test("a user signs in on the auth server's form by keyboard alone", async ({ bro
   const { context, page } = await openConsoleSignIn(browser);
 
   // The address field has the focus as the page opens; Tab goes on to the password, its Show
-  // button, the link for a forgotten one, then the button.
+  // button, the link for a forgotten one, the Keep me signed in box, then the button.
   await expectFocused(page.locator("#email"));
   await page.keyboard.type(user.email);
   await page.keyboard.press("Tab");
@@ -75,6 +75,16 @@ test("a user signs in on the auth server's form by keyboard alone", async ({ bro
 
   await page.keyboard.press("Tab");
   await expectFocused(page.getByRole("link", { name: "Forgot your password?" }));
+  // Under the default, Let each user choose, the Keep me signed in box comes next: Space ticks it and
+  // unticks it again, and it is left unticked (#743).
+  await page.keyboard.press("Tab");
+  const keepSignedIn = page.getByRole("checkbox", { name: "Keep me signed in", exact: true });
+  await expectFocused(keepSignedIn);
+  await expect(keepSignedIn).not.toBeChecked();
+  await page.keyboard.press("Space");
+  await expect(keepSignedIn).toBeChecked();
+  await page.keyboard.press("Space");
+  await expect(keepSignedIn).not.toBeChecked();
   await page.keyboard.press("Tab");
   await expectFocused(page.getByRole("button", { name: "Sign in", exact: true }));
   await page.keyboard.press("Enter");

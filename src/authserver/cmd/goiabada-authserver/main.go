@@ -310,6 +310,7 @@ func run() int {
 	// path here can name an admin console session however it is composed.
 	sessionStore, err := newSessionStore(
 		sessionbackend.NewAuthServerBackend(database),
+		sessionbackend.NewKeepSignedIn(database),
 		cfg.AuthServer.IsCookieSecure(),
 		currentKeys,
 		previousKeys,
@@ -475,21 +476,22 @@ func dispatch(args []string) (rest []string, command string, err error) {
 
 // newSessionStore builds the auth server's browser session store over backend.
 //
-// The end user's cookie keeps an expiry, so single sign-on survives a browser restart. It is
-// set per save from the row's own expires_at, which the operator's session settings decide,
-// so one knob governs both halves and the browser never holds a handle that outlives what it
-// names. The admin console does the opposite for the opposite reason, and the trade is argued
-// in full in #266. A function of its own so the choice is pinned where it is made: the store's
-// tests pin what each lifetime writes, and this package's pin which one this binary passes
-// (#431).
+// A sign-in in progress keeps a cookie with an expiry, its row's flat 30 minutes, so a browser
+// restart mid-sign-in keeps the steps already done. A signed-in session's cookie keeps one, set per
+// save and per refresh from the row's own expires_at, only while keepSignedIn answers true for it:
+// the Keep users signed in after the browser closes setting, and under Let each user choose the
+// session's recorded answer. Otherwise it ends with the browser (#743 decisions 2 and 5). The
+// admin console's cookie always ends with the browser, and the trade is argued in full in #266. A
+// function of its own so the choice is pinned where it is made: the store's tests pin what each
+// lifetime writes, and this package's pin which one this binary passes (#431).
 //
 // It is built with a ConditionalBackend, so the store can write a session on condition nothing
 // wrote it since its request read it, which is what keeps a ceremony step from putting back a
 // sign-in another tab has replaced (#579).
-func newSessionStore(backend sessionstore.ConditionalBackend, secure bool,
+func newSessionStore(backend sessionstore.ConditionalBackend, keepSignedIn sessionstore.KeepSignedIn, secure bool,
 	current sessionstore.KeyPair, previous *sessionstore.KeyPair) (*sessionstore.ConditionalStore, error) {
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, secure,
-		sessionstore.PersistentCookie, current, previous)
+		sessionstore.PersistentCookie(keepSignedIn), current, previous)
 	if err != nil {
 		return nil, err
 	}

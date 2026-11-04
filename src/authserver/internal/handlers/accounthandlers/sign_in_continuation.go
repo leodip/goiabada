@@ -65,7 +65,7 @@ func carryOnSignIn(w http.ResponseWriter, r *http.Request, ceremonies signInCere
 		return false
 	}
 
-	result := proof.Record(r.Context(), &signInBrowser{w: w, r: r, ceremonies: ceremonies}, authContext, user)
+	result := proof.Record(r.Context(), &signInBrowser{w: w, r: r, ceremonies: ceremonies}, authContext, user, nil)
 	if errors.Is(result.SaveErr, ceremony.ErrCeremonyReplaced) {
 		slog.WarnContext(r.Context(), "the browser session no longer holds the sign-in a registration came from")
 		return false

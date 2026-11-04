@@ -57,5 +57,5 @@ func (s *ServerSideStore) Regenerate(w http.ResponseWriter, r *http.Request, ses
 
 	session.ID = newId
 	session.IsNew = false
-	return s.setCookie(w, session, newId, expiresAt)
+	return s.setCookie(ctx, w, session, newId, expiresAt)
 }

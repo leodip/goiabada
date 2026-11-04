@@ -258,6 +258,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 					"userSessionIdleTimeoutInSeconds": {"900"},
 					"userSessionMaxLifetimeInSeconds": {"86400"},
 					"maxUserSessionsPerUser":          {"20"},
+					"keepSignedIn":                    {"ask"},
 				})),
 		},
 		{

@@ -79,9 +79,17 @@ func (b *browserSession) ConfirmCeremony(ceremonyId string) error {
 }
 
 // RegenerateSessionAndBind is CeremonyStore.RegenerateSessionAndBind, the create arm's conditional
-// rotation, which binds the user session it started to the browser session.
-func (b *browserSession) RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string) error {
-	return b.ceremonyStore.RegenerateSessionAndBind(b.w, b.r, ceremonyId, userId, userSessionIdentifier)
+// rotation, which binds the user session it started to the browser session and records the answer
+// the ceremony entered its password with.
+func (b *browserSession) RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string,
+	keepSignedIn *bool) error {
+	return b.ceremonyStore.RegenerateSessionAndBind(b.w, b.r, ceremonyId, userId, userSessionIdentifier, keepSignedIn)
+}
+
+// RecordKeepSignedIn is CeremonyStore.RecordKeepSignedIn, the reuse arm's conditional write of the
+// answer its ceremony entered the password with.
+func (b *browserSession) RecordKeepSignedIn(ceremonyId string, keepSignedIn *bool) error {
+	return b.ceremonyStore.RecordKeepSignedIn(b.w, b.r, ceremonyId, keepSignedIn)
 }
 
 // Device is the browser this request comes from, as its device cookie and headers say.
@@ -89,9 +97,10 @@ func (b *browserSession) Device() usersession.Device {
 	return b.deviceCookie.read(b.r)
 }
 
-// WriteDeviceCookie gives the browser its device identifier, on this request's response.
-func (b *browserSession) WriteDeviceCookie(identifier string) {
-	b.deviceCookie.write(b.w, identifier)
+// WriteDeviceCookie gives the browser its device identifier, on this request's response, for
+// maxLifetimeInSeconds up to 400 days.
+func (b *browserSession) WriteDeviceCookie(identifier string, maxLifetimeInSeconds int) {
+	b.deviceCookie.write(b.w, identifier, maxLifetimeInSeconds)
 }
 
 // RecordCredentialFailure is CredentialFailureRecorder.RecordCredentialFailure on this request, whose

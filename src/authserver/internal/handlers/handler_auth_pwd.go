@@ -31,7 +31,7 @@ func HandleAuthPwdGet(
 			return
 		}
 
-		renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo, nil, "", "")
+		renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo, nil, "", "", false)
 	}
 }
 
@@ -68,6 +68,16 @@ func HandleAuthPwdPost(
 		// Referer and every proxy's access log (#202).
 		password := r.PostFormValue("password")
 
+		// The Keep me signed in box, which the page shows under Let each user choose alone, read from
+		// the body like the credentials, so a link cannot tick it. A box left unticked posts nothing,
+		// which is an answer too; under Always and Never the page asks nothing, and the password is
+		// entered with no answer, whatever the request carries (#743 decisions 2 and 4).
+		ticked := r.PostFormValue(keepSignedInField) == keepSignedInTicked
+		var keepSignedIn *bool
+		if settings.KeepSignedIn == record.KeepSignedInAsk {
+			keepSignedIn = &ticked
+		}
+
 		// renderRefusal reads r when it is called, so a refusal after the password was verified is
 		// worded in the page language the user switched r to. It loads the client block then and only then:
 		// an accepted submission redirects, and has no form to show it in. A failed read, or a client
@@ -80,7 +90,7 @@ func HandleAuthPwdPost(
 				return
 			}
 			renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo,
-				i18n.NewLocalizedError(code, nil), field, email)
+				i18n.NewLocalizedError(code, nil), field, email, ticked)
 		}
 
 		// Refused before any lookup, and never charged to the rate limiter: a form that verifies
@@ -97,7 +107,7 @@ func HandleAuthPwdPost(
 
 		result, err := submission.Run(r.Context(),
 			newCredentialCheckingBrowserSession(w, r, ceremonyStore, credentialFailures),
-			authContext, email, password)
+			authContext, email, password, keepSignedIn)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
@@ -122,13 +132,26 @@ func HandleAuthPwdPost(
 	}
 }
 
+// keepSignedInField is the password form's Keep me signed in box, and keepSignedInTicked the value
+// it posts when ticked.
+const (
+	keepSignedInField  = "keepSignedIn"
+	keepSignedInTicked = "true"
+)
+
 // renderPasswordForm renders the password form for the ceremony, with a refusal, the field it is
 // about, and the address the user typed when it is shown again. The form names its ceremony, so the
 // boundary reads the submission as that ceremony's, and refuses it once the browser no longer holds
 // it (#79, #246).
+//
+// Under Let each user choose it asks Keep me signed in, with the box unticked on the form's first
+// render, since a pre-ticked box is not consent, and as the user left it (ticked) beside a refusal
+// (#743 decisions 2 and 4).
 func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
 	settings *record.Settings, authContext *ceremony.AuthContext, displayInfo *authflow.ClientDisplayInfo,
-	refusal *i18n.LocalizedError, errorField, email string) {
+	refusal *i18n.LocalizedError, errorField, email string, ticked bool) {
+
+	keepSignedInAsked := settings.KeepSignedIn == record.KeepSignedInAsk
 
 	bind := map[string]interface{}{
 		"error":       nil,
@@ -143,6 +166,8 @@ func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer Pag
 		"layoutClientLogoUrl":     displayInfo.LogoURL,
 		"layoutClientDescription": displayInfo.Description,
 		"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
+		"keepSignedInAsked":       keepSignedInAsked,
+		"keepSignedIn":            keepSignedInAsked && ticked,
 	}
 	if refusal != nil {
 		bind["error"] = refusal.Localize(r.Context())

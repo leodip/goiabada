@@ -130,6 +130,10 @@ type registryEntry struct {
 // before it raced here.
 type registry struct {
 	sessions map[string]registryEntry
+
+	// refresh is the response a touch of this request holds the session cookie on, set by
+	// Refreshing, or nil on a request that does not count as activity on its session.
+	refresh *refreshWriter
 }
 
 // registryFor returns the request's session cache, installing one if the request does

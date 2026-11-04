@@ -27,6 +27,10 @@ type Settings struct {
 	// MaxUserSessionsPerUser is how many sessions one user may hold, from 0 to 1000, 0 meaning no
 	// limit (#564). Migration 000063 gives an existing installation 20, the seed's value.
 	MaxUserSessionsPerUser int `db:"max_user_sessions_per_user"`
+	// KeepSignedIn is whether the signed-in cookie outlives the browser: always, ask (each user
+	// chooses on the password page) or never (#743). Migration 000081 gives an existing installation
+	// ask, the seed's value.
+	KeepSignedIn KeepSignedIn `db:"keep_signed_in"`
 	// AESEncryptionKeyLegacy is the data key as historically stored in the DB.
 	// The key now comes from the environment ((*config.Config).DataKeys, issue
 	// #83). Do NOT use it for encrypt/decrypt at runtime.

@@ -32,3 +32,17 @@ const RetiredAuthContext string = "AuthContext"
 // and sharing the key is what lets a marker belonging to the other flow be told
 // apart from no marker at all.
 const LinkMarker string = "LinkMarker"
+
+// KeepSignedIn holds the answer the user gave the password page's Keep me signed in box, under the
+// Let each user choose setting, at the browser session's last password entry: true ticked, false
+// unticked. It is absent when that entry showed no box, under Always or Never, and on a session
+// signed in before the setting existed; the store reads an absent answer as unticked, since no one
+// gave consent to a cookie that outlives the browser (#743 decisions 2 and 5).
+const KeepSignedIn string = "KeepSignedIn"
+
+// KeepSignedInPasswordAt holds the instant, RFC 3339 in UTC with nanoseconds, of the password entry
+// the answer under KeepSignedIn was given at, present whenever that entry's ceremony recorded one,
+// with or without an answer. An older completion that reaches the browser session after a newer one
+// leaves the newer answer as it is, ordered by this instant (#743 decision 2). Only ceremony.Store
+// reads or writes it.
+const KeepSignedInPasswordAt string = "KeepSignedInPasswordAt"

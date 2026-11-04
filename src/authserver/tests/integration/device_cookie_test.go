@@ -49,11 +49,13 @@ type observedDeviceCookie struct {
 }
 
 // deviceBrowser is a browser of its own, a cookie jar, sending sameBrowserUserAgent and a request
-// id the test names on every request, and noting every device cookie the server sets.
+// id the test names on every request, and noting every device cookie the server sets, and every
+// session cookie.
 type deviceBrowser struct {
 	*http.Client
 	requestId string
 	observed  []observedDeviceCookie
+	sessions  []observedDeviceCookie
 }
 
 type deviceBrowserTransport struct {
@@ -69,8 +71,11 @@ func (d *deviceBrowserTransport) RoundTrip(req *http.Request) (*http.Response, e
 		return nil, err
 	}
 	for _, cookie := range resp.Cookies() {
-		if cookie.Name == deviceCookieName() {
+		switch cookie.Name {
+		case deviceCookieName():
 			d.browser.observed = append(d.browser.observed, observedDeviceCookie{path: req.URL.Path, cookie: cookie})
+		case browserSessionCookieName():
+			d.browser.sessions = append(d.browser.sessions, observedDeviceCookie{path: req.URL.Path, cookie: cookie})
 		}
 	}
 	return resp, nil
@@ -221,7 +226,7 @@ func sha256OfDevice(value string) string {
 }
 
 // A sign-in that starts a session sets the device cookie on /auth/completed, with the session
-// cookie's attributes and 400 days to live, and records its digest, which no API returns. A later
+// cookie's attributes and the seeded User session max lifetime, 24 hours, to live, and records its digest, which no API returns. A later
 // sign-in that reuses the session writes no cookie.
 func TestDeviceCookie_ASignInThatStartsASessionSetsIt(t *testing.T) {
 	f := newDeviceFixture(t)
@@ -238,7 +243,7 @@ func TestDeviceCookie_ASignInThatStartsASessionSetsIt(t *testing.T) {
 	assert.True(t, cookie.HttpOnly)
 	assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
 	assert.Equal(t, appConfig.AuthServer.IsCookieSecure(), cookie.Secure, "Secure exactly on https")
-	assert.Equal(t, 34560000, cookie.MaxAge, "400 days")
+	assert.Equal(t, 86400, cookie.MaxAge, "as long as a session can live: the max lifetime")
 
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 1)
@@ -325,7 +330,7 @@ func TestDeviceCookie_ABrowserThatLostItsSessionCookieReplacesItsOwnSession(t *t
 
 	set := theDeviceCookieSet(t, after)
 	assert.Equal(t, device, set.cookie.Value, "the browser keeps its identifier")
-	assert.Equal(t, 34560000, set.cookie.MaxAge, "with a fresh lifetime")
+	assert.Equal(t, 86400, set.cookie.MaxAge, "with a fresh lifetime")
 
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 1, "the browser's earlier session is gone")
@@ -435,4 +440,47 @@ func deviceCookieIn(t *testing.T, httpClient *http.Client) *http.Cookie {
 	}
 	t.Fatalf("the browser holds no %v cookie", deviceCookieName())
 	return nil
+}
+
+// The device cookie lives the User session max lifetime in force when the sign-in starts the
+// session, not one fixed when the server started (#743 decision 1).
+func TestDeviceCookie_LivesTheMaxLifetimeInForce(t *testing.T) {
+	changeSettings(t, func(settings *record.Settings) {
+		settings.UserSessionMaxLifetimeInSeconds = 7200
+	})
+	f := newDeviceFixture(t)
+	browser := newDeviceBrowser(t)
+
+	f.signIn(t, browser)
+
+	assert.Equal(t, 7200, theDeviceCookieSet(t, browser).cookie.MaxAge, "two hours, as the setting says")
+}
+
+// A max lifetime longer than 400 days gives the device cookie and the sign-in cookie a Max-Age of
+// 400 days, 34,560,000 seconds, the most RFC 6265bis lets a browser keep a cookie, where a browser
+// would otherwise cut it to a limit of its own (#743 decisions 1 and 6). Under Always, where the
+// sign-in cookie outlives the browser.
+func TestDeviceCookie_AndTheSignInCookieAskForAtMost400Days(t *testing.T) {
+	changeSettings(t, func(settings *record.Settings) {
+		settings.UserSessionIdleTimeoutInSeconds = 160000000
+		settings.UserSessionMaxLifetimeInSeconds = 160000000
+		settings.KeepSignedIn = record.KeepSignedInAlways
+	})
+	f := newDeviceFixture(t)
+	browser := newDeviceBrowser(t)
+
+	f.signIn(t, browser)
+
+	assert.Equal(t, 34560000, theDeviceCookieSet(t, browser).cookie.MaxAge, "the device cookie")
+
+	var signedIn []observedDeviceCookie
+	for _, set := range browser.sessions {
+		if set.path == "/auth/completed" || len(signedIn) > 0 {
+			signedIn = append(signedIn, set)
+		}
+	}
+	require.NotEmpty(t, signedIn, "/auth/completed binds the session and writes the sign-in cookie")
+	for _, set := range signedIn {
+		assert.Equal(t, 34560000, set.cookie.MaxAge, "the sign-in cookie written on %v", set.path)
+	}
 }

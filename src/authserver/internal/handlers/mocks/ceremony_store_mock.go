@@ -365,6 +365,75 @@ func (_c *CeremonyStore_LatestAuthContext_Call) RunAndReturn(run func(r *http.Re
 	return _c
 }
 
+// RecordKeepSignedIn provides a mock function for the type CeremonyStore
+func (_mock *CeremonyStore) RecordKeepSignedIn(w http.ResponseWriter, r *http.Request, ceremonyId string, keepSignedIn *bool) error {
+	ret := _mock.Called(w, r, ceremonyId, keepSignedIn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RecordKeepSignedIn")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string, *bool) error); ok {
+		r0 = returnFunc(w, r, ceremonyId, keepSignedIn)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// CeremonyStore_RecordKeepSignedIn_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RecordKeepSignedIn'
+type CeremonyStore_RecordKeepSignedIn_Call struct {
+	*mock.Call
+}
+
+// RecordKeepSignedIn is a helper method to define mock.On call
+//   - w http.ResponseWriter
+//   - r *http.Request
+//   - ceremonyId string
+//   - keepSignedIn *bool
+func (_e *CeremonyStore_Expecter) RecordKeepSignedIn(w any, r any, ceremonyId any, keepSignedIn any) *CeremonyStore_RecordKeepSignedIn_Call {
+	return &CeremonyStore_RecordKeepSignedIn_Call{Call: _e.mock.On("RecordKeepSignedIn", w, r, ceremonyId, keepSignedIn)}
+}
+
+func (_c *CeremonyStore_RecordKeepSignedIn_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, keepSignedIn *bool)) *CeremonyStore_RecordKeepSignedIn_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 http.ResponseWriter
+		if args[0] != nil {
+			arg0 = args[0].(http.ResponseWriter)
+		}
+		var arg1 *http.Request
+		if args[1] != nil {
+			arg1 = args[1].(*http.Request)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 *bool
+		if args[3] != nil {
+			arg3 = args[3].(*bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *CeremonyStore_RecordKeepSignedIn_Call) Return(err error) *CeremonyStore_RecordKeepSignedIn_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *CeremonyStore_RecordKeepSignedIn_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, keepSignedIn *bool) error) *CeremonyStore_RecordKeepSignedIn_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RegenerateSession provides a mock function for the type CeremonyStore
 func (_mock *CeremonyStore) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error {
 	ret := _mock.Called(w, r, ceremonyId, userId)
@@ -435,16 +504,16 @@ func (_c *CeremonyStore_RegenerateSession_Call) RunAndReturn(run func(w http.Res
 }
 
 // RegenerateSessionAndBind provides a mock function for the type CeremonyStore
-func (_mock *CeremonyStore) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64, userSessionIdentifier string) error {
-	ret := _mock.Called(w, r, ceremonyId, userId, userSessionIdentifier)
+func (_mock *CeremonyStore) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64, userSessionIdentifier string, keepSignedIn *bool) error {
+	ret := _mock.Called(w, r, ceremonyId, userId, userSessionIdentifier, keepSignedIn)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RegenerateSessionAndBind")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string, int64, string) error); ok {
-		r0 = returnFunc(w, r, ceremonyId, userId, userSessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string, int64, string, *bool) error); ok {
+		r0 = returnFunc(w, r, ceremonyId, userId, userSessionIdentifier, keepSignedIn)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -462,11 +531,12 @@ type CeremonyStore_RegenerateSessionAndBind_Call struct {
 //   - ceremonyId string
 //   - userId int64
 //   - userSessionIdentifier string
-func (_e *CeremonyStore_Expecter) RegenerateSessionAndBind(w any, r any, ceremonyId any, userId any, userSessionIdentifier any) *CeremonyStore_RegenerateSessionAndBind_Call {
-	return &CeremonyStore_RegenerateSessionAndBind_Call{Call: _e.mock.On("RegenerateSessionAndBind", w, r, ceremonyId, userId, userSessionIdentifier)}
+//   - keepSignedIn *bool
+func (_e *CeremonyStore_Expecter) RegenerateSessionAndBind(w any, r any, ceremonyId any, userId any, userSessionIdentifier any, keepSignedIn any) *CeremonyStore_RegenerateSessionAndBind_Call {
+	return &CeremonyStore_RegenerateSessionAndBind_Call{Call: _e.mock.On("RegenerateSessionAndBind", w, r, ceremonyId, userId, userSessionIdentifier, keepSignedIn)}
 }
 
-func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64, userSessionIdentifier string)) *CeremonyStore_RegenerateSessionAndBind_Call {
+func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64, userSessionIdentifier string, keepSignedIn *bool)) *CeremonyStore_RegenerateSessionAndBind_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 http.ResponseWriter
 		if args[0] != nil {
@@ -488,12 +558,17 @@ func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Run(run func(w http.Respo
 		if args[4] != nil {
 			arg4 = args[4].(string)
 		}
+		var arg5 *bool
+		if args[5] != nil {
+			arg5 = args[5].(*bool)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
 			arg4,
+			arg5,
 		)
 	})
 	return _c
@@ -504,7 +579,7 @@ func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Return(err error) *Ceremo
 	return _c
 }
 
-func (_c *CeremonyStore_RegenerateSessionAndBind_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64, userSessionIdentifier string) error) *CeremonyStore_RegenerateSessionAndBind_Call {
+func (_c *CeremonyStore_RegenerateSessionAndBind_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64, userSessionIdentifier string, keepSignedIn *bool) error) *CeremonyStore_RegenerateSessionAndBind_Call {
 	_c.Call.Return(run)
 	return _c
 }

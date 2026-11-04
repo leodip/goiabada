@@ -2033,6 +2033,10 @@ var publishedRequestEnums = map[string]string{
 		"[none, low, medium, high, nist] with 400 before saving. Covered by " +
 		"TestAPISettingsGeneralPut_ValidationErrors' invalid-policy request. Published in #550, when nist " +
 		"became the fifth",
+	"UpdateSettingsSessionsRequest.keepSignedIn": "enforced: handler_api_settings_sessions.go refuses " +
+		"any value but [always, ask, never], an absent or empty one included, with 400 before saving. " +
+		"Covered by TestSettingsSessionsPut_RefusesAMissingOrUnknownKeepSignedIn and " +
+		"TestAPISettingsSessionsPut_KeepSignedInIsRequiredAndOneOfThreeModes. Published in #743",
 	"UpdateSettingsUIThemeRequest.uiTheme": "enforced: handler_api_settings_ui_theme.go trims the " +
 		"value and refuses anything but the empty value and uithemes.Get() with 400 before saving. " +
 		"Covered by TestAPISettingsUIThemePut_ValidationErrors. Published in #617, when the themes " +

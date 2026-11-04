@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../../../lib/fixtures";
 import { env } from "../../../lib/environment";
 import { clientUrl, expectRefusal, grantClientPermission, readClientSecret } from "../../../lib/admin-console";
-import { signInThroughClient, type BrowserSignIn } from "../../../lib/browser-sign-in";
+import { openSignIn, signInThroughClient, submitPassword, testRedirectUri, type BrowserSignIn } from "../../../lib/browser-sign-in";
 import { clientCredentialsToken, userTokens } from "../../../lib/oauth";
 import { fillSettingsForm, readSettingsForm, saveSettings, withSettingsRestored } from "../../../lib/settings";
 import { authorizeAgain, expectSessionDeleted, sessionIds } from "../../../lib/sessions";
@@ -97,6 +97,71 @@ test("session timeouts are saved, and refused when out of range or inconsistent"
     await fillSettingsForm(page, { userSessionIdleTimeoutInSeconds: "3600", userSessionMaxLifetimeInSeconds: "43200" });
     await saveSettings(page);
     expect(await readSettingsForm(page, sessionsPath)).toMatchObject({ userSessionIdleTimeoutInSeconds: "3600", userSessionMaxLifetimeInSeconds: "43200" });
+  });
+});
+
+// Keep users signed in after the browser closes: three radio buttons, Let each user choose as seeded,
+// and each mode saved is the one the page shows chosen afterwards.
+const keepSignedInLabels = { always: "Always", ask: "Let each user choose", never: "Never" } as const;
+
+test("keep users signed in after the browser closes is saved as Always, Let each user choose or Never", async ({ page }) => {
+  await withSettingsRestored(page, sessionsPath, async () => {
+    const modes = page.getByRole("group", { name: "Keep users signed in after the browser closes" });
+    await expect(modes.getByRole("radio")).toHaveCount(3);
+    await expect(modes.getByRole("radio", { name: keepSignedInLabels.ask, exact: true })).toBeChecked();
+
+    for (const mode of ["always", "never", "ask"] as const) {
+      await page.goto(`${env.adminUrl}${sessionsPath}`);
+      await page.getByRole("radio", { name: keepSignedInLabels[mode], exact: true }).check();
+      await saveSettings(page);
+      await expect(page.getByRole("radio", { name: keepSignedInLabels[mode], exact: true })).toBeChecked();
+      expect(await readSettingsForm(page, sessionsPath)).toMatchObject({ keepSignedIn: mode });
+    }
+  });
+});
+
+// On https the auth server's session cookie carries the __Host- prefix.
+const signInCookie = "__Host-authserver";
+
+// Under Always and Never the password page asks nothing: under Always the sign-in cookie outlives
+// the browser, with the idle timeout as its expiry, and under Never it is a session cookie, which the
+// browser drops when it closes (#743 decisions 2 and 5).
+test("under Always the sign-in cookie outlives the browser and under Never it ends with it, with no box either way", async ({
+  page,
+  browser,
+  clients,
+  users,
+}) => {
+  const user = await users.create();
+  const { client } = await browserSignInClient(page, clients);
+  await withSettingsRestored(page, sessionsPath, async () => {
+    const idleTimeout = Number((await readSettingsForm(page, sessionsPath)).userSessionIdleTimeoutInSeconds);
+    expect(idleTimeout).toBeGreaterThan(0);
+
+    for (const mode of ["always", "never"] as const) {
+      await page.goto(`${env.adminUrl}${sessionsPath}`);
+      await page.getByRole("radio", { name: keepSignedInLabels[mode], exact: true }).check();
+      await saveSettings(page);
+
+      const { context, page: signIn } = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
+      try {
+        await expect(signIn.locator('input[name="password"]')).toBeVisible();
+        await expect(signIn.getByRole("checkbox", { name: /keep me signed in/i })).toHaveCount(0);
+        await submitPassword(signIn, user.email, user.password);
+        await signIn.waitForURL((url) => url.href.startsWith(testRedirectUri));
+
+        const cookie = (await context.cookies(env.authUrl)).find((c) => c.name === signInCookie);
+        expect(cookie, `no ${signInCookie} cookie under ${mode}`).toBeDefined();
+        if (mode === "always") {
+          expect(cookie!.expires * 1000, "an expiry, the idle timeout from now").toBeGreaterThan(Date.now() + (idleTimeout - 600) * 1000);
+          expect(cookie!.expires * 1000).toBeLessThan(Date.now() + (idleTimeout + 60) * 1000);
+        } else {
+          expect(cookie!.expires, "a session cookie, which ends with the browser").toBe(-1);
+        }
+      } finally {
+        await context.close();
+      }
+    }
   });
 });
 

@@ -151,6 +151,8 @@ type SettingsSessionsResponse struct {
 	UserSessionIdleTimeoutInSeconds int `json:"userSessionIdleTimeoutInSeconds"`
 	UserSessionMaxLifetimeInSeconds int `json:"userSessionMaxLifetimeInSeconds"`
 	MaxUserSessionsPerUser          int `json:"maxUserSessionsPerUser"`
+	// KeepSignedIn is "Keep users signed in after the browser closes": "always", "ask" or "never".
+	KeepSignedIn string `json:"keepSignedIn"`
 }
 
 // UpdateSettingsSessionsRequest contains session-related settings fields for update
@@ -161,6 +163,9 @@ type UpdateSettingsSessionsRequest struct {
 	// limit, so an absent or null field must be told from 0 to be refused rather than turn the cap
 	// off for a caller that does not know the field (#564 decision 6).
 	MaxUserSessionsPerUser *int `json:"maxUserSessionsPerUser"`
+	// KeepSignedIn is required on the wire, one of "always", "ask" and "never": a caller that does
+	// not know the field must not choose for the deployment by omission (#743 decision 4).
+	KeepSignedIn string `json:"keepSignedIn"`
 }
 
 // SettingsTokensResponse represents the token settings returned by the API

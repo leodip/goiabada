@@ -243,6 +243,18 @@ type AuthContext struct {
 	// Absent from a context written by an older binary it unmarshals as nil, which reads as "the
 	// codes were already shown", the page a reload draws.
 	RecoveryCodes []string
+	// KeepSignedIn is the answer the user gave the password page's Keep me signed in box when this
+	// ceremony verified the password: true ticked, false unticked, and nil when the page showed no
+	// box, under Always or Never, or when the password was proven elsewhere (registration,
+	// activation). Written only by RecordPasswordVerified, and carried to /auth/completed, which
+	// records it in the browser session when the ceremony entered the password, on either arm, so
+	// the session's next cookie write follows it; nil leaves the session with no answer, which
+	// counts as unticked (#743 decisions 2 and 5). An SSO pass verifies no password and records
+	// nothing, so the session keeps the answer it holds.
+	//
+	// Absent from a context written by an older binary it unmarshals as nil: no answer, the
+	// unticked direction.
+	KeepSignedIn *bool
 }
 
 func (ac *AuthContext) SetScope(scope string) {
@@ -286,7 +298,9 @@ func (ac *AuthContext) ParkDeferredError(code, description string) {
 //     AuthenticatedAt as well, and level 2 alone must not stand in for level 1 at /auth/completed's
 //     create gate (#129 decisions 6 and 15).
 //   - PasswordVerifiedAt is the same instant, kept where a code entered later cannot move it (#542).
-func (ac *AuthContext) RecordPasswordVerified(user *record.User, now time.Time) {
+//   - KeepSignedIn is the answer keepSignedIn the password was entered with, replacing any earlier
+//     one: true or false when the page asked Keep me signed in, nil when it showed no box (#743).
+func (ac *AuthContext) RecordPasswordVerified(user *record.User, now time.Time, keepSignedIn *bool) {
 	ac.UserId = user.Id
 	ac.AuthStateGeneration = user.AuthStateGeneration
 	otpConfigGeneration := user.OtpConfigGeneration
@@ -298,6 +312,7 @@ func (ac *AuthContext) RecordPasswordVerified(user *record.User, now time.Time) 
 	ac.PasswordVerifiedAt = &passwordVerifiedAt
 	ac.Level1AuthCompleted = true
 	ac.AuthState = AuthStateLevel1PasswordCompleted
+	ac.KeepSignedIn = keepSignedIn
 }
 
 // RecordOTPVerified records that this ceremony verified a one-time code at now. generation is the
@@ -400,6 +415,7 @@ func (ac *AuthContext) Restart() {
 	ac.OtpClaimGeneration = nil
 	ac.AdoptedSessionAuthTime = nil
 	ac.RecoveryCodes = nil
+	ac.KeepSignedIn = nil
 }
 
 // AddAuthMethod records a completed factor on AuthMethods, the space-separated list that becomes

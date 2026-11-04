@@ -142,7 +142,7 @@ func (b *lastComparisonBackend) UpdateIfUnchanged(ctx context.Context, id string
 func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerActive(t *testing.T) {
 	backend := &lastComparisonBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
-		sessionstore.PersistentCookie, sessionstore.KeyPair{
+		sessionstore.PersistentCookie(sessiontest.KeepEverySignedInSession), sessionstore.KeyPair{
 			AuthenticationKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 			EncryptionKey:     []byte("0123456789abcdef0123456789abcdef"),
 		}, nil)

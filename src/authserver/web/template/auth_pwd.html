@@ -36,6 +36,19 @@
     {{ end }}
   </div>
 
+  {{/* Keep me signed in, under Let each user choose alone: ticked, the sign-in outlasts closing the
+       browser; unticked, it ends with it. Unticked on the first render, since a pre-ticked box is
+       not consent, and as the user left it beside a refusal (#743 decisions 2 and 4). */}}
+  {{ if .keepSignedInAsked }}
+  <label class="choice" for="keepSignedIn">
+    <input type="checkbox" id="keepSignedIn" name="keepSignedIn" value="true"{{ if .keepSignedIn }} checked{{ end }} aria-labelledby="keep-signed-in-label" aria-describedby="keep-signed-in-note">
+    <span class="grid min-w-0 flex-1 gap-0.5">
+      <span class="choice-label" id="keep-signed-in-label">{{ T $.ctx "auth.pwd.keep_signed_in" }}</span>
+      <span class="field-hint" id="keep-signed-in-note">{{ T $.ctx "auth.pwd.keep_signed_in_note" }}</span>
+    </span>
+  </label>
+  {{ end }}
+
   {{/* The Turnstile challenge, while it is on: Cloudflare's script renders the widget, which writes
        its token into the form as cf-turnstile-response. The action names this form, which the
        server checks the token was solved for (#642). Its size is the one that fits the form,

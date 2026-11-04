@@ -3463,7 +3463,9 @@ paths:
     get:
       tags: [Settings]
       summary: Get session settings
-      description: Get the session idle timeout, the session maximum lifetime, and the most sessions one user can hold.
+      description: >-
+        Get the session idle timeout, the session maximum lifetime, the most sessions one user can
+        hold, and whether users stay signed in after the browser closes.
       operationId: getSettingsSessions
       responses:
         '200':
@@ -3482,9 +3484,10 @@ paths:
       tags: [Settings]
       summary: Update session settings
       description: |
-        Replace the session settings. All three fields are required. A request without
+        Replace the session settings. All four fields are required. A request without
         `maxUserSessionsPerUser`, or with it `null`, is refused with `400`, and so is a value outside
-        0 to 1000.
+        0 to 1000. A request without `keepSignedIn`, or with a value other than `always`, `ask` or
+        `never`, is refused with `400` too.
 
         Lowering `maxUserSessionsPerUser` ends no session at once: each user's sessions over the new
         value end at that user's next sign-in, their expired sessions first and then the least
@@ -7555,10 +7558,19 @@ components:
             sessions end, and then the least recently used. 0 means no limit.
           minimum: 0
           maximum: 1000
+        keepSignedIn:
+          type: string
+          enum: [always, ask, never]
+          description: >-
+            Keep users signed in after the browser closes. `always`: every user's sign-in outlasts
+            closing the browser. `ask`: the password page asks each user, with an unticked box.
+            `never`: every user signs in again after closing the browser. Sessions still end at
+            their idle timeout and maximum lifetime in every mode.
       required:
         - userSessionIdleTimeoutInSeconds
         - userSessionMaxLifetimeInSeconds
         - maxUserSessionsPerUser
+        - keepSignedIn
 
     UpdateSettingsSessionsRequest:
       type: object
@@ -7576,10 +7588,19 @@ components:
             the user's expired sessions end, and then the least recently used.
           minimum: 0
           maximum: 1000
+        keepSignedIn:
+          type: string
+          enum: [always, ask, never]
+          description: >-
+            Keep users signed in after the browser closes. `always`: every user's sign-in outlasts
+            closing the browser. `ask`: the password page asks each user, with an unticked box.
+            `never`: every user signs in again after closing the browser. Sessions still end at
+            their idle timeout and maximum lifetime in every mode.
       required:
         - userSessionIdleTimeoutInSeconds
         - userSessionMaxLifetimeInSeconds
         - maxUserSessionsPerUser
+        - keepSignedIn
 
     SettingsUIThemeResponse:
       type: object

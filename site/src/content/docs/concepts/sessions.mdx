@@ -42,13 +42,14 @@ To ask for a password every time, whatever the session, send [`prompt=login`](/c
 
 ## How long a session lasts
 
-A session's lifetimes, and how many sessions one user can hold, are under **Admin**, **Sessions** in the admin console, and apply to every client:
+A session's lifetimes, how many sessions one user can hold, and whether users stay signed in after closing the browser are under **Admin**, **Sessions** in the admin console, and apply to every client:
 
 | Setting | Default |
 |---|---|
 | **Idle timeout, in seconds** | 7200 (2 hours) |
 | **Maximum lifetime, in seconds** | 86400 (24 hours) |
 | **Maximum sessions per user** | 20 (0 means no limit) |
+| **Keep users signed in after the browser closes** | Let each user choose |
 
 A session can be used only while all of these hold:
 
@@ -105,7 +106,7 @@ A page that keeps sending a window it opened to sign in can push the user's sign
 
 The auth server gives each browser a cookie of its own, `__Host-authserver_device`, or `authserver_device` when its base URL is plain `http`, so a sign-in can tell which of the user's sessions came from that browser. It holds a random identifier that only the auth server reads, and it's used for nothing else: a first-party cookie the auth server needs to work, not a tracker.
 
-- **It's written when a sign-in starts a new session,** for 400 days, the longest a browser keeps a cookie. A browser that already has one keeps its identifier.
+- **It's written when a sign-in starts a new session,** for the maximum lifetime, 24 hours by default: as long as that session can last. The longest it asks for is 400 days, the most a browser keeps a cookie. A browser that already has one keeps its identifier.
 - **Signing out doesn't clear it,** and neither does an administrator ending a session: it names the browser, not a session.
 - **A session stores the identifier's SHA-256, never the identifier,** and neither is shown in the admin console, returned by an API or logged.
 - **A browser whose cookies were cleared counts as a new browser.** Its next sign-in leaves the old session alone, to expire or be ended by [the cap](#how-many-sessions-a-user-can-hold).
@@ -127,9 +128,31 @@ The cap catches pile-ups, such as a script that signs in with a fresh browser ev
 
 ## Closing the browser
 
-Closing the browser doesn't end a session with the auth server. The cookie lasts as long as the session does, so reopening the browser within the idle timeout signs the user straight back in, and a restarted machine or a laptop shut for lunch costs nobody a password.
+Closing the browser doesn't end a session with the auth server: the session still ends at its idle timeout or maximum lifetime. What closing it decides is whether the browser still has the auth server's cookie when it opens again, and that's the **Keep users signed in after the browser closes** setting:
 
-The admin console does the opposite on purpose. Its own cookie lasts only until the browser closes, so reopening the browser asks an administrator to sign in to it again, even while the auth server still has their session. An administrator's browser reaches every part of the deployment, so one more sign-in is worth it to keep a lost or forgotten machine from still holding that access. Some browsers restore what was open after a crash or an update, and that can bring an admin console session back with it.
+| Setting | The password page | The auth server's cookie |
+|---|---|---|
+| **Let each user choose** | Shows a **Keep me signed in** box, unticked | Ticked, it lasts as long as the session, up to 400 days. Unticked, it ends when the browser closes. |
+| **Always** | Shows no box | Lasts as long as the session, up to 400 days |
+| **Never** | Shows no box | Ends when the browser closes |
+
+When the cookie lasts, reopening the browser within the idle timeout signs the user straight back in, and a restarted machine or a laptop shut for lunch costs nobody a password. When it ends with the browser, the user enters their password again. The session they left behind stays on the server until it expires, or until their next sign-in from that browser ends it, as [How the auth server recognizes a browser](#how-the-auth-server-recognizes-a-browser) describes. On a shared or public computer, leaving the box unticked is what keeps the next person from walking into the account.
+
+The answer belongs to the browser's session:
+
+- **A single sign-on keeps it.** A sign-in that goes straight through asks nothing.
+- **Each password entry replaces it.** Whenever the password page shows again, for `prompt=login`, `max_age`, an expired session or another user, the box asks again, unticked.
+- **A password entered with no box leaves no answer,** under **Always** or **Never**, and a browser with no answer counts as unticked under **Let each user choose**.
+
+A changed setting reaches a browser the next time the auth server writes its cookie, at its next sign-in at the latest. While a browser isn't signed in yet, the cookie of its sign-in in progress lasts 30 minutes whatever the setting, so restarting the browser partway through loses nothing. Some browsers restore what was open, cookies included, after a crash or an update, or when they're set to continue where you left off, and that brings back a cookie meant to end with the browser.
+
+### Administrators
+
+The admin console's own cookie always ends when the browser closes. But the console signs in through the auth server, without `prompt=login` or `max_age`, so after a restart an administrator whose auth server cookie outlived the browser is signed straight back in without a password.
+
+<Aside type="caution">
+**Administrators should leave Keep me signed in unticked.** Under **Let each user choose**, the default, that makes reopening the browser ask an administrator for their password again, so a lost or forgotten machine doesn't keep access to the whole deployment. Under **Always**, every administrator stays signed in after closing the browser.
+</Aside>
 
 <Aside>
 To end a session rather than leave it to expire, sign out or end it from the sessions page. See [Ending sessions](/concepts/ending-sessions/).

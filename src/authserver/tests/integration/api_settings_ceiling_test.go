@@ -146,6 +146,7 @@ func TestSettingsCeiling_ManageSettingsStillChangesTheOtherSettings(t *testing.T
 		UserSessionIdleTimeoutInSeconds: before.UserSessionIdleTimeoutInSeconds + 60,
 		UserSessionMaxLifetimeInSeconds: before.UserSessionMaxLifetimeInSeconds + 60,
 		MaxUserSessionsPerUser:          &before.MaxUserSessionsPerUser,
+		KeepSignedIn:                    string(before.KeepSignedIn),
 	})
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
