@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net/mail"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,7 +73,9 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 	adminEmail := r.cfg.AdminEmail
 	if len(adminEmail) == 0 {
 		const defaultAdminEmail = "admin@example.com"
-		slog.WarnContext(ctx, "admin email is not set, defaulting it", "email", defaultAdminEmail)
+		// The default is named in the message rather than in an attribute: it is the built-in value,
+		// and no record carries an address (#779 decision 3).
+		slog.WarnContext(ctx, "admin email is not set, defaulting it to admin@example.com")
 		adminEmail = defaultAdminEmail
 	}
 	// Lowercased at the write, exactly as every other path that stores an email does.
@@ -210,7 +213,6 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 	// those announced rows a rollback then removed, and would repeat on a deadlock rerun.
 	slog.InfoContext(ctx, "database seeded",
 		"client_identifier", builtin.AdminConsoleClientIdentifier,
-		"email", adminEmail,
 		"current_key_identifier", currentKey.KeyIdentifier,
 		"next_key_identifier", nextKey.KeyIdentifier)
 
@@ -446,15 +448,21 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 }
 
 // checkAdminEmail refuses an admin email longer than an account's address may be, counted after the
-// seed's trimming as every other path counts one, naming the variable it came from. Only the length
-// is checked: the shape is left as the seed has always taken it, so admin@localhost seeds. Checked
-// before anything is generated or written, so the database stays empty for the next start, with
-// the variable fixed; without it such an address failed the first start with a database error on
-// MySQL, PostgreSQL and SQL Server, and seeded on SQLite (#632).
+// seed's trimming as every other path counts one, or one that is not a single bare address, naming
+// the variable it came from. Without the length check such an address failed the first start with a
+// database error on MySQL, PostgreSQL and SQL Server, and seeded on SQLite (#632). Without the shape
+// check a list such as "first@example.com, second@example.com" seeded, and every email to the
+// administrator then failed. The shape is the email sender's own parser's, not the stricter rule the
+// account forms apply, so admin@localhost seeds. The refusal does not quote the value, since the
+// startup log records it (#779). Checked before anything is generated or written, so the database
+// stays empty for the next start, with the variable fixed.
 func checkAdminEmail(email string) error {
 	if inputvalidation.TextLength(email) > accountvalidation.MaxEmailLength {
 		return errs.Errorf("GOIABADA_ADMIN_EMAIL cannot be the first administrator's email address: it is longer than %d characters",
 			accountvalidation.MaxEmailLength)
+	}
+	if parsed, err := mail.ParseAddress(email); err != nil || parsed.Name != "" || parsed.Address != email {
+		return errs.New("GOIABADA_ADMIN_EMAIL cannot be the first administrator's email address: it is not a single email address")
 	}
 	return nil
 }

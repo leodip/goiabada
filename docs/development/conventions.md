@@ -76,11 +76,13 @@ lowercase string literal with no `component:` prefix and no `failed to` or `erro
 verb being "unable to"; values ride as snake_case attributes, one fixed name per concept, `error`
 for an error, `client_identifier` for the wire string against `client_id` for the row id.
 `request_id` is the handler's, injected from the context, so a site with a `context.Context` or
-`*http.Request` in scope at any depth uses the `*Context` variant. Error means someone must act,
+`*http.Request` in scope at any depth uses the `*Context` variant. A log line names a person by
+`user_id`, never by their address, so no record keeps an address after the account is deleted
+(#779). Error means someone must act,
 Warn a refused or handled request, Info lifecycle and configuration, Debug per-request tracing. Two
 guards hold it. `sloglint`, enabled in `.golangci.yml` and run by `./run-tests.sh --type lint` and
 CI's Lint job over type-checked code, holds the lowercase message, the snake_case keys, the refused
-`err` and `request_id`, and the `*Context` rule; a function that hands its caller's key/value run to
+`err`, `request_id` and `email`, and the `*Context` rule; a function that hands its caller's key/value run to
 a record is registered there under `custom-funcs` so the keys are read at its call sites.
 `TestSlogConvention` in `core/guard/slog_lint.go`, called from all three module tiers, holds what
 sloglint cannot express: that the message is a literal at the call rather than a constant, the

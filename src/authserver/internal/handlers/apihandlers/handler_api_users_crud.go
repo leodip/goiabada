@@ -531,7 +531,8 @@ func HandleUserCreatePost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
-			"email":          createdUser.Email,
+			"user_id":        createdUser.Id,
+			"email_digest":   hashutil.HashString(createdUser.Email),
 			"logged_in_user": loggedInUser,
 		})
 

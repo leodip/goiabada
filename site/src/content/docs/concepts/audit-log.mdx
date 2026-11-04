@@ -104,7 +104,7 @@ Every key is snake_case, and a key means the same thing in every event that carr
 
 Events are about people and clients, so details carry ids, not secrets. A refresh token appears only as its `jti`, and an authenticator code only as its time step.
 
-An email address typed into a form nobody has signed in to is recorded only as `email_digest`, the SHA-256 hex digest of the address as that form looks it up. That covers a failed sign-in, a refused password grant, a registration, a forgot-password request, and a rate limit on any of them. The digest lets you match attempts on one address, and check an address you know against them. Anyone holding a candidate address can do the same, so treat it as a pseudonym, not a secret. An address an account holds is recorded as it is, since administrators already see it in the users list, and so is the address an administrator sends a test email to.
+No entry records an email address. An entry about one records `email_digest`, the SHA-256 hex digest of the address in lowercase. That covers a failed sign-in, a refused password grant, a registration, a forgot-password request, a rate limit on any of them, an account created or activated, an email verification code, and the recipient of a test email. Each address is also trimmed of surrounding spaces, the form every account's address is stored in, except on a forgot-password request, whose digest is of the address as that form looks it up. To find the entries about an address you know, compute its digest with `printf '%s' 'ana@example.com' | sha256sum`, the address in lowercase. Anyone holding a candidate address can do the same, so treat the digest as a pseudonym, not a secret. An entry about an account also names it by `user_id`.
 
 | Key | Meaning |
 |---|---|
@@ -124,9 +124,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `code_id` | The row id of an authorization code. |
 | `command` | `goiabada-authserver recover`, on every entry the `recover` command writes. An entry an API request made names its token's subject under `logged_in_user` instead. |
 | `consent_id` | The row id of a consent a user gave a client. |
-| `email` | The address of an account: the one created, activated, or given an email verification code. |
-| `email_destination` | The address an email verification code was sent to. |
-| `email_digest` | The SHA-256 hex digest of an address typed into a form nobody has signed in to, or named by a password grant. |
+| `email_digest` | The SHA-256 hex digest of the email address the entry is about, in lowercase and, except on a forgot-password request, trimmed: one typed into a form or named by a password grant, an account's, or a test email's recipient. |
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
 | `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
 | `grant_id` | The grant a client revoked: the `jti` of its first refresh token, which its access tokens carry as `grant_id`. |
@@ -192,7 +190,6 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `target_id` | The row id of the user, group, client or resource a request acted on. |
 | `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
 | `terminated_session_identifiers` | The identifier of each session ended. |
-| `to` | The address an administrator sent a test email to. |
 | `token_client_id` | The row id of the client a token sent to the revocation endpoint was issued to. |
 | `token_expiration_in_seconds` | Under `old` and `new`: the default access token lifetime, in seconds. |
 | `token_type` | The type of token a client sent to the revocation endpoint: `access_token` or `refresh_token`. |

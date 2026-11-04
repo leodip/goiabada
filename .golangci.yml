@@ -161,11 +161,15 @@ linters:
       # core/errs stack. request_id is never written by a call site: the
       # handler injects it from the context, and a site writing its own puts
       # the key in the record twice. core/logging, which IS the injector, is
-      # exempted under exclusions below (#320 decisions 2 and 3).
+      # exempted under exclusions below (#320 decisions 2 and 3). email is
+      # refused because a log line names a person by user_id, never by their
+      # address, which would otherwise outlive the account in the logs (#779
+      # decision 2).
       forbidden-keys:
         - err
         - request_id
         - request-id
+        - email
       # Functions that take the caller's key/value run and hand it to one
       # record. Registering them is what makes sloglint read the keys at their
       # call sites, which is where 328 API 500s and 20 id_token_hint refusals

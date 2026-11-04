@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -90,7 +91,7 @@ func HandleUserEmailVerificationCodePost(
 
 		auditLogger.Log(r.Context(), audit.EventGeneratedEmailVerificationCode, map[string]interface{}{
 			"user_id":        user.Id,
-			"email":          user.Email,
+			"email_digest":   hashutil.HashString(user.Email),
 			"logged_in_user": loggedInUser,
 		})
 

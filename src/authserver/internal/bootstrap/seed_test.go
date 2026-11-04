@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -443,8 +445,8 @@ func adminAddressOfLength(n int) string {
 }
 
 // GOIABADA_ADMIN_EMAIL may be up to 254 characters, the longest address an account holds, counted
-// after the seed trims it, and only its length is checked: an address with no dot in its domain
-// seeds as it always has (#632 decision 4).
+// after the seed trims it, and its shape is the email sender's parser's, not the account forms'
+// stricter rule: an address with no dot in its domain seeds as it always has (#632 decision 4).
 func TestRun_AdminEmailOfUpTo254CharactersSeeds(t *testing.T) {
 	address254 := adminAddressOfLength(254)
 	require.Len(t, address254, 254)
@@ -520,6 +522,65 @@ func TestRun_RefusesAnAdminEmailPast254CharactersInBothModes(t *testing.T) {
 			assert.Equal(t, mode.outcome, outcome)
 			assertSeeded(t, db, cfg)
 		})
+	}
+}
+
+// A first start refuses a GOIABADA_ADMIN_EMAIL that is not a single bare address in both bootstrap
+// modes, as it refuses one past 254 characters: before any write and before the bootstrap file is
+// staged, naming the variable without quoting its value, which the startup log would then record
+// (#779). Without it a list of two addresses seeded, and every email to the administrator failed.
+func TestRun_RefusesAnAdminEmailThatIsNotASingleAddressInBothModes(t *testing.T) {
+	modes := []struct {
+		name    string
+		config  func(t *testing.T) Config
+		outcome Outcome
+	}{
+		{"single-step", func(*testing.T) Config { return singleStepConfig() }, Continue},
+		{"two-step", twoStepConfig, Exit},
+	}
+	values := []struct {
+		name  string
+		email string
+		parts []string
+	}{
+		{"two addresses", "first@example.com, second@example.com", []string{"first@example.com", "second@example.com"}},
+		{"an address with a display name", "Admin <admin@example.com>", []string{"admin@example.com"}},
+		{"an address in angle brackets", "<admin@example.com>", []string{"admin@example.com"}},
+		{"no address", "admin", []string{"admin@"}},
+	}
+	for _, mode := range modes {
+		for _, value := range values {
+			t.Run(mode.name+", "+value.name, func(t *testing.T) {
+				db := newSeedDB(t)
+				cfg := mode.config(t)
+				cfg.AdminEmail = value.email
+				faults := &faultDB{runDatabase: db}
+
+				outcome, err := testRunner(faults, cfg).run(context.Background())
+
+				require.Error(t, err)
+				assert.Equal(t, Refused, outcome)
+				assert.Contains(t, err.Error(), "GOIABADA_ADMIN_EMAIL cannot be the first administrator's email address: it is not a single email address")
+				for _, part := range value.parts {
+					assert.NotContains(t, strings.ToLower(fmt.Sprintf("%+v", err)), part)
+				}
+				assert.Zero(t, faults.writes, "no write was attempted")
+				isEmpty, err := db.IsEmpty(context.Background())
+				require.NoError(t, err)
+				assert.True(t, isEmpty, "the next start sees an empty database")
+				if cfg.BootstrapEnvOutFile != "" {
+					assert.NoDirExists(t, filepath.Dir(cfg.BootstrapEnvOutFile),
+						"refused before the bootstrap file is staged, so not even its directory exists")
+				}
+
+				cfg.AdminEmail = "admin@localhost"
+				outcome, err = testRunner(db, cfg).run(context.Background())
+
+				require.NoError(t, err, "the next start, with the variable fixed, seeds")
+				assert.Equal(t, mode.outcome, outcome)
+				assertSeeded(t, db, cfg)
+			})
+		}
 	}
 }
 
@@ -887,14 +948,56 @@ func TestRun_WritesOneSeededRecord(t *testing.T) {
 	for _, key := range keys {
 		byState[key.State] = key.KeyIdentifier
 	}
-	assert.Equal(t, builtin.AdminConsoleClientIdentifier, seeded[0].Attrs["client_identifier"])
-	assert.Equal(t, "admin@example.com", seeded[0].Attrs["email"])
-	assert.Equal(t, byState[record.KeyStateCurrent.String()], seeded[0].Attrs["current_key_identifier"])
-	assert.Equal(t, byState[record.KeyStateNext.String()], seeded[0].Attrs["next_key_identifier"])
+	// The whole attribute set, so an address added back under any key fails (#779 decision 3).
+	assert.Equal(t, map[string]any{
+		"client_identifier":      builtin.AdminConsoleClientIdentifier,
+		"current_key_identifier": byState[record.KeyStateCurrent.String()],
+		"next_key_identifier":    byState[record.KeyStateNext.String()],
+	}, seeded[0].Attrs)
+	for _, logRecord := range logs.Records() {
+		assert.NotContains(t, strings.ToLower(logRecord.Message), "admin@example.com",
+			"no record names the first administrator's address: %s", logRecord.Message)
+		for key, value := range logRecord.Attrs {
+			assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), "admin@example.com",
+				"%s carries the address under %s", logRecord.Message, key)
+		}
+	}
 
 	messages := recordMessages(logs)
 	assert.Contains(t, messages, "app name is not set, defaulting it")
 	assert.Contains(t, messages, "using pre-generated OAuth client secret from environment")
+}
+
+// An unset GOIABADA_ADMIN_EMAIL is named in the warning's message, the operator's own
+// configuration, with no attribute holding it (#779 decision 3).
+func TestRun_DefaultAdminEmailWarningCarriesNoAttribute(t *testing.T) {
+	db := newSeedDB(t)
+	cfg := singleStepConfig()
+	cfg.AdminEmail = ""
+	logs := logtest.CaptureSlog(t)
+
+	_, err := testRunner(db, cfg).run(context.Background())
+	require.NoError(t, err)
+
+	var warnings []logtest.CapturedRecord
+	for _, logRecord := range logs.Records() {
+		if strings.HasPrefix(logRecord.Message, "admin email is not set") {
+			warnings = append(warnings, logRecord)
+		}
+	}
+	require.Len(t, warnings, 1)
+	assert.Equal(t, slog.LevelWarn, warnings[0].Level)
+	assert.Equal(t, "admin email is not set, defaulting it to admin@example.com", warnings[0].Message)
+	assert.Empty(t, warnings[0].Attrs)
+
+	for _, logRecord := range logs.Records() {
+		if logRecord.Message == "database seeded" {
+			for key, value := range logRecord.Attrs {
+				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), "admin@example.com",
+					"database seeded carries the default address under %s", key)
+			}
+		}
+	}
 }
 
 // TestRun_AStopDuringTheSeedLetsItFinish and the case after it are #390 decision 9 for the seed: a

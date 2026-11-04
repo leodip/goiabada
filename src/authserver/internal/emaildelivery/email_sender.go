@@ -23,6 +23,7 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -176,6 +177,9 @@ type relayDial struct {
 	commandTimeout time.Duration
 	// sendDeadline is when the whole send ends, however many connections it takes.
 	sendDeadline time.Time
+	// recipient is the address every relay reply is cleared of before it reaches an error or a log
+	// line (#779 decision 4).
+	recipient string
 }
 
 func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEmailInput) (SendResult, error) {
@@ -199,7 +203,10 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	from := &mail.Address{Name: smtpConfig.FromName, Address: smtpConfig.FromEmail}
 	to, err := mail.ParseAddress(input.To)
 	if err != nil {
-		return SendResult{}, errs.Wrap(err, "invalid recipient address")
+		// The parser's error quotes what it could not take, which is the recipient's address or a
+		// part of it, and a send failure reaches a log line, so its text is left out (#779
+		// decision 4).
+		return SendResult{}, errs.New("invalid recipient address")
 	}
 	message, err := e.buildMessage(from, to, input)
 	if err != nil {
@@ -223,10 +230,17 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 		implicitTLS:    smtpEnc == SMTPEncryptionSSLTLS,
 		dialTimeout:    cmp.Or(e.dialTimeout, defaultDialTimeout),
 		commandTimeout: cmp.Or(e.commandTimeout, defaultCommandTimeout),
+		recipient:      to.Address,
 	}
 	// The send's budget runs from the start of the connect, so a slow connect or handshake leaves
 	// the conversation less of it.
 	dial.sendDeadline = time.Now().Add(cmp.Or(e.sendTimeout, defaultSendTimeout))
+
+	// A relay's reply may quote the recipient's address, or an authentication username that is the
+	// same address, and every send-failure log line records the reply (#779 decision 4). Each reply
+	// that reaches an error or a log line goes through this first, wherever the conversation
+	// stopped.
+	redact := func(err error) error { return withoutRecipient(err, to.Address) }
 
 	client, closeConnection, err := e.connect(ctx, dial)
 	if err != nil {
@@ -250,10 +264,11 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 		// StartTLS re-issues EHLO, per RFC 3207 section 4.2: everything learned before the
 		// handshake has to be discarded.
 		if startTLSErr := client.StartTLS(dial.tlsConfig); startTLSErr != nil {
-			return SendResult{}, tlsFailure(errs.Wrap(startTLSErr, "unable to send SMTP message"))
+			return SendResult{}, tlsFailure(errs.Wrap(redact(startTLSErr), "unable to send SMTP message"))
 		}
 	case SMTPEncryptionNone:
 		upgrade, upgradeErr := startTLSIfAvailable(client, dial.tlsConfig)
+		upgradeErr = redact(upgradeErr)
 		switch upgrade {
 		case upgraded:
 			encrypted = true
@@ -292,26 +307,29 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	}
 
 	if len(smtpConfig.Username) > 0 {
-		if authenticateErr := authenticate(client, host, smtpEnc, smtpConfig.Username, password); authenticateErr != nil {
+		if authenticateErr := authenticate(client, host, smtpEnc, smtpConfig.Username, password, redact); authenticateErr != nil {
 			return SendResult{}, errs.Wrap(authenticateErr, "unable to send SMTP message")
 		}
 	}
 
+	messageRefused := func(err error) error {
+		return replyFailure(errs.Wrap(redact(err), "unable to send SMTP message"), SendFailureMessageRefused)
+	}
 	if mailErr := client.Mail(from.Address); mailErr != nil {
-		return SendResult{}, replyFailure(errs.Wrap(mailErr, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(mailErr)
 	}
 	if rcptErr := client.Rcpt(to.Address); rcptErr != nil {
-		return SendResult{}, replyFailure(errs.Wrap(rcptErr, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(rcptErr)
 	}
 	w, err := client.Data()
 	if err != nil {
-		return SendResult{}, replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(err)
 	}
 	if _, err := w.Write(message); err != nil {
-		return SendResult{}, replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(err)
 	}
 	if err := w.Close(); err != nil {
-		return SendResult{}, replyFailure(errs.Wrap(err, "unable to send SMTP message"), SendFailureMessageRefused)
+		return SendResult{}, messageRefused(err)
 	}
 	// The relay answered the end of the data with a positive reply, so it has taken responsibility
 	// for the message (RFC 5321 sections 4.1.1.4 and 6.1). Whatever happens to QUIT or to closing
@@ -319,7 +337,7 @@ func (e *Sender) send(ctx context.Context, smtpConfig SMTPConfig, input *SendEma
 	// message twice. The failure is still logged. A lost reply to the data never reaches here: no
 	// reply is no acceptance, and w.Close returned it above (#718 decision 1).
 	if err := client.Quit(); err != nil {
-		slog.WarnContext(ctx, "unable to end the smtp session after the server accepted the message", "error", err)
+		slog.WarnContext(ctx, "unable to end the smtp session after the server accepted the message", "error", redact(err))
 	}
 
 	return SendResult{Encrypted: encrypted}, nil
@@ -376,7 +394,7 @@ func (e *Sender) connect(ctx context.Context, dial relayDial) (*smtp.Client, fun
 	if err != nil {
 		stopClosingOnCancel()
 		_ = conn.Close()
-		return nil, nil, replyFailure(errs.Wrap(err, "unable to connect to SMTP server"), SendFailureOther)
+		return nil, nil, replyFailure(errs.Wrap(withoutRecipient(err, dial.recipient), "unable to connect to SMTP server"), SendFailureOther)
 	}
 	closeConnection := func() {
 		_ = client.Close()
@@ -390,7 +408,7 @@ func (e *Sender) connect(ctx context.Context, dial relayDial) (*smtp.Client, fun
 	// for the EHLO StartTLS repeats, so all three carry it (#718 decision 9).
 	if helloErr := client.Hello(e.helloName(tcpConn)); helloErr != nil {
 		closeConnection()
-		return nil, nil, replyFailure(errs.Wrap(helloErr, "unable to send SMTP message"), SendFailureOther)
+		return nil, nil, replyFailure(errs.Wrap(withoutRecipient(helloErr, dial.recipient), "unable to send SMTP message"), SendFailureOther)
 	}
 	return client, closeConnection, nil
 }
@@ -537,6 +555,31 @@ func replyFailure(err error, refused SendFailureKind) error {
 	}
 }
 
+// recipientPlaceholder is what a relay's reply shows in place of the recipient's address.
+const recipientPlaceholder = "<recipient>"
+
+// withoutRecipient is err with every occurrence of address in the relay's reply, matched
+// case-insensitively, replaced with recipientPlaceholder. A reply stays a *textproto.Error with its
+// code, and a line that is no SMTP reply stays a textproto.ProtocolError, so replyFailure labels
+// either as before and errors.As still reaches it. net/smtp returns both as the error itself, so
+// the copy takes err's place; any other error, which carries no relay text, is returned as it is.
+// The match is best-effort: an address the relay quotes in another form, such as encoded, stays.
+func withoutRecipient(err error, address string) error {
+	if err == nil || address == "" {
+		return err
+	}
+	quoted := regexp.MustCompile("(?i)" + regexp.QuoteMeta(address))
+	var reply *textproto.Error
+	if errors.As(err, &reply) {
+		return &textproto.Error{Code: reply.Code, Msg: quoted.ReplaceAllLiteralString(reply.Msg, recipientPlaceholder)}
+	}
+	var garbled textproto.ProtocolError
+	if errors.As(err, &garbled) {
+		return textproto.ProtocolError(quoted.ReplaceAllLiteralString(string(garbled), recipientPlaceholder))
+	}
+	return err
+}
+
 // tlsFailure labels a failed STARTTLS or handshake. Every failure there is the TLS connection's,
 // whatever shape it reaches the client in -- a certificate that did not verify, a server that does
 // not speak TLS, an alert, a refused STARTTLS command -- except the TCP connection itself failing:
@@ -559,8 +602,9 @@ func connectionBroke(err error) bool {
 }
 
 // authenticate picks a mechanism and runs it. The password is only put on the wire when the
-// connection protects it, or when it never leaves the machine.
-func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, username, password string) error {
+// connection protects it, or when it never leaves the machine. redact clears the relay's reply of
+// the recipient's address, which a relay echoing the username quotes when the two are the same.
+func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, username, password string, redact func(error) error) error {
 
 	ok, mechs := client.Extension("AUTH")
 	if !ok {
@@ -627,7 +671,7 @@ func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, user
 	}
 
 	if err := client.Auth(auth); err != nil {
-		return replyFailure(errs.WithStack(err), SendFailureAuthenticationRejected)
+		return replyFailure(errs.WithStack(redact(err)), SendFailureAuthenticationRejected)
 	}
 	return nil
 }
