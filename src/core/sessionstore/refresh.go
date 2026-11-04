@@ -32,10 +32,11 @@ func Refreshing(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		refresh := &refreshWriter{ResponseWriter: w}
 		registryFor(r).refresh = refresh
-		next.ServeHTTP(refresh, r)
 		// A handler that returned without answering leaves net/http to answer on w, beneath this
-		// writer, so the held cookie goes onto the headers now, while they are still unsent.
-		refresh.release()
+		// writer, and one that panicked leaves the recoverer above to answer on it, so the held
+		// cookie goes onto the headers as the handler ends either way, while they are still unsent.
+		defer refresh.release()
+		next.ServeHTTP(refresh, r)
 	})
 }
 

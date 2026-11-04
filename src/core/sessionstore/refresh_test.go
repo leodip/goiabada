@@ -161,6 +161,39 @@ func TestRefreshing_TheCookieGoesOutWithTheHeadersHoweverTheyAreSent(t *testing.
 	}
 }
 
+// A handler that panics after the refresh leaves the answer to the recoverer above, as the auth
+// server's root httpmw.Recoverer, which writes its 500 on the writer it was given, beneath
+// Refreshing's. The refreshed cookie still goes out on that 500: the row was touched, and under a
+// stricter setting the cookie is what replaces one that outlives the browser.
+func TestRefreshing_TheCookieGoesOutOnTheAnswerToAPanic(t *testing.T) {
+	store, _, cookie, id := staleSignedInSession(t, keepNoSignedInSession)
+	var readErr error
+	recoverer := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if recover() != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+			}()
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	w := httptest.NewRecorder()
+	recoverer(Refreshing(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, readErr = store.Get(r, storeTestName); readErr == nil {
+			panic("a handler fault")
+		}
+	}))).ServeHTTP(w, requestWith(cookie))
+
+	require.NoError(t, readErr)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	cookies := sessionCookies(store, w)
+	require.Len(t, cookies, 1)
+	assert.Equal(t, id, decodeCookieId(t, store.ServerSideStore, cookies[0]))
+	assertEndsWithTheBrowser(t, cookies[0])
+}
+
 // When the row cannot be read before the headers go out, no cookie is sent: the browser keeps the
 // one it has, where a cookie naming a removed row would sign it out. The failure is logged, unless
 // the browser abandoned the request, which ends its reads too and is no fault.
