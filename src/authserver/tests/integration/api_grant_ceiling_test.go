@@ -164,6 +164,17 @@ func putPermissions(t *testing.T, accessToken, path string, wanted, expected []i
 	return resp, requestId
 }
 
+// assertUserIdNamesAUserTarget holds a refusal row's user_id to its target: the target's id when
+// the target is a user, and no user_id at all for a group, client or resource (#780 decision 5).
+func assertUserIdNamesAUserTarget(t *testing.T, row map[string]any, kind string, targetId int64) {
+	t.Helper()
+	if kind == "user" {
+		assert.InDelta(t, float64(targetId), row["user_id"], 0, "a user target is named by user_id")
+	} else {
+		assert.NotContains(t, row, "user_id", "a %s target names no user", kind)
+	}
+}
+
 // refusalRows is the administrator_change_refused rows one request left, details decoded.
 func refusalRows(t *testing.T, readerToken, requestId string) []map[string]any {
 	t.Helper()
@@ -215,6 +226,7 @@ func assertRefusedByTheGrantCeiling(t *testing.T, resp *http.Response, requestId
 	assert.Equal(t, "grant", row["ceiling"])
 	assert.Equal(t, target.kind, row["target_kind"])
 	assert.InDelta(t, float64(targetId), row["target_id"], 0)
+	assertUserIdNamesAUserTarget(t, row, target.kind, targetId)
 	var named []int64
 	if raw, ok := row["permission_ids"].([]any); assert.True(t, ok, "permissionIds is a list: %v", row["permission_ids"]) {
 		for _, id := range raw {

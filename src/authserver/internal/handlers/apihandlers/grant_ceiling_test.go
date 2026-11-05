@@ -156,6 +156,7 @@ func TestGrantCeiling_AGranularTokenChangingAnAdministrativePermissionIsRefused(
 				assert.Equal(t, "grant", record.details["ceiling"])
 				assert.Equal(t, save.kind, record.details["target_kind"])
 				assert.Equal(t, grantOwnerId, record.details["target_id"])
+				assertUserIdOfAUserTarget(t, record.details, save.kind, grantOwnerId)
 				assert.Equal(t, variant.causes, record.details["permission_ids"])
 			})
 		}

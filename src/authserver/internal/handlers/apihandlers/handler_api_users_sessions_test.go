@@ -133,14 +133,16 @@ func TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 
-	// The older event's payload, unchanged. Decision 9 chose two events over one extended event on
-	// compatibility grounds, so an external consumer parsing this one strictly must keep working:
-	// exactly two keys, and neither renamed.
+	// The older event's payload. Decision 9 chose two events over one extended event on
+	// compatibility grounds, so its keys are never renamed; it grows only by additive keys, the
+	// reason (#564) and the session's user_id (#780), and the whole map is held here.
 	require.NotNil(t, deletedPayload)
 	assert.Equal(t, int64(100), deletedPayload["user_session_id"])
 	assert.Equal(t, adminSubject, deletedPayload["logged_in_user"])
 	assert.Equal(t, "ended_by_administrator", deletedPayload["reason"])
-	assert.Len(t, deletedPayload, 3)
+	// The session's user, which the account and admin API both hold (#780 decision 5).
+	assert.Equal(t, int64(42), deletedPayload["user_id"])
+	assert.Len(t, deletedPayload, 4)
 
 	// The new event's payload, field by field. Asserted here rather than trusted because it is the
 	// only durable record of what a termination revoked, and a missing or renamed field is invisible

@@ -164,6 +164,7 @@ func TestSettingsCeiling_EveryCallerBelowManageIsRefused(t *testing.T) {
 				assert.Equal(t, "settings", refusal.details["ceiling"])
 				assert.NotContains(t, refusal.details, "target_kind", "a settings write has no target")
 				assert.NotContains(t, refusal.details, "target_id", "a settings write has no target")
+				assert.NotContains(t, refusal.details, "user_id", "a settings write names no user")
 				assert.NotContains(t, refusal.details, "permission_ids")
 				if caller.scope != "" {
 					assert.Equal(t, grantCaller, refusal.details["logged_in_user"])

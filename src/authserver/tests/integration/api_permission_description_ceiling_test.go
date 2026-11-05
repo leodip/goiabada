@@ -114,6 +114,7 @@ func TestPermissionDescriptionCeiling_ManageSettingsCannotRewriteAnAdministrativ
 			assert.Equal(t, "target", row["ceiling"])
 			assert.Equal(t, "resource", row["target_kind"])
 			assert.InDelta(t, float64(resource.Id), row["target_id"], 0)
+			assert.NotContains(t, row, "user_id", "a resource target names no user")
 			assert.Equal(t, []any{float64(permissionId)}, row["permission_ids"])
 		})
 	}

@@ -311,6 +311,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 			"change":      "granted",
 			"target_kind": "user",
 			"target_id":   user.Id,
+			"user_id":     user.Id,
 			"permission_identifiers": []string{
 				builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier,
 			},

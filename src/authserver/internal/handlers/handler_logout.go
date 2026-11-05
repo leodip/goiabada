@@ -604,6 +604,7 @@ func handleExistingSessionOnLogout(
 				// hint gives (#564).
 				auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
 					"user_session_id": userSession.Id,
+					"user_id":         userSession.UserId,
 					"logged_in_user":  "",
 					"reason":          audit.DeletedUserSessionSignedOut,
 				})
@@ -855,9 +856,10 @@ func deleteWholeUserSession(
 
 	// "" rather than a subject, and the key stays: /auth/logout carries no bearer token, so
 	// there is no caller identity to read, and "" is what this row has always carried. The
-	// actor is this event's own user_session_id (#385).
+	// actor is this event's own user_id, the session's user (#385, #780).
 	auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
 		"user_session_id": userSession.Id,
+		"user_id":         userSession.UserId,
 		"logged_in_user":  "",
 		"reason":          audit.DeletedUserSessionSignedOut,
 	})

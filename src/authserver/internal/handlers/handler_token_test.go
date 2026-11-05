@@ -208,7 +208,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Authorization_code successful flow", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
-		code := &record.Code{Id: 1}
+		code := &record.Code{Id: 1, ClientId: 3, UserId: 7}
 		requestSettings := &record.Settings{Issuer: "https://issuer.example"}
 		endpoint.settings = requestSettings
 		endpoint.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
@@ -217,8 +217,11 @@ func TestHandleTokenPost(t *testing.T) {
 		// The issuer is handed the request's own settings and the validated code itself.
 		endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, theseSettings(requestSettings), code).
 			Return(tokenResponse, nil).Once()
+		// The code's user and client, as the password grant's issuance names them (#780 decision 5).
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
-			"code_id": code.Id,
+			"code_id":   int64(1),
+			"user_id":   int64(7),
+			"client_id": int64(3),
 		}).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
 
@@ -370,6 +373,8 @@ func TestHandleTokenPost(t *testing.T) {
 		}).Run(func(mock.Arguments) { order = append(order, audit.EventBumpedUserSession) }).Return().Once()
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
 			"code_id":           grant.RefreshToken.Code.Id,
+			"user_id":           int64(456),
+			"client_id":         int64(123),
 			"refresh_token_jti": grant.RefreshToken.RefreshTokenJti,
 			"flow":              "auth_code",
 		}).Run(func(mock.Arguments) { order = append(order, audit.EventTokenIssuedRefreshTokenResponse) }).Return().Once()
@@ -394,6 +399,8 @@ func TestHandleTokenPost(t *testing.T) {
 		// The strict double refuses any other Log call, the bump's included.
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
 			"code_id":           grant.RefreshToken.Code.Id,
+			"user_id":           int64(456),
+			"client_id":         int64(123),
 			"refresh_token_jti": grant.RefreshToken.RefreshTokenJti,
 			"flow":              "auth_code",
 		}).Return().Once()

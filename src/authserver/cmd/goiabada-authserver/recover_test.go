@@ -720,6 +720,7 @@ func TestRecover_AppliesEachAskedActionInOneRevocation(t *testing.T) {
 		"change":                 "granted",
 		"target_kind":            "user",
 		"target_id":              after.Id,
+		"user_id":                after.Id,
 		"permission_identifiers": []string{"authserver:manage"},
 		"command":                recovery.Actor,
 	}, recorder.details[3])

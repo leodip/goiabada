@@ -320,6 +320,7 @@ func TestMembershipCeiling_AGranularTokenMovingAUserThroughAnAdministrativeGroup
 			assert.Equal(t, "grant", refusal.details["ceiling"])
 			assert.Equal(t, change.targetKind, refusal.details["target_kind"])
 			assert.Equal(t, change.targetId(administrativeGroupId), refusal.details["target_id"])
+			assertUserIdOfAUserTarget(t, refusal.details, change.targetKind, change.targetId(administrativeGroupId))
 			assert.Equal(t, []int64{permManage}, refusal.details["permission_ids"], "the administrative permission the group holds, and not its other one")
 			if change.namesGroups {
 				assert.Equal(t, []int64{administrativeGroupId}, refusal.details["group_ids"])
