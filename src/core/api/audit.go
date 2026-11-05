@@ -19,6 +19,12 @@ type AuditLogResponse struct {
 	// RequestId is the request's id as the application log carries it, empty when the entry
 	// was not written on a request (#328).
 	RequestId string `json:"requestId"`
+	// UserId is the row id of the user the entry is about, and LoggedInUserId the row id of the
+	// user whose access token made the request. Each is always on the wire, null when the row
+	// names no such user, as on every row written before the columns existed, so a page
+	// filtered by user tells the events about them from the events they made (#780 decision 6).
+	UserId         *int64 `json:"userId"`
+	LoggedInUserId *int64 `json:"loggedInUserId"`
 }
 
 type GetAuditLogsResponse struct {

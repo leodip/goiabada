@@ -106,7 +106,10 @@ var machineOnlyRefusals = map[string]machineOnlyClass{
 	"Invalid user ID":                classMissingOrBadID,
 	"Invalid user ID format":         classMissingOrBadID,
 	"Invalid user session ID format": classMissingOrBadID,
-	"Invalid version number":         classMissingOrBadID,
+	// The audit log's userId query filter. The console checks its User id box itself and never
+	// sends a malformed one, so only a hand-built request reads this (#780 decisions 3 and 8).
+	"Invalid userId value":   classMissingOrBadID,
+	"Invalid version number": classMissingOrBadID,
 
 	"expectedClientIds is required: send the client ids as you last read them, or [] if there were none.":                          classMissingExpected,
 	"expectedGroupIds is required: send the group ids as you last read them, or [] if there were none.":                            classMissingExpected,

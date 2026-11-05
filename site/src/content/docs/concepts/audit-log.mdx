@@ -200,7 +200,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `turnstile_enabled` | Under `old` and `new`: whether the Turnstile challenge is on. |
 | `turnstile_site_key` | Under `old` and `new`: the site key of the Turnstile widget. |
 | `user_attribute_id` | The row id of a user's custom attribute. |
-| `user_id` | The user's row id. |
+| `user_id` | The row id of the user the entry is about. It also fills the entry's `user_id` column, which the Admin API's `userId` filter matches. |
 | `user_session_id` | The row id of a user's session. |
 | `user_session_idle_timeout_in_seconds` | Under `old` and `new`: the session idle timeout, in seconds. |
 | `user_session_max_lifetime_in_seconds` | Under `old` and `new`: the session maximum lifetime, in seconds. |
@@ -222,7 +222,7 @@ Every `deleted_user_session` entry names the session's user by `user_id`, and ha
 
 ## The Admin API
 
-- [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (1 to 200; anything else gets the default, 20), and the `auditEvent` and `requestId` filters, each an exact match.
+- [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (1 to 200; anything else gets the default, 20), and three filters. `auditEvent` and `requestId` are each an exact match. `userId`, a user's row id, lists the events about that user and the ones they made: those whose `user_id` or `logged_in_user_id` column holds it, each once. It finds a deleted user's events too. The filters you set combine, so `userId=42&auditEvent=deleted_user_session` lists the ends of user 42's sessions. Each entry carries the two columns as `userId` and `loggedInUserId`, `null` when the event names no such user.
 - [`GET /api/v1/admin/audit-logs/event-types`](/reference/api/admin/operations/getauditeventtypes/) returns every event name the server can write. The viewer's event list comes from here, so it includes events that haven't happened yet.
 - [`GET /api/v1/admin/settings/audit-logs`](/reference/api/admin/operations/getsettingsauditlogs/) and [`PUT`](/reference/api/admin/operations/updatesettingsauditlogs/) read and change the two switches and the retention.
 

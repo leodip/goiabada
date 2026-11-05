@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -405,4 +407,239 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 			assert.Equal(t, 1, found.Total, "the generated id must be searchable like any other")
 		}
 	})
+}
+
+// #780: the userId filter and the two user columns every entry answers.
+
+// seededRow is one audit row a user-filter test writes: who it is about, who made it, and the
+// request it was written on. A zero user id leaves that column NULL, as on a row written before
+// the columns existed.
+type seededRow struct {
+	userId, loggedInUserId int64
+	requestId              string
+}
+
+// seedAuditLogsWithUsers writes rows under a unique event name, oldest first and a second apart,
+// each with its seq in the details, and returns the event name.
+func seedAuditLogsWithUsers(t *testing.T, rows []seededRow) string {
+	t.Helper()
+	auditEvent := "test_audit_event_" + fake.LetterN(10)
+	base := time.Now().UTC().Add(-time.Duration(len(rows)) * time.Second)
+
+	for i, row := range rows {
+		auditLog := &record.AuditLog{
+			CreatedAt:      base.Add(time.Duration(i) * time.Second),
+			AuditEvent:     auditEvent,
+			Details:        fmt.Sprintf(`{"seq":%d}`, i),
+			RequestId:      row.requestId,
+			UserId:         sql.NullInt64{Int64: row.userId, Valid: row.userId != 0},
+			LoggedInUserId: sql.NullInt64{Int64: row.loggedInUserId, Valid: row.loggedInUserId != 0},
+		}
+		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
+	}
+	return auditEvent
+}
+
+// userIdOfNoRealUser is an id far above any user this suite creates, so the rows a test seeds
+// under it are the only rows the filter can find.
+func userIdOfNoRealUser() int64 {
+	return int64(fake.Number(1_000_000_000, 1_900_000_000))
+}
+
+// seqs is each entry's seq, in the order the page answered them.
+func seqs(t *testing.T, entries []api.AuditLogResponse) []int {
+	t.Helper()
+	out := make([]int, 0, len(entries))
+	for _, entry := range entries {
+		var details struct {
+			Seq int `json:"seq"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
+		out = append(out, details.Seq)
+	}
+	return out
+}
+
+func int64Ptr(v int64) *int64 { return &v }
+
+func TestAPIAuditLogsGet_UserFilter(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	user := userIdOfNoRealUser()
+	other := user + 1
+	requestId := "user-filter-" + fake.LetterN(16)
+
+	auditEvent := seedAuditLogsWithUsers(t, []seededRow{
+		{userId: user},                                // 0: about the user
+		{userId: other, loggedInUserId: user},         // 1: made by the user
+		{userId: user, loggedInUserId: user},          // 2: about and by the user, listed once
+		{userId: other, loggedInUserId: other},        // 3: naming neither
+		{},                                            // 4: no user columns
+		{userId: user, requestId: requestId},          // 5: about the user, on the request
+		{loggedInUserId: other, requestId: requestId}, // 6: on the request, naming neither
+		{userId: other, loggedInUserId: user, requestId: requestId}, // 7: by the user, on the request
+	})
+	// A row about the user under another event, which only the filters without auditEvent list.
+	otherEvent := seedAuditLogsWithUsers(t, []seededRow{{userId: user, requestId: requestId}})
+
+	testCases := []struct {
+		name     string
+		query    string
+		wantSeqs []int
+		events   []string
+	}{
+		{"the user and the event list the rows about them or by them, newest first",
+			"userId=%d&auditEvent=" + auditEvent, []int{7, 5, 2, 1, 0}, nil},
+		{"the user and the request id",
+			"userId=%d&requestId=" + requestId, []int{0, 7, 5}, []string{otherEvent, auditEvent, auditEvent}},
+		{"all three",
+			"userId=%d&requestId=" + requestId + "&auditEvent=" + auditEvent, []int{7, 5}, nil},
+		{"the user alone",
+			"userId=%d", []int{0, 7, 5, 2, 1, 0}, []string{otherEvent, auditEvent, auditEvent, auditEvent, auditEvent, auditEvent}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			body, resp := getAuditLogs(t, accessToken, fmt.Sprintf(tc.query, user))
+			defer func() { _ = resp.Body.Close() }()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Equal(t, len(tc.wantSeqs), body.Total)
+			assert.Equal(t, tc.wantSeqs, seqs(t, body.AuditLogs))
+			if tc.events != nil {
+				events := make([]string, 0, len(body.AuditLogs))
+				for _, entry := range body.AuditLogs {
+					events = append(events, entry.AuditEvent)
+				}
+				assert.Equal(t, tc.events, events)
+			}
+		})
+	}
+
+	t.Run("each entry answers the user it is about and the user who acted, null when none", func(t *testing.T) {
+		body, resp := getAuditLogs(t, accessToken, "auditEvent="+auditEvent)
+		defer func() { _ = resp.Body.Close() }()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(t, []int{7, 6, 5, 4, 3, 2, 1, 0}, seqs(t, body.AuditLogs))
+		// Newest first: seq 7 down to seq 0.
+		wantUserIds := []*int64{int64Ptr(other), nil, int64Ptr(user), nil,
+			int64Ptr(other), int64Ptr(user), int64Ptr(other), int64Ptr(user)}
+		wantLoggedInUserIds := []*int64{int64Ptr(user), int64Ptr(other), nil, nil,
+			int64Ptr(other), int64Ptr(user), int64Ptr(user), nil}
+		for i, entry := range body.AuditLogs {
+			assert.Equal(t, wantUserIds[i], entry.UserId, "seq %d's userId", 7-i)
+			assert.Equal(t, wantLoggedInUserIds[i], entry.LoggedInUserId, "seq %d's loggedInUserId", 7-i)
+		}
+	})
+
+	t.Run("an id no row names answers an empty page", func(t *testing.T) {
+		body, resp := getAuditLogs(t, accessToken, fmt.Sprintf("userId=%d", userIdOfNoRealUser()+1_000_000_000))
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, 0, body.Total)
+		assert.Empty(t, body.AuditLogs)
+	})
+
+	t.Run("the user filter pages like the others", func(t *testing.T) {
+		body, resp := getAuditLogs(t, accessToken, fmt.Sprintf("userId=%d&auditEvent=%s&page=2&size=2", user, auditEvent))
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, 5, body.Total, "the total counts every match, not this page")
+		assert.Equal(t, []int{2, 1}, seqs(t, body.AuditLogs))
+	})
+}
+
+// A userId that is not a positive integer is refused, never ignored: ignoring it would list every
+// user's events under a filter the caller believes is set (#780 decision 3).
+func TestAPIAuditLogsGet_AUserIdThatIsNotAPositiveIntegerIsRefused(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	for _, value := range []string{"abc", "0", "-4", "4.0", "99999999999999999999"} {
+		t.Run(value, func(t *testing.T) {
+			resp := makeAPIRequest(t, "GET",
+				appConfig.AuthServer.BaseURL+auditLogsURL+"?userId="+url.QueryEscape(value), accessToken, nil)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var body api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, "VALIDATION_ERROR", body.ErrorCode)
+		})
+	}
+}
+
+// End to end: a change an administrator makes through the Admin API with their own token is listed
+// under the user changed and under the administrator, and says which is which. Disabling a user
+// writes two entries, the change and the revocation it causes, and both name the two users.
+func TestAPIAuditLogsGet_AChangeIsListedUnderBothUsers(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	readToken, _ := createAdminClientWithToken(t)
+	adminToken, administrator := createUserAccessTokenWithScope(t,
+		builtin.AuthServerResourceIdentifier+":"+builtin.ManageUsersPermissionIdentifier)
+	changed := createUserToChange(t)
+	require.NotEqual(t, administrator.Id, changed.Id)
+
+	requestId := disableUserUnderRequestId(t, adminToken, changed)
+
+	for _, who := range []struct {
+		name string
+		id   int64
+	}{{"under the user changed", changed.Id}, {"under the administrator", administrator.Id}} {
+		t.Run(who.name, func(t *testing.T) {
+			body, resp := getAuditLogs(t, readToken,
+				fmt.Sprintf("userId=%d&requestId=%s", who.id, url.QueryEscape(requestId)))
+			defer func() { _ = resp.Body.Close() }()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			require.Equal(t, 2, body.Total)
+			events := []string{}
+			for _, entry := range body.AuditLogs {
+				events = append(events, entry.AuditEvent)
+				assert.Equal(t, int64Ptr(changed.Id), entry.UserId,
+					"%s: userId is the user the change was made to", entry.AuditEvent)
+				assert.Equal(t, int64Ptr(administrator.Id), entry.LoggedInUserId,
+					"%s: loggedInUserId is the administrator whose token made the change", entry.AuditEvent)
+			}
+			assert.Equal(t, []string{"revoked_user_auth_state", "updated_user_details"}, events)
+		})
+	}
+
+	t.Run("not under a user it does not name", func(t *testing.T) {
+		body, resp := getAuditLogs(t, readToken,
+			fmt.Sprintf("userId=%d&requestId=%s", userIdOfNoRealUser(), url.QueryEscape(requestId)))
+		defer func() { _ = resp.Body.Close() }()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, 0, body.Total, "the request's entries name two users, and this is neither")
+		assert.Empty(t, body.AuditLogs)
+	})
+}
+
+// A client credentials token has no user, so the change it makes is listed under the user changed
+// only, and answers loggedInUserId null.
+func TestAPIAuditLogsGet_AChangeMadeWithAClientCredentialsTokenNamesNoActingUser(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	clientToken, client := createAdminClientWithToken(t)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	changed := createUserToChange(t)
+
+	requestId := disableUserUnderRequestId(t, clientToken, changed)
+
+	// All three filters together: the change's own entry, on its request, about the user.
+	query := fmt.Sprintf("userId=%d&requestId=%s&auditEvent=updated_user_details", changed.Id,
+		url.QueryEscape(requestId))
+	body, resp := getAuditLogs(t, clientToken, query)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, 1, body.Total)
+	assert.Equal(t, int64Ptr(changed.Id), body.AuditLogs[0].UserId)
+	assert.Nil(t, body.AuditLogs[0].LoggedInUserId, "a client credentials token names no acting user")
+
+	raw := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+auditLogsURL+"?"+query, clientToken, nil)
+	defer func() { _ = raw.Body.Close() }()
+	rawBody, err := io.ReadAll(raw.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(rawBody), `"loggedInUserId":null`, "the key is present, and null")
 }
