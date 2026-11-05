@@ -18,6 +18,7 @@ import (
 // Both directions, and both a populated and a zero value per type, so an omitempty added or
 // removed shows up rather than only a tag rename.
 func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
+	falseValue := false
 	tests := []struct {
 		name     string
 		want     any
@@ -27,13 +28,15 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 		{
 			name: "DynamicClientRegistrationRequest",
 			want: &DynamicClientRegistrationRequest{
-				RedirectURIs:            []string{"https://client.example.org/callback"},
-				PostLogoutRedirectURIs:  []string{"https://client.example.org/signed-out"},
-				TokenEndpointAuthMethod: "client_secret_basic",
-				GrantTypes:              []string{"authorization_code", "refresh_token"},
-				ClientName:              "Example Client",
-				PolicyURI:               "https://client.example.org/privacy",
-				TOSURI:                  "https://client.example.org/terms",
+				RedirectURIs:                     []string{"https://client.example.org/callback"},
+				PostLogoutRedirectURIs:           []string{"https://client.example.org/signed-out"},
+				TokenEndpointAuthMethod:          "client_secret_basic",
+				GrantTypes:                       []string{"authorization_code", "refresh_token"},
+				ClientName:                       "Example Client",
+				PolicyURI:                        "https://client.example.org/privacy",
+				TOSURI:                           "https://client.example.org/terms",
+				BackchannelLogoutURI:             "https://client.example.org/backchannel-logout",
+				BackchannelLogoutSessionRequired: true,
 			},
 			newValue: func() any { return &DynamicClientRegistrationRequest{} },
 			literal: `{"redirect_uris":["https://client.example.org/callback"],` +
@@ -42,7 +45,9 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				`"grant_types":["authorization_code","refresh_token"],` +
 				`"client_name":"Example Client",` +
 				`"policy_uri":"https://client.example.org/privacy",` +
-				`"tos_uri":"https://client.example.org/terms"}`,
+				`"tos_uri":"https://client.example.org/terms",` +
+				`"backchannel_logout_uri":"https://client.example.org/backchannel-logout",` +
+				`"backchannel_logout_session_required":true}`,
 		},
 		{
 			// Every field of the request is optional, so the zero value is the empty object.
@@ -56,17 +61,19 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 		{
 			name: "DynamicClientRegistrationResponse",
 			want: &DynamicClientRegistrationResponse{
-				ClientID:                "generated-client-id",
-				ClientSecret:            "generated-client-secret",
-				ClientIDIssuedAt:        1758326400,
-				ClientSecretExpiresAt:   0,
-				RedirectURIs:            []string{"https://client.example.org/callback"},
-				PostLogoutRedirectURIs:  []string{"https://client.example.org/signed-out"},
-				TokenEndpointAuthMethod: "client_secret_basic",
-				GrantTypes:              []string{"authorization_code", "refresh_token"},
-				ClientName:              "Example Client",
-				PolicyURI:               "https://client.example.org/privacy",
-				TOSURI:                  "https://client.example.org/terms",
+				ClientID:                         "generated-client-id",
+				ClientSecret:                     "generated-client-secret",
+				ClientIDIssuedAt:                 1758326400,
+				ClientSecretExpiresAt:            0,
+				RedirectURIs:                     []string{"https://client.example.org/callback"},
+				PostLogoutRedirectURIs:           []string{"https://client.example.org/signed-out"},
+				TokenEndpointAuthMethod:          "client_secret_basic",
+				GrantTypes:                       []string{"authorization_code", "refresh_token"},
+				ClientName:                       "Example Client",
+				PolicyURI:                        "https://client.example.org/privacy",
+				TOSURI:                           "https://client.example.org/terms",
+				BackchannelLogoutURI:             "https://client.example.org/backchannel-logout",
+				BackchannelLogoutSessionRequired: &falseValue,
 			},
 			newValue: func() any { return &DynamicClientRegistrationResponse{} },
 			literal: `{"client_id":"generated-client-id",` +
@@ -79,7 +86,10 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				`"grant_types":["authorization_code","refresh_token"],` +
 				`"client_name":"Example Client",` +
 				`"policy_uri":"https://client.example.org/privacy",` +
-				`"tos_uri":"https://client.example.org/terms"}`,
+				`"tos_uri":"https://client.example.org/terms",` +
+				`"backchannel_logout_uri":"https://client.example.org/backchannel-logout",` +
+				// false is a value beside a stored URI (#784 decision 10), so it is echoed.
+				`"backchannel_logout_session_required":false}`,
 		},
 		{
 			// A public client gets no secret, and the four members RFC 7591 section 3.2.1

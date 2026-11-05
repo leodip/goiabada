@@ -22,6 +22,14 @@ type DynamicClientRegistrationRequest struct {
 	PolicyURI string `json:"policy_uri,omitempty"`
 	TOSURI    string `json:"tos_uri,omitempty"`
 
+	// BackchannelLogoutURI is where the auth server POSTs a logout token when a session the client
+	// was on ends (OpenID Connect Back-Channel Logout 1.0 section 2.2), and
+	// BackchannelLogoutSessionRequired whether every token must name the session, false by default.
+	// A self-registered client's URI must use https whatever its type, and the flag is stored only
+	// with a URI (#784 decision 10).
+	BackchannelLogoutURI             string `json:"backchannel_logout_uri,omitempty"`
+	BackchannelLogoutSessionRequired bool   `json:"backchannel_logout_session_required,omitempty"`
+
 	// All other fields ignored per RFC 7591 §2:
 	// "The authorization server MUST ignore any client metadata
 	//  sent by the client that it does not understand"
@@ -49,6 +57,11 @@ type DynamicClientRegistrationResponse struct {
 	// section 3.2.1 lets the server reject or replace a requested value).
 	PolicyURI string `json:"policy_uri,omitempty"`
 	TOSURI    string `json:"tos_uri,omitempty"`
+	// BackchannelLogoutURI and BackchannelLogoutSessionRequired are what was stored, both present
+	// whenever a URI was and both absent otherwise, so the flag is a pointer: false is echoed beside
+	// a stored URI (#784 decision 10).
+	BackchannelLogoutURI             string `json:"backchannel_logout_uri,omitempty"`
+	BackchannelLogoutSessionRequired *bool  `json:"backchannel_logout_session_required,omitempty"`
 }
 
 // DynamicClientRegistrationError represents RFC 7591 §3.2.2 error response

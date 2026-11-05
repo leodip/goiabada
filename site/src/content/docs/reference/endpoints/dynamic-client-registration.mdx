@@ -54,7 +54,7 @@ While DCR is on, **anyone** who can reach `/connect/register` can create a clien
 
 ## The request
 
-The body is a JSON object. The auth server reads seven fields and ignores every other one, as RFC 7591 asks:
+The body is a JSON object. The auth server reads nine fields and ignores every other one, as RFC 7591 asks:
 
 | Field | What it does |
 |---|---|
@@ -65,6 +65,8 @@ The body is a JSON object. The auth server reads seven fields and ignores every 
 | `client_name` | The name the consent screen shows, up to 100 characters, the bound of the client's description it's stored as, with no `<` or `>`. |
 | `policy_uri` | The app's privacy policy, which the consent screen links. Kept only on one of the client's hosts: see [Privacy policy and terms of service](#privacy-policy-and-terms-of-service) below. |
 | `tos_uri` | The app's terms of service, which the consent screen links. Kept only on one of the client's hosts, as `policy_uri` is. |
+| `backchannel_logout_uri` | Where the auth server tells the app that a user's session ended: the client's [back-channel logout URI](/concepts/clients/#back-channel-logout). Optional. See [Back-channel logout](#back-channel-logout) below. |
+| `backchannel_logout_session_required` | `true` when the app needs the session identifier, `sid`, in every logout token it's sent. Optional, `false` by default, and stored only with a `backchannel_logout_uri`. |
 
 `refresh_token` is accepted and sets nothing of its own: a client that may use the authorization code flow can redeem the refresh tokens it gets.
 
@@ -75,6 +77,12 @@ A body larger than 64 KiB is refused as one that can't be read.
 A self-registered client's redirect URIs follow the [rules for every client](/concepts/clients/#redirect-uris), and the stricter ones on [Redirect URIs for self-registered clients](/concepts/clients/#redirect-uris-for-self-registered-clients): a public client gets loopback `http` and custom schemes, a confidential one `https` and loopback `http`. On top of those, a registration holds at most 60 redirect URIs, each up to 2,048 bytes, and none listed twice.
 
 `post_logout_redirect_uris` follows the same rules, for the same kind of client, and holds up to 60 entries of its own. A sign-out matches them exactly, port included, as [Sign-out redirect URIs](/concepts/clients/#sign-out-redirect-uris) explains, and never uses `redirect_uris`.
+
+## Back-channel logout
+
+A `backchannel_logout_uri` follows the [rules for every client](/concepts/clients/#back-channel-logout), and must use `https`, whether the client is public or confidential: `http` is refused, on `127.0.0.1` and `localhost` too. The registration must also ask for the `authorization_code` grant type, since a client that signs no users in has no session to end.
+
+A URI that breaks these rules refuses the registration with `invalid_client_metadata`. It isn't dropped, as a `policy_uri` is. `backchannel_logout_session_required` sent without a URI is stored as `false`.
 
 ## Privacy policy and terms of service
 
@@ -120,6 +128,8 @@ A registration is answered `201 Created`, with `Cache-Control: no-store`, and th
 | `client_name` | The name, when one was sent |
 | `policy_uri` | The privacy policy URL, when one was sent and [kept](#privacy-policy-and-terms-of-service) |
 | `tos_uri` | The terms of service URL, when one was sent and [kept](#privacy-policy-and-terms-of-service) |
+| `backchannel_logout_uri` | The back-channel logout URI, when one was sent |
+| `backchannel_logout_session_required` | Whether every logout token names the session, `true` or `false`, beside a `backchannel_logout_uri` |
 
 ## Errors
 
@@ -139,7 +149,7 @@ Cache-Control: no-store
 | `error` | Status | Why |
 |---|---|---|
 | `access_denied` | 403 | DCR is off: "Dynamic client registration is not enabled" |
-| `invalid_client_metadata` | 400 | The body isn't JSON or is too large, or a field holds a value the auth server doesn't take: an unknown `token_endpoint_auth_method`, a grant type it doesn't take, `implicit` and `password` included, `client_credentials` on a public client, a `client_name` too long or holding `<` or `>`, or a sign-out redirect URI that's malformed, refused for this kind of client, too long, listed twice, or one too many |
+| `invalid_client_metadata` | 400 | The body isn't JSON or is too large, or a field holds a value the auth server doesn't take: an unknown `token_endpoint_auth_method`, a grant type it doesn't take, `implicit` and `password` included, `client_credentials` on a public client, a `client_name` too long or holding `<` or `>`, a sign-out redirect URI that's malformed, refused for this kind of client, too long, listed twice, or one too many, a [back-channel logout URI](#back-channel-logout) the auth server can't use, or a `backchannel_logout_session_required` that isn't `true` or `false` |
 | `invalid_redirect_uri` | 400 | A redirect URI is missing, malformed, refused for this kind of client, too long, listed twice, or one too many |
 | `server_error` | 500 | The auth server couldn't save the client. Nothing was registered. |
 
