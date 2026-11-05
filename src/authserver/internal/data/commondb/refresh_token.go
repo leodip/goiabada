@@ -554,24 +554,22 @@ func (d *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 // deleteRefreshTokensByColumn removes every refresh token whose given column
 // matches, used to clear a parent's tokens before deleting the parent itself.
 //
-// SQL Server cannot cascade refresh_tokens.user_id or .client_id. refresh_tokens
-// already cascades from codes, and codes cascades from both users and clients, so
-// a direct cascade would be a second delete path into the same table, which SQL
-// Server rejects as "cycles or multiple cascade paths". Its migration therefore
-// declares both foreign keys ON DELETE NO ACTION (mssqldb migration 000011), and
-// a refresh token issued without a code then blocks deletion of its user or
-// client outright:
+// refresh_tokens.user_id and .client_id are ON DELETE NO ACTION on all four
+// engines (each schema.golden); only refresh_tokens.code_id cascades. So on every
+// engine, not only SQL Server, a refresh token issued without a code blocks
+// deletion of its user or client outright, as SQL Server reports it:
 //
 //	The DELETE statement conflicted with the REFERENCE constraint
 //	"fk_refresh_tokens_user" ... table "dbo.refresh_tokens", column 'user_id'.
 //
 // Codeless tokens are not hypothetical: the ROPC grant creates exactly that shape
-// (TokenIssuer.generateRefreshTokenForROPC, "no Code reference"), so on SQL Server
-// any user who had used ROPC could not be deleted at all.
+// (TokenIssuer.generateRefreshTokenForROPC, "no Code reference"), so without this
+// delete any user or client that had used ROPC could not be deleted at all.
 //
-// This runs on every engine rather than only on SQL Server. The other three would
-// have cascaded these rows anyway, so the result is identical, and one code path
-// that all four exercise is worth more than the statement it saves.
+// SQL Server could not cascade these two keys even if asked: refresh_tokens
+// already cascades from codes, and codes cascades from both users and clients, so
+// a direct cascade would be a second delete path into the same table, which SQL
+// Server rejects as "cycles or multiple cascade paths" (mssqldb migration 000011).
 func (d *Database) deleteRefreshTokensByColumn(ctx context.Context, tx *sql.Tx, column string, value int64) error {
 	var s statement
 	switch column {
