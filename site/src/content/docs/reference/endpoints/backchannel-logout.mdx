@@ -1,0 +1,112 @@
+---
+title: Back-channel logout
+description: What the auth server POSTs to your app's back-channel logout URI when a user's session ends, how it retries, and what your app answers.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page tells you what the auth server sends to your app's back-channel logout URI when a user's session ends, and what your app must answer.
+
+It's [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html). "Back-channel" means the auth server calls your app's server directly, not through the user's browser, so your app hears about the end even when the user isn't there. The auth server advertises it in the [discovery document](/reference/endpoints/discovery-and-jwks/) as `backchannel_logout_supported` and `backchannel_logout_session_supported`. To receive the calls, follow [Get told when a session ends](/guides/sign-users-out/#get-told-when-a-session-ends).
+
+## How a delivery goes
+
+<Steps>
+
+1. A user's session ends while it's still valid: someone ends it, the user signs out, a different user signs in on the browser, and the other ends [Telling your apps](/concepts/ending-sessions/#telling-your-apps) lists.
+
+2. Once the end is saved, the auth server signs one logout token for each app the session was on that has a [back-channel logout URI](/concepts/clients/#back-channel-logout), and POSTs it there. The request that ended the session doesn't wait for it.
+
+3. Your app checks the token, ends its own sessions for that user, and answers `200 OK`.
+
+</Steps>
+
+A session that expires is never sent, and neither is an app without a URI. Disabling or deleting a user, a password reset, an administrator setting the password and the `recover` command send one token to each app that knew the user, naming the user and no session: see [Telling the apps that knew the user](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user).
+
+## The request
+
+A POST with the token as `logout_token` in a form body, and no cookie or credentials:
+
+```http
+POST /backchannel-logout HTTP/1.1
+Host: app.example.com
+Content-Type: application/x-www-form-urlencoded
+
+logout_token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiIsInR5cCI6ImxvZ291dCtqd3QifQ...
+```
+
+The URI's query, if you registered one, is sent as you registered it.
+
+## The logout token
+
+A JWT signed with the same key as ID tokens, so your app checks it against the keys at [`/certs`](/reference/endpoints/discovery-and-jwks/#the-key-set). It's never encrypted. Its header:
+
+| Member | Value |
+|---|---|
+| `alg` | `RS256` |
+| `kid` | The key that signed it |
+| `typ` | `logout+jwt`. An ID token says `JWT`, so the two can't be mistaken for each other |
+
+Its claims:
+
+| Claim | Value |
+|---|---|
+| `iss` | The issuer, as in the discovery document's `issuer` |
+| `aud` | Your client's identifier, the `client_id` |
+| `iat` | When it was signed, in seconds since 1970 |
+| `exp` | 120 seconds after `iat` |
+| `jti` | A new UUID for each delivery |
+| `events` | `{"http://schemas.openid.net/event/backchannel-logout": {}}` |
+| `sub` | The user, as in their ID tokens. Always there |
+| `sid` | The session that ended, as in the ID tokens issued through it. Left out of a token about every session of the user |
+
+A token never has a `nonce` or an `nbf`.
+
+An app that [requires the session identifier](/concepts/clients/#back-channel-logout) always gets `sid`: where another app would get one token with no `sid`, it gets one for each of the user's sessions it was on that was still valid.
+
+## What your app answers
+
+| Your answer | What the auth server does |
+|---|---|
+| `200 OK`, or any other 2xx | Counts it as delivered |
+| `400 Bad Request`, or any other 4xx but 408 and 429 | Gives up: the token was refused |
+| A 3xx | Gives up. The redirect is never followed |
+| 408, 429 or a 5xx | Sends the same token again |
+| Nothing within 5 seconds, or no connection | Sends the same token again |
+
+Answer `200` once your app has ended the sessions, and also when it has none for that user: it's already signed out. Answer `400` for a token that fails a check. Send `Cache-Control: no-store` with both. The body of your answer is ignored.
+
+## Retries
+
+Each attempt has 5 seconds for the connection, TLS and your answer. A delivery has at most three attempts, about 0, 15 and 60 seconds after the token was signed, each moved by up to a tenth so many retries don't arrive at once. Every attempt carries the same token, `jti` included, and none starts too late to finish before the token expires. `Retry-After` isn't read.
+
+A certificate the auth server doesn't trust ends the delivery at once, since a retry would meet it again. An `https` URI needs a certificate from an authority the auth server's system trusts.
+
+## Where the auth server connects
+
+A client an administrator created is reached at any address, plain `http` included for a confidential client, through the proxy in `HTTPS_PROXY` or `HTTP_PROXY` when one is set. A [self-registered client](/concepts/clients/#self-registered-clients) is reached only over `https` and at a public address, checked on the address the auth server connects to, and never through a proxy.
+
+Where a firewall or an egress policy limits what the auth server reaches, allow your apps' back-channel logout URIs.
+
+## When a delivery is lost
+
+A delivery that gets no answer after its last attempt is given up. So is one still running when the auth server stops, and one dropped because too many were already running: deliveries are kept in memory only. Nothing sends it later, so your app has to find out on its own, and that isn't always possible:
+
+- **Ending a session, a different user signing in on the browser, a reused authorization code, a credential change, and disabling or deleting the user** revoke the session's refresh tokens. Your app learns at its next refresh, which fails.
+- **A sign-out and a sign-in ending an older session** revoke nothing. A normal refresh token stops working with the session, but an offline refresh token keeps working, so an app holding one stays signed in.
+
+<Aside type="caution">
+An app that must stop when the user's session does shouldn't ask for `offline_access`. A normal refresh token stops working with the session, however the session ends, whether or not the logout token arrived.
+</Aside>
+
+## The audit log and metrics
+
+Each delivery leaves a `sent_logout_token` entry in the [audit log](/concepts/audit-log/) when it finishes, naming the client, the user, the session, the token's `jti`, the `outcome` and the number of `attempts`. A delivery that isn't delivered also writes a warning to the [logs](/deploy/logs/), with the status or the error. The metric `goiabada_backchannel_logout_deliveries_total` counts deliveries by outcome: see [Monitoring](/deploy/monitoring/).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Sign users out" description="Receive logout tokens in your app, step by step." href="/guides/sign-users-out/#get-told-when-a-session-ends" />
+  <LinkCard title="Clients" description="Register a back-channel logout URI, and its rules." href="/concepts/clients/#back-channel-logout" />
+  <LinkCard title="Ending sessions" description="Every end of a session, and which apps each one tells." href="/concepts/ending-sessions/#telling-your-apps" />
+</CardGrid>

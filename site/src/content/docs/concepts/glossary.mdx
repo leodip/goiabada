@@ -58,6 +58,10 @@ The server that signs users in and issues tokens. It serves the OAuth2 and OpenI
 
 A short-lived, single-use code the auth server sends to a client after the user signs in. The client exchanges it at `/auth/token` for tokens. See [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/).
 
+### Back-channel logout URI
+
+An address on your app's server where the auth server tells your app that a user's session ended, by POSTing a logout token to it directly rather than through the browser. You register it on the client's **Back-channel logout** tab. See [Back-channel logout](/concepts/clients/#back-channel-logout).
+
 ### Claim
 
 One piece of information inside a token, such as `sub` (who the user is) or `email`.
@@ -100,6 +104,10 @@ An API asking the auth server whether a token is still active, at [`/auth/intros
 ### Legal document
 
 A privacy notice or terms of use you write in the admin console, under **Legal documents**, and publish as numbered versions that never change. A document's kind says what users do with it: they accept each version of one marked **Users must accept**, and read one marked **For information**. See [Publish legal documents](/guides/publish-legal-documents/).
+
+### Logout token
+
+A signed JWT the auth server sends to a client's back-channel logout URI when a session the client was on ends. It names the user (`sub`) and, unless it's about every session of the user, the session (`sid`), so the app can end its own session for them. Its header says `typ` `logout+jwt`, which tells it apart from an ID token. See [Back-channel logout](/reference/endpoints/backchannel-logout/).
 
 ### Permission
 

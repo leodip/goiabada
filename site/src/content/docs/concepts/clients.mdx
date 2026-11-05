@@ -132,7 +132,7 @@ Through the Admin API, replace the list whole with [`PUT /api/v1/admin/clients/{
 
 ## Back-channel logout
 
-A back-channel logout URI is an address on your app's server where the auth server tells your app that a user's session ended. It POSTs a signed logout token there, as [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) describes. A client without one is sent nothing.
+A back-channel logout URI is an address on your app's server where the auth server tells your app that a user's session ended. It POSTs a signed logout token there, as [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) describes. A client without one is sent nothing. [Get told when a session ends](/guides/sign-users-out/#get-told-when-a-session-ends) shows how your app receives it.
 
 - **It uses `https`.** A confidential client may use plain `http` on any host, such as `http://app:3000/backchannel-logout` on a private network. A public client can't, and neither can a [self-registered client](#self-registered-clients) when it registers.
 - **It's an absolute URI that names a host,** at most 2048 bytes, with no user name or password and no fragment. A query is allowed, and kept exactly as you enter it.

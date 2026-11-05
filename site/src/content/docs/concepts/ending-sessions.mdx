@@ -49,7 +49,7 @@ Ending a session also tells the apps the session was signed in to. Each one with
 
 A session that has expired tells nobody, whatever removes it. Disabling or deleting a user, a password reset, an administrator setting the password and the `recover` command tell every app that knew the user instead, expired sessions or not: see [Credential changes](#credential-changes).
 
-The tokens go out once the session has ended, and the request that ended it doesn't wait for them. An app that can't be reached, doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429 is sent the same token again about 15 seconds and about a minute later. Each delivery leaves a `sent_logout_token` entry in the audit log, whose `outcome` says whether the app was told.
+The tokens go out once the session has ended, and the request that ended it doesn't wait for them. An app that can't be reached, doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429 is sent the same token again about 15 seconds and about a minute later. Each delivery leaves a `sent_logout_token` entry in the audit log, whose `outcome` says whether the app was told. [Back-channel logout](/reference/endpoints/backchannel-logout/) gives the request, the token and what your app answers.
 
 A delivery that never succeeds is given up, and so is one still being tried when the auth server stops. Ending a session, a different user signing in, a reused code and a credential change revoke the refresh tokens all the same, so such an app learns at its next refresh that the session is over. A sign-out and a sign-in ending an older session revoke nothing: an app holding an offline refresh token from that session keeps refreshing after a lost delivery, and stays signed in.
 

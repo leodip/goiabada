@@ -1,6 +1,6 @@
 ---
 title: Sign users out
-description: Sign a user out of your app and of the auth server, and bring them back to your app afterwards.
+description: Sign a user out of your app and of the auth server, bring them back to your app afterwards, and get told when their session ends.
 ---
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
@@ -56,6 +56,8 @@ With the ID token as its hint, a sign-out ends your app's part of the user's ses
 
 A sign-out with no hint, or with one the auth server can't confirm, asks the user "Do you want to sign out?" first, and when they click **Sign out**, it ends the whole session, every client's part of it. RP-Initiated Logout, the OpenID Connect standard the endpoint follows, asks for that, since anyone can send a browser to `/auth/logout`. [Ending sessions](/concepts/ending-sessions/#signing-out) has the precise rules.
 
+When your client has a [back-channel logout URI](#get-told-when-a-session-ends), a sign-out with the hint sends your app a logout token for its part of the session too, after it has already ended its own. Answer it with `200` like any other. A sign-out with no hint sends one to every app on the session.
+
 An ID token that has expired still works as a hint while the session it came from is there, so a user who leaves your app open all day can still sign out without the question.
 
 ## Your app's tokens
@@ -95,6 +97,53 @@ A confidential client can go further and encrypt the hint with a key made from i
 
 A POST from another origin with no hint, whether another site or another host of the same domain, is refused with `403 Forbidden`, to stop a page you don't control from signing your users out. See [Sign-out answers 403](/troubleshooting/sign-out-answers-403/).
 
+## Get told when a session ends
+
+Your app's own session can outlive the user's session on the auth server: when they sign out of another app with no hint, someone ends their session under **Account**, **Sessions**, or an administrator disables them. Give your client a back-channel logout URI, and the auth server tells your app each time a session it was on ends, by POSTing a signed logout token there, as [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) describes. Your app then signs the user out at once.
+
+<Steps>
+
+1. Add a route to your app's server, such as `https://app.example.com/backchannel-logout`. Enter it on your client's **Back-channel logout** tab in the admin console, and click **Save**. The auth server calls it directly, not through the browser, so the auth server must be able to reach it, and the call carries no cookie: leave the route out of your app's sign-in and CSRF checks. [Back-channel logout](/concepts/clients/#back-channel-logout) gives the URI's rules.
+
+2. When the auth server calls it, read `logout_token` from the form body:
+
+   ```http
+   POST /backchannel-logout HTTP/1.1
+   Host: app.example.com
+   Content-Type: application/x-www-form-urlencoded
+
+   logout_token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiIsInR5cCI6ImxvZ291dCtqd3QifQ...
+   ```
+
+3. Check the token. Refuse it unless all of these hold:
+
+   - its signature verifies with one of the keys at `/certs`, and its header's `alg` is `RS256`;
+   - its header's `typ` is `logout+jwt`;
+   - `iss` is the issuer, `aud` is your client's identifier, it has an `iat`, and its `exp` hasn't passed;
+   - `events` is an object holding the member `http://schemas.openid.net/event/backchannel-logout`;
+   - it has a `sub`, a `sid` or both;
+   - it has no `nonce`.
+
+   Most JWT libraries check the signature, `alg`, `typ`, `iss`, `aud` and `exp` when you tell them what to expect. The `typ`, `events` and `nonce` checks are what tell a logout token from an ID token, which is signed with the same key and names the same user. [The logout token](/reference/endpoints/backchannel-logout/#the-logout-token) lists every claim.
+
+4. End your app's sessions the token names. With a `sid`, that's each session whose ID token has that `sid` and the same `sub`. Without one, it's every session your app has for that `sub`, on every device. Delete the tokens your app kept for them.
+
+5. Answer `200 OK` with `Cache-Control: no-store`, also when your app had no session left to end: the user is signed out either way. For a token that fails a check in step 3, answer `400`, with no-store too:
+
+   ```http
+   HTTP/1.1 400 Bad Request
+   Content-Type: application/json
+   Cache-Control: no-store
+
+   {"error":"invalid_request","error_description":"The token isn't typed logout+jwt."}
+   ```
+
+</Steps>
+
+When your app doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429, the auth server sends the same token again, `jti` included, for about a minute. So a token can arrive twice: answer `200` again. [Retries](/reference/endpoints/backchannel-logout/#retries) gives the schedule.
+
+A token that never gets through isn't sent later. After a sign-out, or a sign-in that ends an older session, nothing else tells an app holding an offline refresh token from that session, so it stays signed in. See [When a delivery is lost](/reference/endpoints/backchannel-logout/#when-a-delivery-is-lost).
+
 ## Next steps
 
 <CardGrid>
@@ -102,4 +151,5 @@ A POST from another origin with no hint, whether another site or another host of
   <LinkCard title="Revoke" description="End a grant with its refresh or access token." href="/reference/endpoints/revoke/" />
   <LinkCard title="Ending sessions" description="What a sign-out ends, and what it leaves alone." href="/concepts/ending-sessions/" />
   <LinkCard title="Sessions" description="How long a session lasts, and single sign-on." href="/concepts/sessions/" />
+  <LinkCard title="Back-channel logout" description="The logout token, its retries, and what your app answers." href="/reference/endpoints/backchannel-logout/" />
 </CardGrid>

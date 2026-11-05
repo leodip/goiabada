@@ -62,3 +62,18 @@ export async function resultBody(page: Page): Promise<Record<string, unknown>> {
 export async function shownClaims(page: Page, heading: "ID token claims" | "Access token claims"): Promise<Record<string, unknown>> {
   return JSON.parse(await page.locator(`h3:text-is("${heading}") + pre`).innerText());
 }
+
+// The claims of the logout tokens the web app accepted at its back-channel logout URI about the user
+// this browser last signed in to it as, oldest first, from its page.
+export async function receivedLogoutTokens(page: Page, app: WebApp): Promise<Record<string, unknown>[]> {
+  await page.goto(app.url);
+  return JSON.parse(await page.locator('h2:text-is("Logout tokens received") ~ pre').innerText());
+}
+
+// Waits for the web app to have accepted count logout tokens about this browser's user, and returns
+// them. A delivery runs once the end of the session has committed, and one whose first attempt fails is
+// tried again about 15 seconds later, so this waits longer than one attempt.
+export async function waitForLogoutTokens(page: Page, app: WebApp, count: number): Promise<Record<string, unknown>[]> {
+  await expect.poll(async () => (await receivedLogoutTokens(page, app)).length, { timeout: 40_000 }).toBe(count);
+  return receivedLogoutTokens(page, app);
+}
