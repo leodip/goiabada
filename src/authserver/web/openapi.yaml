@@ -3824,8 +3824,7 @@ paths:
             Return only entries about this user or made by them: those whose `userId` or
             whose `loggedInUserId` is this id, each entry once. A value that is not a
             positive integer answers 400 `VALIDATION_ERROR`. An id that names no user, or a
-            deleted one, answers the entries that name it, often none. Entries written
-            before the user columns existed name no user, so this filter does not find them.
+            deleted one, answers the entries that name it, often none.
           schema:
             type: integer
             format: int64
@@ -7772,8 +7771,7 @@ components:
           nullable: true
           description: |
             The row id of the user the entry is about, the `user_id` in its details.
-            Null when it is about no user, and on entries written before the user columns
-            existed.
+            Null when it is about no user.
         loggedInUserId:
           type: integer
           format: int64
@@ -7782,7 +7780,7 @@ components:
             The row id of the user whose access token made the request: the administrator
             on the Admin API, the user themselves on the Account API. Null when no user's
             token made it, as on a sign-in in the browser or a call with a client
-            credentials token, and on entries written before the user columns existed.
+            credentials token.
       required:
         - id
         - createdAt

@@ -555,7 +555,7 @@ func TestAPIAuditLogsGet_UserFilter(t *testing.T) {
 func TestAPIAuditLogsGet_AUserIdThatIsNotAPositiveIntegerIsRefused(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	for _, value := range []string{"abc", "0", "-4", "4.0", "99999999999999999999"} {
+	for _, value := range []string{"", "abc", "0", "-4", "4.0", "99999999999999999999"} {
 		t.Run(value, func(t *testing.T) {
 			resp := makeAPIRequest(t, "GET",
 				appConfig.AuthServer.BaseURL+auditLogsURL+"?userId="+url.QueryEscape(value), accessToken, nil)

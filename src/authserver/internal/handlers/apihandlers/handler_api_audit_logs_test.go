@@ -57,7 +57,6 @@ func TestHandleAuditLogsGet_TheUserFilterReachesTheReadWithTheOthers(t *testing.
 		{"the largest id", "userId=9223372036854775807",
 			record.AuditLogFilter{UserId: 9223372036854775807}},
 		{"no user", "auditEvent=user_login", record.AuditLogFilter{AuditEvent: "user_login"}},
-		{"an empty user sets no filter", "userId=", record.AuditLogFilter{}},
 	}
 
 	for _, tc := range testCases {
@@ -76,6 +75,7 @@ func TestHandleAuditLogsGet_TheUserFilterReachesTheReadWithTheOthers(t *testing.
 // every user's events under a filter the caller believes is set (#780 decision 3).
 func TestHandleAuditLogsGet_AUserIdThatIsNotAPositiveIntegerIsRefused(t *testing.T) {
 	for _, value := range []string{
+		"", // present but empty: a filter the caller set, not an absent one
 		"abc",
 		"0",
 		"-3",

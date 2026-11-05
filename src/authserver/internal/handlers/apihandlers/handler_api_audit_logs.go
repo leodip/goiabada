@@ -35,10 +35,10 @@ func HandleAuditLogsGet(
 		// The user filter lists the rows about that user or made by them. A value that is not a
 		// positive integer is refused rather than ignored as page and size are: ignored, it
 		// would list every user's events under a filter the caller believes is set (#780
-		// decision 3). An empty value sets no filter, as an empty auditEvent does.
+		// decision 3). An empty value is refused too: only an absent parameter sets no filter.
 		var userId int64
-		if userIdStr := r.URL.Query().Get("userId"); userIdStr != "" {
-			id, err := strconv.ParseInt(userIdStr, 10, 64)
+		if query := r.URL.Query(); query.Has("userId") {
+			id, err := strconv.ParseInt(query.Get("userId"), 10, 64)
 			if err != nil || id <= 0 {
 				writeJSONError(w, "Invalid userId value", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
