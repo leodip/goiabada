@@ -1,0 +1,17 @@
+{{define "title"}}{{ .appName }} - Um administrador excluiu a sua conta{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Olá {{.name}},</p>
+
+    <p>Um administrador excluiu a sua conta {{ .appName }}. Você não pode mais entrar com ela.</p>
+
+    <p>Se você não esperava por isso, entre em contato com o administrador.</p>
+
+    <p>Atenciosamente,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

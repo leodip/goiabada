@@ -2,6 +2,7 @@ import { addGroupMember, cancelDialog, confirmDialog, detail, groupUrl, rowWithC
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { solidPng } from "../../../lib/images";
+import { linksIn, waitForMail } from "../../../lib/mailpit";
 import { passwordToken, userTokens } from "../../../lib/oauth";
 import { passwordGrantClient } from "../../../lib/test-clients";
 
@@ -69,14 +70,15 @@ test("a file that is not an image is refused", async ({ page, users }) => {
   await expect(page.locator("#deleteImageBtn")).toBeHidden();
 });
 
-test("deleting a user shows what goes with them, and they can no longer sign in", async ({
+test("deleting a user shows what goes with them, emails them, and they can no longer sign in", async ({
   page,
   request,
   clients,
   groups,
   users,
 }) => {
-  const user = await users.create();
+  // Verified, since the deletion notice goes only to a verified address.
+  const user = await users.create({ emailVerified: true });
   const group = await groups.create();
   await addGroupMember(page, group.id, user.email);
   const { client, secret } = await passwordGrantClient(page, clients);
@@ -92,6 +94,13 @@ test("deleting a user shows what goes with them, and they can no longer sign in"
   await page.getByRole("button", { name: "Delete user" }).click();
   await expect(page).toHaveURL(new RegExp(`^${env.adminUrl}/admin/users/?(\\?|$)`));
   user.markDeleted();
+
+  // The user is told an administrator deleted the account, after the response.
+  const notice = await waitForMail(request, user.email);
+  expect(notice.subject).toBe("An administrator deleted your account");
+  expect(notice.html).toContain("You can no longer sign in with it.");
+  expect(notice.html).toContain("If you didn't expect this, contact your administrator.");
+  expect(linksIn(notice)).toEqual([]);
 
   await page.goto(`${env.adminUrl}/admin/users?query=${user.email.split("@")[0]}`);
   await expect(page.getByText("No users found.")).toBeVisible();

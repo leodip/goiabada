@@ -2076,6 +2076,7 @@
 "email.recovery_code_used.subject" = "Um código de recuperação foi usado para entrar"
 "email.recovery_codes_replaced.subject" = "Seus códigos de recuperação foram substituídos"
 "email.account_deleted.subject" = "Sua conta foi excluída"
+"email.account_deleted_by_administrator.subject" = "Um administrador excluiu a sua conta"
 "email.otp_lockout.subject" = "Seu aplicativo autenticador foi bloqueado após muitos códigos errados"
 
 # --- Bootstrap de JS --------------------------------------------------------

@@ -2182,6 +2182,7 @@
 "email.recovery_code_used.subject" = "A recovery code was used to sign in"
 "email.recovery_codes_replaced.subject" = "Your recovery codes were replaced"
 "email.account_deleted.subject" = "Your account was deleted"
+"email.account_deleted_by_administrator.subject" = "An administrator deleted your account"
 "email.otp_lockout.subject" = "Your authenticator was disabled after too many wrong codes"
 
 # --- JS bootstrap ------------------------------------------------------------

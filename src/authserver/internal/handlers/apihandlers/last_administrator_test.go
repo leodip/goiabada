@@ -162,14 +162,18 @@ var lastAdministratorRemovals = []lastAdministratorRemoval{
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), adminHoldingManageId).
 				Return(&record.User{Id: adminHoldingManageId, Enabled: true}, nil).Once()
 		},
-		expectDecision: expectUserHoldsManageDirectly(guardTx),
+		expectDecision: func(database *datamocks.Database) {
+			database.On("GetUserByIdForUpdate", mock.Anything, guardTx, adminHoldingManageId).
+				Return(&record.User{Id: adminHoldingManageId, Enabled: true}, nil).Once()
+			expectUserHoldsManageDirectly(guardTx)(database)
+		},
 		expectWrite: func(database *datamocks.Database) {
 			database.On("DeleteUser", mock.Anything, guardTx, adminHoldingManageId).Return(nil).Once()
 		},
 		serve: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) *httptest.ResponseRecorder {
 			r := membershipRequest(http.MethodDelete, "/api/v1/admin/users/42", "", "authserver:manage", map[string]string{"id": "42"})
 			rr := httptest.NewRecorder()
-			HandleUserDelete(database, auditLogger).ServeHTTP(rr, r)
+			HandleUserDelete(database, auditLogger, discardNotices{}).ServeHTTP(rr, r)
 			return rr
 		},
 	},

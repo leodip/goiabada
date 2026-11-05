@@ -751,6 +751,7 @@ func HandleUserEnabledPut(
 func HandleUserDelete(
 	database usersCrudDatabase,
 	auditLogger AuditLogger,
+	notifier AccountNotifier,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -789,10 +790,24 @@ func HandleUserDelete(
 		// administrator, so the deletion runs in a transaction that takes the administrators' lock
 		// first, decides from the user's grants as read under it, and is rolled back when it would
 		// leave no enabled user holding manage (#402 decisions 10 and 11).
+		//
+		// The user's row is read under its lock after the administrators' lock, the order the
+		// user's own deletion takes them in, for the notice below: it goes to the address the row
+		// had when the deletion committed (#783 decision 10). Safe to rerun: deleted is the
+		// committing attempt's.
+		var deleted *record.User
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			deleted = nil
 			administrators, lockErr := lockAdministrators(r.Context(), database, tx)
 			if lockErr != nil {
 				return lockErr
+			}
+			locked, lockedErr := database.GetUserByIdForUpdate(r.Context(), tx, userId)
+			if lockedErr != nil {
+				return errs.Wrap(lockedErr, "unable to read the user under its lock")
+			}
+			if locked == nil {
+				return errAccountGone
 			}
 			holdsManage, readErr := administrators.userHoldsManage(r.Context(), database, userId)
 			if readErr != nil {
@@ -804,16 +819,32 @@ func HandleUserDelete(
 			if deleteErr := database.DeleteUser(r.Context(), tx, userId); deleteErr != nil {
 				return errs.Wrap(deleteErr, "unable to delete the user")
 			}
-			return administrators.leavesAnAdministrator(r.Context())
+			if leaveErr := administrators.leavesAnAdministrator(r.Context()); leaveErr != nil {
+				return leaveErr
+			}
+			deleted = locked
+			return nil
 		})
 		if errors.Is(err, errLastAdministrator) {
 			writeLastAdministrator(w, r)
+			return
+		}
+		if errors.Is(err, errAccountGone) {
+			// Another request deleted the user after this one read them: this one deleted nothing.
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
+
+		// The user is told an administrator deleted their account, naming no administrator, once
+		// this request has been answered (#783 decision 10). The notice is captured now, from the
+		// row the deletion read under its lock, so the job needs nothing of the account, which is
+		// gone. The notifier sends only with SMTP on and to a verified address; a deletion refused
+		// or rolled back above returned before this, and tells nobody.
+		defer notifier.Send(r, accountnotice.AccountDeletedByAdministrator, accountnotice.To(deleted))
 
 		// Get logged in user from access token
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())

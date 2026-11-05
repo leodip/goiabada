@@ -2186,6 +2186,7 @@
 "email.recovery_code_used.subject" = "Für die Anmeldung wurde ein Wiederherstellungscode verwendet"
 "email.recovery_codes_replaced.subject" = "Ihre Wiederherstellungscodes wurden ersetzt"
 "email.account_deleted.subject" = "Ihr Konto wurde gelöscht"
+"email.account_deleted_by_administrator.subject" = "Ihr Konto wurde von der Administration gelöscht"
 "email.otp_lockout.subject" = "Ihre Authenticator-App wurde nach zu vielen falschen Codes gesperrt"
 
 # --- JS bootstrap ------------------------------------------------------------

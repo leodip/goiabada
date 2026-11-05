@@ -1,0 +1,17 @@
+{{define "title"}}{{ .appName }} - Un amministratore ha eliminato il tuo account{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Ciao {{.name}},</p>
+
+    <p>Un amministratore ha eliminato il tuo account {{ .appName }}. Non puoi più accedere con questo account.</p>
+
+    <p>Se non te lo aspettavi, contatta il tuo amministratore.</p>
+
+    <p>Un saluto,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

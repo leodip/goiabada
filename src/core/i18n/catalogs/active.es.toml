@@ -2187,6 +2187,7 @@
 "email.recovery_code_used.subject" = "Se ha usado un código de recuperación para iniciar sesión"
 "email.recovery_codes_replaced.subject" = "Se han sustituido tus códigos de recuperación"
 "email.account_deleted.subject" = "Se ha eliminado tu cuenta"
+"email.account_deleted_by_administrator.subject" = "Un administrador ha eliminado tu cuenta"
 "email.otp_lockout.subject" = "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos"
 
 # --- JS bootstrap ------------------------------------------------------------

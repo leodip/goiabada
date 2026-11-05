@@ -58,6 +58,7 @@ func TestGerman_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"recovery_codes_replaced", "Ihre Wiederherstellungscodes wurden ersetzt", "Ihre bisherigen Wiederherstellungscodes funktionieren nicht mehr"},
 			{"otp_lockout", "Ihre Authenticator-App wurde nach zu vielen falschen Codes gesperrt", "Melden Sie sich mit einem Ihrer Wiederherstellungscodes an"},
 			{"account_deleted", "Ihr Konto wurde gelöscht", "Andernfalls kannte jemand anderes Ihr Passwort."},
+			{"account_deleted_by_administrator", "Ihr Konto wurde von der Administration gelöscht", "Die Administration hat Ihr Konto bei"},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)

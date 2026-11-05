@@ -239,7 +239,9 @@ paths:
     delete:
       tags: [Users]
       summary: Delete user
-      description: Delete a user by ID
+      description: |
+        Delete a user by ID. The user is emailed that an administrator deleted their account, when
+        SMTP is configured and their address is verified.
       operationId: deleteUser
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
