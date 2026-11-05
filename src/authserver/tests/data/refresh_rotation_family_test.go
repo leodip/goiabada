@@ -413,11 +413,11 @@ func TestRefreshRotation_ASessionRevocationBetweenTheClaimAndTheInsertEndsTheNew
 		revoke func(ctx context.Context, db data.Database, f *family, session *record.UserSession) error
 	}{
 		{"the session's termination", func(ctx context.Context, db data.Database, _ *family, session *record.UserSession) error {
-			_, err := revocation.TerminateUserSessionTx(ctx, db, session)
+			_, err := revocation.TerminateUserSessionTx(ctx, db, session, false)
 			return err
 		}},
 		{"the response to a reused code", func(ctx context.Context, db data.Database, f *family, _ *record.UserSession) error {
-			_, err := revocation.RevokeOnAuthCodeReuseTx(ctx, db, f.code)
+			_, err := revocation.RevokeOnAuthCodeReuseTx(ctx, db, f.code, nil)
 			return err
 		}},
 	}

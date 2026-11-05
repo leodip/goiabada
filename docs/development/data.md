@@ -46,9 +46,16 @@ effects after it succeeds. Audit events describe the committed outcome.
 
 Preserve the row locks that make security decisions atomic:
 
-- A termination deletes the session row first. Issuance takes that row before inserting its code
-  or signing implicit tokens in the same transaction, so neither slips past a termination's sweep
-  before its commit (#139).
+- A termination takes the session row first: it deletes it, or, for a session whose apps it tells,
+  takes it with `AcquireUserSessionRow` and reads the apps before the deletion cascades them away.
+  Issuance takes that row before inserting its code or signing implicit tokens in the same
+  transaction, so neither slips past a termination's sweep before its commit (#139), and a sign-in
+  adding an app to the session is either read by the termination or finds the session gone (#784).
+  The termination reads the apps with `GetCommittedUserSessionClients`, which takes `FOR SHARE` on
+  MySQL: under InnoDB's REPEATABLE READ an ordinary read after the wait answers the snapshot of the
+  transaction's first read, without the app that sign-in added.
+  A credential change and a user's deletion that tell apps take each of the user's session rows
+  this way, in id order, after the user's row: the deletion takes it with `GetUserByIdForUpdate`.
 - Refresh rotation takes the user's row first (`AcquireUserRow`), as credential changes do through
   their write and generation increment. A rotation cannot stamp a child from a token a revocation
   already moved past, and the revocation's sweep cannot miss that child (#131).

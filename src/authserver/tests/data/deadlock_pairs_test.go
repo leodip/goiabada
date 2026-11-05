@@ -175,7 +175,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 
 	sweepDone := make(chan error, 1)
 	go func() {
-		_, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
+		_, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", revocation.LogoutNotice{}, func(tx *sql.Tx) error {
 			return pDB.SetUserPasswordHash(context.Background(), tx, user.Id, newHash)
 		})
 		sweepDone <- err
@@ -284,7 +284,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 	}
 	sweepDone := make(chan sweepResult, 1)
 	go func() {
-		result, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
+		result, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", revocation.LogoutNotice{}, func(tx *sql.Tx) error {
 			return pDB.SetUserPasswordHash(context.Background(), tx, user.Id, newHash)
 		})
 		sweepDone <- sweepResult{result: result, err: err}
@@ -351,7 +351,7 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 
 	terminationDone := make(chan error, 1)
 	go func() {
-		_, err := revocation.TerminateUserSessionTx(context.Background(), pDB, session)
+		_, err := revocation.TerminateUserSessionTx(context.Background(), pDB, session, false)
 		terminationDone <- err
 	}()
 

@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -100,6 +101,7 @@ func HandleUserPasswordPut(
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 	notifier AccountNotifier,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -178,8 +180,12 @@ func HandleUserPasswordPut(
 		// the account had a password is decided from it, so a setup link completed while this
 		// request waited can't leave the answer stale (#724 decision 6). Assigned on every
 		// attempt, since a deadlock reruns the body.
+		//
+		// Every session of the user ends and none is kept, so every app that knew the user is told
+		// (#784 decision 3).
 		var replaced *record.User
-		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
+		notice := userWideNotice(settings, user)
+		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", notice, func(tx *sql.Tx) error {
 			current, readErr := database.GetUserByIdForUpdate(r.Context(), tx, user.Id)
 			if readErr != nil {
 				return readErr
@@ -216,6 +222,7 @@ func HandleUserPasswordPut(
 		})
 		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
 			revocation.ReasonAdminPasswordSet, loggedInUser, result)
+		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		// Get the updated user to return
 		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
@@ -593,6 +600,7 @@ var errUserAlreadyDisabled = errors.New("the user is already disabled")
 func HandleUserEnabledPut(
 	database usersCrudDatabase,
 	auditLogger AuditLogger,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -633,6 +641,12 @@ func HandleUserEnabledPut(
 			return
 		}
 
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
+
 		// Get logged in user from access token
 		jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 		var loggedInUser string
@@ -661,8 +675,10 @@ func HandleUserEnabledPut(
 			// Disabling a holder of manage can remove the last administrator, so the write takes
 			// the administrators' lock as the transaction's first statement, decides from the
 			// user's grants as read under it, and is rolled back, sweep and all, when it would
-			// leave no enabled user holding manage (#402 decisions 10 and 11).
-			result, txErr := revocation.RevokeUserAuthStateTx(r.Context(), database, userId, "", func(tx *sql.Tx) error {
+			// leave no enabled user holding manage (#402 decisions 10 and 11). A disable ends every
+			// session of the user, so every app that knew the user is told (#784 decision 3).
+			notice := userWideNotice(settings, user)
+			result, txErr := revocation.RevokeUserAuthStateTx(r.Context(), database, userId, "", notice, func(tx *sql.Tx) error {
 				administrators, lockErr := lockAdministrators(r.Context(), database, tx)
 				if lockErr != nil {
 					return lockErr
@@ -728,6 +744,7 @@ func HandleUserEnabledPut(
 		if transitioned {
 			revocation.LogRevokedUserAuthState(r.Context(), auditLogger, userId,
 				revocation.ReasonAccountDisabled, loggedInUser, result)
+			logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 		}
 
 		// Get the updated user to return
@@ -752,6 +769,7 @@ func HandleUserDelete(
 	database usersCrudDatabase,
 	auditLogger AuditLogger,
 	notifier AccountNotifier,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -786,6 +804,12 @@ func HandleUserDelete(
 			return
 		}
 
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
+
 		// Delete user from database. Deleting a holder of manage can remove the last
 		// administrator, so the deletion runs in a transaction that takes the administrators' lock
 		// first, decides from the user's grants as read under it, and is rolled back when it would
@@ -793,11 +817,16 @@ func HandleUserDelete(
 		//
 		// The user's row is read under its lock after the administrators' lock, the order the
 		// user's own deletion takes them in, for the notice below: it goes to the address the row
-		// had when the deletion committed (#783 decision 10). Safe to rerun: deleted is the
-		// committing attempt's.
+		// had when the deletion committed (#783 decision 10). The deletion ends every session of the
+		// user, so every app that knew the user is told (#784 decision 3): the apps are read under
+		// the user's row, as a credential change takes it before the sessions' rows, and before the
+		// deletion's cascade takes the sessions and grants they are read from. Safe to rerun: deleted
+		// and deliveries are the committing attempt's.
 		var deleted *record.User
+		var deliveries []backchannel.Delivery
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			deleted = nil
+			deliveries = nil
 			administrators, lockErr := lockAdministrators(r.Context(), database, tx)
 			if lockErr != nil {
 				return lockErr
@@ -816,6 +845,11 @@ func HandleUserDelete(
 			if decideErr := administrators.decide(r.Context(), holdsManage); decideErr != nil {
 				return decideErr
 			}
+			told, collectErr := revocation.UserWideDeliveries(r.Context(), database, tx, userId, locked.Subject,
+				sessionLive(settings))
+			if collectErr != nil {
+				return collectErr
+			}
 			if deleteErr := database.DeleteUser(r.Context(), tx, userId); deleteErr != nil {
 				return errs.Wrap(deleteErr, "unable to delete the user")
 			}
@@ -823,6 +857,7 @@ func HandleUserDelete(
 				return leaveErr
 			}
 			deleted = locked
+			deliveries = told
 			return nil
 		})
 		if errors.Is(err, errLastAdministrator) {
@@ -858,6 +893,7 @@ func HandleUserDelete(
 			"user_id":        userId,
 			"logged_in_user": loggedInUser,
 		})
+		logoutTokens.Send(r.Context(), settings.Issuer, deliveries)
 
 		// Create response
 		response := api.SuccessResponse{
@@ -867,4 +903,16 @@ func HandleUserDelete(
 		// Set content type and encode response
 		writeJSON(w, r, http.StatusOK, response)
 	}
+}
+
+// sessionLive judges a session valid within the settings' idle timeout and maximum lifetime, whatever
+// max_age any client asked for: only such a session's end tells its apps (#784 decision 1).
+func sessionLive(settings *record.Settings) revocation.SessionLive {
+	return revocation.LiveUnder(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds)
+}
+
+// userWideNotice is the logout notice of an end of every session of user, none kept: every app that
+// knew the user is told (#784 decision 3).
+func userWideNotice(settings *record.Settings, user *record.User) revocation.LogoutNotice {
+	return revocation.LogoutNotice{Subject: user.Subject, UserWide: true, Live: sessionLive(settings)}
 }

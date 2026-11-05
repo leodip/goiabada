@@ -54,3 +54,36 @@ func TestIsNotIDTokenTyp(t *testing.T) {
 		})
 	}
 }
+
+// An id_token_hint must carry an ID token's JOSE header: typ JWT, the value every ID token this
+// server issues and the account logout's hint carry. Every other header is refused, so the logout
+// token (logout+jwt) and the access token (at+jwt), signed with the same key, are never taken for
+// one, and a header with no typ is refused as well (#784 decision 12). A typ is a media type,
+// compared without regard to case and with the application/ prefix optional (RFC 7515 section
+// 4.1.9).
+func TestHasIDTokenHeader(t *testing.T) {
+	testCases := []struct {
+		name   string
+		header map[string]interface{}
+		want   bool
+	}{
+		{"JWT, as every ID token carries it", map[string]interface{}{"alg": "RS256", "typ": "JWT"}, true},
+		{"jwt in lower case", map[string]interface{}{"typ": "jwt"}, true},
+		{"the full media type", map[string]interface{}{"typ": "application/jwt"}, true},
+		{"a logout token", map[string]interface{}{"typ": "logout+jwt"}, false},
+		{"a logout token's full media type", map[string]interface{}{"typ": "application/logout+jwt"}, false},
+		{"an access token", map[string]interface{}{"typ": "at+jwt"}, false},
+		{"an access token's full media type", map[string]interface{}{"typ": "application/at+jwt"}, false},
+		{"JWT with a parameter", map[string]interface{}{"typ": "JWT; charset=utf-8"}, false},
+		{"an empty typ", map[string]interface{}{"typ": ""}, false},
+		{"typ is not a string", map[string]interface{}{"typ": 1}, false},
+		{"no typ in the header", map[string]interface{}{"alg": "RS256"}, false},
+		{"no header at all", nil, false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, HasIDTokenHeader(tc.header))
+		})
+	}
+}

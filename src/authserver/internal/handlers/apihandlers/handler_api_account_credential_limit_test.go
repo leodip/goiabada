@@ -80,7 +80,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 	return &credentialEnv{
 		password: rateLimiter.LimitAccountPassword(
 			HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, rateLimiter,
-				heldNotifier(t, &heldJobs{}))),
+				heldNotifier(t, &heldJobs{}), &recordingLogoutTokens{})),
 		otp: rateLimiter.LimitAccountPassword(
 			HandleAccountOTPPut(database, auditLogger, rateLimiter, testDataCipher, heldNotifier(t, &heldJobs{}))),
 		email: rateLimiter.LimitAccountPassword(

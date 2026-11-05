@@ -350,11 +350,21 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   jobs in flight. Forgot-password's code store, audit record and mail run here, so every well-formed
   request answers alike, and so do the account notices, which never fail the change (#404, #724).
   At most 64 jobs of each `Class` run at once, recovery, registration, the email change's account
-  notice and the security notices each against a budget of its own, so the two public forms cannot
+  notice, the security notices and the logout tokens to administrator-registered and to
+  self-registered clients each against a budget of its own, so the two public forms cannot
   fill the slot the authenticated notices need, and a flood of security notices cannot drop the
   notice to an address just changed away from; past that `Go` drops the job with one Warn record on
   the request's id, never running it inline, and a dropped job is never counted in flight (#485,
   #394 review, #724 decision 4)
+- `internal/backchannel/` - OpenID Connect Back-Channel Logout 1.0's sending side (#784): the
+  `Delivery` an end of a session collects inside its transaction (`SessionDeliveries`, one per app
+  on the session with a back-channel logout URI), and the `Sender` that hands each to an
+  after-response job of its own once the end commits. A job checks the stored URI again, signs one
+  `logout+jwt` token under the current signing key, POSTs it with at most three attempts within the
+  token's two minutes (a self-registered client's only to a public unicast address it dials,
+  never through a proxy), and records the delivery: `goiabada_backchannel_logout_deliveries_total`
+  (registered once by the server, `Register`), `sent_logout_token` (`LogSentLogoutToken`) and a Warn
+  record when it was not delivered
 - `internal/accountnotice/` - The one notifier for every email about a change to an account: the
   email change's notice to the previous address and the security notices, such as a changed
   password. A handler calls `Send`, or `SendRecoveryCodeUsed` with the count of codes left, after
@@ -379,7 +389,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `template.HTML` built from data, which its `trusted_html_lint_test.go` holds (#622 decision 4)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlmatch,uuid}/` - The authserver-only utilities
   #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and
-  origin predicates, UUIDs (#360); `oidc` also holds the grant type list every grant-type reader
+  origin predicates, UUIDs (#360); `urlmatch` also holds the back-channel logout URI rule every intake
+  and delivery checks (#784); `oidc` also holds the grant type list every grant-type reader
   consults and the `amr` values (#437); the encrypted id_token_hint's JWE, keyed from a client
   secret and sharing nothing with the data cipher, left `encryption` for `internal/idtokenhint`
   (#434)

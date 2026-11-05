@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/errs"
@@ -27,16 +29,29 @@ import (
 // logoutDatabase is what the logout ceremony needs: the session it ends, the clients it
 // must notify, the deletes that end it, and the client's sign-out redirect URIs a target is
 // matched against. Its redirect URIs are read only to describe a refused target (#147 decision 9).
+// The session's row, its apps and its user are read for the logout tokens a sign-out sends (#784).
 type logoutDatabase interface {
+	backchannel.SessionDatabase
+
+	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
+	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
+}
+
+// logoutTokenSender tells the apps whose part of a session ended, with the logout tokens the end
+// collected, once it has committed (#784). *backchannel.Sender satisfies it; issuer is the tokens'
+// iss, the request's issuer setting.
+type logoutTokenSender interface {
+	Send(ctx context.Context, issuer string, deliveries []backchannel.Delivery)
 }
 
 // HandleLogoutGet and HandleLogoutPost serve /auth/logout, the OpenID Connect RP-Initiated
@@ -50,11 +65,12 @@ func HandleLogoutGet(
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		r = refineLogoutLocale(r)
-		doLogout(w, r, pageRenderer, httpSession, database, tokenParser, auditLogger, dataCipher)
+		doLogout(w, r, pageRenderer, httpSession, database, tokenParser, auditLogger, dataCipher, logoutTokens)
 	}
 }
 
@@ -259,6 +275,9 @@ type hintClassification struct {
 	state             hintState
 	client            *record.Client
 	sessionIdentifier string
+	// subject is the hint's sub, which the ownership gate found to be the session's user's whenever
+	// the session is there: the logout token's sub (#784).
+	subject string
 }
 
 // rejectIdTokenHint is the one answer for a hint classifyIdTokenHint refuses: the record every
@@ -362,6 +381,13 @@ func classifyIdTokenHint(
 	// token carries iss, sub, iat, nbf, exp and a session-bound sid, and its aud is the resource
 	// identifier, so GetClientByClientIdentifier resolves it under the collision. Confirming it would
 	// skip the consent page entirely and end that client's half of the session (#109).
+	//
+	// The JOSE header must be an ID Token's too: a logout token carries no typ claim, is signed with
+	// the same key and names sub, sid and aud, so every claim gate below would take it for an ID
+	// Token, and an access token's header says at+jwt (#784 decision 12).
+	if typ, _ := idToken.Header["typ"].(string); !issuance.HasIDTokenHeader(idToken.Header) {
+		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "the JOSE header typ is not an ID Token's", "header_typ", typ)
+	}
 	if typ := idToken.StringClaim("typ"); issuance.IsNotIDTokenTyp(typ) {
 		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "typ names a token that is not an ID Token", "typ", typ)
 	}
@@ -529,6 +555,7 @@ func classifyIdTokenHint(
 		state:             hintConfirmed,
 		client:            client,
 		sessionIdentifier: sessionIdentifier,
+		subject:           subject,
 	}, nil
 }
 
@@ -548,13 +575,19 @@ func classifyIdTokenHint(
 // A lookup or delete failure is returned so the caller can surface a 500. A session row that is not
 // there is nothing to tear down rather than a failure, and those two used to be one branch returning
 // a variable that was sometimes nil to mean both (#109 item 4).
+//
+// The client whose part ended is told with a logout token naming the user and the session, after the
+// audit events, when the session was still valid under settings; the other apps on the session are
+// told nothing, since their part did not end (#784 decisions 1 and 2).
 func handleExistingSessionOnLogout(
 	r *http.Request,
-	sessionIdentifier string,
-	client *record.Client,
+	settings *record.Settings,
+	hint hintClassification,
 	database logoutDatabase,
 	auditLogger AuditLogger,
+	logoutTokens logoutTokenSender,
 ) error {
+	sessionIdentifier, client := hint.sessionIdentifier, hint.client
 	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 	if err != nil {
 		return err
@@ -614,11 +647,23 @@ func handleExistingSessionOnLogout(
 					"logged_in_user":     "",
 				})
 			}
+
+			if sessionLive(settings, userSession) {
+				if delivery, tells := backchannel.SessionClientDelivery(&sessionClient.Client, userSession, hint.subject); tells {
+					logoutTokens.Send(r.Context(), settings.Issuer, []backchannel.Delivery{delivery})
+				}
+			}
 			break
 		}
 	}
 
 	return nil
+}
+
+// sessionLive reports whether userSession was still within its idle timeout and maximum lifetime
+// under settings: only then does ending it, or an app's part of it, tell its apps (#784 decision 1).
+func sessionLive(settings *record.Settings, userSession *record.UserSession) bool {
+	return revocation.LiveUnder(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds)(userSession)
 }
 
 // HandleLogoutPost is HandleLogoutGet's POST binding.
@@ -629,10 +674,11 @@ func HandleLogoutPost(
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r = refineLogoutLocale(r)
-		doLogout(w, r, pageRenderer, httpSession, database, tokenParser, auditLogger, dataCipher)
+		doLogout(w, r, pageRenderer, httpSession, database, tokenParser, auditLogger, dataCipher, logoutTokens)
 	}
 }
 
@@ -658,6 +704,7 @@ func doLogout(
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
 	dataCipher *encryption.DataCipher,
+	logoutTokens logoutTokenSender,
 ) {
 	settings, ok := reqctx.SettingsFrom(r.Context())
 	if !ok {
@@ -728,7 +775,7 @@ func doLogout(
 		// teardown, because it is unauthenticated and a caller could name any client; it is trusted
 		// only for deciding whether a supplied URI is registered to the client it names, which is
 		// self-limiting (#109).
-		if err := handleExistingSessionOnLogout(r, hint.sessionIdentifier, hint.client, database, auditLogger); err != nil {
+		if err := handleExistingSessionOnLogout(r, settings, hint, database, auditLogger, logoutTokens); err != nil {
 			// A failed teardown is the one thing here that does deserve a 500: the End-User is still
 			// signed in and saying otherwise would be a lie. Contrast the redirect resolution above,
 			// whose failures deliberately degrade to "no redirect".
@@ -744,7 +791,7 @@ func doLogout(
 		userId := int64(0)
 		if len(sessionIdentifier) > 0 {
 			var err error
-			userId, err = deleteWholeUserSession(r, sessionIdentifier, database, auditLogger)
+			userId, err = deleteWholeUserSession(r, settings, sessionIdentifier, database, auditLogger, logoutTokens)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -836,11 +883,19 @@ func redirectToHintlessLogout(w http.ResponseWriter, r *http.Request) {
 // A lookup or delete failure is returned so the caller can surface a 500; a row that is simply not
 // there is not an error, it is nothing to tear down. Those two used to be one branch returning a
 // variable that was sometimes nil to mean both (#109 item 4).
+//
+// A session still valid under settings tells every app on it with a back-channel logout URI, after
+// the audit event (#784 decisions 1 and 2). Its apps are read in the deletion's own transaction,
+// under the session's row and before the deletion takes their rows with it, so an app a ceremony
+// adds to the session at the same moment is either told or finds the session gone. The user's
+// subject is read before the transaction, which then reads no users row while holding a session's.
 func deleteWholeUserSession(
 	r *http.Request,
+	settings *record.Settings,
 	sessionIdentifier string,
 	database logoutDatabase,
 	auditLogger AuditLogger,
+	logoutTokens logoutTokenSender,
 ) (int64, error) {
 	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 	if err != nil {
@@ -850,7 +905,13 @@ func deleteWholeUserSession(
 		return 0, nil
 	}
 
-	if err := database.DeleteUserSession(r.Context(), nil, userSession.Id); err != nil {
+	var deliveries []backchannel.Delivery
+	if sessionLive(settings, userSession) {
+		deliveries, err = endLiveUserSession(r.Context(), database, userSession)
+	} else {
+		err = database.DeleteUserSession(r.Context(), nil, userSession.Id)
+	}
+	if err != nil {
 		return 0, err
 	}
 
@@ -863,8 +924,44 @@ func deleteWholeUserSession(
 		"logged_in_user":  "",
 		"reason":          audit.DeletedUserSessionSignedOut,
 	})
+	logoutTokens.Send(r.Context(), settings.Issuer, deliveries)
 
 	return userSession.UserId, nil
+}
+
+// endLiveUserSession deletes userSession and answers the logout tokens for the apps it served, read
+// under its row before the deletion. A row already gone, ended by someone else meanwhile, names no
+// app: that end tells them. A user already gone names nobody either, since deleting a user takes
+// their sessions with it.
+func endLiveUserSession(ctx context.Context, database logoutDatabase, userSession *record.UserSession) ([]backchannel.Delivery, error) {
+	user, err := database.GetUserById(ctx, nil, userSession.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	var deliveries []backchannel.Delivery
+	err = database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		deliveries = nil
+		held, acquireErr := database.AcquireUserSessionRow(ctx, tx, userSession.SessionIdentifier)
+		if acquireErr != nil {
+			return acquireErr
+		}
+		if !held {
+			return nil
+		}
+		if user != nil {
+			read, readErr := backchannel.SessionDeliveries(ctx, database, tx, userSession, user.Subject)
+			if readErr != nil {
+				return readErr
+			}
+			deliveries = read
+		}
+		return database.DeleteUserSession(ctx, tx, userSession.Id)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return deliveries, nil
 }
 
 // clientForPostLogoutRedirect resolves the client whose registered URIs may authorize a post-logout

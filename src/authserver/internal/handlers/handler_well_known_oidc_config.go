@@ -70,6 +70,11 @@ func HandleWellKnownOIDCConfigGet(
 			// value is the issuer above, so the three that RFC 9207 section 2.4 has a client compare
 			// are one (#576, decision 2).
 			AuthorizationResponseIssParameterSupported: true,
+			// Back-Channel Logout 1.0 section 2.1: the server sends logout tokens, and every one about
+			// a session names it with sid, which ID tokens carry too. Capabilities of the server,
+			// advertised whether or not any client has registered a URI (#784 decision 4).
+			BackchannelLogoutSupported:        true,
+			BackchannelLogoutSessionSupported: true,
 		}
 
 		// Include registration endpoint if DCR is enabled (RFC 7591 §4)

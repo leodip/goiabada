@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -65,7 +66,11 @@ func HandleDynamicClientRegistrationPost(
 		// 2. Parse request (RFC 7591 §3.1)
 		var req oidc.DynamicClientRegistrationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			refuseDCR(w, r, oidc.DCRErrorInvalidClientMetadata, "Invalid request body", http.StatusBadRequest)
+			description := "Invalid request body"
+			if named, ok := dcrBackchannelLogoutTypeRefusal(err); ok {
+				description = named
+			}
+			refuseDCR(w, r, oidc.DCRErrorInvalidClientMetadata, description, http.StatusBadRequest)
 			return
 		}
 
@@ -93,7 +98,18 @@ func HandleDynamicClientRegistrationPost(
 			return
 		}
 
-		// 5c. Keep the privacy policy and terms of service only on a redirect URI's scheme and host
+		// 5c. Refuse a back-channel logout URI the client could not be sent to, rather than drop it as
+		// a policy_uri is dropped: an app believing it registered a URI it did not would never hear
+		// of a logout (#784 decision 10).
+		if err := validateDCRBackchannelLogout(&req); err != nil {
+			refuseDCR(w, r, oidc.DCRErrorInvalidClientMetadata, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// The flag is stored only with a URI: Back-Channel Logout 1.0 section 2.2 makes it a
+		// statement about the tokens sent there.
+		backchannelLogoutSessionRequired := req.BackchannelLogoutURI != "" && bool(req.BackchannelLogoutSessionRequired)
+
+		// 5d. Keep the privacy policy and terms of service only on a redirect URI's scheme and host
 		// (RFC 7591 section 5), dropping either otherwise and registering the client all the same
 		// (#622 decision 12). Refusing them would break, on upgrade, every client whose legal pages
 		// live on another host than its redirect URIs, every native and loopback client among them,
@@ -130,8 +146,11 @@ func HandleDynamicClientRegistrationPost(
 			Description:           req.ClientName,
 			PrivacyPolicyURL:      policyURI,
 			TermsOfServiceURL:     tosURI,
-			IsPublic:              isPublic,
-			Enabled:               true,
+			// Written here, at creation; SetClientBackchannelLogout is their only other writer.
+			BackchannelLogoutURI:             req.BackchannelLogoutURI,
+			BackchannelLogoutSessionRequired: backchannelLogoutSessionRequired,
+			IsPublic:                         isPublic,
+			Enabled:                          true,
 			// A self-registered client is one nobody here has vetted, and RFC 7591 section 5
 			// requires all of its metadata be treated as self-asserted. Consent is the only
 			// control that binds such a client's identity to the user's authority, so it is on
@@ -238,6 +257,11 @@ func HandleDynamicClientRegistrationPost(
 			PolicyURI: policyURI,
 			TOSURI:    tosURI,
 		}
+		// Both settings whenever a URI was stored, the flag even when false (RFC 7591 section 3.2.1).
+		if req.BackchannelLogoutURI != "" {
+			response.BackchannelLogoutURI = req.BackchannelLogoutURI
+			response.BackchannelLogoutSessionRequired = &backchannelLogoutSessionRequired
+		}
 
 		// Only include secret for confidential clients (RFC 7591 §3.2.1)
 		if !isPublic {
@@ -330,6 +354,56 @@ func validateDCRRedirectURIs(req *oidc.DynamicClientRegistrationRequest) error {
 // whatever the grant types, as redirect_uris is when the authorization code flow isn't asked for.
 func validateDCRPostLogoutRedirectURIs(req *oidc.DynamicClientRegistrationRequest) error {
 	return validateDCRURIList(req.PostLogoutRedirectURIs, req.TokenEndpointAuthMethod == "none", postLogoutRedirectURIField)
+}
+
+// validateDCRBackchannelLogout refuses a registration's backchannel_logout_uri when it breaks OpenID
+// Connect Back-Channel Logout 1.0 section 2.2 as #784 decision 6 settles it for a self-registered
+// client, urlmatch.CheckBackchannelLogoutURI with no http: https only, whatever the client type,
+// since nobody has vetted the client and an anonymous registrant may not ask for the token in the
+// clear. It is refused too on a registration with no authorization_code grant, the only flow a
+// registration can ask for that signs users in, as the admin API refuses it on a client with no
+// such flow: such a client has no session to end. An empty URI is no URI.
+//
+// Each description names the field. A URI carrying a user name or password is not repeated, since
+// the refusal is also logged.
+func validateDCRBackchannelLogout(req *oidc.DynamicClientRegistrationRequest) error {
+	uri := req.BackchannelLogoutURI
+	if uri == "" {
+		return nil
+	}
+	switch urlmatch.CheckBackchannelLogoutURI(uri, false) {
+	case urlmatch.BackchannelLogoutURIAcceptable:
+	case urlmatch.BackchannelLogoutURITooLong:
+		return errs.Errorf("backchannel_logout_uri cannot exceed %d bytes", urlmatch.BackchannelLogoutURIMaxBytes)
+	case urlmatch.BackchannelLogoutURISchemeNotHTTP, urlmatch.BackchannelLogoutURIPlainHTTP:
+		return errs.Errorf("backchannel_logout_uri must use https on a self-registered client: %s", uri)
+	case urlmatch.BackchannelLogoutURIUserinfo:
+		return errs.Errorf("backchannel_logout_uri cannot carry a user name or password")
+	default:
+		return errs.Errorf("backchannel_logout_uri must be an absolute URI that names a host, with no fragment, well-formed percent-escapes and no characters a URI excludes: %s", uri)
+	}
+	if !containsGrantType(req.GrantTypes, oidc.GrantTypeAuthorizationCode) {
+		return errs.Errorf("backchannel_logout_uri needs the authorization_code grant type: a client that signs no users in has no session to end")
+	}
+	return nil
+}
+
+// dcrBackchannelLogoutTypeRefusal names the field when a registration body could not be read only
+// because a back-channel logout member held a value of the wrong type, which #784 decision 10
+// refuses naming the field: backchannel_logout_uri is a string and
+// backchannel_logout_session_required a boolean, null included: it is the request's one
+// oidc.NonNullBool, whose refusal encoding/json passes on without the member's name. Any other
+// unreadable body keeps the plain description, so ok is false.
+func dcrBackchannelLogoutTypeRefusal(err error) (description string, ok bool) {
+	var notABoolean *oidc.NotABooleanError
+	if errors.As(err, &notABoolean) {
+		return "backchannel_logout_session_required must be a boolean", true
+	}
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(err, &typeErr) && typeErr.Field == "backchannel_logout_uri" {
+		return "backchannel_logout_uri must be a string", true
+	}
+	return "", false
 }
 
 // dcrURIField names the registration field a list of URIs came in, the way a refusal names it, so

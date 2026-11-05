@@ -156,20 +156,26 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 
 // TestValidateIdTokenHint_TypeOfToken: a validly signed token of this server that is not an ID
 // Token is refused as a hint, with the answer a hint that does not parse gets, so the reply does
-// not say which kind of token was sent (#401). ID Tokens carry no typ at all, so the absent row is
-// the one a real hint takes.
+// not say which kind of token was sent (#401). Two things say which kind it is: the typ claim,
+// which ID Tokens leave out, and the JOSE header typ, which must be JWT, as every ID Token's is, so
+// a logout token or an access token, signed with the same key, is never taken for one (#784
+// decision 12). The first row is the shape a real hint takes.
 func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 	settings := &record.Settings{Issuer: "https://test-issuer.com"}
 
 	tests := []struct {
-		name     string
-		typ      interface{} // nil leaves the claim out
-		accepted bool
+		name      string
+		typ       interface{} // nil leaves the claim out
+		headerTyp interface{} // nil leaves typ out of the header
+		accepted  bool
 	}{
-		{name: "ID Token, no typ", typ: nil, accepted: true},
-		{name: "access token", typ: "Bearer"},
-		{name: "session refresh token", typ: "Refresh"},
-		{name: "offline refresh token", typ: "Offline"},
+		{name: "ID Token, no typ claim, header JWT", headerTyp: "JWT", accepted: true},
+		{name: "access token by its claim", typ: "Bearer", headerTyp: "JWT"},
+		{name: "session refresh token", typ: "Refresh", headerTyp: "JWT"},
+		{name: "offline refresh token", typ: "Offline", headerTyp: "JWT"},
+		{name: "logout token, whose header is logout+jwt", headerTyp: "logout+jwt"},
+		{name: "access token by its header", headerTyp: "at+jwt"},
+		{name: "a header with no typ"},
 	}
 
 	for _, tc := range tests {
@@ -178,9 +184,13 @@ func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 			if tc.typ != nil {
 				claims["typ"] = tc.typ
 			}
+			header := map[string]interface{}{"alg": "RS256", "kid": "the-key"}
+			if tc.headerTyp != nil {
+				header["typ"] = tc.headerTyp
+			}
 			tokenParser := handlersmocks.NewTokenParser(t)
 			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).
-				Return(&oauth.JwtToken{TokenBase64: "the-hint", Claims: claims}, nil)
+				Return(&oauth.JwtToken{TokenBase64: "the-hint", Header: header, Claims: claims}, nil)
 
 			sub, err := validateIdTokenHint(context.Background(), "the-hint", tokenParser, settings)
 

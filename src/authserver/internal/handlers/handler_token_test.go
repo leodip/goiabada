@@ -55,7 +55,7 @@ func TestHandleTokenPost(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 				handler := HandleTokenPost(jsonWriter, database,
 					handlersmocks.NewTokenIssuer(t), handlersmocks.NewTokenValidator(t),
-					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
+					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 				rr := httptest.NewRecorder()
 				req, _ := http.NewRequest("POST", "/token", test.body(rr))
@@ -88,7 +88,7 @@ func TestHandleTokenPost(t *testing.T) {
 			jsonWriter := handlersmocks.NewJSONWriter(t)
 
 			handler := HandleTokenPost(jsonWriter, datamocks.NewDatabase(t),
-				handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
+				handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 			rr := httptest.NewRecorder()
 			req, _ := http.NewRequest("POST", "/token",
@@ -116,7 +116,7 @@ func TestHandleTokenPost(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			handler := HandleTokenPost(jsonWriter, database,
 				handlersmocks.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
-				handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
+				handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 			rr := httptest.NewRecorder()
 			req, _ := http.NewRequest("POST", "/token",
@@ -170,7 +170,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator := handlersmocks.NewTokenValidator(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics())
+		handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -506,7 +506,7 @@ func newTokenEndpoint(t *testing.T) *tokenEndpoint {
 		registry:    metrics.NewRegistry(),
 	}
 	endpoint.handler = HandleTokenPost(endpoint.jsonWriter, endpoint.database, endpoint.issuer,
-		endpoint.validator, endpoint.auditLogger, noCredentialFailures{}, tokenmetrics.Register(endpoint.registry))
+		endpoint.validator, endpoint.auditLogger, noCredentialFailures{}, tokenmetrics.Register(endpoint.registry), &recordingLogoutTokens{})
 	return endpoint
 }
 
@@ -584,7 +584,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	tokenValidator := handlersmocks.NewTokenValidator(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics())
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -649,7 +649,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	tokenValidator := handlersmocks.NewTokenValidator(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics())
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -697,7 +697,7 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	handler := HandleTokenPost(jsonWriter, database,
-		handlersmocks.NewTokenIssuer(t), tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics())
+		handlersmocks.NewTokenIssuer(t), tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1045,7 +1045,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			tokenValidator := handlersmocks.NewTokenValidator(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics())
+			handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 			form := url.Values{"grant_type": {tc.grantType}, "client_id": {"test_client"}}
 			if tc.rawScope != omittedScope {
@@ -1123,7 +1123,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		tokenValidator := handlersmocks.NewTokenValidator(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		return jsonWriter, tokenValidator, tokenIssuer, auditLogger,
-			HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics())
+			HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 	}
 
 	// Rows 1 and 2 differ ONLY in grant type. Row 2 fails if a GrantType check is ever added to the
@@ -1290,7 +1290,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 	tokenIssuer := handlersmocks.NewTokenIssuer(t)
 	tokenValidator := handlersmocks.NewTokenValidator(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics())
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 	form := "grant_type=password&client_id=test_client&username=u&password=p&scope=openid"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
@@ -1343,7 +1343,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	tokenValidator := handlersmocks.NewTokenValidator(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics())
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 	formData := "grant_type=refresh_token&refresh_token=superseded&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
@@ -1414,7 +1414,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 
 		rateLimiter := newTestRateLimiter(nil)
 		handler := HandleTokenPost(jsonWriter, database, tokenIssuer,
-			tokenValidator, auditLogger, rateLimiter, testTokenMetrics())
+			tokenValidator, auditLogger, rateLimiter, testTokenMetrics(), &recordingLogoutTokens{})
 		return rateLimiter.LimitROPC(handler), auditLogger
 	}
 
@@ -1540,7 +1540,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		quietAudit.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		rateLimiter := newTestRateLimiter(nil)
 		token := rateLimiter.LimitROPC(HandleTokenPost(jsonWriter, datamocks.NewDatabase(t),
-			handlersmocks.NewTokenIssuer(t), tokenValidator, quietAudit, rateLimiter, testTokenMetrics()))
+			handlersmocks.NewTokenIssuer(t), tokenValidator, quietAudit, rateLimiter, testTokenMetrics(), &recordingLogoutTokens{}))
 		for i := 0; i < 5*tightBudget; i++ {
 			require.Equal(t, http.StatusOK, post(token), "attempt %d should reach the handler", i+1)
 		}
@@ -1678,7 +1678,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		tokenValidator := handlersmocks.NewTokenValidator(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		return jsonWriter, tokenValidator, auditLogger,
-			HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics())
+			HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 	}
 
 	const form = "grant_type=authorization_code&client_id=test_client&client_secret=s&" +

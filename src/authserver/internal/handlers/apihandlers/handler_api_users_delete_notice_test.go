@@ -82,19 +82,29 @@ func stubAdminDeletionUpToTheWrite(database *datamocks.Database, before *record.
 		Return([]record.UserGroup{}, nil).Once()
 }
 
+// stubAdminDeletionTellsNoApp answers the reads that name the apps the deletion tells, before the
+// delete: the user has no session and no grant, so no app is told.
+func stubAdminDeletionTellsNoApp(database *datamocks.Database) {
+	database.On("GetUserSessionsByUserId", mock.Anything, guardTx, adminDeletionNoticeUserId).
+		Return([]record.UserSession{}, nil).Once()
+	database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, guardTx, adminDeletionNoticeUserId, mock.Anything).
+		Return([]int64{}, nil).Once()
+}
+
 // stubAdminDeletion answers a deletion that commits: stubAdminDeletionUpToTheWrite, the delete and
 // the audit event. The audit event is the logger's only expectation, so a notice that wrote an
 // audit entry of its own would fail the case.
 func stubAdminDeletion(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	before *record.User, locked *record.User) {
 	stubAdminDeletionUpToTheWrite(database, before, locked)
+	stubAdminDeletionTellsNoApp(database)
 	database.On("DeleteUser", mock.Anything, guardTx, adminDeletionNoticeUserId).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUser, mock.Anything).Return().Once()
 }
 
 func adminDeletionNoticeHandler(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, jobs *heldJobs,
 	pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) http.Handler {
-	return HandleUserDelete(database, auditLogger, accountnotice.New(pageRenderer, emailSender, jobs))
+	return HandleUserDelete(database, auditLogger, accountnotice.New(pageRenderer, emailSender, jobs), &recordingLogoutTokens{})
 }
 
 func TestHandleUserDelete_TellsTheUserAnAdministratorDeletedTheirAccount(t *testing.T) {
@@ -224,11 +234,13 @@ func TestHandleUserDelete_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 				database.On("GetUserPermissionByUserIdAndPermissionId", mock.Anything, guardTx, adminDeletionNoticeUserId, permManage).
 					Return(&record.UserPermission{Id: 9, UserId: adminDeletionNoticeUserId, PermissionId: permManage}, nil).Once()
 				expectHoldersCounted(database, guardTx, 1, 0)
+				stubAdminDeletionTellsNoApp(database)
 				database.On("DeleteUser", mock.Anything, guardTx, adminDeletionNoticeUserId).Return(nil).Once()
 			}},
 		{"the deletion rolls back", http.StatusInternalServerError,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, settings *record.Settings) {
 				stubAdminDeletionUpToTheWrite(database, adminDeletionNoticeRow(), adminDeletionNoticeRow())
+				stubAdminDeletionTellsNoApp(database)
 				database.On("DeleteUser", mock.Anything, guardTx, adminDeletionNoticeUserId).
 					Return(errors.New("delete failed")).Once()
 			}},

@@ -28,7 +28,7 @@ This page helps your app make sure a sign-in comes back for the user it expects.
 
 ## What the auth server checks
 
-The hint must be an ID token the auth server signed, with its issuer in `iss` and a `sub`. Access tokens and refresh tokens are refused, although the same key signs them.
+The hint must be an ID token the auth server signed, with `typ: JWT` in its header, its issuer in `iss` and a `sub`. Access tokens and refresh tokens are refused, although the same key signs them.
 
 Two things aren't checked. The token can be expired, as OpenID Connect recommends, since a hint usually comes from a sign-in some time ago. And it doesn't have to have been issued to the client that sends it.
 
@@ -36,7 +36,7 @@ A hint that fails a check is refused with `invalid_request`:
 
 | `error_description` | Why |
 |---|---|
-| "The id_token_hint is invalid." | It isn't a token the auth server signed, or it's an access or refresh token. |
+| "The id_token_hint is invalid." | It isn't a token the auth server signed, its header `typ` isn't `JWT`, or it's an access or refresh token. |
 | "The id_token_hint was not issued by this server." | Its `iss` isn't the auth server's issuer. |
 | "The id_token_hint does not contain a valid sub claim." | It has no `sub`. |
 

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,13 +32,18 @@ import (
 
 // recoverAuditRecorder is runRecover's audit logger in these tests: the events and payloads are
 // the assertion, so they are captured rather than written to the database the way the running
-// command does through audit.NewLogger.
+// command does through audit.NewLogger. The back-channel sender logs each delivery from its own
+// goroutine, so Log appends an event and its details together under mu; the tests read the fields
+// once the command has returned, after every delivery finished.
 type recoverAuditRecorder struct {
+	mu      sync.Mutex
 	events  []string
 	details []map[string]interface{}
 }
 
 func (r *recoverAuditRecorder) Log(_ context.Context, auditEvent string, details map[string]interface{}) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.events = append(r.events, auditEvent)
 	r.details = append(r.details, details)
 }
@@ -67,10 +73,12 @@ func newRecoverDatabaseAt(t *testing.T, path string) (*sqlitedb.Database, *recor
 
 	ctx := context.Background()
 	settings := &record.Settings{
-		AppName:                "recover test",
-		Issuer:                 "https://localhost:8080",
-		PasswordPolicy:         record.PasswordPolicyLow,
-		AESEncryptionKeyLegacy: []byte{},
+		AppName:                         "recover test",
+		Issuer:                          "https://localhost:8080",
+		PasswordPolicy:                  record.PasswordPolicyLow,
+		AESEncryptionKeyLegacy:          []byte{},
+		UserSessionIdleTimeoutInSeconds: 7200,
+		UserSessionMaxLifetimeInSeconds: 86400,
 	}
 	resource := &record.Resource{
 		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
@@ -98,6 +106,9 @@ func newRecoverDatabaseAt(t *testing.T, path string) (*sqlitedb.Database, *recor
 		if err := db.CreatePermission(ctx, tx, manage); err != nil {
 			return err
 		}
+		if err := db.CreateKeyPair(ctx, tx, recoverTestKeyPair(t)); err != nil {
+			return err
+		}
 		return db.CreateUser(ctx, tx, user)
 	}))
 	return db, manage
@@ -121,7 +132,7 @@ func runRecoverOn(t *testing.T, db *sqlitedb.Database, audit *recoverAuditRecord
 	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	var out, errOut bytes.Buffer
-	code := runRecover(context.Background(), db, m, audit, inv, &out, &errOut)
+	code := runRecover(context.Background(), db, m, audit, inv, recoverTestDataKey(t), &out, &errOut)
 	return code, out.String(), errOut.String()
 }
 
@@ -300,7 +311,7 @@ func TestRecoverCommand_HelpPrintsTheUsageAndOpensNothing(t *testing.T) {
 	inv, ok := readRecoverCommand([]string{"--help", "--password-stdin"}, sqliteBase(a),
 		strings.NewReader(""), &stderr)
 	require.True(t, ok, "stderr: %s", stderr.String())
-	code := runRecoverCommand(inv, datafactory.OpenDatabase, &stdout, &stderr)
+	code := runRecoverCommand(inv, datafactory.OpenDatabase, recoverDataKey{}, &stdout, &stderr)
 
 	require.Equal(t, migrateExitOK, code)
 	assert.Equal(t, recoverUsage+"\n", stdout.String())
@@ -379,7 +390,7 @@ func TestRecoverCommand_AFlagAfterRecoverChoosesTheDatabaseOpened(t *testing.T) 
 	inv, ok := readRecoverCommand([]string{"--email", "admin@example.com", "--grant-manage",
 		"--db-dsn=file:" + b}, sqliteBase(a), strings.NewReader(""), &stderr)
 	require.True(t, ok, "stderr: %s", stderr.String())
-	code := runRecoverCommand(inv, datafactory.OpenDatabase, &stdout, &stderr)
+	code := runRecoverCommand(inv, datafactory.OpenDatabase, recoverDataKey{}, &stdout, &stderr)
 
 	require.Equal(t, migrateExitOK, code, "stderr: %s", stderr.String())
 	assert.NoFileExists(t, a)
@@ -426,7 +437,7 @@ func TestRecoverCommand_NeverCreatesTheDatabase(t *testing.T) {
 					opened = append(opened, *c)
 					return nil, errors.New(`database "goiabada_typo" does not exist`)
 				}
-				code := runRecoverCommand(inv, open, &stdout, &stderr)
+				code := runRecoverCommand(inv, open, recoverDataKey{}, &stdout, &stderr)
 
 				require.Equal(t, migrateExitError, code)
 				require.Len(t, opened, 1)
@@ -461,7 +472,7 @@ func TestRecoverCommand_SQLiteWritesNoCreationRecord(t *testing.T) {
 	open := func(_ context.Context, _ *config.DatabaseConfig, _ bool) (datafactory.Migratable, error) {
 		return nil, errors.New("not opened")
 	}
-	code := runRecoverCommand(inv, open, &stdout, &stderr)
+	code := runRecoverCommand(inv, open, recoverDataKey{}, &stdout, &stderr)
 
 	require.Equal(t, migrateExitError, code)
 	assert.Empty(t, logs.Records(), "logs: %s", logs.Text())

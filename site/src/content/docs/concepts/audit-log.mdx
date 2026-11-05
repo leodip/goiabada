@@ -35,7 +35,7 @@ These record who can administer Goiabada and who tried to reach past that. See [
 
 | Event | Written when | Details |
 |---|---|---|
-| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. It also covers reading an administrator client's secret, reading or setting the secret of a client listed for the `authserver` resource, rewording an administrative permission's description, switching a client's **May request administrative scopes**, deleting a group holding an administrative permission, and listing the `authserver` resource among a client's introspection resources. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `user_id` when the target is a user, `permission_ids` for a grant or a description change, `group_ids` for a group membership change, and `resource_ids` for a client's introspection resources |
+| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, changing the email or audit log settings, or setting or changing a client's back-channel logout URI. It also covers reading an administrator client's secret, reading or setting the secret of a client listed for the `authserver` resource, rewording an administrative permission's description, switching a client's **May request administrative scopes**, deleting a group holding an administrative permission, and listing the `authserver` resource among a client's introspection resources. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target`, `settings` or `backchannel_logout_uri`), `target_kind` and `target_id` when the request has a target, `user_id` when the target is a user, `permission_ids` for a grant or a description change, `group_ids` for a group membership change, and `resource_ids` for a client's introspection resources |
 | `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. It's written after the change's own entries, such as `added_user_permission` or `user_added_to_group`, never instead of them. Deleting an administrator or an administrative group writes only its own deletion entry. | `change` (`granted` or `revoked`), `target_kind` and `target_id`, `user_id` when the target is a user, `permission_identifiers` (such as `authserver:manage`), `group_id` for a membership change, and `logged_in_user`, or `command` for the `recover` command's grant |
 | `updated_client_administrative_scopes` | A client's **May request administrative scopes** switch was saved, on or off. An allowed client is an administrator client, so watch this beside `administrative_permission_changed`. The Admin API writes it for every call to that route, even one that keeps the value it had; the admin console's **Save** calls it only when the switch changed. | `client_id`, `client_identifier`, `allowed` (the new value) and `logged_in_user` |
 | `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused (see the answers on [Authorize](/reference/endpoints/authorize/#administrative-scopes) and [Token](/reference/endpoints/token/#administrative-scopes)). It's written at the authorization endpoint when the browser holds a valid session and the request doesn't ask for `prompt=login`, at the last step before a code or tokens are issued, and on the token endpoint's authorization code, refresh token and password grants. A refusal at the authorization endpoint with no valid session, or held back until after the password because of `prompt=login`, writes a Warn log record instead, since anyone can reach that endpoint. | `client_id`, `client_identifier`, `scopes`, `checkpoint` (`"authorize"`, `"issue"`, `"authorization_code"`, `"refresh_token"` or `"password"`) and `user_id` |
@@ -118,11 +118,12 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `added_resource_ids` | The row ids of the resources a save of a client's introspection resources added. |
 | `allowed` | Whether the client may now ask for the administrative scopes. |
 | `applies_to` | A legal document's Applies to after the save: `all_apps`, or `selected_apps` for the apps it lists. |
+| `attempts` | How many times the auth server sent a logout token before its delivery finished, 0 when it sent none. |
 | `audit_log_retention_days` | The new audit log retention, in days. |
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
 | `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
 | `auth_state` | The step of the sign-in the browser most recently moved, when a page of a sign-in it no longer holds, or of none, was refused. |
-| `ceiling` | Which rule refused an administrator change: `grant`, `target` or `settings`. |
+| `ceiling` | Which rule refused an administrator change: `grant`, `target`, `settings` or `backchannel_logout_uri`. |
 | `change` | `granted` or `revoked`. |
 | `checkpoint` | Where an administrative scope was refused: `authorize`, `issue`, or the token endpoint's `authorization_code`, `refresh_token` or `password` grant. |
 | `client_id` | The client's row id, the id in the Admin API's client paths. |
@@ -148,7 +149,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `is_public` | Whether a client that registered itself is public, with no secret. |
 | `issue_access_token` | Whether the implicit flow issued an access token. |
 | `issue_id_token` | Whether the implicit flow issued an ID token. |
-| `jti` | The `jti` of an access token a client revoked. |
+| `jti` | The `jti` of an access token a client revoked, or of a logout token the auth server sent. |
 | `keep_signed_in` | Under `old` and `new`: whether users stay signed in after the browser closes, `always`, `ask` (each user chooses) or `never`. |
 | `key_id` | The key id (`kid`) of a deleted signing key. |
 | `kind` | A legal document's kind: `must_accept` for terms users must accept, `for_information` for a privacy notice. |
@@ -163,7 +164,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `old` | The default token settings, the session settings, or the Turnstile settings, before the change, keyed as below. |
 | `old_generation` | The user's authentication generation before their sessions and tokens were revoked. |
 | `old_ui_theme` | The UI theme before the change. |
-| `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. |
+| `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. For a logout token, how its delivery ended: see `goiabada_backchannel_logout_deliveries_total` on [Monitoring](/deploy/monitoring/#metrics-catalog). |
 | `permission_id` | The row id of a permission. |
 | `permission_identifiers` | The administrative permissions changed, such as `authserver:manage`. |
 | `permission_ids` | The row ids of the administrative permissions a refused request would have changed. |
@@ -270,6 +271,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `deleted_user_session_client` | A client signed a user out, and was removed from the user's session. The session ends only when no other client is left on it. |
 | `deleted_user_session` | A session was deleted by a sign-in, a sign-out, its user or an administrator. Its `reason` says which: see [Why a session was deleted](#why-a-session-was-deleted). |
 | `terminated_user_session` | A session was ended by an administrator, by its own user, or by another user signing in on the same browser, and its codes and refresh tokens were revoked. |
+| `sent_logout_token` | The auth server sent a logout token to an app's [back-channel logout URI](/concepts/clients/#back-channel-logout), telling it a user's session ended. It's written once the delivery finishes, so its `outcome` and `attempts` say whether the app was told. A delivery dropped because too many were already running writes none. |
 | `revoked_user_auth_state` | A user's password was reset or changed, the user was disabled, or the `recover` command recovered the user, so their sessions and refresh tokens were revoked. A user changing their own password keeps the session they did it from. |
 
 ### Tokens
@@ -381,6 +383,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_client_oauth2_flows` | An administrator saved which flows a client may use, and whether it needs PKCE. |
 | `updated_redirect_uris` | An administrator saved a client's redirect URIs. |
 | `updated_post_logout_redirect_uris` | An administrator saved a client's sign-out redirect URIs. |
+| `updated_client_backchannel_logout` | An administrator saved a client's back-channel logout URI, or whether it requires the session identifier. |
 | `updated_web_origins` | An administrator saved a client's web origins. |
 | `updated_client_tokens` | An administrator saved a client's token settings: lifetimes, and which claims go in its tokens. |
 | `updated_client_permissions` | An administrator changed the permissions granted to a client. |

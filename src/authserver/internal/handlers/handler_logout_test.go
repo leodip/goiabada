@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -43,7 +44,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req, _ := http.NewRequest("GET", "/logout", nil)
 		rr := httptest.NewRecorder()
@@ -74,7 +75,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req, _ := http.NewRequest("GET", "/auth/logout?"+url.Values{
 			"post_logout_redirect_uri": {"https://example.com/out"},
@@ -131,7 +132,7 @@ func TestHandleLogoutGet(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 				tokenParser := handlersmocks.NewTokenParser(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
-				handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+				handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 				req, _ := http.NewRequest("GET", tc.target, nil)
 				rr := httptest.NewRecorder()
@@ -161,7 +162,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req, _ := http.NewRequest("GET", "/auth/logout?ui_locales=pt-BR", nil)
 		rr := httptest.NewRecorder()
@@ -187,7 +188,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -224,7 +225,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
@@ -265,7 +266,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
@@ -301,7 +302,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"client_id":                {"dcr_client"},
@@ -332,7 +333,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
@@ -391,7 +392,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
@@ -446,7 +447,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
@@ -477,7 +478,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, "")
 		rr := httptest.NewRecorder()
@@ -506,7 +507,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
@@ -544,7 +545,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -588,7 +589,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
@@ -599,7 +600,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
+			Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 		var bound map[string]interface{}
 		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logout_consent.html",
@@ -794,6 +795,14 @@ func TestDecryptIDTokenHint(t *testing.T) {
 // and classifyIdTokenHint owns that with an exhaustive table. Deciding it here meant returning an
 // error the caller turned into a 500, which is what a user whose session had merely been reaped or
 // replaced saw (#109 decision 11).
+// logoutTestSettings is the settings a teardown judges a session's liveness by and takes the logout
+// tokens' iss from.
+var logoutTestSettings = &record.Settings{
+	Issuer:                          "https://logout-issuer.example",
+	UserSessionIdleTimeoutInSeconds: 7200,
+	UserSessionMaxLifetimeInSeconds: 86400,
+}
+
 func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 	// Item 4. A database error and a session that is simply not there used to be one branch returning
@@ -807,7 +816,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").
 			Return(nil, errors.New("lookup exploded"))
 
-		err := handleExistingSessionOnLogout(r, "test-session", &record.Client{}, database, auditLogger)
+		err := handleExistingSessionOnLogout(r, logoutTestSettings, hintClassification{sessionIdentifier: "test-session", client: &record.Client{}}, database, auditLogger, &recordingLogoutTokens{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "lookup exploded")
@@ -822,7 +831,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(nil, nil)
 
-		err := handleExistingSessionOnLogout(r, "test-session", &record.Client{}, database, auditLogger)
+		err := handleExistingSessionOnLogout(r, logoutTestSettings, hintClassification{sessionIdentifier: "test-session", client: &record.Client{}}, database, auditLogger, &recordingLogoutTokens{})
 
 		require.NoError(t, err, "a session that is not there is nothing to tear down, not a failure")
 		database.AssertExpectations(t)
@@ -868,7 +877,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
+		err := handleExistingSessionOnLogout(r, logoutTestSettings, hintClassification{sessionIdentifier: sessionIdentifier, client: client}, database, auditLogger, &recordingLogoutTokens{})
 
 		require.NoError(t, err)
 		database.AssertExpectations(t)
@@ -916,7 +925,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}).Return().Once()
 		auditLogger.On("Log", mock.Anything, audit.EventLogout, mock.Anything).Return()
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
+		err := handleExistingSessionOnLogout(r, logoutTestSettings, hintClassification{sessionIdentifier: sessionIdentifier, client: client}, database, auditLogger, &recordingLogoutTokens{})
 
 		require.NoError(t, err)
 		database.AssertExpectations(t)
@@ -949,12 +958,79 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).Return(nil)
 		database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, userSession.Clients).Return(nil)
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
+		err := handleExistingSessionOnLogout(r, logoutTestSettings, hintClassification{sessionIdentifier: sessionIdentifier, client: client}, database, auditLogger, &recordingLogoutTokens{})
 
 		require.NoError(t, err) // The function should not return an error if the client is not found in the session
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
+
+	// #784 decision 2: the app whose part of a live session ended is told, with a token naming the
+	// hint's user and the session; the other app on the session, URI and all, is not. An expired
+	// session tells nobody (decision 1).
+	hintedSession := func(started time.Time, lastAccessed time.Time) *record.UserSession {
+		return &record.UserSession{
+			Id:                1,
+			UserId:            123,
+			SessionIdentifier: "test-session",
+			Started:           started,
+			LastAccessed:      lastAccessed,
+			Clients: []record.UserSessionClient{
+				{Id: 1, Client: record.Client{Id: 41, ClientIdentifier: "test-client",
+					BackchannelLogoutURI: "https://app.example/bcl?tenant=1"}},
+				{Id: 2, Client: record.Client{Id: 42, ClientIdentifier: "other-client",
+					BackchannelLogoutURI: "https://other.example/bcl"}},
+			},
+		}
+	}
+	now := time.Now().UTC()
+	for _, tc := range []struct {
+		name    string
+		session *record.UserSession
+		told    [][]backchannel.Delivery
+	}{
+		{
+			name:    "A live session tells the app whose part ended, and only it",
+			session: hintedSession(now.Add(-time.Hour), now.Add(-time.Minute)),
+			told: [][]backchannel.Delivery{{{
+				ClientId:          41,
+				ClientIdentifier:  "test-client",
+				URI:               "https://app.example/bcl?tenant=1",
+				UserId:            123,
+				Subject:           "hint-subject",
+				SessionIdentifier: "test-session",
+			}}},
+		},
+		{
+			name:    "A session past its idle timeout tells nobody",
+			session: hintedSession(now.Add(-3*time.Hour), now.Add(-7201*time.Second)),
+		},
+		{
+			name:    "A session past its maximum lifetime tells nobody",
+			session: hintedSession(now.Add(-86401*time.Second), now.Add(-time.Minute)),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			logoutTokens := &recordingLogoutTokens{}
+
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(tc.session, nil)
+			database.On("UserSessionLoadClients", mock.Anything, mock.Anything, tc.session).Return(nil)
+			database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, tc.session.Clients).Return(nil)
+			database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(1)).Return(nil)
+			auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
+
+			err := handleExistingSessionOnLogout(&http.Request{}, logoutTestSettings, hintClassification{
+				sessionIdentifier: "test-session",
+				client:            &record.Client{ClientIdentifier: "test-client"},
+				subject:           "hint-subject",
+			}, database, auditLogger, logoutTokens)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.told, logoutTokens.sent)
+		})
+	}
 }
 
 // The fixtures the hinted pipeline's cases share. A confirmed hint is one classifyIdTokenHint
@@ -1034,7 +1110,7 @@ func stubConfirmedHint(
 	client := &record.Client{Id: 11, ClientIdentifier: hintedClientId}
 
 	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-		Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: claims}, nil)
+		Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: claims}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, hintedClientId).Return(client, nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, hintedSubject).
 		Return(&record.User{Id: hintedUserId}, nil).Maybe()
@@ -1195,7 +1271,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 		rr := httptest.NewRecorder()
@@ -1241,7 +1317,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{
 			"post_logout_redirect_uri": {"https://example.com/out?state=registered&lang=en"},
@@ -1301,7 +1377,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				tokenParser := handlersmocks.NewTokenParser(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 				req := withSessionIdentifier(logoutPostRequest(t, url.Values{
 					"post_logout_redirect_uri": {target},
@@ -1688,7 +1764,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				tokenParser := handlersmocks.NewTokenParser(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 				redirectURI := tc.redirectURI
 				if redirectURI == "" {
@@ -1779,7 +1855,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				tokenParser := handlersmocks.NewTokenParser(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 				req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 				rr := httptest.NewRecorder()
@@ -1832,7 +1908,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				tokenParser := handlersmocks.NewTokenParser(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 				req := logoutPostRequest(t, url.Values{})
 				if tc.sessionIdentifier != "" {
@@ -1872,7 +1948,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := logoutPostRequest(t, url.Values{"ui_locales": {"pt-BR"}})
 		rr := httptest.NewRecorder()
@@ -1903,7 +1979,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := hintedRequest(t, http.MethodPost, url.Values{
 			"id_token_hint": {hintedToken},
@@ -1948,7 +2024,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		// Rejected at the client_id gate, which refuses before any lookup: the parameter names a
 		// different client from the aud the hint is signed over.
@@ -1962,7 +2038,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
+			Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -2009,7 +2085,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				tokenParser := handlersmocks.NewTokenParser(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+				handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 				form := url.Values{"id_token_hint": {hintedToken}, "client_id": {"another_client"}}
 				if tc.present {
@@ -2019,7 +2095,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				rr := httptest.NewRecorder()
 
 				tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-					Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
+					Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 				handler.ServeHTTP(rr, req)
 
@@ -2041,7 +2117,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := logoutPostRequest(t, url.Values{})
 		rr := httptest.NewRecorder()
@@ -2071,7 +2147,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		tokenParser := handlersmocks.NewTokenParser(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+		handler := HandleLogoutPost(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
 		req := logoutPostRequest(t, url.Values{})
 		rr := httptest.NewRecorder()
@@ -2327,6 +2403,12 @@ func TestBuildPostLogoutRedirect(t *testing.T) {
 // greppable message and a collector can count them by gate. Asserting it against tc.gate is what
 // makes the table pay for it: a gate renamed in the classifier and not in the row fails here
 // rather than silently logging the wrong name.
+// idTokenHeader is the JOSE header of an ID Token this server issues, which a parsed hint carries:
+// a fixture standing for a real hint needs it, since the hint checks require it (#784 decision 12).
+func idTokenHeader() map[string]interface{} {
+	return map[string]interface{}{"alg": "RS256", "kid": "test-key", "typ": "JWT"}
+}
+
 func assertRejectionRecord(t *testing.T, logs *logtest.SlogCapture, want hintState, wantErr bool, gate string) {
 	t.Helper()
 
@@ -2452,11 +2534,15 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		name string
 		// gate names the check that is expected to refuse the row, so a failure says which one stopped
 		// working rather than only that the answer changed.
-		gate       string
-		mutate     func(claims map[string]interface{})
-		hintAbsent bool
-		hintValue  *string
-		innerToken *string
+		gate   string
+		mutate func(claims map[string]interface{})
+		// headerTyp replaces the JOSE header's typ, which is JWT on every other row; deleteHeaderTyp
+		// leaves it out.
+		headerTyp       *string
+		deleteHeaderTyp bool
+		hintAbsent      bool
+		hintValue       *string
+		innerToken      *string
 		// clientId is the value the parameter arrived with; clientIdAbsent says it did not arrive at
 		// all. The two are separate fields because the classifier reads client_id for presence, so a
 		// row that could only say "" would be unable to tell the gate's two sides apart, which is
@@ -2565,6 +2651,31 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			name: "typ says this is an ID token", gate: "ID-Token shape",
 			mutate: func(claims map[string]interface{}) { claims["typ"] = "ID" },
 			want:   hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			// A logout token names sub, sid and aud, carries iss and iat and no typ claim, and is
+			// signed with the same key, so every claim gate would take it for an ID Token: only its
+			// header tells it apart. Every claim is identical to the confirmed row (#784 decision 12).
+			name: "the header says this is a logout token", gate: "ID-Token shape",
+			headerTyp: strPtr("logout+jwt"),
+			want:      hintRejected,
+		},
+		{
+			name: "the header says this is an access token", gate: "ID-Token shape",
+			headerTyp: strPtr("at+jwt"),
+			want:      hintRejected,
+		},
+		{
+			// A requirement rather than a denylist: a header that names no type is no ID Token's.
+			name: "the header has no typ", gate: "ID-Token shape",
+			deleteHeaderTyp: true,
+			want:            hintRejected,
+		},
+		{
+			// A typ is a media type, compared without regard to case (RFC 7515 section 4.1.9).
+			name: "the header typ is jwt in lower case", gate: "ID-Token shape",
+			headerTyp: strPtr("jwt"),
+			want:      hintConfirmed, wantSid: theSessionId,
 		},
 		{
 			name: "sub is missing", gate: "ID-Token shape",
@@ -2851,6 +2962,13 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			if tc.mutate != nil {
 				tc.mutate(claims)
 			}
+			header := idTokenHeader()
+			if tc.headerTyp != nil {
+				header["typ"] = *tc.headerTyp
+			}
+			if tc.deleteHeaderTyp {
+				delete(header, "typ")
+			}
 
 			// The literal false is decision 14's whole mechanism, so it is asserted rather than
 			// matched loosely: a classifier that passed true would find no expectation here and the
@@ -2863,7 +2981,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			if tc.parserErr != nil {
 				parserCall.Return(nil, tc.parserErr).Maybe()
 			} else {
-				parserCall.Return(&oauth.JwtToken{TokenBase64: parsed, Claims: claims}, nil).Maybe()
+				parserCall.Return(&oauth.JwtToken{TokenBase64: parsed, Header: header, Claims: claims}, nil).Maybe()
 			}
 
 			stubDB := tc.stubDB

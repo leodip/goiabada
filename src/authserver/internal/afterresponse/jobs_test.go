@@ -382,3 +382,26 @@ func TestGo_ConcurrentCallsAdmitExactlyTheCap(t *testing.T) {
 	assert.Equal(t, int32(64), ran.Load())
 	assert.Len(t, warnings(capture), 136)
 }
+
+// TestGo_SelfRegisteredDeliveriesTakeNoSlotFromOtherApps: a delivery to a self-registered client
+// is admitted against a budget of its own, so an anonymous registrant whose endpoint never answers
+// fills only that budget, and a logout token to an administrator's client still goes (#784 decision
+// 5).
+func TestGo_SelfRegisteredDeliveriesTakeNoSlotFromOtherApps(t *testing.T) {
+	jobs := New(metrics.NewRegistry())
+	release := make(chan struct{})
+	fillToTheCap(t, jobs, ClassBackchannelLogoutSelfRegistered, release)
+	defer close(release)
+
+	ran := make(chan struct{})
+	jobs.Go(context.Background(), ClassBackchannelLogout, func(context.Context) { close(ran) })
+	select {
+	case <-ran:
+	case <-time.After(5 * time.Second):
+		t.Fatal("a delivery to an administrator's client was not run while the self-registered budget was full")
+	}
+
+	jobs.Go(context.Background(), ClassBackchannelLogoutSelfRegistered, func(context.Context) {
+		t.Error("a self-registered delivery past its cap ran")
+	})
+}

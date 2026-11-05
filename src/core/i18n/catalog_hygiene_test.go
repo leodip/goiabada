@@ -125,10 +125,15 @@ var logInOrOut = regexp.MustCompile(`(?i)(?:^|[^=\w])log(?:ged|ging)?(?:[ -]?|\s
 // UI's word for signing in.
 var smtpMechanisms = regexp.MustCompile(`\b(?:PLAIN|LOGIN|CRAM-MD5)\b`)
 
+// backchannelLogout matches the name of OpenID Connect Back-Channel Logout 1.0, the protocol a
+// client's back-channel logout URI and its logout tokens belong to (#784). Like LOGIN above, it is
+// the protocol's spelling, not the UI's word for signing out.
+var backchannelLogout = regexp.MustCompile(`(?i)\bback-channel logout\b`)
+
 // saysLogInOrOut reports whether v says login or logout as a word, once the protocol values above
 // are taken out.
 func saysLogInOrOut(v string) bool {
-	return logInOrOut.MatchString(smtpMechanisms.ReplaceAllString(v, ""))
+	return logInOrOut.MatchString(backchannelLogout.ReplaceAllString(smtpMechanisms.ReplaceAllString(v, ""), ""))
 }
 
 // TestCatalog_EnglishSaysSignInAndSignOut holds the English catalog to the
@@ -144,11 +149,13 @@ func TestCatalog_EnglishSaysSignInAndSignOut(t *testing.T) {
 
 func TestCatalog_LogInOrOutMatchesOnlyTheWords(t *testing.T) {
 	for _, v := range []string{"Login", "Logout", "Are you sure you want to logout?", "shown on login and consent screens", "Log in", "log-in page",
-		"Log out now", "Logged out", "You have been logged out.", "while logging in", "the application that logged you out"} {
+		"Log out now", "Logged out", "You have been logged out.", "while logging in", "the application that logged you out",
+		"the back-channel logout URI, then logout", "a channel logout"} {
 		assert.Truef(t, saysLogInOrOut(v), "%q should match", v)
 	}
 	for _, v := range []string{"Sign in", "Sign out", "the sign-in page", "You have been signed out.", "prompt=login", "login_hint", "catalogue",
-		"logo uploads", "the audit log is", "logged into the audit log", "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5."} {
+		"logo uploads", "the audit log is", "logged into the audit log", "The SMTP server offers none of PLAIN, LOGIN or CRAM-MD5.",
+		"Back-channel logout URI must use https or http", "the client's back-channel logout settings"} {
 		assert.Falsef(t, saysLogInOrOut(v), "%q should not match", v)
 	}
 }

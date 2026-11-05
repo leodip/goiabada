@@ -1,3 +1,4 @@
+import { createRemoteJWKSet, type JWTVerifyGetKey } from "jose";
 import * as client from "openid-client";
 import { issuer, serviceClient, webClients, type WebClientKey } from "./config";
 
@@ -25,6 +26,23 @@ export function webConfig(key: WebClientKey) {
 
 export function serviceConfig() {
   return discover(serviceClient.clientId, serviceClient.clientSecret);
+}
+
+// The auth server's signing keys, from the discovery document's jwks_uri, which sign its ID tokens
+// and its logout tokens alike. jose fetches them when it first needs them, and again for a kid it
+// doesn't know, so a rotated key is picked up.
+const globalKeys = globalThis as unknown as { testappKeys?: Map<string, JWTVerifyGetKey> };
+const keySets = (globalKeys.testappKeys ??= new Map<string, JWTVerifyGetKey>());
+
+export function signingKeys(config: client.Configuration): JWTVerifyGetKey {
+  const uri = config.serverMetadata().jwks_uri;
+  if (!uri) throw new Error("The discovery document has no jwks_uri.");
+  let keys = keySets.get(uri);
+  if (!keys) {
+    keys = createRemoteJWKSet(new URL(uri));
+    keySets.set(uri, keys);
+  }
+  return keys;
 }
 
 // What a failed call to the auth server said, for showing on the page.

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -20,8 +21,11 @@ import (
 )
 
 // userSessionManagerDatabase is what the session manager needs: the session row and the clients
-// it authorized, and the transaction that changes them together.
+// it authorized, and the transaction that changes them together. The apps a removed session served
+// are read for the logout tokens its removal sends (#784).
 type userSessionManagerDatabase interface {
+	backchannel.SessionDatabase
+
 	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
@@ -120,6 +124,11 @@ type SessionLimits struct {
 type Removal struct {
 	Session record.UserSession
 	Reason  string
+	// LogoutDeliveries is a logout token for each app on the session with a back-channel logout URI,
+	// read under the session's row before its deletion, when the session was still within its idle
+	// timeout and maximum lifetime; nil otherwise. The caller hands it to the back-channel sender
+	// after the commit, beside the audit event (#784 decision 1).
+	LogoutDeliveries []backchannel.Delivery
 }
 
 // Device is the browser a sign-in starts a session on, as the HTTP side read it: the device cookie
@@ -186,7 +195,11 @@ type Device struct {
 //     decision 5).
 //
 // Every row removed comes back with its reason, so the caller can audit each, and only when the
-// transaction committed: every failure rolled them back.
+// transaction committed: every failure rolled them back. A removed session still within limits' idle
+// timeout and maximum lifetime, whatever its reason, comes back with the logout tokens for the apps it
+// served, read under its row before its deletion; an expired one tells nobody (#784 decision 1). The
+// user's subject, which the tokens name, is read before the transaction, so the transaction reads no
+// users row while it holds a session's.
 func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authentication Authentication,
 	authStateGeneration int64, otpConfigGeneration *int64, device Device, ipAddress string,
 	replacing *record.UserSession, limits SessionLimits) (*record.UserSession, []Removal, error) {
@@ -204,6 +217,16 @@ func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authe
 	if replacing != nil && replacing.UserId != userId {
 		return nil, nil, errs.Errorf("refusing to replace user session %v: it belongs to user %v, not %v",
 			replacing.Id, replacing.UserId, userId)
+	}
+
+	user, err := u.database.GetUserById(ctx, nil, userId)
+	if err != nil {
+		return nil, nil, err
+	}
+	// No user is one deleted meanwhile, whose sessions went with the user: nothing to tell.
+	subject := ""
+	if user != nil {
+		subject = user.Subject
 	}
 
 	utcNow := time.Now().UTC()
@@ -246,8 +269,32 @@ func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authe
 	// transaction answered nil, so an aborted attempt's deletions, which never happened, are not
 	// reported (#198).
 	var removed []Removal
-	err := u.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+	err = u.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		var removedThisAttempt []Removal
+
+		// remove deletes us, reading first the apps to tell when it is still valid: under its row, so
+		// an app a ceremony adds to it at the same moment is either read or finds the session gone.
+		remove := func(us record.UserSession, reason string) error {
+			removal := Removal{Session: us, Reason: reason}
+			if subject != "" && us.IsValid(utcNow, limits.IdleTimeoutInSeconds, limits.MaxLifetimeInSeconds, nil) {
+				held, acquireErr := u.database.AcquireUserSessionRow(ctx, tx, us.SessionIdentifier)
+				if acquireErr != nil {
+					return acquireErr
+				}
+				if held {
+					deliveries, deliveriesErr := backchannel.SessionDeliveries(ctx, u.database, tx, &us, subject)
+					if deliveriesErr != nil {
+						return deliveriesErr
+					}
+					removal.LogoutDeliveries = deliveries
+				}
+			}
+			if deleteUserSessionErr := u.database.DeleteUserSession(ctx, tx, us.Id); deleteUserSessionErr != nil {
+				return deleteUserSessionErr
+			}
+			removedThisAttempt = append(removedThisAttempt, removal)
+			return nil
+		}
 
 		if claimErr := authentication.OTPClaim.Recheck(ctx, u.database, tx, userId); claimErr != nil {
 			return claimErr
@@ -291,19 +338,17 @@ func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authe
 				kept = append(kept, us)
 				continue
 			}
-			if deleteUserSessionErr := u.database.DeleteUserSession(ctx, tx, us.Id); deleteUserSessionErr != nil {
-				return deleteUserSessionErr
+			if removeErr := remove(us, reason); removeErr != nil {
+				return removeErr
 			}
-			removedThisAttempt = append(removedThisAttempt, Removal{Session: us, Reason: reason})
 		}
 
 		// The cap counts what the two rules above left, and the new session, which is not among kept
 		// and so is never chosen (#564 decision 5).
 		for _, us := range sessionsOverCap(kept, utcNow, limits) {
-			if deleteUserSessionErr := u.database.DeleteUserSession(ctx, tx, us.Id); deleteUserSessionErr != nil {
-				return deleteUserSessionErr
+			if removeErr := remove(us, audit.DeletedUserSessionSessionCap); removeErr != nil {
+				return removeErr
 			}
-			removedThisAttempt = append(removedThisAttempt, Removal{Session: us, Reason: audit.DeletedUserSessionSessionCap})
 		}
 		removed = removedThisAttempt
 		return nil

@@ -54,11 +54,21 @@ const (
 	// notice to an address an attacker has just changed away from, which once the address is theirs
 	// is the victim's only warning (#724 decision 4).
 	ClassSecurityNotice Class = "security_notice"
+	// ClassBackchannelLogout is one logout token to an administrator-registered client's
+	// back-channel logout URI (#784 decision 5). A delivery holds its slot for up to about a minute
+	// while an app that does not answer is retried, so it has a budget of its own.
+	ClassBackchannelLogout Class = "backchannel_logout"
+	// ClassBackchannelLogoutSelfRegistered is one logout token to a client that registered itself
+	// through dynamic client registration. Anyone can register one while registration is on, so its
+	// endpoint, however slow, fills only this budget and never takes the slot a delivery to an
+	// administrator's client needs (#784 decision 5).
+	ClassBackchannelLogoutSelfRegistered Class = "backchannel_logout_self_registered"
 )
 
 // classes is every class declared above, the closed set the metrics' class label takes (#400
 // decision 4). A class missing from it would be reported as other.
-var classes = []Class{ClassRecovery, ClassRegistration, ClassAccountNotice, ClassSecurityNotice}
+var classes = []Class{ClassRecovery, ClassRegistration, ClassAccountNotice, ClassSecurityNotice,
+	ClassBackchannelLogout, ClassBackchannelLogoutSelfRegistered}
 
 // Jobs runs jobs after their responses and counts the ones in flight. The zero value is not used;
 // New builds one, and the server holds the one the routes hand to their handlers.

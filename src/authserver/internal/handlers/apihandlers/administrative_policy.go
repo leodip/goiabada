@@ -51,12 +51,14 @@ const manageScopeRequiredDescription = "Only a token with the authserver:manage 
 // group, and listing the authserver resource on a client's introspection resources; the target
 // ceiling is any other write on an administrator, switching a client's allowance to request the
 // administrative scopes, and changing the description of an administrative permission; the settings
-// ceiling is changing the email or the audit-log settings (#402 decisions 1, 5 and 7, #499 decision
-// 4, #676 decision 14).
+// ceiling is changing the email or the audit-log settings; the back-channel logout URI ceiling is
+// setting or changing a client's back-channel logout URI (#402 decisions 1, 5 and 7, #499 decision
+// 4, #676 decision 14, #784 decision 15).
 const (
-	ceilingGrant    = "grant"
-	ceilingTarget   = "target"
-	ceilingSettings = "settings"
+	ceilingGrant                = "grant"
+	ceilingTarget               = "target"
+	ceilingSettings             = "settings"
+	ceilingBackchannelLogoutURI = "backchannel_logout_uri"
 )
 
 // The kind of target a refusal names.
@@ -472,6 +474,34 @@ func settingsCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger A
 		return true
 	}
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{ceiling: ceilingSettings})
+	return false
+}
+
+// backchannelLogoutURIChangeReserved reports whether a save storing wanted over stored sets or
+// changes a client's back-channel logout URI, which is authserver:manage's alone: anything but
+// clearing it or carrying the stored one back unchanged (#784 decision 15).
+func backchannelLogoutURIChangeReserved(stored, wanted string) bool {
+	return wanted != "" && wanted != stored
+}
+
+// backchannelLogoutURICeilingAllows applies the back-channel logout URI ceiling to a save of a
+// client's back-channel logout settings that stores wanted. A URI an administrator registers is
+// trusted to reach any address, so whoever sets one points the auth server's own requests into its
+// network, a reach authserver:manage-clients has nowhere else; it is reserved to authserver:manage,
+// as the SMTP host is. Clearing the URI, or changing the session-required flag alone, is not. It
+// reports whether the save may go on, and when it may not it has answered the request. It reads
+// nothing: the client as read is what it judges, and the save holds the same comparison again under
+// the client's row (#784 decision 15).
+func backchannelLogoutURICeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger AuditLogger,
+	client *record.Client, wanted string) bool {
+	if callerHoldsManage(r) || !backchannelLogoutURIChangeReserved(client.BackchannelLogoutURI, wanted) {
+		return true
+	}
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
+		ceiling:    ceilingBackchannelLogoutURI,
+		targetKind: targetKindClient,
+		targetId:   client.Id,
+	})
 	return false
 }
 

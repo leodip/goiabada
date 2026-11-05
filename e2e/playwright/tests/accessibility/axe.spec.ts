@@ -645,6 +645,18 @@ test("the clients' pages", async ({ page, clients, resources }) => {
       await page.locator("#btnSave").click();
     }),
     at(page, "the sign-out redirect URIs of a client with no flow that redirects", clientUrl(machine.id, "sign-out-redirect-uris")),
+    at(page, "a client's back-channel logout, none yet", tab("backchannel-logout")),
+    refused(page, "a client's back-channel logout, the URI refused", "backchannelLogoutUri", async () => {
+      await page.locator("#backchannelLogoutUri").fill("ftp://app.example.com/backchannel-logout");
+      await page.locator("#btnSave").click();
+    }),
+    saved(page, "a client's back-channel logout saved", async () => {
+      await page.goto(tab("backchannel-logout"));
+      await page.locator("#backchannelLogoutUri").fill(`${env.webtest1Url}/backchannel-logout`);
+      await page.locator("#backchannelLogoutSessionRequired").check();
+      await page.locator("#btnSave").click();
+    }),
+    at(page, "the back-channel logout of a client with no flow that signs users in", clientUrl(machine.id, "backchannel-logout")),
     at(page, "a client's web origins, none yet", tab("web-origins")),
     saved(page, "a client's web origins saved", async () => {
       await page.locator("#webOrigin").fill(env.webtest1Url);

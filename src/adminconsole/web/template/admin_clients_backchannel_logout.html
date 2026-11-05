@@ -1,0 +1,65 @@
+{{define "title"}}{{ T $.ctx "adminconsole.client_tabs.backchannel_logout" }} – {{ .client.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "page"}}
+{{ template "client_header" (args "backchannel-logout" .client.ClientId .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
+
+{{ if not .client.CanManageBackchannelLogout }}
+<div class="panel">
+  <div class="panel-body">
+    <div class="notice notice-note">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.backchannel_logout.requires_sign_in_flow" }}</p>
+    </div>
+  </div>
+</div>
+{{ else }}
+{{/* errorField names the field a refusal is about, which is marked invalid, described by the
+     notice and focused. Only authserver:manage sets or changes the URI; anyone may clear it or
+     switch the checkbox, so the URI stays editable and an administrator without it is told so
+     under it (#784 decision 15). */}}
+<form id="formClientBackchannelLogout" class="panel" method="post" novalidate
+  {{- if .client.IsSystemLevelClient }} data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_clients.modal.save_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"{{ end }}>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="backchannel-logout-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.backchannel_logout.saved_successfully" }}</p>
+    </div>
+    {{ end }}
+    <p class="text-ink-muted">{{ T $.ctx "adminconsole.admin_clients.backchannel_logout.lead" }}</p>
+
+    <div class="field">
+      <label class="field-label" for="backchannelLogoutUri">{{ T $.ctx "adminconsole.admin_clients.backchannel_logout.field.uri" }}</label>
+      <input class="control control-mono" id="backchannelLogoutUri" type="url" name="backchannelLogoutUri" value="{{ .client.BackchannelLogoutURI }}" placeholder="https://app.example.com/backchannel-logout" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "backchannelLogoutUri" }}backchannel-logout-error {{ end }}{{ end }}backchannelLogoutUriHint"
+        {{- if .error }}{{ if eq .errorField "backchannelLogoutUri" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+      <p class="field-hint" id="backchannelLogoutUriHint">{{ T $.ctx "adminconsole.admin_clients.backchannel_logout.field.uri_hint" }}
+        {{- if not $.isAdmin }} <span class="block font-semibold">{{ T $.ctx "adminconsole.admin_clients.backchannel_logout.field.uri_manage_only" }}</span>{{ end }}</p>
+    </div>
+
+    <div class="check-list">
+      <label class="check-row" for="backchannelLogoutSessionRequired">
+        <input type="checkbox" id="backchannelLogoutSessionRequired" name="backchannelLogoutSessionRequired" aria-describedby="backchannelLogoutSessionRequiredHint"{{ if .client.BackchannelLogoutSessionRequired }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.backchannel_logout.field.session_required" }}</span>
+          <span class="field-hint" id="backchannelLogoutSessionRequiredHint">{{ T $.ctx "adminconsole.admin_clients.backchannel_logout.field.session_required_hint" }}</span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
+  </div>
+</form>
+
+{{ if .client.IsSystemLevelClient }}{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_clients.save_button") (T $.ctx "adminconsole.admin_clients.modal.save_title")) }}{{ end }}
+{{ end }}
+{{end}}

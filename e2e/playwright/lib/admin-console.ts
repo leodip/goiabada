@@ -11,6 +11,7 @@ export type ClientTab =
   | "oauth2-flows"
   | "redirect-uris"
   | "sign-out-redirect-uris"
+  | "backchannel-logout"
   | "web-origins"
   | "user-sessions"
   | "permissions"
@@ -252,6 +253,15 @@ export async function addSignOutRedirectUri(page: Page, id: number, uri: string)
   await page.locator("#addURIBtn").click();
   await page.locator("#btnSave").click();
   await expect(page.getByText("Sign-out redirect URIs saved.")).toBeVisible();
+}
+
+// Sets the client's back-channel logout URI on its Back-channel logout tab, as Sign users out, "Get
+// told when a session ends", tells a person to.
+export async function setBackchannelLogoutUri(page: Page, id: number, uri: string) {
+  await page.goto(clientUrl(id, "backchannel-logout"));
+  await page.locator("#backchannelLogoutUri").fill(uri);
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Back-channel logout settings saved.")).toBeVisible();
 }
 
 export type GroupTab = "settings" | "attributes" | "members" | "permissions" | "delete";

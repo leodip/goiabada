@@ -29,6 +29,11 @@ export default function Home() {
           <a href={`${docs}/guides/single-sign-on-across-clients/`}>Single sign-on across clients</a>
         </li>
         <li>
+          <a href="/web3">Web app with no back-channel logout</a>: a confidential client that isn't told
+          when a session ends, so it keeps its tokens.{" "}
+          <a href={`${docs}/guides/sign-users-out/`}>Sign users out</a>
+        </li>
+        <li>
           <a href="/spa">SPA</a>: a public client, in the browser.{" "}
           <a href={`${docs}/guides/add-sign-in-to-a-spa-or-mobile-app/`}>Add sign-in to a SPA or mobile app</a>
         </li>

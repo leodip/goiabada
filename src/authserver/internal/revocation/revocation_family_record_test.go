@@ -216,7 +216,7 @@ func TestTerminateUserSessionTx_ALostKeyRunsTheTerminationOnceMore(t *testing.T)
 		Return(false, nil).Once()
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 
-	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
+	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession(), false)
 
 	require.NoError(t, err)
 	require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)
@@ -243,7 +243,7 @@ func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(nil, nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"a-2"}, result.RevokedRefreshTokenJtis)
@@ -261,7 +261,7 @@ func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonAuthCodeReuse).
 			Return(false, boom).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.ErrorIs(t, err, boom)
 		assert.Equal(t, AuthCodeReuseResult{}, result)
@@ -284,7 +284,7 @@ func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(nil, nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.NoError(t, err)
 		require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)

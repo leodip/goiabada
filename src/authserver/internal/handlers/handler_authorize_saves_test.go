@@ -201,7 +201,7 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			if tc.hint != "" {
 				target += "&id_token_hint=the-hint"
 				tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).Return(
-					&oauth.JwtToken{Claims: jwt.MapClaims{"iss": "https://issuer.example", "sub": tc.hint}}, nil)
+					&oauth.JwtToken{Header: idTokenHeader(), Claims: jwt.MapClaims{"iss": "https://issuer.example", "sub": tc.hint}}, nil)
 			}
 
 			req := httptest.NewRequest("GET", target, nil)

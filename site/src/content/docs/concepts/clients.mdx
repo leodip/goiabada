@@ -61,7 +61,7 @@ A client you create in the admin console starts:
 - with the default ACR level `urn:goiabada:level2_optional`;
 - not allowed to request the administrative scopes.
 
-The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Sign-out redirect URIs**, **Web origins**, **Sessions**, **Permissions** and, for a confidential client, **Introspection**.
+The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Sign-out redirect URIs**, **Back-channel logout**, **Web origins**, **Sessions**, **Permissions** and, for a confidential client, **Introspection**.
 
 ## Public and confidential clients
 
@@ -129,6 +129,21 @@ The [redirect URI rules](#redirect-uris) apply to each one, with these differenc
 [OpenID Connect RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html#ClientMetadata) allows plain `http` only for a confidential client. Goiabada also accepts a loopback `http` address from a public client, as it does for redirect URIs.
 
 Through the Admin API, replace the list whole with [`PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris`](/reference/api/admin/operations/updateclientpostlogoutredirecturis/), sending the list as you read it in `expectedPostLogoutRedirectURIs`. Each save leaves an `updated_post_logout_redirect_uris` entry in the [audit log](/concepts/audit-log/).
+
+## Back-channel logout
+
+A back-channel logout URI is an address on your app's server where the auth server tells your app that a user's session ended. It POSTs a signed logout token there, as [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) describes. A client without one is sent nothing. [Get told when a session ends](/guides/sign-users-out/#get-told-when-a-session-ends) shows how your app receives it.
+
+- **It uses `https`.** A confidential client may use plain `http` on any host, such as `http://app:3000/backchannel-logout` on a private network. A public client can't, and neither can a [self-registered client](#self-registered-clients), whoever sets its URI.
+- **It's an absolute URI that names a host,** at most 2048 bytes, with no user name or password and no fragment. A query is allowed, and kept exactly as you enter it.
+- **The client needs a flow that signs users in,** the authorization code flow or the implicit flow. A client with neither has no session to end.
+- **A self-registered client's URI reaches only public addresses.** See [Self-registered clients](#self-registered-clients).
+
+A client can also require the session identifier, `sid`, in every logout token it's sent. Turn that on when your app finds its sessions by `sid` alone. Without it, disabling or deleting the user, a password reset or an administrator setting the password sends your app one token naming only the user, which asks it to end every session it has for them. With it, your app is sent one token for each of the user's sessions it was on instead. See [Credential changes](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user).
+
+In the admin console, open the client's **Back-channel logout** tab, enter the URI, such as `https://app.example.com/backchannel-logout`, tick **Require the session identifier** if your app needs `sid`, then click **Save**. Empty the field and save to send nothing.
+
+Through the Admin API, set both with [`PUT /api/v1/admin/clients/{id}/backchannel-logout`](/reference/api/admin/operations/updateclientbackchannellogout/): `backchannelLogoutUri`, empty for none, and `backchannelLogoutSessionRequired`. Setting or changing the URI takes `authserver:manage`, because the auth server sends requests to whatever address it names, inside your network included. `authserver:manage-clients` can still clear it and change `backchannelLogoutSessionRequired`. Each save leaves an `updated_client_backchannel_logout` entry in the [audit log](/concepts/audit-log/).
 
 ## Web origins
 
@@ -271,7 +286,7 @@ curl -X POST https://auth.example.com/connect/register \
   }'
 ```
 
-The auth server reads seven fields and ignores the rest:
+The auth server reads nine fields and ignores the rest:
 
 - `redirect_uris`, required when the client uses the authorization code flow.
 - `post_logout_redirect_uris`, the client's [sign-out redirect URIs](#sign-out-redirect-uris), optional.
@@ -279,8 +294,9 @@ The auth server reads seven fields and ignores the rest:
 - `grant_types`: `authorization_code` (the default), `refresh_token` and `client_credentials`. A public client can't ask for `client_credentials`, and the legacy flows can't be asked for at all: both are off on the client, whatever the global settings, until an administrator turns one on for it.
 - `client_name`: the name the consent screen shows, up to 100 characters, which becomes the client's **Description**.
 - `policy_uri` and `tos_uri`: the client's **Privacy policy URL** and **Terms of service URL**. Each is kept only when it has the scheme and host of one of the client's redirect URIs, and dropped otherwise, without refusing the registration. See [Privacy policy and terms of service](/reference/endpoints/dynamic-client-registration/#privacy-policy-and-terms-of-service).
+- `backchannel_logout_uri` and `backchannel_logout_session_required`: the client's [back-channel logout](#back-channel-logout) settings, optional. The URI must use `https`. See [Back-channel logout](/reference/endpoints/dynamic-client-registration/#back-channel-logout).
 
-It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Metadata it refuses gets a 400 with `invalid_client_metadata`, or `invalid_redirect_uri` for a redirect URI. A refused sign-out redirect URI gets `invalid_client_metadata`. Every field, answer and error is on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
+It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Metadata it refuses gets a 400 with `invalid_client_metadata`, or `invalid_redirect_uri` for a redirect URI. A refused sign-out redirect URI or back-channel logout setting gets `invalid_client_metadata`. Every field, answer and error is on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
 
 Because nobody has reviewed them, self-registered clients are treated more carefully:
 
@@ -288,6 +304,7 @@ Because nobody has reviewed them, self-registered clients are treated more caref
 - **Their identifier can't be changed.** It's generated, `dcr_` followed by a UUID.
 - **They start with consent on.** The consent screen shows the name the client gave itself, with a note that it registered itself and hasn't been verified. Give it a display name and turn on **Display name** under **Sign-in and consent pages** to replace both. A public one also starts with [**Remember consent**](#consent-required) off, so its users see the screen on every sign-in.
 - **They're never sent an error.** An error response is a redirect to the client, and anyone can point a self-registered client anywhere. So when the user declines or the auth server refuses the request, the user sees a page naming the app and the address it asked for, and the request stops there. `prompt=none` included.
+- **Their back-channel logout URI reaches only public addresses.** Otherwise anyone could register a client that has the auth server send requests into your network, to a cloud metadata service for one. The auth server checks the address it connects to, after looking the name up, and sends nothing to a loopback, private, link-local, shared (`100.64.0.0/10`), multicast, broadcast, documentation or 6to4 (`2002::/16`) address, or any other address IANA lists as not globally reachable, IPv4 or IPv6. A NAT64 address (`64:ff9b::/96`) counts as the IPv4 address it carries. It never uses a proxy for them. This holds whoever set the URI, and after you've reviewed the client too. A refused delivery isn't tried again, and is recorded as `blocked`. For an app on your own network, create the client in the admin console instead.
 - **A sign-out without a hint doesn't send the user back to them.** Their sign-out redirect URIs prove nothing about where the user should go, so a [sign-out](/reference/endpoints/logout/#where-the-user-lands) with no `id_token_hint` ends on the auth server's "Signed out" page. One with a hint the auth server confirms still goes back to one of the client's sign-out redirect URIs.
 
 Once you've reviewed a self-registered client, you can change its settings like any other, **Ask users for consent** included.

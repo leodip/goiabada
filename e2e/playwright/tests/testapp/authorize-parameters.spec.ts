@@ -66,16 +66,17 @@ test("an id_token_hint naming the signed-in user signs in silently; naming someo
   const alice = await users.create();
   const bob = await users.create();
   const { context, page: app } = await userBrowser(browser);
-  await signInToWebApp(app, testapp.web, alice);
+  await signInToWebApp(app, testapp.web3, alice);
   await expectResult(app, "Signed in");
-  expect((await signInToWebApp(app, testapp.web, alice, { id_token_hint: "yes" })).askedForPassword).toBe(false);
+  expect((await signInToWebApp(app, testapp.web3, alice, { id_token_hint: "yes" })).askedForPassword).toBe(false);
   await expectResult(app, "Signed in");
 
   // Bob signs in on the second site in the same browser, so the browser's session is now his, while
-  // the first site still holds Alice's ID token.
+  // the first site still holds Alice's ID token: it's the web app with no back-channel logout URI, so
+  // it isn't told her session ended.
   expect((await signInToWebApp(app, testapp.web2, bob, { prompt: "login" })).askedForPassword).toBe(true);
   await expectResult(app, "Signed in");
-  expect((await signInToWebApp(app, testapp.web, alice, { id_token_hint: "yes" })).askedForPassword).toBe(true);
+  expect((await signInToWebApp(app, testapp.web3, alice, { id_token_hint: "yes" })).askedForPassword).toBe(true);
   await expectResult(app, "Signed in");
   expect((await shownClaims(app, "ID token claims")).email).toBe(alice.email);
   await context.close();

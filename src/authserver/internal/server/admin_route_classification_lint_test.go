@@ -32,12 +32,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The three ceilings a row can name, spelled as the policy's refusal records them (#402 decisions
-// 1, 5 and 7).
+// The four ceilings a row can name, spelled as the policy's refusal records them (#402 decisions
+// 1, 5 and 7, #784 decision 15).
 const (
-	adminCeilingGrant    = "grant"
-	adminCeilingTarget   = "target"
-	adminCeilingSettings = "settings"
+	adminCeilingGrant                = "grant"
+	adminCeilingTarget               = "target"
+	adminCeilingSettings             = "settings"
+	adminCeilingBackchannelLogoutURI = "backchannel_logout_uri"
 )
 
 // adminPolicyCeilings is every function in the handler package that applies a ceiling, and the
@@ -57,6 +58,7 @@ var adminPolicyCeilings = map[string]string{
 	"permissionDescriptionCeilingAllows": adminCeilingTarget,
 	"introspectionResourceCeilingAllows": adminCeilingGrant,
 	"settingsCeilingAllows":              adminCeilingSettings,
+	"backchannelLogoutURICeilingAllows":  adminCeilingBackchannelLogoutURI,
 }
 
 // adminPolicyRefusal is the function every ceiling answers a refusal through.
@@ -139,6 +141,7 @@ var adminRouteClassification = map[string]adminRouteClass{
 	"PUT /api/v1/admin/clients/{id}/oauth2-flows":              appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/redirect-uris":             appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris": appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/backchannel-logout":        appliesCeilings(adminCeilingTarget, adminCeilingBackchannelLogoutURI),
 	"PUT /api/v1/admin/clients/{id}/web-origins":               appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/tokens":                    appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/permissions":               appliesCeilings(adminCeilingGrant, adminCeilingTarget),
@@ -294,7 +297,8 @@ func adminRouteRowDisagrees(class adminRouteClass, applied []string) string {
 		return "a row names its ceilings or why it needs none, and this names both"
 	}
 	for _, ceiling := range class.ceilings {
-		if ceiling != adminCeilingGrant && ceiling != adminCeilingTarget && ceiling != adminCeilingSettings {
+		if ceiling != adminCeilingGrant && ceiling != adminCeilingTarget && ceiling != adminCeilingSettings &&
+			ceiling != adminCeilingBackchannelLogoutURI {
 			return "names \"" + ceiling + "\", which is no ceiling"
 		}
 	}
@@ -588,9 +592,99 @@ func adminPassedCalls(fn *ast.FuncDecl) map[string]bool {
 }
 
 // adminWrite is a write a function makes through a database port, spelled as written, and where.
+// rolledBack is, for a transaction or a write inside its body, the branches taken only once that
+// transaction has rolled back: the write reaches no ceiling there (see adminRolledBackBranches).
 type adminWrite struct {
-	call string
-	pos  token.Pos
+	call       string
+	pos        token.Pos
+	rolledBack []adminSpan
+}
+
+// adminSpan is the source a node covers.
+type adminSpan struct {
+	pos, end token.Pos
+}
+
+// adminRolledBackTransaction is a transaction fn opens and the branches taken once it rolled back.
+type adminRolledBackTransaction struct {
+	call     adminSpan
+	branches []adminSpan
+}
+
+// adminRolledBackBranches is each transaction fn opens, `v = port.RunInTransaction(...)` or
+// `v := ...`, with the branches taken only when that transaction answered a sentinel of the
+// handler's own package: an if whose condition is `errors.Is(v, sentinel)`, or a case of a switch
+// with no tag listing it, with sentinel a bare identifier. Such an error is one the transaction's
+// body returned to roll back, so the transaction wrote nothing, and a ceiling there may refuse
+// what the body found under its locks (#784 decision 15 compares a URI under the client's row). A
+// sentinel of another package, such as data.ErrCommitOutcomeUnknown, may follow a commit, so it
+// spares nothing.
+func adminRolledBackBranches(fn *ast.FuncDecl, ports map[string]bool) []adminRolledBackTransaction {
+	transactions := map[string]adminSpan{}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		assign, isAssign := n.(*ast.AssignStmt)
+		if !isAssign || len(assign.Lhs) != 1 || len(assign.Rhs) != 1 {
+			return true
+		}
+		name, isIdent := assign.Lhs[0].(*ast.Ident)
+		call, isCall := assign.Rhs[0].(*ast.CallExpr)
+		if !isIdent || !isCall {
+			return true
+		}
+		selector, isSelector := call.Fun.(*ast.SelectorExpr)
+		if !isSelector || selector.Sel.Name != "RunInTransaction" {
+			return true
+		}
+		if port, isPort := selector.X.(*ast.Ident); isPort && ports[port.Name] {
+			transactions[name.Name] = adminSpan{call.Pos(), call.End()}
+		}
+		return true
+	})
+	if len(transactions) == 0 {
+		return nil
+	}
+
+	// rolledBackBy is the transaction cond tests for a sentinel of the package, if any.
+	rolledBackBy := func(cond ast.Expr) (adminSpan, bool) {
+		call, isCall := cond.(*ast.CallExpr)
+		if !isCall || len(call.Args) != 2 || adminCallName(call.Fun) != "errors.Is" {
+			return adminSpan{}, false
+		}
+		tested, isIdent := call.Args[0].(*ast.Ident)
+		if _, sentinel := call.Args[1].(*ast.Ident); !isIdent || !sentinel {
+			return adminSpan{}, false
+		}
+		at, opened := transactions[tested.Name]
+		return at, opened
+	}
+
+	branches := map[adminSpan][]adminSpan{}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		switch stmt := n.(type) {
+		case *ast.IfStmt:
+			if at, ok := rolledBackBy(stmt.Cond); ok {
+				branches[at] = append(branches[at], adminSpan{stmt.Body.Pos(), stmt.Body.End()})
+			}
+		case *ast.SwitchStmt:
+			if stmt.Tag != nil {
+				return true
+			}
+			for _, clause := range stmt.Body.List {
+				caseClause := clause.(*ast.CaseClause)
+				for _, expr := range caseClause.List {
+					if at, ok := rolledBackBy(expr); ok {
+						branches[at] = append(branches[at], adminSpan{caseClause.Colon, caseClause.End()})
+					}
+				}
+			}
+		}
+		return true
+	})
+	found := make([]adminRolledBackTransaction, 0, len(branches))
+	for call, spared := range branches {
+		found = append(found, adminRolledBackTransaction{call: call, branches: spared})
+	}
+	return found
 }
 
 // adminWrites is every write fn makes through a database port parameter, in source order.
@@ -614,6 +708,7 @@ func adminWrites(fn *ast.FuncDecl, ceilings map[string]string) []adminWrite {
 		return nil
 	}
 
+	rolledBack := adminRolledBackBranches(fn, ports)
 	var writes []adminWrite
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		call, isCall := n.(*ast.CallExpr)
@@ -623,7 +718,13 @@ func adminWrites(fn *ast.FuncDecl, ceilings map[string]string) []adminWrite {
 		if selector, isSelector := call.Fun.(*ast.SelectorExpr); isSelector {
 			if port, isIdent := selector.X.(*ast.Ident); isIdent && ports[port.Name] {
 				if !strings.HasPrefix(selector.Sel.Name, "Get") {
-					writes = append(writes, adminWrite{call: port.Name + "." + selector.Sel.Name, pos: call.Pos()})
+					write := adminWrite{call: port.Name + "." + selector.Sel.Name, pos: call.Pos()}
+					for _, transaction := range rolledBack {
+						if transaction.call.pos <= call.Pos() && call.Pos() < transaction.call.end {
+							write.rolledBack = transaction.branches
+						}
+					}
+					writes = append(writes, write)
 				}
 				return true
 			}
@@ -659,13 +760,20 @@ func adminReturningBlocks(body *ast.BlockStmt) []*ast.BlockStmt {
 
 // adminWriteReaching is the first write that runs before a ceiling at pos can: one earlier in the
 // source and not inside a block ending in a return that does not also hold the ceiling, as a
-// branch that writes and answers is. Empty when there is none.
+// branch that writes and answers is, nor a transaction whose rolled-back branch holds the ceiling.
+// Empty when there is none.
 func adminWriteReaching(writes []adminWrite, returning []*ast.BlockStmt, pos token.Pos) string {
 	for _, write := range writes {
 		if write.pos >= pos {
 			break
 		}
 		ended := false
+		for _, branch := range write.rolledBack {
+			if branch.pos <= pos && pos < branch.end {
+				ended = true
+				break
+			}
+		}
 		for _, block := range returning {
 			holdsWrite := block.Pos() <= write.pos && write.pos < block.End()
 			holdsCeiling := block.Pos() <= pos && pos < block.End()
@@ -692,8 +800,10 @@ func adminCallName(fun ast.Expr) string {
 	return "a call"
 }
 
-// adminCeilingOrder is the order ceilings are named in: grant, target, settings.
-var adminCeilingOrder = map[string]int{adminCeilingGrant: 0, adminCeilingTarget: 1, adminCeilingSettings: 2}
+// adminCeilingOrder is the order ceilings are named in: grant, target, settings,
+// backchannel_logout_uri.
+var adminCeilingOrder = map[string]int{adminCeilingGrant: 0, adminCeilingTarget: 1, adminCeilingSettings: 2,
+	adminCeilingBackchannelLogoutURI: 3}
 
 // sortedCeilings is ceilings in adminCeilingOrder, each once, never nil.
 func sortedCeilings(ceilings []string) []string {
@@ -1010,6 +1120,64 @@ func TestAdminRouteClassification_Guard_FailsOnACeilingAppliedAfterAWrite(t *tes
 			require.Len(t, report.Errors, 1)
 			assert.Contains(t, report.Errors[0], "1 admin route(s)")
 			assert.Contains(t, report.Errors[0], tc.finding+", so a refusal would answer a request that already wrote")
+		})
+	}
+}
+
+// adminRouteFixtureRolledBackGate is HandleUserEnabledPut's ceiling applied again once a
+// transaction whose body found, under its lock, what the ceiling refuses has rolled back; branch is
+// the line selecting the branch, with err the transaction's answer.
+func adminRouteFixtureRolledBackGate(branch string) string {
+	return "\t\tif !userTargetCeilingAllows(w, r) {\n\t\t\treturn\n\t\t}\n" +
+		"\t\terr := database.RunInTransaction(func() error {\n" +
+		"\t\t\tdatabase.AcquireUserRow(user)\n" +
+		"\t\t\tif changed {\n\t\t\t\treturn errChangedUnderTheRow\n\t\t\t}\n" +
+		"\t\t\treturn database.UpdateUserEnabled(user)\n" +
+		"\t\t})\n" +
+		branch +
+		"\t\t\tif !userTargetCeilingAllows(w, r) {\n\t\t\t\treturn\n\t\t\t}\n" +
+		"\t\t}\n"
+}
+
+func TestAdminRouteClassification_Guard_PassesACeilingAppliedOnceItsTransactionRolledBack(t *testing.T) {
+	// The transaction answered a sentinel its body returned, so it wrote nothing: the ceiling may
+	// refuse what the body found under the row, in an if or in a case of a switch.
+	for name, branch := range map[string]string{
+		"an if":         "\t\tif errors.Is(err, errChangedUnderTheRow) {\n",
+		"a switch case": "\t\tswitch {\n\t\tcase errors.Is(err, errChangedUnderTheRow):\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			handlers := strings.Replace(adminRouteFixtureHandlers, adminRouteFixtureEnabledGate,
+				adminRouteFixtureRolledBackGate(branch), 1)
+			require.NotEqual(t, adminRouteFixtureHandlers, handlers, "the fixture edit must apply")
+			root := writeAdminRouteFixture(t, handlers)
+
+			report := runAdminRouteGuard(root, adminRouteFixtureClassification(), adminRouteFixtureCeilings)
+
+			assert.False(t, report.Stopped, "a tree read in full must not be fatal: %s", report.Fatal)
+			assert.Empty(t, report.Errors, "a ceiling after a rolled-back transaction answers a request that wrote nothing")
+		})
+	}
+}
+
+func TestAdminRouteClassification_Guard_FailsOnACeilingAfterATransactionThatMayHaveCommitted(t *testing.T) {
+	// A sentinel of another package may follow a commit, and a ceiling after the transaction in no
+	// branch at all follows one: each would answer a request that already wrote.
+	for name, branch := range map[string]string{
+		"another package's sentinel": "\t\tif errors.Is(err, data.ErrCommitOutcomeUnknown) {\n",
+		"no rolled-back branch":      "\t\tif err == nil {\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			handlers := strings.Replace(adminRouteFixtureHandlers, adminRouteFixtureEnabledGate,
+				adminRouteFixtureRolledBackGate(branch), 1)
+			require.NotEqual(t, adminRouteFixtureHandlers, handlers, "the fixture edit must apply")
+			root := writeAdminRouteFixture(t, handlers)
+
+			report := runAdminRouteGuard(root, adminRouteFixtureClassification(), adminRouteFixtureCeilings)
+
+			require.Len(t, report.Errors, 1)
+			assert.Contains(t, report.Errors[0], "1 admin route(s)")
+			assert.Contains(t, report.Errors[0], "HandleUserEnabledPut: applies userTargetCeilingAllows after its write database.RunInTransaction, so a refusal would answer a request that already wrote")
 		})
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
@@ -207,7 +208,7 @@ func TestLastAdministrator_TwoConcurrentRemovalsOfTheLastTwoEndWithOneRefused(t 
 	first := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
 		aId := strconv.FormatInt(a.Id, 10)
-		first <- serveAsManage(apihandlers.HandleUserDelete(&parkedAfterTheRemovalCounted{Database: h.DB, b: parked}, auditLogger, noNotices{}),
+		first <- serveAsManage(apihandlers.HandleUserDelete(&parkedAfterTheRemovalCounted{Database: h.DB, b: parked}, auditLogger, noNotices{}, noLogoutTokens{}),
 			http.MethodDelete, "/api/v1/admin/users/"+aId, map[string]string{"id": aId}, nil)
 	}()
 	holder := parked.awaitParked(t)
@@ -217,7 +218,7 @@ func TestLastAdministrator_TwoConcurrentRemovalsOfTheLastTwoEndWithOneRefused(t 
 	second := goBlocked(t, "the disabling of administrator B", holder, func(reached func()) *httptest.ResponseRecorder {
 		bId := strconv.FormatInt(b.Id, 10)
 		reached()
-		return serveAsManage(apihandlers.HandleUserEnabledPut(h.DB, auditLogger),
+		return serveAsManage(apihandlers.HandleUserEnabledPut(h.DB, auditLogger, noLogoutTokens{}),
 			http.MethodPut, "/api/v1/admin/users/"+bId+"/enabled", map[string]string{"id": bId}, disable)
 	})
 	second.requireBlocked(t)
@@ -247,3 +248,9 @@ func TestLastAdministrator_TwoConcurrentRemovalsOfTheLastTwoEndWithOneRefused(t 
 	require.NoError(t, err)
 	assert.Equal(t, 1, count, "one administrator remains")
 }
+
+// noLogoutTokens drops the logout tokens a removal hands it: what reaches the apps is the
+// integration tier's to show.
+type noLogoutTokens struct{}
+
+func (noLogoutTokens) Send(context.Context, string, []backchannel.Delivery) {}

@@ -49,7 +49,7 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 	otherCode := createTestCodeInSession(t, client.Id, user.Id, otherSession.SessionIdentifier)
 	otherToken := createTokenOfCode(t, client.Id, user.Id, otherCode.Id, otherSession.SessionIdentifier)
 
-	result, err := revocation.TerminateUserSessionTx(context.Background(), database, session)
+	result, err := revocation.TerminateUserSessionTx(context.Background(), database, session, false)
 	if err != nil {
 		t.Fatalf("revocation.TerminateUserSessionTx returned error: %v", err)
 	}

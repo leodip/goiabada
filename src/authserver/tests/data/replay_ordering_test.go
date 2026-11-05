@@ -40,7 +40,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		require.NoError(t, err, "opening the replay's transaction")
 		defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
 
-		result, err := revocation.RevokeOnAuthCodeReuse(context.Background(), database, tx, code)
+		result, err := revocation.RevokeOnAuthCodeReuse(context.Background(), database, tx, code, nil)
 		require.NoError(t, err, "the replay response on a session nothing else has touched yet")
 		assert.Equal(t, []string{token.RefreshTokenJti}, result.RevokedRefreshTokenJtis,
 			"the replay revokes the grant's token")
@@ -49,7 +49,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		// Its first statement is the delete, which is what makes it wait.
 		termination := goBlocked(t, "the termination", tx, func(reached func()) error {
 			reached()
-			_, err := revocation.TerminateUserSessionTx(context.Background(), other, session)
+			_, err := revocation.TerminateUserSessionTx(context.Background(), other, session, false)
 			return err
 		})
 
@@ -94,7 +94,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 			defer func() { _ = other.RollbackTransaction(context.Background(), otherTx) }()
 
 			reached()
-			result, err := revocation.RevokeOnAuthCodeReuse(context.Background(), other, otherTx, code)
+			result, err := revocation.RevokeOnAuthCodeReuse(context.Background(), other, otherTx, code, nil)
 			if err != nil {
 				return replayOutcome{result: result, err: err}
 			}

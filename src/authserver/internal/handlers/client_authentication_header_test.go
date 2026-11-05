@@ -64,7 +64,7 @@ func headerEndpoints() []headerEndpoint {
 			handler: func(t *testing.T, database *datamocks.Database) http.HandlerFunc {
 				return HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
 					protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
-					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
+					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 			},
 			form: url.Values{"grant_type": {"client_credentials"}},
 		},
@@ -247,7 +247,7 @@ func TestClientAuthentication_SpacesAfterBasic(t *testing.T) {
 					return input.ClientId == headerClientIdentifier && input.ClientSecret == headerClientSecret
 				})).Return(nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client", "Stops here.", http.StatusBadRequest)).Once()
 			handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
-				validator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
+				validator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 			rr := postWithAuthorization(handler, "/auth/token", url.Values{"grant_type": {"client_credentials"}}, field)
 

@@ -5,6 +5,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
@@ -64,6 +65,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	httpHelper := render.New(s.templateFS, s.staticFS)
 	// The one notifier every account notice goes through, after its response (#724).
 	notifier := accountnotice.New(httpHelper, emailSender, s.jobs)
+	// The one sender every logout token goes through, after the end of the session it tells of has
+	// committed, each delivery an after-response job (#784).
+	logoutTokens := backchannel.NewSender(s.database, s.dataCipher, s.jobs, auditLogger, s.backchannelMetrics)
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 	legalDocuments := legaldocuments.NewReader(s.database)
 
@@ -112,7 +116,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// The two endpoints an emailed link points at register from the constants the links are
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
 	pages.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
-	pages.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL, notifier))
+	pages.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL, notifier, logoutTokens))
 	// One discovery document at both well-known addresses, OIDC Discovery 1.0's and RFC 8414's, so
 	// the two cannot disagree: RFC 8414 section 3 allows more than one address and section 3.2 fields
 	// beyond its own. RFC 8414 section 3.1's path-suffixed form has no route; a reverse proxy serving
@@ -161,7 +165,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker, legalDocuments)))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker, legalDocuments, logoutTokens)))
 		r.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewIssuance(s.database, codeIssuer, tokenIssuer, userSessionManager, permissionChecker, auditLogger, tokenMetrics)))
 		passwordPrompt := authflow.NewPasswordPrompt(s.database)
 		r.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, passwordPrompt))
@@ -181,9 +185,9 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Post("/legal-acceptance", handlers.HandleLegalAcceptancePost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
 		r.Get("/consent", handlers.HandleConsentGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewConsentPrompt(s.database)))
 		r.Post("/consent", handlers.HandleConsentPost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewConsentSubmission(s.database, permissionChecker, auditLogger)))
-		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
+		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher, logoutTokens))
 		r.Get("/logout/declined", handlers.HandleLogoutDeclinedGet(httpHelper))
-		r.Post("/logout", handlers.HandleLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
+		r.Post("/logout", handlers.HandleLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher, logoutTokens))
 	})
 	// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force).
 	// Outside the /auth group, which is mounted on the page branch whole, because it answers on the
@@ -191,7 +195,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// /auth/token from this route, behind the token branch alone; any other method falls to the
 	// group its path is under, whose chain runs before the 405, as it did when the route was its
 	// own (#435).
-	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics))
+	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics, logoutTokens))
 	// Token revocation (RFC 7009, #676), outside the /auth group for the reason the token endpoint
 	// is, on a branch of its own that answers a fault 503. No rate limit: the client authenticates
 	// before anything else, as at the token endpoint's grants that have none (decision 10).
@@ -289,19 +293,19 @@ func (s *Server) initRoutes(branches appBranches) {
 		// User management routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/search", apihandlers.HandleUsersSearchGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}", apihandlers.HandleUserGet(s.database))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/enabled", apihandlers.HandleUserEnabledPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/enabled", apihandlers.HandleUserEnabledPut(s.database, auditLogger, logoutTokens))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/profile", apihandlers.HandleUserProfilePut(s.database, profileValidator, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/address", apihandlers.HandleUserAddressPut(s.database, addressValidator, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/email", apihandlers.HandleUserEmailPut(s.database, emailValidator, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/email/verification-code", apihandlers.HandleUserEmailVerificationCodePost(s.database, auditLogger, s.dataCipher))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/phone", apihandlers.HandleUserPhonePut(s.database, phoneValidator, auditLogger))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleUserPasswordPut(s.database, passwordValidator, auditLogger, notifier))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/password", apihandlers.HandleUserPasswordPut(s.database, passwordValidator, auditLogger, notifier, logoutTokens))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/otp", apihandlers.HandleUserOTPPut(s.database, auditLogger, notifier))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/profile-picture", apihandlers.HandleUserProfilePictureGet(s.database, baseURL))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/profile-picture", apihandlers.HandleUserProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleUserProfilePictureDelete(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender, s.dataCipher, baseURL))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleUserDelete(s.database, auditLogger, notifier))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleUserDelete(s.database, auditLogger, notifier, logoutTokens))
 		r.With(apiBearer.RequireBearerTokenScopeSetAnyOf(scopesUserExport)).Get("/users/{id}/export", apihandlers.HandleUserExportGet(s.database, auditLogger, baseURL))
 
 		// User attributes routes
@@ -314,7 +318,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// User session routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/sessions", apihandlers.HandleUserSessionsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/user-sessions/{id}", apihandlers.HandleUserSessionGet(s.database))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-sessions/{id}", apihandlers.HandleUserSessionDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-sessions/{id}", apihandlers.HandleUserSessionDelete(s.database, auditLogger, logoutTokens))
 
 		// User consent routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleUserConsentsGet(s.database))
@@ -392,6 +396,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/oauth2-flows", apihandlers.HandleClientOAuth2FlowsPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/redirect-uris", apihandlers.HandleClientRedirectURIsPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/post-logout-redirect-uris", apihandlers.HandleClientPostLogoutRedirectURIsPut(s.database, auditLogger))
+		// Setting or changing the URI is reserved to authserver:manage by the handler (#784 decision 15).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/backchannel-logout", apihandlers.HandleClientBackchannelLogoutPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/web-origins", apihandlers.HandleClientWebOriginsPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/tokens", apihandlers.HandleClientTokensPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/permissions", apihandlers.HandleClientPermissionsGet(s.database))
@@ -489,7 +495,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// below counts every change, since each sends the user a notice: a request it refuses
 		// never reaches the password check, and one that check refuses is counted (#724).
 		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Put("/password",
-			apihandlers.HandleAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter, notifier))
+			apihandlers.HandleAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter, notifier, logoutTokens))
 		r.Get("/otp/enrollment", apihandlers.HandleAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
 		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Put("/otp",
 			apihandlers.HandleAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher, notifier))
@@ -504,7 +510,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// code, so it spends the bucket the changes above share; it sends one notice, and only when
 		// it succeeds, so it takes no account_credential_change (decision 4).
 		r.With(apiBearer.RequireAdminConsoleClient(), rateLimiter.LimitAccountPassword).Post("/deletion",
-			apihandlers.HandleAccountDeletionPost(s.database, auditLogger, rateLimiter, s.dataCipher, notifier))
+			apihandlers.HandleAccountDeletionPost(s.database, auditLogger, rateLimiter, s.dataCipher, notifier, logoutTokens))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
 		// The legal document versions the caller accepted (#622 decision 10).
@@ -512,7 +518,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 		// Sessions (self-service)
 		r.Get("/sessions", apihandlers.HandleAccountSessionsGet(s.database))
-		r.Delete("/sessions/{id}", apihandlers.HandleAccountSessionDelete(s.database, auditLogger))
+		r.Delete("/sessions/{id}", apihandlers.HandleAccountSessionDelete(s.database, auditLogger, logoutTokens))
 
 		// Logout request (self-service)
 		r.Post("/logout-request", apihandlers.HandleAccountLogoutRequestPost(s.database, s.dataCipher, baseURL))

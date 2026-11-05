@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
@@ -15,12 +16,15 @@ import (
 
 // Database is what the revocation service needs: the generation counters it advances,
 // and the sessions, codes and refresh tokens the advance invalidates, and the session row the
-// reuse response takes first (#139).
+// reuse response takes first (#139), and the apps an ended session served, which its logout tokens
+// go to (#784).
 //
 // Exported, unlike the per-file ports #386 left in the handler packages, because it is this
 // package's own port and eight consumer ports across handlers and apihandlers embed it to hand
 // the capability on (#387).
 type Database interface {
+	backchannel.SessionDatabase
+
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error)
@@ -29,8 +33,11 @@ type Database interface {
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
 	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
+	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
 	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
 	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
@@ -92,6 +99,37 @@ type UserAuthStateResult struct {
 	// audit reader needs to know which generation was invalidated, not only the new one.
 	OldGeneration int64
 	NewGeneration int64
+	// LogoutDeliveries is the logout tokens the revocation's LogoutNotice asked for, collected inside
+	// its transaction before the sweep deleted the sessions and revoked the grants they are read
+	// from; nil when there is nobody to tell. The caller hands it to the back-channel sender after
+	// the commit, beside the audit events (#784). It is no part of the audit payload.
+	LogoutDeliveries []backchannel.Delivery
+}
+
+// LogoutNotice is whom revoking a user's authentication state tells that their sessions ended, in
+// one of #784 decision 3's two shapes. The zero value tells nobody.
+type LogoutNotice struct {
+	// Subject is the user's sub, which every logout token names. Empty tells nobody.
+	Subject string
+	// UserWide is an end of every session of the user with none kept: deleting or disabling the user,
+	// a password reset, an administrator setting the password. Each app that was on any of the user's
+	// stored sessions, valid or not, or holds one of the user's unrevoked, unexpired refresh tokens,
+	// is sent one token naming sub alone, which asks it to end every session of the user
+	// (Back-Channel Logout 1.0 section 2.4). An app that registered
+	// backchannel_logout_session_required is instead sent a sub+sid token for each valid session it
+	// was on, and nothing for a grant alone.
+	//
+	// Otherwise the end is session-specific, as the user's own password change is: each app on each
+	// ended session that was still valid is sent a sub+sid token for it, and the kept session's apps
+	// and the grants are told nothing (#784 decision 1).
+	UserWide bool
+	// Live judges whether an ended session was still valid when it ended; nil judges none valid.
+	Live SessionLive
+}
+
+// live reports whether the notice judges session valid.
+func (n LogoutNotice) live(session *record.UserSession) bool {
+	return n.Live != nil && n.Live(session)
 }
 
 // RevokeUserAuthState invalidates every credential a user authenticated under before this
@@ -109,7 +147,11 @@ type UserAuthStateResult struct {
 // (decision 4). The caller owns the transaction, which is REQUIRED here rather than
 // optional, because IncrementUserAuthStateGeneration cannot read back its own increment
 // safely without one.
-func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId int64, exceptSid string) (UserAuthStateResult, error) {
+//
+// notice says which apps are told that their sessions ended, and how; the deliveries are collected
+// under each session's row before the sweep deletes it (see LogoutNotice).
+func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId int64, exceptSid string,
+	notice LogoutNotice) (UserAuthStateResult, error) {
 	result := UserAuthStateResult{
 		TerminatedSessionIdentifiers: []string{},
 		RevokedRefreshTokenJtis:      []string{},
@@ -165,6 +207,22 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	// the same two rows in opposite orders and deadlock on nothing but the order the engine
 	// returned them in (#139).
 	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+
+	// The apps to tell, read before the deletions below cascade the sessions' apps away and before the
+	// token sweep revokes the grants. Each session's row is taken in the same id order the deletions
+	// would take it, so the order this transaction locks in is unchanged.
+	if notice.Subject != "" {
+		var deliveries []backchannel.Delivery
+		if notice.UserWide {
+			deliveries, err = userWideDeliveries(ctx, db, tx, userId, sessions, exceptSid, notice)
+		} else {
+			deliveries, err = endedSessionDeliveries(ctx, db, tx, sessions, exceptSid, notice)
+		}
+		if err != nil {
+			return result, err
+		}
+		result.LogoutDeliveries = deliveries
+	}
 
 	preservedSessionFound := false
 	for i := range sessions {
@@ -329,7 +387,7 @@ const (
 // distinct "commit outcome unknown" event, not a rollback, and neither is in scope for #106
 // (decision 5, finding 36).
 func RevokeUserAuthStateTx(ctx context.Context, db Database, userId int64, exceptSid string,
-	write func(tx *sql.Tx) error) (UserAuthStateResult, error) {
+	notice LogoutNotice, write func(tx *sql.Tx) error) (UserAuthStateResult, error) {
 
 	// The write and the sweep in one transaction opened through RunInTransaction, so a deadlock
 	// reruns both together (#301). The body is safe to rerun: every write callback is a
@@ -342,13 +400,159 @@ func RevokeUserAuthStateTx(ctx context.Context, db Database, userId int64, excep
 		}
 
 		var err error
-		result, err = RevokeUserAuthState(ctx, db, tx, userId, exceptSid)
+		result, err = RevokeUserAuthState(ctx, db, tx, userId, exceptSid, notice)
 		return err
 	})
 	if err != nil {
 		return UserAuthStateResult{}, err
 	}
 	return result, nil
+}
+
+// UserWideDeliveries is the logout tokens a user-wide end of #784 decision 3 sends for the user
+// userId, whose sub is subject, read on the end's own transaction before it deletes the user's
+// sessions and grants: one sub-only token to each app that was on any of the user's stored sessions
+// or holds one of the user's unrevoked, unexpired refresh tokens, and a sub+sid token for each
+// session live judges valid to each app requiring sid (see LogoutNotice). It takes each session's
+// row, in id order, as it reads that session's apps.
+//
+// It exists for an end that is not a revocation of the user's authentication state, the deletion of
+// the user, whose cascade takes the sessions and grants it reads: every deletion of a user, the
+// administrator's and the user's own, calls it inside the deletion's transaction, holding the user's
+// row, before the deletion. A revocation collects the same through RevokeUserAuthState's notice.
+func UserWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int64, subject string,
+	live SessionLive) ([]backchannel.Delivery, error) {
+
+	if subject == "" {
+		return nil, nil
+	}
+	sessions, err := db.GetUserSessionsByUserId(ctx, tx, userId)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+	return userWideDeliveries(ctx, db, tx, userId, sessions, "", LogoutNotice{Subject: subject, UserWide: true, Live: live})
+}
+
+// userWideDeliveries is UserWideDeliveries over the user's sessions, already read and in id order,
+// leaving out exceptSid's.
+func userWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int64, sessions []record.UserSession,
+	exceptSid string, notice LogoutNotice) ([]backchannel.Delivery, error) {
+
+	var deliveries []backchannel.Delivery
+	// Each app told sub alone, by client id: once, whatever number of sessions and grants it has.
+	subOnly := map[int64]record.Client{}
+
+	for i := range sessions {
+		session := &sessions[i]
+		if exceptSid != "" && session.SessionIdentifier == exceptSid {
+			continue
+		}
+		sessionClients, err := heldSessionClients(ctx, db, tx, session)
+		if err != nil {
+			return nil, err
+		}
+		for _, sessionClient := range sessionClients {
+			client := sessionClient.Client
+			if client.BackchannelLogoutURI == "" {
+				continue
+			}
+			if !client.BackchannelLogoutSessionRequired {
+				subOnly[client.Id] = client
+				continue
+			}
+			// An app requiring sid is told of each session it was on that was still valid, and of
+			// nothing else (#784 decisions 1 and 3).
+			if notice.live(session) {
+				if delivery, tells := backchannel.SessionClientDelivery(&client, session, notice.Subject); tells {
+					deliveries = append(deliveries, delivery)
+				}
+			}
+		}
+	}
+
+	// The apps holding a grant that still works, read before the sweep revokes it. A grant alone tells
+	// an app requiring sid nothing, since no session of its ended.
+	holderIds, err := db.GetUsableRefreshTokenClientIdsByUserId(ctx, tx, userId, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	var unread []int64
+	for _, clientId := range holderIds {
+		if _, read := subOnly[clientId]; !read {
+			unread = append(unread, clientId)
+		}
+	}
+	if len(unread) > 0 {
+		holders, err := db.GetClientsByIds(ctx, tx, unread)
+		if err != nil {
+			return nil, err
+		}
+		for _, client := range holders {
+			if client.BackchannelLogoutURI != "" && !client.BackchannelLogoutSessionRequired {
+				subOnly[client.Id] = client
+			}
+		}
+	}
+
+	clientIds := make([]int64, 0, len(subOnly))
+	for clientId := range subOnly {
+		clientIds = append(clientIds, clientId)
+	}
+	sort.Slice(clientIds, func(i, j int) bool { return clientIds[i] < clientIds[j] })
+	for _, clientId := range clientIds {
+		client := subOnly[clientId]
+		deliveries = append(deliveries, backchannel.Delivery{
+			ClientId:         client.Id,
+			ClientIdentifier: client.ClientIdentifier,
+			URI:              client.BackchannelLogoutURI,
+			IsPublic:         client.IsPublic,
+			CreatedViaDCR:    client.CreatedViaDCR,
+			UserId:           userId,
+			Subject:          notice.Subject,
+		})
+	}
+	return deliveries, nil
+}
+
+// endedSessionDeliveries is the logout tokens of a session-specific end: a sub+sid token to each app
+// on each of sessions, but exceptSid's, that the notice judges still valid. It takes each such
+// session's row, in the order given, which is id order, as it reads that session's apps.
+func endedSessionDeliveries(ctx context.Context, db Database, tx *sql.Tx, sessions []record.UserSession,
+	exceptSid string, notice LogoutNotice) ([]backchannel.Delivery, error) {
+
+	var deliveries []backchannel.Delivery
+	for i := range sessions {
+		session := &sessions[i]
+		if (exceptSid != "" && session.SessionIdentifier == exceptSid) || !notice.live(session) {
+			continue
+		}
+		held, err := db.AcquireUserSessionRow(ctx, tx, session.SessionIdentifier)
+		if err != nil {
+			return nil, err
+		}
+		if !held {
+			continue
+		}
+		sessionDeliveries, err := backchannel.SessionDeliveries(ctx, db, tx, session, notice.Subject)
+		if err != nil {
+			return nil, err
+		}
+		deliveries = append(deliveries, sessionDeliveries...)
+	}
+	return deliveries, nil
+}
+
+// heldSessionClients takes session's row and answers the apps it served, with their clients, or none
+// when the row is already gone: another end took it, and told its apps.
+func heldSessionClients(ctx context.Context, db Database, tx *sql.Tx, session *record.UserSession) ([]record.UserSessionClient, error) {
+	held, err := db.AcquireUserSessionRow(ctx, tx, session.SessionIdentifier)
+	if err != nil || !held {
+		return nil, err
+	}
+	// As last committed: on MySQL an ordinary read answers the snapshot from before the row was
+	// taken, without an app a sign-in added to the session meanwhile.
+	return db.GetCommittedUserSessionClients(ctx, tx, session.Id)
 }
 
 // TerminationResult reports what terminating one session actually did. It carries exactly what
@@ -366,6 +570,11 @@ type TerminationResult struct {
 	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
 	RevokedRefreshTokenJtis []string
+	// LogoutDeliveries is a logout token for each app on the session with a back-channel logout URI,
+	// collected under the session's row before its deletion, when the caller said the session was
+	// still live; nil otherwise. The caller hands it to the back-channel sender after the commit,
+	// beside the audit events (#784 decisions 1 and 3). It is no part of any audit payload.
+	LogoutDeliveries []backchannel.Delivery
 }
 
 // TerminateUserSessionTx ends one session as a security action: it writes the durable fact that
@@ -375,7 +584,8 @@ type TerminationResult struct {
 // The four writes, in the order this transaction issues them. #129 decision 5 put the code sweep
 // first; #139 moved the deletion ahead of it, and the reason is the whole of write 1 below.
 //
-//  1. DeleteUserSession, FIRST because it is the statement that TAKES THE SESSION ROW. An
+//  1. DeleteUserSession, FIRST because it is the statement that TAKES THE SESSION ROW, unless the
+//     row was taken already to read the apps to tell (see live below). An
 //     authorization ceremony about to mint a code writes that same row before it inserts, so one
 //     of the two transactions waits for the other: either this one waits and the code sweep below
 //     then runs after the insert committed, so the new code is marked, or the ceremony waits and
@@ -424,13 +634,23 @@ type TerminationResult struct {
 // takes no transaction and a logged termination that then rolled back would be a false record
 // (decision 9, following RevokeUserAuthStateTx).
 //
+// live is whether the session was still valid, within its idle timeout and maximum lifetime, when
+// the caller decided to end it. Only then are its apps told (#784 decision 1): before write 1 the
+// transaction takes the session's row (AcquireUserSessionRow) and reads the apps the session
+// served, since the deletion takes their rows with it. A ceremony adding an app to the session takes
+// that row first too, so the app is either read here or the ceremony finds the session gone. A row
+// already gone, ended by someone else in the meantime, names no app: that end tells them. The user's
+// subject, which never changes, is read before the transaction opens, so the transaction reads no
+// users row while it holds a session's. The logout tokens are the CALLER's to send after the commit,
+// as the audit events are.
+//
 // WHAT A COMMIT FAILURE DOES AND DOES NOT GUARANTEE is the contract RevokeUserAuthStateTx
 // documents at length and this shares: the helper's rollback covers failures before the commit
 // only, and `database/sql` promises nothing about a Commit that returns an error. So a 500 from a
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a termination with no audit record of
 // it, which is fail-closed on the security side and a gap on the forensic side.
-func TerminateUserSessionTx(ctx context.Context, db Database, userSession *record.UserSession) (TerminationResult, error) {
+func TerminateUserSessionTx(ctx context.Context, db Database, userSession *record.UserSession, live bool) (TerminationResult, error) {
 	// Both sweeps key on the session identifier and the delete keys on the id, so this takes the
 	// loaded row rather than two loose values: from one row they cannot describe two different
 	// sessions, and every call site already holds it: the two endpoints load it for their own
@@ -446,6 +666,18 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 		return TerminationResult{}, errs.New("terminating a user session requires a session identifier")
 	}
 
+	subject := ""
+	if live {
+		user, err := db.GetUserById(ctx, nil, userSession.UserId)
+		if err != nil {
+			return TerminationResult{}, err
+		}
+		// No user is a session whose user is being deleted, which takes its sessions with it.
+		if user != nil {
+			subject = user.Subject
+		}
+	}
+
 	// Opened through RunInTransactionRetryingConflict, so a deadlock reruns the writes together
 	// (#301), and so does a family record lost to a containment of the same family that overlaps
 	// this transaction, as RevokeClientGrantsTx states. The body is safe to rerun: it reads nothing
@@ -453,9 +685,24 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 	// found already written, and the counts it reports are the committing attempt's.
 	var result TerminationResult
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
-		// First, and write 1 of the doc comment above is why: it is the statement that takes the
-		// session row, which is what orders this transaction against a ceremony minting a code
-		// for the session it is ending (#139).
+		// The apps to tell, under the session's row and before the deletion below takes their rows.
+		var deliveries []backchannel.Delivery
+		if subject != "" {
+			held, err := db.AcquireUserSessionRow(ctx, tx, userSession.SessionIdentifier)
+			if err != nil {
+				return err
+			}
+			if held {
+				deliveries, err = backchannel.SessionDeliveries(ctx, db, tx, userSession, subject)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Write 1 of the doc comment above, and the reason it comes before the sweeps: it takes the
+		// session row, when the read above has not, which is what orders this transaction against
+		// a ceremony minting a code for the session it is ending (#139).
 		if err := db.DeleteUserSession(ctx, tx, userSession.Id); err != nil {
 			return err
 		}
@@ -483,6 +730,7 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 		result = TerminationResult{
 			RevokedCodeCount:        revokedCodeCount,
 			RevokedRefreshTokenJtis: revokedJtis,
+			LogoutDeliveries:        deliveries,
 		}
 		return nil
 	})
@@ -500,6 +748,25 @@ type AuthCodeReuseResult struct {
 	// losing racer of a concurrent redemption apart from a real replay (#77). Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
 	RevokedRefreshTokenJtis []string
+	// LogoutDeliveries is a logout token for each app on the session the response ended, with a
+	// back-channel logout URI, when the caller's live said the session was still valid; nil
+	// otherwise. The caller hands it to the back-channel sender after the commit, beside the audit
+	// event (#784 decision 1). It is no part of the audit payload.
+	LogoutDeliveries []backchannel.Delivery
+}
+
+// SessionLive reports whether a session was still valid, within its idle timeout and maximum
+// lifetime, when an end took it: only then are its apps told (#784 decision 1). The caller builds it
+// over its settings; nil says no session is live, which tells nobody.
+type SessionLive func(session *record.UserSession) bool
+
+// LiveUnder is the SessionLive of a session's two lifetimes as the settings hold them, judged at
+// the moment it is asked: within the idle timeout and the maximum lifetime, whatever max_age any
+// client asked for.
+func LiveUnder(idleTimeoutInSeconds, maxLifetimeInSeconds int) SessionLive {
+	return func(session *record.UserSession) bool {
+		return session.IsValid(time.Now().UTC(), idleTimeoutInSeconds, maxLifetimeInSeconds, nil)
+	}
 }
 
 // RevokeOnAuthCodeReuse is the RFC 6749 section 10.5 response to a reused authorization code, on
@@ -516,7 +783,13 @@ type AuthCodeReuseResult struct {
 // sweep runs. RevokeOnAuthCodeReuseTx is the caller that opens one; this form exists so the data
 // tier's ordering test can hold the transaction open across a termination's arrival and still run
 // the statements that ship.
-func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *record.Code) (AuthCodeReuseResult, error) {
+//
+// When it ends the session and live says the session was still valid, it reads the apps the session
+// served before the deletion takes their rows, under the session row the first statement took, so
+// they can be told (#784 decision 1). The subject is the code's user's, which the token endpoint
+// loaded with the code.
+func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *record.Code,
+	live SessionLive) (AuthCodeReuseResult, error) {
 	if tx == nil {
 		return AuthCodeReuseResult{}, errs.New("the response to a reused authorization code requires a transaction: the session row it takes first is released by an autocommitted statement")
 	}
@@ -593,19 +866,29 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 	// on a handful of statements, and not a deadlock: this transaction takes no lock any mint
 	// holds. Paying it is what buys the absence of the deadlock the acquisition's own comment
 	// describes. (#139)
+	var deliveries []backchannel.Delivery
 	if code.SessionIdentifier != "" && len(revokedJtis) > 0 {
 		session, err := db.GetUserSessionBySessionIdentifier(ctx, tx, code.SessionIdentifier)
 		if err != nil {
 			return AuthCodeReuseResult{}, err
 		}
 		if session != nil {
+			// The apps to tell, before the deletion takes their rows. The session row is held since
+			// the first statement, so an app a ceremony adds to it meanwhile is either here or the
+			// ceremony finds the session gone.
+			if live != nil && live(session) && code.User.Id == code.UserId && code.User.Subject != "" {
+				deliveries, err = backchannel.SessionDeliveries(ctx, db, tx, session, code.User.Subject)
+				if err != nil {
+					return AuthCodeReuseResult{}, err
+				}
+			}
 			if err := db.DeleteUserSession(ctx, tx, session.Id); err != nil {
 				return AuthCodeReuseResult{}, err
 			}
 		}
 	}
 
-	return AuthCodeReuseResult{RevokedRefreshTokenJtis: revokedJtis}, nil
+	return AuthCodeReuseResult{RevokedRefreshTokenJtis: revokedJtis, LogoutDeliveries: deliveries}, nil
 }
 
 // RevokeOnAuthCodeReuseTx runs RevokeOnAuthCodeReuse in one transaction it opens and commits, so
@@ -617,7 +900,10 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 // order is not optional: AuditLogger.Log writes on a nil transaction, and on SQLite the whole
 // process shares the one connection this transaction holds, so an audit written inside it would
 // wait on itself. A logged response that then rolled back would also be a false record.
-func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code) (AuthCodeReuseResult, error) {
+//
+// live says whether the session the response ends was still valid, so its apps are told; the logout
+// tokens are the caller's to send after the commit, as the audit event is.
+func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code, live SessionLive) (AuthCodeReuseResult, error) {
 	// Refused before a transaction is opened, so a bad argument is not reported as a database
 	// failure after a round trip.
 	if code == nil {
@@ -632,7 +918,7 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 	var result AuthCodeReuseResult
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		var err error
-		result, err = RevokeOnAuthCodeReuse(ctx, db, tx, code)
+		result, err = RevokeOnAuthCodeReuse(ctx, db, tx, code, live)
 		return err
 	})
 	if err != nil {

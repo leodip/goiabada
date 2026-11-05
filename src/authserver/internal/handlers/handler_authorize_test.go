@@ -2709,6 +2709,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		wrongIssuerToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-wrong-issuer",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://wrong-issuer.com",
 				"sub": "user-123",
@@ -2784,6 +2785,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		accessToken := &oauth.JwtToken{
 			TokenBase64: "an-access-token",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
 				"sub": "user-123",
@@ -2860,6 +2862,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		noSubToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-no-sub",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
 			},
@@ -2933,6 +2936,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		expiredToken := &oauth.JwtToken{
 			TokenBase64: "expired-jwt-token",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
 				"sub": userSubject,
@@ -3026,6 +3030,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		validToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-token",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
 				"sub": userSubject,
@@ -3121,6 +3126,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		differentUserToken := &oauth.JwtToken{
 			TokenBase64: "different-user-jwt",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
 				"sub": hintSubject,
@@ -3218,6 +3224,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		validToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-token",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
 				"sub": userSubject,
@@ -3346,6 +3353,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		validToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-token",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
 				"sub": userSubject,
@@ -3462,6 +3470,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		differentUserToken := &oauth.JwtToken{
 			TokenBase64: "different-user-jwt",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
 				"sub": hintSubject,
@@ -3561,6 +3570,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		differentUserToken := &oauth.JwtToken{
 			TokenBase64: "different-user-jwt",
+			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
 				"iss": "https://test-issuer.com",
 				"sub": hintSubject,

@@ -40,6 +40,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/[client]/cal
       expiresAt: expiresIn === undefined ? undefined : Date.now() + expiresIn * 1000,
       signedInAt: Date.now(),
     };
+    state.subject = tokens.claims()?.sub;
     setResult(state, "Signed in", true, {
       seconds_since_the_sign_in_started: Math.round((Date.now() - pending.startedAt) / 1000),
       token_type: tokens.token_type,

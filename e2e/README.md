@@ -133,7 +133,7 @@ below is about the e2e suite.
 Tests sit under `playwright/tests/`, one folder per area: the admin console (`admin-console/sign-in`,
 `admin-console/shell`, `admin-console/clients/`, `resources/`, `groups/`, `users/`, `legal-documents/`,
 `account/` and `settings/`), the test app (`testapp/`: a user signing in to its web apps, its SPA and its API, single
-sign-on across its two sites, signing out, the authorization parameters, and the auth server's own
+sign-on across its two sites, signing out, being told when a session ends, the authorization parameters, and the auth server's own
 pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), the protocol
 itself where no page reaches it (`oauth/`), the Turnstile challenge on the auth server's forms with
 Cloudflare's test keys (`turnstile/`), and accessibility (`accessibility/`: axe over every page and

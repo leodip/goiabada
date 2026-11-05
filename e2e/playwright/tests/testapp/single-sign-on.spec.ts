@@ -64,11 +64,13 @@ test("signing out on one site with the ID token leaves the other site signed in,
 });
 
 // With no hint, the user is asked, and the whole session ends, every app's part of it: /userinfo
-// refuses the tokens it handed out, and their refresh tokens stop working.
+// refuses the tokens it handed out, and their refresh tokens stop working. The other site is the web
+// app with no back-channel logout URI, so it still holds its tokens to try; one with the URI is told
+// and signs the user out (backchannel-logout.spec.ts).
 test("signing out on one site with no ID token ends the other site's part too", async ({ browser, users }) => {
   const user = await users.create();
   const { context, page: app } = await userBrowser(browser);
-  await signInToWebApp(app, testapp.web, user);
+  await signInToWebApp(app, testapp.web3, user);
   await expectResult(app, "Signed in");
   await signInToWebApp(app, testapp.web2, user);
   await expectResult(app, "Signed in");
@@ -80,12 +82,12 @@ test("signing out on one site with no ID token ends the other site's part too", 
   await app.waitForURL(testapp.web2.url);
   await expectResult(app, "Signed out");
 
-  await app.goto(testapp.web.url);
+  await app.goto(testapp.web3.url);
   await app.getByRole("button", { name: "Call /userinfo" }).click();
   await expectResult(app, "/userinfo failed");
   await app.getByRole("button", { name: "Refresh the tokens" }).click();
   await expectResult(app, "Refresh failed");
   expect((await resultBody(app)).error).toBe("invalid_grant");
-  expect((await signInToWebApp(app, testapp.web, user)).askedForPassword).toBe(true);
+  expect((await signInToWebApp(app, testapp.web3, user)).askedForPassword).toBe(true);
   await context.close();
 });

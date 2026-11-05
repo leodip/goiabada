@@ -430,6 +430,7 @@ func HandleResetPasswordPost(
 	auditLogger AuditLogger,
 	adminConsoleBaseURL string,
 	notifier AccountNotifier,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -550,9 +551,14 @@ func HandleResetPasswordPost(
 		// The same read under the user's row decides the notice after the response: whether the
 		// account had a password is read from the row the claim replaces, so a password set while
 		// this request waited can't leave the answer stale (#724 decision 6).
+		//
+		// Every session of the user ends and none is kept, so every app that knew the user is told
+		// (#784 decision 3).
 		var wasVerified bool
 		var replaced *record.User
-		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
+		notice := revocation.LogoutNotice{Subject: user.Subject, UserWide: true,
+			Live: revocation.LiveUnder(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds)}
+		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", notice, func(tx *sql.Tx) error {
 			// The claim below also marks the address verified, and whether that verified it, the
 			// verified_email entry, is read here, under the user's row: taken first, as a
 			// credential change takes it, so an administrator's edit of the same address can't
@@ -594,6 +600,7 @@ func HandleResetPasswordPost(
 		// After commit, per decision 5. This is also the first audit event this handler emits
 		// on SUCCESS: until now it logged only failures (auditFailedResetPasswordCode).
 		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id, revocation.ReasonPasswordReset, "", result)
+		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		// The claim also marked the address verified: the link went to it, and dies when it
 		// changes. That changes something only for the link an administrator emails a new

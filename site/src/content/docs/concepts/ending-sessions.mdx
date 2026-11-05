@@ -36,6 +36,23 @@ That's what sets ending a session apart from one expiring. An [offline refresh t
 
 Each one leaves two entries in the [audit log](/concepts/audit-log/): `terminated_user_session`, which records what was revoked, and `deleted_user_session`, the record that the session is gone. Count `terminated_user_session` to know how many sessions were ended.
 
+## Telling your apps
+
+Ending a session also tells the apps the session was signed in to. Each one with a [back-channel logout URI](/concepts/clients/#back-channel-logout) is sent a logout token there: a signed statement naming the user (`sub`) and the session (`sid`), so the app can end its own session for that user. That happens whenever a session that was still valid ends:
+
+- someone ends it from the admin console or the API;
+- the user [signs out](#signing-out). With an `id_token_hint`, only the app that signed the user out is told, since only its part of the session ended;
+- a [different user signs in](#a-different-user-signs-in-on-the-same-browser) on the browser;
+- a sign-in ends it: the user's own session the browser had, their other sessions [from the same browser](/concepts/sessions/#how-the-auth-server-recognizes-a-browser), or the ones over [the cap](/concepts/sessions/#how-many-sessions-a-user-can-hold);
+- an app redeems an authorization code from it twice;
+- the user changes their own password, which ends their other sessions.
+
+A session that has expired tells nobody, whatever removes it. Disabling or deleting a user, a password reset, an administrator setting the password and the `recover` command tell every app that knew the user instead, expired sessions or not: see [Credential changes](#credential-changes).
+
+The tokens go out once the session has ended, and the request that ended it doesn't wait for them. An app that can't be reached, doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429 is sent the same token again about 15 seconds and about a minute later. Each delivery leaves a `sent_logout_token` entry in the audit log, whose `outcome` says whether the app was told. [Back-channel logout](/reference/endpoints/backchannel-logout/) gives the request, the token and what your app answers.
+
+A delivery that never succeeds is given up, and so is one still being tried when the auth server stops. Ending a session, a different user signing in, a reused code and a credential change revoke the refresh tokens all the same, so such an app learns at its next refresh that the session is over. A sign-out and a sign-in ending an older session revoke nothing: an app holding an offline refresh token from that session keeps refreshing after a lost delivery, and stays signed in.
+
 ## A session that has expired
 
 You can't end a session that has passed its [idle timeout or maximum lifetime](/concepts/sessions/#how-long-a-session-lasts), because it's already gone. The session lists leave it out, and both `DELETE` calls answer it with 404, just as they would a session that was never there. Nothing is revoked and nothing is written to the audit log. The background job deletes the row later, and that revokes nothing either.
@@ -57,6 +74,8 @@ Your app signs a user out by sending them to [`/auth/logout`](/reference/endpoin
 
 Either way the browser's cookie is cleared, so its next sign-in starts from the password. A normal refresh token stops working once the session behind it has ended. Offline refresh tokens aren't tied to a session and keep working.
 
+Each app whose part of the session ended is [told](#telling-your-apps), when the session was still valid: with a hint, your app alone, and without one, every app on the session.
+
 A sign-out with a confirmed hint leaves `deleted_user_session_client` in the audit log, for your app leaving the session. When yours was the session's last client, the session ends too, and it also leaves `deleted_user_session`, with the reason `signed_out`, and `logout`. One without a hint leaves `logout`, even when there was no session, and `deleted_user_session` when there was one.
 
 ## Credential changes
@@ -72,6 +91,14 @@ When a user's credentials change, their sessions and refresh tokens stop being u
 | The auth server's [`recover` command](/troubleshooting/locked-out-of-the-admin-console/#recover-the-user-with-the-auth-server) recovers the user, whatever it was asked to do | Every session of theirs is ended and every refresh token revoked | `recovery_command` |
 
 That covers every grant, offline refresh tokens whose session has already expired and tokens from the [password grant](/legacy-flows/ropc/) included, and an authorization code that was issued but not redeemed yet can't be exchanged any more. Each change leaves a `revoked_user_auth_state` entry in the audit log, with the `reason` above and the sessions and refresh tokens it ended.
+
+### Telling the apps that knew the user
+
+A password reset, an administrator setting the password and disabling the user end every session the user has, and so do deleting the user and [recovering them](/troubleshooting/locked-out-of-the-admin-console/#recover-the-user-with-the-auth-server) with the `recover` command. Each of these [tells](#telling-your-apps) every app that knew the user: each app with a back-channel logout URI that was on any of the user's sessions, expired ones included, or holds one of the user's refresh tokens that's still unrevoked and unexpired. It's sent one logout token naming the user (`sub`) and no session. A token without `sid` asks the app to end every session it has for that user, so it reaches an app whose own session outlived the user's session here, and an app holding only an offline refresh token.
+
+An app that [requires the session identifier](/concepts/clients/#back-channel-logout) is sent a token naming the session instead, one for each of the user's sessions it was on that was still valid. It's told nothing for a refresh token alone.
+
+A user changing their own password ends only their other sessions, so only those tell their apps: each app on each of them that was still valid gets a token naming the user and that session. The apps on the session they changed it from, and the apps holding only a refresh token, are told nothing.
 
 A user changing their own password normally stays signed in to the app they did it from. If that app refreshes at the same moment as the change, it may be asked to sign in again.
 
@@ -91,6 +118,7 @@ When the person who signs in is a **different** user, the browser has changed ha
 | The previous user's session | Ended, as if someone had ended it: deleted, with its refresh tokens and unredeemed authorization codes revoked |
 | The new user | Never gets the session that was there |
 | The previous user's other devices | Untouched. Only what this browser's session handed out is revoked |
+| The apps on the previous user's session | Told that it ended, as in [Telling your apps](#telling-your-apps), when it was still valid |
 
 The grants that session held were reachable from this browser, and the browser is now someone else's. An offline refresh token from it would otherwise keep working in the background indefinitely.
 

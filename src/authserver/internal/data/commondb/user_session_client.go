@@ -66,6 +66,25 @@ var selectUserSessionClientsByUserSessionId = statement{
 	mssql:    "SELECT " + userSessionClientColumns.mssql + " FROM user_session_clients WHERE user_session_id = @p1",
 }
 
+// selectCommittedUserSessionClientsByUserSessionId and selectCommittedClientById are the reads
+// GetCommittedUserSessionClients runs: the same rows as selectUserSessionClientsByUserSessionId and
+// selectClientById, read as last committed. On MySQL that takes a locking read, FOR SHARE; the
+// other three already read what was committed when each statement started (see
+// GetCommittedUserSessionClients).
+var selectCommittedUserSessionClientsByUserSessionId = statement{
+	sqlite:   "SELECT " + userSessionClientColumns.sqlite + " FROM user_session_clients WHERE user_session_id = ?",
+	mysql:    "SELECT " + userSessionClientColumns.mysql + " FROM user_session_clients WHERE user_session_id = ? FOR SHARE",
+	postgres: "SELECT " + userSessionClientColumns.postgres + " FROM user_session_clients WHERE user_session_id = $1",
+	mssql:    "SELECT " + userSessionClientColumns.mssql + " FROM user_session_clients WHERE user_session_id = @p1",
+}
+
+var selectCommittedClientById = statement{
+	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
+	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ? FOR SHARE",
+	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1",
+	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WHERE id = @p1",
+}
+
 // selectUserSessionClientsWhere is completed by an IN list of ids or of user session ids.
 var selectUserSessionClientsWhere = statement{
 	sqlite:   "SELECT " + userSessionClientColumns.sqlite + " FROM user_session_clients WHERE ",
@@ -179,6 +198,49 @@ func (d *Database) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx
 func (d *Database) GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error) {
 	return queryAll(ctx, d, tx, nil, selectUserSessionClientsByUserSessionId.text(d.Dialect), []any{userSessionId},
 		scanUserSessionClient, "userSessionClient")
+}
+
+// GetCommittedUserSessionClients answers the apps a session served, each with its client, as last
+// committed: what an end of the session tells, read under the session's row (#784).
+//
+// The difference from GetUserSessionClientsByUserSessionId and UserSessionClientsLoadClients is
+// MySQL's. Under InnoDB's default REPEATABLE READ every consistent read in a transaction reads the
+// snapshot its first read established, and an end reads the user's sessions before it takes a
+// session's row. A sign-in that adds an app to the session and commits in between is waited for by
+// AcquireUserSessionRow, and a consistent read after it still answers the session without that
+// app, which the end then deletes untold. A locking read answers the latest committed rows. The
+// clients are read the same way, since the app may have been registered, or its back-channel
+// logout URI set, after the snapshot. On PostgreSQL and SQL Server at READ COMMITTED each
+// statement reads what was committed when it started, and SQLite has one writer at a time, so
+// their statements take no lock.
+//
+// tx is required: the read is only current under the session's row, which a transaction holds.
+func (d *Database) GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error) {
+
+	if tx == nil {
+		return nil, errs.New("reading a session's apps as committed requires a transaction: they are current only under the session's row")
+	}
+
+	userSessionClients, err := queryAll(ctx, d, tx, nil, selectCommittedUserSessionClientsByUserSessionId.text(d.Dialect),
+		[]any{userSessionId}, scanUserSessionClient, "userSessionClient")
+	if err != nil {
+		return nil, err
+	}
+
+	// One read per app, by id: a session serves a handful, and it keeps the lock on the one row read.
+	for i := range userSessionClients {
+		client, err := queryOne(ctx, d, tx, selectCommittedClientById.text(d.Dialect),
+			[]any{userSessionClients[i].ClientId}, scanClient, "client")
+		if err != nil {
+			return nil, err
+		}
+		if client == nil {
+			return nil, errs.Errorf("client with id %d not found", userSessionClients[i].ClientId)
+		}
+		userSessionClients[i].Client = *client
+	}
+
+	return userSessionClients, nil
 }
 
 func (d *Database) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]record.UserSessionClient, error) {

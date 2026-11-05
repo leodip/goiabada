@@ -35,6 +35,8 @@ func (r *auditRecorder) Log(_ context.Context, auditEvent string, _ map[string]i
 // transaction answers before, and the read under the row answers under.
 func expectTheUserUnderItsRow(database *datamocks.Database, before, under *record.User) *datamocks.RunInTransactionStub {
 	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), "admin@example.com").Return(before, nil)
+	// No settings row tells nobody, which keeps the double to the recovery's own statements.
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return((*record.Settings)(nil), nil)
 	stub := datamocks.ExpectRunInTransaction(database, recoveryTx)
 	database.On("AcquireUserRow", mock.Anything, recoveryTx, before.Id).Return(nil)
 	database.On("GetUserByIdForUpdate", mock.Anything, recoveryTx, before.Id).Return(under, nil)
@@ -121,6 +123,7 @@ func TestRun_ADeadlockRerunReportsOnlyTheCommittingAttempt(t *testing.T) {
 	user := &record.User{Id: 7, Email: "admin@example.com", Enabled: true}
 	const manageId = int64(11)
 	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), "admin@example.com").Return(user, nil)
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return((*record.Settings)(nil), nil)
 	database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), builtin.AuthServerResourceIdentifier).
 		Return(&record.Resource{Id: 3, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil)
 	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(3)).

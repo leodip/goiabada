@@ -171,6 +171,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				recordEdge("commit")
 			}
 		})
+		expectForeignSessionApps(database, crossUserTerminateTx, userSession)
 		database.On("RevokeCodesBySessionIdentifier", mock.Anything, crossUserTerminateTx, userSession.SessionIdentifier).
 			Return(revokedCodeCount, nil).Once()
 		database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, crossUserTerminateTx, userSession.SessionIdentifier).
@@ -870,6 +871,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// rollback runs and nothing was committed. Same failure point the two API callers use.
 		deleteError := errors.New("the session delete failed")
 		stub := datamocks.ExpectRunInTransaction(database, crossUserTerminateTx)
+		expectForeignSessionApps(database, crossUserTerminateTx, foreignSession)
 		database.On("DeleteUserSession", mock.Anything, crossUserTerminateTx, foreignSession.Id).
 			Return(deleteError).Once()
 
@@ -3641,6 +3643,7 @@ func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHold
 			default:
 				expectCeremonyConfirmed(ceremonyStore, rr, req)
 				failure := errors.New("the database is unreachable")
+				expectForeignSessionApps(database, &sql.Tx{}, foreignSession)
 				datamocks.ExpectRunInTransactionRefused(database, failure)
 				pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 					return errors.Is(err, failure)
@@ -3661,6 +3664,18 @@ func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHold
 	}
 }
 
+// expectForeignSessionApps answers the reads a termination of a live foreign session makes for the
+// apps to tell (#784): the previous user's subject, the session's row and its apps, none of which
+// has a back-channel logout URI. Maybe, since a foreign session past its lifetime reads none of
+// them; which sessions tell their apps is revocation_test.go's and the integration tier's to show.
+func expectForeignSessionApps(database *datamocks.Database, tx *sql.Tx, foreignSession *record.UserSession) {
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), foreignSession.UserId).
+		Return(&record.User{Id: foreignSession.UserId, Subject: "previous-user"}, nil).Maybe()
+	database.On("AcquireUserSessionRow", mock.Anything, tx, foreignSession.SessionIdentifier).Return(true, nil).Maybe()
+	database.On("GetCommittedUserSessionClients", mock.Anything, tx, foreignSession.Id).
+		Return([]record.UserSessionClient{}, nil).Maybe()
+}
+
 // expectForeignSessionEnded arms /auth/completed to end the session the browser arrived with,
 // another user's, as the create arm ends it: the ceremony confirmed first, then the session deleted
 // with its codes and its one refresh token revoked in one transaction, then the handover, the
@@ -3673,6 +3688,7 @@ func expectForeignSessionEnded(ceremonyStore *handlersmocks.CeremonyStore, datab
 
 	tx := &sql.Tx{}
 	datamocks.ExpectRunInTransaction(database, tx)
+	expectForeignSessionApps(database, tx, foreignSession)
 	database.On("DeleteUserSession", mock.Anything, tx, foreignSession.Id).Return(nil).Once()
 	database.On("RevokeCodesBySessionIdentifier", mock.Anything, tx, foreignSession.SessionIdentifier).
 		Return(int64(1), nil).Once()

@@ -257,6 +257,15 @@ cause, each a whole sentence.
 | `handler.client_post_logout_redirect_uris.insecure_http` | `uri` (string) | Sign-out redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): {{.uri}} |
 | `handler.client_post_logout_redirect_uris.not_absolute` | `uri` (string) | Sign-out redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): {{.uri}} |
 | `handler.client_post_logout_redirect_uris.duplicate` | (none) | Duplicate sign-out redirect URIs are not allowed |
+| `handler.client_backchannel_logout.uri_required` | (none) | backchannelLogoutUri is required: send the back-channel logout URI, or an empty string for none. |
+| `handler.client_backchannel_logout.session_required_required` | (none) | backchannelLogoutSessionRequired is required: send true or false. |
+| `handler.client_backchannel_logout.no_sign_in_flow` | (none) | A back-channel logout URI is used by clients that sign users in through the authorization code with PKCE flow or the implicit flow, and neither is enabled for this client. |
+| `handler.client_backchannel_logout.uri_too_long` | `length` (int), `max` (int), `prefix` (string) | Back-channel logout URI is too long ({{.length}} bytes, the maximum is {{.max}}): {{.prefix}}... |
+| `handler.client_backchannel_logout.uri_invalid` | `uri` (string) | Back-channel logout URI must be an absolute URI that names a host, with no fragment, well-formed percent-escapes and no spaces or characters a URI excludes: {{.uri}} |
+| `handler.client_backchannel_logout.uri_scheme_invalid` | `uri` (string) | Back-channel logout URI must use https or http: {{.uri}} |
+| `handler.client_backchannel_logout.uri_userinfo` | `uri` (string) | Back-channel logout URI must not carry a user name or password: {{.uri}} |
+| `handler.client_backchannel_logout.uri_http_public_client` | `uri` (string) | Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client an administrator created: {{.uri}} |
+| `handler.client_backchannel_logout.uri_http_self_registered` | `uri` (string) | Back-channel logout URI must use https on a client that registered itself, whatever its type. Plain http is allowed only on a confidential client an administrator created: {{.uri}} |
 | `handler.client_web_origins.empty` | (none) | Web origin cannot be empty |
 | `handler.client_web_origins.invalid` | `origin` (string) | Invalid web origin: {{.origin}}. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero. |
 | `handler.client_web_origins.too_long` | `length` (int), `max` (int), `origin` (string) | Web origin is too long ({{.length}} characters, the maximum is {{.max}}): {{.origin}} |

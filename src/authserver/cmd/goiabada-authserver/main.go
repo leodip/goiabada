@@ -119,7 +119,10 @@ func run() int {
 	// is validated, because a schema migration touches no encrypted value and neither does a
 	// recovery, which writes a password hash, clears an OTP seed and grants a permission and
 	// decrypts nothing, and the key would otherwise be a precondition for repairing a database
-	// on a deployment that has not set one (#268, #498). Their arguments are the ones dispatch
+	// on a deployment that has not set one (#268, #498). Only the logout tokens a recovery sends
+	// after its commit need the key, to decrypt the signing key, so the recovery is handed the key
+	// as read, and an unusable one leaves those unsent rather than refusing the recovery (#784
+	// decision 11). Their arguments are the ones dispatch
 	// left after the command's word, and the database configuration was handed to each reader by
 	// value, so the --db-* flags it parsed among them override a copy and the loaded
 	// configuration stays what the process was started with (#424).
@@ -127,7 +130,7 @@ func run() int {
 		return runMigrateCommand(migration, os.Stdout, os.Stderr)
 	}
 	if command == "recover" {
-		return runRecoverCommand(recovery, datafactory.OpenDatabase, os.Stdout, os.Stderr)
+		return runRecoverCommand(recovery, datafactory.OpenDatabase, readRecoverDataKey(cfg), os.Stdout, os.Stderr)
 	}
 
 	// The process owns the signals, from here to its exit, so a stop arriving while the server is

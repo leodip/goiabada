@@ -39,6 +39,7 @@ func HandleAccountPasswordPut(
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 	notifier AccountNotifier,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtToken, subject, ok := accountCaller(w, r)
@@ -124,8 +125,13 @@ func HandleAccountPasswordPut(
 		// the address the account has as the change commits, not the one read before the password
 		// was checked, which a concurrent address change or verification may have moved (#724).
 		// Assigned on every attempt, since a deadlock reruns the body.
+		//
+		// The sessions it ends are particular ones, the user's others, so each app on each of them
+		// that was still valid is told of that session, and the kept session's apps and the grants
+		// are told nothing (#784 decision 3).
 		var current *record.User
-		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, exceptSid,
+		notice := revocation.LogoutNotice{Subject: user.Subject, Live: sessionLive(settings)}
+		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, exceptSid, notice,
 			func(tx *sql.Tx) error {
 				var readErr error
 				if current, readErr = database.GetUserByIdForUpdate(r.Context(), tx, user.Id); readErr != nil {
@@ -147,6 +153,7 @@ func HandleAccountPasswordPut(
 		})
 		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
 			revocation.ReasonPasswordChange, subject, result)
+		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		// Response
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}

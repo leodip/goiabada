@@ -64,11 +64,13 @@ test("the API refuses a request with no token, a token it can't verify, and a to
   expect(forged.headers()["www-authenticate"]).toContain('error="invalid_token"');
 });
 
+// The web app with no back-channel logout URI keeps its token after the end; one that has the URI is
+// told and drops it (backchannel-logout.spec.ts).
 test("the API introspects each token, so one whose session was ended is refused at once", async ({ page, browser, users }) => {
   const user = await users.create();
   await grantUserPermission(page, user.id, testapp.api.resource, "read");
   const { context, page: app } = await userBrowser(browser);
-  await signInToWebApp(app, testapp.web, user);
+  await signInToWebApp(app, testapp.web3, user);
   await expectResult(app, "Signed in");
   await app.getByRole("button", { name: "Call the API" }).click();
   await expectResult(app, "The API answered 200");

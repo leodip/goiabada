@@ -1,5 +1,7 @@
 package issuance
 
+import "strings"
+
 // TokenType names the typ of a token TokenIssuer produces: the ID token, the access token, and the
 // two kinds of refresh token. The two refresh values are also what refresh_tokens.refresh_token_type
 // stores, so the branch that chooses the type and every branch that later reads it spell it from
@@ -47,3 +49,20 @@ func IsNotIDTokenTyp(typ string) bool {
 // access token issued before #676, whose header said JWT, are never taken for one. The typ CLAIM
 // stays TokenTypeBearer, since APIs may read it.
 const AccessTokenHeaderType = "at+jwt"
+
+// IDTokenHeaderType is the JOSE header typ every ID Token carries: golang-jwt's default, which the
+// ID Token and the account logout's hint keep. RFC 7519 section 5.1 recommends it for a JWT.
+const IDTokenHeaderType = "JWT"
+
+// HasIDTokenHeader reports whether a JOSE header is an ID Token's: its typ is JWT, compared as a
+// media type, without regard to case and with the application/ prefix optional (RFC 7515 section
+// 4.1.9). /auth/authorize and logout require it of an id_token_hint, beside IsNotIDTokenTyp's check
+// of the claim, because the claim cannot tell every token apart: a logout token carries no typ
+// claim, is signed with the same key and names sub, sid and aud, the cross-JWT confusion
+// Back-Channel Logout 1.0 section 4.1 and RFC 8725 section 3.11 describe. A requirement rather than
+// a list of what is refused, so a token type added later is refused without joining one (#784
+// decision 12). A refresh token keeps the default header too, which is why the claim check stays.
+func HasIDTokenHeader(header map[string]interface{}) bool {
+	typ, _ := header["typ"].(string)
+	return strings.EqualFold(typ, IDTokenHeaderType) || strings.EqualFold(typ, "application/"+IDTokenHeaderType)
+}

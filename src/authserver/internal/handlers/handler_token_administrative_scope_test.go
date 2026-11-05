@@ -67,7 +67,7 @@ func TestHandleTokenPost_AdministrativeScopeRefusalIsAudited(t *testing.T) {
 			tokenValidator := handlersmocks.NewTokenValidator(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			handler := HandleTokenPost(jsonWriter, datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t), tokenValidator,
-				auditLogger, noCredentialFailures{}, testTokenMetrics())
+				auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 			req, _ := http.NewRequest("POST", "/token", strings.NewReader(tc.form))
 			req = withSettings(req, &record.Settings{})

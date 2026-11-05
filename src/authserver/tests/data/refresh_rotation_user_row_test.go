@@ -150,7 +150,7 @@ func changeTheUsersPassword(ctx context.Context, db data.Database, f *family, pa
 	if !f.ropc {
 		preserved = f.code.SessionIdentifier
 	}
-	_, err := revocation.RevokeUserAuthStateTx(ctx, db, f.user.Id, preserved, func(tx *sql.Tx) error {
+	_, err := revocation.RevokeUserAuthStateTx(ctx, db, f.user.Id, preserved, revocation.LogoutNotice{}, func(tx *sql.Tx) error {
 		if err := db.SetUserPasswordHash(ctx, tx, f.user.Id, "hash-after-the-credential-change"); err != nil {
 			return err
 		}

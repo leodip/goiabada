@@ -8,6 +8,7 @@ claims and answers.
 |---|---|---|
 | `/web` | `testapp-web`, confidential | Add sign-in to a web app, Sign users out, Require two-factor authentication |
 | `/web2` | `testapp-web2`, confidential | Single sign-on across clients |
+| `/web3` | `testapp-web3`, confidential, no back-channel logout URI | Sign users out: what the auth server does with the tokens of an app that isn't told a session ended |
 | `/spa` | `testapp-spa`, public | Add sign-in to a SPA or mobile app |
 | `/service` | `testapp-service`, client credentials | Protect an API |
 | `/api/products` | `testapp-api`, confidential, introspects | Protect an API: checks and introspects the token, answers 401 or 403 |
@@ -28,28 +29,37 @@ which `e2e/infra/prepare.sh` wrote, and add the `http://localhost:3000/...` addr
 1. **The API** (Protect an API, steps 1 to 3). Under **Admin**, **Resources and permissions**,
    create `product-api`, give it the permissions `read` and `write`, and give `product-api:read`
    to your user, on the user's **Permissions** tab.
-2. **`testapp-web`** (Add sign-in to a web app, steps 1 and 2, and Sign users out, step 2).
-   Create it, leaving **Authorization code flow with PKCE** on. Redirect URI:
-   `https://e2e-webtest1.goiabada.dev/web/callback`. Sign-out redirect URI:
-   `https://e2e-webtest1.goiabada.dev/web/signed-out`. Copy its secret to `WEB_CLIENT_SECRET`.
-3. **`testapp-web2`**: the same, with `/web2/callback` and `/web2/signed-out` (on
-   `https://e2e-webtest2.goiabada.dev` in the e2e environment). Its secret goes to
-   `WEB2_CLIENT_SECRET`.
-4. **`testapp-spa`** (Add sign-in to a SPA or mobile app, steps 1 to 4). Create it with
+2. **`testapp-web`** (Add sign-in to a web app, steps 1 and 2, and Sign users out, step 2 and "Get
+   told when a session ends", step 1). Create it, leaving **Authorization code flow with PKCE** on.
+   Redirect URI: `https://e2e-webtest1.goiabada.dev/web/callback`. Sign-out redirect URI:
+   `https://e2e-webtest1.goiabada.dev/web/signed-out`. Back-channel logout URI, on its
+   **Back-channel logout** tab: `https://e2e-webtest1.goiabada.dev/web/backchannel-logout`. Copy its
+   secret to `WEB_CLIENT_SECRET`.
+3. **`testapp-web2`**: the same, with `/web2/callback`, `/web2/signed-out` and
+   `/web2/backchannel-logout` (on `https://e2e-webtest2.goiabada.dev` in the e2e environment). Its
+   secret goes to `WEB2_CLIENT_SECRET`.
+4. **`testapp-web3`**: the same as `testapp-web`, with `/web3/callback` and `/web3/signed-out`, and
+   no back-channel logout URI. Its secret goes to `WEB3_CLIENT_SECRET`.
+5. **`testapp-spa`** (Add sign-in to a SPA or mobile app, steps 1 to 4). Create it with
    **Authorization code flow with PKCE** on, choose **Public client** on **Authentication** and confirm with **Yes**, add
    `https://e2e-webtest1.goiabada.dev/spa` as both its redirect URI and its sign-out redirect URI,
    and the web origin
    `https://e2e-webtest1.goiabada.dev`.
-5. **`testapp-service`** (Protect an API, "Let a service call your API", steps 1 and 2). Create
+6. **`testapp-service`** (Protect an API, "Let a service call your API", steps 1 and 2). Create
    it with **Client credentials flow** on and **Authorization code flow with PKCE** off, grant it `product-api` `read` on **Permissions**, and
    copy its secret to `SERVICE_CLIENT_SECRET`.
-6. **`testapp-api`** (Protect an API, "Ask the auth server about a token", steps 1 and 2). Create
+7. **`testapp-api`** (Protect an API, "Ask the auth server about a token", steps 1 and 2). Create
    it with **Authorization code flow with PKCE** on, choose `product-api` on its **Introspection**
    tab, click **Add resource** and **Save**, and copy its secret to `API_CLIENT_SECRET`.
+
+A back-channel logout URI is called by the auth server, not the browser, so on your own machine it
+works only when the auth server can reach the app: `http://localhost:3000/web/backchannel-logout` for
+an auth server on the same machine, outside a container.
 
 ## Configure and run
 
 ```bash
 cp .env.example .env.local   # then fill in the secrets
 npm run dev                  # http://localhost:3000
+npm test                     # the back-channel logout route's checks of a logout token
 ```

@@ -27,10 +27,13 @@ export type Result = {
   at: number;
 };
 
-// One entry per client: "web", "web2", "service".
+// One entry per client: "web", "web2", "web3", "service".
 export type ClientState = {
   pending?: Pending;
   signIn?: SignIn;
+  // The sub of the last sign-in, kept after it ends, so the page can show the logout tokens about
+  // that user.
+  subject?: string;
   logoutState?: string;
   result?: Result;
   serviceToken?: string;
@@ -69,4 +72,43 @@ export async function clientState(key: string): Promise<ClientState> {
 
 export function setResult(state: ClientState, title: string, ok: boolean, body: unknown) {
   state.result = { title, ok, body, at: Date.now() };
+}
+
+// For the back-channel logout route, which no browser calls: ends this client's sign-ins that
+// matches picks, in every browser's session, with result as each one's outcome, and answers the sub
+// of each sign-in ended.
+export function endSignIns(key: string, matches: (signIn: SignIn) => boolean, result: Omit<Result, "at">): string[] {
+  const ended: string[] = [];
+  for (const session of store.values()) {
+    const state = session[key];
+    if (!state?.signIn || !matches(state.signIn)) continue;
+    state.signIn = undefined;
+    state.result = { ...result, at: Date.now() };
+    if (state.subject) ended.push(state.subject);
+  }
+  return ended;
+}
+
+// The logout tokens the client accepted, by user, for its page: the newest ten for each user, kept
+// for an hour.
+type Received = { claims: Record<string, unknown>; at: number };
+
+const globalReceived = globalThis as unknown as { testappLogoutTokens?: Map<string, Received[]> };
+const received = (globalReceived.testappLogoutTokens ??= new Map<string, Received[]>());
+const keptFor = 60 * 60 * 1000;
+
+export function recordLogoutToken(key: string, subject: string, claims: Record<string, unknown>) {
+  const now = Date.now();
+  for (const [name, list] of received) {
+    if (now - list[list.length - 1].at > keptFor) received.delete(name);
+  }
+  const name = `${key} ${subject}`;
+  const list = received.get(name) ?? [];
+  list.push({ claims, at: now });
+  received.set(name, list.slice(-10));
+}
+
+export function logoutTokensAbout(key: string, subject: string | undefined): Record<string, unknown>[] {
+  if (!subject) return [];
+  return (received.get(`${key} ${subject}`) ?? []).map((entry) => entry.claims);
 }

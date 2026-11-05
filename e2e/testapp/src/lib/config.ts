@@ -12,8 +12,10 @@ function env(name: string, fallback?: string): string {
 export const issuer = env("GOIABADA_ISSUER");
 export const appUrl = env("APP_URL").replace(/\/$/, "");
 
-// The two web apps are confidential clients: they sign users in on the server, with a secret.
-// The second one exists to try single sign-on across clients.
+// The web apps are confidential clients: they sign users in on the server, with a secret. The
+// second one exists to try single sign-on across clients. The third registered no back-channel logout
+// URI, so it keeps its tokens when the user's session ends, as an app does before it's told or when a
+// delivery is lost.
 export const webClients = {
   web: {
     title: "Web app",
@@ -24,6 +26,11 @@ export const webClients = {
     title: "Second web app",
     clientId: env("WEB2_CLIENT_ID", "testapp-web2"),
     clientSecret: env("WEB2_CLIENT_SECRET"),
+  },
+  web3: {
+    title: "Web app with no back-channel logout",
+    clientId: env("WEB3_CLIENT_ID", "testapp-web3"),
+    clientSecret: env("WEB3_CLIENT_SECRET"),
   },
 } as const;
 

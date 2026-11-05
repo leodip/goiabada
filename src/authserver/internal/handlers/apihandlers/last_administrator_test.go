@@ -151,7 +151,7 @@ var lastAdministratorRemovals = []lastAdministratorRemoval{
 		serve: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) *httptest.ResponseRecorder {
 			r := membershipRequest(http.MethodPut, "/api/v1/admin/users/42/enabled", `{"enabled":false}`, "authserver:manage", map[string]string{"id": "42"})
 			rr := httptest.NewRecorder()
-			HandleUserEnabledPut(database, auditLogger).ServeHTTP(rr, r)
+			HandleUserEnabledPut(database, auditLogger, &recordingLogoutTokens{}).ServeHTTP(rr, withSessionSettings(r))
 			return rr
 		},
 	},
@@ -173,7 +173,7 @@ var lastAdministratorRemovals = []lastAdministratorRemoval{
 		serve: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) *httptest.ResponseRecorder {
 			r := membershipRequest(http.MethodDelete, "/api/v1/admin/users/42", "", "authserver:manage", map[string]string{"id": "42"})
 			rr := httptest.NewRecorder()
-			HandleUserDelete(database, auditLogger, discardNotices{}).ServeHTTP(rr, r)
+			HandleUserDelete(database, auditLogger, discardNotices{}, &recordingLogoutTokens{}).ServeHTTP(rr, withSessionSettings(r))
 			return rr
 		},
 	},

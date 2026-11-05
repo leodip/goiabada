@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -251,6 +252,43 @@ func TestLogout_RejectedHint_AsksTheEndUserAndRefusesTheRedirect(t *testing.T) {
 	gone, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the consent page precedes the teardown, it does not replace it")
+}
+
+// TestLogout_HintWithoutAnIdTokensHeader_IsRefused: a hint must carry an ID Token's JOSE header,
+// typ JWT. The ID Token's own claims, re-signed with the server's key under a logout token's header
+// (logout+jwt) or an access token's (at+jwt), pass every claim check, and are refused as any refused
+// hint is: the consent page, then no redirect. The same claims re-signed under JWT are confirmed and
+// redirected, so the header is all that differs (#784 decision 12).
+func TestLogout_HintWithoutAnIdTokensHeader_IsRefused(t *testing.T) {
+	for _, headerTyp := range []string{"logout+jwt", "at+jwt"} {
+		t.Run(headerTyp, func(t *testing.T) {
+			grant := createOfflineGrant(t)
+			idToken, _ := sessionBoundGrantOnSameSession(t, grant)
+			hint := resignWithCurrentKey(t, jwt.MapClaims(decodeJWTPayload(t, idToken)), headerTyp)
+			require.Equal(t, headerTyp, decodeJWTHeader(t, hint)["typ"])
+
+			resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
+				"id_token_hint":            {hint},
+				"post_logout_redirect_uri": {grant.signOutRedirectURI},
+				"client_id":                {grant.client.ClientIdentifier},
+				"state":                    {fake.LetterN(8)},
+			})
+			defer func() { _ = resp.Body.Close() }()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Empty(t, resp.Header.Get("Location"), "a refused hint earns no redirect")
+			assertSignedOutPage(t, resp, signedOutEnglish, true)
+		})
+	}
+
+	t.Run("the same claims under JWT are confirmed", func(t *testing.T) {
+		grant := createOfflineGrant(t)
+		idToken, _ := sessionBoundGrantOnSameSession(t, grant)
+		hint := resignWithCurrentKey(t, jwt.MapClaims(decodeJWTPayload(t, idToken)), "")
+		require.Equal(t, "JWT", decodeJWTHeader(t, hint)["typ"])
+
+		logoutWithHint(t, grant, hint)
+	})
 }
 
 // The two cases below pin that #129 changed NOTHING about RP-initiated logout (decision 3). The

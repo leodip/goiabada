@@ -86,6 +86,10 @@ type Database interface {
 	// UpdateClient never writes the column: only this, CreateClient and SetClientPublic's transition
 	// do (#711 decision 5).
 	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientId int64, remember bool) error
+	// SetClientBackchannelLogout writes a client's back-channel logout URI and whether it requires
+	// the session identifier, and nothing else but updated_at. UpdateClient never writes either
+	// column: only this and CreateClient do (#784 decisions 14 and 15).
+	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error
 	// AcquireClientRow takes the client's row inside the caller's transaction and holds it
 	// until that transaction ends, so a read taken afterwards cannot be invalidated by
 	// another writer before the caller writes it back (see #245).
@@ -876,6 +880,10 @@ type Database interface {
 	// substitute for it, because that query joins through codes and so excludes ROPC
 	// rows, and because it needs a live session row to supply the identifier (#106).
 	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
+	// GetUsableRefreshTokenClientIdsByUserId answers the clients holding one of the user's refresh
+	// tokens that is unrevoked and unexpired at now, each once, through either linkage shape. It is
+	// the grants a user-wide end tells (#784 decision 3).
+	GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
 	// GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds
 	// with one client, through either linkage shape: codes.user_id with codes.client_id
 	// for the authorization code flow, refresh_tokens.user_id with
@@ -915,6 +923,10 @@ type Database interface {
 	GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error)
 	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
 	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
+	// GetCommittedUserSessionClients answers a session's apps, each with its client, as last
+	// committed, on the caller's transaction: what an end of the session tells, read under the
+	// session's row (#784).
+	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
 }
 
 // ErrUniqueViolation is what a caller asks about when it wants to know whether a write lost a race

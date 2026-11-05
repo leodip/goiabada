@@ -161,6 +161,7 @@ for (const viewport of viewports) {
         { url: clientUrl(client.id, "settings"), form: "#formClientSettings" },
         { url: clientUrl(client.id, "redirect-uris") },
         { url: clientUrl(client.id, "sign-out-redirect-uris") },
+        { url: clientUrl(client.id, "backchannel-logout"), form: "#formClientBackchannelLogout" },
         { url: `${env.adminUrl}/admin/users` },
         { url: userUrl(user.id, "profile"), form: "main form.panel" },
         { url: `${env.adminUrl}/admin/groups` },

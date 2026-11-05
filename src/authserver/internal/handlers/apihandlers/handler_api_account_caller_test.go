@@ -52,7 +52,7 @@ func TestAccountHandlers_ACallerWithoutATokenOrSubjectIsAWiringFault(t *testing.
 			return HandleAccountOTPPut(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), nil, testDataCipher, heldNotifier(t, &heldJobs{}))
 		},
 		"HandleAccountPasswordPut": func(t *testing.T) http.HandlerFunc {
-			return HandleAccountPasswordPut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t), nil, nil)
+			return HandleAccountPasswordPut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t), nil, nil, &recordingLogoutTokens{})
 		},
 		"HandleAccountPhonePut": func(t *testing.T) http.HandlerFunc {
 			return HandleAccountPhonePut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t))
@@ -76,7 +76,7 @@ func TestAccountHandlers_ACallerWithoutATokenOrSubjectIsAWiringFault(t *testing.
 			return HandleAccountSessionsGet(datamocks.NewDatabase(t))
 		},
 		"HandleAccountSessionDelete": func(t *testing.T) http.HandlerFunc {
-			return HandleAccountSessionDelete(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t))
+			return HandleAccountSessionDelete(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), &recordingLogoutTokens{})
 		},
 	}
 	// The account API is these eighteen handlers, one per route in routes.go's /api/v1/account group.

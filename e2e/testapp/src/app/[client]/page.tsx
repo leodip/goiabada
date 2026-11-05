@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import { defaultScope, isWebClientKey, webClients } from "@/lib/config";
 import { claims, shorten } from "@/lib/jwt";
-import { readClientState } from "@/lib/session";
+import { logoutTokensAbout, readClientState } from "@/lib/session";
 import { ResultBox } from "@/app/result-box";
 
 // A confidential web app: Add sign-in to a web app, Sign users out, Require two-factor
-// authentication, and Single sign-on across clients, with the second web app.
+// authentication, and Single sign-on across clients, with the second web app. The logout tokens it
+// was sent at its back-channel logout URI are listed at the end.
 export default async function WebAppPage({ params }: PageProps<"/[client]">) {
   const { client: key } = await params;
   if (!isWebClientKey(key)) notFound();
@@ -113,6 +114,14 @@ export default async function WebAppPage({ params }: PageProps<"/[client]">) {
         <input type="hidden" name="hint" value="no" />
         <button>Sign out with no id_token_hint</button>
       </form>
+
+      <h2>Logout tokens received</h2>
+      <p>
+        The claims of each logout token the auth server sent to <code>/{key}/backchannel-logout</code>{" "}
+        about the user this browser last signed in as{state.subject ? <> (<code>{state.subject}</code>)</> : null},
+        oldest first.
+      </p>
+      <pre>{JSON.stringify(logoutTokensAbout(key, state.subject), null, 2)}</pre>
     </main>
   );
 }

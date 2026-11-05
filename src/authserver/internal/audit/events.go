@@ -620,6 +620,23 @@ const (
 	//
 	// Payload: client_id, the client saved, and logged_in_user.
 	EventUpdatedPostLogoutRedirectURIs = "updated_post_logout_redirect_uris"
+
+	// EventUpdatedClientBackchannelLogout records an administrator's save of a client's
+	// back-channel logout URI and whether it requires the session identifier, through PUT
+	// /api/v1/admin/clients/{id}/backchannel-logout, written once the save has committed (#784
+	// decision 9). A save that would set or change the URI without authserver:manage is refused
+	// and writes administrator_change_refused instead (#784 decision 15).
+	//
+	// Payload: client_id, the client saved, and logged_in_user.
+	EventUpdatedClientBackchannelLogout = "updated_client_backchannel_logout"
+	// EventSentLogoutToken records one delivery of a logout token to an app's back-channel logout
+	// URI, written when the delivery finishes, after the end of the session it tells of has
+	// committed (#784 decision 8). It is the record that an app was told that this user's session
+	// ended, and how it answered. A delivery dropped for its job budget never ran and writes none.
+	//
+	// Payload: client_id, user_id, session_identifier (empty for a token about every session of the
+	// user), jti (the token's), outcome (delivered, refused, failed, blocked or skipped) and attempts.
+	EventSentLogoutToken = "sent_logout_token" //nolint:gosec // G101: an audit event name, not a credential
 )
 
 // The reason field of EventDeletedUserSession, one value per cause, which every row of that event
@@ -750,6 +767,7 @@ var auditEventTypes = []string{
 	EventRotatedKeys,
 	EventSavedConsent,
 	EventSentEmailVerificationMessage,
+	EventSentLogoutToken,
 	EventSentTestEmail,
 	EventStartedNewUserSession,
 	EventTerminatedUserSession,
@@ -763,6 +781,7 @@ var auditEventTypes = []string{
 	EventUpdatedAuditLogsSettings,
 	EventUpdatedClientAdministrativeScopes,
 	EventUpdatedClientAuthentication,
+	EventUpdatedClientBackchannelLogout,
 	EventUpdatedClientIntrospectionResources,
 	EventUpdatedClientLogo,
 	EventUpdatedClientOAuth2Flows,

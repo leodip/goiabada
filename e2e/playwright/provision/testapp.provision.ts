@@ -21,6 +21,7 @@ import {
   resourceUrl,
   rowWithCell,
   saveResourcePermissions,
+  setBackchannelLogoutUri,
   signInAsAdmin,
   submitNewClient,
   submitNewResource,
@@ -42,7 +43,7 @@ async function createClient(page: Page, client: NewClient): Promise<number> {
 test("set up the test app's clients and API", async ({ page }) => {
   await signInAsAdmin(page);
 
-  const clientIds = [testapp.web, testapp.web2, testapp.spa, testapp.service, testapp.api].map((c) => c.clientId);
+  const clientIds = [testapp.web, testapp.web2, testapp.web3, testapp.spa, testapp.service, testapp.api].map((c) => c.clientId);
   await page.goto(clientsList);
   for (const identifier of clientIds) {
     if ((await clientRow(page, identifier).count()) > 0) {
@@ -63,14 +64,16 @@ test("set up the test app's clients and API", async ({ page }) => {
   for (const permission of testapp.api.permissions) await addResourcePermission(page, permission);
   await saveResourcePermissions(page);
 
-  // Add sign-in to a web app, steps 1 and 2, and Sign users out, step 2: a confidential client with the
-  // authorization code flow, its callback as a redirect URI and its signed-out page as a sign-out
-  // redirect URI.
+  // Add sign-in to a web app, steps 1 and 2, Sign users out, step 2, and its "Get told when a session
+  // ends", step 1: a confidential client with the authorization code flow, its callback as a redirect
+  // URI, its signed-out page as a sign-out redirect URI, and its back-channel logout route as its
+  // back-channel logout URI. The third web app skips that last step.
   const secrets: Record<string, string> = {};
-  for (const [key, app] of [["WEB", testapp.web], ["WEB2", testapp.web2]] as const) {
+  for (const [key, app] of [["WEB", testapp.web], ["WEB2", testapp.web2], ["WEB3", testapp.web3]] as const) {
     const id = await createClient(page, { identifier: app.clientId });
     await addRedirectUri(page, id, `${app.url}/callback`);
     await addSignOutRedirectUri(page, id, `${app.url}/signed-out`);
+    if (app !== testapp.web3) await setBackchannelLogoutUri(page, id, `${app.url}/backchannel-logout`);
     secrets[`${key}_CLIENT_ID`] = app.clientId;
     secrets[`${key}_CLIENT_SECRET`] = await readClientSecret(page, id);
   }
