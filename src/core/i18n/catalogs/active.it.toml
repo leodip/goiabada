@@ -2007,6 +2007,9 @@
 "handler.account_otp.code_required" = "Inserisci il codice a 6 cifre della tua app di autenticazione."
 "handler.account_otp.code_invalid" = "Il codice è di 6 cifre. Inserisci quello mostrato dalla tua app di autenticazione."
 "handler.account_otp.enrollment_not_pending" = "Non ci sono configurazioni OTP in corso oppure quella avviata è scaduta. Richiedine una nuova con GET /api/v1/account/otp/enrollment e riprova."
+"handler.account_deletion.disabled" = "L'eliminazione dell'account è disattivata. Chiedi al tuo amministratore di eliminare il tuo account."
+"handler.account_deletion.last_administrator" = "Sei l'ultimo amministratore, quindi non puoi eliminare il tuo account. Assegna prima authserver:manage a un altro utente."
+"handler.account_deletion.one_second_factor" = "Invia un codice di autenticazione o un codice di recupero, non entrambi."
 "handler.account_logout.post_logout_redirect_uri_required" = "postLogoutRedirectUri è obbligatorio"
 "handler.account_logout.client_identifier_invalid" = "Identificatore client non valido"
 "handler.account_logout.client_unresolved" = "Non è possibile identificare il client da postLogoutRedirectUri; fornisci clientIdentifier."
@@ -2165,6 +2168,7 @@
 "email.otp_disabled_by_administrator.subject" = "Un amministratore ha disattivato la tua autenticazione a due fattori"
 "email.recovery_code_used.subject" = "È stato usato un codice di recupero per accedere"
 "email.recovery_codes_replaced.subject" = "I tuoi codici di recupero sono stati sostituiti"
+"email.account_deleted.subject" = "Il tuo account è stato eliminato"
 "email.otp_lockout.subject" = "La tua app di autenticazione è stata bloccata dopo troppi codici errati"
 
 # --- JS bootstrap ------------------------------------------------------------

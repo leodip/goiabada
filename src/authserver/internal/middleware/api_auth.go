@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/liveness"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 // RequireBearerTokenScope requires a bearer token carrying requiredScope.
@@ -245,4 +246,41 @@ type ActingUser struct{}
 
 func (ActingUser) ActingUserId(ctx context.Context) (int64, bool) {
 	return reqctx.ActingUserIdFrom(ctx)
+}
+
+// RequireAdminConsoleClient admits only an access token issued to the admin console's own client,
+// whatever else the token carries. It is the route guard of the Account API operations that only the
+// console's own pages may call, such as deleting the account (#783 decision 3): a client the user
+// granted authserver:manage-account still reaches the rest of the Account API, but not these.
+//
+// It reads the token's client_id claim, which every access token carries (RFC 9068 section 2.2),
+// matched exactly as the token endpoint matches a client identifier. Mounted after
+// RequireValidSession, which has already resolved that claim to a live, enabled client.
+//
+// The refusal is 403 CLIENT_NOT_ALLOWED with the insufficient_scope challenge: RFC 6750 section 3.1
+// defines insufficient_scope as "the request requires higher privileges than provided by the access
+// token", answered 403, and no scope the client could ask for reaches the route, which is what the
+// API envelope's code says. The sentence is English, as every bearer refusal is.
+func (m *BearerToken) RequireAdminConsoleClient() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Mirrors RequireBearerTokenScopeAnyOf, so this guard adds no response shape of its
+			// own for the "no token" case.
+			jwtToken, ok := reqctx.BearerTokenFrom(r.Context())
+			if !ok {
+				m.refusals.missing(w, r)
+				return
+			}
+
+			if jwtToken.StringClaim("client_id") != builtin.AdminConsoleClientIdentifier {
+				slog.WarnContext(r.Context(), "rejecting bearer token: issued to a client other than the admin console's",
+					"client_id", jwtToken.StringClaim("client_id"))
+				m.refusals.forbidden(w, r, "CLIENT_NOT_ALLOWED",
+					"This endpoint accepts only access tokens issued to the admin console's own client.")
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }

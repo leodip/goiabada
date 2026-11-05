@@ -75,6 +75,8 @@ var apiErrorCodes = map[string]string{
 	"SECRET_KEY_NOT_ACCEPTED":              "adminconsole: isHandledAccountOTPError.",
 	"OTP_ALREADY_ENABLED":                  "adminconsole: handler_account_otp.go reloads the page on it, from the enable and from the enrolment fetch.",
 	"OTP_NOT_ENABLED":                      "adminconsole: handler_account_otp.go reloads the page on it, from the disable.",
+	"INVALID_RECOVERY_CODE":                "400 on the account's own deletion: the recovery code sent in place of an authenticator code is wrong or already used, the sign-in page's answer to both (#783).",
+	"ACCOUNT_DELETION_DISABLED":            "403 on the account's own deletion: an administrator turned it off, so only an administrator can delete the account (#783).",
 	"INVALID_OR_EXPIRED_VERIFICATION_CODE": "adminconsole: handler_account_email_verification.go:139.",
 
 	// Conditions an integrator can act on, distinguishable from a plain rejected value. #279 kept
@@ -91,8 +93,8 @@ var apiErrorCodes = map[string]string{
 
 	// Authentication and authorization. A caller distinguishes "send a token", "the token is not
 	// good enough" and "the session is gone", and retries differently for each.
-	// ACCESS_TOKEN_REQUIRED, INVALID_REQUEST, INVALID_TOKEN, USER_CONTEXT_REQUIRED and
-	// INSUFFICIENT_SCOPE are the bearer middleware's; the rest are handlers'. An account handler
+	// ACCESS_TOKEN_REQUIRED, INVALID_REQUEST, INVALID_TOKEN, USER_CONTEXT_REQUIRED,
+	// INSUFFICIENT_SCOPE and CLIENT_NOT_ALLOWED are the bearer middleware's; the rest are handlers'. An account handler
 	// reached without the token or subject that middleware guarantees answers the 500, not a 401
 	// of its own (#522 decision 4).
 	"ACCESS_TOKEN_REQUIRED": "401: no bearer token, so the caller obtains one.",
@@ -101,6 +103,7 @@ var apiErrorCodes = map[string]string{
 	"INVALID_SESSION":       "401: the session behind the token is gone.",
 	"USER_CONTEXT_REQUIRED": "403: the endpoint needs a user, and the token carries none.",
 	"INSUFFICIENT_SCOPE":    "403: the token's scopes do not cover the route.",
+	"CLIENT_NOT_ALLOWED":    "403 from RequireAdminConsoleClient: the route answers only tokens issued to the admin console's own client, whatever the token's scopes (#783).",
 	"FORBIDDEN":             "403: the caller may not act on this resource.",
 	"MANAGE_SCOPE_REQUIRED": "403 from the administrative policy: the request acts on an administrator or an administrative permission, which only authserver:manage may do, so no granular scope will ever be enough (#402).",
 

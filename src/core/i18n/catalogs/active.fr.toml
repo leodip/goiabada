@@ -2003,6 +2003,9 @@
 "handler.account_otp.code_required" = "Saisissez le code à 6 chiffres de votre application d’authentification."
 "handler.account_otp.code_invalid" = "Le code comporte 6 chiffres. Saisissez celui qu’affiche votre application d’authentification."
 "handler.account_otp.enrollment_not_pending" = "Aucune configuration d’authentification à deux facteurs n’est en cours, ou celle que vous avez commencée a expiré. Demandez-en une nouvelle avec GET /api/v1/account/otp/enrollment et réessayez."
+"handler.account_deletion.disabled" = "La suppression de compte est désactivée. Demandez à votre administrateur de supprimer votre compte."
+"handler.account_deletion.last_administrator" = "Vous êtes le dernier administrateur, vous ne pouvez donc pas supprimer votre compte. Accordez d’abord authserver:manage à un autre utilisateur."
+"handler.account_deletion.one_second_factor" = "Envoyez un code d’authentification ou un code de récupération, pas les deux."
 "handler.account_logout.post_logout_redirect_uri_required" = "postLogoutRedirectUri est obligatoire."
 "handler.account_logout.client_identifier_invalid" = "Identifiant du client invalide."
 "handler.account_logout.client_unresolved" = "Impossible de déterminer le client à partir de postLogoutRedirectUri. Fournissez clientIdentifier."
@@ -2161,6 +2164,7 @@
 "email.otp_disabled_by_administrator.subject" = "Un administrateur a désactivé votre authentification à deux facteurs"
 "email.recovery_code_used.subject" = "Un code de récupération a été utilisé pour vous connecter"
 "email.recovery_codes_replaced.subject" = "Vos codes de récupération ont été remplacés"
+"email.account_deleted.subject" = "Votre compte a été supprimé"
 "email.otp_lockout.subject" = "Votre application d’authentification a été bloquée après trop de codes erronés"
 
 # --- JS bootstrap ------------------------------------------------------------

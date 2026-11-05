@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Il tuo account è stato eliminato{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Ciao {{.name}},</p>
+
+    <p>Il tuo account {{ .appName }} è stato eliminato dalle impostazioni del tuo account. Non puoi più accedere con questo account e le app non possono più accedervi.</p>
+
+    <p>Se hai effettuato tu la modifica, non devi fare nulla.</p>
+
+    <p><strong>Altrimenti, qualcun altro conosceva la tua password.</strong> Contatta il tuo amministratore.</p>
+
+    <p>Un saluto,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

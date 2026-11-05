@@ -488,6 +488,13 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/otp/recovery-codes", apihandlers.HandleAccountRecoveryCodesGet(s.database))
 		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Post("/otp/recovery-codes",
 			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter, notifier))
+		// Deleting the account answers only the admin console's own client, so an application the
+		// user granted manage-account cannot delete it (#783 decision 3). The client guard comes
+		// first, so another client's token spends nothing. The deletion checks the password and a
+		// code, so it spends the bucket the changes above share; it sends one notice, and only when
+		// it succeeds, so it takes no account_credential_change (decision 4).
+		r.With(apiBearer.RequireAdminConsoleClient(), rateLimiter.LimitAccountPassword).Post("/deletion",
+			apihandlers.HandleAccountDeletionPost(s.database, auditLogger, rateLimiter, s.dataCipher, notifier))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
 		// The legal document versions the caller accepted (#622 decision 10).

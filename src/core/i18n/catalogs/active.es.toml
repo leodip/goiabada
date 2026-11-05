@@ -2005,6 +2005,9 @@
 "handler.account_otp.code_required" = "Escribe el código de 6 dígitos de tu aplicación de autenticación."
 "handler.account_otp.code_invalid" = "El código tiene 6 dígitos. Escribe el que muestra tu aplicación de autenticación."
 "handler.account_otp.enrollment_not_pending" = "No hay ninguna configuración de OTP pendiente o la que iniciaste ha caducado. Solicita una nueva con GET /api/v1/account/otp/enrollment y vuelve a intentarlo."
+"handler.account_deletion.disabled" = "La eliminación de cuentas está desactivada. Pide a tu administrador que elimine tu cuenta."
+"handler.account_deletion.last_administrator" = "Eres el último administrador, así que no puedes eliminar tu cuenta. Concede authserver:manage a otro usuario primero."
+"handler.account_deletion.one_second_factor" = "Envía un código de autenticación o un código de recuperación, no ambos."
 "handler.account_logout.post_logout_redirect_uri_required" = "El campo postLogoutRedirectUri es obligatorio"
 "handler.account_logout.client_identifier_invalid" = "El identificador del cliente no es válido"
 "handler.account_logout.client_unresolved" = "No se pudo identificar al cliente a partir de postLogoutRedirectUri; indica clientIdentifier."
@@ -2163,6 +2166,7 @@
 "email.otp_disabled_by_administrator.subject" = "Un administrador ha desactivado tu autenticación de dos factores"
 "email.recovery_code_used.subject" = "Se ha usado un código de recuperación para iniciar sesión"
 "email.recovery_codes_replaced.subject" = "Se han sustituido tus códigos de recuperación"
+"email.account_deleted.subject" = "Se ha eliminado tu cuenta"
 "email.otp_lockout.subject" = "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos"
 
 # --- JS bootstrap ------------------------------------------------------------

@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Se ha eliminado tu cuenta{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Hola, {{.name}}:</p>
+
+    <p>Tu cuenta de {{ .appName }} se ha eliminado desde la configuración de tu cuenta. Ya no puedes iniciar sesión con ella, y las aplicaciones ya no pueden acceder a ella.</p>
+
+    <p>Si has hecho este cambio, no necesitas hacer nada.</p>
+
+    <p><strong>Si no has sido tú, otra persona conocía tu contraseña.</strong> Contacta con tu administrador.</p>
+
+    <p>Un saludo,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

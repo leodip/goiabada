@@ -56,6 +56,7 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 		{"email_recovery_code_used", "recovery_code_used", "Se ha usado un código de recuperación para iniciar sesión", "Te quedan 3 códigos de recuperación sin usar."},
 		{"email_recovery_codes_replaced", "recovery_codes_replaced", "Se han sustituido tus códigos de recuperación", "Tus códigos de recuperación anteriores ya no sirven"},
 		{"email_otp_lockout", "otp_lockout", "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos", "Inicia sesión con uno de tus códigos de recuperación"},
+		{"email_account_deleted", "account_deleted", "Se ha eliminado tu cuenta", "Si no has sido tú, otra persona conocía tu contraseña."},
 	} {
 		for _, locale := range []string{"es", "es-MX", "es-419"} {
 			t.Run(tc.body+" "+locale, func(t *testing.T) {
@@ -75,7 +76,8 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 				notice := map[string]bool{"email_address_changed": true, "email_password_changed": true,
 					"email_password_changed_by_administrator": true, "email_password_reset": true,
 					"email_otp_enabled": true, "email_otp_disabled": true, "email_otp_disabled_by_administrator": true,
-					"email_recovery_code_used": true, "email_recovery_codes_replaced": true, "email_otp_lockout": true}
+					"email_recovery_code_used": true, "email_recovery_codes_replaced": true, "email_otp_lockout": true,
+					"email_account_deleted": true}
 				if !notice[tc.body] {
 					assert.Contains(t, buf.String(), `href="https://example.com/continue"`)
 				} else {

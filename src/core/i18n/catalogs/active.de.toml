@@ -2004,6 +2004,9 @@
 "handler.account_otp.code_required" = "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein."
 "handler.account_otp.code_invalid" = "Der Code besteht aus 6 Ziffern. Geben Sie den Code ein, den Ihre Authenticator-App anzeigt."
 "handler.account_otp.enrollment_not_pending" = "Es ist keine OTP-Einrichtung offen oder die begonnene Einrichtung ist abgelaufen. Fordern Sie mit GET /api/v1/account/otp/enrollment eine neue an und versuchen Sie es erneut."
+"handler.account_deletion.disabled" = "Das Löschen von Konten ist deaktiviert. Bitten Sie Ihre Administration, Ihr Konto zu löschen."
+"handler.account_deletion.last_administrator" = "Sie sind die letzte Person mit Administrationsrechten und können Ihr Konto deshalb nicht löschen. Erteilen Sie zuerst einem anderen Konto authserver:manage."
+"handler.account_deletion.one_second_factor" = "Senden Sie einen Authentifizierungscode oder einen Wiederherstellungscode, nicht beides."
 "handler.account_logout.post_logout_redirect_uri_required" = "postLogoutRedirectUri muss angegeben werden."
 "handler.account_logout.client_identifier_invalid" = "Ungültige Client-Kennung."
 "handler.account_logout.client_unresolved" = "Der Client konnte anhand von postLogoutRedirectUri nicht ermittelt werden. Geben Sie clientIdentifier an."
@@ -2162,6 +2165,7 @@
 "email.otp_disabled_by_administrator.subject" = "Ihre Zwei-Faktor-Authentifizierung wurde von der Administration deaktiviert"
 "email.recovery_code_used.subject" = "Für die Anmeldung wurde ein Wiederherstellungscode verwendet"
 "email.recovery_codes_replaced.subject" = "Ihre Wiederherstellungscodes wurden ersetzt"
+"email.account_deleted.subject" = "Ihr Konto wurde gelöscht"
 "email.otp_lockout.subject" = "Ihre Authenticator-App wurde nach zu vielen falschen Codes gesperrt"
 
 # --- JS bootstrap ------------------------------------------------------------

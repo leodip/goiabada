@@ -42,6 +42,9 @@ func TestEventTypes_ContainsCriticalEvents(t *testing.T) {
 		EventAuthFailedOtp,
 		EventCreatedUser,
 		EventDeletedUser,
+		// A user deleting their own account (#783 decision 7): the same class as deleted_user,
+		// which keeps meaning an administrator's deletion, so an alert on deletions needs both.
+		EventDeletedOwnAccount,
 		EventCreatedClient,
 		EventDeletedClient,
 		EventTokenIssuedAuthorizationCodeResponse,
@@ -153,6 +156,7 @@ func TestEventTypes_CriticalEventValuesAreWireValues(t *testing.T) {
 		{"EventTokenIssuedAuthorizationCodeResponse", EventTokenIssuedAuthorizationCodeResponse,
 			"token_issued_authorization_code_response"},
 		{"EventStartedNewUserSession", EventStartedNewUserSession, "started_new_user_session"},
+		{"EventDeletedOwnAccount", EventDeletedOwnAccount, "deleted_own_account"},
 	} {
 		assert.Equal(t, tc.want, tc.constant,
 			"%s is stored data; changing it orphans every audit_logs row carrying it", tc.name)
