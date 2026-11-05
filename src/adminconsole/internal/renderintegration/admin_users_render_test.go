@@ -150,6 +150,10 @@ func TestRender_AdminUserDetails(t *testing.T) {
 	assert.Contains(t, out, "jane@example.com")
 	assert.Contains(t, out, "Jane Q Doe")
 
+	// The user's id, the number the audit log names users by, is the list's first entry, under
+	// the label the audit log's User id box carries (#780).
+	assert.Regexp(t, `<dl class="detail-list">\s*<dt>Id do usuário</dt>\s*<dd class="font-mono text-sm">7</dd>`, out)
+
 	// Both cells render through DateTime, in pt-BR's catalog layout: this page's dates were
 	// "02 Jan 2026 03:04:05 UTC" under every locale, month name and all, because the layout
 	// lived in the template and Go's time.Format has no locale (#373, decision 8).

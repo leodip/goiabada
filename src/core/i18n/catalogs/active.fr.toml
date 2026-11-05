@@ -1079,6 +1079,7 @@
 "adminconsole.admin_users.delete.field.confirm_email" = "Pour confirmer, saisissez l’adresse e-mail de l’utilisateur"
 "adminconsole.admin_users.delete.delete_button" = "Supprimer l’utilisateur"
 
+"adminconsole.admin_users.details.field.user_id" = "Identifiant d’utilisateur"
 "adminconsole.admin_users.details.field.subject" = "Sujet"
 "adminconsole.admin_users.details.field.full_name" = "Nom"
 "adminconsole.admin_users.details.field.email" = "Adresse e-mail"

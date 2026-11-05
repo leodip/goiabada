@@ -1080,6 +1080,7 @@
 "adminconsole.admin_users.delete.field.confirm_email" = "Geben Sie zur Bestätigung die E-Mail-Adresse des Kontos ein"
 "adminconsole.admin_users.delete.delete_button" = "Konto löschen"
 
+"adminconsole.admin_users.details.field.user_id" = "Benutzer-ID"
 "adminconsole.admin_users.details.field.subject" = "Subject"
 "adminconsole.admin_users.details.field.full_name" = "Name"
 "adminconsole.admin_users.details.field.email" = "E-Mail-Adresse"

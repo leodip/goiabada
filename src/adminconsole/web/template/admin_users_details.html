@@ -28,7 +28,10 @@
     </div>
     {{ end }}
 
+    {{/* The user's row id, the number the audit log and the admin API name users by (#780). */}}
     <dl class="detail-list">
+      <dt>{{ T $.ctx "adminconsole.admin_users.details.field.user_id" }}</dt>
+      <dd class="font-mono text-sm">{{ .user.Id }}</dd>
       <dt>{{ T $.ctx "adminconsole.admin_users.details.field.subject" }}</dt>
       <dd class="font-mono text-sm">{{ .user.Subject }}</dd>
       <dt>{{ T $.ctx "adminconsole.admin_users.details.field.full_name" }}</dt>
