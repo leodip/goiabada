@@ -2,6 +2,7 @@ package apiclient
 
 import (
 	"context"
+	"io"
 
 	"github.com/leodip/goiabada/core/api"
 )
@@ -1498,6 +1499,22 @@ func wireCharacterization() []wireCase {
 			},
 			verb: "DELETE", path: "/api/v1/admin/users/42", contentType: charJSON,
 			successStatus: 200, reply: `{}`,
+		},
+		{
+			// The answer is not decoded: the body comes back as the bytes that arrived, for the
+			// console to pass to the browser (#781 decision 5).
+			name: "GetUserExport",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetUserExport(ctx, charAccessToken, 42)
+				if err != nil {
+					return nil, err
+				}
+				defer func() { _ = got.Body.Close() }()
+				body, err := io.ReadAll(got.Body)
+				return string(body), err
+			},
+			verb: "GET", path: "/api/v1/admin/users/42/export",
+			successStatus: 200, reply: `{"formatVersion":1}`, want: `{"formatVersion":1}`,
 		},
 		// --- legal_documents.go -----------------------------------------------------------
 		{

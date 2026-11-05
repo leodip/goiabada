@@ -287,6 +287,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Get("/users/{userId}/consents", adminuserhandlers.HandleConsentsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/users/{userId}/consents", adminuserhandlers.HandleConsentsPost(httpHelper, apiClient))
 		r.Get("/users/{userId}/legal-documents", adminuserhandlers.HandleLegalDocumentsGet(httpHelper, apiClient))
+		r.Post("/users/{userId}/export", adminuserhandlers.HandleExportPost(httpHelper, apiClient))
 		r.Get("/users/{userId}/sessions", adminuserhandlers.HandleSessionsGet(httpHelper, apiClient))
 		r.Post("/users/{userId}/sessions", adminuserhandlers.HandleSessionsPost(httpHelper, apiClient))
 		r.Get("/users/{userId}/attributes", adminuserhandlers.HandleAttributesGet(httpHelper, apiClient))

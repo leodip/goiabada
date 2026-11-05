@@ -2,8 +2,10 @@ package apiclient
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,4 +142,99 @@ func TestAuthServerClient_SearchUsersPaginatedReturnsThePagesUsersAndItsTotal(t 
 	assert.Equal(t, "jane@example.com", users[0].Email)
 	assert.Equal(t, int64(43), users[1].Id)
 	assert.Equal(t, "other@example.com", users[1].Email)
+}
+
+// The user's export reaches the browser as the auth server sent it (#781 decision 5): the console
+// asks for gzip and hands back the compressed bytes and the headers that describe them, never
+// decoding them, so the browser unpacks the file it saves.
+func TestAuthServerClient_GetUserExportHandsBackTheCompressedBytesAndTheirHeaders(t *testing.T) {
+	// Not a real gzip stream: bytes a decoding client could not have passed through unchanged.
+	compressed := []byte{0x1f, 0x8b, 0x08, 0x00, 'n', 'o', 't', '-', 'd', 'e', 'c', 'o', 'd', 'e', 'd'}
+	var gotPath, gotAuthorization, gotAcceptEncoding string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuthorization = r.Header.Get("Authorization")
+		gotAcceptEncoding = r.Header.Get("Accept-Encoding")
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Content-Disposition", `attachment; filename="user-42-2026-11-05.json"`)
+		w.Header().Set("Content-Length", "15")
+		_, _ = w.Write(compressed)
+	}))
+	t.Cleanup(server.Close)
+	client := NewAuthServerClient(server.URL, nil, nil)
+
+	export, err := client.GetUserExport(context.Background(), "an-access-token", 42)
+	require.NoError(t, err)
+	defer func() { _ = export.Body.Close() }()
+	body, err := io.ReadAll(export.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, "/api/v1/admin/users/42/export", gotPath)
+	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
+	assert.Equal(t, "gzip", gotAcceptEncoding, "the console asks for the compressed answer")
+	assert.Equal(t, compressed, body, "the bytes as they arrived, not decoded")
+	assert.Equal(t, "application/json", export.ContentType)
+	assert.Equal(t, "gzip", export.ContentEncoding)
+	assert.Equal(t, `attachment; filename="user-42-2026-11-05.json"`, export.ContentDisposition)
+	assert.Equal(t, "15", export.ContentLength)
+}
+
+// An auth server answering plain JSON, which it does for a caller not accepting gzip, is passed
+// through plain: no encoding is claimed for bytes that carry none.
+func TestAuthServerClient_GetUserExportClaimsNoEncodingForAPlainAnswer(t *testing.T) {
+	client, _ := serves(t, `{"formatVersion":1}`)
+
+	export, err := client.GetUserExport(context.Background(), "an-access-token", 42)
+	require.NoError(t, err)
+	defer func() { _ = export.Body.Close() }()
+	body, err := io.ReadAll(export.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, `{"formatVersion":1}`, string(body))
+	assert.Empty(t, export.ContentEncoding)
+	assert.Empty(t, export.ContentDisposition)
+}
+
+// The document is never read under the 1 MiB ceiling every other answer is (decision 5): 30,000
+// audit events are 1.2 MB gzipped. It is read by the caller, after the method returned, so the
+// call's deadline must outlive the return.
+func TestAuthServerClient_GetUserExportPassesAnAnswerPastTheCeilingWhole(t *testing.T) {
+	large := strings.Repeat("x", maxAPIResponseBytes+4096)
+	client, _ := serves(t, large)
+
+	export, err := client.GetUserExport(context.Background(), "an-access-token", 42)
+	require.NoError(t, err)
+	defer func() { _ = export.Body.Close() }()
+	body, err := io.ReadAll(export.Body)
+	require.NoError(t, err)
+
+	assert.Len(t, body, maxAPIResponseBytes+4096)
+}
+
+// The call has five minutes, the auth server's own bound on writing the answer, instead of the ten
+// seconds every other call has (decision 5).
+func TestAuthServerClient_GetUserExportHasFiveMinutes(t *testing.T) {
+	client := NewAuthServerClient("http://auth.example.com", nil, nil)
+	var deadline time.Time
+	var hasDeadline bool
+	client.httpClient = &http.Client{
+		Transport: roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+			deadline, hasDeadline = r.Context().Deadline()
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+				Request:    r,
+			}, nil
+		}),
+	}
+
+	started := time.Now()
+	export, err := client.GetUserExport(context.Background(), "an-access-token", 42)
+	require.NoError(t, err)
+	_ = export.Body.Close()
+
+	require.True(t, hasDeadline, "the call carries a deadline")
+	assert.WithinDuration(t, started.Add(5*time.Minute), deadline, 5*time.Second)
 }

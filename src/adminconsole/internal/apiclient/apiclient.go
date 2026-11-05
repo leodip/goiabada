@@ -2,7 +2,8 @@
 // AuthServerClient has one method per endpoint the console calls, each stating its verb, target,
 // body and the success it accepts, and every one takes the path executor.go declares once: the
 // administrator's bearer token on the request, the client's deadline on the call, the answer read
-// under one size ceiling, and a status the method does not accept answered as an APIError. There is
+// under one size ceiling, and a status the method does not accept answered as an APIError; a
+// user's export alone is passed through unread, for the browser to save. There is
 // no interface over the client: each handler declares an unexported port naming the methods it
 // calls, so a fake missing one fails to compile.
 //
@@ -70,7 +71,7 @@ func NewAuthServerClient(authServerBaseURL string, rootCAs *x509.CertPool, upstr
 	// The transport is the default one carrying the configured roots, so the file's authorities
 	// are trusted beside the system roots rather than in their place (#525). The client carries no
 	// timeout of its own: the executor gives each call its deadline, ten seconds for all but the
-	// three that send mail (#718 decision 8).
+	// three that send mail (#718 decision 8) and a user's export (#781 decision 5).
 	client := &http.Client{}
 	if rootCAs != nil {
 		transport := http.DefaultTransport.(*http.Transport).Clone()

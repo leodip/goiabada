@@ -433,6 +433,7 @@
 "adminconsole.user_tabs.groups" = "Gruppi"
 "adminconsole.user_tabs.legal_documents" = "Documenti legali"
 "adminconsole.user_header.audit_events_link" = "Mostra gli eventi di audit"
+"adminconsole.user_header.download_data_button" = "Scarica i dati"
 
 # --- Adminconsole standalone pages (error, not-found, unauthorized, welcome) -
 

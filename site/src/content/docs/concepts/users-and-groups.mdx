@@ -52,7 +52,7 @@ The email address is the user's sign-in name. Two users can't share one, it's st
 
 Every new user gets the `authserver:manage-account` permission, which lets them manage their own account in the admin console's **Account** pages. Nothing else: a new user holds no other permission and is in no group.
 
-The user's page has these tabs: **Details**, **Profile**, **Picture**, **Email**, **Phone**, **Address**, **Authentication**, **Consents**, **Legal documents**, **Sessions**, **Attributes**, **Permissions** and **Groups**. The profile, email, phone and address are what a client reads through [scopes](/concepts/scopes/). **Show audit events**, above the tabs, opens the [audit log](/concepts/audit-log/#see-what-happened) filtered to the events about the user and the ones they made.
+The user's page has these tabs: **Details**, **Profile**, **Picture**, **Email**, **Phone**, **Address**, **Authentication**, **Consents**, **Legal documents**, **Sessions**, **Attributes**, **Permissions** and **Groups**. The profile, email, phone and address are what a client reads through [scopes](/concepts/scopes/). **Show audit events**, above the tabs, opens the [audit log](/concepts/audit-log/#see-what-happened) filtered to the events about the user and the ones they made. **Download data**, beside it, saves everything held about the user as one file: see [A request for a person's data](#a-request-for-a-persons-data).
 
 ## Enabled and disabled
 
@@ -87,6 +87,37 @@ It leaves:
 - what clients already received about the user, such as their name and email address. Clients aren't told the user is gone.
 
 Whoever deletes the account, the user is emailed that it's gone: see [emails about account changes](/reference/security/#emails-about-account-changes).
+
+## A request for a person's data
+
+When someone asks for a copy of the data you hold about them, as the GDPR lets them, open them in **Users** and click **Download data**, above the tabs. Your browser saves `user-<id>-<date>.json`, such as `user-42-2026-11-05.json`: the user's id and today's date in UTC. It's one JSON document, ready to send them.
+
+It holds:
+
+- the user's profile, email, phone and address, with whether the email and phone were verified;
+- their attributes, and their groups with the attributes and permissions each gives them;
+- the permissions granted to them directly;
+- the consents they gave clients;
+- their live sessions, with the clients each one served;
+- every refresh token the auth server holds for them, revoked ones included, with its client, scope, times, whether it's revoked, and the IP address and browser of the sign-in it came from;
+- the legal documents they accepted;
+- their picture;
+- every [audit log](/concepts/audit-log/) entry about them or made by them;
+- under `identifiers`, their id, subject, email address and its digest, and under `issuer`, your auth server's issuer.
+
+Nothing secret is in it: no password, authenticator secret, recovery code, emailed code or token.
+
+An entry an administrator made about the person says an administrator did it, with `actedByAdministrator`, but not who. An entry about a sign-in that replaced another user's session on a shared browser doesn't name that other user. So you can send the file as it is. The audit log itself still shows who acted.
+
+Each download is recorded in the audit log as `exported_user_data`, under the user and under you.
+
+The file doesn't hold:
+
+- audit entries that name the person only by their subject, email address or its digest, not by their id. Search the `audit_logs` table's `details`, or your log pipeline, for the values under `identifiers`. An entry about an address the person used before carries that address's digest, which the file can't know;
+- the server logs, which can include the person's IP address;
+- your backups.
+
+Scripts get the same file from `GET /api/v1/admin/users/{id}/export`, with a token that reads both users and the audit log: see [the Admin API scopes](/reference/api/scopes/#the-admin-api-scopes).
 
 ## Passwords
 

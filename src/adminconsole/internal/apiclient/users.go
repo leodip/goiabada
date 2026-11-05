@@ -2,6 +2,7 @@ package apiclient
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -202,4 +203,38 @@ func (c *AuthServerClient) DeleteUser(ctx context.Context, accessToken string, u
 		successStatus: http.StatusOK,
 	})
 	return err
+}
+
+// UserExport is the auth server's answer to GET /api/v1/admin/users/{id}/export, to hand to the
+// browser as it came (#781 decision 5): Body holds the bytes as they arrived, compressed when
+// ContentEncoding says so, and the other fields are the headers describing them, each empty when
+// the auth server sent none. The caller reads Body and must close it.
+type UserExport struct {
+	ContentType        string
+	ContentEncoding    string
+	ContentLength      string
+	ContentDisposition string
+	Body               io.ReadCloser
+}
+
+// GetUserExport asks for one user's export, everything held about them as one JSON document. It
+// asks for gzip and never decodes or reads the answer, so the document's size is not held to the
+// ceiling every other answer is.
+func (c *AuthServerClient) GetUserExport(ctx context.Context, accessToken string, userId int64) (*UserExport, error) {
+	//nolint:bodyclose // the body is the caller's: UserExport hands it on, and the caller closes it
+	resp, err := c.passThrough(ctx, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/export",
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &UserExport{
+		ContentType:        resp.Header.Get("Content-Type"),
+		ContentEncoding:    resp.Header.Get("Content-Encoding"),
+		ContentLength:      resp.Header.Get("Content-Length"),
+		ContentDisposition: resp.Header.Get("Content-Disposition"),
+		Body:               resp.Body,
+	}, nil
 }

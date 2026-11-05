@@ -2,7 +2,8 @@
 {{- /* (args tab userId email page query ctx): what every page of one user opens with, the link
      back to the list at the page and search it came from, the user's email as the page's heading,
      the link to the user's audit events (the audit log filtered by their id, which finds them
-     after the user is deleted too), and the tabs with tab current. */ -}}
+     after the user is deleted too), the form downloading everything held about the user (a form,
+     not a link, so another site cannot start it), and the tabs with tab current. */ -}}
 {{- $tab := index . 0 }}
 {{- $id := index . 1 }}
 {{- $email := index . 2 }}
@@ -16,6 +17,9 @@
   </div>
   <div class="page-actions">
     <a class="button" href="/admin/settings/audit-log-viewer?userId={{ $id }}">{{ T $ctx "adminconsole.user_header.audit_events_link" }}</a>
+    <form method="post" action="/admin/users/{{ $id }}/export">
+      <button class="button" type="submit">{{ T $ctx "adminconsole.user_header.download_data_button" }}</button>
+    </form>
   </div>
 </div>
 {{ template "manage_users_tabs" (args $tab $id $page $query $ctx) }}

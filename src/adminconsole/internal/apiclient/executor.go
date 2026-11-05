@@ -16,7 +16,8 @@ import (
 )
 
 // generalAPITimeout bounds every request the general AuthServerClient makes but the three that
-// send mail, which take mailSendingAPITimeout. Ten seconds,
+// send mail, which take mailSendingAPITimeout, and a user's export, which takes
+// passThroughAPITimeout. Ten seconds,
 // matching oauthclient.TokenExchangeTimeout, sessionbackend's httpBackendTimeout and
 // publicsettings.Client's clientTimeout: all four sit on the admin console's page-load path, where a handler
 // goroutine held open by an auth server that accepted the connection and then stopped answering
@@ -125,34 +126,14 @@ func execute[T any](ctx context.Context, c *AuthServerClient, accessToken string
 // do performs r and returns the success body without decoding it, for the methods that return
 // nothing and for the two that take the body apart themselves.
 func (c *AuthServerClient) do(ctx context.Context, accessToken string, r apiRequest) ([]byte, error) {
-	var payload io.Reader
-	switch {
-	case r.jsonBody != nil:
-		jsonData, err := json.Marshal(r.jsonBody)
-		if err != nil {
-			return nil, errs.Errorf("failed to marshal request: %w", err)
-		}
-		payload = bytes.NewBuffer(jsonData)
-	case r.rawBody != nil:
-		payload = bytes.NewBuffer(r.rawBody)
-	}
-
 	// The deadline is the call's, not the client's, because the three calls that send mail wait
 	// longer than the rest. It covers the answer's read, which happens before do returns.
 	ctx, cancel := context.WithTimeout(ctx, r.deadline())
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, r.method, r.url, payload)
+	req, err := newAPIRequest(ctx, accessToken, r)
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	// The language the console's page renders in, so the auth server answers a refusal the page
-	// shows in that language when it has the sentence translated (#559 decision 3).
-	req.Header.Set("Accept-Language", i18n.CatalogTag(ctx))
-	if r.contentType != "" {
-		req.Header.Set("Content-Type", r.contentType)
+		return nil, err
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -175,6 +156,90 @@ func (c *AuthServerClient) do(ctx context.Context, accessToken string, r apiRequ
 		return nil, parseAPIError(resp, body)
 	}
 	return body, nil
+}
+
+// passThroughAPITimeout bounds the one call whose answer passes to the browser as it came, a
+// user's export (#781 decision 5): five minutes, the bound the auth server gives itself to write
+// that answer, so a slow connection still finishes. The body is read after the call returns, by
+// whoever copies it on, and the deadline covers that read too.
+const passThroughAPITimeout = 5 * time.Minute
+
+// passThrough performs r for an answer to hand on untouched rather than decode: it asks for gzip,
+// so the compressed bytes arrive as they were sent and are never unpacked here, and it reads none
+// of a success, so the ceiling every other answer is held to does not apply. The caller reads the
+// success's body and closes it, which ends the call's deadline. A status r does not accept is
+// read under the ceiling and answered as an APIError, as do answers one.
+func (c *AuthServerClient) passThrough(ctx context.Context, accessToken string, r apiRequest) (*http.Response, error) {
+	ctx, cancel := context.WithTimeout(ctx, passThroughAPITimeout)
+
+	req, err := newAPIRequest(ctx, accessToken, r)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	// Set by hand, so the transport neither adds its own nor unpacks the answer: the browser does.
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		cancel()
+		return nil, errs.Errorf("failed to make request: %w", err)
+	}
+
+	if !r.accepts(resp.StatusCode) {
+		defer cancel()
+		defer func() { _ = resp.Body.Close() }()
+		body, readErr := boundedread.Read(resp.Body, maxAPIResponseBytes)
+		if readErr != nil {
+			return nil, readErr
+		}
+		return nil, parseAPIError(resp, body)
+	}
+
+	resp.Body = &cancelOnClose{ReadCloser: resp.Body, cancel: cancel}
+	return resp, nil
+}
+
+// cancelOnClose is a passed-through answer's body, which ends its call's deadline once closed.
+type cancelOnClose struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (b *cancelOnClose) Close() error {
+	err := b.ReadCloser.Close()
+	b.cancel()
+	return err
+}
+
+// newAPIRequest builds r's request on ctx, carrying the administrator's bearer token and the
+// page's language.
+func newAPIRequest(ctx context.Context, accessToken string, r apiRequest) (*http.Request, error) {
+	var payload io.Reader
+	switch {
+	case r.jsonBody != nil:
+		jsonData, err := json.Marshal(r.jsonBody)
+		if err != nil {
+			return nil, errs.Errorf("failed to marshal request: %w", err)
+		}
+		payload = bytes.NewBuffer(jsonData)
+	case r.rawBody != nil:
+		payload = bytes.NewBuffer(r.rawBody)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, r.method, r.url, payload)
+	if err != nil {
+		return nil, errs.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	// The language the console's page renders in, so the auth server answers a refusal the page
+	// shows in that language when it has the sentence translated (#559 decision 3).
+	req.Header.Set("Accept-Language", i18n.CatalogTag(ctx))
+	if r.contentType != "" {
+		req.Header.Set("Content-Type", r.contentType)
+	}
+	return req, nil
 }
 
 // multipartPicture builds the upload body the three picture endpoints take: one "picture" part
