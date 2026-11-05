@@ -55,6 +55,10 @@ test("the discovery document matches the server: its issuer, its endpoints, and 
   expect(metadata.token_endpoint_auth_methods_supported).toEqual(["client_secret_post", "client_secret_basic", "none"]);
   expect(metadata.revocation_endpoint_auth_methods_supported).toEqual(["client_secret_basic", "client_secret_post", "none"]);
   expect(metadata.introspection_endpoint_auth_methods_supported).toEqual(["client_secret_basic", "client_secret_post"]);
+  // OpenID Connect Back-Channel Logout 1.0 section 2.1: the server sends logout tokens, each about one
+  // session naming it with sid, whether or not any client has registered a URI.
+  expect(metadata.backchannel_logout_supported).toBe(true);
+  expect(metadata.backchannel_logout_session_supported).toBe(true);
 
   for (const field of [
     "authorization_endpoint",

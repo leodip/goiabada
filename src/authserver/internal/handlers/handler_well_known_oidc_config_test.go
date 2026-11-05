@@ -52,6 +52,8 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 		RequestParameterSupported:                  false,
 		RequestURIParameterSupported:               false,
 		AuthorizationResponseIssParameterSupported: true,
+		BackchannelLogoutSupported:                 true,
+		BackchannelLogoutSessionSupported:          true,
 	}
 }
 
@@ -147,4 +149,18 @@ func TestWellKnownConfig_AdvertisesIssInAuthorizationResponses(t *testing.T) {
 			assert.Equal(t, "true", string(fields["authorization_response_iss_parameter_supported"]))
 		})
 	}
+}
+
+// TestWellKnownConfig_AdvertisesBackchannelLogout pins Back-Channel Logout 1.0 section 2.1's two
+// flags on the wire, true for every deployment: they are capabilities of the server, whether or not
+// any client has registered a URI (#784 decision 4). An absent flag reads as false.
+func TestWellKnownConfig_AdvertisesBackchannelLogout(t *testing.T) {
+	encoded, err := json.Marshal(serveDiscovery(t, &record.Settings{Issuer: "https://example.com"}))
+	require.NoError(t, err)
+
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(encoded, &fields))
+
+	assert.Equal(t, "true", string(fields["backchannel_logout_supported"]))
+	assert.Equal(t, "true", string(fields["backchannel_logout_session_supported"]))
 }

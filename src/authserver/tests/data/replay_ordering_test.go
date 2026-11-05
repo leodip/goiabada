@@ -49,7 +49,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		// Its first statement is the delete, which is what makes it wait.
 		termination := goBlocked(t, "the termination", tx, func(reached func()) error {
 			reached()
-			_, err := revocation.TerminateUserSessionTx(context.Background(), other, session)
+			_, err := revocation.TerminateUserSessionTx(context.Background(), other, session, false)
 			return err
 		})
 

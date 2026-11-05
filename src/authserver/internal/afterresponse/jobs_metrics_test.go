@@ -44,10 +44,14 @@ func TestJobs_TheScrapeReportsTheJobsInFlightAndDroppedByClass(t *testing.T) {
 	// series appeared only at its first drop raised no GoiabadaAfterResponseJobsDropped alert for it.
 	assert.Equal(t, []string{
 		`goiabada_after_response_jobs_dropped_total{class="account_notice"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="backchannel_logout"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="backchannel_logout_self_registered"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="recovery"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="registration"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="security_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="account_notice"} 0`,
+		`goiabada_after_response_jobs_in_flight{class="backchannel_logout"} 0`,
+		`goiabada_after_response_jobs_in_flight{class="backchannel_logout_self_registered"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="recovery"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="registration"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="security_notice"} 0`,
@@ -68,10 +72,14 @@ func TestJobs_TheScrapeReportsTheJobsInFlightAndDroppedByClass(t *testing.T) {
 
 	assert.Equal(t, []string{
 		`goiabada_after_response_jobs_dropped_total{class="account_notice"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="backchannel_logout"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="backchannel_logout_self_registered"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="recovery"} 2`,
 		`goiabada_after_response_jobs_dropped_total{class="registration"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="security_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="account_notice"} 0`,
+		`goiabada_after_response_jobs_in_flight{class="backchannel_logout"} 0`,
+		`goiabada_after_response_jobs_in_flight{class="backchannel_logout_self_registered"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="recovery"} 64`,
 		`goiabada_after_response_jobs_in_flight{class="registration"} 1`,
 		`goiabada_after_response_jobs_in_flight{class="security_notice"} 0`,
@@ -82,10 +90,14 @@ func TestJobs_TheScrapeReportsTheJobsInFlightAndDroppedByClass(t *testing.T) {
 	require.True(t, jobs.Wait(5*time.Second))
 	assert.Equal(t, []string{
 		`goiabada_after_response_jobs_dropped_total{class="account_notice"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="backchannel_logout"} 0`,
+		`goiabada_after_response_jobs_dropped_total{class="backchannel_logout_self_registered"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="recovery"} 2`,
 		`goiabada_after_response_jobs_dropped_total{class="registration"} 0`,
 		`goiabada_after_response_jobs_dropped_total{class="security_notice"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="account_notice"} 0`,
+		`goiabada_after_response_jobs_in_flight{class="backchannel_logout"} 0`,
+		`goiabada_after_response_jobs_in_flight{class="backchannel_logout_self_registered"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="recovery"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="registration"} 0`,
 		`goiabada_after_response_jobs_in_flight{class="security_notice"} 0`,

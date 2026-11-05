@@ -350,11 +350,20 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   jobs in flight. Forgot-password's code store, audit record and mail run here, so every well-formed
   request answers alike, and so do the account notices, which never fail the change (#404, #724).
   At most 64 jobs of each `Class` run at once, recovery, registration, the email change's account
-  notice and the security notices each against a budget of its own, so the two public forms cannot
+  notice, the security notices and the logout tokens to administrator-registered and to
+  self-registered clients each against a budget of its own, so the two public forms cannot
   fill the slot the authenticated notices need, and a flood of security notices cannot drop the
   notice to an address just changed away from; past that `Go` drops the job with one Warn record on
   the request's id, never running it inline, and a dropped job is never counted in flight (#485,
   #394 review, #724 decision 4)
+- `internal/backchannel/` - OpenID Connect Back-Channel Logout 1.0's sending side (#784): the
+  `Delivery` an end of a session collects inside its transaction (`SessionDeliveries`, one per app
+  on the session with a back-channel logout URI), and the `Sender` that hands each to an
+  after-response job of its own once the end commits. A job checks the stored URI again, signs one
+  `logout+jwt` token under the current signing key, POSTs it with at most three attempts within the
+  token's two minutes, and records the delivery: `goiabada_backchannel_logout_deliveries_total`
+  (registered once by the server, `Register`), `sent_logout_token` (`LogSentLogoutToken`) and a Warn
+  record when it was not delivered
 - `internal/accountnotice/` - The one notifier for every email about a change to an account: the
   email change's notice to the previous address and the security notices, such as a changed
   password. A handler calls `Send`, or `SendRecoveryCodeUsed` with the count of codes left, after

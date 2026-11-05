@@ -235,7 +235,7 @@ func runImplicitOrderingAgainstTermination(t *testing.T, db data.Database, other
 
 		termination := goBlocked(t, "the termination", tx, func(reached func()) error {
 			reached()
-			_, terminateErr := revocation.TerminateUserSessionTx(context.Background(), other, session)
+			_, terminateErr := revocation.TerminateUserSessionTx(context.Background(), other, session, false)
 			return terminateErr
 		})
 

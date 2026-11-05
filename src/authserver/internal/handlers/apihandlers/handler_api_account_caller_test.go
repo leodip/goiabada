@@ -76,7 +76,7 @@ func TestAccountHandlers_ACallerWithoutATokenOrSubjectIsAWiringFault(t *testing.
 			return HandleAccountSessionsGet(datamocks.NewDatabase(t))
 		},
 		"HandleAccountSessionDelete": func(t *testing.T) http.HandlerFunc {
-			return HandleAccountSessionDelete(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t))
+			return HandleAccountSessionDelete(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), &recordingLogoutTokens{})
 		},
 	}
 	// The account API is these eighteen handlers, one per route in routes.go's /api/v1/account group.

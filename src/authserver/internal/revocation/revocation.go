@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
@@ -15,12 +16,15 @@ import (
 
 // Database is what the revocation service needs: the generation counters it advances,
 // and the sessions, codes and refresh tokens the advance invalidates, and the session row the
-// reuse response takes first (#139).
+// reuse response takes first (#139), and the apps an ended session served, which its logout tokens
+// go to (#784).
 //
 // Exported, unlike the per-file ports #386 left in the handler packages, because it is this
 // package's own port and eight consumer ports across handlers and apihandlers embed it to hand
 // the capability on (#387).
 type Database interface {
+	backchannel.SessionDatabase
+
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error)
@@ -29,6 +33,7 @@ type Database interface {
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
 	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
 	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
@@ -366,6 +371,11 @@ type TerminationResult struct {
 	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
 	RevokedRefreshTokenJtis []string
+	// LogoutDeliveries is a logout token for each app on the session with a back-channel logout URI,
+	// collected under the session's row before its deletion, when the caller said the session was
+	// still live; nil otherwise. The caller hands it to the back-channel sender after the commit,
+	// beside the audit events (#784 decisions 1 and 3). It is no part of any audit payload.
+	LogoutDeliveries []backchannel.Delivery
 }
 
 // TerminateUserSessionTx ends one session as a security action: it writes the durable fact that
@@ -375,7 +385,8 @@ type TerminationResult struct {
 // The four writes, in the order this transaction issues them. #129 decision 5 put the code sweep
 // first; #139 moved the deletion ahead of it, and the reason is the whole of write 1 below.
 //
-//  1. DeleteUserSession, FIRST because it is the statement that TAKES THE SESSION ROW. An
+//  1. DeleteUserSession, FIRST because it is the statement that TAKES THE SESSION ROW, unless the
+//     row was taken already to read the apps to tell (see live below). An
 //     authorization ceremony about to mint a code writes that same row before it inserts, so one
 //     of the two transactions waits for the other: either this one waits and the code sweep below
 //     then runs after the insert committed, so the new code is marked, or the ceremony waits and
@@ -424,13 +435,23 @@ type TerminationResult struct {
 // takes no transaction and a logged termination that then rolled back would be a false record
 // (decision 9, following RevokeUserAuthStateTx).
 //
+// live is whether the session was still valid, within its idle timeout and maximum lifetime, when
+// the caller decided to end it. Only then are its apps told (#784 decision 1): before write 1 the
+// transaction takes the session's row (AcquireUserSessionRow) and reads the apps the session
+// served, since the deletion takes their rows with it. A ceremony adding an app to the session takes
+// that row first too, so the app is either read here or the ceremony finds the session gone. A row
+// already gone, ended by someone else in the meantime, names no app: that end tells them. The user's
+// subject, which never changes, is read before the transaction opens, so the transaction reads no
+// users row while it holds a session's. The logout tokens are the CALLER's to send after the commit,
+// as the audit events are.
+//
 // WHAT A COMMIT FAILURE DOES AND DOES NOT GUARANTEE is the contract RevokeUserAuthStateTx
 // documents at length and this shares: the helper's rollback covers failures before the commit
 // only, and `database/sql` promises nothing about a Commit that returns an error. So a 500 from a
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a termination with no audit record of
 // it, which is fail-closed on the security side and a gap on the forensic side.
-func TerminateUserSessionTx(ctx context.Context, db Database, userSession *record.UserSession) (TerminationResult, error) {
+func TerminateUserSessionTx(ctx context.Context, db Database, userSession *record.UserSession, live bool) (TerminationResult, error) {
 	// Both sweeps key on the session identifier and the delete keys on the id, so this takes the
 	// loaded row rather than two loose values: from one row they cannot describe two different
 	// sessions, and every call site already holds it: the two endpoints load it for their own
@@ -446,6 +467,18 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 		return TerminationResult{}, errs.New("terminating a user session requires a session identifier")
 	}
 
+	subject := ""
+	if live {
+		user, err := db.GetUserById(ctx, nil, userSession.UserId)
+		if err != nil {
+			return TerminationResult{}, err
+		}
+		// No user is a session whose user is being deleted, which takes its sessions with it.
+		if user != nil {
+			subject = user.Subject
+		}
+	}
+
 	// Opened through RunInTransactionRetryingConflict, so a deadlock reruns the writes together
 	// (#301), and so does a family record lost to a containment of the same family that overlaps
 	// this transaction, as RevokeClientGrantsTx states. The body is safe to rerun: it reads nothing
@@ -453,9 +486,24 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 	// found already written, and the counts it reports are the committing attempt's.
 	var result TerminationResult
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
-		// First, and write 1 of the doc comment above is why: it is the statement that takes the
-		// session row, which is what orders this transaction against a ceremony minting a code
-		// for the session it is ending (#139).
+		// The apps to tell, under the session's row and before the deletion below takes their rows.
+		var deliveries []backchannel.Delivery
+		if subject != "" {
+			held, err := db.AcquireUserSessionRow(ctx, tx, userSession.SessionIdentifier)
+			if err != nil {
+				return err
+			}
+			if held {
+				deliveries, err = backchannel.SessionDeliveries(ctx, db, tx, userSession, subject)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Write 1 of the doc comment above, and the reason it comes before the sweeps: it takes the
+		// session row, when the read above has not, which is what orders this transaction against
+		// a ceremony minting a code for the session it is ending (#139).
 		if err := db.DeleteUserSession(ctx, tx, userSession.Id); err != nil {
 			return err
 		}
@@ -483,6 +531,7 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 		result = TerminationResult{
 			RevokedCodeCount:        revokedCodeCount,
 			RevokedRefreshTokenJtis: revokedJtis,
+			LogoutDeliveries:        deliveries,
 		}
 		return nil
 	})

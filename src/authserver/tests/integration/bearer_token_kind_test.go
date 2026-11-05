@@ -307,9 +307,9 @@ func TestBearerToken_NonIdTokenAsIdTokenHintIsRefused(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			token, ok := tokens[kind].(string)
 			require.True(t, ok, "the exchange yields a %s", kind)
-			errorCode, errorDescription := authorizeWithHint(t, token)
-			assert.Equal(t, unparseableCode, errorCode)
-			assert.Equal(t, unparseableDescription, errorDescription)
+			kindCode, kindDescription := authorizeWithHint(t, token)
+			assert.Equal(t, unparseableCode, kindCode)
+			assert.Equal(t, unparseableDescription, kindDescription)
 		})
 	}
 

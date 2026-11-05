@@ -19,6 +19,7 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/cleanup"
 	"github.com/leodip/goiabada/authserver/internal/config"
@@ -93,6 +94,9 @@ type Server struct {
 	// The requests the introspection endpoint answers, by outcome (#676 decision 11), registered here
 	// for the same reason.
 	introspectionMetrics *introspectionmetrics.Recorder
+	// The logout tokens delivered to apps' back-channel logout URIs, by outcome, counted on the
+	// metrics listener (#784 decision 8). The sender is built in routes.go over the audit log.
+	backchannelMetrics *backchannel.Recorder
 
 	// The Turnstile challenge's check, through which the forms that carry it verify a submission's
 	// token with Cloudflare, counting each check on the metrics listener (#642 decisions 3 and 4).
@@ -126,6 +130,7 @@ func NewServer(router *routing.Router, database data.Database, sessionStore *ses
 		tokenMetrics:         tokenmetrics.Register(registry),
 		revocationMetrics:    revocationmetrics.Register(registry),
 		introspectionMetrics: introspectionmetrics.Register(registry),
+		backchannelMetrics:   backchannel.Register(registry),
 
 		challengeVerifier: challengeVerifier,
 		secretKeyChecker:  challengeVerifier,

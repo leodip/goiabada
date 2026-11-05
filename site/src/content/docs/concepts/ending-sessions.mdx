@@ -36,6 +36,14 @@ That's what sets ending a session apart from one expiring. An [offline refresh t
 
 Each one leaves two entries in the [audit log](/concepts/audit-log/): `terminated_user_session`, which records what was revoked, and `deleted_user_session`, the record that the session is gone. Count `terminated_user_session` to know how many sessions were ended.
 
+## Telling your apps
+
+Ending a session also tells the apps the session was signed in to. Each one with a [back-channel logout URI](/concepts/clients/#back-channel-logout) is sent a logout token there: a signed statement naming the user (`sub`) and the session (`sid`), so the app can end its own session for that user. That happens when someone ends a session from the admin console or the API, and when a [different user signs in](#a-different-user-signs-in-on-the-same-browser) on the browser. A session that has expired tells nobody.
+
+The tokens go out once the session has ended, and the request that ended it doesn't wait for them. An app that can't be reached, doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429 is sent the same token again about 15 seconds and about a minute later. Each delivery leaves a `sent_logout_token` entry in the audit log, whose `outcome` says whether the app was told.
+
+A delivery that never succeeds is given up, and so is one still being tried when the auth server stops. The session's refresh tokens are revoked all the same, so such an app learns at its next refresh that the session is over.
+
 ## A session that has expired
 
 You can't end a session that has passed its [idle timeout or maximum lifetime](/concepts/sessions/#how-long-a-session-lasts), because it's already gone. The session lists leave it out, and both `DELETE` calls answer it with 404, just as they would a session that was never there. Nothing is revoked and nothing is written to the audit log. The background job deletes the row later, and that revokes nothing either.
@@ -91,6 +99,7 @@ When the person who signs in is a **different** user, the browser has changed ha
 | The previous user's session | Ended, as if someone had ended it: deleted, with its refresh tokens and unredeemed authorization codes revoked |
 | The new user | Never gets the session that was there |
 | The previous user's other devices | Untouched. Only what this browser's session handed out is revoked |
+| The apps on the previous user's session | Told that it ended, as in [Telling your apps](#telling-your-apps), when it was still valid |
 
 The grants that session held were reachable from this browser, and the browser is now someone else's. An offline refresh token from it would otherwise keep working in the background indefinitely.
 

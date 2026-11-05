@@ -406,12 +406,15 @@ var userTargetWrites = []targetWrite{
 			r := targetRequest(http.MethodDelete, "/api/v1/admin/user-sessions/91", "", scope, map[string]string{"id": "91"})
 			r = r.WithContext(reqctx.WithSettings(r.Context(), sessionSettings))
 			rr := httptest.NewRecorder()
-			HandleUserSessionDelete(database, auditLogger).ServeHTTP(rr, r)
+			HandleUserSessionDelete(database, auditLogger, &recordingLogoutTokens{}).ServeHTTP(rr, r)
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
 			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), targetSessionId).
 				Return(liveSessionOf(targetSessionId, "sid-91", targetUserId), nil).Once()
+			// The termination reads the session's user's subject before its transaction (#784).
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), targetUserId).
+				Return(&record.User{Id: targetUserId, Subject: "subject-91"}, nil).Maybe()
 		},
 		writes:           []string{"RunInTransaction", "DeleteUserSession"},
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),

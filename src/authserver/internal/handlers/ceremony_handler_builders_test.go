@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -195,14 +196,28 @@ type authCompletedGetDeps struct {
 	permissionChecker  PermissionChecker
 	// legalDocuments left out owes nothing.
 	legalDocuments legalDocumentsPort
+	// logoutTokens left out keeps what it is handed and sends nothing.
+	logoutTokens *recordingLogoutTokens
+}
+
+// recordingLogoutTokens keeps every set of logout tokens a handover hands to the sender.
+type recordingLogoutTokens struct {
+	sent [][]backchannel.Delivery
+}
+
+func (r *recordingLogoutTokens) Send(_ context.Context, _ string, deliveries []backchannel.Delivery) {
+	r.sent = append(r.sent, deliveries)
 }
 
 func buildAuthCompletedGet(d authCompletedGetDeps) http.HandlerFunc {
+	if d.logoutTokens == nil {
+		d.logoutTokens = &recordingLogoutTokens{}
+	}
 	return HandleAuthCompletedGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		testClientErrorResponder(d.database, d.pageRenderer, d.templateFS),
 		d.pageRenderer, d.ceremonyStore, NewDeviceCookie(false),
 		authflow.NewCompletion(d.database, d.userSessionManager, d.auditLogger, d.permissionChecker,
-			legalDocumentsOrNone(d.legalDocuments)))
+			legalDocumentsOrNone(d.legalDocuments), d.logoutTokens))
 }
 
 type consentGetDeps struct {

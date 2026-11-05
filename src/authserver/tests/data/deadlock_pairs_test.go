@@ -351,7 +351,7 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 
 	terminationDone := make(chan error, 1)
 	go func() {
-		_, err := revocation.TerminateUserSessionTx(context.Background(), pDB, session)
+		_, err := revocation.TerminateUserSessionTx(context.Background(), pDB, session, false)
 		terminationDone <- err
 	}()
 

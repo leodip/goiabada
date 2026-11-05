@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
@@ -25,6 +26,13 @@ type accountSessionsDatabase interface {
 	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)
 	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
+}
+
+// logoutTokenSender tells the apps an ended session served, with the logout tokens its termination
+// collected, once the termination has committed (#784). *backchannel.Sender satisfies it; issuer is
+// the tokens' iss, the request's issuer setting.
+type logoutTokenSender interface {
+	Send(ctx context.Context, issuer string, deliveries []backchannel.Delivery)
 }
 
 // HandleAccountSessionsGet - GET /api/v1/account/sessions
@@ -90,6 +98,7 @@ func HandleAccountSessionsGet(
 func HandleAccountSessionDelete(
 	database accountSessionsDatabase,
 	auditLogger AuditLogger,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, subject, ok := accountCaller(w, r)
@@ -145,8 +154,9 @@ func HandleAccountSessionDelete(
 		// the explicit self-service "end this session" action, so it also marks the codes issued
 		// through the session revoked and sweeps the refresh tokens those grants produced, in one
 		// transaction (#129 decision 5). The ownership check above answers 403 first, so this is
-		// never reached for somebody else's session.
-		result, err := revocation.TerminateUserSessionTx(r.Context(), database, us)
+		// never reached for somebody else's session. The session is live, as the check above found,
+		// so its apps are told (#784 decision 1).
+		result, err := revocation.TerminateUserSessionTx(r.Context(), database, us, true)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -163,6 +173,7 @@ func HandleAccountSessionDelete(
 			"reason":          audit.DeletedUserSessionEndedByUser,
 		})
 		revocation.LogTerminatedUserSession(r.Context(), auditLogger, us, subject, result)
+		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		// Success response
 		resp := api.SuccessResponse{Success: true}

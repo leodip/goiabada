@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
@@ -72,6 +73,13 @@ type auditLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
 
+// logoutTokenSender tells the apps a foreign session served, with the logout tokens its termination
+// collected, once the termination has committed (#784). *backchannel.Sender satisfies it; issuer is
+// the tokens' iss.
+type logoutTokenSender interface {
+	Send(ctx context.Context, issuer string, deliveries []backchannel.Delivery)
+}
+
 // completionBrowser is what Completion does through the handler's per-request adapter, which
 // satisfies it. Its save, clear and rotations land only while the browser session still holds this
 // ceremony, and otherwise answer ceremony.ErrCeremonyReplaced and write nothing (#579); the device
@@ -109,15 +117,16 @@ type Completion struct {
 	auditLogger    auditLogger
 	scopes         scopeFilter
 	legalDocuments legalDocumentsOwed
+	logoutTokens   logoutTokenSender
 }
 
 // NewCompletion builds the operation over the database, the user sessions, the audit log, the
-// scope filter and the legal documents it uses.
+// scope filter, the legal documents and the logout token sender it uses.
 func NewCompletion(database completionDatabase, sessions completionSessions, auditLogger auditLogger,
-	scopes scopeFilter, legalDocuments legalDocumentsOwed) *Completion {
+	scopes scopeFilter, legalDocuments legalDocumentsOwed, logoutTokens logoutTokenSender) *Completion {
 
 	return &Completion{database: database, sessions: sessions, auditLogger: auditLogger, scopes: scopes,
-		legalDocuments: legalDocuments}
+		legalDocuments: legalDocuments, logoutTokens: logoutTokens}
 }
 
 // CompletionResult is what Completion.Run did. Exactly one of NextStep, ClientError, Stale and
@@ -237,7 +246,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 			if create, creates := plan.(createSessionPlan); creates && create.terminatesForeignSession() {
 				err = browser.ConfirmCeremony(authContext.CeremonyId)
 				if err == nil {
-					err = o.terminateForeignSession(ctx, authContext, client, userSession)
+					err = o.terminateForeignSession(ctx, settings, authContext, client, userSession)
 				}
 				switch {
 				case errors.Is(err, ceremony.ErrCeremonyReplaced):
@@ -277,11 +286,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 			targetAcrLevel, ipAddress)
 	case createSessionPlan:
 		boundSession, err = o.bindNewSession(ctx, browser, mode, authContext, client, userSession, targetAcrLevel,
-			ipAddress, usersession.SessionLimits{
-				IdleTimeoutInSeconds: settings.UserSessionIdleTimeoutInSeconds,
-				MaxLifetimeInSeconds: settings.UserSessionMaxLifetimeInSeconds,
-				MaxSessionsPerUser:   settings.MaxUserSessionsPerUser,
-			})
+			ipAddress, settings)
 	default:
 		// restartPlan, the third mode.
 		return restartCompletion(browser, authContext), nil
@@ -466,10 +471,16 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 // old session: the fail-closed direction.
 func (o *Completion) bindNewSession(ctx context.Context, browser completionBrowser, plan createSessionPlan,
 	authContext *ceremony.AuthContext, client *record.Client, userSession *record.UserSession,
-	targetAcrLevel record.AcrLevel, ipAddress string, limits usersession.SessionLimits) (*record.UserSession, error) {
+	targetAcrLevel record.AcrLevel, ipAddress string, settings *record.Settings) (*record.UserSession, error) {
 
 	if err := browser.ConfirmCeremony(authContext.CeremonyId); err != nil {
 		return nil, err
+	}
+
+	limits := usersession.SessionLimits{
+		IdleTimeoutInSeconds: settings.UserSessionIdleTimeoutInSeconds,
+		MaxLifetimeInSeconds: settings.UserSessionMaxLifetimeInSeconds,
+		MaxSessionsPerUser:   settings.MaxUserSessionsPerUser,
 	}
 
 	// The browser changed hands, so the session it carried is ended rather than left orphaned with
@@ -477,7 +488,7 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	// never reach this one. Both sweeps key on the session identifier, so the previous user's other
 	// devices are untouched (#133).
 	if plan.terminatesForeignSession() {
-		if err := o.terminateForeignSession(ctx, authContext, client, userSession); err != nil {
+		if err := o.terminateForeignSession(ctx, settings, authContext, client, userSession); err != nil {
 			return nil, err
 		}
 	}
@@ -536,13 +547,19 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 
 // terminateForeignSession ends userSession, another user's that the browser arrived with, with its
 // codes and refresh tokens (revocation.TerminateUserSessionTx), then audits the handover, the deletion
-// and the termination, in that order and after the commit. The create arm calls it before it starts
-// the new session, and a sign-in refused for the id_token_hint calls it in place of the create arm,
-// since that browser changed hands too (#133, #535).
-func (o *Completion) terminateForeignSession(ctx context.Context, authContext *ceremony.AuthContext,
-	client *record.Client, userSession *record.UserSession) error {
+// and the termination, in that order and after the commit, and then tells the session's apps. The
+// create arm calls it before it starts the new session, and a sign-in refused for the id_token_hint
+// calls it in place of the create arm, since that browser changed hands too (#133, #535).
+//
+// The apps are told only when the session was still within its idle timeout and maximum lifetime
+// under settings, whatever max_age the ceremony asked for: a session that merely expired tells
+// nobody (#784 decision 1). The tokens' iss is settings' issuer.
+func (o *Completion) terminateForeignSession(ctx context.Context, settings *record.Settings,
+	authContext *ceremony.AuthContext, client *record.Client, userSession *record.UserSession) error {
 
-	terminationResult, err := revocation.TerminateUserSessionTx(ctx, o.database, userSession)
+	live := o.sessions.HasValidUserSession(userSession, settings.UserSessionIdleTimeoutInSeconds,
+		settings.UserSessionMaxLifetimeInSeconds, nil)
+	terminationResult, err := revocation.TerminateUserSessionTx(ctx, o.database, userSession, live)
 	if err != nil {
 		return err
 	}
@@ -567,6 +584,7 @@ func (o *Completion) terminateForeignSession(ctx context.Context, authContext *c
 		"reason":          audit.DeletedUserSessionReplacedByOtherUser,
 	})
 	revocation.LogTerminatedUserSession(ctx, o.auditLogger, userSession, "", terminationResult)
+	o.logoutTokens.Send(ctx, settings.Issuer, terminationResult.LogoutDeliveries)
 	return nil
 }
 

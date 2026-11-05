@@ -544,7 +544,7 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(nil).Once()
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(nil).Once()
 
-	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
+	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession(), false)
 	require.NoError(t, err)
 
 	// The count is the sweep's own, reported as-is: it is what the audit event carries, and
@@ -602,7 +602,7 @@ func TestTerminateUserSessionTx_NothingToRevoke(t *testing.T) {
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
 		Return([]*record.RefreshToken{}, nil).Once()
 
-	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
+	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession(), false)
 	require.NoError(t, err)
 
 	assert.Equal(t, int64(0), result.RevokedCodeCount)
@@ -621,7 +621,7 @@ func TestTerminateUserSessionTx_RejectsAnUnusableSession(t *testing.T) {
 	t.Run("nil session", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 
-		result, err := TerminateUserSessionTx(context.Background(), db, nil)
+		result, err := TerminateUserSessionTx(context.Background(), db, nil, true)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires the session to terminate")
@@ -634,7 +634,7 @@ func TestTerminateUserSessionTx_RejectsAnUnusableSession(t *testing.T) {
 		session := terminatedSession()
 		session.SessionIdentifier = ""
 
-		result, err := TerminateUserSessionTx(context.Background(), db, session)
+		result, err := TerminateUserSessionTx(context.Background(), db, session, true)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires a session identifier")
@@ -768,7 +768,7 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			db := datamocks.NewDatabase(t)
 			tc.setup(db)
 
-			result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
+			result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession(), false)
 
 			require.ErrorIs(t, err, boom)
 			assert.Equal(t, TerminationResult{}, result)

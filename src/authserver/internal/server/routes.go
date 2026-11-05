@@ -5,6 +5,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
@@ -64,6 +65,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	httpHelper := render.New(s.templateFS, s.staticFS)
 	// The one notifier every account notice goes through, after its response (#724).
 	notifier := accountnotice.New(httpHelper, emailSender, s.jobs)
+	// The one sender every logout token goes through, after the end of the session it tells of has
+	// committed, each delivery an after-response job (#784).
+	logoutTokens := backchannel.NewSender(s.database, s.dataCipher, s.jobs, auditLogger, s.backchannelMetrics)
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 	legalDocuments := legaldocuments.NewReader(s.database)
 
@@ -161,7 +165,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker, legalDocuments)))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker, legalDocuments, logoutTokens)))
 		r.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewIssuance(s.database, codeIssuer, tokenIssuer, userSessionManager, permissionChecker, auditLogger, tokenMetrics)))
 		passwordPrompt := authflow.NewPasswordPrompt(s.database)
 		r.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, passwordPrompt))
@@ -314,7 +318,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// User session routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/sessions", apihandlers.HandleUserSessionsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/user-sessions/{id}", apihandlers.HandleUserSessionGet(s.database))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-sessions/{id}", apihandlers.HandleUserSessionDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-sessions/{id}", apihandlers.HandleUserSessionDelete(s.database, auditLogger, logoutTokens))
 
 		// User consent routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleUserConsentsGet(s.database))
@@ -514,7 +518,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 		// Sessions (self-service)
 		r.Get("/sessions", apihandlers.HandleAccountSessionsGet(s.database))
-		r.Delete("/sessions/{id}", apihandlers.HandleAccountSessionDelete(s.database, auditLogger))
+		r.Delete("/sessions/{id}", apihandlers.HandleAccountSessionDelete(s.database, auditLogger, logoutTokens))
 
 		// Logout request (self-service)
 		r.Post("/logout-request", apihandlers.HandleAccountLogoutRequestPost(s.database, s.dataCipher, baseURL))

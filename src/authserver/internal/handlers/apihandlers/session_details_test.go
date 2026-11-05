@@ -23,6 +23,7 @@ import (
 // sessionSettings are permissive enough that a session's validity is decided by its own
 // timestamps rather than by the numbers here: one day idle, one week alive.
 var sessionSettings = &record.Settings{
+	Issuer:                          "https://auth.example.com",
 	UserSessionIdleTimeoutInSeconds: 86400,
 	UserSessionMaxLifetimeInSeconds: 604800,
 }

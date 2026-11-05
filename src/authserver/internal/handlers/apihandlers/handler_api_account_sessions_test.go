@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -70,12 +72,17 @@ func TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 				}).Return().Once()
 
 			rr := httptest.NewRecorder()
-			handler := HandleAccountSessionDelete(database, auditLogger)
+			logoutTokens := &recordingLogoutTokens{}
+			handler := HandleAccountSessionDelete(database, auditLogger, logoutTokens)
 			handler.ServeHTTP(rr, accountSessionDeleteRequest("100", tokenSub))
 
 			assert.Equal(t, http.StatusOK, rr.Code)
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
+
+			// The apps on the session are told once the termination has committed (#784).
+			assert.Equal(t, [][]backchannel.Delivery{{toldDelivery(userSession)}}, logoutTokens.sent)
+			assert.Equal(t, sessionSettings.Issuer, logoutTokens.issuer)
 
 			require.NotNil(t, deletedPayload)
 			assert.Equal(t, int64(100), deletedPayload["user_session_id"])
@@ -114,7 +121,7 @@ func TestHandleAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountSessionDelete(database, auditLogger)
+	handler := HandleAccountSessionDelete(database, auditLogger, &recordingLogoutTokens{})
 	handler.ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 	assert.Equal(t, http.StatusForbidden, rr.Code)
@@ -137,13 +144,14 @@ func TestHandleAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 		Return(liveSessionOf(100, "sid-own", 42), nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
 		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
-	// The deletion, which since #139 is the first write inside the termination transaction.
-	stub := datamocks.ExpectRunInTransaction(database, apiTerminateTx)
+	// The deletion, which since #139 is the first write inside the termination transaction, after
+	// the read of the session's apps (#784).
+	stub := stubTerminationOpening(database, liveSessionOf(100, "sid-own", 42))
 	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, int64(100)).
 		Return(errors.New("the session delete failed")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountSessionDelete(database, auditLogger)
+	handler := HandleAccountSessionDelete(database, auditLogger, &recordingLogoutTokens{})
 	handler.ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -168,7 +176,7 @@ func TestHandleAccountSessionDelete_AnOwnSessionNoLongerLiveIsNotFound(t *testin
 				Return(&record.User{Id: 42, Enabled: true}, nil).Once()
 
 			rr := httptest.NewRecorder()
-			HandleAccountSessionDelete(database, auditLogger).ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
+			HandleAccountSessionDelete(database, auditLogger, &recordingLogoutTokens{}).ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 			require.Equal(t, http.StatusNotFound, rr.Code)
 			assert.Equal(t, "NOT_FOUND", decodeAPIError(t, rr))
@@ -193,7 +201,7 @@ func TestHandleAccountSessionDelete_AnotherUsersDeadSessionIsForbidden(t *testin
 				Return(&record.User{Id: 42, Enabled: true}, nil).Once()
 
 			rr := httptest.NewRecorder()
-			HandleAccountSessionDelete(database, auditLogger).ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
+			HandleAccountSessionDelete(database, auditLogger, &recordingLogoutTokens{}).ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 			require.Equal(t, http.StatusForbidden, rr.Code)
 			assert.Equal(t, "FORBIDDEN", decodeAPIError(t, rr))
@@ -202,4 +210,15 @@ func TestHandleAccountSessionDelete_AnotherUsersDeadSessionIsForbidden(t *testin
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
+}
+
+// recordingLogoutTokens keeps every set of logout tokens a termination hands to the sender.
+type recordingLogoutTokens struct {
+	sent   [][]backchannel.Delivery
+	issuer string
+}
+
+func (r *recordingLogoutTokens) Send(_ context.Context, issuer string, deliveries []backchannel.Delivery) {
+	r.issuer = issuer
+	r.sent = append(r.sent, deliveries)
 }

@@ -216,7 +216,7 @@ func TestTerminateUserSessionTx_ALostKeyRunsTheTerminationOnceMore(t *testing.T)
 		Return(false, nil).Once()
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 
-	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
+	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession(), false)
 
 	require.NoError(t, err)
 	require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)

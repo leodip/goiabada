@@ -109,6 +109,7 @@ func HandleUserSessionsGet(
 func HandleUserSessionDelete(
 	database usersSessionsDatabase,
 	auditLogger AuditLogger,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -159,8 +160,9 @@ func HandleUserSessionDelete(
 		// administrative "end this session" action, so it also marks the codes issued through the
 		// session revoked and sweeps the refresh tokens those grants produced, all in one
 		// transaction (#129 decision 5). The 404s above answer first, so a missing or dead session
-		// never opens one.
-		result, err := revocation.TerminateUserSessionTx(r.Context(), database, userSession)
+		// never opens one. The session is live, as the check above found, so its apps are told (#784
+		// decision 1).
+		result, err := revocation.TerminateUserSessionTx(r.Context(), database, userSession, true)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -178,6 +180,7 @@ func HandleUserSessionDelete(
 			"reason":          audit.DeletedUserSessionEndedByAdministrator,
 		})
 		revocation.LogTerminatedUserSession(r.Context(), auditLogger, userSession, loggedInUser, result)
+		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		// Return success response
 		response := api.SuccessResponse{

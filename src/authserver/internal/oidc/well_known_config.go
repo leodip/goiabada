@@ -34,4 +34,8 @@ type WellKnownConfig struct {
 	// RFC 9207 section 3. Written true, never omitted: every authorization response carries iss,
 	// and a client reads an absent flag as false and then ignores the iss it receives (#576).
 	AuthorizationResponseIssParameterSupported bool `json:"authorization_response_iss_parameter_supported"`
+	// Back-Channel Logout 1.0 section 2.1 (#784 decision 4). Written true, never omitted: a client
+	// reads an absent flag as false.
+	BackchannelLogoutSupported        bool `json:"backchannel_logout_supported"`
+	BackchannelLogoutSessionSupported bool `json:"backchannel_logout_session_supported"`
 }

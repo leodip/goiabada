@@ -118,6 +118,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `added_resource_ids` | The row ids of the resources a save of a client's introspection resources added. |
 | `allowed` | Whether the client may now ask for the administrative scopes. |
 | `applies_to` | A legal document's Applies to after the save: `all_apps`, or `selected_apps` for the apps it lists. |
+| `attempts` | How many times the auth server sent a logout token before its delivery finished, 0 when it sent none. |
 | `audit_log_retention_days` | The new audit log retention, in days. |
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
 | `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
@@ -148,7 +149,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `is_public` | Whether a client that registered itself is public, with no secret. |
 | `issue_access_token` | Whether the implicit flow issued an access token. |
 | `issue_id_token` | Whether the implicit flow issued an ID token. |
-| `jti` | The `jti` of an access token a client revoked. |
+| `jti` | The `jti` of an access token a client revoked, or of a logout token the auth server sent. |
 | `keep_signed_in` | Under `old` and `new`: whether users stay signed in after the browser closes, `always`, `ask` (each user chooses) or `never`. |
 | `key_id` | The key id (`kid`) of a deleted signing key. |
 | `kind` | A legal document's kind: `must_accept` for terms users must accept, `for_information` for a privacy notice. |
@@ -163,7 +164,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `old` | The default token settings, the session settings, or the Turnstile settings, before the change, keyed as below. |
 | `old_generation` | The user's authentication generation before their sessions and tokens were revoked. |
 | `old_ui_theme` | The UI theme before the change. |
-| `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. |
+| `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. For a logout token, how its delivery ended: see `goiabada_backchannel_logout_deliveries_total` on [Monitoring](/deploy/monitoring/#metrics-catalog). |
 | `permission_id` | The row id of a permission. |
 | `permission_identifiers` | The administrative permissions changed, such as `authserver:manage`. |
 | `permission_ids` | The row ids of the administrative permissions a refused request would have changed. |
@@ -270,6 +271,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `deleted_user_session_client` | A client signed a user out, and was removed from the user's session. The session ends only when no other client is left on it. |
 | `deleted_user_session` | A session was deleted by a sign-in, a sign-out, its user or an administrator. Its `reason` says which: see [Why a session was deleted](#why-a-session-was-deleted). |
 | `terminated_user_session` | A session was ended by an administrator, by its own user, or by another user signing in on the same browser, and its codes and refresh tokens were revoked. |
+| `sent_logout_token` | The auth server sent a logout token to an app's [back-channel logout URI](/concepts/clients/#back-channel-logout), telling it a user's session ended. It's written once the delivery finishes, so its `outcome` and `attempts` say whether the app was told. A delivery dropped because too many were already running writes none. |
 | `revoked_user_auth_state` | A user's password was reset or changed, the user was disabled, or the `recover` command recovered the user, so their sessions and refresh tokens were revoked. A user changing their own password keeps the session they did it from. |
 
 ### Tokens

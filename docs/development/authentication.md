@@ -182,6 +182,36 @@ An API, calling as a confidential client, asks whether a token is active.
   `goiabada_introspection_requests_total` counts each answer by outcome (#676)
 - Implementation: `handler_introspect.go`, `clientauth`, `liveness`, `introspectionmetrics`
 
+### Back-channel logout (OpenID Connect Back-Channel Logout 1.0)
+The auth server tells an app that a session it was on ended, by POSTing a logout token to the
+client's back-channel logout URI (#784).
+- Triggers: an end of a session still valid when it ended. Today these are the account and admin
+  session ends and the cross-user handover at `/auth/completed`, through
+  `revocation.TerminateUserSessionTx`, whose `live` argument is the caller's validity judgement
+  (idle timeout and maximum lifetime, never `max_age`). Expiry tells nobody (decision 1)
+- Recipients are collected inside the end's transaction: the session's row is taken first
+  (`AcquireUserSessionRow`), then `backchannel.SessionDeliveries` reads its `user_session_clients`
+  with their clients, before the deletion cascades them away. A row already gone names nobody. The
+  user's subject is read before the transaction, so it holds no users row lock while holding the
+  session's. The caller hands `TerminationResult.LogoutDeliveries` to `backchannel.Sender.Send`
+  after the commit, beside its audit events
+- The token: `typ: logout+jwt`, RS256 under the current signing key's `kid`; `iss`, `aud` (the
+  client identifier), `iat`, `exp` 120 seconds on, `jti`, the back-channel logout event with `{}`,
+  `sub`, and `sid` for a session end; no `nonce` or `nbf` (decision 4). The typed header is what
+  `issuance.HasIDTokenHeader` refuses as an `id_token_hint` (decision 12)
+- Delivery: each one an after-response job, `ClassBackchannelLogout` or, for a client created
+  through DCR, `ClassBackchannelLogoutSelfRegistered`. The URI is checked again with
+  `urlmatch.CheckBackchannelLogoutURI` (http only for an administrator's confidential client), else
+  `skipped`. At most three attempts at about 0, 15 and 60 seconds with jitter, each with a 5-second
+  deadline, none that could outlive the token; the same token every time; no redirect followed. Any
+  2xx is `delivered`; 408, 429, 5xx, a timeout and a connection failure are retried; another status
+  is `refused`; a certificate failure, or no success after the last attempt, is `failed` (decision 5)
+- Each delivery counts on `goiabada_backchannel_logout_deliveries_total` by outcome, writes
+  `sent_logout_token` when it finishes, and one Warn record when it was not delivered (decision 8)
+- Discovery advertises `backchannel_logout_supported` and `backchannel_logout_session_supported`
+- Implementation: `backchannel`, `revocation/revocation.go`, `authflow/completion.go`,
+  `handler_api_account_sessions.go`, `handler_api_users_sessions.go`
+
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**
 - Endpoint: `GET /auth/authorize` with `response_type=token|id_token|id_token token`
@@ -657,7 +687,7 @@ memory, and follow its MUST and SHOULD requirements. The main ones: OAuth 2.0 (R
 tokens (RFC 6750), PKCE (RFC 7636), revocation (RFC 7009), introspection (RFC 7662), dynamic client
 registration (RFC 7591), authorization server metadata (RFC 8414), JWT (RFC 7519) and JWK (RFC
 7517), JWT access tokens (RFC 9068), the OAuth 2.0 Security Best Current Practice (RFC 9700), and
-OpenID Connect Core 1.0 and Discovery 1.0.
+OpenID Connect Core 1.0, Discovery 1.0 and Back-Channel Logout 1.0.
 
 Goiabada departs from three of RFC 9068's SHOULDs and MAYs, and the tokens page documents each:
 a request whose scopes name several resources gets one token naming them all in `aud` (section 3,
