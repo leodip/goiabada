@@ -228,6 +228,13 @@ client's back-channel logout URI (#784).
   deadline, none that could outlive the token; the same token every time; no redirect followed. Any
   2xx is `delivered`; 408, 429, 5xx, a timeout and a connection failure are retried; another status
   is `refused`; a certificate failure, or no success after the last attempt, is `failed` (decision 5)
+- Address guard (decision 7): a delivery to a client created through DCR, whoever set its URI, goes
+  through `backchannel.newDeliveryClients`' guarded client: no proxy, and a `net.Dialer.Control`
+  that refuses any dialed address `publicUnicast` rejects (loopback, RFC 1918, `fc00::/7`,
+  link-local, `100.64.0.0/10`, unspecified, multicast, broadcast, documentation ranges, and their
+  IPv4-mapped forms). Control sees the resolved address, so DNS rebinding gains nothing. A refusal
+  is final, `blocked`. An administrator's client uses a separate transport with the environment's
+  proxy and reaches any address
 - Each delivery counts on `goiabada_backchannel_logout_deliveries_total` by outcome, writes
   `sent_logout_token` when it finishes, and one Warn record when it was not delivered (decision 8)
 - Discovery advertises `backchannel_logout_supported` and `backchannel_logout_session_supported`

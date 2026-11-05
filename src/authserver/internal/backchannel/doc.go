@@ -6,7 +6,9 @@
 // committed. Each delivery is an after-response job of its own, admitted against the budget of
 // administrator-registered clients or of self-registered ones (#784 decision 5). A job checks the
 // stored URI against #784 decision 6's rules again, signs one token with the current signing key
-// (decision 4), and POSTs it with at most three attempts before the token expires. Each delivery is
+// (decision 4), and POSTs it with at most three attempts before the token expires. A delivery to a
+// self-registered client dials only a public unicast address, checked on the address dialed, and
+// never through a proxy; an administrator's client is reached anywhere (decision 7). Each delivery is
 // counted on goiabada_backchannel_logout_deliveries_total by outcome, audited as sent_logout_token
 // when it finishes, and logged as one Warn record when it does not succeed (decision 8).
 //

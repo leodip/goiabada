@@ -361,7 +361,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   on the session with a back-channel logout URI), and the `Sender` that hands each to an
   after-response job of its own once the end commits. A job checks the stored URI again, signs one
   `logout+jwt` token under the current signing key, POSTs it with at most three attempts within the
-  token's two minutes, and records the delivery: `goiabada_backchannel_logout_deliveries_total`
+  token's two minutes (a self-registered client's only to a public unicast address it dials,
+  never through a proxy), and records the delivery: `goiabada_backchannel_logout_deliveries_total`
   (registered once by the server, `Register`), `sent_logout_token` (`LogSentLogoutToken`) and a Warn
   record when it was not delivered
 - `internal/accountnotice/` - The one notifier for every email about a change to an account: the

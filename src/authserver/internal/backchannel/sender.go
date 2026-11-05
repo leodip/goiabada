@@ -125,7 +125,10 @@ type Sender struct {
 	jobs        Jobs
 	auditLogger AuditLogger
 	recorder    *Recorder
-	client      *http.Client
+	// client delivers to administrators' clients; selfRegisteredClient, to clients created through
+	// dynamic client registration, through the address guard and no proxy (#784 decision 7).
+	client               *http.Client
+	selfRegisteredClient *http.Client
 
 	// The schedule and the clock, fields so a test can run the schedule without waiting it out.
 	offsets        []time.Duration
@@ -150,22 +153,18 @@ func NewSender(database KeyDatabase, dataCipher *encryption.DataCipher, jobs Job
 // deliveries follow the same rules and write the same Warn records and audit events, and are counted
 // nowhere.
 func NewCommandSender(database KeyDatabase, dataCipher *encryption.DataCipher, auditLogger AuditLogger) *Sender {
+	client, selfRegisteredClient := newDeliveryClients(http.ProxyFromEnvironment, publicUnicast)
 	return &Sender{
-		database:    database,
-		dataCipher:  dataCipher,
-		auditLogger: auditLogger,
-		// The environment's proxy is honoured, as the Turnstile client honours it, and no redirect is
-		// ever followed: a 3xx is the app's answer (#784 decisions 5 and 7). There is no client-wide
-		// timeout; each attempt has its own deadline.
-		client: &http.Client{
-			Transport:     http.DefaultTransport.(*http.Transport).Clone(),
-			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-		},
-		offsets:        attemptOffsets,
-		attemptTimeout: attemptTimeout,
-		now:            func() time.Time { return time.Now().UTC() },
-		sleep:          sleepFor,
-		jitter:         jitter,
+		database:             database,
+		dataCipher:           dataCipher,
+		auditLogger:          auditLogger,
+		client:               client,
+		selfRegisteredClient: selfRegisteredClient,
+		offsets:              attemptOffsets,
+		attemptTimeout:       attemptTimeout,
+		now:                  func() time.Time { return time.Now().UTC() },
+		sleep:                sleepFor,
+		jitter:               jitter,
 	}
 }
 
@@ -296,7 +295,7 @@ func (s *Sender) run(ctx context.Context, issuer string, delivery Delivery, jti 
 		if s.now().Add(s.attemptTimeout).After(expiresAt) {
 			break
 		}
-		attempt := s.attempt(ctx, delivery.URI, token)
+		attempt := s.attempt(ctx, delivery, token)
 		attempt.attempts = last.attempts + 1
 		if !attempt.retry {
 			return attempt.result
@@ -316,20 +315,28 @@ type attemptResult struct {
 // attempt POSTs the token once, within the attempt's deadline, and classifies what came back (#784
 // decision 5). Any 2xx is delivered; a 3xx, which is never followed, and any 4xx but 408 and 429
 // are refused, as is anything else that is not retried; 408, 429 and 5xx, a timeout and a failed
-// connection are retried; a certificate the auth server does not trust is final.
-func (s *Sender) attempt(ctx context.Context, uri string, token string) attemptResult {
+// connection are retried; a certificate the auth server does not trust is final, and so is an
+// address the guard on a self-registered client's deliveries refuses (#784 decision 7).
+func (s *Sender) attempt(ctx context.Context, delivery Delivery, token string) attemptResult {
 	ctx, cancel := context.WithTimeout(ctx, s.attemptTimeout)
 	defer cancel()
 
 	body := url.Values{"logout_token": {token}}.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, uri, strings.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, delivery.URI, strings.NewReader(body))
 	if err != nil {
 		return attemptResult{result: result{outcome: Failed, err: errs.Wrap(err, "unable to build the request")}}
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := s.client.Do(req)
+	client := s.client
+	if delivery.CreatedViaDCR {
+		client = s.selfRegisteredClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
+		if addressBlocked(err) {
+			return attemptResult{result: result{outcome: Blocked, err: err}}
+		}
 		if certificateFailure(err) {
 			return attemptResult{result: result{outcome: Failed, err: err}}
 		}
