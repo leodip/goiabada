@@ -599,7 +599,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
+			Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 		var bound map[string]interface{}
 		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logout_consent.html",
@@ -1034,7 +1034,7 @@ func stubConfirmedHint(
 	client := &record.Client{Id: 11, ClientIdentifier: hintedClientId}
 
 	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-		Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: claims}, nil)
+		Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: claims}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, hintedClientId).Return(client, nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, hintedSubject).
 		Return(&record.User{Id: hintedUserId}, nil).Maybe()
@@ -1962,7 +1962,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
+			Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -2019,7 +2019,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				rr := httptest.NewRecorder()
 
 				tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-					Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
+					Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 				handler.ServeHTTP(rr, req)
 
@@ -2327,6 +2327,12 @@ func TestBuildPostLogoutRedirect(t *testing.T) {
 // greppable message and a collector can count them by gate. Asserting it against tc.gate is what
 // makes the table pay for it: a gate renamed in the classifier and not in the row fails here
 // rather than silently logging the wrong name.
+// idTokenHeader is the JOSE header of an ID Token this server issues, which a parsed hint carries:
+// a fixture standing for a real hint needs it, since the hint checks require it (#784 decision 12).
+func idTokenHeader() map[string]interface{} {
+	return map[string]interface{}{"alg": "RS256", "kid": "test-key", "typ": "JWT"}
+}
+
 func assertRejectionRecord(t *testing.T, logs *logtest.SlogCapture, want hintState, wantErr bool, gate string) {
 	t.Helper()
 
@@ -2452,11 +2458,15 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		name string
 		// gate names the check that is expected to refuse the row, so a failure says which one stopped
 		// working rather than only that the answer changed.
-		gate       string
-		mutate     func(claims map[string]interface{})
-		hintAbsent bool
-		hintValue  *string
-		innerToken *string
+		gate   string
+		mutate func(claims map[string]interface{})
+		// headerTyp replaces the JOSE header's typ, which is JWT on every other row; deleteHeaderTyp
+		// leaves it out.
+		headerTyp       *string
+		deleteHeaderTyp bool
+		hintAbsent      bool
+		hintValue       *string
+		innerToken      *string
 		// clientId is the value the parameter arrived with; clientIdAbsent says it did not arrive at
 		// all. The two are separate fields because the classifier reads client_id for presence, so a
 		// row that could only say "" would be unable to tell the gate's two sides apart, which is
@@ -2565,6 +2575,31 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			name: "typ says this is an ID token", gate: "ID-Token shape",
 			mutate: func(claims map[string]interface{}) { claims["typ"] = "ID" },
 			want:   hintConfirmed, wantSid: theSessionId,
+		},
+		{
+			// A logout token names sub, sid and aud, carries iss and iat and no typ claim, and is
+			// signed with the same key, so every claim gate would take it for an ID Token: only its
+			// header tells it apart. Every claim is identical to the confirmed row (#784 decision 12).
+			name: "the header says this is a logout token", gate: "ID-Token shape",
+			headerTyp: strPtr("logout+jwt"),
+			want:      hintRejected,
+		},
+		{
+			name: "the header says this is an access token", gate: "ID-Token shape",
+			headerTyp: strPtr("at+jwt"),
+			want:      hintRejected,
+		},
+		{
+			// A requirement rather than a denylist: a header that names no type is no ID Token's.
+			name: "the header has no typ", gate: "ID-Token shape",
+			deleteHeaderTyp: true,
+			want:            hintRejected,
+		},
+		{
+			// A typ is a media type, compared without regard to case (RFC 7515 section 4.1.9).
+			name: "the header typ is jwt in lower case", gate: "ID-Token shape",
+			headerTyp: strPtr("jwt"),
+			want:      hintConfirmed, wantSid: theSessionId,
 		},
 		{
 			name: "sub is missing", gate: "ID-Token shape",
@@ -2851,6 +2886,13 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			if tc.mutate != nil {
 				tc.mutate(claims)
 			}
+			header := idTokenHeader()
+			if tc.headerTyp != nil {
+				header["typ"] = *tc.headerTyp
+			}
+			if tc.deleteHeaderTyp {
+				delete(header, "typ")
+			}
 
 			// The literal false is decision 14's whole mechanism, so it is asserted rather than
 			// matched loosely: a classifier that passed true would find no expectation here and the
@@ -2863,7 +2905,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			if tc.parserErr != nil {
 				parserCall.Return(nil, tc.parserErr).Maybe()
 			} else {
-				parserCall.Return(&oauth.JwtToken{TokenBase64: parsed, Claims: claims}, nil).Maybe()
+				parserCall.Return(&oauth.JwtToken{TokenBase64: parsed, Header: header, Claims: claims}, nil).Maybe()
 			}
 
 			stubDB := tc.stubDB

@@ -700,10 +700,13 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser id
 		return "", errs.Wrap(err, "unable to check the id_token_hint")
 	}
 	// OIDC Core 1.0 section 3.1.2.1 defines the hint as an ID Token, and the signature does not say
-	// which kind of token this is: access and refresh tokens are signed with the same key and carry
-	// iss and sub too. A refused kind is answered as a hint that does not parse, so the answer says
-	// nothing about which it was (#401).
-	if err != nil || issuance.IsNotIDTokenTyp(jwtToken.StringClaim("typ")) {
+	// which kind of token this is: access, refresh and logout tokens are signed with the same key and
+	// carry iss and sub too. The typ claim names an access or refresh token (#401), and the JOSE
+	// header must be an ID Token's, which a logout token's and an access token's are not (#784
+	// decision 12). A refused kind is answered as a hint that does not parse, so the answer says
+	// nothing about which it was.
+	if err != nil || !issuance.HasIDTokenHeader(jwtToken.Header) ||
+		issuance.IsNotIDTokenTyp(jwtToken.StringClaim("typ")) {
 		return "", oauth.NewErrorDetailWithHTTPStatus("invalid_request", "The id_token_hint is invalid.",
 			httpStatusBadRequest)
 	}

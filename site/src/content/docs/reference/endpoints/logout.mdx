@@ -70,7 +70,7 @@ The auth server confirms a hint when all of these hold:
 
 - It isn't empty.
 - An encrypted hint comes with a `client_id`, and decrypts with that client's secret.
-- Its signature is the auth server's, and it's an ID token: an access token or a refresh token isn't one.
+- Its signature is the auth server's, and it's an ID token, with `typ: JWT` in its header: an access token or a refresh token isn't one.
 - It has `sub` and `iat`, `iss` is the auth server's issuer, and `aud` is the identifier of a client that exists.
 - A `client_id` sent beside it equals its `aud`. An empty `client_id=` doesn't.
 - Its `nbf`, when there is one, has passed.

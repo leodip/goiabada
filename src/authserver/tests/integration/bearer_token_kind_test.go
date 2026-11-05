@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
@@ -307,6 +308,21 @@ func TestBearerToken_NonIdTokenAsIdTokenHintIsRefused(t *testing.T) {
 			token, ok := tokens[kind].(string)
 			require.True(t, ok, "the exchange yields a %s", kind)
 			errorCode, errorDescription := authorizeWithHint(t, token)
+			assert.Equal(t, unparseableCode, errorCode)
+			assert.Equal(t, unparseableDescription, errorDescription)
+		})
+	}
+
+	// A hint must carry an ID Token's JOSE header, typ JWT: the ID Token's own claims, re-signed with
+	// the server's key under a logout token's or an access token's header, pass every claim check and
+	// are refused all the same. Re-signed under JWT they pass, so the header is all that differs
+	// (#784 decision 12).
+	idTokenClaims := jwt.MapClaims(decodeJWTPayload(t, idToken))
+	errorCode, _ = authorizeWithHint(t, resignWithCurrentKey(t, idTokenClaims, ""))
+	require.Equal(t, "login_required", errorCode, "the ID token's claims re-signed under JWT pass the hint check")
+	for _, headerTyp := range []string{"logout+jwt", "at+jwt"} {
+		t.Run("the ID token's claims under "+headerTyp, func(t *testing.T) {
+			errorCode, errorDescription := authorizeWithHint(t, resignWithCurrentKey(t, idTokenClaims, headerTyp))
 			assert.Equal(t, unparseableCode, errorCode)
 			assert.Equal(t, unparseableDescription, errorDescription)
 		})

@@ -362,6 +362,13 @@ func classifyIdTokenHint(
 	// token carries iss, sub, iat, nbf, exp and a session-bound sid, and its aud is the resource
 	// identifier, so GetClientByClientIdentifier resolves it under the collision. Confirming it would
 	// skip the consent page entirely and end that client's half of the session (#109).
+	//
+	// The JOSE header must be an ID Token's too: a logout token carries no typ claim, is signed with
+	// the same key and names sub, sid and aud, so every claim gate below would take it for an ID
+	// Token, and an access token's header says at+jwt (#784 decision 12).
+	if typ, _ := idToken.Header["typ"].(string); !issuance.HasIDTokenHeader(idToken.Header) {
+		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "the JOSE header typ is not an ID Token's", "header_typ", typ)
+	}
 	if typ := idToken.StringClaim("typ"); issuance.IsNotIDTokenTyp(typ) {
 		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "typ names a token that is not an ID Token", "typ", typ)
 	}
