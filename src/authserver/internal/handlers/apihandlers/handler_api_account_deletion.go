@@ -11,11 +11,13 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -23,10 +25,11 @@ import (
 
 // accountDeletionDatabase is what POST /api/v1/account/deletion needs: the caller's row, what the
 // last-administrator guard reads, the stored authenticator's verification, the recovery code's
-// claim, and the deletion.
+// claim, the apps the deletion tells, and the deletion.
 type accountDeletionDatabase interface {
 	userRemovalDatabase
 	otpcredential.Database
+	revocation.Database
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
@@ -73,14 +76,17 @@ var (
 // same transaction, so a deletion refused or rolled back spends none, and one that commits deletes it
 // with the rest of the set. The row read under its lock must still hold the password and the
 // authenticator the request was checked against: one replaced in between is refused as a wrong
-// password or code, spending nothing. After the commit, deleted_own_account is written and the user is sent
-// "Your account was deleted", addressed to their row as the deletion read it under the row's lock.
+// password or code, spending nothing. The deletion ends every session the user has, so every app that
+// knew the user is told, read on the same transaction before the delete (#784 decision 3). After the
+// commit, deleted_own_account is written, those apps are sent their logout tokens, and the user is
+// sent "Your account was deleted", addressed to their row as the deletion read it under the row's lock.
 func HandleAccountDeletionPost(
 	database accountDeletionDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 	dataCipher *encryption.DataCipher,
 	notifier AccountNotifier,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, subject, ok := accountCaller(w, r)
@@ -178,10 +184,14 @@ func HandleAccountDeletionPost(
 
 		codeHash := otpcredential.HashRecoveryCode(req.RecoveryCode)
 		usedOTPCode := user.OTPEnabled && !useRecoveryCode
-		// Safe to rerun: current is the committing attempt's.
+		// The apps the deletion tells are read under the user's row, as the administrator's deletion
+		// reads them, before the delete's cascade takes the sessions and grants they are read from.
+		// Safe to rerun: current and deliveries are the committing attempt's.
 		var current *record.User
+		var deliveries []backchannel.Delivery
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			current = nil
+			deliveries = nil
 			administrators, lockErr := lockAdministrators(r.Context(), database, tx)
 			if lockErr != nil {
 				return lockErr
@@ -222,6 +232,11 @@ func HandleAccountDeletionPost(
 			if decideErr := administrators.decide(r.Context(), holdsManage); decideErr != nil {
 				return decideErr
 			}
+			told, collectErr := revocation.UserWideDeliveries(r.Context(), database, tx, user.Id, locked.Subject,
+				sessionLive(settings))
+			if collectErr != nil {
+				return collectErr
+			}
 			if deleteErr := database.DeleteUser(r.Context(), tx, user.Id); deleteErr != nil {
 				return errs.Wrap(deleteErr, "unable to delete the account")
 			}
@@ -229,6 +244,7 @@ func HandleAccountDeletionPost(
 				return leaveErr
 			}
 			current = locked
+			deliveries = told
 			return nil
 		})
 		switch {
@@ -269,6 +285,7 @@ func HandleAccountDeletionPost(
 			"user_id":        user.Id,
 			"logged_in_user": subject,
 		})
+		logoutTokens.Send(r.Context(), settings.Issuer, deliveries)
 
 		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
 	}

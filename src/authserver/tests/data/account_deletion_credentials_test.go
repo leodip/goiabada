@@ -113,7 +113,7 @@ func TestAccountDeletion_RefusesCredentialsReplacedBeforeTheDeletion(t *testing.
 				"sub": user.Subject, "scope": "authserver:manage-account", "auth_time": float64(1),
 			}})
 			rr := httptest.NewRecorder()
-			apihandlers.HandleAccountDeletionPost(db, &countingAuditLogger{}, uncountedFailures{}, dataCipher, noNotices{}).
+			apihandlers.HandleAccountDeletionPost(db, &countingAuditLogger{}, uncountedFailures{}, dataCipher, noNotices{}, noLogoutTokens{}).
 				ServeHTTP(rr, req.WithContext(reqCtx))
 
 			require.Equal(t, 2, db.transactions, "the change ran before the deletion's transaction")

@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -32,8 +34,9 @@ import (
 // checked before any credential and again under the administrators' lock, the password, then the
 // second factor. A wrong password, authenticator code or recovery code spends the account_password
 // budget; a blank one spends nothing, and a refused deletion spends no recovery code. The deletion
-// is DeleteUser in a transaction whose first statement takes the administrators' lock; after the
-// commit it writes deleted_own_account and hands off the "Your account was deleted" notice.
+// is DeleteUser in a transaction whose first statement takes the administrators' lock, which reads the
+// apps that knew the user before the delete; after the commit it writes deleted_own_account, sends
+// those apps their logout tokens and hands off the "Your account was deleted" notice.
 //
 // The mocks are strict, so a write the case does not name, an audit entry it does not expect or a
 // notice handed off by a refusal fails it.
@@ -108,6 +111,21 @@ type deletionFixture struct {
 	jobs         *heldJobs
 	pageRenderer *handlersmocks.PageRenderer
 	emailSender  *accounthandlersmocks.EmailSender
+	logoutTokens *deletionLogoutTokens
+}
+
+// deletionLogoutTokens records the logout tokens the deletion sends, noting the send when the case
+// gives it a note.
+type deletionLogoutTokens struct {
+	recordingLogoutTokens
+	note func(string)
+}
+
+func (d *deletionLogoutTokens) Send(ctx context.Context, issuer string, deliveries []backchannel.Delivery) {
+	if d.note != nil {
+		d.note("send")
+	}
+	d.recordingLogoutTokens.Send(ctx, issuer, deliveries)
 }
 
 func newDeletionFixture(t *testing.T) *deletionFixture {
@@ -118,13 +136,14 @@ func newDeletionFixture(t *testing.T) *deletionFixture {
 		jobs:         &heldJobs{},
 		pageRenderer: handlersmocks.NewPageRenderer(t),
 		emailSender:  accounthandlersmocks.NewEmailSender(t),
+		logoutTokens: &deletionLogoutTokens{},
 	}
 }
 
 func (f *deletionFixture) serve(req *http.Request) *httptest.ResponseRecorder {
 	rr := httptest.NewRecorder()
 	HandleAccountDeletionPost(f.database, f.auditLogger, f.credentials, testDataCipher,
-		accountnotice.New(f.pageRenderer, f.emailSender, f.jobs)).ServeHTTP(rr, req)
+		accountnotice.New(f.pageRenderer, f.emailSender, f.jobs), f.logoutTokens).ServeHTTP(rr, req)
 	return rr
 }
 
@@ -169,9 +188,19 @@ func (f *deletionFixture) expectDeletionOpened(current *record.User, note ...fun
 	return stub
 }
 
+// expectDeletionTellsNoApp answers the reads, on the deletion's transaction before the delete, that
+// name the apps the deletion tells (#784 decision 3): the user has no session and no grant.
+func (f *deletionFixture) expectDeletionTellsNoApp() {
+	f.database.On("GetUserSessionsByUserId", mock.Anything, deletionTx, deletionUserId).
+		Return([]record.UserSession{}, nil).Once()
+	f.database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, deletionTx, deletionUserId, mock.Anything).
+		Return([]int64{}, nil).Once()
+}
+
 // expectDeletionCompleted answers the rest of a deletion of an ordinary user that commits.
 func (f *deletionFixture) expectDeletionCompleted(note ...func(string)) {
 	f.expectGuardReads(deletionTx, false)
+	f.expectDeletionTellsNoApp()
 	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(nil).
 		Run(func(mock.Arguments) {
 			for _, n := range note {
@@ -364,6 +393,7 @@ func TestHandleAccountDeletionPost_AnAdministratorDeletesWhileAnotherRemains(t *
 	stub := f.expectDeletionOpened(user)
 	f.expectGuardReads(deletionTx, true)
 	expectHoldersCounted(f.database, deletionTx, 2, 1)
+	f.expectDeletionTellsNoApp()
 	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(nil).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventDeletedOwnAccount, mock.Anything).Return().Once()
 
@@ -592,6 +622,7 @@ func TestHandleAccountDeletionPost_TheLastAdministratorUnderTheLockIsRefused(t *
 		otpcredential.HashRecoveryCode(deletionRecoveryCode)).Return(true, nil).Once()
 	f.expectGuardReads(deletionTx, true)
 	expectHoldersCounted(f.database, deletionTx, 1, 0)
+	f.expectDeletionTellsNoApp()
 	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(nil).Once()
 
 	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
@@ -605,6 +636,7 @@ func TestHandleAccountDeletionPost_TheLastAdministratorUnderTheLockIsRefused(t *
 		"the body refuses, so the deletion and the code's claim roll back")
 	assert.Zero(t, f.credentials.failures)
 	assert.Empty(t, f.jobs.jobs)
+	assert.Empty(t, f.logoutTokens.sent, "no app is told")
 }
 
 // Two-factor authentication turned on after the request read the account, with no code sent: the
@@ -634,6 +666,7 @@ func TestHandleAccountDeletionPost_ARolledBackDeletionTellsNobody(t *testing.T) 
 	f.expectEarlyCheck(false, 0)
 	stub := f.expectDeletionOpened(user)
 	f.expectGuardReads(deletionTx, false)
+	f.expectDeletionTellsNoApp()
 	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(errors.New("delete failed")).Once()
 
 	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{"password": deletionPassword}))
@@ -641,6 +674,46 @@ func TestHandleAccountDeletionPost_ARolledBackDeletionTellsNobody(t *testing.T) 
 	require.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
 	require.Error(t, stub.BodyErr)
 	assert.Empty(t, f.jobs.jobs)
+	assert.Empty(t, f.logoutTokens.sent, "no app is told")
+}
+
+// The deletion ends every session the user has, so every app that knew the user is told (#784
+// decision 3): the apps are read on the deletion's transaction before the delete takes the sessions
+// and grants with it, and sent their logout tokens once it has committed. Here the user has no
+// session, and the one app holds a usable refresh token of theirs and has a back-channel logout URI.
+func TestHandleAccountDeletionPost_TellsTheAppsThatKnewTheUser(t *testing.T) {
+	f := newDeletionFixture(t)
+	user := deletionUser(t)
+	f.expectCaller(user)
+	f.expectEarlyCheck(false, 0)
+	var order []string
+	note := func(edge string) { order = append(order, edge) }
+	f.logoutTokens.note = note
+	stub := f.expectDeletionOpened(user, note)
+	f.expectGuardReads(deletionTx, false)
+	app := record.Client{Id: 31, ClientIdentifier: "the-app", BackchannelLogoutURI: "https://app.example.com/bcl"}
+	f.database.On("GetUserSessionsByUserId", mock.Anything, deletionTx, deletionUserId).
+		Return([]record.UserSession{}, nil).Once()
+	f.database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, deletionTx, deletionUserId, mock.Anything).
+		Return([]int64{app.Id}, nil).Run(func(mock.Arguments) { note("read the apps") }).Once()
+	f.database.On("GetClientsByIds", mock.Anything, deletionTx, []int64{app.Id}).Return([]record.Client{app}, nil).Once()
+	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(nil).
+		Run(func(mock.Arguments) { note("delete") }).Once()
+	f.auditLogger.On("Log", mock.Anything, audit.EventDeletedOwnAccount, mock.Anything).Return().
+		Run(func(mock.Arguments) { note("audit") }).Once()
+	settings := deletionSettings()
+	settings.Issuer = "https://auth.example.com"
+
+	rr := f.serve(deletionRequest(t, settings, map[string]string{"password": deletionPassword}))
+
+	f.assertDeleted(t, rr, stub)
+	assert.Equal(t, []string{"begin", "read the apps", "delete", "commit", "audit", "send"}, order,
+		"the apps are read before the delete and told after the commit")
+	assert.Equal(t, [][]backchannel.Delivery{{{
+		ClientId: app.Id, ClientIdentifier: app.ClientIdentifier, URI: app.BackchannelLogoutURI,
+		UserId: deletionUserId, Subject: deletionSubject,
+	}}}, f.logoutTokens.sent, "one token naming the user and no session")
+	assert.Equal(t, settings.Issuer, f.logoutTokens.issuer)
 }
 
 // The wrong code that disables the authenticator is audited and told once, as at sign-in (#489,

@@ -203,6 +203,21 @@ func TestBackchannelLogout_DeletingAUserTellsEveryAppThatKnewThem(t *testing.T) 
 	a.assertToldEverywhere(t, "")
 }
 
+// TestBackchannelLogout_DeletingTheirOwnAccountTellsEveryAppThatKnewThem: the user deletes their own
+// account from the admin console, which tells the same apps as an administrator's deletion. The
+// console's own session tells nothing: its client has no back-channel logout URI.
+func TestBackchannelLogout_DeletingTheirOwnAccountTellsEveryAppThatKnewThem(t *testing.T) {
+	user := consoleSignInUser(t, "en")
+	accessToken := consoleAccessToken(t, user)
+	a := newUserWideApps(t, user)
+
+	status, body, _ := deleteAccount(t, accessToken, api.DeleteAccountRequest{Password: deletionUserPassword})
+	require.Equal(t, http.StatusOK, status, "body: %v", body)
+
+	// The user is gone, so the audit rows are not checked by user.
+	a.assertToldEverywhere(t, "")
+}
+
 // TestBackchannelLogout_AnAdministratorSettingThePasswordTellsEveryAppThatKnewTheUser: an
 // administrator sets the user's password.
 func TestBackchannelLogout_AnAdministratorSettingThePasswordTellsEveryAppThatKnewTheUser(t *testing.T) {
