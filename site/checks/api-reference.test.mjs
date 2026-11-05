@@ -23,6 +23,7 @@ function spec(paths) {
 		tags: [
 			{ name: 'Users', description: 'User management (Admin API)' },
 			{ name: 'Clients', description: 'OAuth client management (Admin API)' },
+			{ name: 'Settings', description: 'System settings (Admin API)' },
 			{ name: 'Account', description: 'Self-service account management (Account API)' },
 			{ name: 'Browser Sessions', description: 'Not a public surface.' },
 		],
@@ -47,6 +48,7 @@ const fullSpec = () =>
 		'/api/v1/admin/users/{id}': { get: operation('getUser', ['Users']), delete: operation('deleteUser', ['Users']) },
 		'/api/v1/admin/clients/{id}': { get: operation('getClient', ['Clients']) },
 		'/client/logo/{clientIdentifier}': { get: { ...operation('getClientLogoImage', ['Clients']), security: [] } },
+		'/api/public/settings': { get: { ...operation('getPublicSettings', ['Settings']), security: [] } },
 		'/api/v1/account/profile': { get: operation('getAccountProfile', ['Account']) },
 		'/api/v1/account/profile-picture': { post: operation('uploadAccountProfilePicture', ['Account']) },
 		'/api/v1/account/otp/enrollment': { get: operation('getAccountOTPEnrollment', ['Account']) },
@@ -54,20 +56,22 @@ const fullSpec = () =>
 		'/api/v1/sessions/load': { post: operation('loadBrowserSession', ['Browser Sessions']) },
 	});
 
-test('the Admin API holds the admin operations and the public client logo, under their own tags', () => {
+test('the Admin API holds the admin operations, the public client logo and the public settings, under their own tags', () => {
 	const { admin } = splitApiReference(fullSpec());
 	assert.deepEqual(operations(admin), [
 		'GET /api/v1/admin/users/{id} getUser [Users]',
 		'DELETE /api/v1/admin/users/{id} deleteUser [Users]',
 		'GET /api/v1/admin/clients/{id} getClient [Clients]',
 		'GET /client/logo/{clientIdentifier} getClientLogoImage [Clients]',
+		'GET /api/public/settings getPublicSettings [Settings]',
 	]);
 	assert.equal(admin.info.title, 'Admin API');
 	assert.deepEqual(
 		admin.tags.map((tag) => tag.name),
-		['Users', 'Clients'],
+		['Users', 'Clients', 'Settings'],
 	);
 	assert.deepEqual(admin.paths['/client/logo/{clientIdentifier}'].get.security, []);
+	assert.deepEqual(admin.paths['/api/public/settings'].get.security, []);
 });
 
 test('the Account API holds the account operations, split by resource', () => {

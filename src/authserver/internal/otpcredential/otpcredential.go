@@ -391,7 +391,8 @@ func RemoveTx(ctx context.Context, db Database, tx *sql.Tx, user *record.User) (
 // step, OutcomeClockAhead, is not counted: only the authenticator can produce it, so it is no
 // guess against it (#142).
 //
-// One caller today, authflow.OTPSubmission's already-enrolled arm.
+// Two callers today: authflow.OTPSubmission's already-enrolled arm and the Account API's
+// account deletion.
 func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User, code string, now time.Time) (VerifyResult, error) {
 	// Before the seed is touched, for the replay's reason: nothing about the refusal
 	// tells the submitter whether the code matched, was replayed, or was never looked at

@@ -33,7 +33,7 @@ import (
 
 func TestPublicSettings_Success(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database)
+	handler := HandlePublicSettingsGet(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 		Id:          1,
@@ -79,7 +79,7 @@ func TestPublicSettings_CarriesTheStoredPolicysRules(t *testing.T) {
 			}, nil).Once()
 
 			recorder := httptest.NewRecorder()
-			NewPublicSettings(database).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+			HandlePublicSettingsGet(database).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
 
 			require.Equal(t, http.StatusOK, recorder.Code)
 			var body map[string]json.RawMessage
@@ -99,7 +99,7 @@ func TestPublicSettings_CarriesAccountDeletionEnabled(t *testing.T) {
 		}, nil).Once()
 
 		recorder := httptest.NewRecorder()
-		NewPublicSettings(database).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+		HandlePublicSettingsGet(database).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
 
 		require.Equal(t, http.StatusOK, recorder.Code)
 		var body map[string]any
@@ -110,7 +110,7 @@ func TestPublicSettings_CarriesAccountDeletionEnabled(t *testing.T) {
 
 func TestPublicSettings_DatabaseError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database)
+	handler := HandlePublicSettingsGet(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(nil, errors.New("database is down")).Once()
@@ -130,7 +130,7 @@ func TestPublicSettings_DatabaseError(t *testing.T) {
 // authentication.
 func TestPublicSettings_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database)
+	handler := HandlePublicSettingsGet(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil).Once()
 
@@ -166,7 +166,7 @@ func (f *failingResponseWriter) WriteHeader(int) {}
 
 func TestPublicSettings_EncodeFailure(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database)
+	handler := HandlePublicSettingsGet(database)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 		Id: 1, AppName: "Goiabada",
@@ -247,7 +247,7 @@ func assertOnlyAllowlistedFields(t *testing.T, responseType reflect.Type, allowe
 // namely someone replacing the DTO mapping with a direct encode of settings.
 func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := NewPublicSettings(database)
+	handler := HandlePublicSettingsGet(database)
 
 	aesKey := []byte("SENTINEL-legacy-aes-encryption-key")
 	smtpPassword := []byte("SENTINEL-smtp-password-encrypted")

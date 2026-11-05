@@ -669,3 +669,77 @@ func TestHandleAccountDeletionPost_TheCodeThatDisablesTheAuthenticatorIsTold(t *
 	f.jobs.runAll(t, afterresponse.ClassSecurityNotice)
 	assert.Equal(t, deletionAddress, captured.sent.To)
 }
+
+// A password changed after the request checked it, committed before the deletion locks the row: the
+// password the deletion was asked with is no longer the account's, so it is refused as a wrong one
+// and rolled back. It was right when checked, so it spends nothing.
+func TestHandleAccountDeletionPost_APasswordReplacedMeanwhileIsRefused(t *testing.T) {
+	f := newDeletionFixture(t)
+	user := deletionUser(t)
+	f.expectCaller(user)
+	f.expectEarlyCheck(false, 0)
+	current := *user
+	var err error
+	current.PasswordHash, err = passwordhash.Hash("A-different-current-password-123!")
+	require.NoError(t, err)
+	current.AuthStateGeneration++
+	stub := f.expectDeletionOpened(&current)
+
+	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{"password": deletionPassword}))
+
+	require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+	assert.Equal(t, "AUTHENTICATION_FAILED", errorCodeOf(t, rr))
+	require.Error(t, stub.BodyErr, "nothing is deleted")
+	f.database.AssertNotCalled(t, "DeleteUser", mock.Anything, mock.Anything, mock.Anything)
+	assert.Zero(t, f.credentials.failures)
+	assert.Empty(t, f.jobs.jobs)
+}
+
+// An authenticator removed and enrolled again after the request accepted its code: the code belongs
+// to an authenticator the account no longer has, so it is refused as a wrong one and rolled back.
+func TestHandleAccountDeletionPost_AnAuthenticatorReplacedMeanwhileIsRefused(t *testing.T) {
+	f := newDeletionFixture(t)
+	user := enrolledDeletionUser(t)
+	f.expectCaller(user)
+	f.expectEarlyCheck(false, 0)
+	f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserId, mock.Anything,
+		user.OtpConfigGeneration).Return(true, nil).Once()
+	current := *user
+	current.OtpConfigGeneration = 8
+	var err error
+	current.OTPSecretEncrypted, err = testDataCipher.Encrypt("JBSWY3DPEHPK3PXP")
+	require.NoError(t, err)
+	stub := f.expectDeletionOpened(&current)
+
+	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
+		"password": deletionPassword, "otpCode": currentOtpCode(t)}))
+
+	require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+	assert.Equal(t, "INVALID_OTP_CODE", errorCodeOf(t, rr))
+	require.Error(t, stub.BodyErr, "nothing is deleted")
+	f.database.AssertNotCalled(t, "DeleteUser", mock.Anything, mock.Anything, mock.Anything)
+	assert.Zero(t, f.credentials.failures)
+	assert.Empty(t, f.jobs.jobs)
+}
+
+// Two-factor removed after the request accepted its code leaves the password alone enough, as
+// removing it on Account → Two-factor does (decision 1), so the deletion goes on.
+func TestHandleAccountDeletionPost_TwoFactorRemovedMeanwhileStillDeletes(t *testing.T) {
+	f := newDeletionFixture(t)
+	user := enrolledDeletionUser(t)
+	f.expectCaller(user)
+	f.expectEarlyCheck(false, 0)
+	f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserId, mock.Anything,
+		user.OtpConfigGeneration).Return(true, nil).Once()
+	current := *user
+	current.OTPEnabled = false
+	current.OTPSecretEncrypted = nil
+	current.OtpConfigGeneration = 7
+	stub := f.expectDeletionOpened(&current)
+	f.expectDeletionCompleted()
+
+	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
+		"password": deletionPassword, "otpCode": currentOtpCode(t)}))
+
+	f.assertDeleted(t, rr, stub)
+}

@@ -11,8 +11,8 @@ info:
     ```
     Authorization: Bearer <access_token>
     ```
-    `getClientLogoImage`, at `/client/logo/{clientIdentifier}` outside `/api/v1`, is
-    public and marked `security: []`.
+    `getClientLogoImage`, at `/client/logo/{clientIdentifier}`, and `getPublicSettings`, at
+    `/api/public/settings`, are outside `/api/v1`: they are public and marked `security: []`.
 
     ## API Groups
 
@@ -3170,6 +3170,26 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/public/settings:
+    get:
+      tags: [Settings]
+      summary: Get public settings
+      description: |
+        The settings the admin console reads before anyone holds a token: the app name, the UI
+        theme, whether SMTP is configured, the issuer, the password rules, and whether users can
+        delete their own account. This is a public endpoint that does not require
+        authentication.
+      operationId: getPublicSettings
+      security: []
+      responses:
+        '200':
+          description: Public settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicSettingsResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/admin/settings/email:
     get:
       tags: [Settings]
@@ -7391,6 +7411,67 @@ components:
     # =========================================================================
     # Settings Schemas
     # =========================================================================
+    PublicSettingsResponse:
+      type: object
+      properties:
+        appName:
+          type: string
+        uiTheme:
+          type: string
+          description: The name of the UI theme the pages use.
+        smtpEnabled:
+          type: boolean
+          description: When true, SMTP is configured, so the auth server can send email.
+        issuer:
+          type: string
+          description: The issuer the auth server writes into the iss claim of every token it signs.
+        accountDeletionEnabled:
+          type: boolean
+          description: >-
+            When true, users can delete their own account from their account pages in the admin
+            console. The same setting as accountDeletionEnabled in the general settings.
+        passwordRules:
+          $ref: '#/components/schemas/PasswordRulesResponse'
+      required:
+        - appName
+        - uiTheme
+        - smtpEnabled
+        - issuer
+        - accountDeletionEnabled
+        - passwordRules
+
+    PasswordRulesResponse:
+      type: object
+      description: What the general settings' password policy asks of a new password.
+      properties:
+        minLength:
+          type: integer
+          description: The minimum length, in characters.
+        requiresLowercase:
+          type: boolean
+        requiresUppercase:
+          type: boolean
+        requiresNumber:
+          type: boolean
+        requiresSymbol:
+          type: boolean
+        refusesCommon:
+          type: boolean
+          description: When true, a commonly used password is refused.
+        refusesAccountWords:
+          type: boolean
+          description: >-
+            When true, a password too close to the account's email address, username or the app
+            name is refused.
+      required:
+        - minLength
+        - requiresLowercase
+        - requiresUppercase
+        - requiresNumber
+        - requiresSymbol
+        - refusesCommon
+        - refusesAccountWords
+
     SettingsGeneralResponse:
       type: object
       properties:

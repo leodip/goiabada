@@ -945,6 +945,13 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 					if pkg, ok := f.X.(*ast.Ident); ok && pkg.Name == "http" {
 						out[404] = true
 					}
+				case "WriteInternalServerError", "WriteJSON":
+					// The shared primitives writeInternalServerError and writeJSON wrap, called
+					// directly by the handlers outside apihandlers, such as the public settings:
+					// each can answer 500 for the reason its wrapper above can.
+					if pkg, ok := f.X.(*ast.Ident); ok && pkg.Name == "apiresponse" {
+						out[500] = true
+					}
 				}
 			}
 		}
@@ -1258,18 +1265,10 @@ var schemasWithNoAPIStruct = map[string]string{
 // read that this document does not declare, and the reason has to say why that is acceptable
 // rather than merely true.
 var apiStructsWithNoSchema = map[string]string{
-	// Outside the document's declared scope. info.description scopes this file to the Admin
-	// API (/api/v1/admin/*) and the Account API (/api/v1/account/*); /api/public/settings is
-	// neither, which is also why TestOpenAPI_DescribesEveryAPIRoute scopes itself to /api/v1.
-	//
-	// The three RFC 7591 registration types were exempted here on the same ground until #385
-	// moved them to authserver/internal/oidc. The entries came out with them rather than
-	// staying: structFields reads src/core/api alone, so a struct that is no longer declared
-	// there is not a gap this map can be exempting, and the loop below fails an entry that
-	// names one.
-	"PublicSettingsResponse": "the unauthenticated /api/public/settings, outside the Admin and Account API scope this document declares",
-	// Carried by PublicSettingsResponse alone, as its passwordRules (#550 decision 11).
-	"PasswordRulesResponse": "the password rules the unauthenticated /api/public/settings carries, outside the Admin and Account API scope this document declares",
+	// Empty since #783. PublicSettingsResponse and PasswordRulesResponse were here, as the
+	// answer of /api/public/settings, outside the Admin and Account API scope the document then
+	// declared; the document describes that public operation now, beside the client logo, so
+	// their properties are checked here like every other schema's.
 }
 
 func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {

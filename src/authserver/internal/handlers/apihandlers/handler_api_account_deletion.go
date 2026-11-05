@@ -44,6 +44,12 @@ var (
 	errSecondFactorNowRequired = errors.New("two-factor authentication was turned on after the account was read")
 	// errAccountGone is the account deleted by another request after this one read it.
 	errAccountGone = errors.New("the account was deleted after it was read")
+	// errPasswordReplaced is the password changed after the request checked the one it carried, so
+	// the password the deletion was asked with is no longer the account's.
+	errPasswordReplaced = errors.New("the password was replaced after it was checked")
+	// errAuthenticatorReplaced is the authenticator removed and enrolled again after the request
+	// accepted its code, so the code belongs to an authenticator the account no longer has.
+	errAuthenticatorReplaced = errors.New("the authenticator was replaced after its code was checked")
 )
 
 // HandleAccountDeletionPost - POST /api/v1/account/deletion
@@ -65,7 +71,9 @@ var (
 // The deletion is DeleteUser in a transaction whose first statement takes the administrators' lock,
 // rolled back when it would leave no enabled user holding manage. A recovery code is claimed on that
 // same transaction, so a deletion refused or rolled back spends none, and one that commits deletes it
-// with the rest of the set. After the commit, deleted_own_account is written and the user is sent
+// with the rest of the set. The row read under its lock must still hold the password and the
+// authenticator the request was checked against: one replaced in between is refused as a wrong
+// password or code, spending nothing. After the commit, deleted_own_account is written and the user is sent
 // "Your account was deleted", addressed to their row as the deletion read it under the row's lock.
 func HandleAccountDeletionPost(
 	database accountDeletionDatabase,
@@ -169,6 +177,7 @@ func HandleAccountDeletionPost(
 		}
 
 		codeHash := otpcredential.HashRecoveryCode(req.RecoveryCode)
+		usedOTPCode := user.OTPEnabled && !useRecoveryCode
 		// Safe to rerun: current is the committing attempt's.
 		var current *record.User
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
@@ -184,8 +193,18 @@ func HandleAccountDeletionPost(
 			if locked == nil {
 				return errAccountGone
 			}
+			// The credentials were checked against the first read, so the row under the lock must still
+			// hold them: a password change, or an authenticator removed and enrolled again, committed in
+			// between leaves this request asking with credentials the account no longer has.
+			if locked.PasswordHash != user.PasswordHash {
+				return errPasswordReplaced
+			}
 			if locked.OTPEnabled && !user.OTPEnabled {
 				return errSecondFactorNowRequired
+			}
+			// Two-factor removed meanwhile leaves the password alone enough, as decision 1 allows.
+			if locked.OTPEnabled && usedOTPCode && locked.OtpConfigGeneration != user.OtpConfigGeneration {
+				return errAuthenticatorReplaced
 			}
 			if useRecoveryCode {
 				used, claimErr := database.TryUseUserRecoveryCode(r.Context(), tx, user.Id, codeHash)
@@ -218,6 +237,16 @@ func HandleAccountDeletionPost(
 			return
 		case errors.Is(err, errRecoveryCodeRefused):
 			refuseDeletionRecoveryCode(w, r, database, auditLogger, credentialFailures, user.Id, subject, codeHash)
+			return
+		case errors.Is(err, errPasswordReplaced):
+			// Not a guess: the password was right when it was checked, so it spends nothing.
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil),
+				"AUTHENTICATION_FAILED", http.StatusBadRequest)
+			return
+		case errors.Is(err, errAuthenticatorReplaced):
+			// Answered as a wrong code, which it now is, and spends nothing for the same reason.
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil),
+				"INVALID_OTP_CODE", http.StatusBadRequest)
 			return
 		case errors.Is(err, errSecondFactorNowRequired):
 			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPCodeRequired, nil),
