@@ -7,7 +7,7 @@
     "start": "NODE_OPTIONS='--max-http-header-size=32768' astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "test": "node --test 'checks/*.test.mjs' 'plugins/*.test.mjs'",
+    "test": "node --test 'checks/*.test.mjs' 'plugins/*.test.mjs' 'src/consent/*.test.mjs'",
     "astro": "astro"
   },
   "dependencies": {
@@ -27,10 +27,14 @@
     "sharp": "^0.35.5",
     "starlight-links-validator": "^0.27.0",
     "starlight-openapi": "^0.27.0",
+    "vanilla-cookieconsent": "^3.3.0",
     "yaml": "^2.9.1"
   },
   "overrides": {
     "form-data": "^4.0.6",
     "postcss-nested": "7.0.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
   }
 }

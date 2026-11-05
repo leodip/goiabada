@@ -4,14 +4,23 @@
 import { fileURLToPath } from 'node:url';
 
 import { assertApiReferenceLinks } from './api-reference-links.mjs';
+import { assertContentSecurityPolicy, writeContentSecurityPolicy } from './csp.mjs';
 import { assertLlmsFiles, writeLlmsFiles } from './llms.mjs';
+import { assertConsentOnEveryPage, assertNoOffSiteLoads } from './privacy.mjs';
 import { assertShippedLinks } from './shipped-links.mjs';
 
 // srcDir is the repository's src/ directory, whose code the shipped-link check
 // reads. llms holds the title and one-line summary that head llms.txt.
 // apiReferences, when given, maps each generated API reference to the base it is
 // published under, and every link into one is checked against the built pages.
-export default function buildChecks({ srcDir, llms, apiReferences }) {
+// No page or stylesheet may load anything from another site. privacyPage, when
+// given, is the Privacy page's path, and every page must carry the consent prompt
+// and the footer's links to it and to Cookie settings. Last, every page gets its
+// Content-Security-Policy, holding the hashes of its inline scripts and style
+// elements, and starts with a byte order mark in place of its charset meta, which
+// the policy would push past HTML's first 1024 bytes; so no step may change a page
+// after this one. The check then reads the policies back.
+export default function buildChecks({ srcDir, llms, apiReferences, privacyPage }) {
 	let site;
 	return {
 		name: 'goiabada-build-checks',
@@ -34,6 +43,18 @@ export default function buildChecks({ srcDir, llms, apiReferences }) {
 					const apiLinks = assertApiReferenceLinks({ distDir, site, bases });
 					logger.info(`${apiLinks} links into the generated API reference name a built page`);
 				}
+
+				const loads = assertNoOffSiteLoads({ distDir, site });
+				logger.info(`${loads.pages} pages and ${loads.stylesheets} stylesheets load nothing from another site`);
+
+				if (privacyPage) {
+					const consentPages = assertConsentOnEveryPage({ distDir, site, privacyPage });
+					logger.info(`${consentPages} pages carry the consent prompt and the footer's Privacy and Cookie settings links`);
+				}
+
+				writeContentSecurityPolicy({ distDir });
+				const cspPages = assertContentSecurityPolicy({ distDir });
+				logger.info(`${cspPages} pages carry a Content-Security-Policy that lists each of their inline scripts and style elements, and declare their encoding in time`);
 			},
 		},
 	};

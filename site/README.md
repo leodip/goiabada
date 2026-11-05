@@ -59,6 +59,33 @@ and errors are handwritten pages beside the generated ones, in `src/content/docs
   is missing from either file, an entry names no page, or an entry lacks text its page renders.
   This step is ours, in `checks/llms.mjs`. The project title and summary that head `llms.txt`
   are in `astro.config.mjs`, and its sections follow the sidebar.
+- **A page or stylesheet loads anything from another site:** a script, a stylesheet, a preload,
+  modulepreload, prefetch, preconnect or dns-prefetch link, an icon or manifest, an image or
+  `srcset` candidate, a frame, media or an embedded object, or a CSS `url()` or `@import` in a
+  built stylesheet, a `<style>` element or a `style` attribute, naming another origin. Serve it
+  from the site instead. Links that load nothing, such as `canonical`, `sitemap` and `<a href>`,
+  are allowed, and so are `data:` URLs. Google's tag passes because the consent prompt's script adds
+  it after Accept, and the check doesn't read scripts.
+- **A page lacks the consent prompt or the footer's links:** every page, the 404 page included,
+  must load the consent prompt's script and carry a Privacy link to `/about/privacy/` and the
+  Cookie settings button. Both come from the `Footer` override in `src/components/Footer.astro`,
+  so a page that doesn't render Starlight's footer fails. So does moving the Privacy page without
+  updating the link.
+- **A page's Content-Security-Policy is missing, misplaced or incomplete, or a page has an inline
+  event handler:** the build's last step writes into every page a
+  `<meta http-equiv="Content-Security-Policy">` as the first element of its `<head>`, with the
+  directives in `checks/csp.mjs` and the SHA-256 hashes of that page's inline scripts and `<style>`
+  elements, so the browser runs what the build produced and nothing injected later. It then reads
+  every page back, and fails when the policy is not the head's first element or leaves out an
+  inline script or style element, or when a page has an `onclick`-style attribute, which no hash
+  allows: use a script instead. Inline `style` attributes are allowed. A policy that long would
+  push the page's `<meta charset>` past the first 1024 bytes, where HTML requires it, so the step
+  takes it out and starts the page with a UTF-8 byte order mark instead; the check fails a page
+  whose charset declaration ends later, or that declares no encoding. No step may change a page
+  after this one, or its hashes go stale.
+
+These last three checks are ours, in `checks/privacy.mjs` and `checks/csp.mjs`, run from
+`checks/build-checks.mjs`.
 
 `npm test` runs the checks' tests on small fixtures with Node's built-in test runner.
 
@@ -77,6 +104,33 @@ site's 404 page, with its search and sidebar, for any other path, a 301 to the r
 without it, `charset=utf-8` on text, and `X-Frame-Options` and `X-Content-Type-Options` on every answer, static
 assets included. The 404 page's text is `src/content/docs/404.md`.
 
-CI's Check workflow runs the checks' tests, the build and the image's answers on every pull
-request. The Docs workflow builds and pushes the image when `site/` or
-`src/authserver/web/openapi.yaml` changes on `main`, and on every release.
+## The site in a browser
+
+`checks/docs-browser.sh` starts a docs image and opens it in Chromium with
+[Playwright](https://playwright.dev), from `browser/`:
+
+```sh
+(cd site && npx playwright install chromium)   # once for each Playwright version
+site/checks/docs-browser.sh goiabada-docs
+```
+
+It fails on any Content-Security-Policy violation while it opens the home page, a page with code
+blocks and tabs, an Admin API operation page and the Privacy page, searches each, switches its
+theme and, on the home page, enlarges a screenshot. It also fails when anything reaches Google
+before the visitor accepts Analytics, when Google's tag isn't requested after Accept, or when
+anything is sent after the visitor withdraws from Cookie settings or rejects, or from a browser
+sending Global Privacy Control. It checks that the prompt's Accept and Reject sit side by side on
+a wide screen and a phone, and that the consent buttons' text has at least 4.5:1 contrast in both
+themes, under the pointer too. Google's requests are answered with a stand-in, so a run sends
+nothing to Analytics. These are what a dependency update can break without failing the build:
+search stopping, code losing its colours, Analytics refused after Accept. After a failure,
+`npx playwright show-report` in `site/` opens the traces.
+
+`@playwright/test` is pinned to the e2e suite's version.
+
+## CI
+
+CI's Check workflow runs the checks' tests, the build, the image's answers and the browser tests on
+every pull request, and uploads the browser tests' report when they fail. The Docs workflow builds
+and pushes the image when `site/` or `src/authserver/web/openapi.yaml` changes on `main`, and on
+every release.
