@@ -5,10 +5,13 @@ import (
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -26,20 +29,185 @@ import (
 // and records exported_user_data once the answer is written (#781 decisions 3, 5, 6 and 8). The
 // scope rule, decision 1, is the route's middleware, held by the integration tier.
 
-// userExportUsers is the endpoint's port, implemented directly: the users it holds by id, or the
-// failure every read answers.
-type userExportUsers struct {
-	users map[int64]*record.User
-	err   error
-	reads []int64
+// userExportStore is the endpoint's port, implemented directly: one user's rows as the database
+// answers them, in the order given, which is not id order, and the read that fails, if any.
+type userExportStore struct {
+	users            map[int64]*record.User
+	attributes       []record.UserAttribute
+	groups           []record.Group
+	groupAttributes  map[int64][]record.GroupAttribute
+	groupPermissions map[int64][]record.Permission
+	memberCounts     map[int64]int
+	permissions      []record.Permission
+	resources        map[int64]record.Resource
+	consents         []record.UserConsent
+	clients          map[int64]record.Client
+	sessions         []record.UserSession
+	sessionClients   map[int64][]record.UserSessionClient
+	acceptances      []record.LegalDocumentAcceptance
+	legalDocuments   []record.LegalDocument
+	legalVersions    map[int64][]record.LegalDocumentVersion
+	picture          *record.UserProfilePicture
+
+	// failing names the one read that answers err; "" for none, "*" for every read.
+	failing string
+	err     error
+	// reads is the user id each read about the user was given, by the read's name.
+	reads map[string][]int64
 }
 
-func (d *userExportUsers) GetUserById(_ context.Context, _ *sql.Tx, userId int64) (*record.User, error) {
-	d.reads = append(d.reads, userId)
-	if d.err != nil {
-		return nil, d.err
+func (d *userExportStore) read(name string, userId int64) error {
+	if d.reads == nil {
+		d.reads = map[string][]int64{}
 	}
-	return d.users[userId], nil
+	d.reads[name] = append(d.reads[name], userId)
+	if d.failing == name || d.failing == "*" {
+		return d.err
+	}
+	return nil
+}
+
+func (d *userExportStore) GetUserById(_ context.Context, _ *sql.Tx, userId int64) (*record.User, error) {
+	if err := d.read("GetUserById", userId); err != nil {
+		return nil, err
+	}
+	user, ok := d.users[userId]
+	if !ok {
+		return nil, nil
+	}
+	copied := *user
+	return &copied, nil
+}
+
+func (d *userExportStore) GetUserAttributesByUserId(_ context.Context, _ *sql.Tx, userId int64) ([]record.UserAttribute, error) {
+	if err := d.read("GetUserAttributesByUserId", userId); err != nil {
+		return nil, err
+	}
+	return slices.Clone(d.attributes), nil
+}
+
+func (d *userExportStore) UserLoadGroups(_ context.Context, _ *sql.Tx, user *record.User) error {
+	if err := d.read("UserLoadGroups", user.Id); err != nil {
+		return err
+	}
+	user.Groups = slices.Clone(d.groups)
+	return nil
+}
+
+func (d *userExportStore) CountGroupMembers(_ context.Context, _ *sql.Tx, groupId int64) (int, error) {
+	if err := d.read("CountGroupMembers", 0); err != nil {
+		return 0, err
+	}
+	return d.memberCounts[groupId], nil
+}
+
+func (d *userExportStore) GetGroupAttributesByGroupId(_ context.Context, _ *sql.Tx, groupId int64) ([]record.GroupAttribute, error) {
+	if err := d.read("GetGroupAttributesByGroupId", 0); err != nil {
+		return nil, err
+	}
+	return slices.Clone(d.groupAttributes[groupId]), nil
+}
+
+func (d *userExportStore) GroupLoadPermissions(_ context.Context, _ *sql.Tx, group *record.Group) error {
+	if err := d.read("GroupLoadPermissions", 0); err != nil {
+		return err
+	}
+	group.Permissions = slices.Clone(d.groupPermissions[group.Id])
+	return nil
+}
+
+func (d *userExportStore) UserLoadPermissions(_ context.Context, _ *sql.Tx, user *record.User) error {
+	if err := d.read("UserLoadPermissions", user.Id); err != nil {
+		return err
+	}
+	user.Permissions = slices.Clone(d.permissions)
+	return nil
+}
+
+func (d *userExportStore) GetResourceById(_ context.Context, _ *sql.Tx, resourceId int64) (*record.Resource, error) {
+	if err := d.read("GetResourceById", 0); err != nil {
+		return nil, err
+	}
+	resource, ok := d.resources[resourceId]
+	if !ok {
+		return nil, nil
+	}
+	return &resource, nil
+}
+
+func (d *userExportStore) GetConsentsByUserId(_ context.Context, _ *sql.Tx, userId int64) ([]record.UserConsent, error) {
+	if err := d.read("GetConsentsByUserId", userId); err != nil {
+		return nil, err
+	}
+	return slices.Clone(d.consents), nil
+}
+
+func (d *userExportStore) UserConsentsLoadClients(_ context.Context, _ *sql.Tx, userConsents []record.UserConsent) error {
+	if err := d.read("UserConsentsLoadClients", 0); err != nil {
+		return err
+	}
+	for i := range userConsents {
+		userConsents[i].Client = d.clients[userConsents[i].ClientId]
+	}
+	return nil
+}
+
+func (d *userExportStore) GetUserSessionsByUserId(_ context.Context, _ *sql.Tx, userId int64) ([]record.UserSession, error) {
+	if err := d.read("GetUserSessionsByUserId", userId); err != nil {
+		return nil, err
+	}
+	return slices.Clone(d.sessions), nil
+}
+
+func (d *userExportStore) UserSessionsLoadClients(_ context.Context, _ *sql.Tx, userSessions []record.UserSession) error {
+	if err := d.read("UserSessionsLoadClients", 0); err != nil {
+		return err
+	}
+	for i := range userSessions {
+		userSessions[i].Clients = slices.Clone(d.sessionClients[userSessions[i].Id])
+	}
+	return nil
+}
+
+func (d *userExportStore) GetClientsByIds(_ context.Context, _ *sql.Tx, clientIds []int64) ([]record.Client, error) {
+	if err := d.read("GetClientsByIds", 0); err != nil {
+		return nil, err
+	}
+	clients := make([]record.Client, 0, len(clientIds))
+	for _, id := range clientIds {
+		if client, ok := d.clients[id]; ok {
+			clients = append(clients, client)
+		}
+	}
+	return clients, nil
+}
+
+func (d *userExportStore) GetLegalDocumentAcceptancesByUserId(_ context.Context, _ *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error) {
+	if err := d.read("GetLegalDocumentAcceptancesByUserId", userId); err != nil {
+		return nil, err
+	}
+	return slices.Clone(d.acceptances), nil
+}
+
+func (d *userExportStore) GetAllLegalDocuments(_ context.Context, _ *sql.Tx) ([]record.LegalDocument, error) {
+	if err := d.read("GetAllLegalDocuments", 0); err != nil {
+		return nil, err
+	}
+	return slices.Clone(d.legalDocuments), nil
+}
+
+func (d *userExportStore) GetLegalDocumentVersionsByLegalDocumentId(_ context.Context, _ *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error) {
+	if err := d.read("GetLegalDocumentVersionsByLegalDocumentId", 0); err != nil {
+		return nil, err
+	}
+	return slices.Clone(d.legalVersions[legalDocumentId]), nil
+}
+
+func (d *userExportStore) GetUserProfilePictureByUserId(_ context.Context, _ *sql.Tx, userId int64) (*record.UserProfilePicture, error) {
+	if err := d.read("GetUserProfilePictureByUserId", userId); err != nil {
+		return nil, err
+	}
+	return d.picture, nil
 }
 
 // exportAudit records each event the handler logs, with what the response held at that moment.
@@ -127,21 +295,26 @@ func exportRequest(id string, acceptEncoding ...string) *http.Request {
 	for _, value := range acceptEncoding {
 		r.Header.Add("Accept-Encoding", value)
 	}
-	r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{Issuer: "https://auth.example.com"}))
+	r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{
+		Issuer:                          "https://auth.example.com",
+		UserSessionIdleTimeoutInSeconds: 7200,
+		UserSessionMaxLifetimeInSeconds: 86400,
+	}))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": "the-administrator"})
 	return withPathValue(r, "id", id)
 }
 
-func serveExport(t *testing.T, database *userExportUsers, r *http.Request) (*deadlineRecorder, *exportAudit) {
+func serveExport(t *testing.T, database *userExportStore, r *http.Request) (*deadlineRecorder, *exportAudit) {
 	t.Helper()
 	rr := &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
 	auditLogger := &exportAudit{recorder: rr.ResponseRecorder}
-	HandleUserExportGet(database, auditLogger).ServeHTTP(rr, r)
+	HandleUserExportGet(database, auditLogger, "https://auth.example.com").ServeHTTP(rr, r)
 	return rr, auditLogger
 }
 
-func exportDatabase() *userExportUsers {
-	return &userExportUsers{users: map[int64]*record.User{42: exportFixtureUser()}}
+// exportDatabase holds the fixture user and nothing else about them.
+func exportDatabase() *userExportStore {
+	return &userExportStore{users: map[int64]*record.User{42: exportFixtureUser()}}
 }
 
 // assertTheFixtureDocument holds a plain JSON body to the fixture's document, and exportedAt to an
@@ -171,7 +344,7 @@ func TestHandleUserExportGet_AnswersTheDocumentAsAFileToSave(t *testing.T) {
 
 	after := time.Now()
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.Equal(t, []int64{42}, database.reads)
+	assert.Equal(t, []int64{42}, database.reads["GetUserById"])
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
 	assert.Empty(t, rr.Header().Get("Content-Encoding"), "a caller that names no encoding gets plain JSON")
 	assert.Equal(t, []string{"Accept-Encoding"}, rr.Header().Values("Vary"))
@@ -263,7 +436,7 @@ func TestHandleUserExportGet_AWriterWithNoDeadlineStillAnswers(t *testing.T) {
 	rr := httptest.NewRecorder()
 	auditLogger := &exportAudit{recorder: rr}
 
-	HandleUserExportGet(exportDatabase(), auditLogger).ServeHTTP(rr, exportRequest("42"))
+	HandleUserExportGet(exportDatabase(), auditLogger, "https://auth.example.com").ServeHTTP(rr, exportRequest("42"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	assertTheFixtureDocument(t, rr.Body.Bytes(), time.Now().Add(-time.Minute), time.Now())
@@ -296,13 +469,13 @@ func TestHandleUserExportGet_RefusalsAndFailuresAreUncompressedAndUnrecorded(t *
 	for _, c := range []struct {
 		name     string
 		id       string
-		database *userExportUsers
+		database *userExportStore
 		status   int
 		code     string
 	}{
 		{"an id that is not a number", "abc", exportDatabase(), http.StatusBadRequest, "VALIDATION_ERROR"},
 		{"an id that names no user", "43", exportDatabase(), http.StatusNotFound, "NOT_FOUND"},
-		{"a failed read", "42", &userExportUsers{err: errs.New("the database is down")}, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR"},
+		{"a failed read", "42", &userExportStore{failing: "*", err: errs.New("the database is down")}, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			logtest.CaptureSlog(t)
@@ -333,4 +506,269 @@ func TestHandleUserExportGet_NoSettingsIsAFiveHundred(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Empty(t, auditLogger.events)
 	assert.Len(t, capture.Records(), 1)
+}
+
+// The secrets a seeded client carries, which no part of the document may copy.
+const exportSeededClientSecret = "the-seeded-client-secret-ciphertext"
+
+// exportEverythingDatabase holds the fixture user with one or more of each part the admin API
+// reads about a user: attributes, two groups (one with attributes and permissions of its own, one
+// with none), direct permissions, consents, two live sessions and one past its idle timeout, three
+// legal document acceptances (one of a retired document) and a profile picture. Every list is
+// answered out of id order, as nothing promises the reads' order. The sessions are timed from now.
+func exportEverythingDatabase(now time.Time) *userExportStore {
+	at := func(s string) sql.NullTime {
+		parsed, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			panic(err)
+		}
+		return sql.NullTime{Time: parsed, Valid: true}
+	}
+	instant := func(s string) time.Time { return at(s).Time }
+	store := exportDatabase()
+
+	store.attributes = []record.UserAttribute{
+		{Id: 12, CreatedAt: at("2025-03-01T10:00:00Z"), Key: "department", Value: "Sales", IncludeInIdToken: true, UserId: 42},
+		{Id: 11, CreatedAt: at("2025-02-01T10:00:00Z"), Key: "employee_number", Value: "E-1001", IncludeInAccessToken: true, UserId: 42},
+	}
+
+	store.groups = []record.Group{
+		{Id: 8, GroupIdentifier: "auditors", Description: "Auditors", IncludeInIdToken: true},
+		{Id: 5, CreatedAt: at("2025-01-10T09:00:00Z"), GroupIdentifier: "sales", Description: "Sales team", IncludeInAccessToken: true},
+	}
+	store.memberCounts = map[int64]int{5: 3, 8: 1}
+	store.groupAttributes = map[int64][]record.GroupAttribute{
+		5: {
+			{Id: 31, Key: "region", Value: "south", IncludeInIdToken: true, GroupId: 5},
+			{Id: 30, Key: "floor", Value: "2", GroupId: 5},
+		},
+	}
+	store.groupPermissions = map[int64][]record.Permission{
+		5: {
+			{Id: 21, PermissionIdentifier: "orders:write", Description: "Write orders", ResourceId: 3},
+			{Id: 20, PermissionIdentifier: "orders:read", Description: "Read orders", ResourceId: 3},
+		},
+	}
+	store.permissions = []record.Permission{
+		{Id: 23, PermissionIdentifier: "manage-users", Description: "Manage users", ResourceId: 4},
+		{Id: 22, PermissionIdentifier: "orders:export", Description: "Export orders", ResourceId: 3},
+	}
+	store.resources = map[int64]record.Resource{
+		3: {Id: 3, ResourceIdentifier: "orders-api", Description: "Orders API"},
+		4: {Id: 4, ResourceIdentifier: "authserver", Description: "Authserver"},
+	}
+
+	store.clients = map[int64]record.Client{
+		100: {Id: 100, ClientIdentifier: "shop", Description: "The shop", DisplayName: "Shop", ShowDisplayName: true,
+			ClientSecretEncrypted: []byte(exportSeededClientSecret)},
+		101: {Id: 101, ClientIdentifier: "forum", Description: "Forum app",
+			ClientSecretEncrypted: []byte(exportSeededClientSecret)},
+	}
+	store.consents = []record.UserConsent{
+		{Id: 41, UserId: 42, ClientId: 101, Scope: "openid email", GrantedAt: at("2026-02-01T08:00:00Z")},
+		{Id: 40, UserId: 42, ClientId: 100, Scope: "openid profile", GrantedAt: at("2026-01-01T08:00:00Z")},
+	}
+
+	store.sessions = []record.UserSession{
+		{Id: 62, SessionIdentifier: "sid-62", Started: now.Add(-48 * time.Hour), LastAccessed: now.Add(-47 * time.Hour),
+			AuthTime: now.Add(-48 * time.Hour), AuthMethods: "pwd", AcrLevel: record.AcrLevel1, IpAddress: "192.0.2.9", UserId: 42},
+		{Id: 61, SessionIdentifier: "sid-61", Started: now.Add(-time.Hour), LastAccessed: now.Add(-10 * time.Minute),
+			AuthTime: now.Add(-time.Hour), AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, IpAddress: "203.0.113.7",
+			DeviceName: "Firefox", DeviceType: "desktop", DeviceOS: "Linux", UserAgent: "Mozilla/5.0 (X11)", UserId: 42},
+		{Id: 60, SessionIdentifier: "sid-60", Started: now.Add(-2 * time.Hour), LastAccessed: now.Add(-20 * time.Minute),
+			AuthTime: now.Add(-2 * time.Hour), AuthMethods: "pwd", AcrLevel: record.AcrLevel1, IpAddress: "198.51.100.4",
+			DeviceName: "Safari", DeviceType: "mobile", DeviceOS: "iOS", UserAgent: "Mozilla/5.0 (iPhone)", UserId: 42},
+	}
+	store.sessionClients = map[int64][]record.UserSessionClient{
+		61: {{UserSessionId: 61, ClientId: 101}, {UserSessionId: 61, ClientId: 100}},
+		60: {{UserSessionId: 60, ClientId: 100}},
+		62: {{UserSessionId: 62, ClientId: 100}},
+	}
+
+	// The database answers acceptances in the order they were stored; AcceptedBy turns them the
+	// latest first.
+	store.acceptances = []record.LegalDocumentAcceptance{
+		{Id: 70, AcceptedAt: instant("2025-01-02T00:00:00Z"), UserId: 42, LegalDocumentVersionId: 900},
+		{Id: 71, AcceptedAt: instant("2025-05-02T00:00:00Z"), UserId: 42, LegalDocumentVersionId: 910},
+		{Id: 72, AcceptedAt: instant("2026-01-02T00:00:00Z"), UserId: 42, LegalDocumentVersionId: 901},
+	}
+	store.legalDocuments = []record.LegalDocument{
+		{Id: 90, ShortName: "terms"},
+		{Id: 91, ShortName: "house-rules", RetiredAt: at("2026-06-01T00:00:00Z")},
+	}
+	store.legalVersions = map[int64][]record.LegalDocumentVersion{
+		90: {
+			{Id: 900, PublishedAt: instant("2025-01-01T00:00:00Z"), LegalDocumentId: 90, VersionNumber: 1, Title: "Terms of use"},
+			{Id: 901, PublishedAt: instant("2026-01-01T00:00:00Z"), LegalDocumentId: 90, VersionNumber: 2, Title: "Terms of use, revised"},
+		},
+		91: {
+			{Id: 910, PublishedAt: instant("2025-05-01T00:00:00Z"), LegalDocumentId: 91, VersionNumber: 1, Title: "House rules"},
+		},
+	}
+
+	// The first four bytes of a PNG: 89 50 4e 47, which is iVBORw== in base64.
+	store.picture = &record.UserProfilePicture{Id: 3, UserId: 42, ContentType: "image/png", Picture: []byte{0x89, 'P', 'N', 'G'}}
+	return store
+}
+
+// exportEverythingParts is what the document holds for exportEverythingDatabase beside the user,
+// written out by hand: each entry as the matching admin API read answers it, every list in id
+// order, the expired session left out, and the picture as its content type and base64 bytes. The
+// four %s are the live sessions' times: session 60's start and last access, then session 61's.
+const exportEverythingParts = `{
+	"attributes": [
+		{"id": 11, "createdAt": "2025-02-01T10:00:00Z", "updatedAt": null, "key": "employee_number",
+			"value": "E-1001", "includeInIdToken": false, "includeInAccessToken": true, "userId": 42},
+		{"id": 12, "createdAt": "2025-03-01T10:00:00Z", "updatedAt": null, "key": "department",
+			"value": "Sales", "includeInIdToken": true, "includeInAccessToken": false, "userId": 42}
+	],
+	"groups": [
+		{"id": 5, "createdAt": "2025-01-10T09:00:00Z", "updatedAt": null, "groupIdentifier": "sales",
+			"description": "Sales team", "includeInIdToken": false, "includeInAccessToken": true, "memberCount": 3,
+			"attributes": [
+				{"id": 30, "createdAt": null, "updatedAt": null, "key": "floor", "value": "2",
+					"includeInIdToken": false, "includeInAccessToken": false, "groupId": 5},
+				{"id": 31, "createdAt": null, "updatedAt": null, "key": "region", "value": "south",
+					"includeInIdToken": true, "includeInAccessToken": false, "groupId": 5}
+			],
+			"permissions": [
+				{"id": 20, "permissionIdentifier": "orders:read", "description": "Read orders", "resourceId": 3,
+					"resource": {"id": 3, "resourceIdentifier": "orders-api", "description": "Orders API", "isSystemLevelResource": false}},
+				{"id": 21, "permissionIdentifier": "orders:write", "description": "Write orders", "resourceId": 3,
+					"resource": {"id": 3, "resourceIdentifier": "orders-api", "description": "Orders API", "isSystemLevelResource": false}}
+			]},
+		{"id": 8, "createdAt": null, "updatedAt": null, "groupIdentifier": "auditors",
+			"description": "Auditors", "includeInIdToken": true, "includeInAccessToken": false, "memberCount": 1,
+			"attributes": [], "permissions": []}
+	],
+	"permissions": [
+		{"id": 22, "permissionIdentifier": "orders:export", "description": "Export orders", "resourceId": 3,
+			"resource": {"id": 3, "resourceIdentifier": "orders-api", "description": "Orders API", "isSystemLevelResource": false}},
+		{"id": 23, "permissionIdentifier": "manage-users", "description": "Manage users", "resourceId": 4,
+			"resource": {"id": 4, "resourceIdentifier": "authserver", "description": "Authserver", "isSystemLevelResource": true}}
+	],
+	"consents": [
+		{"id": 40, "createdAt": null, "updatedAt": null, "clientId": 100, "userId": 42, "scope": "openid profile",
+			"grantedAt": "2026-01-01T08:00:00Z", "clientIdentifier": "shop", "clientName": "Shop",
+			"clientNameUnverified": false, "clientDescription": "The shop"},
+		{"id": 41, "createdAt": null, "updatedAt": null, "clientId": 101, "userId": 42, "scope": "openid email",
+			"grantedAt": "2026-02-01T08:00:00Z", "clientIdentifier": "forum", "clientName": "forum",
+			"clientNameUnverified": false, "clientDescription": "Forum app"}
+	],
+	"sessions": [
+		{"id": 60, "createdAt": null, "updatedAt": null, "sessionIdentifier": "sid-60", "started": %[1]s,
+			"lastAccessed": %[2]s, "authMethods": "pwd", "acrLevel": "urn:goiabada:level1", "authTime": %[1]s,
+			"ipAddress": "198.51.100.4", "deviceName": "Safari", "deviceType": "mobile", "deviceOS": "iOS",
+			"userAgent": "Mozilla/5.0 (iPhone)", "userId": 42, "isCurrent": false,
+			"clientIdentifiers": ["shop"], "clients": [{"clientIdentifier": "shop", "name": "Shop", "nameUnverified": false}]},
+		{"id": 61, "createdAt": null, "updatedAt": null, "sessionIdentifier": "sid-61", "started": %[3]s,
+			"lastAccessed": %[4]s, "authMethods": "pwd otp", "acrLevel": "urn:goiabada:level2_mandatory", "authTime": %[3]s,
+			"ipAddress": "203.0.113.7", "deviceName": "Firefox", "deviceType": "desktop", "deviceOS": "Linux",
+			"userAgent": "Mozilla/5.0 (X11)", "userId": 42, "isCurrent": false,
+			"clientIdentifiers": ["forum", "shop"], "clients": [
+				{"clientIdentifier": "forum", "name": "forum", "nameUnverified": false},
+				{"clientIdentifier": "shop", "name": "Shop", "nameUnverified": false}]}
+	],
+	"legalDocumentAcceptances": [
+		{"id": 70, "acceptedAt": "2025-01-02T00:00:00Z", "legalDocumentId": 90, "shortName": "terms", "version": 1,
+			"title": "Terms of use", "publishedAt": "2025-01-01T00:00:00Z", "retired": false,
+			"url": "https://auth.example.com/legal/terms/versions/1"},
+		{"id": 71, "acceptedAt": "2025-05-02T00:00:00Z", "legalDocumentId": 91, "shortName": "house-rules", "version": 1,
+			"title": "House rules", "publishedAt": "2025-05-01T00:00:00Z", "retired": true, "url": null},
+		{"id": 72, "acceptedAt": "2026-01-02T00:00:00Z", "legalDocumentId": 90, "shortName": "terms", "version": 2,
+			"title": "Terms of use, revised", "publishedAt": "2026-01-01T00:00:00Z", "retired": false,
+			"url": "https://auth.example.com/legal/terms/versions/2"}
+	],
+	"profilePicture": {"contentType": "image/png", "data": "iVBORw=="}
+}`
+
+// exportedParts is the document's parts that exportEverythingParts describes, out of a plain body.
+func exportedParts(t *testing.T, body []byte) string {
+	t.Helper()
+	var parts map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parts), "%q", body)
+	picked := map[string]json.RawMessage{}
+	for _, key := range []string{"attributes", "groups", "permissions", "consents", "sessions", "legalDocumentAcceptances", "profilePicture"} {
+		picked[key] = parts[key]
+	}
+	out, err := json.Marshal(picked)
+	require.NoError(t, err)
+	return string(out)
+}
+
+// The document holds what the admin API reads about the user, each entry as the matching read
+// answers it and every list in id order, oldest first, so two exports of one person compare line
+// by line (#781 decision 3). Sessions are the live ones, by the rule GET /users/{id}/sessions
+// applies, and none is marked current, even the caller's own: the document is the same whoever asks.
+func TestHandleUserExportGet_HoldsWhatTheAdminAPIReadsAboutTheUser(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	database := exportEverythingDatabase(now)
+	r := exportRequest("42")
+	// The caller's own token names session 61.
+	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": "the-administrator", "sid": "sid-61"})
+
+	rr, _ := serveExport(t, database, r)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	quoted := func(at time.Time) string { return `"` + at.Format(time.RFC3339) + `"` }
+	assert.JSONEq(t, fmt.Sprintf(exportEverythingParts,
+		quoted(now.Add(-2*time.Hour)), quoted(now.Add(-20*time.Minute)),
+		quoted(now.Add(-time.Hour)), quoted(now.Add(-10*time.Minute))),
+		exportedParts(t, rr.Body.Bytes()))
+
+	// Every read about the user named this user.
+	for _, name := range []string{"GetUserAttributesByUserId", "UserLoadGroups", "UserLoadPermissions", "GetConsentsByUserId",
+		"GetUserSessionsByUserId", "GetLegalDocumentAcceptancesByUserId", "GetUserProfilePictureByUserId"} {
+		assert.Equal(t, []int64{42}, database.reads[name], name)
+	}
+}
+
+// Nothing secret reaches the document from the parts either: the clients loaded onto consents and
+// sessions carry an encrypted secret, which no mapping copies.
+func TestHandleUserExportGet_ThePartsHoldNoSecret(t *testing.T) {
+	rr, _ := serveExport(t, exportEverythingDatabase(time.Now().UTC()), exportRequest("42"))
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.NotContains(t, rr.Body.String(), exportSeededClientSecret)
+	assert.NotContains(t, rr.Body.String(), base64.StdEncoding.EncodeToString([]byte(exportSeededClientSecret)))
+	assert.NotContains(t, rr.Body.String(), "$2a$10$theseededpasswordhashofana")
+	assert.NotContains(t, rr.Body.String(), "the-seeded-otp-secret")
+}
+
+// The handler reads every part before it answers, so a read that fails is the API's clean 500,
+// never a document with a part missing, and records nothing (decision 5).
+func TestHandleUserExportGet_AFailedReadOfAnyPartIsAFiveHundred(t *testing.T) {
+	for _, read := range []string{
+		"GetUserAttributesByUserId", "UserLoadGroups", "CountGroupMembers", "GetGroupAttributesByGroupId",
+		"GroupLoadPermissions", "UserLoadPermissions", "GetResourceById", "GetConsentsByUserId",
+		"UserConsentsLoadClients", "GetUserSessionsByUserId", "UserSessionsLoadClients", "GetClientsByIds",
+		"GetLegalDocumentAcceptancesByUserId", "GetAllLegalDocuments", "GetLegalDocumentVersionsByLegalDocumentId",
+		"GetUserProfilePictureByUserId",
+	} {
+		t.Run(read, func(t *testing.T) {
+			logtest.CaptureSlog(t)
+			database := exportEverythingDatabase(time.Now().UTC())
+			database.failing, database.err = read, errs.New("the database is down")
+
+			rr, auditLogger := serveExport(t, database, exportRequest("42", "gzip"))
+
+			assert.Equal(t, http.StatusInternalServerError, rr.Code)
+			assert.NotEmpty(t, database.reads[read], "the read was made")
+			assert.Empty(t, rr.Header().Get("Content-Encoding"))
+			assert.Empty(t, rr.Header().Get("Content-Disposition"))
+			var envelope map[string]string
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &envelope), "a plain JSON envelope: %q", rr.Body.String())
+			assert.Equal(t, "INTERNAL_SERVER_ERROR", envelope["error_code"])
+			assert.Empty(t, auditLogger.events)
+		})
+	}
+}
+
+// A user with nothing beside the profile has every list empty, never null, and no picture.
+func TestHandleUserExportGet_AUserWithNothingElseHasEmptyListsAndNoPicture(t *testing.T) {
+	rr, _ := serveExport(t, exportDatabase(), exportRequest("42"))
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.JSONEq(t, `{"attributes": [], "groups": [], "permissions": [], "consents": [], "sessions": [],
+		"legalDocumentAcceptances": [], "profilePicture": null}`, exportedParts(t, rr.Body.Bytes()))
 }

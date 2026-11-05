@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/userexport"
@@ -32,13 +34,32 @@ import (
 // finishes (decision 5).
 const userExportWriteTimeout = 5 * time.Minute
 
-// userExportDatabase is what the export reads.
+// userExportDatabase is what the export reads: the user, and each part through the reads the admin
+// API answers it with, so a part holds what the matching endpoint answers. It embeds the session
+// row builder's port, the member count's and the legal document acceptances'.
 type userExportDatabase interface {
+	sessionDetailsDatabase
+	groupMemberCounter
+	legaldocuments.AcceptedDatabase
+
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserAttribute, error)
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
+	GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupAttribute, error)
+	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *record.Group) error
+	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
+	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []record.UserConsent) error
+	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
+	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
 }
 
 // HandleUserExportGet - GET /api/v1/admin/users/{id}/export
-func HandleUserExportGet(database userExportDatabase, auditLogger AuditLogger) http.HandlerFunc {
+//
+// baseURL is the auth server's own, which a legal document acceptance's address is built from.
+func HandleUserExportGet(database userExportDatabase, auditLogger AuditLogger, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		extendWriteDeadline(w, r, userExportWriteTimeout)
 
@@ -64,7 +85,11 @@ func HandleUserExportGet(database userExportDatabase, auditLogger AuditLogger) h
 			return
 		}
 
-		document := userexport.Build(user, settings.Issuer, time.Now())
+		document, err := buildUserExport(r.Context(), database, user, settings, baseURL, time.Now())
+		if err != nil {
+			writeInternalServerError(w, r, err, "user_id", user.Id)
+			return
+		}
 		if !writeUserExport(w, r, document) {
 			return
 		}
@@ -76,6 +101,144 @@ func HandleUserExportGet(database userExportDatabase, auditLogger AuditLogger) h
 			"logged_in_user": callerSubject(r),
 		})
 	}
+}
+
+// buildUserExport reads every part of the user's document and builds it, or answers the first read
+// that failed, so the document is never sent with a part missing (decision 5). It is the one
+// builder of the document, whoever asks: the admin API's export calls it, and the account API's
+// own copy (#782) is to call it too.
+//
+// Each part is read as the matching admin API endpoint reads it: the live sessions by the rule
+// GET /users/{id}/sessions applies, and a legal document acceptance with its address built from
+// baseURL. No session is marked current, the caller's own included, since the document is the
+// same whoever asks.
+func buildUserExport(ctx context.Context, database userExportDatabase, user *record.User,
+	settings *record.Settings, baseURL string, exportedAt time.Time) (api.UserExportResponse, error) {
+
+	attributes, err := database.GetUserAttributesByUserId(ctx, nil, user.Id)
+	if err != nil {
+		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the user's attributes for the export")
+	}
+
+	resources := permissionResources{database: database, byId: map[int64]*record.Resource{}}
+	groups, err := readUserExportGroups(ctx, database, user, &resources)
+	if err != nil {
+		return api.UserExportResponse{}, err
+	}
+
+	if err = database.UserLoadPermissions(ctx, nil, user); err != nil {
+		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the user's permissions for the export")
+	}
+	if err = resources.load(ctx, user.Permissions); err != nil {
+		return api.UserExportResponse{}, err
+	}
+
+	consents, err := database.GetConsentsByUserId(ctx, nil, user.Id)
+	if err != nil {
+		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the user's consents for the export")
+	}
+	if err = database.UserConsentsLoadClients(ctx, nil, consents); err != nil {
+		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the clients of the user's consents for the export")
+	}
+
+	userSessions, err := database.GetUserSessionsByUserId(ctx, nil, user.Id)
+	if err != nil {
+		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the user's sessions for the export")
+	}
+	if err = database.UserSessionsLoadClients(ctx, nil, userSessions); err != nil {
+		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the clients of the user's sessions for the export")
+	}
+	sessions, err := buildSessionDetails(ctx, database, userSessions, settings, "")
+	if err != nil {
+		return api.UserExportResponse{}, err
+	}
+
+	accepted, err := legaldocuments.AcceptedBy(ctx, database, user.Id)
+	if err != nil {
+		return api.UserExportResponse{}, err
+	}
+	acceptances := make([]api.LegalDocumentAcceptanceResponse, 0, len(accepted))
+	for i := range accepted {
+		a := &accepted[i]
+		acceptances = append(acceptances, apimapping.ToLegalDocumentAcceptanceResponse(&a.Acceptance, &a.Document, &a.Version, baseURL))
+	}
+
+	picture, err := database.GetUserProfilePictureByUserId(ctx, nil, user.Id)
+	if err != nil {
+		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the user's profile picture for the export")
+	}
+
+	return userexport.Build(user, userexport.Parts{
+		Attributes:               apimapping.ToUserAttributeResponses(attributes),
+		Groups:                   groups,
+		Permissions:              apimapping.ToPermissionResponses(user.Permissions),
+		Consents:                 apimapping.ToUserConsentResponses(consents),
+		Sessions:                 sessions,
+		LegalDocumentAcceptances: acceptances,
+		ProfilePicture:           picture,
+	}, settings.Issuer, exportedAt), nil
+}
+
+// readUserExportGroups is each group the user is a member of, as GET /users/{id}/groups answers it,
+// with the attributes and permissions the user gets through it, as the group's own
+// /attributes and /permissions answer them.
+func readUserExportGroups(ctx context.Context, database userExportDatabase, user *record.User,
+	resources *permissionResources) ([]api.UserExportGroupResponse, error) {
+
+	if err := database.UserLoadGroups(ctx, nil, user); err != nil {
+		return nil, errs.Wrap(err, "unable to read the user's groups for the export")
+	}
+	memberCounts, err := countGroupMembers(ctx, database, user.Groups)
+	if err != nil {
+		return nil, err
+	}
+
+	groups := make([]api.UserExportGroupResponse, 0, len(user.Groups))
+	for i := range user.Groups {
+		group := &user.Groups[i]
+		attributes, err := database.GetGroupAttributesByGroupId(ctx, nil, group.Id)
+		if err != nil {
+			return nil, errs.Wrapf(err, "unable to read the attributes of group %d for the export", group.Id)
+		}
+		if err := database.GroupLoadPermissions(ctx, nil, group); err != nil {
+			return nil, errs.Wrapf(err, "unable to read the permissions of group %d for the export", group.Id)
+		}
+		if err := resources.load(ctx, group.Permissions); err != nil {
+			return nil, err
+		}
+		groups = append(groups, api.UserExportGroupResponse{
+			GroupResponse: *apimapping.ToGroupResponse(group, memberCounts[group.Id]),
+			Attributes:    apimapping.ToGroupAttributeResponses(attributes),
+			Permissions:   apimapping.ToPermissionResponses(group.Permissions),
+		})
+	}
+	return groups, nil
+}
+
+// permissionResources fills in each permission's resource, as the user and group permission reads
+// do, reading each resource once however many permissions name it.
+type permissionResources struct {
+	database userExportDatabase
+	byId     map[int64]*record.Resource
+}
+
+func (p *permissionResources) load(ctx context.Context, permissions []record.Permission) error {
+	for i := range permissions {
+		resourceId := permissions[i].ResourceId
+		resource, read := p.byId[resourceId]
+		if !read {
+			var err error
+			resource, err = p.database.GetResourceById(ctx, nil, resourceId)
+			if err != nil {
+				return errs.Wrapf(err, "unable to read resource %d for the export", resourceId)
+			}
+			p.byId[resourceId] = resource
+		}
+		if resource != nil {
+			permissions[i].Resource = *resource
+		}
+	}
+	return nil
 }
 
 // writeUserExport answers the document as a file to save: JSON, gzip-compressed when the request

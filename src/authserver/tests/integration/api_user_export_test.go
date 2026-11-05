@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
@@ -430,4 +432,216 @@ func TestAPIUserExport_ARefusedExportRecordsNothing(t *testing.T) {
 
 	assert.Len(t, exportEvents(t, user.Id), 1, "only the admitted export is recorded")
 	assert.Empty(t, exportEvents(t, administrator.Id), "nothing names the refused caller")
+}
+
+// exportedUserParts is what newExportedUserParts seeds about a user beside the profile, read back
+// from the database, since each engine keeps its own time precision.
+type exportedUserParts struct {
+	attributes   [2]*record.UserAttribute
+	group        *record.Group
+	groupAttr    *record.GroupAttribute
+	resource     *record.Resource
+	groupPerm    *record.Permission
+	directPerm   *record.Permission
+	client       *record.Client
+	clientSecret string
+	consent      *record.UserConsent
+	liveSession  *record.UserSession
+	acceptances  *acceptancesFixture
+	picture      []byte
+}
+
+// newExportedUserParts gives the user one or more of each part the admin API reads about a user:
+// two attributes, a group with an attribute and a permission of its own, a permission granted
+// directly, a consent, a live session with the app it served and one past its idle timeout, three
+// legal document acceptances (one of a retired document), and a profile picture.
+func newExportedUserParts(t *testing.T, user *record.User) exportedUserParts {
+	t.Helper()
+	ctx := context.Background()
+	var p exportedUserParts
+	suffix := strings.ToLower(fake.LetterN(8))
+
+	for i, attribute := range []*record.UserAttribute{
+		{Key: "employee_number", Value: "E-1001", IncludeInAccessToken: true, UserId: user.Id},
+		{Key: "department", Value: "Sales", IncludeInIdToken: true, UserId: user.Id},
+	} {
+		require.NoError(t, database.CreateUserAttribute(ctx, nil, attribute))
+		stored, err := database.GetUserAttributeById(ctx, nil, attribute.Id)
+		require.NoError(t, err)
+		p.attributes[i] = stored
+	}
+
+	p.resource = createTestResource(t, "export-resource-"+suffix, "Export resource")
+	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, p.resource.Id) })
+	p.groupPerm = createTestPermission(t, p.resource.Id, "orders-read-"+suffix, "Read orders")
+	p.directPerm = createTestPermission(t, p.resource.Id, "orders-export-"+suffix, "Export orders")
+
+	group := createTestGroup(t)
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
+	attribute := createTestGroupAttribute(t, group.Id, "region", "south")
+	createTestGroupPermission(t, group.Id, p.groupPerm.Id)
+	require.NoError(t, database.CreateUserGroup(ctx, nil, &record.UserGroup{UserId: user.Id, GroupId: group.Id}))
+	require.NoError(t, database.CreateUserPermission(ctx, nil, &record.UserPermission{UserId: user.Id, PermissionId: p.directPerm.Id}))
+	var err error
+	p.group, err = database.GetGroupById(ctx, nil, group.Id)
+	require.NoError(t, err)
+	p.groupAttr, err = database.GetGroupAttributeById(ctx, nil, attribute.Id)
+	require.NoError(t, err)
+
+	p.clientSecret = "export-client-secret-" + fake.LetterN(12)
+	p.client = &record.Client{
+		ClientIdentifier:         "export-app-" + suffix,
+		ClientSecretEncrypted:    []byte(p.clientSecret),
+		Description:              "The export app",
+		Enabled:                  true,
+		ConsentRequired:          true,
+		AuthorizationCodeEnabled: true,
+		DefaultAcrLevel:          record.AcrLevel1,
+	}
+	require.NoError(t, database.CreateClient(ctx, nil, p.client))
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, p.client.Id) })
+
+	consent := &record.UserConsent{UserId: user.Id, ClientId: p.client.Id, Scope: "openid profile",
+		GrantedAt: sql.NullTime{Time: time.Now().UTC().Add(-time.Hour), Valid: true}}
+	require.NoError(t, database.CreateUserConsent(ctx, nil, consent))
+	p.consent, err = database.GetUserConsentById(ctx, nil, consent.Id)
+	require.NoError(t, err)
+
+	live := createTestUserSession(t, user.Id, fake.UUID())
+	t.Cleanup(func() { _ = database.DeleteUserSession(context.Background(), nil, live.Id) })
+	now := time.Now().UTC()
+	require.NoError(t, database.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{
+		UserSessionId: live.Id, ClientId: p.client.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)}))
+	p.liveSession, err = database.GetUserSessionById(ctx, nil, live.Id)
+	require.NoError(t, err)
+	expired := &record.UserSession{
+		SessionIdentifier: fake.UUID(),
+		Started:           now.Add(-25 * time.Hour),
+		LastAccessed:      now.Add(-24 * time.Hour),
+		AuthMethods:       "pwd",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthTime:          now.Add(-25 * time.Hour),
+		IpAddress:         "192.0.2.99",
+		UserId:            user.Id,
+	}
+	require.NoError(t, database.CreateUserSession(ctx, nil, expired))
+	t.Cleanup(func() { _ = database.DeleteUserSession(context.Background(), nil, expired.Id) })
+
+	p.acceptances = newAcceptancesFixture(t, user)
+
+	// The first eight bytes of a PNG, and a byte past them.
+	p.picture = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0x00}
+	require.NoError(t, database.CreateUserProfilePicture(ctx, nil, &record.UserProfilePicture{
+		UserId: user.Id, Picture: p.picture, ContentType: "image/png"}))
+	return p
+}
+
+// jsonInstant is a stored instant as the admin API writes it.
+func jsonInstant(stored time.Time) string {
+	return `"` + stored.Format(time.RFC3339Nano) + `"`
+}
+
+// expectedExportParts is the document's attributes, groups, permissions, consents, sessions and
+// profile picture for the seeded parts, written out by hand: each entry as the matching admin API
+// read answers it, every list in id order, the expired session left out and no session current.
+func expectedExportParts(user *record.User, p exportedUserParts) string {
+	resource := fmt.Sprintf(`{"id": %d, "resourceIdentifier": %q, "description": "Export resource", "isSystemLevelResource": false}`,
+		p.resource.Id, p.resource.ResourceIdentifier)
+	s := p.liveSession
+	return fmt.Sprintf(`{
+		"attributes": [
+			{"id": %d, "createdAt": %s, "updatedAt": %s, "key": "employee_number", "value": "E-1001",
+				"includeInIdToken": false, "includeInAccessToken": true, "userId": %d},
+			{"id": %d, "createdAt": %s, "updatedAt": %s, "key": "department", "value": "Sales",
+				"includeInIdToken": true, "includeInAccessToken": false, "userId": %d}
+		],
+		"groups": [
+			{"id": %d, "createdAt": %s, "updatedAt": %s, "groupIdentifier": %q, "description": "Test Group",
+				"includeInIdToken": true, "includeInAccessToken": false, "memberCount": 1,
+				"attributes": [
+					{"id": %d, "createdAt": %s, "updatedAt": %s, "key": "region", "value": "south",
+						"includeInIdToken": true, "includeInAccessToken": false, "groupId": %d}
+				],
+				"permissions": [
+					{"id": %d, "permissionIdentifier": %q, "description": "Read orders", "resourceId": %d, "resource": %s}
+				]}
+		],
+		"permissions": [
+			{"id": %d, "permissionIdentifier": %q, "description": "Export orders", "resourceId": %d, "resource": %s}
+		],
+		"consents": [
+			{"id": %d, "createdAt": %s, "updatedAt": %s, "clientId": %d, "userId": %d, "scope": "openid profile",
+				"grantedAt": %s, "clientIdentifier": %q, "clientName": %q, "clientNameUnverified": false,
+				"clientDescription": "The export app"}
+		],
+		"sessions": [
+			{"id": %d, "createdAt": %s, "updatedAt": %s, "sessionIdentifier": %q, "started": %s, "lastAccessed": %s,
+				"authMethods": "pwd", "acrLevel": "urn:goiabada:pwd", "authTime": %s, "ipAddress": "192.168.1.100",
+				"deviceName": "Test Device", "deviceType": "computer", "deviceOS": "linux", "userAgent": %q,
+				"userId": %d, "isCurrent": false, "clientIdentifiers": [%q],
+				"clients": [{"clientIdentifier": %q, "name": %q, "nameUnverified": false}]}
+		],
+		"profilePicture": {"contentType": "image/png", "data": "iVBORw0KGgoA"}
+	}`,
+		p.attributes[0].Id, jsonTime(p.attributes[0].CreatedAt), jsonTime(p.attributes[0].UpdatedAt), user.Id,
+		p.attributes[1].Id, jsonTime(p.attributes[1].CreatedAt), jsonTime(p.attributes[1].UpdatedAt), user.Id,
+		p.group.Id, jsonTime(p.group.CreatedAt), jsonTime(p.group.UpdatedAt), p.group.GroupIdentifier,
+		p.groupAttr.Id, jsonTime(p.groupAttr.CreatedAt), jsonTime(p.groupAttr.UpdatedAt), p.group.Id,
+		p.groupPerm.Id, p.groupPerm.PermissionIdentifier, p.resource.Id, resource,
+		p.directPerm.Id, p.directPerm.PermissionIdentifier, p.resource.Id, resource,
+		p.consent.Id, jsonTime(p.consent.CreatedAt), jsonTime(p.consent.UpdatedAt), p.client.Id, user.Id,
+		jsonTime(p.consent.GrantedAt), p.client.ClientIdentifier, p.client.ClientIdentifier,
+		s.Id, jsonTime(s.CreatedAt), jsonTime(s.UpdatedAt), s.SessionIdentifier, jsonInstant(s.Started), jsonInstant(s.LastAccessed),
+		jsonInstant(s.AuthTime), testSessionUserAgent,
+		user.Id, p.client.ClientIdentifier,
+		p.client.ClientIdentifier, p.client.ClientIdentifier)
+}
+
+// The document holds what the admin API reads about the user: attributes, groups with the
+// attributes and permissions the user gets through them, the permissions granted directly,
+// consents, live sessions with the apps they served, legal document acceptances and the profile
+// picture, each entry as the matching read answers it and every list in id order (#781 decision
+// 3). Nothing secret comes with them.
+func TestAPIUserExport_HoldsWhatTheAdminAPIReadsAboutTheUser(t *testing.T) {
+	adminToken, _ := createAdminClientWithToken(t)
+	user, secrets := newExportedUser(t)
+	p := newExportedUserParts(t, user)
+
+	answer := getUserExport(t, adminToken, user.Id, "gzip")
+
+	require.Equal(t, http.StatusOK, answer.status, "%s", answer.raw)
+	var document map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(answer.document(t), &document))
+	picked := map[string]json.RawMessage{}
+	for _, key := range []string{"attributes", "groups", "permissions", "consents", "sessions", "profilePicture"} {
+		picked[key] = document[key]
+	}
+	got, err := json.Marshal(picked)
+	require.NoError(t, err)
+	assert.JSONEq(t, expectedExportParts(user, p), string(got))
+
+	// The acceptances in id order are the order they were made in, so reversed they are the
+	// latest first, as the fixture's own expectation reads them.
+	var acceptances []api.LegalDocumentAcceptanceResponse
+	require.NoError(t, json.Unmarshal(document["legalDocumentAcceptances"], &acceptances))
+	require.Len(t, acceptances, 3)
+	assert.Less(t, acceptances[0].Id, acceptances[1].Id)
+	assert.Less(t, acceptances[1].Id, acceptances[2].Id)
+	slices.Reverse(acceptances)
+	p.acceptances.assertTheFixturesAcceptances(t, acceptances)
+
+	body := string(answer.document(t))
+	for name, secret := range map[string]string{
+		"the client secret":         p.clientSecret,
+		"the client secret, base64": base64.StdEncoding.EncodeToString([]byte(p.clientSecret)),
+		"the password hash":         secrets.passwordHash,
+		"the OTP secret":            secrets.otpSecret,
+		"the recovery code's hash":  secrets.recoveryCodeHash,
+	} {
+		assert.NotContains(t, body, secret, name)
+	}
+	lowered := strings.ToLower(body)
+	for _, key := range []string{"password", "otpsecret", "recoverycode", "verificationcode", "clientsecret"} {
+		assert.NotContains(t, lowered, key)
+	}
 }

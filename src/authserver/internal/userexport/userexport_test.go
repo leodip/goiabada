@@ -134,7 +134,7 @@ const exportedUserDocument = `{
 func TestBuild_TheWrapperTheIdentifiersAndTheUser(t *testing.T) {
 	exportedAt := time.Date(2026, 11, 5, 9, 30, 0, 0, time.UTC)
 
-	document := Build(exportedUser(), "https://auth.example.com", exportedAt)
+	document := Build(exportedUser(), Parts{}, "https://auth.example.com", exportedAt)
 
 	encoded, err := json.Marshal(document)
 	require.NoError(t, err)
@@ -146,7 +146,7 @@ func TestBuild_TheWrapperTheIdentifiersAndTheUser(t *testing.T) {
 func TestBuild_ExportedAtIsWrittenInUTC(t *testing.T) {
 	saoPaulo := time.FixedZone("BRT", -3*60*60)
 
-	document := Build(exportedUser(), "https://auth.example.com", time.Date(2026, 11, 5, 22, 15, 0, 0, saoPaulo))
+	document := Build(exportedUser(), Parts{}, "https://auth.example.com", time.Date(2026, 11, 5, 22, 15, 0, 0, saoPaulo))
 
 	encoded, err := json.Marshal(document)
 	require.NoError(t, err)
@@ -159,7 +159,7 @@ func TestBuild_ExportedAtIsWrittenInUTC(t *testing.T) {
 // answers them, and an empty list is [] rather than null, so a reader never tells "none" from
 // "not read".
 func TestBuild_AnEmptyListIsNeverNull(t *testing.T) {
-	document := Build(&record.User{Id: 7, Subject: "s", Email: "e@example.com"}, "https://auth.example.com",
+	document := Build(&record.User{Id: 7, Subject: "s", Email: "e@example.com"}, Parts{}, "https://auth.example.com",
 		time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC))
 
 	encoded, err := json.Marshal(document)
@@ -182,7 +182,7 @@ func TestBuild_AnEmptyListIsNeverNull(t *testing.T) {
 // Nothing secret is in the document: no password hash, two-factor secret, pending code or code
 // hash, and no field that would carry one.
 func TestBuild_CarriesNoSecret(t *testing.T) {
-	document := Build(exportedUser(), "https://auth.example.com", time.Date(2026, 11, 5, 9, 30, 0, 0, time.UTC))
+	document := Build(exportedUser(), Parts{}, "https://auth.example.com", time.Date(2026, 11, 5, 9, 30, 0, 0, time.UTC))
 
 	encoded, err := json.Marshal(document)
 	require.NoError(t, err)

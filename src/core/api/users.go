@@ -298,8 +298,8 @@ type GetUserConsentsResponse struct {
 // by line (decision 3). FormatVersion goes up only for a change that breaks a reader; a field added
 // to a reused entry appears here too, and is additive.
 //
-// Groups, RefreshTokens, ProfilePicture and AuditEvents are shapes no admin API read answers yet:
-// they are [] and null until their entries are defined.
+// RefreshTokens and AuditEvents are shapes no admin API read answers yet: they are [] until their
+// entries are defined.
 type UserExportResponse struct {
 	FormatVersion int       `json:"formatVersion"`
 	ExportedAt    time.Time `json:"exportedAt"`
@@ -309,13 +309,13 @@ type UserExportResponse struct {
 	Identifiers              UserExportIdentifiersResponse     `json:"identifiers"`
 	User                     UserResponse                      `json:"user"`
 	Attributes               []UserAttributeResponse           `json:"attributes"`
-	Groups                   []json.RawMessage                 `json:"groups"`
+	Groups                   []UserExportGroupResponse         `json:"groups"`
 	Permissions              []PermissionResponse              `json:"permissions"`
 	Consents                 []UserConsentResponse             `json:"consents"`
 	Sessions                 []UserSessionDetailResponse       `json:"sessions"`
 	RefreshTokens            []json.RawMessage                 `json:"refreshTokens"`
 	LegalDocumentAcceptances []LegalDocumentAcceptanceResponse `json:"legalDocumentAcceptances"`
-	ProfilePicture           json.RawMessage                   `json:"profilePicture"`
+	ProfilePicture           *UserExportProfilePictureResponse `json:"profilePicture"`
 	AuditEvents              []json.RawMessage                 `json:"auditEvents"`
 }
 
@@ -327,4 +327,20 @@ type UserExportIdentifiersResponse struct {
 	Subject     string `json:"subject"`
 	Email       string `json:"email"`
 	EmailDigest string `json:"emailDigest"`
+}
+
+// UserExportGroupResponse is one group the user is a member of, as GET /api/v1/admin/users/{id}/groups
+// answers it, with the attributes and permissions the user gets through it, as the group's own
+// attribute and permission reads answer them, each list in id order.
+type UserExportGroupResponse struct {
+	GroupResponse
+	Attributes  []GroupAttributeResponse `json:"attributes"`
+	Permissions []PermissionResponse     `json:"permissions"`
+}
+
+// UserExportProfilePictureResponse is the user's profile picture: its content type and the image
+// itself, which JSON carries as standard base64.
+type UserExportProfilePictureResponse struct {
+	ContentType string `json:"contentType"`
+	Data        []byte `json:"data"`
 }

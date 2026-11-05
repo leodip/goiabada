@@ -6116,8 +6116,8 @@ components:
     UserExportResponse:
       description: |
         Everything the auth server holds about one user. Each entry is the one the matching Admin
-        API read answers. `groups`, `refreshTokens` and `auditEvents` are `[]`, and
-        `profilePicture` is null.
+        API read answers, and every list is in id order, oldest first. `refreshTokens` and
+        `auditEvents` are `[]`.
       type: object
       properties:
         formatVersion:
@@ -6139,9 +6139,12 @@ components:
           items:
             $ref: '#/components/schemas/UserAttributeResponse'
         groups:
+          description: |
+            The groups the user is a member of, each with the attributes and permissions the user
+            gets through it.
           type: array
           items:
-            type: object
+            $ref: '#/components/schemas/UserExportGroupResponse'
         permissions:
           description: The permissions granted to the user directly.
           type: array
@@ -6152,6 +6155,9 @@ components:
           items:
             $ref: '#/components/schemas/UserConsentResponse'
         sessions:
+          description: |
+            The user's live sessions, as `GET /api/v1/admin/users/{id}/sessions` lists them.
+            `isCurrent` is false on every one, since the document is the same whoever asks.
           type: array
           items:
             $ref: '#/components/schemas/UserSessionDetailResponse'
@@ -6164,7 +6170,9 @@ components:
           items:
             $ref: '#/components/schemas/LegalDocumentAcceptanceResponse'
         profilePicture:
-          type: object
+          description: The user's profile picture, or null when the user has none.
+          allOf:
+            - $ref: '#/components/schemas/UserExportProfilePictureResponse'
           nullable: true
         auditEvents:
           type: array
@@ -6185,6 +6193,41 @@ components:
         - legalDocumentAcceptances
         - profilePicture
         - auditEvents
+
+    UserExportGroupResponse:
+      description: |
+        A group the user is a member of, as `GET /api/v1/admin/users/{id}/groups` answers it,
+        with the group's attributes and permissions as the group's own reads answer them.
+      allOf:
+        - $ref: '#/components/schemas/GroupResponse'
+        - type: object
+          properties:
+            attributes:
+              type: array
+              items:
+                $ref: '#/components/schemas/GroupAttributeResponse'
+            permissions:
+              type: array
+              items:
+                $ref: '#/components/schemas/PermissionResponse'
+          required:
+            - attributes
+            - permissions
+
+    UserExportProfilePictureResponse:
+      description: The user's profile picture.
+      type: object
+      properties:
+        contentType:
+          description: The image's media type, such as `image/png`.
+          type: string
+        data:
+          description: The image, in base64.
+          type: string
+          format: byte
+      required:
+        - contentType
+        - data
 
     UserExportIdentifiersResponse:
       description: What the user is known by, to search older audit rows and the logs with.

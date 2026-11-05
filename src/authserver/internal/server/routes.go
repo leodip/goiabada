@@ -302,7 +302,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleUserProfilePictureDelete(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender, s.dataCipher, baseURL))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleUserDelete(s.database, auditLogger, notifier))
-		r.With(apiBearer.RequireBearerTokenScopeSetAnyOf(scopesUserExport)).Get("/users/{id}/export", apihandlers.HandleUserExportGet(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeSetAnyOf(scopesUserExport)).Get("/users/{id}/export", apihandlers.HandleUserExportGet(s.database, auditLogger, baseURL))
 
 		// User attributes routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/attributes", apihandlers.HandleUserAttributesGet(s.database))
