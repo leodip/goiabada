@@ -3672,7 +3672,7 @@ func expectForeignSessionApps(database *datamocks.Database, tx *sql.Tx, foreignS
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), foreignSession.UserId).
 		Return(&record.User{Id: foreignSession.UserId, Subject: "previous-user"}, nil).Maybe()
 	database.On("AcquireUserSessionRow", mock.Anything, tx, foreignSession.SessionIdentifier).Return(true, nil).Maybe()
-	database.On("GetUserSessionClientsByUserSessionId", mock.Anything, tx, foreignSession.Id).
+	database.On("GetCommittedUserSessionClients", mock.Anything, tx, foreignSession.Id).
 		Return([]record.UserSessionClient{}, nil).Maybe()
 }
 

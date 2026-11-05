@@ -273,7 +273,7 @@ func (s *Sender) deliver(ctx context.Context, issuer string, delivery Delivery) 
 // run checks the stored URI again, signs the token once, and makes the attempts: each at its offset,
 // the same token every time, and none that could not finish before the token expires.
 func (s *Sender) run(ctx context.Context, issuer string, delivery Delivery, jti string) result {
-	allowHTTP := !delivery.IsPublic && !delivery.CreatedViaDCR
+	allowHTTP := urlmatch.BackchannelLogoutHTTPAllowed(delivery.IsPublic, delivery.CreatedViaDCR)
 	if urlmatch.CheckBackchannelLogoutURI(delivery.URI, allowHTTP) != urlmatch.BackchannelLogoutURIAcceptable {
 		return result{outcome: Skipped, err: errURINotAllowed}
 	}

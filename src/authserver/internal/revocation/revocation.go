@@ -550,14 +550,9 @@ func heldSessionClients(ctx context.Context, db Database, tx *sql.Tx, session *r
 	if err != nil || !held {
 		return nil, err
 	}
-	sessionClients, err := db.GetUserSessionClientsByUserSessionId(ctx, tx, session.Id)
-	if err != nil || len(sessionClients) == 0 {
-		return nil, err
-	}
-	if err := db.UserSessionClientsLoadClients(ctx, tx, sessionClients); err != nil {
-		return nil, err
-	}
-	return sessionClients, nil
+	// As last committed: on MySQL an ordinary read answers the snapshot from before the row was
+	// taken, without an app a sign-in added to the session meanwhile.
+	return db.GetCommittedUserSessionClients(ctx, tx, session.Id)
 }
 
 // TerminationResult reports what terminating one session actually did. It carries exactly what

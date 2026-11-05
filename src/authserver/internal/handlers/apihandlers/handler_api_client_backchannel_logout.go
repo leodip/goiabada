@@ -20,12 +20,12 @@ import (
 
 // The two ways the row read under the client's lock refuses a save the earlier read let through.
 var (
-	// errBackchannelLogoutHTTPOnPublicClient is an http URI on a client made public since it was
-	// loaded.
-	errBackchannelLogoutHTTPOnPublicClient = errors.New("an http back-channel logout URI on a client that is now public")
-	// errBackchannelLogoutURIChangedSinceLoaded is a save below authserver:manage carrying back a URI
-	// another save changed since it was loaded.
-	errBackchannelLogoutURIChangedSinceLoaded = errors.New("the back-channel logout URI changed since it was loaded")
+	// errBackchannelLogoutHTTPNotAllowed is an http URI on a client that may no longer have one: one
+	// made public since it was loaded.
+	errBackchannelLogoutHTTPNotAllowed = errors.New("an http back-channel logout URI on a client that may not have one")
+	// errBackchannelLogoutURICeiling is a save below authserver:manage that, compared with the row,
+	// sets the URI or changes it: another save changed the URI since this one's caller loaded it.
+	errBackchannelLogoutURICeiling = errors.New("a back-channel logout URI change reserved to authserver:manage")
 )
 
 // HandleClientBackchannelLogoutPut - PUT /api/v1/admin/clients/{id}/backchannel-logout
@@ -36,18 +36,21 @@ var (
 //
 // Both fields are required, so a body cannot clear what it does not mention. An empty URI clears
 // it. A URI follows decision 6's rule, urlmatch.CheckBackchannelLogoutURI: https on any client,
-// http on a confidential one only, the confidential condition decided again on the row read under
-// the client's lock, as the other client saves decide what they preserve. A URI is refused for a
+// http only on a confidential one an administrator created (urlmatch.BackchannelLogoutHTTPAllowed),
+// the same rule the sender holds a stored URI to, decided again on the row read under the client's
+// lock, as the other client saves decide what they preserve. A URI is refused for a
 // client with neither the authorization code nor the implicit flow, as the sign-out redirect URIs
 // are: such a client signs nobody in, so no session it is on can end.
 //
 // Only an authserver:manage token sets a URI or changes the stored one, since an administrator's URI
 // reaches any address the auth server can (#784 decision 15); clearing it, or changing the flag
 // alone, stays open to authserver:manage-clients. The refusal is decided before the transaction
-// against the row as read, and the comparison is held again under the lock: a save below
-// authserver:manage whose URI the row no longer holds is answered 409, since writing it would set a
-// URI the ceiling never judged. The administrator-client ceiling comes first, as on every client
-// save. updated_client_backchannel_logout is recorded once the save has committed.
+// against the row as read, and the comparison is made again under the lock, as the decision
+// compares it: a save below authserver:manage carrying back a URI another save changed meanwhile
+// would set a URI the ceiling never judged, and is refused as the first comparison refuses, 403
+// MANAGE_SCOPE_REQUIRED and administrator_change_refused, once the transaction has rolled back. The
+// administrator-client ceiling comes first, as on every client save.
+// updated_client_backchannel_logout is recorded once the save has committed.
 func HandleClientBackchannelLogoutPut(
 	database clientsDatabase,
 	auditLogger AuditLogger,
@@ -97,7 +100,7 @@ func HandleClientBackchannelLogoutPut(
 				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientBackchannelLogoutNoSignInFlow, nil))
 				return
 			}
-			if refusal := backchannelLogoutURIRefusal(uri, !client.IsPublic); refusal != nil {
+			if refusal := backchannelLogoutURIRefusal(uri, client); refusal != nil {
 				writeValidationError(w, r, refusal)
 				return
 			}
@@ -117,7 +120,13 @@ func HandleClientBackchannelLogoutPut(
 		// write together; each attempt decides from the row read under its own lock and writes
 		// fixed values, and nothing reaches the response from inside it (#301).
 		var saved *record.Client
+		// httpRefusal is the refusal of an http URI the row under the lock no longer allows, and
+		// refusedRow the row the ceiling refused under the lock, each assigned by the attempt that
+		// returned its error.
+		var httpRefusal *i18n.LocalizedError
+		var refusedRow *record.Client
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			httpRefusal, refusedRow = nil, nil
 			if acquireErr := database.AcquireClientRow(r.Context(), tx, client.Id); acquireErr != nil {
 				return acquireErr
 			}
@@ -128,11 +137,13 @@ func HandleClientBackchannelLogoutPut(
 			if current == nil {
 				return errs.New("client no longer exists")
 			}
-			if uri != "" && urlmatch.CheckBackchannelLogoutURI(uri, !current.IsPublic) == urlmatch.BackchannelLogoutURIPlainHTTP {
-				return errBackchannelLogoutHTTPOnPublicClient
+			if uri != "" && urlmatch.CheckBackchannelLogoutURI(uri, urlmatch.BackchannelLogoutHTTPAllowed(current.IsPublic, current.CreatedViaDCR)) == urlmatch.BackchannelLogoutURIPlainHTTP {
+				httpRefusal = backchannelLogoutHTTPRefusal(uri, current)
+				return errBackchannelLogoutHTTPNotAllowed
 			}
 			if !holdsManage && backchannelLogoutURIChangeReserved(current.BackchannelLogoutURI, uri) {
-				return errBackchannelLogoutURIChangedSinceLoaded
+				refusedRow = current
+				return errBackchannelLogoutURICeiling
 			}
 			if setErr := database.SetClientBackchannelLogout(r.Context(), tx, client.Id, uri, sessionRequired); setErr != nil {
 				return setErr
@@ -143,11 +154,16 @@ func HandleClientBackchannelLogoutPut(
 			return nil
 		})
 		switch {
-		case errors.Is(err, errBackchannelLogoutHTTPOnPublicClient):
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientBackchannelLogoutURIHTTPPublicClient, map[string]any{"uri": uri}))
+		case errors.Is(err, errBackchannelLogoutHTTPNotAllowed):
+			writeValidationError(w, r, httpRefusal)
 			return
-		case errors.Is(err, errBackchannelLogoutURIChangedSinceLoaded):
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientBackchannelLogoutChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
+		case errors.Is(err, errBackchannelLogoutURICeiling):
+			// The same ceiling as before the transaction, judging the row read under the lock, so the
+			// same refusal and record, written now that the transaction has rolled back.
+			if !backchannelLogoutURICeilingAllows(w, r, auditLogger, refusedRow, uri) {
+				return
+			}
+			writeInternalServerError(w, r, errs.New("the back-channel logout URI ceiling refused under the client's row and allowed after it"), "client_id", client.Id)
 			return
 		case err != nil:
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client back-channel logout"), "client_id", client.Id)
@@ -179,10 +195,9 @@ func HandleClientBackchannelLogoutPut(
 }
 
 // backchannelLogoutURIRefusal is the admin API's refusal of a back-channel logout URI that breaks
-// decision 6's rule, in the request's language, or nil for one it admits. allowHTTP is whether the
-// client is confidential.
-func backchannelLogoutURIRefusal(uri string, allowHTTP bool) *i18n.LocalizedError {
-	switch urlmatch.CheckBackchannelLogoutURI(uri, allowHTTP) {
+// decision 6's rule for client, in the request's language, or nil for one it admits.
+func backchannelLogoutURIRefusal(uri string, client *record.Client) *i18n.LocalizedError {
+	switch urlmatch.CheckBackchannelLogoutURI(uri, urlmatch.BackchannelLogoutHTTPAllowed(client.IsPublic, client.CreatedViaDCR)) {
 	case urlmatch.BackchannelLogoutURIAcceptable:
 		return nil
 	case urlmatch.BackchannelLogoutURITooLong:
@@ -194,8 +209,17 @@ func backchannelLogoutURIRefusal(uri string, allowHTTP bool) *i18n.LocalizedErro
 	case urlmatch.BackchannelLogoutURIUserinfo:
 		return i18n.NewLocalizedError(i18n.ErrCodeClientBackchannelLogoutURIUserinfo, map[string]any{"uri": uri})
 	case urlmatch.BackchannelLogoutURIPlainHTTP:
-		return i18n.NewLocalizedError(i18n.ErrCodeClientBackchannelLogoutURIHTTPPublicClient, map[string]any{"uri": uri})
+		return backchannelLogoutHTTPRefusal(uri, client)
 	default:
 		return i18n.NewLocalizedError(i18n.ErrCodeClientBackchannelLogoutURIInvalid, map[string]any{"uri": uri})
 	}
+}
+
+// backchannelLogoutHTTPRefusal is the refusal of an http URI on client, which may not have one: a
+// self-registered client, of either type, or a public one an administrator created.
+func backchannelLogoutHTTPRefusal(uri string, client *record.Client) *i18n.LocalizedError {
+	if client.CreatedViaDCR {
+		return i18n.NewLocalizedError(i18n.ErrCodeClientBackchannelLogoutURIHTTPSelfRegistered, map[string]any{"uri": uri})
+	}
+	return i18n.NewLocalizedError(i18n.ErrCodeClientBackchannelLogoutURIHTTPPublicClient, map[string]any{"uri": uri})
 }

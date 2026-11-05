@@ -27,10 +27,10 @@ type Delivery struct {
 	SessionIdentifier string
 }
 
-// SessionDatabase is what SessionDeliveries reads: the apps a session served, with their clients.
+// SessionDatabase is what SessionDeliveries reads: the apps a session served, with their clients, as
+// last committed.
 type SessionDatabase interface {
-	GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
-	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
+	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
 }
 
 // SessionDeliveries is the logout tokens the end of session sends: one to each app the session
@@ -39,18 +39,14 @@ type SessionDatabase interface {
 //
 // The caller reads it on the end's own transaction, holding the session's row and before the
 // session's deletion takes its apps with it, so an app a ceremony adds to the session at the same
-// moment is either here or refused. It answers nil when there is nobody to tell.
+// moment is either here or refused. The apps are read as last committed, since on MySQL an ordinary
+// read would answer the transaction's snapshot from before the row was taken. It answers nil when
+// there is nobody to tell.
 func SessionDeliveries(ctx context.Context, db SessionDatabase, tx *sql.Tx, session *record.UserSession,
 	subject string) ([]Delivery, error) {
 
-	sessionClients, err := db.GetUserSessionClientsByUserSessionId(ctx, tx, session.Id)
+	sessionClients, err := db.GetCommittedUserSessionClients(ctx, tx, session.Id)
 	if err != nil {
-		return nil, err
-	}
-	if len(sessionClients) == 0 {
-		return nil, nil
-	}
-	if err := db.UserSessionClientsLoadClients(ctx, tx, sessionClients); err != nil {
 		return nil, err
 	}
 

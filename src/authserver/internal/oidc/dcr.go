@@ -1,5 +1,10 @@
 package oidc
 
+import (
+	"encoding/json"
+	"errors"
+)
+
 // The RFC 7591 dynamic client registration types, moved here from core/api by #385 on the
 // membership test this package's doc states.
 //
@@ -26,13 +31,48 @@ type DynamicClientRegistrationRequest struct {
 	// was on ends (OpenID Connect Back-Channel Logout 1.0 section 2.2), and
 	// BackchannelLogoutSessionRequired whether every token must name the session, false by default.
 	// A self-registered client's URI must use https whatever its type, and the flag is stored only
-	// with a URI (#784 decision 10).
-	BackchannelLogoutURI             string `json:"backchannel_logout_uri,omitempty"`
-	BackchannelLogoutSessionRequired bool   `json:"backchannel_logout_session_required,omitempty"`
+	// with a URI (#784 decision 10). The flag is a NonNullBool, so a null is refused as a value
+	// that is not a boolean, as the decision refuses one, where a bool would read it as false.
+	BackchannelLogoutURI             string      `json:"backchannel_logout_uri,omitempty"`
+	BackchannelLogoutSessionRequired NonNullBool `json:"backchannel_logout_session_required,omitempty"`
 
 	// All other fields ignored per RFC 7591 §2:
 	// "The authorization server MUST ignore any client metadata
 	//  sent by the client that it does not understand"
+}
+
+// NonNullBool is a registration member that must be true or false when it is sent. Left out, it is
+// false. A JSON null, which encoding/json leaves a bool's zero value for, is refused as every other
+// value is, with a *NotABooleanError (#784 decision 10). encoding/json does not name the member in
+// an error a decoding method returns, so the handler names it: backchannel_logout_session_required
+// is the request's one NonNullBool.
+type NonNullBool bool
+
+// NotABooleanError is NonNullBool's refusal of a value that is not true or false.
+type NotABooleanError struct {
+	// Value is the JSON value's kind as encoding/json names it, such as "null" or "string".
+	Value string
+}
+
+func (e *NotABooleanError) Error() string {
+	return "json: cannot read " + e.Value + " as a boolean"
+}
+
+// UnmarshalJSON reads true or false, and refuses null and every other value.
+func (b *NonNullBool) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return &NotABooleanError{Value: "null"}
+	}
+	var value bool
+	if err := json.Unmarshal(data, &value); err != nil {
+		var typeErr *json.UnmarshalTypeError
+		if errors.As(err, &typeErr) {
+			return &NotABooleanError{Value: typeErr.Value}
+		}
+		return err
+	}
+	*b = NonNullBool(value)
+	return nil
 }
 
 // DynamicClientRegistrationResponse represents RFC 7591 §3.2.1 successful registration

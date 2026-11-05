@@ -652,6 +652,9 @@ func TestClientBackchannelLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) 
 	}
 	codeFlow := func() *record.Client { return &record.Client{Id: 7, AuthorizationCodeEnabled: true} }
 	publicCodeFlow := func() *record.Client { return &record.Client{Id: 7, AuthorizationCodeEnabled: true, IsPublic: true} }
+	selfRegisteredCodeFlow := func() *record.Client {
+		return &record.Client{Id: 7, AuthorizationCodeEnabled: true, CreatedViaDCR: true}
+	}
 	overlong := "https://example.com/" + strings.Repeat("x", 2048)
 
 	assertRefusalLanguages(t, []refusalCase{
@@ -716,9 +719,18 @@ func TestClientBackchannelLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) 
 			serve:   saveURI(publicCodeFlow(), "http://app.internal/bcl"),
 			status:  http.StatusBadRequest,
 			code:    "handler.client_backchannel_logout.uri_http_public_client",
-			english: "Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client: http://app.internal/bcl",
+			english: "Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client an administrator created: http://app.internal/bcl",
 			//nolint:misspell // the pt-BR catalog's text: "confidencial" is Portuguese, not a misspelling of "confidential"
-			portuguese: "A URI de logout back-channel precisa usar https em um cliente público. http simples só é permitido em um cliente confidencial: http://app.internal/bcl",
+			portuguese: "A URI de logout back-channel precisa usar https em um cliente público. http simples só é permitido em um cliente confidencial criado por um administrador: http://app.internal/bcl",
+		},
+		{
+			name:    "an http URI on a confidential client that registered itself",
+			serve:   saveURI(selfRegisteredCodeFlow(), "http://app.internal/bcl"),
+			status:  http.StatusBadRequest,
+			code:    "handler.client_backchannel_logout.uri_http_self_registered",
+			english: "Back-channel logout URI must use https on a client that registered itself, whatever its type. Plain http is allowed only on a confidential client an administrator created: http://app.internal/bcl",
+			//nolint:misspell // the pt-BR catalog's text: "confidencial" is Portuguese, not a misspelling of "confidential"
+			portuguese: "A URI de logout back-channel precisa usar https em um cliente que se registrou sozinho, seja qual for o tipo. http simples só é permitido em um cliente confidencial criado por um administrador: http://app.internal/bcl",
 		},
 	})
 }

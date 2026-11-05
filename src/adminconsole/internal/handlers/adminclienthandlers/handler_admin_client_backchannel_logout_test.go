@@ -194,8 +194,8 @@ func TestHandleBackchannelLogoutPost_ReadsTheURIFromTheBodyAlone(t *testing.T) {
 }
 
 // Each refusal the auth server answers for this save is drawn on the tab, beside the inputs as
-// typed, and marks the field it is about: a URI breaking decision 6's rules, a URI on a client with
-// no sign-in flow, and a URI another save changed since the page was loaded (#784 decisions 6 and 9).
+// typed, and marks the field it is about: a URI breaking decision 6's rules and a URI on a client
+// with no sign-in flow (#784 decisions 6 and 9).
 func TestHandleBackchannelLogoutPost_ARefusalMarksItsField(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -208,7 +208,7 @@ func TestHandleBackchannelLogoutPost_ARefusalMarksItsField(t *testing.T) {
 		{"http on a public client", "handler.client_backchannel_logout.uri_http_public_client", http.StatusBadRequest},
 		{"a URI too long", "handler.client_backchannel_logout.uri_too_long", http.StatusBadRequest},
 		{"no flow that signs users in", "handler.client_backchannel_logout.no_sign_in_flow", http.StatusBadRequest},
-		{"changed since the page was loaded", "handler.client_backchannel_logout.changed_since_loaded", http.StatusConflict},
+		{"http on a self-registered client", "handler.client_backchannel_logout.uri_http_self_registered", http.StatusBadRequest},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			const refusal = "The auth server's sentence."

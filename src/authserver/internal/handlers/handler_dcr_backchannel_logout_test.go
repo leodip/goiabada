@@ -217,6 +217,12 @@ func TestHandleDynamicClientRegistrationPost_RefusesABackchannelLogoutSettingItC
 		{name: "the flag as an object, with no URI",
 			body:  confidentialBody(`,"backchannel_logout_session_required":{}`),
 			field: "backchannel_logout_session_required", says: "boolean"},
+		{name: "the flag as null",
+			body:  confidentialBody(`,"backchannel_logout_uri":"https://app.example.com/backchannel-logout","backchannel_logout_session_required":null`),
+			field: "backchannel_logout_session_required", says: "boolean"},
+		{name: "the flag as null, with no URI",
+			body:  confidentialBody(`,"backchannel_logout_session_required":null`),
+			field: "backchannel_logout_session_required", says: "boolean"},
 	}
 
 	for _, tc := range tests {

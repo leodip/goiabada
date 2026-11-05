@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,13 +32,18 @@ import (
 
 // recoverAuditRecorder is runRecover's audit logger in these tests: the events and payloads are
 // the assertion, so they are captured rather than written to the database the way the running
-// command does through audit.NewLogger.
+// command does through audit.NewLogger. The back-channel sender logs each delivery from its own
+// goroutine, so Log appends an event and its details together under mu; the tests read the fields
+// once the command has returned, after every delivery finished.
 type recoverAuditRecorder struct {
+	mu      sync.Mutex
 	events  []string
 	details []map[string]interface{}
 }
 
 func (r *recoverAuditRecorder) Log(_ context.Context, auditEvent string, details map[string]interface{}) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.events = append(r.events, auditEvent)
 	r.details = append(r.details, details)
 }

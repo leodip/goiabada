@@ -71,6 +71,8 @@ type receiver struct {
 
 type post struct {
 	method      string
+	path        string
+	query       string
 	contentType string
 	token       string
 }
@@ -86,8 +88,9 @@ func newReceiver(t *testing.T, statuses ...int) *receiver {
 func (rc *receiver) serve(w http.ResponseWriter, r *http.Request) {
 	rc.mu.Lock()
 	assert.NoError(rc.t, r.ParseForm())
-	rc.posts = append(rc.posts, post{method: r.Method, contentType: r.Header.Get("Content-Type"),
-		token: r.PostForm.Get("logout_token")})
+	rc.posts = append(rc.posts, post{method: r.Method, path: r.URL.Path, query: r.URL.RawQuery,
+		contentType: r.Header.Get("Content-Type"),
+		token:       r.PostForm.Get("logout_token")})
 	status := http.StatusOK
 	if len(rc.statuses) > 0 {
 		status = rc.statuses[0]
@@ -243,6 +246,24 @@ func TestSend_PostsASignedLogoutToken(t *testing.T) {
 		"outcome":            "delivered",
 		"attempts":           1,
 	}, h.sent(t))
+}
+
+// TestSend_TheRegisteredQueryReachesTheAppUnchanged: a back-channel logout URI's query is kept
+// exactly as registered (#784 decision 6), on the first attempt and on a retry: several
+// parameters, a percent-escape, a plus and an empty value, none decoded or re-encoded.
+func TestSend_TheRegisteredQueryReachesTheAppUnchanged(t *testing.T) {
+	const query = "tenant=a&escaped=%2F1&plus=a+b&empty="
+	h := newHarness(t)
+	rc := newReceiver(t, http.StatusServiceUnavailable, http.StatusOK)
+
+	h.sender.Send(context.Background(), testIssuer, []Delivery{confidential(rc.server.URL + "/backchannel-logout?" + query)})
+
+	posts := rc.received()
+	require.Len(t, posts, 2, "the 503 is retried")
+	for i, p := range posts {
+		assert.Equal(t, "/backchannel-logout", p.path, "attempt %d", i+1)
+		assert.Equal(t, query, p.query, "attempt %d", i+1)
+	}
 }
 
 // TestSend_ASubjectOnlyDeliveryHasNoSid is decision 3's other shape: no session identifier, no sid

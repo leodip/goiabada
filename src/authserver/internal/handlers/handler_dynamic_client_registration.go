@@ -107,7 +107,7 @@ func HandleDynamicClientRegistrationPost(
 		}
 		// The flag is stored only with a URI: Back-Channel Logout 1.0 section 2.2 makes it a
 		// statement about the tokens sent there.
-		backchannelLogoutSessionRequired := req.BackchannelLogoutURI != "" && req.BackchannelLogoutSessionRequired
+		backchannelLogoutSessionRequired := req.BackchannelLogoutURI != "" && bool(req.BackchannelLogoutSessionRequired)
 
 		// 5d. Keep the privacy policy and terms of service only on a redirect URI's scheme and host
 		// (RFC 7591 section 5), dropping either otherwise and registering the client all the same
@@ -391,18 +391,17 @@ func validateDCRBackchannelLogout(req *oidc.DynamicClientRegistrationRequest) er
 // dcrBackchannelLogoutTypeRefusal names the field when a registration body could not be read only
 // because a back-channel logout member held a value of the wrong type, which #784 decision 10
 // refuses naming the field: backchannel_logout_uri is a string and
-// backchannel_logout_session_required a boolean. Any other unreadable body keeps the plain
-// description, so ok is false.
+// backchannel_logout_session_required a boolean, null included: it is the request's one
+// oidc.NonNullBool, whose refusal encoding/json passes on without the member's name. Any other
+// unreadable body keeps the plain description, so ok is false.
 func dcrBackchannelLogoutTypeRefusal(err error) (description string, ok bool) {
-	var typeErr *json.UnmarshalTypeError
-	if !errors.As(err, &typeErr) {
-		return "", false
-	}
-	switch typeErr.Field {
-	case "backchannel_logout_uri":
-		return "backchannel_logout_uri must be a string", true
-	case "backchannel_logout_session_required":
+	var notABoolean *oidc.NotABooleanError
+	if errors.As(err, &notABoolean) {
 		return "backchannel_logout_session_required must be a boolean", true
+	}
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(err, &typeErr) && typeErr.Field == "backchannel_logout_uri" {
+		return "backchannel_logout_uri must be a string", true
 	}
 	return "", false
 }

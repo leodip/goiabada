@@ -137,10 +137,55 @@ func TestHandleClientBackchannelLogoutPut_AClientMadePublicUnderTheRowIsRefusedH
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	code, description := decodeErrorEnvelope(t, rr)
 	assert.Equal(t, "handler.client_backchannel_logout.uri_http_public_client", code)
-	assert.Equal(t, "Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client: http://app.internal:3000/bcl", description)
+	assert.Equal(t, "Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client an administrator created: http://app.internal:3000/bcl", description)
 	assert.Equal(t, []string{"begin", "acquire", "read", "rollback"}, order)
 	database.AssertNotCalled(t, "SetClientBackchannelLogout", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// Decisions 6 and 7: a client that registered itself is held to https whatever its type and whoever
+// sets its URI, so an http URI is refused it before anything is written, as the sender would skip
+// it; https is admitted.
+func TestHandleClientBackchannelLogoutPut_AClientThatRegisteredItselfTakesHTTPSOnly(t *testing.T) {
+	selfRegistered := func(public bool) *record.Client {
+		client := confidentialCodeFlowClient("")
+		client.CreatedViaDCR = true
+		client.IsPublic = public
+		return client
+	}
+	for name, public := range map[string]bool{"confidential": false, "public": true} {
+		t.Run(name+" refused http", func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(selfRegistered(public), nil).Once()
+
+			rr := serveBackchannelLogoutSave(t, database, auditLogger, manageScopeClaim,
+				backchannelLogoutBody(t, "http://app.internal:3000/bcl", false))
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, "handler.client_backchannel_logout.uri_http_self_registered", code)
+			assert.Equal(t, "Back-channel logout URI must use https on a client that registered itself, whatever its type. Plain http is allowed only on a confidential client an administrator created: http://app.internal:3000/bcl", description)
+			database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+
+	t.Run("https admitted", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(selfRegistered(false), nil).Once()
+		datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+		expectTheRowUnderTheLock(database, selfRegistered(false), func(string) {})
+		database.On("SetClientBackchannelLogout", mock.Anything, clientUpdateTx, int64(7), "https://app.example.com/bcl", false).Return(nil).Once()
+		expectTheAnswersLoads(database)
+		auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientBackchannelLogout, mock.Anything).Return().Once()
+
+		rr := serveBackchannelLogoutSave(t, database, auditLogger, manageScopeClaim,
+			backchannelLogoutBody(t, "https://app.example.com/bcl", false))
+
+		assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	})
 }
 
 // Decision 15, for every caller below authserver:manage: a save that sets a URI, or changes the
@@ -222,11 +267,13 @@ func TestHandleClientBackchannelLogoutPut_OnlyManageSetsOrChangesTheURI(t *testi
 	}
 }
 
-// The ceiling's comparison holds under the client's row: a caller below authserver:manage carrying
-// back the URI it loaded, to change the flag alone, is answered 409 when another save changed the
-// URI before this one took the row, since writing it would set a URI the ceiling never judged. An
+// Decision 15 compares the URI under the client's row: a caller below authserver:manage carrying
+// back the URI it loaded, to change the flag alone, sets a URI when another save changed it before
+// this one took the row. It is refused as the comparison before the transaction refuses, 403
+// MANAGE_SCOPE_REQUIRED with its insufficient_scope challenge and one administrator_change_refused
+// record under ceiling backchannel_logout_uri, written after the rollback, with nothing saved. An
 // authserver:manage caller, whom the ceiling never refuses, writes.
-func TestHandleClientBackchannelLogoutPut_AURIChangedUnderTheRowIsAConflictBelowManage(t *testing.T) {
+func TestHandleClientBackchannelLogoutPut_AURIChangedUnderTheRowMeetsTheCeilingBelowManage(t *testing.T) {
 	const loaded = "https://app.example.com/bcl"
 	const changedMeanwhile = "https://other.example.com/bcl"
 
@@ -239,16 +286,28 @@ func TestHandleClientBackchannelLogoutPut_AURIChangedUnderTheRowIsAConflictBelow
 		expectOrdinaryClient(database)
 		datamocks.ExpectRunInTransaction(database, clientUpdateTx, note)
 		expectTheRowUnderTheLock(database, confidentialCodeFlowClient(changedMeanwhile), note)
+		var records []loggedEvent
+		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+			note("audit")
+			records = append(records, loggedEvent{event: args.String(1), details: args.Get(2).(map[string]interface{})})
+		}).Return()
 
 		rr := serveBackchannelLogoutSave(t, database, auditLogger, manageClientsScopeClaim, backchannelLogoutBody(t, loaded, true))
 
-		assert.Equal(t, http.StatusConflict, rr.Code)
 		code, description := decodeErrorEnvelope(t, rr)
-		assert.Equal(t, "CONCURRENT_UPDATE", code)
-		assert.Equal(t, "The client's back-channel logout URI was changed by another save after it was loaded. Nothing was saved: reload it and make the change again.", description)
-		assert.Equal(t, []string{"begin", "acquire", "read", "rollback"}, order)
+		assertManageScopeRequired(t, rr, rr.Code, code, description)
+		require.Len(t, records, 1, "one record, and not the save's own")
+		assert.Equal(t, "administrator_change_refused", records[0].event)
+		assert.Equal(t, map[string]interface{}{
+			"logged_in_user": grantCaller,
+			"method":         http.MethodPut,
+			"route":          "",
+			"ceiling":        "backchannel_logout_uri",
+			"target_kind":    "client",
+			"target_id":      int64(7),
+		}, records[0].details)
+		assert.Equal(t, []string{"begin", "acquire", "read", "rollback", "audit"}, order, "recorded after the rollback")
 		database.AssertNotCalled(t, "SetClientBackchannelLogout", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("manage-clients clearing it", func(t *testing.T) {

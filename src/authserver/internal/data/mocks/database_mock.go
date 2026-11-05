@@ -7956,6 +7956,80 @@ func (_c *Database_GetCodeById_Call) RunAndReturn(run func(ctx context.Context, 
 	return _c
 }
 
+// GetCommittedUserSessionClients provides a mock function for the type Database
+func (_mock *Database) GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error) {
+	ret := _mock.Called(ctx, tx, userSessionId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCommittedUserSessionClients")
+	}
+
+	var r0 []record.UserSessionClient
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]record.UserSessionClient, error)); ok {
+		return returnFunc(ctx, tx, userSessionId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []record.UserSessionClient); ok {
+		r0 = returnFunc(ctx, tx, userSessionId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.UserSessionClient)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userSessionId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetCommittedUserSessionClients_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCommittedUserSessionClients'
+type Database_GetCommittedUserSessionClients_Call struct {
+	*mock.Call
+}
+
+// GetCommittedUserSessionClients is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userSessionId int64
+func (_e *Database_Expecter) GetCommittedUserSessionClients(ctx any, tx any, userSessionId any) *Database_GetCommittedUserSessionClients_Call {
+	return &Database_GetCommittedUserSessionClients_Call{Call: _e.mock.On("GetCommittedUserSessionClients", ctx, tx, userSessionId)}
+}
+
+func (_c *Database_GetCommittedUserSessionClients_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionId int64)) *Database_GetCommittedUserSessionClients_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetCommittedUserSessionClients_Call) Return(userSessionClients []record.UserSessionClient, err error) *Database_GetCommittedUserSessionClients_Call {
+	_c.Call.Return(userSessionClients, err)
+	return _c
+}
+
+func (_c *Database_GetCommittedUserSessionClients_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)) *Database_GetCommittedUserSessionClients_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetConsentByUserIdAndClientId provides a mock function for the type Database
 func (_mock *Database) GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error) {
 	ret := _mock.Called(ctx, tx, userId, clientId)

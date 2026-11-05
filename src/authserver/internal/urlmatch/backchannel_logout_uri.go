@@ -25,6 +25,14 @@ const (
 	BackchannelLogoutURIPlainHTTP
 )
 
+// BackchannelLogoutHTTPAllowed is the client's permission to a plain http back-channel logout URI,
+// CheckBackchannelLogoutURI's allowHTTP, under #784 decision 6: only a confidential client an
+// administrator created has it. A self-registered client is held to https whatever its type and
+// whoever later sets its URI, as its deliveries are held to public addresses (decision 7).
+func BackchannelLogoutHTTPAllowed(isPublic, createdViaDCR bool) bool {
+	return !isPublic && !createdViaDCR
+}
+
 // BackchannelLogoutURIMaxBytes bounds a back-channel logout URI at a redirect URI's width, the
 // column's (#784 decision 14).
 const BackchannelLogoutURIMaxBytes = 2048

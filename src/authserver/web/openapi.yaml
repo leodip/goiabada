@@ -2688,13 +2688,15 @@ paths:
         empty `backchannelLogoutUri` clears the URI.
 
         The URI is an absolute `https` URI that names a host, at most 2048 bytes, with no user name
-        or password and no fragment. A query is kept as sent. A confidential client may use plain
-        `http` on any host; a public client can't. The client needs the authorization code flow or
-        the implicit flow.
+        or password and no fragment. A query is kept as sent. A confidential client an
+        administrator created may use plain `http` on any host; a public client can't, and neither
+        can a client that registered itself, whatever its type. The client needs the authorization
+        code flow or the implicit flow.
 
         Setting the URI, or changing the stored one, needs `authserver:manage`: another token is
         refused 403 `MANAGE_SCOPE_REQUIRED`, and the refusal is recorded as
-        `administrator_change_refused`. `authserver:manage-clients` can clear the URI and change
+        `administrator_change_refused`. The URI sent is compared with the one stored when the save
+        is made, so sending back a URI another save has since changed is refused the same way. `authserver:manage-clients` can clear the URI and change
         `backchannelLogoutSessionRequired` alone. On a client that may act as an administrator,
         only `authserver:manage` may save at all. Each save is recorded as
         `updated_client_backchannel_logout`.
@@ -2722,15 +2724,6 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-        '409':
-          description: |
-            A token without `authserver:manage` sent back the URI as it read it, and another save
-            changed the URI since. error_code is CONCURRENT_UPDATE; nothing was saved. Read the
-            client again and retry.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 

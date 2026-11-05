@@ -32,15 +32,15 @@ const manageScopeRequiredCode = "MANAGE_SCOPE_REQUIRED"
 // backchannelLogoutErrorFields maps the tab's refusals to the field each is about. Every refusal the
 // save meets is about the URI: the flag is always sent, so its own refusal never comes back.
 var backchannelLogoutErrorFields = map[string]string{
-	i18n.ErrCodeClientBackchannelLogoutURIRequired:         "backchannelLogoutUri",
-	i18n.ErrCodeClientBackchannelLogoutNoSignInFlow:        "backchannelLogoutUri",
-	i18n.ErrCodeClientBackchannelLogoutURITooLong:          "backchannelLogoutUri",
-	i18n.ErrCodeClientBackchannelLogoutURIInvalid:          "backchannelLogoutUri",
-	i18n.ErrCodeClientBackchannelLogoutURISchemeInvalid:    "backchannelLogoutUri",
-	i18n.ErrCodeClientBackchannelLogoutURIUserinfo:         "backchannelLogoutUri",
-	i18n.ErrCodeClientBackchannelLogoutURIHTTPPublicClient: "backchannelLogoutUri",
-	i18n.ErrCodeClientBackchannelLogoutChangedSinceLoaded:  "backchannelLogoutUri",
-	manageScopeRequiredCode:                                "backchannelLogoutUri",
+	i18n.ErrCodeClientBackchannelLogoutURIRequired:           "backchannelLogoutUri",
+	i18n.ErrCodeClientBackchannelLogoutNoSignInFlow:          "backchannelLogoutUri",
+	i18n.ErrCodeClientBackchannelLogoutURITooLong:            "backchannelLogoutUri",
+	i18n.ErrCodeClientBackchannelLogoutURIInvalid:            "backchannelLogoutUri",
+	i18n.ErrCodeClientBackchannelLogoutURISchemeInvalid:      "backchannelLogoutUri",
+	i18n.ErrCodeClientBackchannelLogoutURIUserinfo:           "backchannelLogoutUri",
+	i18n.ErrCodeClientBackchannelLogoutURIHTTPPublicClient:   "backchannelLogoutUri",
+	i18n.ErrCodeClientBackchannelLogoutURIHTTPSelfRegistered: "backchannelLogoutUri",
+	manageScopeRequiredCode:                                  "backchannelLogoutUri",
 }
 
 // ClientBackchannelLogout is what the Back-channel logout tab is drawn from: the URI the auth server

@@ -59,7 +59,7 @@ func newStartSessionMocks(t *testing.T) *startSessionMocks {
 	db.On("GetUserById", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(&record.User{Id: 123, Subject: "subject-123"}, nil).Maybe()
 	db.On("AcquireUserSessionRow", mock.Anything, txSentinel, mock.Anything).Return(true, nil).Maybe()
-	db.On("GetUserSessionClientsByUserSessionId", mock.Anything, txSentinel, mock.Anything).
+	db.On("GetCommittedUserSessionClients", mock.Anything, txSentinel, mock.Anything).
 		Return([]record.UserSessionClient(nil), nil).Maybe()
 	return &startSessionMocks{db: db, manager: &Manager{database: db}}
 }

@@ -251,12 +251,12 @@ const (
 	ErrCodeClientBackchannelLogoutURIRequired             = "handler.client_backchannel_logout.uri_required"
 	ErrCodeClientBackchannelLogoutSessionRequiredRequired = "handler.client_backchannel_logout.session_required_required"
 	ErrCodeClientBackchannelLogoutNoSignInFlow            = "handler.client_backchannel_logout.no_sign_in_flow"
-	ErrCodeClientBackchannelLogoutURITooLong              = "handler.client_backchannel_logout.uri_too_long"           // Args: {"length": int, "max": int, "prefix": string}
-	ErrCodeClientBackchannelLogoutURIInvalid              = "handler.client_backchannel_logout.uri_invalid"            // Args: {"uri": string}
-	ErrCodeClientBackchannelLogoutURISchemeInvalid        = "handler.client_backchannel_logout.uri_scheme_invalid"     // Args: {"uri": string}
-	ErrCodeClientBackchannelLogoutURIUserinfo             = "handler.client_backchannel_logout.uri_userinfo"           // Args: {"uri": string}
-	ErrCodeClientBackchannelLogoutURIHTTPPublicClient     = "handler.client_backchannel_logout.uri_http_public_client" // Args: {"uri": string}
-	ErrCodeClientBackchannelLogoutChangedSinceLoaded      = "handler.client_backchannel_logout.changed_since_loaded"
+	ErrCodeClientBackchannelLogoutURITooLong              = "handler.client_backchannel_logout.uri_too_long"             // Args: {"length": int, "max": int, "prefix": string}
+	ErrCodeClientBackchannelLogoutURIInvalid              = "handler.client_backchannel_logout.uri_invalid"              // Args: {"uri": string}
+	ErrCodeClientBackchannelLogoutURISchemeInvalid        = "handler.client_backchannel_logout.uri_scheme_invalid"       // Args: {"uri": string}
+	ErrCodeClientBackchannelLogoutURIUserinfo             = "handler.client_backchannel_logout.uri_userinfo"             // Args: {"uri": string}
+	ErrCodeClientBackchannelLogoutURIHTTPPublicClient     = "handler.client_backchannel_logout.uri_http_public_client"   // Args: {"uri": string}
+	ErrCodeClientBackchannelLogoutURIHTTPSelfRegistered   = "handler.client_backchannel_logout.uri_http_self_registered" // Args: {"uri": string}
 
 	ErrCodeClientWebOriginEmpty            = "handler.client_web_origins.empty"
 	ErrCodeClientWebOriginInvalid          = "handler.client_web_origins.invalid"  // Args: {"origin": string}

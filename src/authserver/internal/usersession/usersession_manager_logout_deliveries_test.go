@@ -39,15 +39,11 @@ func (m *startSessionMocks) appsOn(session record.UserSession, held bool) {
 		return
 	}
 	clients := []record.UserSessionClient{
-		{Id: 1, UserSessionId: session.Id, ClientId: 51},
-		{Id: 2, UserSessionId: session.Id, ClientId: 52},
+		{Id: 1, UserSessionId: session.Id, ClientId: 51,
+			Client: record.Client{Id: 51, ClientIdentifier: "told-app", BackchannelLogoutURI: "https://told.example/bcl"}},
+		{Id: 2, UserSessionId: session.Id, ClientId: 52, Client: record.Client{Id: 52, ClientIdentifier: "untold-app"}},
 	}
-	m.db.On("GetUserSessionClientsByUserSessionId", mock.Anything, txSentinel, session.Id).Return(clients, nil).Once()
-	m.db.On("UserSessionClientsLoadClients", mock.Anything, txSentinel, clients).Run(func(args mock.Arguments) {
-		loaded := args.Get(2).([]record.UserSessionClient)
-		loaded[0].Client = record.Client{Id: 51, ClientIdentifier: "told-app", BackchannelLogoutURI: "https://told.example/bcl"}
-		loaded[1].Client = record.Client{Id: 52, ClientIdentifier: "untold-app"}
-	}).Return(nil).Once()
+	m.db.On("GetCommittedUserSessionClients", mock.Anything, txSentinel, session.Id).Return(clients, nil).Once()
 }
 
 // toldApp is the one delivery a removed live session sends.

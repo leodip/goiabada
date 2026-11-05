@@ -44,6 +44,7 @@ type logoutDatabase interface {
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
+	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
 }
 
 // logoutTokenSender tells the apps whose part of a session ended, with the logout tokens the end

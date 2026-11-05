@@ -923,6 +923,10 @@ type Database interface {
 	GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error)
 	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
 	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
+	// GetCommittedUserSessionClients answers a session's apps, each with its client, as last
+	// committed, on the caller's transaction: what an end of the session tells, read under the
+	// session's row (#784).
+	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
 }
 
 // ErrUniqueViolation is what a caller asks about when it wants to know whether a write lost a race

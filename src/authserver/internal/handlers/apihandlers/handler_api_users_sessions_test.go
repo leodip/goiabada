@@ -75,17 +75,11 @@ func stubTerminationOpening(database *datamocks.Database, userSession *record.Us
 	database.On("AcquireUserSessionRow", mock.Anything, apiTerminateTx, userSession.SessionIdentifier).
 		Return(true, nil).Once()
 	sessionClients := []record.UserSessionClient{
-		{Id: 1, UserSessionId: userSession.Id, ClientId: toldClient.Id},
-		{Id: 2, UserSessionId: userSession.Id, ClientId: 10},
+		{Id: 1, UserSessionId: userSession.Id, ClientId: toldClient.Id, Client: toldClient},
+		{Id: 2, UserSessionId: userSession.Id, ClientId: 10, Client: record.Client{Id: 10, ClientIdentifier: "app-without-uri"}},
 	}
-	database.On("GetUserSessionClientsByUserSessionId", mock.Anything, apiTerminateTx, userSession.Id).
+	database.On("GetCommittedUserSessionClients", mock.Anything, apiTerminateTx, userSession.Id).
 		Return(sessionClients, nil).Once()
-	database.On("UserSessionClientsLoadClients", mock.Anything, apiTerminateTx, sessionClients).
-		Run(func(args mock.Arguments) {
-			loaded := args.Get(2).([]record.UserSessionClient)
-			loaded[0].Client = toldClient
-			loaded[1].Client = record.Client{Id: 10, ClientIdentifier: "app-without-uri"}
-		}).Return(nil).Once()
 	return stub
 }
 

@@ -48,6 +48,12 @@ func saveBackchannelLogout(t *testing.T, accessToken string, clientId int64, bod
 // public, holding the back-channel logout settings given, and removes it when the test ends.
 func newBackchannelLogoutClient(t *testing.T, prefix string, public bool, uri string, sessionRequired bool) *record.Client {
 	t.Helper()
+	return createBackchannelLogoutClient(t, newBackchannelLogoutClientRecord(t, prefix, public, uri, sessionRequired), false)
+}
+
+// newBackchannelLogoutClientRecord is the client newBackchannelLogoutClient creates, not yet stored.
+func newBackchannelLogoutClientRecord(t *testing.T, prefix string, public bool, uri string, sessionRequired bool) *record.Client {
+	t.Helper()
 	client := &record.Client{
 		ClientIdentifier:                 prefix + strings.ToLower(fake.LetterN(8)),
 		Enabled:                          true,
@@ -62,6 +68,14 @@ func newBackchannelLogoutClient(t *testing.T, prefix string, public bool, uri st
 		require.NoError(t, err)
 		client.ClientSecretEncrypted = secret
 	}
+	return client
+}
+
+// createBackchannelLogoutClient stores client, as registered through dynamic client registration
+// when selfRegistered, and deletes it when the test ends.
+func createBackchannelLogoutClient(t *testing.T, client *record.Client, selfRegistered bool) *record.Client {
+	t.Helper()
+	client.CreatedViaDCR = selfRegistered
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
 	return client
@@ -129,12 +143,14 @@ func TestAPIClientBackchannelLogoutPut_SavesClearsAndAnswersBothSettings(t *test
 	assert.False(t, storedRequired)
 }
 
-// Decision 6's rules for an administrator: https on any client, http on a confidential one only,
-// and each refusal its own catalog key, with nothing written.
+// Decision 6's rules for an administrator: https on any client, http only on a confidential one an
+// administrator created, and each refusal its own catalog key, with nothing written. A client that
+// registered itself is held to https whatever its type, whoever sets its URI.
 func TestAPIClientBackchannelLogoutPut_TheURIRules(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	confidential := newBackchannelLogoutClient(t, "bcl-rules-conf-", false, "", false)
 	public := newBackchannelLogoutClient(t, "bcl-rules-pub-", true, "", false)
+	selfRegistered := createBackchannelLogoutClient(t, newBackchannelLogoutClientRecord(t, "bcl-rules-dcr-", false, "", false), true)
 	overlong := "https://app.example.com/" + strings.Repeat("x", 2049-len("https://app.example.com/"))
 
 	refused := []struct {
@@ -145,9 +161,11 @@ func TestAPIClientBackchannelLogoutPut_TheURIRules(t *testing.T) {
 		wantDescription string
 	}{
 		{"http on a public client", public, "http://app.internal:3000/bcl", "uri_http_public_client",
-			"Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client: http://app.internal:3000/bcl"},
+			"Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client an administrator created: http://app.internal:3000/bcl"},
 		{"http on loopback on a public client", public, "http://127.0.0.1:8080/bcl", "uri_http_public_client",
-			"Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client: http://127.0.0.1:8080/bcl"},
+			"Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client an administrator created: http://127.0.0.1:8080/bcl"},
+		{"http on a confidential client that registered itself", selfRegistered, "http://app.internal:3000/bcl", "uri_http_self_registered",
+			"Back-channel logout URI must use https on a client that registered itself, whatever its type. Plain http is allowed only on a confidential client an administrator created: http://app.internal:3000/bcl"},
 		{"another scheme", confidential, "ftp://app.example.com/bcl", "uri_scheme_invalid",
 			"Back-channel logout URI must use https or http: ftp://app.example.com/bcl"},
 		{"a custom scheme", confidential, "com.example.app:/bcl", "uri_scheme_invalid",
@@ -187,6 +205,7 @@ func TestAPIClientBackchannelLogoutPut_TheURIRules(t *testing.T) {
 		{"https on a public client", public, "https://spa.example.com/bcl"},
 		{"https on a confidential client", confidential, "https://app.example.com:8443/bcl?tenant=a"},
 		{"http on a confidential client", confidential, "http://10.0.0.7/bcl"},
+		{"https on a confidential client that registered itself", selfRegistered, "https://app.example.com/dcr-bcl"},
 		{"2048 bytes", confidential, overlong[:2048]},
 		{"surrounding spaces trimmed", confidential, "  https://app.example.com/trimmed  "},
 	}
