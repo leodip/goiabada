@@ -6798,6 +6798,80 @@ func (_c *Database_GetAllWebOrigins_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// GetAuditLogsByUserId provides a mock function for the type Database
+func (_mock *Database) GetAuditLogsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.AuditLog, error) {
+	ret := _mock.Called(ctx, tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAuditLogsByUserId")
+	}
+
+	var r0 []record.AuditLog
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]record.AuditLog, error)); ok {
+		return returnFunc(ctx, tx, userId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []record.AuditLog); ok {
+		r0 = returnFunc(ctx, tx, userId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.AuditLog)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetAuditLogsByUserId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAuditLogsByUserId'
+type Database_GetAuditLogsByUserId_Call struct {
+	*mock.Call
+}
+
+// GetAuditLogsByUserId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) GetAuditLogsByUserId(ctx any, tx any, userId any) *Database_GetAuditLogsByUserId_Call {
+	return &Database_GetAuditLogsByUserId_Call{Call: _e.mock.On("GetAuditLogsByUserId", ctx, tx, userId)}
+}
+
+func (_c *Database_GetAuditLogsByUserId_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64)) *Database_GetAuditLogsByUserId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetAuditLogsByUserId_Call) Return(auditLogs []record.AuditLog, err error) *Database_GetAuditLogsByUserId_Call {
+	_c.Call.Return(auditLogs, err)
+	return _c
+}
+
+func (_c *Database_GetAuditLogsByUserId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) ([]record.AuditLog, error)) *Database_GetAuditLogsByUserId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetAuditLogsPaginated provides a mock function for the type Database
 func (_mock *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, filter record.AuditLogFilter) ([]record.AuditLog, int, error) {
 	ret := _mock.Called(ctx, tx, page, pageSize, filter)

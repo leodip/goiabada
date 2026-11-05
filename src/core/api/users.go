@@ -289,3 +289,96 @@ type UserConsentResponse struct {
 type GetUserConsentsResponse struct {
 	Consents []UserConsentResponse `json:"consents"`
 }
+
+// UserExportResponse is everything the auth server holds about one user, in one document, as GET
+// /api/v1/admin/users/{id}/export answers it: what an operator hands a person who asked for their
+// data (#781). Each part is the entry the matching admin API read answers, inside this versioned
+// wrapper, and every list is in id order, oldest first, so two exports of one person compare line
+// by line (decision 3). FormatVersion goes up only for a change that breaks a reader; a field added
+// to a reused entry appears here too, and is additive.
+type UserExportResponse struct {
+	FormatVersion int       `json:"formatVersion"`
+	ExportedAt    time.Time `json:"exportedAt"`
+	// Issuer is the auth server's issuer, since a subject is a stable identifier only together
+	// with its issuer (OpenID Connect Core 1.0 section 5.7).
+	Issuer                   string                            `json:"issuer"`
+	Identifiers              UserExportIdentifiersResponse     `json:"identifiers"`
+	User                     UserResponse                      `json:"user"`
+	Attributes               []UserAttributeResponse           `json:"attributes"`
+	Groups                   []UserExportGroupResponse         `json:"groups"`
+	Permissions              []PermissionResponse              `json:"permissions"`
+	Consents                 []UserConsentResponse             `json:"consents"`
+	Sessions                 []UserSessionDetailResponse       `json:"sessions"`
+	RefreshTokens            []UserExportRefreshTokenResponse  `json:"refreshTokens"`
+	LegalDocumentAcceptances []LegalDocumentAcceptanceResponse `json:"legalDocumentAcceptances"`
+	ProfilePicture           *UserExportProfilePictureResponse `json:"profilePicture"`
+	AuditEvents              []UserExportAuditEventResponse    `json:"auditEvents"`
+}
+
+// UserExportAuditEventResponse is one audit event about the user or made by them in the user
+// export: the audit log's entry, as GET /api/v1/admin/audit-logs answers it, plus
+// ActedByAdministrator (#781 decision 2). An event another user's token made about the user, an
+// administrator's on the admin API, does not name them: ActedByAdministrator is true, LoggedInUserId
+// is nil and the details carry no logged_in_user. The other user a sign-in on a shared browser
+// ended is not named either: cross_user_session_replaced carries no previous_user_id. An event the
+// user made keeps whom it acted on, and a client or the recover command named as the actor stays,
+// since neither is a person.
+type UserExportAuditEventResponse struct {
+	AuditLogResponse
+	ActedByAdministrator bool `json:"actedByAdministrator"`
+}
+
+// UserExportIdentifiersResponse is what the user is known by, to search older audit rows and the
+// logs with: the row id, the subject, the email address, and EmailDigest, the SHA-256 hex digest
+// of that address, which is how an audit entry about an address records it.
+type UserExportIdentifiersResponse struct {
+	Id          int64  `json:"id"`
+	Subject     string `json:"subject"`
+	Email       string `json:"email"`
+	EmailDigest string `json:"emailDigest"`
+}
+
+// UserExportGroupResponse is one group the user is a member of, as GET /api/v1/admin/users/{id}/groups
+// answers it, with the attributes and permissions the user gets through it, as the group's own
+// attribute and permission reads answer them, each list in id order.
+type UserExportGroupResponse struct {
+	GroupResponse
+	Attributes  []GroupAttributeResponse `json:"attributes"`
+	Permissions []PermissionResponse     `json:"permissions"`
+}
+
+// UserExportProfilePictureResponse is the user's profile picture: its content type and the image
+// itself, which JSON carries as standard base64.
+type UserExportProfilePictureResponse struct {
+	ContentType string `json:"contentType"`
+	Data        []byte `json:"data"`
+}
+
+// UserExportRefreshTokenResponse is one refresh token the auth server holds for the user in the
+// user export, rotated-out and revoked ones included (#781 decision 4). ClientName and
+// ClientNameUnverified are the client's name as a consent shows it. MaxLifetime is set on an
+// Offline token, SessionIdentifier on a session-bound (Refresh) one. Jti is the id the audit events
+// name as refresh_token_jti; the token itself is never stored. Revoked is true when the token's own
+// row, its authorization code or its rotation family is marked revoked.
+//
+// IpAddress, UserAgent and AuthenticatedAt are the sign-in the token came from. A code-flow token
+// takes all three from its authorization code. A password-grant token has no code, so its address
+// and browser are empty, and its AuthenticatedAt is when the password was checked, which its row
+// keeps through every rotation and so can differ from IssuedAt; it is nil only where nothing is
+// stored.
+type UserExportRefreshTokenResponse struct {
+	ClientIdentifier     string     `json:"clientIdentifier"`
+	ClientName           string     `json:"clientName"`
+	ClientNameUnverified bool       `json:"clientNameUnverified"`
+	Scope                string     `json:"scope"`
+	Type                 string     `json:"type"`
+	IssuedAt             *time.Time `json:"issuedAt"`
+	ExpiresAt            *time.Time `json:"expiresAt"`
+	MaxLifetime          *time.Time `json:"maxLifetime"`
+	SessionIdentifier    string     `json:"sessionIdentifier"`
+	Jti                  string     `json:"jti"`
+	Revoked              bool       `json:"revoked"`
+	IpAddress            string     `json:"ipAddress"`
+	UserAgent            string     `json:"userAgent"`
+	AuthenticatedAt      *time.Time `json:"authenticatedAt"`
+}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -84,18 +85,8 @@ func HandleAuditLogsGet(
 
 		// Convert to response format
 		auditLogResponses := make([]api.AuditLogResponse, len(auditLogs))
-		for i, log := range auditLogs {
-			auditLogResponses[i] = api.AuditLogResponse{
-				Id:         log.Id,
-				CreatedAt:  log.CreatedAt,
-				AuditEvent: log.AuditEvent,
-				Details:    log.Details, // JSON string
-				RequestId:  log.RequestId,
-				// Null when the row names no such user, as every row written before the
-				// columns existed does (#780 decision 6).
-				UserId:         nullableId(log.UserId),
-				LoggedInUserId: nullableId(log.LoggedInUserId),
-			}
+		for i := range auditLogs {
+			auditLogResponses[i] = apimapping.ToAuditLogResponse(&auditLogs[i])
 		}
 
 		response := api.GetAuditLogsResponse{
@@ -107,12 +98,4 @@ func HandleAuditLogsGet(
 
 		writeJSON(w, r, http.StatusOK, response)
 	}
-}
-
-// nullableId is a nullable id column as the wire carries it: the id, or nil for NULL.
-func nullableId(id sql.NullInt64) *int64 {
-	if !id.Valid {
-		return nil
-	}
-	return &id.Int64
 }

@@ -68,6 +68,33 @@ func TestDebugResponseWriter_MultipleWritesAccumulate(t *testing.T) {
 	assert.Equal(t, "first second", recorder.Body.String())
 }
 
+// deadlineWriter is a writer that, like a connection's, takes a write deadline.
+type deadlineWriter struct {
+	*httptest.ResponseRecorder
+	deadlines []time.Time
+}
+
+func (d *deadlineWriter) SetWriteDeadline(deadline time.Time) error {
+	d.deadlines = append(d.deadlines, deadline)
+	return nil
+}
+
+// A handler behind the wrapper reaches the connection's write deadline through
+// http.ResponseController, so the user export lifts its deadline with debugging on as with it
+// off (#781 decision 5).
+func TestDebugResponseWriter_AWriteDeadlineReachesTheWriterBeneath(t *testing.T) {
+	writer := &deadlineWriter{ResponseRecorder: httptest.NewRecorder()}
+	deadline := time.Date(2026, 11, 5, 9, 35, 0, 0, time.UTC)
+	handler := APIDebug(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.NoError(t, http.NewResponseController(w).SetWriteDeadline(deadline))
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	handler.ServeHTTP(writer, httptest.NewRequest("GET", "/api/v1/admin/users/42/export", nil))
+
+	assert.Equal(t, []time.Time{deadline}, writer.deadlines)
+}
+
 // -----------------------------------------------------------------------------
 // The middleware
 // -----------------------------------------------------------------------------

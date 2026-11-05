@@ -598,6 +598,14 @@ const (
 	// logged_in_user.
 	EventUpdatedClientAdministrativeScopes = "updated_client_administrative_scopes"
 
+	// EventExportedUserData records an export of everything held about a user through GET
+	// /api/v1/admin/users/{id}/export (#781 decision 8). It is written once the answer has been
+	// sent, whether or not the caller received all of it, since the data has left the server
+	// either way; a refused or failed export writes nothing.
+	//
+	// Payload: user_id, the user exported, and logged_in_user, the subject of the token that asked.
+	EventExportedUserData = "exported_user_data"
+
 	// EventViewedClientSecret records a read of a client's secret through GET
 	// /api/v1/admin/clients/{id}/secret, the one route that answers one, decrypted. Only a read
 	// that disclosed a secret writes it: a client holding none is answered an empty one and
@@ -711,6 +719,7 @@ var auditEventTypes = []string{
 	EventDisabledOTP,
 	EventDynamicClientRegistration,
 	EventEnabledOTP,
+	EventExportedUserData,
 	EventFailedAccountActivationCode,
 	EventFailedEmailVerificationCode,
 	EventFailedResetPasswordCode,

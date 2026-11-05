@@ -75,7 +75,8 @@ func TestRender_AdminUserLegalDocuments(t *testing.T) {
 		assert.Contains(t, out, `<span class="cell-secondary font-mono text-sm">terms</span>`)
 		assert.Contains(t, out, `<td class="sm:whitespace-nowrap" data-label="Aceito em">20/10/2026 09:30</td>`)
 		assert.NotContains(t, out, "https://auth.example", "the console opens the text itself")
-		assert.NotContains(t, out, "<form", "the tab only reads")
+		assert.Equal(t, 1, strings.Count(out, "<form"), "the tab only reads: its one form is the header's Download data")
+		assert.Contains(t, out, `<form method="post" action="/admin/users/5/export">`)
 	})
 
 	t.Run("none", func(t *testing.T) {

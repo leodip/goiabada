@@ -1151,6 +1151,76 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/users/{id}/export:
+    get:
+      tags: [Users]
+      summary: Export everything held about a user
+      description: |
+        One JSON document holding everything the auth server holds about the user, to answer
+        their request for a copy of their data: the identifiers to search older audit rows and
+        the logs with, the profile, and the user's other data as the matching Admin API reads
+        answer it. Nothing secret is in it: no password hash, two-factor secret, recovery code,
+        pending code or token. Every list is in id order, oldest first, and is `[]` when empty,
+        never null. `formatVersion` goes up only for a change that breaks a reader; a field added
+        to an entry is additive.
+
+        The answer is a file to save, named `user-<id>-<date>.json` in `Content-Disposition`,
+        the date being `exportedAt`'s in UTC. It is gzip-compressed (`Content-Encoding: gzip`)
+        when the request's `Accept-Encoding` accepts gzip, and plain JSON otherwise; error answers
+        are never compressed. Like every Admin API answer it is never cached.
+
+        Every export leaves an `exported_user_data` audit event naming the user in `user_id` and
+        who exported them in `logged_in_user`, once the answer has been sent.
+
+        The audit events in the document don't name the other people who acted on the user: an
+        event an administrator made about the user says an administrator made it, without saying
+        who, so the file can be handed to the user as it is. The audit log still names them.
+
+        The document holds the user's audit events, so the route needs a token that reads both
+        users and the audit log: `authserver:admin-read`, `authserver:manage`, or
+        `authserver:manage-users` together with `authserver:manage-settings`. A token holding
+        `authserver:manage-users` without `authserver:manage-settings` is refused
+        `INSUFFICIENT_SCOPE`.
+      operationId: exportUser
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+        - name: Accept-Encoding
+          in: header
+          required: false
+          description: Send `gzip` to receive the document gzip-compressed.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The user's document
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="user-<id>-<date>.json"`, the date in UTC.'
+              schema:
+                type: string
+            Content-Encoding:
+              description: '`gzip` when the request accepted gzip; absent otherwise.'
+              schema:
+                type: string
+            Vary:
+              description: '`Accept-Encoding`.'
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserExportResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/groups:
     get:
       tags: [Groups]
@@ -6046,6 +6116,248 @@ components:
             $ref: '#/components/schemas/UserConsentResponse'
       required:
         - consents
+
+    UserExportResponse:
+      description: |
+        Everything the auth server holds about one user. Each entry is the one the matching Admin
+        API read answers, and every list is in id order, oldest first.
+      type: object
+      properties:
+        formatVersion:
+          description: The document's format, 1.
+          type: integer
+        exportedAt:
+          type: string
+          format: date-time
+        issuer:
+          description: |
+            The auth server's issuer. A subject identifies the user only together with it.
+          type: string
+        identifiers:
+          $ref: '#/components/schemas/UserExportIdentifiersResponse'
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserAttributeResponse'
+        groups:
+          description: |
+            The groups the user is a member of, each with the attributes and permissions the user
+            gets through it.
+          type: array
+          items:
+            $ref: '#/components/schemas/UserExportGroupResponse'
+        permissions:
+          description: The permissions granted to the user directly.
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionResponse'
+        consents:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserConsentResponse'
+        sessions:
+          description: |
+            The user's live sessions, as `GET /api/v1/admin/users/{id}/sessions` lists them.
+            `isCurrent` is false on every one, since the document is the same whoever asks.
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSessionDetailResponse'
+        refreshTokens:
+          description: |
+            Every refresh token the auth server holds for the user, from a sign-in to an app or a
+            password grant, rotated-out and revoked ones included, until they expire and are
+            deleted.
+          type: array
+          items:
+            $ref: '#/components/schemas/UserExportRefreshTokenResponse'
+        legalDocumentAcceptances:
+          type: array
+          items:
+            $ref: '#/components/schemas/LegalDocumentAcceptanceResponse'
+        profilePicture:
+          description: The user's profile picture, or null when the user has none.
+          allOf:
+            - $ref: '#/components/schemas/UserExportProfilePictureResponse'
+          nullable: true
+        auditEvents:
+          description: |
+            Every audit event about the user or made by them. An event another user made about the
+            user, such as an administrator's change, does not say who made it.
+          type: array
+          items:
+            $ref: '#/components/schemas/UserExportAuditEventResponse'
+      required:
+        - formatVersion
+        - exportedAt
+        - issuer
+        - identifiers
+        - user
+        - attributes
+        - groups
+        - permissions
+        - consents
+        - sessions
+        - refreshTokens
+        - legalDocumentAcceptances
+        - profilePicture
+        - auditEvents
+
+    UserExportAuditEventResponse:
+      description: |
+        An audit event in the user export: the entry `GET /api/v1/admin/audit-logs` answers, plus
+        `actedByAdministrator`. When another user's token made the event about the user, as an
+        administrator's does on the Admin API, `actedByAdministrator` is true, `loggedInUserId` is
+        null and `details` carries no `logged_in_user`. A `cross_user_session_replaced` event
+        carries no `previous_user_id`. An event the user made keeps the users, groups and clients
+        it names, and an event made by a client credentials token keeps the client.
+      allOf:
+        - $ref: '#/components/schemas/AuditLogResponse'
+        - type: object
+          properties:
+            actedByAdministrator:
+              description: |
+                True when another user's token made the event about the user, which the export
+                does not name.
+              type: boolean
+          required:
+            - actedByAdministrator
+
+    UserExportGroupResponse:
+      description: |
+        A group the user is a member of, as `GET /api/v1/admin/users/{id}/groups` answers it,
+        with the group's attributes and permissions as the group's own reads answer them.
+      allOf:
+        - $ref: '#/components/schemas/GroupResponse'
+        - type: object
+          properties:
+            attributes:
+              type: array
+              items:
+                $ref: '#/components/schemas/GroupAttributeResponse'
+            permissions:
+              type: array
+              items:
+                $ref: '#/components/schemas/PermissionResponse'
+          required:
+            - attributes
+            - permissions
+
+    UserExportRefreshTokenResponse:
+      description: |
+        A refresh token the auth server holds for the user, with the sign-in it came from. The
+        token itself is never stored, so it is not here.
+      type: object
+      properties:
+        clientIdentifier:
+          type: string
+        clientName:
+          description: The app's name, as the consent screen shows it.
+          type: string
+        clientNameUnverified:
+          description: True when `clientName` is the app's own claim about itself.
+          type: boolean
+        scope:
+          type: string
+        type:
+          description: |
+            `Refresh` for a token bound to a session, `Offline` for one that outlives it.
+          type: string
+          enum: [Refresh, Offline]
+        issuedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        maxLifetime:
+          description: When an `Offline` token stops being renewable; null on a `Refresh` token.
+          type: string
+          format: date-time
+          nullable: true
+        sessionIdentifier:
+          description: The session a `Refresh` token is bound to; empty on an `Offline` token.
+          type: string
+        jti:
+          description: |
+            The token's id, which the audit events name as `refresh_token_jti`.
+          type: string
+        revoked:
+          description: |
+            True when the token, the sign-in it came from or its rotation family is revoked.
+          type: boolean
+        ipAddress:
+          description: |
+            The IP address of the sign-in the token came from; empty for a password-grant
+            token.
+          type: string
+        userAgent:
+          description: |
+            The browser of the sign-in the token came from; empty for a password-grant token.
+          type: string
+        authenticatedAt:
+          description: |
+            When the user signed in: at the sign-in the token came from, or, for a password-grant
+            token, when the password was checked. A rotated token keeps it, so it can be earlier
+            than `issuedAt`. Null when no authentication time is stored.
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - clientIdentifier
+        - clientName
+        - clientNameUnverified
+        - scope
+        - type
+        - issuedAt
+        - expiresAt
+        - maxLifetime
+        - sessionIdentifier
+        - jti
+        - revoked
+        - ipAddress
+        - userAgent
+        - authenticatedAt
+
+    UserExportProfilePictureResponse:
+      description: The user's profile picture.
+      type: object
+      properties:
+        contentType:
+          description: The image's media type, such as `image/png`.
+          type: string
+        data:
+          description: The image, in base64.
+          type: string
+          format: byte
+      required:
+        - contentType
+        - data
+
+    UserExportIdentifiersResponse:
+      description: What the user is known by, to search older audit rows and the logs with.
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        subject:
+          type: string
+        email:
+          type: string
+        emailDigest:
+          description: |
+            The SHA-256 hex digest of the email address, which is how an audit entry about the
+            address records it.
+          type: string
+      required:
+        - id
+        - subject
+        - email
+        - emailDigest
 
     # =========================================================================
     # Group Schemas

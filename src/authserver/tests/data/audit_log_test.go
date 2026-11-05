@@ -512,3 +512,117 @@ func TestGetAuditLogsPaginated_UserFilter(t *testing.T) {
 		assert.Equal(t, ids["about"], second[0].Id)
 	})
 }
+
+// #781 decision 5: one user's audit events are every row about the user or made by them, each
+// once, in id order, oldest first, all of them at once. Each expected list is written out by hand
+// from the rows below.
+func TestGetAuditLogsByUserId(t *testing.T) {
+	// The user ids are unique to this test run, so each read lists only these rows; no foreign key
+	// holds them to a users row, as none holds an audit row's.
+	user := int64(fake.Number(1_000_000_000, 2_000_000_000))
+	other, third, nobody := user+1, user+2, user+3
+
+	// Written oldest first, so id order is the order they are listed in.
+	rows := []struct {
+		name           string
+		userId         int64
+		loggedInUserId int64
+	}{
+		{"about", user, 0},
+		{"by", other, user},
+		{"about and by", user, user},
+		{"neither", other, third},
+		{"no user columns", 0, 0},
+		{"by, about no one", 0, user},
+	}
+	ids := map[string]int64{}
+	for _, row := range rows {
+		auditLog := &record.AuditLog{
+			AuditEvent:     "user_audit_logs_" + fake.LetterN(10),
+			Details:        `{"test": "data"}`,
+			RequestId:      "itest-" + fake.LetterN(16),
+			UserId:         userColumn(row.userId),
+			LoggedInUserId: userColumn(row.loggedInUserId),
+		}
+		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
+		ids[row.name] = auditLog.Id
+	}
+
+	for _, tc := range []struct {
+		name   string
+		userId int64
+		want   []string
+	}{
+		{"the rows about the user and the rows they made, oldest first",
+			user, []string{"about", "by", "about and by", "by, about no one"}},
+		{"a user named only as the one a row is about",
+			other, []string{"by", "neither"}},
+		{"a user named only as the one who acted",
+			third, []string{"neither"}},
+		{"an id no row names lists nothing",
+			nobody, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logs, err := database.GetAuditLogsByUserId(context.Background(), nil, tc.userId)
+			require.NoError(t, err)
+
+			want := []int64{}
+			for _, name := range tc.want {
+				want = append(want, ids[name])
+			}
+			got := []int64{}
+			for _, log := range logs {
+				got = append(got, log.Id)
+			}
+			assert.Equalf(t, want, got, "the rows %v, oldest first, on %s", tc.want, dbType())
+		})
+	}
+
+	t.Run("each row reads back whole", func(t *testing.T) {
+		written := &record.AuditLog{
+			AuditEvent:     "user_audit_logs_whole_" + fake.LetterN(10),
+			Details:        `{"user_id": "41"}`,
+			RequestId:      "itest-" + fake.LetterN(16),
+			UserId:         userColumn(nobody),
+			LoggedInUserId: userColumn(third),
+		}
+		require.NoError(t, database.CreateAuditLog(context.Background(), nil, written))
+
+		logs, err := database.GetAuditLogsByUserId(context.Background(), nil, nobody)
+		require.NoError(t, err)
+		require.Len(t, logs, 1)
+		assert.Equal(t, written.Id, logs[0].Id)
+		assert.Equal(t, written.AuditEvent, logs[0].AuditEvent)
+		assert.Equal(t, written.Details, logs[0].Details)
+		assert.Equal(t, written.RequestId, logs[0].RequestId)
+		assert.Equal(t, userColumn(nobody), logs[0].UserId)
+		assert.Equal(t, userColumn(third), logs[0].LoggedInUserId)
+		assert.WithinDurationf(t, written.CreatedAt, logs[0].CreatedAt, time.Second, "created_at read back on %s", dbType())
+	})
+}
+
+// #781 decision 5: the read is not paged. The admin API's page holds at most 200 rows, so a user
+// with more than that is read whole, in id order.
+func TestGetAuditLogsByUserId_ReadsMoreThanAPage(t *testing.T) {
+	user := int64(fake.Number(2_000_000_001, 3_000_000_000))
+	const written = 205
+
+	var want []int64
+	for i := 0; i < written; i++ {
+		auditLog := &record.AuditLog{
+			AuditEvent: "user_audit_logs_many",
+			Details:    `{"test": "data"}`,
+			UserId:     userColumn(user),
+		}
+		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
+		want = append(want, auditLog.Id)
+	}
+
+	logs, err := database.GetAuditLogsByUserId(context.Background(), nil, user)
+	require.NoError(t, err)
+	got := []int64{}
+	for _, log := range logs {
+		got = append(got, log.Id)
+	}
+	assert.Equalf(t, want, got, "all %d rows, oldest first, on %s", written, dbType())
+}

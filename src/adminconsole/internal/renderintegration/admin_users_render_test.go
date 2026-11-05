@@ -286,8 +286,9 @@ func TestRender_AdminUsersAuthentication_SaysWhenTheAuthenticatorIsDisabled(t *t
 }
 
 // Every page of a user opens with the user header, which links to that user's audit events: the
-// audit log filtered by their id (#780, decision 8).
-func TestRender_AdminUserHeaderLinksToTheUsersAuditEvents(t *testing.T) {
+// audit log filtered by their id (#780, decision 8). Beside it, Download data is a form posting to
+// the user's export route, not a link, so another site cannot start the download (#781 decision 7).
+func TestRender_AdminUserHeaderLinksToTheUsersAuditEventsAndDownloadsTheirData(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
 		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", Enabled: true},
 		"userFullName":      "",
@@ -299,5 +300,22 @@ func TestRender_AdminUserHeaderLinksToTheUsersAuditEvents(t *testing.T) {
 
 	assert.Contains(t, out, `<div class="page-actions">
     <a class="button" href="/admin/settings/audit-log-viewer?userId=7">Mostrar eventos de auditoria</a>
+    <form method="post" action="/admin/users/7/export">
+      <button class="button" type="submit">Baixar dados</button>
+    </form>
   </div>`)
+}
+
+// The button reads as the UI guide words a button, what it does, in English too.
+func TestRender_AdminUserHeaderDownloadDataInEnglish(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_users_details.html", map[string]interface{}{
+		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", Enabled: true},
+		"userFullName":      "",
+		"page":              "1",
+		"query":             "",
+		"savedSuccessfully": false,
+		"userCreated":       false,
+	}, "en", true)
+
+	assert.Contains(t, out, `<button class="button" type="submit">Download data</button>`)
 }
