@@ -149,6 +149,10 @@ func (s *ctxRecordingApiClient) UpdateClientPostLogoutRedirectURIs(ctx context.C
 	return nil, s.recordWrite(ctx, "UpdateClientPostLogoutRedirectURIs")
 }
 
+func (s *ctxRecordingApiClient) UpdateClientBackchannelLogout(ctx context.Context, _ string, _ int64, _ *api.UpdateClientBackchannelLogoutRequest) (*api.ClientResponse, error) {
+	return nil, s.recordWrite(ctx, "UpdateClientBackchannelLogout")
+}
+
 func (s *ctxRecordingApiClient) UpdateClientTokens(ctx context.Context, _ string, _ int64, _ *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientTokens")
 }
@@ -249,6 +253,14 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
+			name: "HandleBackchannelLogoutGet",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleBackchannelLogoutGet(h, nil, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/clients/3/backchannel-logout",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
+		},
+		{
 			name: "HandleUserSessionsGet",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 				return HandleUserSessionsGet(h, c)
@@ -330,6 +342,16 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				handlertest.WithBody(strings.NewReader(
 					`{"clientId":3,"signOutRedirectURIs":["https://app.example.test/signed-out"],"expectedSignOutRedirectURIs":[]}`)),
 				handlertest.WithContentType("application/json")),
+		},
+		{
+			name: "HandleBackchannelLogoutPost",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleBackchannelLogoutPost(h, newTestSessionStore(), c, consoleBaseURL)
+			},
+			write: "UpdateClientBackchannelLogout",
+			request: handlertest.Request(http.MethodPost, "/admin/clients/3/backchannel-logout",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
+				handlertest.WithForm(url.Values{"backchannelLogoutUri": {"https://app.example.test/bcl"}})),
 		},
 		{
 			name: "HandleWebOriginsPost",

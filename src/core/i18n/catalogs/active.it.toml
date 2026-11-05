@@ -400,6 +400,7 @@
 "adminconsole.client_tabs.oauth2_flows" = "Flussi OAuth2"
 "adminconsole.client_tabs.redirect_uris" = "URI di reindirizzamento"
 "adminconsole.client_tabs.sign_out_redirect_uris" = "URI di reindirizzamento dopo l'uscita"
+"adminconsole.client_tabs.backchannel_logout" = "Uscita back-channel"
 "adminconsole.client_tabs.web_origins" = "Origini web"
 "adminconsole.client_tabs.user_sessions" = "Sessioni"
 "adminconsole.client_tabs.permissions" = "Permessi"
@@ -970,6 +971,15 @@
 "adminconsole.admin_clients.sign_out_redirect_uris.invalid_url" = "Questo URL non è valido. Includi lo schema, ad esempio https://."
 "adminconsole.admin_clients.sign_out_redirect_uris.added" = "URI di reindirizzamento dopo l'uscita aggiunto. Salva per mantenere la modifica."
 "adminconsole.admin_clients.sign_out_redirect_uris.removed" = "URI di reindirizzamento dopo l'uscita rimosso. Salva per mantenere la modifica."
+"adminconsole.admin_clients.backchannel_logout.requires_sign_in_flow" = "Un URI di uscita back-channel serve ai flussi codice di autorizzazione e implicito. Attivane uno nella scheda Flussi OAuth2 per configurarlo qui."
+"adminconsole.admin_clients.backchannel_logout.lead" = "Quando termina una sessione in cui era presente questo client, il server di autenticazione invia con POST un token firmato a questo indirizzo sul server della tua app, così anche la tua app può far uscire l'utente. Lascialo vuoto e non viene inviato nulla."
+"adminconsole.admin_clients.backchannel_logout.field.uri" = "URI di uscita back-channel"
+"adminconsole.admin_clients.backchannel_logout.field.uri_hint" = "Un indirizzo https, o http semplice su un client confidenziale, come http://app:3000/backchannel su una rete privata."
+"adminconsole.admin_clients.backchannel_logout.field.uri_manage_only" = "Solo un amministratore con authserver:manage può impostarlo o modificarlo. Tu puoi svuotarlo."
+"adminconsole.admin_clients.backchannel_logout.field.session_required" = "Richiedi l'identificatore di sessione"
+"adminconsole.admin_clients.backchannel_logout.field.session_required_hint" = "Ogni token inviato a questo client indica la sessione (sid). Attivalo quando la tua app trova le sue sessioni solo tramite sid."
+"adminconsole.admin_clients.backchannel_logout.saved_successfully" = "Impostazioni di uscita back-channel salvate."
+"adminconsole.admin_clients.backchannel_logout.manage_required" = "Solo un amministratore con authserver:manage può impostare o modificare l'URI di uscita back-channel. Puoi comunque svuotarlo o cambiare se l'identificatore di sessione è richiesto."
 
 # --- Client web origins ----------------------------------------------------
 

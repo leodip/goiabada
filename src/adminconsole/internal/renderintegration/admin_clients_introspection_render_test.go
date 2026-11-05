@@ -80,6 +80,10 @@ func (*clientPagesAPI) UpdateClient(context.Context, string, int64, *api.UpdateC
 	panic("unexpected call to UpdateClient")
 }
 
+func (*clientPagesAPI) UpdateClientBackchannelLogout(context.Context, string, int64, *api.UpdateClientBackchannelLogoutRequest) (*api.ClientResponse, error) {
+	panic("unexpected call to UpdateClientBackchannelLogout")
+}
+
 func (*clientPagesAPI) UpdateClientAdministrativeScopes(context.Context, string, int64, *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClientAdministrativeScopes")
 }
@@ -155,6 +159,7 @@ func clientTabs(t *testing.T, pages *clientPagesAPI) map[string]http.HandlerFunc
 		"oauth2-flows":           adminclienthandlers.HandleOAuth2FlowsGet(h, newRenderSessionStore(t), pages),
 		"redirect-uris":          adminclienthandlers.HandleRedirectURIsGet(h, newRenderSessionStore(t), pages),
 		"sign-out-redirect-uris": adminclienthandlers.HandleSignOutRedirectURIsGet(h, newRenderSessionStore(t), pages),
+		"backchannel-logout":     adminclienthandlers.HandleBackchannelLogoutGet(h, newRenderSessionStore(t), pages),
 		"web-origins":            adminclienthandlers.HandleWebOriginsGet(h, newRenderSessionStore(t), pages),
 		"user-sessions":          adminclienthandlers.HandleUserSessionsGet(h, pages),
 		"permissions":            adminclienthandlers.HandlePermissionsGet(h, newRenderSessionStore(t), pages),

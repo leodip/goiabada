@@ -398,6 +398,7 @@
 "adminconsole.client_tabs.oauth2_flows" = "Flujos OAuth2"
 "adminconsole.client_tabs.redirect_uris" = "URI de redirección"
 "adminconsole.client_tabs.sign_out_redirect_uris" = "URI de redirección de cierre de sesión"
+"adminconsole.client_tabs.backchannel_logout" = "Cierre de sesión back-channel"
 "adminconsole.client_tabs.web_origins" = "Orígenes web"
 "adminconsole.client_tabs.user_sessions" = "Sesiones"
 "adminconsole.client_tabs.permissions" = "Permisos"
@@ -968,6 +969,15 @@
 "adminconsole.admin_clients.sign_out_redirect_uris.invalid_url" = "Esa URL no es válida. Incluye el esquema, por ejemplo, https://."
 "adminconsole.admin_clients.sign_out_redirect_uris.added" = "URI de redirección de cierre de sesión añadida. Guarda para conservar el cambio."
 "adminconsole.admin_clients.sign_out_redirect_uris.removed" = "URI de redirección de cierre de sesión quitada. Guarda para conservar el cambio."
+"adminconsole.admin_clients.backchannel_logout.requires_sign_in_flow" = "La URI de cierre de sesión back-channel se usa en los flujos de código de autorización e implícito. Activa uno de ellos en la pestaña Flujos OAuth2 para configurarla aquí."
+"adminconsole.admin_clients.backchannel_logout.lead" = "Cuando termina una sesión en la que estuvo este cliente, el servidor de autenticación envía por POST un token firmado a esta dirección del servidor de tu app, para que tu app también cierre la sesión del usuario. Si la dejas vacía, no se envía nada."
+"adminconsole.admin_clients.backchannel_logout.field.uri" = "URI de cierre de sesión back-channel"
+"adminconsole.admin_clients.backchannel_logout.field.uri_hint" = "Una dirección https, o http sin cifrar en un cliente confidencial, como http://app:3000/backchannel en una red privada."
+"adminconsole.admin_clients.backchannel_logout.field.uri_manage_only" = "Solo un administrador con authserver:manage puede configurarla o cambiarla. Tú puedes vaciarla."
+"adminconsole.admin_clients.backchannel_logout.field.session_required" = "Exigir el identificador de sesión"
+"adminconsole.admin_clients.backchannel_logout.field.session_required_hint" = "Cada token enviado a este cliente nombra la sesión (sid). Actívalo si tu app encuentra sus sesiones solo por sid."
+"adminconsole.admin_clients.backchannel_logout.saved_successfully" = "Configuración de cierre de sesión back-channel guardada."
+"adminconsole.admin_clients.backchannel_logout.manage_required" = "Solo un administrador con authserver:manage puede configurar o cambiar la URI de cierre de sesión back-channel. Aún puedes vaciarla o cambiar si se exige el identificador de sesión."
 
 # --- Client web origins ----------------------------------------------------
 

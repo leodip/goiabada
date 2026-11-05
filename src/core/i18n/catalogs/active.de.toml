@@ -397,6 +397,7 @@
 "adminconsole.client_tabs.oauth2_flows" = "OAuth2-Flows"
 "adminconsole.client_tabs.redirect_uris" = "Redirect-URIs"
 "adminconsole.client_tabs.sign_out_redirect_uris" = "Abmelde-Redirect-URIs"
+"adminconsole.client_tabs.backchannel_logout" = "Back-Channel-Logout"
 "adminconsole.client_tabs.web_origins" = "Web-Origins"
 "adminconsole.client_tabs.user_sessions" = "Sitzungen"
 "adminconsole.client_tabs.permissions" = "Berechtigungen"
@@ -967,6 +968,15 @@
 "adminconsole.admin_clients.sign_out_redirect_uris.invalid_url" = "Das ist keine gültige URL. Geben Sie auch das Schema an, zum Beispiel https://."
 "adminconsole.admin_clients.sign_out_redirect_uris.added" = "Abmelde-Redirect-URI hinzugefügt. Speichern Sie, um die Änderung zu übernehmen."
 "adminconsole.admin_clients.sign_out_redirect_uris.removed" = "Abmelde-Redirect-URI entfernt. Speichern Sie, um die Änderung zu übernehmen."
+"adminconsole.admin_clients.backchannel_logout.requires_sign_in_flow" = "Eine Back-Channel-Logout-URI wird für den Authorization Code Flow und den Implicit Flow verwendet. Aktivieren Sie einen davon im Tab „OAuth2-Flows“, um sie hier festzulegen."
+"adminconsole.admin_clients.backchannel_logout.lead" = "Wenn eine Sitzung endet, in der dieser Client verwendet wurde, sendet der Authentifizierungsserver per POST ein signiertes Token an diese Adresse auf dem Server Ihrer App, damit Ihre App den Benutzer ebenfalls abmelden kann. Bleibt das Feld leer, wird nichts gesendet."
+"adminconsole.admin_clients.backchannel_logout.field.uri" = "Back-Channel-Logout-URI"
+"adminconsole.admin_clients.backchannel_logout.field.uri_hint" = "Eine https-Adresse oder bei einem vertraulichen Client auch einfaches http, etwa http://app:3000/backchannel in einem privaten Netzwerk."
+"adminconsole.admin_clients.backchannel_logout.field.uri_manage_only" = "Nur die Administration mit authserver:manage kann sie festlegen oder ändern. Sie können sie leeren."
+"adminconsole.admin_clients.backchannel_logout.field.session_required" = "Sitzungskennung verlangen"
+"adminconsole.admin_clients.backchannel_logout.field.session_required_hint" = "Jedes an diesen Client gesendete Token nennt die Sitzung (sid). Aktivieren Sie dies, wenn Ihre App ihre Sitzungen allein über sid findet."
+"adminconsole.admin_clients.backchannel_logout.saved_successfully" = "Back-Channel-Logout-Einstellungen gespeichert."
+"adminconsole.admin_clients.backchannel_logout.manage_required" = "Nur die Administration mit authserver:manage kann die Back-Channel-Logout-URI festlegen oder ändern. Sie können sie weiterhin leeren oder ändern, ob die Sitzungskennung verlangt wird."
 
 # --- Client web origins ----------------------------------------------------
 

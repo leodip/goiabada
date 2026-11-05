@@ -125,6 +125,22 @@ func (c *AuthServerClient) UpdateClientPostLogoutRedirectURIs(ctx context.Contex
 	return &response.Client, nil
 }
 
+// UpdateClientBackchannelLogout sets a client's back-channel logout URI and whether it requires the
+// session identifier in every logout token (#784 decision 9).
+func (c *AuthServerClient) UpdateClientBackchannelLogout(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientBackchannelLogoutRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/backchannel-logout",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &response.Client, nil
+}
+
 // UpdateClientWebOrigins updates the full set of web origins for a client.
 func (c *AuthServerClient) UpdateClientWebOrigins(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
 	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{

@@ -92,6 +92,13 @@ func TestAdminClientHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testin
 		{"HandleSignOutRedirectURIsPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleSignOutRedirectURIsPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/sign-out-redirect-uris", routed, jsonBody())},
+		{"HandleBackchannelLogoutGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBackchannelLogoutGet(h, nil, c)
+		}, handlertest.Request(http.MethodGet, "/admin/clients/3/backchannel-logout", routed)},
+		{"HandleBackchannelLogoutPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBackchannelLogoutPost(h, nil, c, consoleBaseURL)
+		}, handlertest.Request(http.MethodPost, "/admin/clients/3/backchannel-logout", routed,
+			handlertest.WithForm(url.Values{"backchannelLogoutUri": {"https://app.example.test/bcl"}}))},
 		{"HandleUserSessionsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleUserSessionsGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions", routed)},

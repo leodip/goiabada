@@ -61,7 +61,7 @@ A client you create in the admin console starts:
 - with the default ACR level `urn:goiabada:level2_optional`;
 - not allowed to request the administrative scopes.
 
-The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Sign-out redirect URIs**, **Web origins**, **Sessions**, **Permissions** and, for a confidential client, **Introspection**.
+The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Sign-out redirect URIs**, **Back-channel logout**, **Web origins**, **Sessions**, **Permissions** and, for a confidential client, **Introspection**.
 
 ## Public and confidential clients
 
@@ -139,6 +139,8 @@ A back-channel logout URI is an address on your app's server where the auth serv
 - **The client needs a flow that signs users in,** the authorization code flow or the implicit flow. A client with neither has no session to end.
 
 A client can also require the session identifier, `sid`, in every logout token it's sent. Turn that on when your app finds its sessions by `sid` alone.
+
+In the admin console, open the client's **Back-channel logout** tab, enter the URI, such as `https://app.example.com/backchannel-logout`, tick **Require the session identifier** if your app needs `sid`, then click **Save**. Empty the field and save to send nothing.
 
 Through the Admin API, set both with [`PUT /api/v1/admin/clients/{id}/backchannel-logout`](/reference/api/admin/operations/updateclientbackchannellogout/): `backchannelLogoutUri`, empty for none, and `backchannelLogoutSessionRequired`. Setting or changing the URI takes `authserver:manage`, because the auth server sends requests to whatever address it names, inside your network included. `authserver:manage-clients` can still clear it and change `backchannelLogoutSessionRequired`. Each save leaves an `updated_client_backchannel_logout` entry in the [audit log](/concepts/audit-log/).
 

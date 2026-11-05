@@ -393,6 +393,7 @@
 "adminconsole.client_tabs.oauth2_flows" = "OAuth2 flows"
 "adminconsole.client_tabs.redirect_uris" = "Redirect URIs"
 "adminconsole.client_tabs.sign_out_redirect_uris" = "Sign-out redirect URIs"
+"adminconsole.client_tabs.backchannel_logout" = "Back-channel logout"
 "adminconsole.client_tabs.web_origins" = "Web origins"
 "adminconsole.client_tabs.user_sessions" = "Sessions"
 "adminconsole.client_tabs.permissions" = "Permissions"
@@ -963,6 +964,15 @@
 "adminconsole.admin_clients.sign_out_redirect_uris.invalid_url" = "That isn't a valid URL. Include the scheme, such as https://."
 "adminconsole.admin_clients.sign_out_redirect_uris.added" = "Sign-out redirect URI added. Save to keep the change."
 "adminconsole.admin_clients.sign_out_redirect_uris.removed" = "Sign-out redirect URI removed. Save to keep the change."
+"adminconsole.admin_clients.backchannel_logout.requires_sign_in_flow" = "A back-channel logout URI is for the authorization code flow and the implicit flow. Turn one of them on, on the OAuth2 flows tab, to set it here."
+"adminconsole.admin_clients.backchannel_logout.lead" = "When a session this client was on ends, the auth server POSTs a signed token to this address on your app's server, so your app can sign the user out too. Leave it empty and nothing is sent."
+"adminconsole.admin_clients.backchannel_logout.field.uri" = "Back-channel logout URI"
+"adminconsole.admin_clients.backchannel_logout.field.uri_hint" = "An https address, or plain http on a confidential client, such as http://app:3000/backchannel on a private network."
+"adminconsole.admin_clients.backchannel_logout.field.uri_manage_only" = "Only an administrator holding authserver:manage can set or change it. You can clear it."
+"adminconsole.admin_clients.backchannel_logout.field.session_required" = "Require the session identifier"
+"adminconsole.admin_clients.backchannel_logout.field.session_required_hint" = "Every token sent to this client names the session (sid). Turn it on when your app finds its sessions by sid alone."
+"adminconsole.admin_clients.backchannel_logout.saved_successfully" = "Back-channel logout settings saved."
+"adminconsole.admin_clients.backchannel_logout.manage_required" = "Only an administrator holding authserver:manage can set or change the back-channel logout URI. You can still clear it, or change whether the session identifier is required."
 
 # --- Client web origins ----------------------------------------------------
 

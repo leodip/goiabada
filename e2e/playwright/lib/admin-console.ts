@@ -11,6 +11,7 @@ export type ClientTab =
   | "oauth2-flows"
   | "redirect-uris"
   | "sign-out-redirect-uris"
+  | "backchannel-logout"
   | "web-origins"
   | "user-sessions"
   | "permissions"

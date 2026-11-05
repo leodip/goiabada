@@ -192,6 +192,8 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/clients/{clientId}/redirect-uris", adminclienthandlers.HandleRedirectURIsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/clients/{clientId}/sign-out-redirect-uris", adminclienthandlers.HandleSignOutRedirectURIsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/clients/{clientId}/sign-out-redirect-uris", adminclienthandlers.HandleSignOutRedirectURIsPost(httpHelper, s.sessionStore, apiClient))
+		r.Get("/clients/{clientId}/backchannel-logout", adminclienthandlers.HandleBackchannelLogoutGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/clients/{clientId}/backchannel-logout", adminclienthandlers.HandleBackchannelLogoutPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/clients/{clientId}/web-origins", adminclienthandlers.HandleWebOriginsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/clients/{clientId}/web-origins", adminclienthandlers.HandleWebOriginsPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/clients/{clientId}/user-sessions", adminclienthandlers.HandleUserSessionsGet(httpHelper, apiClient))
