@@ -417,7 +417,7 @@ func TestRefreshRotation_ASessionRevocationBetweenTheClaimAndTheInsertEndsTheNew
 			return err
 		}},
 		{"the response to a reused code", func(ctx context.Context, db data.Database, f *family, _ *record.UserSession) error {
-			_, err := revocation.RevokeOnAuthCodeReuseTx(ctx, db, f.code)
+			_, err := revocation.RevokeOnAuthCodeReuseTx(ctx, db, f.code, nil)
 			return err
 		}},
 	}

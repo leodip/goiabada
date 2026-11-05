@@ -50,9 +50,17 @@ type startSessionMocks struct {
 	manager *Manager
 }
 
+// What the logout tokens of a removal read (#784) is stubbed to tell nobody: the user's subject,
+// read before the transaction, and for a removed session still valid its row and its apps, of which
+// there are none. usersession_manager_logout_deliveries_test.go holds what those reads decide.
 func newStartSessionMocks(t *testing.T) *startSessionMocks {
 	t.Helper()
 	db := datamocks.NewDatabase(t)
+	db.On("GetUserById", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Return(&record.User{Id: 123, Subject: "subject-123"}, nil).Maybe()
+	db.On("AcquireUserSessionRow", mock.Anything, txSentinel, mock.Anything).Return(true, nil).Maybe()
+	db.On("GetUserSessionClientsByUserSessionId", mock.Anything, txSentinel, mock.Anything).
+		Return([]record.UserSessionClient(nil), nil).Maybe()
 	return &startSessionMocks{db: db, manager: &Manager{database: db}}
 }
 

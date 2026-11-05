@@ -64,7 +64,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 				handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t),
 					handlersmocks.NewTokenIssuer(t),
 					protocolvalidation.NewTokenValidator(validatorDB, nil, nil, testDataCipher),
-					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
+					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 				form := url.Values{"grant_type": {"client_credentials"}}
 				if !basic {
@@ -99,7 +99,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 		handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t),
 			handlersmocks.NewTokenIssuer(t),
 			protocolvalidation.NewTokenValidator(datamocks.NewDatabase(t), nil, nil, testDataCipher),
-			handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
+			handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 		req, err := http.NewRequest("POST", "/auth/token", strings.NewReader("grant_type=client_credentials"))
 		require.NoError(t, err)

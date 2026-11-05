@@ -185,9 +185,9 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Post("/legal-acceptance", handlers.HandleLegalAcceptancePost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
 		r.Get("/consent", handlers.HandleConsentGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewConsentPrompt(s.database)))
 		r.Post("/consent", handlers.HandleConsentPost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewConsentSubmission(s.database, permissionChecker, auditLogger)))
-		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
+		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher, logoutTokens))
 		r.Get("/logout/declined", handlers.HandleLogoutDeclinedGet(httpHelper))
-		r.Post("/logout", handlers.HandleLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
+		r.Post("/logout", handlers.HandleLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher, logoutTokens))
 	})
 	// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force).
 	// Outside the /auth group, which is mounted on the page branch whole, because it answers on the
@@ -195,7 +195,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// /auth/token from this route, behind the token branch alone; any other method falls to the
 	// group its path is under, whose chain runs before the 405, as it did when the route was its
 	// own (#435).
-	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics))
+	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics, logoutTokens))
 	// Token revocation (RFC 7009, #676), outside the /auth group for the reason the token endpoint
 	// is, on a branch of its own that answers a fault 503. No rate limit: the client authenticates
 	// before anything else, as at the token endpoint's grants that have none (decision 10).

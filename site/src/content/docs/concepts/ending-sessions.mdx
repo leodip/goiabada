@@ -38,11 +38,19 @@ Each one leaves two entries in the [audit log](/concepts/audit-log/): `terminate
 
 ## Telling your apps
 
-Ending a session also tells the apps the session was signed in to. Each one with a [back-channel logout URI](/concepts/clients/#back-channel-logout) is sent a logout token there: a signed statement naming the user (`sub`) and the session (`sid`), so the app can end its own session for that user. That happens when someone ends a session from the admin console or the API, and when a [different user signs in](#a-different-user-signs-in-on-the-same-browser) on the browser. A session that has expired tells nobody.
+Ending a session also tells the apps the session was signed in to. Each one with a [back-channel logout URI](/concepts/clients/#back-channel-logout) is sent a logout token there: a signed statement naming the user (`sub`) and the session (`sid`), so the app can end its own session for that user. That happens whenever a session that was still valid ends:
+
+- someone ends it from the admin console or the API;
+- the user [signs out](#signing-out). With an `id_token_hint`, only the app that signed the user out is told, since only its part of the session ended;
+- a [different user signs in](#a-different-user-signs-in-on-the-same-browser) on the browser;
+- a sign-in ends it: the user's own session the browser had, their other sessions [from the same browser](/concepts/sessions/#how-the-auth-server-recognizes-a-browser), or the ones over [the cap](/concepts/sessions/#how-many-sessions-a-user-can-hold);
+- an app redeems an authorization code from it twice.
+
+A session that has expired tells nobody, whatever removes it.
 
 The tokens go out once the session has ended, and the request that ended it doesn't wait for them. An app that can't be reached, doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429 is sent the same token again about 15 seconds and about a minute later. Each delivery leaves a `sent_logout_token` entry in the audit log, whose `outcome` says whether the app was told.
 
-A delivery that never succeeds is given up, and so is one still being tried when the auth server stops. The session's refresh tokens are revoked all the same, so such an app learns at its next refresh that the session is over.
+A delivery that never succeeds is given up, and so is one still being tried when the auth server stops. Ending a session, a different user signing in and a reused code revoke the session's refresh tokens all the same, so such an app learns at its next refresh that the session is over. A sign-out and a sign-in ending an older session revoke nothing: an app holding an offline refresh token from that session keeps refreshing after a lost delivery, and stays signed in.
 
 ## A session that has expired
 
@@ -64,6 +72,8 @@ Your app signs a user out by sending them to [`/auth/logout`](/reference/endpoin
 - **Without one**, once the user confirms on the sign-out page, the whole session ends.
 
 Either way the browser's cookie is cleared, so its next sign-in starts from the password. A normal refresh token stops working once the session behind it has ended. Offline refresh tokens aren't tied to a session and keep working.
+
+Each app whose part of the session ended is [told](#telling-your-apps), when the session was still valid: with a hint, your app alone, and without one, every app on the session.
 
 A sign-out with a confirmed hint leaves `deleted_user_session_client` in the audit log, for your app leaving the session. When yours was the session's last client, the session ends too, and it also leaves `deleted_user_session`, with the reason `signed_out`, and `logout`. One without a hint leaves `logout`, even when there was no session, and `deleted_user_session` when there was one.
 

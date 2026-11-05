@@ -185,10 +185,16 @@ An API, calling as a confidential client, asks whether a token is active.
 ### Back-channel logout (OpenID Connect Back-Channel Logout 1.0)
 The auth server tells an app that a session it was on ended, by POSTing a logout token to the
 client's back-channel logout URI (#784).
-- Triggers: an end of a session still valid when it ended. Today these are the account and admin
-  session ends and the cross-user handover at `/auth/completed`, through
-  `revocation.TerminateUserSessionTx`, whose `live` argument is the caller's validity judgement
-  (idle timeout and maximum lifetime, never `max_age`). Expiry tells nobody (decision 1)
+- Triggers: an end of a session still valid when it ended, judged by the idle timeout and maximum
+  lifetime, never `max_age`. Expiry tells nobody (decision 1). Today these are:
+  - the account and admin session ends and the cross-user handover at `/auth/completed`, through
+    `revocation.TerminateUserSessionTx`, whose `live` argument is the caller's judgement;
+  - a sign-in's removals in `usersession.StartNewUserSession` (`replaced_by_sign_in`,
+    `same_device`, `session_cap`), each `Removal` carrying its `LogoutDeliveries`;
+  - a sign-out at `/auth/logout`: a confirmed hint tells only the hint's client, for its part of the
+    session; a hintless one ends the session in a transaction that reads every app first (decision 2);
+  - a reused code's session, in `revocation.RevokeOnAuthCodeReuse`, whose `SessionLive` argument
+    (`revocation.LiveUnder` over the settings) is the token endpoint's judgement
 - Recipients are collected inside the end's transaction: the session's row is taken first
   (`AcquireUserSessionRow`), then `backchannel.SessionDeliveries` reads its `user_session_clients`
   with their clients, before the deletion cascades them away. A row already gone names nobody. The
@@ -210,6 +216,7 @@ client's back-channel logout URI (#784).
   `sent_logout_token` when it finishes, and one Warn record when it was not delivered (decision 8)
 - Discovery advertises `backchannel_logout_supported` and `backchannel_logout_session_supported`
 - Implementation: `backchannel`, `revocation/revocation.go`, `authflow/completion.go`,
+  `usersession/usersession_manager.go`, `handler_logout.go`, `handler_token.go`,
   `handler_api_account_sessions.go`, `handler_api_users_sessions.go`
 
 ### Implicit Flow (Deprecated)

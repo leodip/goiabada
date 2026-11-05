@@ -460,7 +460,8 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 //     an error.
 //  5. Once bound, writes the device cookie.
 //  6. Audits every session the start removed, whether or not the binding then failed, since their
-//     deletion committed, then the new session.
+//     deletion committed, telling the apps of each one that was still valid (#784 decision 1), then
+//     the new session.
 //
 // The rotation comes after the start's commit, and this is the fixation defence of the create arm:
 // no identifier that existed before the sign-in names the session it produced (#266). It cannot join
@@ -533,6 +534,8 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 			"logged_in_user":  "",
 			"reason":          removal.Reason,
 		})
+		// The apps of a removed session still valid, after its event (#784 decision 1).
+		o.logoutTokens.Send(ctx, settings.Issuer, removal.LogoutDeliveries)
 	}
 	if err != nil {
 		return nil, err

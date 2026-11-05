@@ -1248,7 +1248,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 			Return(&record.UserSession{Id: 9, SessionIdentifier: reuseSid}, nil).Once()
 		db.On("DeleteUserSession", mock.Anything, revokeTx, int64(9)).Return(nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
@@ -1279,7 +1279,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(nil, nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis,
@@ -1295,7 +1295,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		stub := datamocks.ExpectRunInTransaction(db, revokeTx)
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(false, boom).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.ErrorIs(t, err, boom,
 			"a statement that did not run has not established anything, so the caller gets a 500")
@@ -1313,7 +1313,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 			Return([]*record.RefreshToken{token}, nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42}, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
@@ -1331,7 +1331,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
 			Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", Revoked: true}}, nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.NoError(t, err)
 		// Empty, and a list rather than nil, so the audit payload carries [].
@@ -1359,7 +1359,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 			Return(&record.UserSession{Id: 9, SessionIdentifier: reuseSid}, nil).Once()
 		db.On("DeleteUserSession", mock.Anything, revokeTx, int64(9)).Return(boom).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
 
 		// The sweep succeeded and the transaction rolled back, so a caller auditing this result
 		// would list a revocation that never happened.
@@ -1376,7 +1376,7 @@ func TestRevokeOnAuthCodeReuse_RefusesAnUnusableCall(t *testing.T) {
 	t.Run("a nil transaction", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 
-		result, err := RevokeOnAuthCodeReuse(context.Background(), db, nil, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+		result, err := RevokeOnAuthCodeReuse(context.Background(), db, nil, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires a transaction")
@@ -1387,7 +1387,7 @@ func TestRevokeOnAuthCodeReuse_RefusesAnUnusableCall(t *testing.T) {
 	t.Run("a nil code", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 
-		result, err := RevokeOnAuthCodeReuse(context.Background(), db, revokeTx, nil)
+		result, err := RevokeOnAuthCodeReuse(context.Background(), db, revokeTx, nil, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires the reused code")
@@ -1398,7 +1398,7 @@ func TestRevokeOnAuthCodeReuse_RefusesAnUnusableCall(t *testing.T) {
 	t.Run("a nil code handed to the wrapper opens no transaction", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, nil)
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, nil, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires the reused code")

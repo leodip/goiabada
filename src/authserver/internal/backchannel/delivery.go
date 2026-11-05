@@ -56,20 +56,28 @@ func SessionDeliveries(ctx context.Context, db SessionDatabase, tx *sql.Tx, sess
 
 	var deliveries []Delivery
 	for _, sessionClient := range sessionClients {
-		client := sessionClient.Client
-		if client.BackchannelLogoutURI == "" {
-			continue
+		if delivery, tells := SessionClientDelivery(&sessionClient.Client, session, subject); tells {
+			deliveries = append(deliveries, delivery)
 		}
-		deliveries = append(deliveries, Delivery{
-			ClientId:          client.Id,
-			ClientIdentifier:  client.ClientIdentifier,
-			URI:               client.BackchannelLogoutURI,
-			IsPublic:          client.IsPublic,
-			CreatedViaDCR:     client.CreatedViaDCR,
-			UserId:            session.UserId,
-			Subject:           subject,
-			SessionIdentifier: session.SessionIdentifier,
-		})
 	}
 	return deliveries, nil
+}
+
+// SessionClientDelivery is the logout token the end of client's part of session sends to client,
+// naming subject, the session's user's, and the session (#784 decisions 2 and 3), and false when the
+// client registered no back-channel logout URI, so it is sent nothing.
+func SessionClientDelivery(client *record.Client, session *record.UserSession, subject string) (Delivery, bool) {
+	if client.BackchannelLogoutURI == "" {
+		return Delivery{}, false
+	}
+	return Delivery{
+		ClientId:          client.Id,
+		ClientIdentifier:  client.ClientIdentifier,
+		URI:               client.BackchannelLogoutURI,
+		IsPublic:          client.IsPublic,
+		CreatedViaDCR:     client.CreatedViaDCR,
+		UserId:            session.UserId,
+		Subject:           subject,
+		SessionIdentifier: session.SessionIdentifier,
+	}, true
 }

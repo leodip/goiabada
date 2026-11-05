@@ -207,7 +207,7 @@ func passwordGrantErrors(t *testing.T) map[string]string {
 
 		handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
 			protocolvalidation.NewTokenValidator(database, nil, fixedPermissionChecker{held: false}, testDataCipher),
-			auditLogger, noCredentialFailures{}, testTokenMetrics())
+			auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
 
 		req := httptest.NewRequest(http.MethodPost, "/auth/token", strings.NewReader(refusal.form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

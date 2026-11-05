@@ -2,6 +2,7 @@ package revocation
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
@@ -101,4 +102,70 @@ func TestTerminateUserSessionTx_AnExpiredSessionTellsNobody(t *testing.T) {
 	assert.Empty(t, result.LogoutDeliveries)
 	db.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "GetUserSessionClientsByUserSessionId", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestRevokeOnAuthCodeReuse_ALiveSessionNamesTheAppsToTell: a reused code that ends a session still
+// valid reads, under the session row its first statement took and before the deletion, a logout
+// token for each app on the session with a back-channel logout URI, naming the code's user (#784
+// decision 1). An expired session, or no liveness to judge by, names nobody and reads no app.
+func TestRevokeOnAuthCodeReuse_ALiveSessionNamesTheAppsToTell(t *testing.T) {
+	session := &record.UserSession{Id: 9, UserId: revokeUserId, SessionIdentifier: reuseSid}
+	code := &record.Code{Id: 42, SessionIdentifier: reuseSid, UserId: revokeUserId,
+		User: record.User{Id: revokeUserId, Subject: "subject-of-7"}}
+
+	expectReuse := func(db *datamocks.Database) {
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+		datamocks.ExpectRunInTransaction(db, revokeTx)
+		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
+			Return([]*record.RefreshToken{token}, nil).Once()
+		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(session, nil).Once()
+		db.On("DeleteUserSession", mock.Anything, revokeTx, int64(9)).Return(nil).Once()
+	}
+
+	t.Run("a live session tells its apps", func(t *testing.T) {
+		db := datamocks.NewDatabase(t)
+		expectReuse(db)
+		sessionClients := []record.UserSessionClient{
+			{Id: 1, UserSessionId: 9, ClientId: 11},
+			{Id: 2, UserSessionId: 9, ClientId: 12},
+		}
+		db.On("GetUserSessionClientsByUserSessionId", mock.Anything, revokeTx, int64(9)).Return(sessionClients, nil).Once()
+		db.On("UserSessionClientsLoadClients", mock.Anything, revokeTx, sessionClients).
+			Run(func(args mock.Arguments) {
+				loaded := args.Get(2).([]record.UserSessionClient)
+				loaded[0].Client = record.Client{Id: 11, ClientIdentifier: "web", BackchannelLogoutURI: "https://web.example/bc"}
+				loaded[1].Client = record.Client{Id: 12, ClientIdentifier: "no-uri"}
+			}).Return(nil).Once()
+
+		var judged *record.UserSession
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, code, func(s *record.UserSession) bool {
+			judged = s
+			return true
+		})
+
+		require.NoError(t, err)
+		assert.Same(t, session, judged, "the session judged is the one the response ends")
+		assert.Equal(t, []backchannel.Delivery{{ClientId: 11, ClientIdentifier: "web", URI: "https://web.example/bc",
+			UserId: revokeUserId, Subject: "subject-of-7", SessionIdentifier: reuseSid}}, result.LogoutDeliveries)
+		// The apps are read before the deletion takes their rows.
+		order := methodOrder(db)
+		assert.Less(t, slices.Index(order, "UserSessionClientsLoadClients"), slices.Index(order, "DeleteUserSession"))
+	})
+
+	for name, live := range map[string]SessionLive{
+		"an expired session tells nobody": func(*record.UserSession) bool { return false },
+		"no liveness tells nobody":        nil,
+	} {
+		t.Run(name, func(t *testing.T) {
+			db := datamocks.NewDatabase(t)
+			expectReuse(db)
+
+			result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, code, live)
+
+			require.NoError(t, err)
+			assert.Nil(t, result.LogoutDeliveries)
+		})
+	}
 }

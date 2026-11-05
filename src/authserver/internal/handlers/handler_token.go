@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
@@ -28,6 +29,9 @@ import (
 // the grant asked for and the error code answered (#400 decision 5). The grant a refusal is counted
 // under is the request's grant_type parameter, mapped into the four this endpoint redeems, so a
 // request refused before it was parsed or validated is still counted under the grant it named.
+//
+// logoutTokens tells the apps of the session a reused code ends, once the cascade has committed
+// (#784).
 func HandleTokenPost(
 	jsonWriter JSONWriter,
 	database revocation.Database,
@@ -36,6 +40,7 @@ func HandleTokenPost(
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 	tokenMetrics *tokenmetrics.Recorder,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	responder := tokenResponder{jsonWriter: jsonWriter, issuer: tokenIssuer, auditLogger: auditLogger, metrics: tokenMetrics}
 
@@ -54,7 +59,7 @@ func HandleTokenPost(
 
 		grant, err := tokenValidator.ValidateTokenRequest(r.Context(), settings, input)
 		if err != nil {
-			responder.refuse(w, r, input.GrantType, auditTokenRefusal(r, database, auditLogger, credentialFailures, input, err))
+			responder.refuse(w, r, input.GrantType, auditTokenRefusal(r, settings, database, auditLogger, logoutTokens, credentialFailures, input, err))
 			return
 		}
 
@@ -184,8 +189,12 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 //
 // input is the validator's input as the validator left it, so the scope an audit row records for a
 // client credentials request is the scope the validator expanded an omitted one to.
-func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogger AuditLogger,
-	credentialFailures CredentialFailureRecorder, input *protocolvalidation.ValidateTokenRequestInput, err error) error {
+//
+// The session a reuse ends tells its apps when it was still valid under settings, after the audit
+// event (#784 decision 1).
+func auditTokenRefusal(r *http.Request, settings *record.Settings, database revocation.Database, auditLogger AuditLogger,
+	logoutTokens logoutTokenSender, credentialFailures CredentialFailureRecorder,
+	input *protocolvalidation.ValidateTokenRequestInput, err error) error {
 
 	// RFC 6749 §4.1.2: when an authorization code is reused by an
 	// authenticated requester, the server MUST deny the request and
@@ -199,11 +208,13 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 		// The audit row waits for the transaction to commit: it lists JTIs that were
 		// really revoked, and on SQLite an audit write inside the transaction would wait
 		// on the one connection the transaction holds.
-		result, revokeErr := revocation.RevokeOnAuthCodeReuseTx(r.Context(), database, reused.Code)
+		result, revokeErr := revocation.RevokeOnAuthCodeReuseTx(r.Context(), database, reused.Code,
+			revocation.LiveUnder(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds))
 		if revokeErr != nil {
 			return revokeErr
 		}
 		revocation.LogAuthCodeReuse(r.Context(), auditLogger, reused.Code, result)
+		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 		return reused.Detail
 	}
 	// A grant refused because its user is disabled, on the code, refresh or password grant.

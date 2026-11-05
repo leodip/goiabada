@@ -70,7 +70,7 @@ The auth server confirms a hint when all of these hold:
 
 - It isn't empty.
 - An encrypted hint comes with a `client_id`, and decrypts with that client's secret.
-- Its signature is the auth server's, and it's an ID token, with `typ: JWT` in its header: an access token or a refresh token isn't one.
+- Its signature is the auth server's, and it's an ID token, with `typ: JWT` in its header: an access token, a refresh token or a logout token isn't one.
 - It has `sub` and `iat`, `iss` is the auth server's issuer, and `aud` is the identifier of a client that exists.
 - A `client_id` sent beside it equals its `aud`. An empty `client_id=` doesn't.
 - Its `nbf`, when there is one, has passed.
@@ -85,6 +85,8 @@ The ID token from a user's sign-in to your app passes all of these while the bro
 **With a confirmed hint,** the auth server removes your app from the session the hint's `sid` names. The session ends when your app was the last client on it, so the user stays signed in to the other apps sharing it. **Without one,** once the user clicks **Sign out**, the browser's whole session ends.
 
 Either way, the browser's session cookie is cleared, so its next sign-in starts with the password.
+
+Each app whose part of the session ended, and that registered a [back-channel logout URI](/concepts/clients/#back-channel-logout), is sent a logout token there naming the user and the session, when the session was still valid: with a confirmed hint, your app alone, and without one, every app on the session. See [Telling your apps](/concepts/ending-sessions/#telling-your-apps). The token is sent whether or not your app has already ended its own session.
 
 ## Where the user lands
 
@@ -125,7 +127,7 @@ JavaScript can call `/auth/logout` across origins when its origin is registered 
 
 ## The audit log
 
-A sign-out with a confirmed hint leaves `deleted_user_session_client` in the [audit log](/concepts/audit-log/), for your app leaving the session. When yours was the session's last client, the session ends too, and it also leaves `deleted_user_session`, with the reason `signed_out`, and `logout`. One without a hint leaves `logout`, even when there was no session, and `deleted_user_session` when there was one.
+A sign-out with a confirmed hint leaves `deleted_user_session_client` in the [audit log](/concepts/audit-log/), for your app leaving the session. When yours was the session's last client, the session ends too, and it also leaves `deleted_user_session`, with the reason `signed_out`, and `logout`. One without a hint leaves `logout`, even when there was no session, and `deleted_user_session` when there was one. Each app told leaves `sent_logout_token`.
 
 ## Next steps
 

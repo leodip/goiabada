@@ -549,6 +549,25 @@ type AuthCodeReuseResult struct {
 	// losing racer of a concurrent redemption apart from a real replay (#77). Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
 	RevokedRefreshTokenJtis []string
+	// LogoutDeliveries is a logout token for each app on the session the response ended, with a
+	// back-channel logout URI, when the caller's live said the session was still valid; nil
+	// otherwise. The caller hands it to the back-channel sender after the commit, beside the audit
+	// event (#784 decision 1). It is no part of the audit payload.
+	LogoutDeliveries []backchannel.Delivery
+}
+
+// SessionLive reports whether a session was still valid, within its idle timeout and maximum
+// lifetime, when an end took it: only then are its apps told (#784 decision 1). The caller builds it
+// over its settings; nil says no session is live, which tells nobody.
+type SessionLive func(session *record.UserSession) bool
+
+// LiveUnder is the SessionLive of a session's two lifetimes as the settings hold them, judged at
+// the moment it is asked: within the idle timeout and the maximum lifetime, whatever max_age any
+// client asked for.
+func LiveUnder(idleTimeoutInSeconds, maxLifetimeInSeconds int) SessionLive {
+	return func(session *record.UserSession) bool {
+		return session.IsValid(time.Now().UTC(), idleTimeoutInSeconds, maxLifetimeInSeconds, nil)
+	}
 }
 
 // RevokeOnAuthCodeReuse is the RFC 6749 section 10.5 response to a reused authorization code, on
@@ -565,7 +584,13 @@ type AuthCodeReuseResult struct {
 // sweep runs. RevokeOnAuthCodeReuseTx is the caller that opens one; this form exists so the data
 // tier's ordering test can hold the transaction open across a termination's arrival and still run
 // the statements that ship.
-func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *record.Code) (AuthCodeReuseResult, error) {
+//
+// When it ends the session and live says the session was still valid, it reads the apps the session
+// served before the deletion takes their rows, under the session row the first statement took, so
+// they can be told (#784 decision 1). The subject is the code's user's, which the token endpoint
+// loaded with the code.
+func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *record.Code,
+	live SessionLive) (AuthCodeReuseResult, error) {
 	if tx == nil {
 		return AuthCodeReuseResult{}, errs.New("the response to a reused authorization code requires a transaction: the session row it takes first is released by an autocommitted statement")
 	}
@@ -642,19 +667,29 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 	// on a handful of statements, and not a deadlock: this transaction takes no lock any mint
 	// holds. Paying it is what buys the absence of the deadlock the acquisition's own comment
 	// describes. (#139)
+	var deliveries []backchannel.Delivery
 	if code.SessionIdentifier != "" && len(revokedJtis) > 0 {
 		session, err := db.GetUserSessionBySessionIdentifier(ctx, tx, code.SessionIdentifier)
 		if err != nil {
 			return AuthCodeReuseResult{}, err
 		}
 		if session != nil {
+			// The apps to tell, before the deletion takes their rows. The session row is held since
+			// the first statement, so an app a ceremony adds to it meanwhile is either here or the
+			// ceremony finds the session gone.
+			if live != nil && live(session) && code.User.Id == code.UserId && code.User.Subject != "" {
+				deliveries, err = backchannel.SessionDeliveries(ctx, db, tx, session, code.User.Subject)
+				if err != nil {
+					return AuthCodeReuseResult{}, err
+				}
+			}
 			if err := db.DeleteUserSession(ctx, tx, session.Id); err != nil {
 				return AuthCodeReuseResult{}, err
 			}
 		}
 	}
 
-	return AuthCodeReuseResult{RevokedRefreshTokenJtis: revokedJtis}, nil
+	return AuthCodeReuseResult{RevokedRefreshTokenJtis: revokedJtis, LogoutDeliveries: deliveries}, nil
 }
 
 // RevokeOnAuthCodeReuseTx runs RevokeOnAuthCodeReuse in one transaction it opens and commits, so
@@ -666,7 +701,10 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 // order is not optional: AuditLogger.Log writes on a nil transaction, and on SQLite the whole
 // process shares the one connection this transaction holds, so an audit written inside it would
 // wait on itself. A logged response that then rolled back would also be a false record.
-func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code) (AuthCodeReuseResult, error) {
+//
+// live says whether the session the response ends was still valid, so its apps are told; the logout
+// tokens are the caller's to send after the commit, as the audit event is.
+func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code, live SessionLive) (AuthCodeReuseResult, error) {
 	// Refused before a transaction is opened, so a bad argument is not reported as a database
 	// failure after a round trip.
 	if code == nil {
@@ -681,7 +719,7 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 	var result AuthCodeReuseResult
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		var err error
-		result, err = RevokeOnAuthCodeReuse(ctx, db, tx, code)
+		result, err = RevokeOnAuthCodeReuse(ctx, db, tx, code, live)
 		return err
 	})
 	if err != nil {
