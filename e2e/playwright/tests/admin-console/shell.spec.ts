@@ -110,6 +110,11 @@ test("the sidebar marks the page open, and the section a page belongs to", async
   const account = page.getByRole("navigation", { name: "Account", exact: true });
   await expect(account.getByRole("link", { name: "Consents", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(account.locator('[aria-current="page"]')).toHaveCount(1);
+  // Delete account is the menu's last item while account deletion is on, as the baseline has it (#783).
+  await expect(account.getByRole("link").last()).toHaveText("Delete account");
+  await account.getByRole("link", { name: "Delete account", exact: true }).click();
+  await expect(page).toHaveURL(`${env.adminUrl}/account/delete`);
+  await expect(account.getByRole("link", { name: "Delete account", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
 test("every page of the console sends the content security policy and the other security headers", async ({ page }) => {

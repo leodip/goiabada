@@ -344,6 +344,7 @@
 "adminconsole.account_menu.manage_consents" = "Consentimentos"
 "adminconsole.account_menu.sessions" = "Sessões"
 "adminconsole.account_menu.legal_documents" = "Documentos legais"
+"adminconsole.account_menu.delete_account" = "Excluir conta"
 
 # --- Drawer do lado admin ---------------------------------------------------
 
@@ -695,6 +696,25 @@
 "adminconsole.account.sessions.modal_confirm_title" = "Encerrar esta sessão?"
 "adminconsole.account.sessions.end_confirm" = "Encerrar a sessão em {{.device}}? Os aplicativos em que você entrou por ela, incluindo os que continuam funcionando em segundo plano, vão pedir que você entre de novo."
 "adminconsole.account.sessions.end_current_confirm" = "Encerrar a sessão em {{.device}}? É o dispositivo que você está usando, então você vai sair. Os aplicativos em que você entrou por ela vão pedir que você entre de novo."
+
+# --- Account deletion (#783) ------------------------------------------------
+
+"adminconsole.account.delete.page_title" = "Excluir sua conta"
+"adminconsole.account.delete.lead" = "Sua conta {{.appName}} é excluída na hora. Isso não pode ser desfeito."
+"adminconsole.account.delete.deleted_label" = "O que é excluído:"
+"adminconsole.account.delete.deleted" = "seu perfil, endereço de e-mail, telefone e endereço; sua senha, seu autenticador e seus códigos de recuperação; sua foto; seus grupos, permissões e atributos; os consentimentos que você deu a aplicativos; e suas sessões, então você sai de todos os lugares e os aplicativos não podem mais acessar sua conta."
+"adminconsole.account.delete.kept_label" = "O que não é:"
+"adminconsole.account.delete.kept" = "os registros do log de auditoria sobre sua conta, que a identificam por um ID, e não pelo seu endereço de e-mail, até que o período de retenção da sua organização os remova; os logs do servidor, que podem incluir seu endereço IP; os backups feitos antes de hoje, até serem substituídos; e o que os aplicativos já receberam sobre você, como seu nome e endereço de e-mail. Peça a cada aplicativo que exclua o que guarda."
+"adminconsole.account.delete.field.password" = "Senha"
+"adminconsole.account.delete.field.otp" = "Código de autenticação"
+"adminconsole.account.delete.field.recovery_code" = "Código de recuperação"
+"adminconsole.account.delete.use_recovery_code" = "Usar um código de recuperação"
+"adminconsole.account.delete.use_authenticator" = "Usar o aplicativo autenticador"
+"adminconsole.account.delete.button" = "Excluir minha conta"
+"adminconsole.account.delete.confirm_title" = "Excluir sua conta?"
+"adminconsole.account.delete.confirm_body" = "Isso não pode ser desfeito."
+"adminconsole.account_deleted.title" = "Sua conta foi excluída"
+"adminconsole.account_deleted.message" = "Sua conta {{.appName}} não existe mais, e você saiu de todos os lugares. Os aplicativos que você usou mantêm o que já receberam; peça a eles que excluam."
 
 # === Adminconsole — clientes admin ===========================================
 

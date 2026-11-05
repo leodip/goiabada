@@ -349,7 +349,7 @@ test("registering an address that already has an account answers the same, and m
   });
 });
 
-test("account deletion is on, as seeded, and is saved off and on again", async ({ page, request }) => {
+test("account deletion is on, as seeded, and is saved off and on again, the account menu and page following it", async ({ page, request }) => {
   const published = async () =>
     ((await (await request.get(`${env.authUrl}/api/public/settings`)).json()) as { accountDeletionEnabled: boolean }).accountDeletionEnabled;
 
@@ -363,15 +363,27 @@ test("account deletion is on, as seeded, and is saved off and on again", async (
     await expect(page.getByRole("heading", { name: "Account deletion", level: 2 })).toBeVisible();
     expect(await published()).toBe(true);
 
+    const accountMenu = page.getByRole("navigation", { name: "Account", exact: true });
+    const deleteAccount = accountMenu.getByRole("link", { name: "Delete account", exact: true });
+
     await fillSettingsForm(page, { accountDeletionEnabled: false });
     await saveSettings(page);
     await expect(box).not.toBeChecked();
     expect(await published()).toBe(false);
+    // Off, the account menu has no Delete account, and the page isn't there (decision 6).
+    await page.goto(`${env.adminUrl}/account/profile`);
+    await expect(accountMenu.getByRole("link", { name: "Profile", exact: true })).toBeVisible();
+    await expect(deleteAccount).toHaveCount(0);
+    expect((await page.goto(`${env.adminUrl}/account/delete`))?.status()).toBe(404);
 
+    await page.goto(`${env.adminUrl}${general}`);
     await fillSettingsForm(page, { accountDeletionEnabled: true });
     await saveSettings(page);
     await expect(box).toBeChecked();
     expect(await published()).toBe(true);
+    await page.goto(`${env.adminUrl}/account/profile`);
+    await expect(deleteAccount).toBeVisible();
+    expect((await page.goto(`${env.adminUrl}/account/delete`))?.status()).toBe(200);
   });
 });
 

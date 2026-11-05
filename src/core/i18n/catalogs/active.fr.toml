@@ -364,6 +364,7 @@
 "adminconsole.account_menu.manage_consents" = "Consentements"
 "adminconsole.account_menu.sessions" = "Sessions"
 "adminconsole.account_menu.legal_documents" = "Documents juridiques"
+"adminconsole.account_menu.delete_account" = "Supprimer le compte"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -725,6 +726,25 @@
 "adminconsole.account.sessions.modal_confirm_title" = "Fermer cette session ?"
 "adminconsole.account.sessions.end_confirm" = "Fermer la session sur {{.device}} ? Les applications auxquelles vous vous êtes connecté depuis cet appareil, y compris celles qui fonctionnent en arrière-plan, vous demanderont de vous reconnecter."
 "adminconsole.account.sessions.end_current_confirm" = "Fermer la session sur {{.device}} ? C’est l’appareil que vous utilisez : vous serez donc déconnecté. Les applications auxquelles vous vous êtes connecté depuis cet appareil vous demanderont de vous reconnecter."
+
+# --- Account deletion (#783) ------------------------------------------------
+
+"adminconsole.account.delete.page_title" = "Supprimer votre compte"
+"adminconsole.account.delete.lead" = "Votre compte {{.appName}} est supprimé immédiatement. Cette action est irréversible."
+"adminconsole.account.delete.deleted_label" = "Ce qui est supprimé :"
+"adminconsole.account.delete.deleted" = "votre profil, votre adresse e-mail, votre téléphone et votre adresse ; votre mot de passe, votre authentificateur et vos codes de récupération ; votre photo ; vos groupes, autorisations et attributs ; les consentements que vous avez donnés aux applications ; et vos sessions, si bien que vous êtes déconnecté partout et que les applications ne peuvent plus accéder à votre compte."
+"adminconsole.account.delete.kept_label" = "Ce qui ne l’est pas :"
+"adminconsole.account.delete.kept" = "les entrées du journal d’audit concernant votre compte, qui le désignent par un identifiant et non par votre adresse e-mail, jusqu’à ce que la durée de conservation de votre organisation les supprime ; les journaux du serveur, qui peuvent contenir votre adresse IP ; les sauvegardes faites avant aujourd’hui, jusqu’à leur remplacement ; et ce que les applications ont déjà reçu à votre sujet, comme votre nom et votre adresse e-mail. Demandez à chaque application de supprimer ce qu’elle détient."
+"adminconsole.account.delete.field.password" = "Mot de passe"
+"adminconsole.account.delete.field.otp" = "Code d’authentification"
+"adminconsole.account.delete.field.recovery_code" = "Code de récupération"
+"adminconsole.account.delete.use_recovery_code" = "Utiliser plutôt un code de récupération"
+"adminconsole.account.delete.use_authenticator" = "Utiliser plutôt l’application d’authentification"
+"adminconsole.account.delete.button" = "Supprimer mon compte"
+"adminconsole.account.delete.confirm_title" = "Supprimer votre compte ?"
+"adminconsole.account.delete.confirm_body" = "Cette action est irréversible."
+"adminconsole.account_deleted.title" = "Votre compte est supprimé"
+"adminconsole.account_deleted.message" = "Votre compte {{.appName}} n’existe plus, et vous êtes déconnecté partout. Les applications que vous utilisiez conservent ce qu’elles ont déjà reçu ; demandez-leur de le supprimer."
 
 # === Adminconsole — admin clients =============================================
 

@@ -269,3 +269,18 @@ func (c *AuthServerClient) DeleteAccountProfilePicture(ctx context.Context, acce
 	})
 	return err
 }
+
+// DeleteAccount deletes the current user's own account, given their password and, while two-factor
+// authentication is on, an authenticator code or a recovery code. The auth server answers it only
+// for a token issued to the admin console's own client (#783 decision 3). A POST, because the
+// credentials are its content, which a DELETE should not carry (RFC 9110 section 9.3.5).
+func (c *AuthServerClient) DeleteAccount(ctx context.Context, accessToken string, request *api.DeleteAccountRequest) error {
+	_, err := c.do(ctx, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.baseURL + "/api/v1/account/deletion",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	return err
+}

@@ -131,6 +131,11 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Get("/session-ended", handlers.HandleSessionEndedGet(httpHelper, s.sessionStore))
 	})
 
+	// The page a deletion of the user's own account lands on, once the console's session is gone. It
+	// is the same page for anyone, so it sits outside the account pages' sign-in, which would send
+	// a visitor with no session to sign in to an account that no longer exists (#783 decision 8).
+	root.With(baseAuth...).Get("/account/deleted", accounthandlers.HandleAccountDeletedGet(httpHelper))
+
 	// Account routes
 	root.Route("/account", func(r *routing.Router) {
 		r.Use(accountAuth...)
@@ -158,6 +163,8 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Get("/legal-documents", accounthandlers.HandleLegalDocumentsGet(httpHelper, apiClient))
 		r.Get("/sessions", accounthandlers.HandleSessionsGet(httpHelper, apiClient))
 		r.Post("/sessions", accounthandlers.HandleSessionsEndSessionPost(httpHelper, apiClient))
+		r.Get("/delete", accounthandlers.HandleDeleteAccountGet(httpHelper, apiClient))
+		r.Post("/delete", accounthandlers.HandleDeleteAccountPost(httpHelper, s.sessionStore, apiClient, baseURL))
 
 		// Profile picture page and API routes
 		r.Get("/picture", accounthandlers.HandlePictureGet(httpHelper, apiClient))

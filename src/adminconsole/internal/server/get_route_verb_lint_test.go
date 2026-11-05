@@ -56,6 +56,8 @@ var mutatingVerbs = []string{
 var getVerbExemptions = map[string]string{
 	"accounthandlers.HandleLogoutConfirmGet": "renders the sign-out confirmation; it is handed no " +
 		"session store, and the POST beside it signs out (#411)",
+	"accounthandlers.HandleDeleteAccountGet": "renders the Delete account form; the POST beside " +
+		"it deletes (#783)",
 	"adminclienthandlers.HandleDeleteGet":        "renders the delete confirmation; the POST deletes",
 	"adminresourcehandlers.HandleDeleteGet":      "renders the delete confirmation; the POST deletes",
 	"admingrouphandlers.HandleDeleteGet":         "renders the delete confirmation; the POST deletes",

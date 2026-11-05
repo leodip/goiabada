@@ -366,6 +366,7 @@
 "adminconsole.account_menu.manage_consents" = "Consentimientos"
 "adminconsole.account_menu.sessions" = "Sesiones"
 "adminconsole.account_menu.legal_documents" = "Documentos legales"
+"adminconsole.account_menu.delete_account" = "Eliminar cuenta"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -727,6 +728,25 @@
 "adminconsole.account.sessions.modal_confirm_title" = "¿Cerrar esta sesión?"
 "adminconsole.account.sessions.end_confirm" = "¿Quieres cerrar la sesión en {{.device}}? Las aplicaciones que usaste desde ese dispositivo, incluidas las que funcionan en segundo plano, necesitarán que vuelvas a iniciar sesión."
 "adminconsole.account.sessions.end_current_confirm" = "¿Quieres cerrar la sesión en {{.device}}? Es el dispositivo que estás usando, así que se cerrará tu sesión. Las aplicaciones que usaste desde él necesitarán que vuelvas a iniciar sesión."
+
+# --- Account deletion (#783) ------------------------------------------------
+
+"adminconsole.account.delete.page_title" = "Eliminar tu cuenta"
+"adminconsole.account.delete.lead" = "Tu cuenta de {{.appName}} se elimina al instante. No se puede deshacer."
+"adminconsole.account.delete.deleted_label" = "Qué se elimina:"
+"adminconsole.account.delete.deleted" = "tu perfil, tu dirección de correo electrónico, tu teléfono y tu dirección; tu contraseña, tu autenticador y tus códigos de recuperación; tu foto; tus grupos, permisos y atributos; los consentimientos que diste a las aplicaciones; y tus sesiones, así que se cierra tu sesión en todas partes y las aplicaciones ya no pueden acceder a tu cuenta."
+"adminconsole.account.delete.kept_label" = "Qué no:"
+"adminconsole.account.delete.kept" = "las entradas del registro de auditoría sobre tu cuenta, que la identifican por un ID y no por tu dirección de correo electrónico, hasta que el período de retención de tu organización las elimine; los registros del servidor, que pueden incluir tu dirección IP; las copias de seguridad hechas antes de hoy, hasta que se sustituyan; y lo que las aplicaciones ya recibieron sobre ti, como tu nombre y tu dirección de correo electrónico. Pide a cada aplicación que elimine lo que guarda."
+"adminconsole.account.delete.field.password" = "Contraseña"
+"adminconsole.account.delete.field.otp" = "Código de autenticación"
+"adminconsole.account.delete.field.recovery_code" = "Código de recuperación"
+"adminconsole.account.delete.use_recovery_code" = "Usar un código de recuperación"
+"adminconsole.account.delete.use_authenticator" = "Usar la aplicación de autenticación"
+"adminconsole.account.delete.button" = "Eliminar mi cuenta"
+"adminconsole.account.delete.confirm_title" = "¿Eliminar tu cuenta?"
+"adminconsole.account.delete.confirm_body" = "No se puede deshacer."
+"adminconsole.account_deleted.title" = "Tu cuenta se ha eliminado"
+"adminconsole.account_deleted.message" = "Tu cuenta de {{.appName}} ya no existe y se ha cerrado tu sesión en todas partes. Las aplicaciones que usaste conservan lo que ya recibieron; pídeles que lo eliminen."
 
 # === Adminconsole — admin clients =============================================
 

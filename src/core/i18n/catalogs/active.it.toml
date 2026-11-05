@@ -368,6 +368,7 @@
 "adminconsole.account_menu.manage_consents" = "Consensi"
 "adminconsole.account_menu.sessions" = "Sessioni"
 "adminconsole.account_menu.legal_documents" = "Documenti legali"
+"adminconsole.account_menu.delete_account" = "Elimina account"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -729,6 +730,25 @@
 "adminconsole.account.sessions.modal_confirm_title" = "Chiudere questa sessione?"
 "adminconsole.account.sessions.end_confirm" = "Vuoi chiudere la sessione su {{.device}}? Le applicazioni a cui hai effettuato l'accesso da lì, comprese quelle che continuano a funzionare in background, ti chiederanno di accedere di nuovo."
 "adminconsole.account.sessions.end_current_confirm" = "Vuoi chiudere la sessione su {{.device}}? È il dispositivo che stai usando, quindi verrai disconnesso. Le applicazioni a cui hai effettuato l'accesso da lì ti chiederanno di accedere di nuovo."
+
+# --- Account deletion (#783) ------------------------------------------------
+
+"adminconsole.account.delete.page_title" = "Elimina il tuo account"
+"adminconsole.account.delete.lead" = "Il tuo account {{.appName}} viene eliminato subito. L'operazione non si può annullare."
+"adminconsole.account.delete.deleted_label" = "Cosa viene eliminato:"
+"adminconsole.account.delete.deleted" = "il tuo profilo, l'indirizzo email, il telefono e l'indirizzo; la password, l'autenticatore e i codici di recupero; la tua immagine; i tuoi gruppi, permessi e attributi; i consensi che hai dato alle app; e le tue sessioni, quindi esci ovunque e le app non possono più accedere al tuo account."
+"adminconsole.account.delete.kept_label" = "Cosa no:"
+"adminconsole.account.delete.kept" = "le voci del registro di audit sul tuo account, che lo indicano con un ID e non con il tuo indirizzo email, finché il periodo di conservazione della tua organizzazione non le rimuove; i log del server, che possono includere il tuo indirizzo IP; i backup fatti prima di oggi, finché non vengono sostituiti; e ciò che le app hanno già ricevuto su di te, come il tuo nome e il tuo indirizzo email. Chiedi a ogni app di eliminare ciò che conserva."
+"adminconsole.account.delete.field.password" = "Password"
+"adminconsole.account.delete.field.otp" = "Codice di autenticazione"
+"adminconsole.account.delete.field.recovery_code" = "Codice di recupero"
+"adminconsole.account.delete.use_recovery_code" = "Usa invece un codice di recupero"
+"adminconsole.account.delete.use_authenticator" = "Usa invece l'app di autenticazione"
+"adminconsole.account.delete.button" = "Elimina il mio account"
+"adminconsole.account.delete.confirm_title" = "Eliminare il tuo account?"
+"adminconsole.account.delete.confirm_body" = "L'operazione non si può annullare."
+"adminconsole.account_deleted.title" = "Il tuo account è stato eliminato"
+"adminconsole.account_deleted.message" = "Il tuo account {{.appName}} non esiste più e sei uscito ovunque. Le app che hai usato conservano ciò che hanno già ricevuto; chiedi loro di eliminarlo."
 
 # === Adminconsole — admin clients =============================================
 

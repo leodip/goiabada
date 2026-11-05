@@ -23,6 +23,7 @@ var (
 	charVerifyAccountEmail  = &api.VerifyAccountEmailRequest{VerificationCode: "123456"}
 	charUpdateAccountOTP    = &api.UpdateAccountOTPRequest{Enabled: true, OtpCode: "654321"}
 	charCreateRecoveryCodes = &api.CreateAccountRecoveryCodesRequest{Password: "the-password"}
+	charDeleteAccount       = &api.DeleteAccountRequest{Password: "the-password", RecoveryCode: "7kq2-m9xh-4trw-b3np-j6vd-egac"}
 	charAccountLogout       = &api.AccountLogoutRequest{PostLogoutRedirectUri: "https://console.example.com/"}
 	charUpdateAuditSettings = &api.UpdateSettingsAuditLogsRequest{AuditLogRetentionDays: 30}
 
@@ -309,6 +310,15 @@ func wireCharacterization() []wireCase {
 			},
 			verb: "DELETE", path: "/api/v1/account/profile-picture",
 			successStatus: 200, reply: `{}`,
+		},
+		{
+			name: "DeleteAccount",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.DeleteAccount(ctx, charAccessToken, charDeleteAccount)
+			},
+			verb: "POST", path: "/api/v1/account/deletion", contentType: charJSON,
+			bodyOf:        charDeleteAccount,
+			successStatus: 200, reply: `{"success":true}`,
 		},
 
 		// --- audit_logs.go ----------------------------------------------------------------

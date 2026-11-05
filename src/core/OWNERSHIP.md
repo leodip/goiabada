@@ -128,7 +128,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `CreateUserAttributeRequest` | both-apps | — |
 | `core/api` | `CreateUserAttributeResponse` | both-apps | — |
 | `core/api` | `CreateUserResponse` | both-apps | — |
-| `core/api` | `DeleteAccountRequest` | contract | Account API request DTO of `POST /api/v1/account/deletion`, which is what `core/api` is for (#783). The auth server reads it and no admin console file names it until the console's Delete account page does; #385 exempts this package by name. |
+| `core/api` | `DeleteAccountRequest` | both-apps | — |
 | `core/api` | `ErrorResponse` | both-apps | — |
 | `core/api` | `GenerateUserEmailVerificationCodeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetAuditEventTypesResponse` | both-apps | — |

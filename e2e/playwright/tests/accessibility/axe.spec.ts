@@ -518,6 +518,26 @@ test("a user's account pages", async ({ page, browser, clients, users, legalDocu
         await expect(own.locator("#recovery-codes")).toBeVisible();
       },
     },
+    // Delete account, with two-factor authentication on by now; the deletion itself is never
+    // confirmed, so the user stays for the states after it (#783).
+    at(own, "delete account, two-factor authentication on", account("delete")),
+    asks(own, "delete account, asking first", async () => {
+      await own.locator("#password").fill(user.password);
+      await submit();
+    }),
+    {
+      name: "delete account, a recovery code instead",
+      reach: async () => {
+        await own.getByRole("button", { name: "Use a recovery code instead" }).click();
+        await expect(own.locator("#recoveryCode")).toBeVisible();
+      },
+    },
+    refused(own, "delete account, the password refused", "password", async () => {
+      await own.locator("#password").fill("not-the-password");
+      await submit();
+      await confirmDialog(own);
+    }),
+    titled(own, "the page after deleting an account", "Your account is deleted", () => own.goto(account("deleted"))),
     titled(own, "the sign-out question", "Sign out", () => own.goto(`${env.adminUrl}/auth/logout`)),
     {
       // As a browser without JavaScript shows it: its script never loads, so the page stays.

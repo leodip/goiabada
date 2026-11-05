@@ -361,6 +361,7 @@
 "adminconsole.account_menu.manage_consents" = "Consents"
 "adminconsole.account_menu.sessions" = "Sessions"
 "adminconsole.account_menu.legal_documents" = "Legal documents"
+"adminconsole.account_menu.delete_account" = "Delete account"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -722,6 +723,25 @@
 "adminconsole.account.sessions.modal_confirm_title" = "End this session?"
 "adminconsole.account.sessions.end_confirm" = "End the session on {{.device}}? Applications you signed in to from it, including ones that keep working in the background, will need you to sign in again."
 "adminconsole.account.sessions.end_current_confirm" = "End the session on {{.device}}? It's the device you're using, so you'll be signed out. Applications you signed in to from it will need you to sign in again."
+
+# --- Account deletion (#783) ------------------------------------------------
+
+"adminconsole.account.delete.page_title" = "Delete your account"
+"adminconsole.account.delete.lead" = "Your {{.appName}} account is deleted at once. This can't be undone."
+"adminconsole.account.delete.deleted_label" = "What's deleted:"
+"adminconsole.account.delete.deleted" = "your profile, email address, phone and address; your password, authenticator and recovery codes; your picture; your groups, permissions and attributes; the consents you gave apps; and your sessions, so you're signed out everywhere and apps can no longer get access to your account."
+"adminconsole.account.delete.kept_label" = "What isn't:"
+"adminconsole.account.delete.kept" = "the audit log's entries about your account, which name it by an ID, not your email address, until your organization's retention period removes them; server logs, which can include your IP address; backups made before today, until they're replaced; and what apps already received about you, such as your name and email address. Ask each app to delete what it holds."
+"adminconsole.account.delete.field.password" = "Password"
+"adminconsole.account.delete.field.otp" = "Authentication code"
+"adminconsole.account.delete.field.recovery_code" = "Recovery code"
+"adminconsole.account.delete.use_recovery_code" = "Use a recovery code instead"
+"adminconsole.account.delete.use_authenticator" = "Use your authenticator app instead"
+"adminconsole.account.delete.button" = "Delete my account"
+"adminconsole.account.delete.confirm_title" = "Delete your account?"
+"adminconsole.account.delete.confirm_body" = "This can't be undone."
+"adminconsole.account_deleted.title" = "Your account is deleted"
+"adminconsole.account_deleted.message" = "Your {{.appName}} account is gone, and you're signed out everywhere. Apps you used keep what they already received; ask them to delete it."
 
 # === Adminconsole — admin clients =============================================
 

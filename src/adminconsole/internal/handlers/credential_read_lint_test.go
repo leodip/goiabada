@@ -22,7 +22,7 @@ import (
 // follow-up rather than done here.
 //
 // The list below is this module's, not a shared one, and it is the longer of the two. It carries
-// "code", "state", "error" and "error_description" on top of the ten credential names because this
+// "code", "state", "error" and "error_description" on top of the eleven credential names because this
 // module has no authorization endpoint: those four reach it only at /auth/callback, which
 // auth_helper.go arranges by asking for response_mode=form_post precisely so they arrive in a body,
 // and which reads them only from a POST, every other method getting HandleAuthCallbackWrongMethod's
@@ -40,7 +40,7 @@ import (
 // anything else. Naming them means a rename or a move that empties either one fails here instead of
 // shrinking the walk in silence.
 func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
-	// The ten credential-bearing names, as quoted literals. A value under any of them
+	// The eleven credential-bearing names, as quoted literals. A value under any of them
 	// authenticates, authorizes or configures on its own.
 	forbidden := []string{
 		`"password"`,
@@ -52,6 +52,9 @@ func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 		`"secretKey"`,
 		`"base64Image"`,
 		`"verificationCode"`,
+		// A recovery code stands in for the authentication code on the Delete account page
+		// (#783 decision 2).
+		`"recoveryCode"`,
 		`"clientSecret"`,
 		// The four form_post arrivals at /auth/callback. The authorization code is a
 		// credential on the same terms as the rest; state, error and error_description travel

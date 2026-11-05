@@ -365,6 +365,7 @@
 "adminconsole.account_menu.manage_consents" = "Zustimmungen"
 "adminconsole.account_menu.sessions" = "Sitzungen"
 "adminconsole.account_menu.legal_documents" = "Rechtsdokumente"
+"adminconsole.account_menu.delete_account" = "Konto löschen"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -726,6 +727,25 @@
 "adminconsole.account.sessions.modal_confirm_title" = "Diese Sitzung beenden?"
 "adminconsole.account.sessions.end_confirm" = "Möchten Sie die Sitzung auf {{.device}} beenden? Anwendungen, bei denen Sie sich damit angemeldet haben, erfordern dann eine erneute Anmeldung. Das gilt auch für Anwendungen, die im Hintergrund weiterlaufen."
 "adminconsole.account.sessions.end_current_confirm" = "Möchten Sie die Sitzung auf {{.device}} beenden? Da Sie dieses Gerät gerade verwenden, werden Sie abgemeldet. Anwendungen, bei denen Sie sich damit angemeldet haben, erfordern dann eine erneute Anmeldung."
+
+# --- Account deletion (#783) ------------------------------------------------
+
+"adminconsole.account.delete.page_title" = "Ihr Konto löschen"
+"adminconsole.account.delete.lead" = "Ihr Konto bei {{.appName}} wird sofort gelöscht. Das lässt sich nicht rückgängig machen."
+"adminconsole.account.delete.deleted_label" = "Was gelöscht wird:"
+"adminconsole.account.delete.deleted" = "Ihr Profil, Ihre E-Mail-Adresse, Telefonnummer und Anschrift; Ihr Passwort, Ihr Authenticator und Ihre Wiederherstellungscodes; Ihr Bild; Ihre Gruppen, Berechtigungen und Attribute; die Einwilligungen, die Sie Apps gegeben haben; und Ihre Sitzungen, sodass Sie überall abgemeldet sind und Apps keinen Zugriff mehr auf Ihr Konto erhalten."
+"adminconsole.account.delete.kept_label" = "Was nicht:"
+"adminconsole.account.delete.kept" = "die Einträge des Audit-Logs zu Ihrem Konto, die es mit einer ID statt mit Ihrer E-Mail-Adresse nennen, bis die Aufbewahrungsfrist Ihrer Organisation sie entfernt; Serverprotokolle, die Ihre IP-Adresse enthalten können; Sicherungen von vor heute, bis sie ersetzt werden; und was Apps bereits über Sie erhalten haben, etwa Ihren Namen und Ihre E-Mail-Adresse. Bitten Sie jede App, zu löschen, was sie speichert."
+"adminconsole.account.delete.field.password" = "Passwort"
+"adminconsole.account.delete.field.otp" = "Authentifizierungscode"
+"adminconsole.account.delete.field.recovery_code" = "Wiederherstellungscode"
+"adminconsole.account.delete.use_recovery_code" = "Stattdessen einen Wiederherstellungscode verwenden"
+"adminconsole.account.delete.use_authenticator" = "Stattdessen die Authenticator-App verwenden"
+"adminconsole.account.delete.button" = "Mein Konto löschen"
+"adminconsole.account.delete.confirm_title" = "Ihr Konto löschen?"
+"adminconsole.account.delete.confirm_body" = "Das lässt sich nicht rückgängig machen."
+"adminconsole.account_deleted.title" = "Ihr Konto ist gelöscht"
+"adminconsole.account_deleted.message" = "Ihr Konto bei {{.appName}} gibt es nicht mehr, und Sie sind überall abgemeldet. Apps, die Sie genutzt haben, behalten, was sie bereits erhalten haben; bitten Sie sie, es zu löschen."
 
 # === Adminconsole — admin clients =============================================
 
