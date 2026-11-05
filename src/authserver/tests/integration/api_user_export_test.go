@@ -152,9 +152,9 @@ func newExportedUser(t *testing.T) (*record.User, exportSecrets) {
 	return stored, secrets
 }
 
-// expectedExport is the document for the user, exportedAt aside, written out by hand from decision
-// 3: the wrapper, the identifiers, the user as GET /api/v1/admin/users/{id} answers it, and the
-// parts the later slices fill, empty.
+// expectedExport is the document for the user, exportedAt and auditEvents aside, written out by hand
+// from decision 3: the wrapper, the identifiers, the user as GET /api/v1/admin/users/{id} answers
+// it, and the parts a user with nothing else holds, empty.
 func expectedExport(user *record.User, issuer string) string {
 	return fmt.Sprintf(`{
 		"formatVersion": 1,
@@ -179,8 +179,7 @@ func expectedExport(user *record.User, issuer string) string {
 		"sessions": [],
 		"refreshTokens": [],
 		"legalDocumentAcceptances": [],
-		"profilePicture": null,
-		"auditEvents": []
+		"profilePicture": null
 	}`, issuer,
 		user.Id, user.Subject, user.Email, hashutil.HashString(user.Email),
 		user.Id, jsonTime(user.CreatedAt), jsonTime(user.UpdatedAt), user.Subject,
@@ -206,7 +205,7 @@ func storedIssuer(t *testing.T) string {
 }
 
 // assertTheExport holds a 200 to the user's document, its headers and exportedAt, and answers the
-// document's exportedAt.
+// document's exportedAt. The only audit events such a user has are the earlier exports' own.
 func assertTheExport(t *testing.T, answer exportAnswer, user *record.User, before time.Time) time.Time {
 	t.Helper()
 	require.Equal(t, http.StatusOK, answer.status, "%s", answer.raw)
@@ -221,6 +220,13 @@ func assertTheExport(t *testing.T, answer exportAnswer, user *record.User, befor
 	assert.WithinDuration(t, before, exportedAt, time.Minute)
 	assert.False(t, exportedAt.Before(before.Truncate(time.Second)), "exportedAt %v is before the request", exportedAt)
 	delete(parts, "exportedAt")
+	var events []api.UserExportAuditEventResponse
+	require.NoError(t, json.Unmarshal(parts["auditEvents"], &events))
+	require.NotNil(t, events, "auditEvents is a list")
+	for _, event := range events {
+		assert.Equal(t, audit.EventExportedUserData, event.AuditEvent)
+	}
+	delete(parts, "auditEvents")
 	rest, err := json.Marshal(parts)
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedExport(user, storedIssuer(t)), string(rest))
@@ -833,4 +839,125 @@ func TestAPIUserExport_ListsEveryRefreshToken(t *testing.T) {
 	for _, secret := range secrets {
 		assert.NotContains(t, body, secret)
 	}
+}
+
+// storedAuditRow waits for the audit row about or by the user that the request named requestId
+// wrote, of the event given, and answers it as stored.
+func storedAuditRow(t *testing.T, userId int64, event, requestId string) record.AuditLog {
+	t.Helper()
+	var found record.AuditLog
+	require.Eventually(t, func() bool {
+		rows, err := database.GetAuditLogsByUserId(context.Background(), nil, userId)
+		require.NoError(t, err)
+		for _, row := range rows {
+			if row.AuditEvent == event && row.RequestId == requestId {
+				found = row
+				return true
+			}
+		}
+		return false
+	}, afterResponseWait, 100*time.Millisecond, "the %s row of request %s", event, requestId)
+	return found
+}
+
+// enableUser enables the user through the admin API with the token given, which writes
+// updated_user_details about them, and answers that row as stored.
+func enableUser(t *testing.T, accessToken string, userId int64) record.AuditLog {
+	t.Helper()
+	resp, requestId := sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/enabled", userId),
+		map[string]any{"enabled": true})
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	return storedAuditRow(t, userId, audit.EventUpdatedUserDetails, requestId)
+}
+
+// expectedAuditEvent is one entry of auditEvents: the stored row's id, time, event and request id,
+// and the details, user columns and actedByAdministrator written out by hand.
+func expectedAuditEvent(row record.AuditLog, details, userId, loggedInUserId string, actedByAdministrator bool) string {
+	return fmt.Sprintf(`{"id": %d, "createdAt": %s, "auditEvent": %q, "details": %q, "requestId": %q,
+		"userId": %s, "loggedInUserId": %s, "actedByAdministrator": %t}`,
+		row.Id, jsonInstant(row.CreatedAt), row.AuditEvent, details, row.RequestId, userId, loggedInUserId, actedByAdministrator)
+}
+
+// exportedAuditEvents is the auditEvents of an export, as the raw entries.
+func exportedAuditEvents(t *testing.T, answer exportAnswer) []json.RawMessage {
+	t.Helper()
+	require.Equal(t, http.StatusOK, answer.status, "%s", answer.raw)
+	var document struct {
+		AuditEvents []json.RawMessage `json:"auditEvents"`
+	}
+	require.NoError(t, json.Unmarshal(answer.document(t), &document))
+	return document.AuditEvents
+}
+
+// The document lists every audit event about the user or made by them, in id order, each the audit
+// log's entry plus actedByAdministrator (#781 decisions 2 and 3). An administrator's change to the
+// user, made with their own token, says an administrator acted, without the administrator's id or
+// subject; a change by a client credentials token keeps the client, which is no person; and a
+// sign-in on a browser that still carried another user's session no longer names that user. The
+// administrator's own export keeps whom they acted on, and the user's next export lists the export
+// itself as an administrator's action (decision 8).
+func TestAPIUserExport_ListsTheAuditEventsWithoutTheAdministratorsWhoActed(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	ctx := context.Background()
+	user, _ := newExportedUser(t)
+	adminToken, adminClient := createAdminClientWithToken(t)
+	token, administrator := createUserAccessTokenWithScope(t, "openid authserver:manage-users authserver:manage-settings")
+
+	byAdministrator := enableUser(t, token, user.Id)
+	byClient := enableUser(t, adminToken, user.Id)
+	// As the sign-in writes it, when the browser still carried the administrator's session (#133).
+	sharedBrowser := &record.AuditLog{
+		AuditEvent: audit.EventCrossUserSessionReplaced,
+		RequestId:  "export-" + fake.LetterN(12),
+		Details: fmt.Sprintf(`{"client_id":%d,"previous_session_identifier":"sid-of-the-other-user","previous_user_id":%d,"user_id":%d}`,
+			adminClient.Id, administrator.Id, user.Id),
+		UserId: sql.NullInt64{Int64: user.Id, Valid: true},
+	}
+	require.NoError(t, database.CreateAuditLog(ctx, nil, sharedBrowser))
+	sharedBrowserRow := storedAuditRow(t, user.Id, audit.EventCrossUserSessionReplaced, sharedBrowser.RequestId)
+
+	// The administrator exports the user.
+	answer := getUserExport(t, token, user.Id, "gzip")
+	listed, err := json.Marshal(exportedAuditEvents(t, answer))
+	require.NoError(t, err)
+
+	userId := fmt.Sprint(user.Id)
+	assert.JSONEq(t, "["+strings.Join([]string{
+		expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"user_id":%d}`, user.Id), userId, "null", true),
+		expectedAuditEvent(byClient, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, adminClient.ClientIdentifier, user.Id),
+			userId, "null", false),
+		expectedAuditEvent(sharedBrowserRow, fmt.Sprintf(`{"client_id":%d,"previous_session_identifier":"sid-of-the-other-user","user_id":%d}`,
+			adminClient.Id, user.Id), userId, "null", false),
+	}, ",")+"]", string(listed))
+	assert.NotContains(t, string(answer.document(t)), administrator.Subject, "the administrator is named nowhere")
+
+	// The export is recorded under both people.
+	var exportRows []record.AuditLog
+	require.Eventually(t, func() bool {
+		exportRows = exportEvents(t, user.Id)
+		return len(exportRows) == 1
+	}, afterResponseWait, 100*time.Millisecond, "one exported_user_data about the user")
+	exported := exportRows[0]
+
+	// The administrator's own export keeps whom they acted on, and who they are.
+	administratorId := fmt.Sprint(administrator.Id)
+	ownEvents := map[int64]json.RawMessage{}
+	for _, e := range exportedAuditEvents(t, getUserExport(t, adminToken, administrator.Id, "")) {
+		var entry struct {
+			Id int64 `json:"id"`
+		}
+		require.NoError(t, json.Unmarshal(e, &entry))
+		ownEvents[entry.Id] = e
+	}
+	assert.JSONEq(t, expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, administrator.Subject, user.Id),
+		userId, administratorId, false), string(ownEvents[byAdministrator.Id]))
+	assert.JSONEq(t, expectedAuditEvent(exported, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, administrator.Subject, user.Id),
+		userId, administratorId, false), string(ownEvents[exported.Id]))
+	assert.NotContains(t, ownEvents, byClient.Id, "a change to another user by a client is not the administrator's")
+
+	// The user's next export lists the export as an administrator's.
+	events := exportedAuditEvents(t, getUserExport(t, adminToken, user.Id, ""))
+	require.Len(t, events, 4)
+	assert.JSONEq(t, expectedAuditEvent(exported, fmt.Sprintf(`{"user_id":%d}`, user.Id), userId, "null", true), string(events[3]))
 }

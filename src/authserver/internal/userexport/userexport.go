@@ -13,8 +13,10 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 )
 
@@ -27,7 +29,8 @@ const FormatVersion = 1
 // group's own attribute and permission reads, /permissions, /consents, the live sessions of
 // /sessions, and /legal-document-acceptances. ProfilePicture is the stored picture, nil when the
 // user has none. RefreshTokens is every refresh token row the auth server holds for the user, with
-// what its entry is read from. The reads promise no order; Build gives every list one.
+// what its entry is read from. AuditEvents is every audit row about the user or made by them, as
+// stored. The reads promise no order; Build gives every list one.
 type Parts struct {
 	Attributes               []api.UserAttributeResponse
 	Groups                   []api.UserExportGroupResponse
@@ -37,6 +40,7 @@ type Parts struct {
 	LegalDocumentAcceptances []api.LegalDocumentAcceptanceResponse
 	ProfilePicture           *record.UserProfilePicture
 	RefreshTokens            []RefreshToken
+	AuditEvents              []record.AuditLog
 }
 
 // RefreshToken is one refresh token row of the user's with what its entry is read from: Code is
@@ -60,8 +64,14 @@ type RefreshToken struct {
 // of a client loaded onto a consent or a session. Every list is in id order, oldest first, a
 // group's attributes and permissions too, so two exports of one person compare line by line
 // (#781 decision 3). Every list is [] rather than null when it is empty, so a reader never tells
-// "none" from "not read".
-func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) api.UserExportResponse {
+// "none" from "not read". The audit events name no other person who acted on the user (decision
+// 2); a row that cannot be read well enough to strip them is an error, and no document.
+func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) (api.UserExportResponse, error) {
+	events, err := auditEvents(user.Id, parts.AuditEvents)
+	if err != nil {
+		return api.UserExportResponse{}, err
+	}
+
 	groups := inIdOrder(parts.Groups, func(g api.UserExportGroupResponse) int64 { return g.Id })
 	for i := range groups {
 		groups[i].Attributes = inIdOrder(groups[i].Attributes, func(a api.GroupAttributeResponse) int64 { return a.Id })
@@ -98,8 +108,8 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 		LegalDocumentAcceptances: inIdOrder(parts.LegalDocumentAcceptances,
 			func(a api.LegalDocumentAcceptanceResponse) int64 { return a.Id }),
 		ProfilePicture: picture,
-		AuditEvents:    []json.RawMessage{},
-	}
+		AuditEvents:    events,
+	}, nil
 }
 
 func permissionId(p api.PermissionResponse) int64 { return p.Id }
@@ -145,6 +155,63 @@ func refreshTokens(tokens []RefreshToken) []api.UserExportRefreshTokenResponse {
 		entries = append(entries, entry)
 	}
 	return entries
+}
+
+// auditEvents is each audit row's entry, in id order, without the other people who acted on the
+// user (#781 decision 2). A row that another user's token made, an administrator's on the admin
+// API, says an administrator acted: its logged_in_user_id and its details' logged_in_user, the
+// administrator's subject, are left out. A sign-in on a browser that still carried another user's
+// session leaves out previous_user_id, that user. A row the user's own token made keeps whom it
+// acted on; a row no user's token made keeps its actor, a client or the recover command, neither a
+// person. Every other byte of a row is as stored.
+func auditEvents(userId int64, rows []record.AuditLog) ([]api.UserExportAuditEventResponse, error) {
+	sorted := inIdOrder(rows, func(row record.AuditLog) int64 { return row.Id })
+	entries := make([]api.UserExportAuditEventResponse, 0, len(sorted))
+	for i := range sorted {
+		row := &sorted[i]
+		entry := api.UserExportAuditEventResponse{AuditLogResponse: apimapping.ToAuditLogResponse(row)}
+
+		var hidden []string
+		if row.LoggedInUserId.Valid && row.LoggedInUserId.Int64 != userId {
+			entry.ActedByAdministrator = true
+			entry.LoggedInUserId = nil
+			hidden = append(hidden, "logged_in_user")
+		}
+		if row.AuditEvent == audit.EventCrossUserSessionReplaced {
+			hidden = append(hidden, "previous_user_id")
+		}
+		if len(hidden) > 0 {
+			details, err := withoutKeys(row.Details, hidden)
+			if err != nil {
+				return nil, errs.Wrapf(err, "unable to strip audit log %d for the export", row.Id)
+			}
+			entry.Details = details
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
+}
+
+// withoutKeys is a JSON object's text without the keys given. Each other value is copied as it is
+// written, so a number past what a float64 holds keeps every digit; the keys come out sorted, as
+// every audit row's details are written. Text that is not a JSON object is an error, since the
+// keys could not be told apart in it.
+func withoutKeys(object string, keys []string) (string, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(object), &fields); err != nil {
+		return "", errs.Wrap(err, "the details are not a JSON object")
+	}
+	if fields == nil {
+		return "", errs.New("the details are not a JSON object")
+	}
+	for _, key := range keys {
+		delete(fields, key)
+	}
+	stripped, err := json.Marshal(fields)
+	if err != nil {
+		return "", errs.Wrap(err, "unable to encode the stripped details")
+	}
+	return string(stripped), nil
 }
 
 // nullTime is a stored instant, or nil where none is stored.

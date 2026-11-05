@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -297,8 +296,6 @@ type GetUserConsentsResponse struct {
 // wrapper, and every list is in id order, oldest first, so two exports of one person compare line
 // by line (decision 3). FormatVersion goes up only for a change that breaks a reader; a field added
 // to a reused entry appears here too, and is additive.
-//
-// AuditEvents is a shape no admin API read answers yet: it is [] until its entries are defined.
 type UserExportResponse struct {
 	FormatVersion int       `json:"formatVersion"`
 	ExportedAt    time.Time `json:"exportedAt"`
@@ -315,7 +312,20 @@ type UserExportResponse struct {
 	RefreshTokens            []UserExportRefreshTokenResponse  `json:"refreshTokens"`
 	LegalDocumentAcceptances []LegalDocumentAcceptanceResponse `json:"legalDocumentAcceptances"`
 	ProfilePicture           *UserExportProfilePictureResponse `json:"profilePicture"`
-	AuditEvents              []json.RawMessage                 `json:"auditEvents"`
+	AuditEvents              []UserExportAuditEventResponse    `json:"auditEvents"`
+}
+
+// UserExportAuditEventResponse is one audit event about the user or made by them in the user
+// export: the audit log's entry, as GET /api/v1/admin/audit-logs answers it, plus
+// ActedByAdministrator (#781 decision 2). An event another user's token made about the user, an
+// administrator's on the admin API, does not name them: ActedByAdministrator is true, LoggedInUserId
+// is nil and the details carry no logged_in_user. The other user a sign-in on a shared browser
+// ended is not named either: cross_user_session_replaced carries no previous_user_id. An event the
+// user made keeps whom it acted on, and a client or the recover command named as the actor stays,
+// since neither is a person.
+type UserExportAuditEventResponse struct {
+	AuditLogResponse
+	ActedByAdministrator bool `json:"actedByAdministrator"`
 }
 
 // UserExportIdentifiersResponse is what the user is known by, to search older audit rows and the

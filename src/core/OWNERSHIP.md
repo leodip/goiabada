@@ -255,6 +255,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateUserResponse` | both-apps | — |
 | `core/api` | `UserAttributeResponse` | both-apps | — |
 | `core/api` | `UserConsentResponse` | both-apps | — |
+| `core/api` | `UserExportAuditEventResponse` | contract | An audit event in the user export, `GET /api/v1/admin/users/{id}/export`, a published admin API answer whose wire types live here as every one does (#781 decision 2). The auth server writes it and no admin console file reads it. |
 | `core/api` | `UserExportGroupResponse` | contract | A group with its attributes and permissions in the user export, `GET /api/v1/admin/users/{id}/export`, a published admin API answer whose wire types live here as every one does (#781 decision 3). The auth server writes it and no admin console file reads it. |
 | `core/api` | `UserExportIdentifiersResponse` | contract | The identifiers part of the user export, `GET /api/v1/admin/users/{id}/export`, a published admin API answer whose wire types live here as every one does (#781 decision 3). The auth server writes it and no admin console file reads it. |
 | `core/api` | `UserExportProfilePictureResponse` | contract | The profile picture in the user export, `GET /api/v1/admin/users/{id}/export`, a published admin API answer whose wire types live here as every one does (#781 decision 3). The auth server writes it and no admin console file reads it. |

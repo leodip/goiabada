@@ -6,6 +6,7 @@
 package apimapping
 
 import (
+	"database/sql"
 	"strconv"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -652,4 +653,27 @@ func ToLegalDocumentAcceptanceResponse(acceptance *record.LegalDocumentAcceptanc
 		resp.URL = &url
 	}
 	return resp
+}
+
+// ToAuditLogResponse is an audit log entry as GET /api/v1/admin/audit-logs answers it. The user
+// columns are null when the row names no such user, as every row written before the columns
+// existed does (#780 decision 6).
+func ToAuditLogResponse(log *record.AuditLog) api.AuditLogResponse {
+	return api.AuditLogResponse{
+		Id:             log.Id,
+		CreatedAt:      log.CreatedAt,
+		AuditEvent:     log.AuditEvent,
+		Details:        log.Details, // JSON string
+		RequestId:      log.RequestId,
+		UserId:         nullableId(log.UserId),
+		LoggedInUserId: nullableId(log.LoggedInUserId),
+	}
+}
+
+// nullableId is a nullable id column as the wire carries it: the id, or nil for NULL.
+func nullableId(id sql.NullInt64) *int64 {
+	if !id.Valid {
+		return nil
+	}
+	return &id.Int64
 }

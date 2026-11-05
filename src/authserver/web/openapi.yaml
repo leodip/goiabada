@@ -1172,6 +1172,10 @@ paths:
         Every export leaves an `exported_user_data` audit event naming the user in `user_id` and
         who exported them in `logged_in_user`, once the answer has been sent.
 
+        The audit events in the document don't name the other people who acted on the user: an
+        event an administrator made about the user says an administrator made it, without saying
+        who, so the file can be handed to the user as it is. The audit log still names them.
+
         The document holds the user's audit events, so the route needs a token that reads both
         users and the audit log: `authserver:admin-read`, `authserver:manage`, or
         `authserver:manage-users` together with `authserver:manage-settings`. A token holding
@@ -6116,7 +6120,7 @@ components:
     UserExportResponse:
       description: |
         Everything the auth server holds about one user. Each entry is the one the matching Admin
-        API read answers, and every list is in id order, oldest first. `auditEvents` is `[]`.
+        API read answers, and every list is in id order, oldest first.
       type: object
       properties:
         formatVersion:
@@ -6178,9 +6182,12 @@ components:
             - $ref: '#/components/schemas/UserExportProfilePictureResponse'
           nullable: true
         auditEvents:
+          description: |
+            Every audit event about the user or made by them. An event another user made about the
+            user, such as an administrator's change, does not say who made it.
           type: array
           items:
-            type: object
+            $ref: '#/components/schemas/UserExportAuditEventResponse'
       required:
         - formatVersion
         - exportedAt
@@ -6196,6 +6203,26 @@ components:
         - legalDocumentAcceptances
         - profilePicture
         - auditEvents
+
+    UserExportAuditEventResponse:
+      description: |
+        An audit event in the user export: the entry `GET /api/v1/admin/audit-logs` answers, plus
+        `actedByAdministrator`. When another user's token made the event about the user, as an
+        administrator's does on the Admin API, `actedByAdministrator` is true, `loggedInUserId` is
+        null and `details` carries no `logged_in_user`. A `cross_user_session_replaced` event
+        carries no `previous_user_id`. An event the user made keeps the users, groups and clients
+        it names, and an event made by a client credentials token keeps the client.
+      allOf:
+        - $ref: '#/components/schemas/AuditLogResponse'
+        - type: object
+          properties:
+            actedByAdministrator:
+              description: |
+                True when another user's token made the event about the user, which the export
+                does not name.
+              type: boolean
+          required:
+            - actedByAdministrator
 
     UserExportGroupResponse:
       description: |

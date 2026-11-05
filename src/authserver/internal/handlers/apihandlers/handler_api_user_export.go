@@ -58,6 +58,7 @@ type userExportDatabase interface {
 	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
 	GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error)
 	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	GetAuditLogsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.AuditLog, error)
 }
 
 // HandleUserExportGet - GET /api/v1/admin/users/{id}/export
@@ -115,7 +116,8 @@ func HandleUserExportGet(database userExportDatabase, auditLogger AuditLogger, b
 // Each part is read as the matching admin API endpoint reads it: the live sessions by the rule
 // GET /users/{id}/sessions applies, and a legal document acceptance with its address built from
 // baseURL. No session is marked current, the caller's own included, since the document is the
-// same whoever asks.
+// same whoever asks. The audit events are every row about the user or made by them, read whole in
+// id order, which Build strips of the other people who acted on the user (decision 2).
 func buildUserExport(ctx context.Context, database userExportDatabase, user *record.User,
 	settings *record.Settings, baseURL string, exportedAt time.Time) (api.UserExportResponse, error) {
 
@@ -177,7 +179,12 @@ func buildUserExport(ctx context.Context, database userExportDatabase, user *rec
 		return api.UserExportResponse{}, err
 	}
 
-	return userexport.Build(user, userexport.Parts{
+	auditLogs, err := database.GetAuditLogsByUserId(ctx, nil, user.Id)
+	if err != nil {
+		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the user's audit events for the export")
+	}
+
+	document, err := userexport.Build(user, userexport.Parts{
 		Attributes:               apimapping.ToUserAttributeResponses(attributes),
 		Groups:                   groups,
 		Permissions:              apimapping.ToPermissionResponses(user.Permissions),
@@ -186,7 +193,12 @@ func buildUserExport(ctx context.Context, database userExportDatabase, user *rec
 		LegalDocumentAcceptances: acceptances,
 		ProfilePicture:           picture,
 		RefreshTokens:            refreshTokens,
-	}, settings.Issuer, exportedAt), nil
+		AuditEvents:              auditLogs,
+	}, settings.Issuer, exportedAt)
+	if err != nil {
+		return api.UserExportResponse{}, errs.Wrap(err, "unable to build the user export")
+	}
+	return document, nil
 }
 
 // readUserExportGroups is each group the user is a member of, as GET /users/{id}/groups answers it,

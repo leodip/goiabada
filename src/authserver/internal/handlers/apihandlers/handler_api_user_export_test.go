@@ -51,6 +51,7 @@ type userExportStore struct {
 	refreshTokens    []record.RefreshToken
 	codes            map[int64]record.Code
 	revokedFamilies  map[string]bool
+	auditLogs        []record.AuditLog
 
 	// failing names the one read that answers err; "" for none, "*" for every read.
 	failing string
@@ -241,6 +242,13 @@ func (d *userExportStore) IsRefreshTokenFamilyRevoked(_ context.Context, _ *sql.
 		return false, err
 	}
 	return d.revokedFamilies[firstRefreshTokenJti], nil
+}
+
+func (d *userExportStore) GetAuditLogsByUserId(_ context.Context, _ *sql.Tx, userId int64) ([]record.AuditLog, error) {
+	if err := d.read("GetAuditLogsByUserId", userId); err != nil {
+		return nil, err
+	}
+	return slices.Clone(d.auditLogs), nil
 }
 
 // exportAudit records each event the handler logs, with what the response held at that moment.
@@ -777,6 +785,7 @@ func TestHandleUserExportGet_AFailedReadOfAnyPartIsAFiveHundred(t *testing.T) {
 		"UserConsentsLoadClients", "GetUserSessionsByUserId", "UserSessionsLoadClients", "GetClientsByIds",
 		"GetLegalDocumentAcceptancesByUserId", "GetAllLegalDocuments", "GetLegalDocumentVersionsByLegalDocumentId",
 		"GetUserProfilePictureByUserId", "GetRefreshTokensByUserId", "GetCodeById", "IsRefreshTokenFamilyRevoked",
+		"GetAuditLogsByUserId",
 	} {
 		t.Run(read, func(t *testing.T) {
 			logtest.CaptureSlog(t)
@@ -970,4 +979,147 @@ func TestHandleUserExportGet_TheRefreshTokensHoldNoSecret(t *testing.T) {
 		exportSeededClientSecret, base64.StdEncoding.EncodeToString([]byte(exportSeededClientSecret))} {
 		assert.NotContains(t, rr.Body.String(), secret)
 	}
+}
+
+// The subject of the administrator, user 7, whose token acted on the fixture user: no part of the
+// document may carry it.
+const exportAdministratorSubject = "5d1c9e7a-3b2f-4c6d-8e9f-0a1b2c3d4e5f"
+
+// exportAuditEventsDatabase holds the fixture user, Ana (user 42), with eight audit rows, answered
+// out of id order: an earlier export by the administrator (user 7); the administrator's change to
+// Ana; Ana's change to herself; Ana, as an administrator, changing user 9; a sign-in of Ana's on a
+// browser that still carried user 77's session; a change by a client credentials token; a grant by
+// the recover command; and the administrator ending one of Ana's sessions, whose session id is
+// past what a float64 holds exactly.
+func exportAuditEventsDatabase() *userExportStore {
+	at := func(s string) time.Time {
+		parsed, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			panic(err)
+		}
+		return parsed
+	}
+	id := func(n int64) sql.NullInt64 { return sql.NullInt64{Int64: n, Valid: true} }
+	store := exportDatabase()
+	store.auditLogs = []record.AuditLog{
+		{Id: 304, CreatedAt: at("2026-10-04T08:00:00Z"), AuditEvent: "cross_user_session_replaced", RequestId: "req-304",
+			Details: `{"client_id":100,"previous_session_identifier":"sid-77","previous_user_id":77,"user_id":42}`,
+			UserId:  id(42)},
+		{Id: 301, CreatedAt: at("2026-10-01T08:00:00Z"), AuditEvent: "updated_user_details", RequestId: "req-301",
+			Details: `{"logged_in_user":"` + exportAdministratorSubject + `","user_id":42}`,
+			UserId:  id(42), LoggedInUserId: id(7)},
+		{Id: 306, CreatedAt: at("2026-10-06T08:00:00Z"), AuditEvent: "updated_user_permissions", RequestId: "",
+			Details: `{"command":"recover","user_id":42}`,
+			UserId:  id(42)},
+		{Id: 302, CreatedAt: at("2026-10-02T08:00:00Z"), AuditEvent: "updated_user_profile", RequestId: "req-302",
+			Details: `{"logged_in_user":"7b0f2c4e-9d61-4a8e-b2c3-5f1e0a9d8c7b","user_id":42}`,
+			UserId:  id(42), LoggedInUserId: id(42)},
+		{Id: 300, CreatedAt: at("2026-09-30T08:00:00Z"), AuditEvent: "exported_user_data", RequestId: "req-300",
+			Details: `{"logged_in_user":"` + exportAdministratorSubject + `","user_id":42}`,
+			UserId:  id(42), LoggedInUserId: id(7)},
+		{Id: 305, CreatedAt: at("2026-10-05T08:00:00Z"), AuditEvent: "updated_user_details", RequestId: "req-305",
+			Details: `{"logged_in_user":"provisioning-client","user_id":42}`,
+			UserId:  id(42)},
+		{Id: 303, CreatedAt: at("2026-10-03T08:00:00Z"), AuditEvent: "updated_user_details", RequestId: "req-303",
+			Details:        `{"logged_in_user":"7b0f2c4e-9d61-4a8e-b2c3-5f1e0a9d8c7b","user_id":9}`,
+			UserId:         id(9),
+			LoggedInUserId: id(42)},
+		{Id: 307, CreatedAt: at("2026-10-07T08:00:00Z"), AuditEvent: "deleted_user_session", RequestId: "req-307",
+			Details: `{"logged_in_user":"` + exportAdministratorSubject + `","reason":"admin_deleted","user_id":42,"user_session_id":9007199254740993}`,
+			UserId:  id(42), LoggedInUserId: id(7)},
+	}
+	return store
+}
+
+// exportAuditEvents is the document's auditEvents for exportAuditEventsDatabase, written out by
+// hand from decision 2, in id order. The administrator's three rows (300, 301 and 307) say an
+// administrator acted, with no loggedInUserId and no logged_in_user, the rest of their details
+// kept to the digit. The sign-in on a shared browser (304) no longer names user 77. Ana's own
+// actions keep whom they acted on, herself (302) or user 9 (303). The client (305) and the recover
+// command (306) are no person, and stay.
+const exportAuditEvents = `[
+	{"id": 300, "createdAt": "2026-09-30T08:00:00Z", "auditEvent": "exported_user_data",
+		"details": "{\"user_id\":42}", "requestId": "req-300", "userId": 42, "loggedInUserId": null,
+		"actedByAdministrator": true},
+	{"id": 301, "createdAt": "2026-10-01T08:00:00Z", "auditEvent": "updated_user_details",
+		"details": "{\"user_id\":42}", "requestId": "req-301", "userId": 42, "loggedInUserId": null,
+		"actedByAdministrator": true},
+	{"id": 302, "createdAt": "2026-10-02T08:00:00Z", "auditEvent": "updated_user_profile",
+		"details": "{\"logged_in_user\":\"7b0f2c4e-9d61-4a8e-b2c3-5f1e0a9d8c7b\",\"user_id\":42}", "requestId": "req-302",
+		"userId": 42, "loggedInUserId": 42, "actedByAdministrator": false},
+	{"id": 303, "createdAt": "2026-10-03T08:00:00Z", "auditEvent": "updated_user_details",
+		"details": "{\"logged_in_user\":\"7b0f2c4e-9d61-4a8e-b2c3-5f1e0a9d8c7b\",\"user_id\":9}", "requestId": "req-303",
+		"userId": 9, "loggedInUserId": 42, "actedByAdministrator": false},
+	{"id": 304, "createdAt": "2026-10-04T08:00:00Z", "auditEvent": "cross_user_session_replaced",
+		"details": "{\"client_id\":100,\"previous_session_identifier\":\"sid-77\",\"user_id\":42}", "requestId": "req-304",
+		"userId": 42, "loggedInUserId": null, "actedByAdministrator": false},
+	{"id": 305, "createdAt": "2026-10-05T08:00:00Z", "auditEvent": "updated_user_details",
+		"details": "{\"logged_in_user\":\"provisioning-client\",\"user_id\":42}", "requestId": "req-305",
+		"userId": 42, "loggedInUserId": null, "actedByAdministrator": false},
+	{"id": 306, "createdAt": "2026-10-06T08:00:00Z", "auditEvent": "updated_user_permissions",
+		"details": "{\"command\":\"recover\",\"user_id\":42}", "requestId": "",
+		"userId": 42, "loggedInUserId": null, "actedByAdministrator": false},
+	{"id": 307, "createdAt": "2026-10-07T08:00:00Z", "auditEvent": "deleted_user_session",
+		"details": "{\"reason\":\"admin_deleted\",\"user_id\":42,\"user_session_id\":9007199254740993}", "requestId": "req-307",
+		"userId": 42, "loggedInUserId": null, "actedByAdministrator": true}
+]`
+
+// The document lists every audit event about the user or made by them, in id order, each the audit
+// log's entry plus actedByAdministrator (#781 decisions 2 and 3). An event another user's token
+// made about the user says an administrator acted, without saying who; the other user a sign-in on
+// a shared browser ended is not named; the user's own actions keep whom they acted on.
+func TestHandleUserExportGet_ListsTheAuditEventsWithoutTheAdministratorsWhoActed(t *testing.T) {
+	database := exportAuditEventsDatabase()
+
+	rr, _ := serveExport(t, database, exportRequest("42", "gzip"))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	reader, err := gzip.NewReader(bytes.NewReader(rr.Body.Bytes()))
+	require.NoError(t, err)
+	body, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	assert.JSONEq(t, exportAuditEvents, exportedPart(t, body, "auditEvents"))
+	assert.Equal(t, []int64{42}, database.reads["GetAuditLogsByUserId"])
+
+	// Nothing anywhere in the document names the administrator or the other user of the browser.
+	assert.NotContains(t, string(body), exportAdministratorSubject)
+	assert.NotContains(t, string(body), `"loggedInUserId":7`)
+	assert.NotContains(t, string(body), "previous_user_id")
+	assert.NotContains(t, string(body), "77,")
+}
+
+// A row the export must strip but cannot read as a JSON object is never sent as it is: the export
+// is the API's clean 500, and records nothing. A row it need not strip is sent as stored.
+func TestHandleUserExportGet_AnAuditRowItCannotStripIsAFiveHundred(t *testing.T) {
+	for name, row := range map[string]record.AuditLog{
+		"an administrator's": {Id: 1, AuditEvent: "updated_user_details", Details: `not json, ` + exportAdministratorSubject,
+			UserId: sql.NullInt64{Int64: 42, Valid: true}, LoggedInUserId: sql.NullInt64{Int64: 7, Valid: true}},
+		"a shared browser's": {Id: 1, AuditEvent: "cross_user_session_replaced", Details: `["previous_user_id", 77]`,
+			UserId: sql.NullInt64{Int64: 42, Valid: true}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			logtest.CaptureSlog(t)
+			database := exportDatabase()
+			database.auditLogs = []record.AuditLog{row}
+
+			rr, auditLogger := serveExport(t, database, exportRequest("42"))
+
+			assert.Equal(t, http.StatusInternalServerError, rr.Code)
+			assert.NotContains(t, rr.Body.String(), exportAdministratorSubject)
+			assert.Empty(t, auditLogger.events)
+		})
+	}
+
+	t.Run("a row of the user's own", func(t *testing.T) {
+		database := exportDatabase()
+		database.auditLogs = []record.AuditLog{{Id: 1, AuditEvent: "updated_user_profile", Details: `not json`,
+			UserId: sql.NullInt64{Int64: 42, Valid: true}, LoggedInUserId: sql.NullInt64{Int64: 42, Valid: true}}}
+
+		rr, _ := serveExport(t, database, exportRequest("42"))
+
+		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+		assert.JSONEq(t, `[{"id": 1, "createdAt": "0001-01-01T00:00:00Z", "auditEvent": "updated_user_profile",
+			"details": "not json", "requestId": "", "userId": 42, "loggedInUserId": 42, "actedByAdministrator": false}]`,
+			exportedPart(t, rr.Body.Bytes(), "auditEvents"))
+	})
 }
