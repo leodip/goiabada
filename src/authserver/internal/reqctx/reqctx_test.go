@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// present reports which of the six values ctx carries, so a test can say which it expects.
+// present reports which of the seven values ctx carries, so a test can say which it expects.
 func present(ctx context.Context) map[string]bool {
 	_, settings := SettingsFrom(ctx)
 	_, sessionIdentifier := SessionIdentifierFrom(ctx)
@@ -21,6 +21,7 @@ func present(ctx context.Context) map[string]bool {
 	_, bearer := BearerTokenFrom(ctx)
 	_, validated := ValidatedTokenFrom(ctx)
 	_, reservation := CredentialReservationFrom(ctx)
+	_, actingUserId := ActingUserIdFrom(ctx)
 	return map[string]bool{
 		"settings":          settings,
 		"sessionIdentifier": sessionIdentifier,
@@ -28,6 +29,7 @@ func present(ctx context.Context) map[string]bool {
 		"bearer":            bearer,
 		"validated":         validated,
 		"reservation":       reservation,
+		"actingUserId":      actingUserId,
 	}
 }
 
@@ -51,6 +53,12 @@ func TestReqctx_RoundTrip(t *testing.T) {
 		got, ok := SessionUserIdFrom(WithSessionUserId(ctx, 7))
 		require.True(t, ok)
 		assert.Equal(t, int64(7), got)
+	})
+
+	t.Run("acting user id", func(t *testing.T) {
+		got, ok := ActingUserIdFrom(WithActingUserId(ctx, 42))
+		require.True(t, ok)
+		assert.Equal(t, int64(42), got)
 	})
 
 	t.Run("bearer token", func(t *testing.T) {
@@ -115,8 +123,9 @@ func TestReqctx_CredentialReservationFromRefusesTypedNil(t *testing.T) {
 	assert.Nil(t, got)
 }
 
-// The two token keys hold the same type, so a writer that used the other's key would still
-// type-check and still read back as a token, from the wrong accessor.
+// The two token keys hold the same type, and so do the session's user and the acting user, so a
+// writer that used the other's key would still type-check and still read back, from the wrong
+// accessor.
 func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 	ctx := context.Background()
 	token := oauth.JwtToken{TokenBase64: "t"}
@@ -128,6 +137,7 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 		"bearer":            WithBearerToken(ctx, token),
 		"validated":         WithValidatedToken(ctx, token),
 		"reservation":       WithCredentialReservation(ctx, &CredentialReservation{}),
+		"actingUserId":      WithActingUserId(ctx, 7),
 	}
 
 	for written, writtenCtx := range cases {

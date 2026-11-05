@@ -712,6 +712,7 @@ func TestTargetCeiling_AGranularTokenWritingToAnAdministratorIsRefused(t *testin
 			assert.Equal(t, "target", refusal.details["ceiling"])
 			assert.Equal(t, c.write.kind, refusal.details["target_kind"])
 			assert.Equal(t, c.targetId(), refusal.details["target_id"])
+			assertUserIdOfAUserTarget(t, refusal.details, c.write.kind, c.targetId())
 			assert.NotContains(t, refusal.details, "permission_ids", "a target refusal names the target, not permissions")
 			assert.NotContains(t, refusal.details, "group_ids")
 		})

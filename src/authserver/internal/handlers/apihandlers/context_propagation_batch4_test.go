@@ -132,7 +132,7 @@ func TestHandleSettingsKeyDelete_MalformedIdReachesNoKeyPort(t *testing.T) {
 func TestHandleAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
+	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, record.AuditLogFilter{}).
 		Return([]record.AuditLog{{Id: 1, AuditEvent: "login"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
@@ -142,14 +142,15 @@ func TestHandleAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-// The reject arm here is not a refusal but a clamp, because this handler has no refusing branch:
-// every malformed page and size falls back to the default rather than answering 400. So what the
-// case pins is that the clamp happens BEFORE the read and that the read still carries the
-// request's context -- a size of 500 reaches the database as 20, not as 500.
+// The reject arm here is not a refusal but a clamp, because paging has no refusing branch: every
+// malformed page and size falls back to the default rather than answering 400 (only a malformed
+// userId is refused, before any read). So what the case pins is that the clamp happens BEFORE the
+// read and that the read still carries the request's context -- a size of 500 reaches the
+// database as 20, not as 500.
 func TestHandleAuditLogsGet_AnOutOfRangeSizeReachesTheDatabaseClamped(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
+	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, record.AuditLogFilter{}).
 		Return([]record.AuditLog{}, 0, nil).Once()
 
 	rr := httptest.NewRecorder()

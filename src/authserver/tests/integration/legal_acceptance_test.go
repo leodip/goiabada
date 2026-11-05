@@ -311,7 +311,7 @@ func (f *legalAcceptanceFixture) appRedirect(t *testing.T, resp *http.Response) 
 // latestAuditDetails answers the details of the latest audit event of the type, decoded, or nil.
 func latestAuditDetails(t *testing.T, eventType string) map[string]any {
 	t.Helper()
-	logs, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, eventType, "")
+	logs, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, record.AuditLogFilter{AuditEvent: eventType})
 	require.NoError(t, err)
 	if len(logs) == 0 {
 		return nil

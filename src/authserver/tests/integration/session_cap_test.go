@@ -50,6 +50,7 @@ func TestSessionCap_ASignInOverTheCapEndsTheLeastRecentlyUsedSession(t *testing.
 	assert.Len(t, sessionsThroughAdminAPI(t, f.adminToken, f.user.Id), 2)
 	assert.Equal(t, []map[string]any{{
 		"user_session_id": float64(first[0].Id),
+		"user_id":         float64(f.user.Id),
 		"logged_in_user":  "",
 		"reason":          "session_cap",
 	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))
@@ -85,6 +86,7 @@ func TestSessionCap_ExpiredSessionsGoFirst(t *testing.T) {
 	assert.NotContains(t, storedSessionIds(after), expired.Id, "the expired session is the one ended")
 	assert.Equal(t, []map[string]any{{
 		"user_session_id": float64(expired.Id),
+		"user_id":         float64(f.user.Id),
 		"logged_in_user":  "",
 		"reason":          "session_cap",
 	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))

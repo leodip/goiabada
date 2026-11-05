@@ -356,33 +356,50 @@ func TestServerRecordStatements_TheRateLimitCountersSendTheirStatementOnEveryEng
 
 // TestServerRecordStatements_TheEnginesPageTheAuditLogs holds the audit-log page to each filter it
 // is given, to its total order and to each engine's paging, with the page size and the offset each
-// bound to the clause that reads it, and the count beside it to the same filters. SQL Server's
-// page is mssqldb's own, which this package's version stands in for here.
+// bound to the clause that reads it, and the count beside it to the same filters. On SQL Server the
+// request id is also compared as bytes, in the page and the count alike, because its `=` pads
+// (#328). The user filter matches the row's user or its acting user, the id bound to each (#780).
 func TestServerRecordStatements_TheEnginesPageTheAuditLogs(t *testing.T) {
+	const (
+		byEvent     = "audit_event = 'user_created'"
+		byRequest   = "request_id = 'req-1'"
+		bytesOfReq1 = " AND CAST(request_id AS VARBINARY(512)) = CAST('req-1' AS VARBINARY(512))"
+		byUser      = "(user_id = 41 OR logged_in_user_id = 41)"
+	)
 	for _, c := range []struct {
 		name                  string
 		auditEvent, requestId string
-		where                 string
+		userId                int64
+		where, mssqlWhere     string
 	}{
-		{"no filter", "", "", ""},
-		{"by event", "user_created", "", " WHERE audit_event = 'user_created'"},
-		{"by request id", "", "req-1", " WHERE request_id = 'req-1'"},
-		{"by event and request id", "user_created", "req-1", " WHERE audit_event = 'user_created' AND request_id = 'req-1'"},
+		{"no filter", "", "", 0, "", ""},
+		{"by event", "user_created", "", 0, " WHERE " + byEvent, " WHERE " + byEvent},
+		{"by request id", "", "req-1", 0, " WHERE " + byRequest, " WHERE " + byRequest + bytesOfReq1},
+		{"by user", "", "", 41, " WHERE " + byUser, " WHERE " + byUser},
+		{"by event and request id", "user_created", "req-1", 0, " WHERE " + byEvent + " AND " + byRequest,
+			" WHERE " + byEvent + " AND " + byRequest + bytesOfReq1},
+		{"by event and user", "user_created", "", 41, " WHERE " + byEvent + " AND " + byUser,
+			" WHERE " + byEvent + " AND " + byUser},
+		{"by request id and user", "", "req-1", 41, " WHERE " + byRequest + " AND " + byUser,
+			" WHERE " + byRequest + bytesOfReq1 + " AND " + byUser},
+		{"by event, request id and user", "user_created", "req-1", 41, " WHERE " + byEvent + " AND " + byRequest + " AND " + byUser,
+			" WHERE " + byEvent + " AND " + byRequest + bytesOfReq1 + " AND " + byUser},
 	} {
 		for _, dialect := range allDialects {
-			paging := "LIMIT 10 OFFSET 20"
+			paging, where := "LIMIT 10 OFFSET 20", c.where
 			if dialect == data.MSSQL {
-				paging = "OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY"
+				paging, where = "OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY", c.mssqlWhere
 			}
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
 				assertNarrowWriteOn(t, narrowWrite{
 					run: func(ctx context.Context, d *Database) (any, error) {
-						_, _, err := d.GetAuditLogsPaginated(ctx, nil, 3, 10, c.auditEvent, c.requestId)
+						_, _, err := d.GetAuditLogsPaginated(ctx, nil, 3, 10,
+							record.AuditLogFilter{AuditEvent: c.auditEvent, RequestId: c.requestId, UserId: c.userId})
 						return nil, err
 					},
 					statements: []string{
-						"SELECT <columns> FROM audit_logs" + c.where + " ORDER BY created_at DESC, id DESC " + paging,
-						"SELECT COUNT(*) FROM audit_logs" + c.where,
+						"SELECT <columns> FROM audit_logs" + where + " ORDER BY created_at DESC, id DESC " + paging,
+						"SELECT COUNT(*) FROM audit_logs" + where,
 					},
 				}, dialect, true)
 			})

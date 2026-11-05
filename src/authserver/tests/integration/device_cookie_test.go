@@ -339,6 +339,7 @@ func TestDeviceCookie_ABrowserThatLostItsSessionCookieReplacesItsOwnSession(t *t
 
 	assert.Equal(t, []map[string]any{{
 		"user_session_id": float64(earlier[0].Id),
+		"user_id":         float64(f.user.Id),
 		"logged_in_user":  "",
 		"reason":          "same_device",
 	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))

@@ -39,11 +39,18 @@ const (
 	// the step, after the acceptances commit, with user_id, client_id (the app being signed in
 	// to), legal_document_id, short_name and version. declined_legal_documents records a decline,
 	// with user_id and client_id: nothing is stored, and the next sign-in asks again.
-	EventAcceptedLegalDocument                = "accepted_legal_document"
-	EventDeclinedLegalDocuments               = "declined_legal_documents"
+	EventAcceptedLegalDocument  = "accepted_legal_document"
+	EventDeclinedLegalDocuments = "declined_legal_documents"
+	// EventTokenIssuedAuthorizationCodeResponse records an authorization code redeemed for tokens,
+	// with code_id, and the code's user_id and client_id (#780 decision 5).
 	EventTokenIssuedAuthorizationCodeResponse = "token_issued_authorization_code_response"
 	EventTokenIssuedClientCredentialsResponse = "token_issued_client_credentials_response"
-	EventTokenIssuedRefreshTokenResponse      = "token_issued_refresh_token_response" //nolint:gosec // G101: an audit event name, not a credential
+	// EventTokenIssuedRefreshTokenResponse records a refresh token redeemed for new tokens, with
+	// refresh_token_jti, user_id and client_id, and flow: auth_code for a token an authorization
+	// code produced, which adds its code_id and takes the user and client from the code, or ropc
+	// for one the password grant produced, which takes them from the token's own row (#780
+	// decision 5).
+	EventTokenIssuedRefreshTokenResponse = "token_issued_refresh_token_response" //nolint:gosec // G101: an audit event name, not a credential
 	// EventTokenIssuedImplicitResponse is logged when tokens are issued via implicit flow.
 	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
 	EventTokenIssuedImplicitResponse = "token_issued_implicit_response"
@@ -165,8 +172,10 @@ const (
 	// EventDeletedUserSession records that a session row is gone: replaced or swept by a sign-in,
 	// ended by a handover to another user, by signing out, or by its user or an administrator.
 	//
-	// Payload: user_session_id, logged_in_user, and reason, one of the DeletedUserSession values
-	// below, which every row carries whatever site wrote it (#564 decision 7).
+	// Payload: user_session_id; user_id, the session's user, which is not always the user signing in
+	// (a handover, a same-device sweep); logged_in_user; and reason, one of the DeletedUserSession
+	// values below. Every row carries all four whatever site wrote it (#564 decision 7, #780
+	// decision 5).
 	EventDeletedUserSession         = "deleted_user_session"
 	EventUpdatedRedirectURIs        = "updated_redirect_uris"
 	EventUpdatedClientPermissions   = "updated_client_permissions"
@@ -537,8 +546,9 @@ const (
 	//
 	// Payload: logged_in_user, the token's sub; method and route, the route pattern rather than the
 	// path; ceiling, the one that refused it (grant is granting or revoking an administrative
-	// permission); target_kind and target_id, where the request has a target; and, for a grant
-	// refusal, permission_ids, the administrative permissions whose change caused it.
+	// permission); target_kind and target_id, where the request has a target, and user_id beside
+	// them when the target is a user (#780 decision 5); and, for a grant refusal, permission_ids,
+	// the administrative permissions whose change caused it.
 	EventAdministratorChangeRefused = "administrator_change_refused"
 
 	// EventAdministrativePermissionChanged records a committed change to who is an administrator:
@@ -551,11 +561,11 @@ const (
 	// 6).
 	//
 	// Payload: change, granted or revoked; target_kind and target_id, the user, group or client
-	// whose permissions changed, the user for a membership change; permission_identifiers, the
-	// administrative permissions granted or revoked, as resource:permission; group_id, for a
-	// membership change, the group joined or left; and logged_in_user, or command for the
-	// `recover` subcommand's grant (#498). A permission save writes at most one per direction, a
-	// membership change one per administrative group.
+	// whose permissions changed, the user for a membership change; user_id, when the target is a
+	// user (#780 decision 5); permission_identifiers, the administrative permissions granted or
+	// revoked, as resource:permission; group_id, for a membership change, the group joined or left;
+	// and logged_in_user, or command for the `recover` subcommand's grant (#498). A permission save
+	// writes at most one per direction, a membership change one per administrative group.
 	EventAdministrativePermissionChanged = "administrative_permission_changed"
 
 	// EventAdministrativeScopeRefused records an administrative authserver scope refused because

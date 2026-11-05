@@ -31,20 +31,30 @@ type switchesSource interface {
 	AuditSwitches(ctx context.Context) (Switches, error)
 }
 
+// actingUserSource answers the user whose access token made the request ctx belongs to, which the
+// row records as its logged_in_user_id. The production one, middleware.ActingUser, answers the user
+// the session guard put on the context once it found the token live, so recording who acted costs
+// no read (#780 decision 2); false means no user's token made the request.
+type actingUserSource interface {
+	ActingUserId(ctx context.Context) (int64, bool)
+}
+
 // auditWriteTimeout bounds the switches read and the audit insert once Log has detached them from
 // the caller's cancellation. Ten seconds, matching every other bounded wait on a dependency in
 // this repository's request path rather than introducing a value nobody chose against the others.
 const auditWriteTimeout = 10 * time.Second
 
 type Logger struct {
-	database auditDatabase
-	switches switchesSource
+	database   auditDatabase
+	switches   switchesSource
+	actingUser actingUserSource
 }
 
-func NewLogger(database auditDatabase, switches switchesSource) *Logger {
+func NewLogger(database auditDatabase, switches switchesSource, actingUser actingUserSource) *Logger {
 	return &Logger{
-		database: database,
-		switches: switches,
+		database:   database,
+		switches:   switches,
+		actingUser: actingUser,
 	}
 }
 
@@ -115,6 +125,9 @@ func (al *Logger) Log(ctx context.Context, auditEvent string, details map[string
 			// correlation has to survive (#328). An empty context yields "", which is what a row
 			// written off a request carries.
 			RequestId: logging.FieldForLog(requestid.FromContext(ctx)),
+			// The two user columns, filled here so no call site has to remember them (#780).
+			UserId:         userIdOf(details),
+			LoggedInUserId: al.loggedInUserId(ctx),
 			// CreatedAt set by CreateAuditLog
 		}
 
@@ -124,4 +137,38 @@ func (al *Logger) Log(ctx context.Context, auditEvent string, details map[string
 			// Non-blocking: do not return error to caller
 		}
 	}
+}
+
+// userIdOf is the user an event is about: its details' user_id, the one key every event about a
+// user names them by. A payload with no user_id, or one naming user 0 or below, which is no row,
+// leaves the column NULL; so does a value that is not an integer, which cannot be a row id. The
+// call sites write a user's int64 id; int is read too, so a site passing an untyped constant is
+// not silently left out of a user's filter.
+func userIdOf(details map[string]interface{}) sql.NullInt64 {
+	var userId int64
+	switch v := details["user_id"].(type) {
+	case int64:
+		userId = v
+	case int:
+		userId = int64(v)
+	default:
+		return sql.NullInt64{}
+	}
+	if userId <= 0 {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: userId, Valid: true}
+}
+
+// loggedInUserId is the user whose access token made the request, NULL when none did or when the
+// logger was built without the port.
+func (al *Logger) loggedInUserId(ctx context.Context) sql.NullInt64 {
+	if al.actingUser == nil {
+		return sql.NullInt64{}
+	}
+	userId, ok := al.actingUser.ActingUserId(ctx)
+	if !ok {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: userId, Valid: true}
 }

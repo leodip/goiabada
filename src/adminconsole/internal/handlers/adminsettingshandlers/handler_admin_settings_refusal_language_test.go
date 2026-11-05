@@ -35,7 +35,7 @@ func (*refusingSettingsApiClient) GetAuditEventTypes(context.Context, string) (*
 	panic("unexpected call to GetAuditEventTypes")
 }
 
-func (*refusingSettingsApiClient) GetAuditLogsPaginated(context.Context, string, int, int, string, string) (*api.GetAuditLogsResponse, error) {
+func (*refusingSettingsApiClient) GetAuditLogsPaginated(context.Context, string, int, int, string, string, int64) (*api.GetAuditLogsResponse, error) {
 	panic("unexpected call to GetAuditLogsPaginated")
 }
 

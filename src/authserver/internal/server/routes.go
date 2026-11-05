@@ -37,7 +37,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	pages, files, protocol, api, token, revoke, introspect := branches.pages, branches.files, branches.protocol, branches.api,
 		branches.token, branches.revoke, branches.introspect
 
-	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database))
+	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database), middleware.ActingUser{})
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
 	tokenParser := signingkeys.NewTokenParser(s.database)
 	permissionChecker := permissions.NewChecker(s.database)

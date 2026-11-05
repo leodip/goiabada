@@ -17,6 +17,8 @@ test("a user is created, shown on their page, found by search, and can sign in",
   try {
     await expect(page.getByText("User created.")).toBeVisible();
     await expect(page.getByRole("heading", { level: 1, name: email, exact: true })).toBeVisible();
+    // The id the audit log names the user by is the one in the page's address.
+    await expect(detail(page, "User id")).toHaveText(String(id));
     await expect(detail(page, "Email")).toHaveText(email);
     await expect(detail(page, "Name")).toHaveText("Ada Lovelace");
     await expect(detail(page, "Username")).toHaveText("Not set");

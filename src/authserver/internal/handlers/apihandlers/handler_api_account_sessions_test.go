@@ -81,7 +81,9 @@ func TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 			assert.Equal(t, int64(100), deletedPayload["user_session_id"])
 			assert.Equal(t, subject, deletedPayload["logged_in_user"])
 			assert.Equal(t, "ended_by_user", deletedPayload["reason"])
-			assert.Len(t, deletedPayload, 3)
+			// The session's user, which the account and admin API both hold (#780 decision 5).
+			assert.Equal(t, int64(42), deletedPayload["user_id"])
+			assert.Len(t, deletedPayload, 4)
 
 			require.NotNil(t, terminatedPayload)
 			assert.Equal(t, int64(42), terminatedPayload["user_id"])

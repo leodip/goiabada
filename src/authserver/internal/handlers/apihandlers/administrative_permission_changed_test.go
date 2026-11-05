@@ -24,6 +24,26 @@ import (
 // granted and revoked. Deleting an administrative group keeps its own record alone (#402 decision
 // 6).
 
+// withUserIdOfAUserTarget is want with the user_id a user target's record carries beside its
+// target_id, and want unchanged for a group or a client (#780 decision 5).
+func withUserIdOfAUserTarget(want map[string]interface{}, kind string, targetId int64) map[string]interface{} {
+	if kind == "user" {
+		want["user_id"] = targetId
+	}
+	return want
+}
+
+// assertUserIdOfAUserTarget holds a refusal's user_id to its target: the target's id when the
+// target is a user, and no user_id at all for any other target (#780 decision 5).
+func assertUserIdOfAUserTarget(t *testing.T, details map[string]interface{}, kind string, targetId int64) {
+	t.Helper()
+	if kind == "user" {
+		assert.Equal(t, targetId, details["user_id"], "a user target is named by user_id")
+	} else {
+		assert.NotContains(t, details, "user_id", "a %s target names no user", kind)
+	}
+}
+
 // eventNames is the events of the records, in the order they were written.
 func eventNames(records []loggedEvent) []string {
 	names := make([]string, 0, len(records))
@@ -86,20 +106,20 @@ func TestAdministrativePermissionChanged_APermissionSaveRecordsWhatItGrantsAndRe
 			want := append(save.existingEvents(3, 1), "administrative_permission_changed", "administrative_permission_changed")
 			assert.Equal(t, want, eventNames(*records), "beside the save's own records, after them, one per direction")
 			assert.Equal(t, []map[string]interface{}{
-				{
+				withUserIdOfAUserTarget(map[string]interface{}{
 					"change":                 "granted",
 					"target_kind":            save.kind,
 					"target_id":              grantOwnerId,
 					"permission_identifiers": []string{"authserver:manage", "authserver:admin-read"},
 					"logged_in_user":         grantCaller,
-				},
-				{
+				}, save.kind, grantOwnerId),
+				withUserIdOfAUserTarget(map[string]interface{}{
 					"change":                 "revoked",
 					"target_kind":            save.kind,
 					"target_id":              grantOwnerId,
 					"permission_identifiers": []string{"authserver:manage-users"},
 					"logged_in_user":         grantCaller,
-				},
+				}, save.kind, grantOwnerId),
 			}, administrativeChanges(*records))
 		})
 	}
@@ -253,6 +273,7 @@ func TestAdministrativePermissionChanged_MovingAUserThroughAnAdministrativeGroup
 				"change":                 change.change,
 				"target_kind":            "user",
 				"target_id":              ceilingMemberId,
+				"user_id":                int64(42),
 				"group_id":               administrativeGroupId,
 				"permission_identifiers": []string{"authserver:manage"},
 				"logged_in_user":         grantCaller,
@@ -325,6 +346,7 @@ func TestAdministrativePermissionChanged_AUserGroupsSaveRecordsEachAdministrativ
 			"change":                 "granted",
 			"target_kind":            "user",
 			"target_id":              ceilingMemberId,
+			"user_id":                int64(42),
 			"group_id":               administrativeGroupId,
 			"permission_identifiers": []string{"authserver:manage"},
 			"logged_in_user":         grantCaller,
@@ -333,6 +355,7 @@ func TestAdministrativePermissionChanged_AUserGroupsSaveRecordsEachAdministrativ
 			"change":                 "revoked",
 			"target_kind":            "user",
 			"target_id":              ceilingMemberId,
+			"user_id":                int64(42),
 			"group_id":               adminReadGroupId,
 			"permission_identifiers": []string{"authserver:admin-read"},
 			"logged_in_user":         grantCaller,

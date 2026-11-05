@@ -140,6 +140,9 @@ func refuseAdministratorChange(w http.ResponseWriter, r *http.Request, auditLogg
 		details["target_kind"] = refusal.targetKind
 		details["target_id"] = refusal.targetId
 	}
+	if refusal.targetKind == targetKindUser {
+		details["user_id"] = refusal.targetId
+	}
 	if refusal.permissionIds != nil {
 		details["permission_ids"] = refusal.permissionIds
 	}
@@ -234,13 +237,17 @@ func recordAdministrativePermissionChanges(r *http.Request, auditLogger AuditLog
 		if len(identifiers) == 0 {
 			continue
 		}
-		auditLogger.Log(r.Context(), audit.EventAdministrativePermissionChanged, map[string]interface{}{
+		details := map[string]interface{}{
 			"change":                 direction.change,
 			"target_kind":            targetKind,
 			"target_id":              targetId,
 			"permission_identifiers": identifiers,
 			"logged_in_user":         callerSubject(r),
-		})
+		}
+		if targetKind == targetKindUser {
+			details["user_id"] = targetId
+		}
+		auditLogger.Log(r.Context(), audit.EventAdministrativePermissionChanged, details)
 	}
 }
 
@@ -348,6 +355,7 @@ func recordMembershipChanges(r *http.Request, auditLogger AuditLogger, userId in
 			"change":                 change,
 			"target_kind":            targetKindUser,
 			"target_id":              userId,
+			"user_id":                userId,
 			"group_id":               group.id,
 			"permission_identifiers": group.identifiers,
 			"logged_in_user":         callerSubject(r),

@@ -37,6 +37,15 @@ func auditRows(t *testing.T, readerToken, event, requestId string) []map[string]
 	return rows
 }
 
+// withUserIdForAUserTarget is want with the user_id a user target's row carries beside target_id,
+// and want unchanged for a group or a client (#780 decision 5).
+func withUserIdForAUserTarget(want map[string]any, kind string, targetId int64) map[string]any {
+	if kind == "user" {
+		want["user_id"] = float64(targetId)
+	}
+	return want
+}
+
 // administrativeChangeRows is the administrative_permission_changed rows one request left.
 func administrativeChangeRows(t *testing.T, readerToken, requestId string) []map[string]any {
 	t.Helper()
@@ -62,13 +71,13 @@ func TestAdministrativePermissionChanged_GrantingAndRevokingAnAdministrativePerm
 
 			rows := administrativeChangeRows(t, manageToken, requestId)
 			require.Len(t, rows, 1, "one row for the grant")
-			assert.Equal(t, map[string]any{
+			assert.Equal(t, withUserIdForAUserTarget(map[string]any{
 				"change":                 "granted",
 				"target_kind":            target.kind,
 				"target_id":              float64(targetId),
 				"permission_identifiers": []any{"authserver:manage", "authserver:manage-clients"},
 				"logged_in_user":         manageClient.ClientIdentifier,
-			}, rows[0])
+			}, target.kind, targetId), rows[0])
 
 			// Revoking manage and keeping the rest.
 			resp, requestId = putPermissions(t, manageToken, target.path(targetId),
@@ -78,13 +87,13 @@ func TestAdministrativePermissionChanged_GrantingAndRevokingAnAdministrativePerm
 
 			rows = administrativeChangeRows(t, manageToken, requestId)
 			require.Len(t, rows, 1, "one row for the revocation")
-			assert.Equal(t, map[string]any{
+			assert.Equal(t, withUserIdForAUserTarget(map[string]any{
 				"change":                 "revoked",
 				"target_kind":            target.kind,
 				"target_id":              float64(targetId),
 				"permission_identifiers": []any{"authserver:manage"},
 				"logged_in_user":         manageClient.ClientIdentifier,
-			}, rows[0])
+			}, target.kind, targetId), rows[0])
 		})
 	}
 }
@@ -219,6 +228,7 @@ func TestAdministrativePermissionChanged_MovingAUserThroughAnAdministrativeGroup
 				"change":                 change[membership.name],
 				"target_kind":            "user",
 				"target_id":              float64(userId),
+				"user_id":                float64(userId),
 				"group_id":               float64(groupId),
 				"permission_identifiers": []any{"authserver:manage-users"},
 				"logged_in_user":         manageClient.ClientIdentifier,

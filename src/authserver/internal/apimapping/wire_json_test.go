@@ -755,13 +755,19 @@ func TestWireJSON_ClientSessionsEnvelope(t *testing.T) {
 // The one difference from the string era is deliberate: the hand-rolled layout
 // had no fractional seconds and truncated them, where the marshaller emits
 // whatever the instant carries. The second case is that, written down.
+//
+// userId and loggedInUserId are pointers with no omitempty: a row naming no user answers both
+// as null rather than leaving the keys out, as the second case shows (#780 decision 6).
 func TestWireJSON_AuditLogFamily(t *testing.T) {
+	aboutUser, actingUser := int64(42), int64(7)
 	entry := api.AuditLogResponse{
 		Id: 1, CreatedAt: wireCreated, AuditEvent: "user_login",
 		Details: `{"email":"alice@example.com"}`, RequestId: "host/Ppg6bHPK5f-000012",
+		UserId: &aboutUser, LoggedInUserId: &actingUser,
 	}
 	entryJSON := `{"id":1,"createdAt":"2026-09-16T10:00:00Z","auditEvent":"user_login",` +
-		`"details":"{\"email\":\"alice@example.com\"}","requestId":"host/Ppg6bHPK5f-000012"}`
+		`"details":"{\"email\":\"alice@example.com\"}","requestId":"host/Ppg6bHPK5f-000012",` +
+		`"userId":42,"loggedInUserId":7}`
 
 	runWireCases(t, []wireCase{
 		{
@@ -778,7 +784,7 @@ func TestWireJSON_AuditLogFamily(t *testing.T) {
 				Id: 2, CreatedAt: wireCreated.Add(1500 * time.Millisecond), AuditEvent: "user_login",
 			},
 			literal: `{"id":2,"createdAt":"2026-09-16T10:00:01.5Z","auditEvent":"user_login",` +
-				`"details":"","requestId":""}`,
+				`"details":"","requestId":"","userId":null,"loggedInUserId":null}`,
 		},
 		{
 			name: "GetAuditLogsResponse",

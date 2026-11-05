@@ -428,6 +428,7 @@
 "adminconsole.user_tabs.permissions" = "Berechtigungen"
 "adminconsole.user_tabs.groups" = "Gruppen"
 "adminconsole.user_tabs.legal_documents" = "Rechtsdokumente"
+"adminconsole.user_header.audit_events_link" = "Audit-Ereignisse anzeigen"
 
 # --- Adminconsole standalone pages (error, not-found, unauthorized, welcome) -
 
@@ -489,6 +490,7 @@
 "adminconsole.refusal.settings_tokens.offline_idle_timeout_invalid" = "Geben Sie das Offline-Inaktivitätslimit in ganzen Sekunden ein."
 "adminconsole.refusal.settings_tokens.offline_max_lifetime_invalid" = "Geben Sie die maximale Offline-Gültigkeitsdauer in ganzen Sekunden ein."
 "adminconsole.refusal.settings_audit_logs.retention_days_invalid" = "Geben Sie die Aufbewahrungsdauer in ganzen Tagen ein."
+"adminconsole.refusal.audit_log_viewer.user_id_invalid" = "Geben Sie die Benutzer-ID als ganze Zahl größer als 0 ein."
 "adminconsole.refusal.settings_email.port_invalid" = "Geben Sie den Port als ganze Zahl ein."
 "adminconsole.refusal.user_new.email_required" = "Die E-Mail-Adresse darf nicht leer sein."
 "adminconsole.refusal.user_delete.email_required" = "Geben Sie zur Bestätigung die E-Mail-Adresse des Kontos ein."
@@ -1078,6 +1080,7 @@
 "adminconsole.admin_users.delete.field.confirm_email" = "Geben Sie zur Bestätigung die E-Mail-Adresse des Kontos ein"
 "adminconsole.admin_users.delete.delete_button" = "Konto löschen"
 
+"adminconsole.admin_users.details.field.user_id" = "Benutzer-ID"
 "adminconsole.admin_users.details.field.subject" = "Subject"
 "adminconsole.admin_users.details.field.full_name" = "Name"
 "adminconsole.admin_users.details.field.email" = "E-Mail-Adresse"
@@ -1781,6 +1784,10 @@
 "adminconsole.admin_settings.audit_log_viewer.col_event" = "Ereignis"
 "adminconsole.admin_settings.audit_log_viewer.col_request_id" = "Anfrage-ID"
 "adminconsole.admin_settings.audit_log_viewer.request_events_link" = "alle Ereignisse dieser Anfrage anzeigen"
+"adminconsole.admin_settings.audit_log_viewer.col_user_id" = "Benutzer-ID"
+"adminconsole.admin_settings.audit_log_viewer.row_user" = "Benutzer"
+"adminconsole.admin_settings.audit_log_viewer.row_acted_by" = "Ausgeführt von"
+"adminconsole.admin_settings.audit_log_viewer.user_events_link" = "alle Ereignisse über diesen Benutzer oder von ihm anzeigen"
 "adminconsole.admin_settings.audit_log_viewer.col_details" = "Details"
 "adminconsole.admin_settings.audit_log_viewer.no_details" = "Keine"
 "adminconsole.admin_settings.audit_log_viewer.empty" = "Noch keine Audit-Ereignisse vorhanden."

@@ -24,7 +24,7 @@ import (
 // it filters by, and the page of records.
 type settingsAuditLogsAPI interface {
 	GetAuditEventTypes(ctx context.Context, accessToken string) (*api.GetAuditEventTypesResponse, error)
-	GetAuditLogsPaginated(ctx context.Context, accessToken string, page, pageSize int, auditEvent string, requestId string) (*api.GetAuditLogsResponse, error)
+	GetAuditLogsPaginated(ctx context.Context, accessToken string, page, pageSize int, auditEvent string, requestId string, userId int64) (*api.GetAuditLogsResponse, error)
 	GetSettingsAuditLogs(ctx context.Context, accessToken string) (*api.SettingsAuditLogsResponse, error)
 	UpdateSettingsAuditLogs(ctx context.Context, accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error)
 }
@@ -175,27 +175,36 @@ func HandleAuditLogViewerGet(
 		pageStr := r.URL.Query().Get("page")
 		auditEvent := r.URL.Query().Get("auditEvent")
 		requestId := strings.TrimSpace(r.URL.Query().Get("requestId"))
+		userIdText := strings.TrimSpace(r.URL.Query().Get("userId"))
 
 		pageInt := pagination.ParsePage(pageStr)
 
 		const pageSize = 20
 
-		// Fetch audit logs
-		auditLogsResp, err := apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
-		if err != nil {
-			render.HandleAPIError(httpHelper, w, r, err)
-			return
-		}
+		// The User id box holds a user's row id. A value that is not one is the box's error, and
+		// no page is asked for: listing every user's events under a filter the administrator
+		// believes is set would answer the wrong question (#780, decision 8).
+		userId, userIdOk := auditLogUserId(userIdText)
 
-		// A page past the last one is only visible once the total has come back.
-		// Ask again at the last page rather than render an empty list under a bar
-		// that highlights a full one (#305).
-		if clamped := pagination.ClampPage(auditLogsResp.Total, pageSize, pageInt); clamped != pageInt {
-			pageInt = clamped
-			auditLogsResp, err = apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
+		auditLogsResp := &api.GetAuditLogsResponse{}
+		if userIdOk {
+			var err error
+			auditLogsResp, err = apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId, userId)
 			if err != nil {
 				render.HandleAPIError(httpHelper, w, r, err)
 				return
+			}
+
+			// A page past the last one is only visible once the total has come back.
+			// Ask again at the last page rather than render an empty list under a bar
+			// that highlights a full one (#305).
+			if clamped := pagination.ClampPage(auditLogsResp.Total, pageSize, pageInt); clamped != pageInt {
+				pageInt = clamped
+				auditLogsResp, err = apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId, userId)
+				if err != nil {
+					render.HandleAPIError(httpHelper, w, r, err)
+					return
+				}
 			}
 		}
 
@@ -231,6 +240,7 @@ func HandleAuditLogViewerGet(
 			PageSize:   pageSize,
 			AuditEvent: auditEvent,
 			RequestId:  requestId,
+			UserId:     userIdText,
 		}
 
 		p := pagination.New(auditLogsResp.Total, pageSize, pageInt, 5)
@@ -240,9 +250,14 @@ func HandleAuditLogViewerGet(
 			"paginator":           p,
 			"selectedEvent":       auditEvent,
 			"selectedRequestId":   requestId,
-			"paginatorLink":       auditLogViewerLink(auditEvent, requestId),
+			"selectedUserId":      userIdText,
+			"paginatorLink":       auditLogViewerLink(auditEvent, requestId, userId),
 			"auditEventTypes":     eventTypesResp.AuditEventTypes,
 			"auditLogsInDatabase": settingsResp.AuditLogsInDatabaseEnabled,
+		}
+		if !userIdOk {
+			bind["error"] = i18n.T(r.Context(), "adminconsole.refusal.audit_log_viewer.user_id_invalid")
+			bind["errorField"] = "userId"
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html", bind)
@@ -253,12 +268,26 @@ func HandleAuditLogViewerGet(
 	}
 }
 
+// auditLogUserId reads the User id box: empty is no filter, answered as 0 and ok; a positive
+// decimal row id is that id; anything else, 0 included, is not ok. It accepts what the admin API's
+// userId parameter accepts, so the console never sends a value the API refuses.
+func auditLogUserId(text string) (int64, bool) {
+	if text == "" {
+		return 0, true
+	}
+	id, err := strconv.ParseInt(text, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
+}
+
 // auditLogViewerLink is the base URL the paginator appends "page" to, carrying whichever filters
-// are set. It is built here rather than with printf in the template because a request id is
+// are set, the user's when userId is above 0. It is built here rather than with printf in the template because a request id is
 // client-chosen: one holding an "&" pasted into a URL string splits into a second parameter when
 // addUrlParam parses it, so "?requestId=x&page=9" would put page=9 in front of every page link and
 // the handler would read that one. url.Values escapes it once (#328).
-func auditLogViewerLink(auditEvent string, requestId string) string {
+func auditLogViewerLink(auditEvent string, requestId string, userId int64) string {
 	const path = "/admin/settings/audit-log-viewer"
 
 	query := url.Values{}
@@ -267,6 +296,9 @@ func auditLogViewerLink(auditEvent string, requestId string) string {
 	}
 	if requestId != "" {
 		query.Set("requestId", requestId)
+	}
+	if userId > 0 {
+		query.Set("userId", strconv.FormatInt(userId, 10))
 	}
 	if len(query) == 0 {
 		return path

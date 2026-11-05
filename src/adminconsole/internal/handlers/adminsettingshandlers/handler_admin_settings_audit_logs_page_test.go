@@ -36,6 +36,8 @@ type auditPagingApiClient struct {
 	events []string
 	// requestIds records the same for the request id filter (#328).
 	requestIds []string
+	// userIds records the same for the user filter, 0 for none (#780).
+	userIds []int64
 	// eventTypes is the catalog the auth server answers with, and eventTypesErr the
 	// refusal it answers with instead. The viewer fetches the dropdown's options over
 	// the API rather than compiling them in (#351).
@@ -44,11 +46,12 @@ type auditPagingApiClient struct {
 }
 
 func (c *auditPagingApiClient) GetAuditLogsPaginated(_ context.Context, accessToken string, page, pageSize int,
-	auditEvent string, requestId string) (*api.GetAuditLogsResponse, error) {
+	auditEvent string, requestId string, userId int64) (*api.GetAuditLogsResponse, error) {
 
 	c.asked = append(c.asked, page)
 	c.events = append(c.events, auditEvent)
 	c.requestIds = append(c.requestIds, requestId)
+	c.userIds = append(c.userIds, userId)
 
 	return &api.GetAuditLogsResponse{
 		AuditLogs: logsOnPage(c.total, page, pageSize),
@@ -368,7 +371,7 @@ func TestAuditLogViewerLink(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			link := auditLogViewerLink(tc.auditEvent, tc.requestId)
+			link := auditLogViewerLink(tc.auditEvent, tc.requestId, 0)
 			assert.Equal(t, tc.want, link)
 
 			// What the paginator then does with it: the page number must be the
@@ -484,4 +487,98 @@ func TestAuditLogDetails(t *testing.T) {
 			assert.Equal(t, tc.pairs, pairs)
 		})
 	}
+}
+
+// TestHandleAuditLogViewerGet_TheUserIdFilterReachesTheApiAndThePage is the console half of
+// decision 8 (#780): the User id box is read here, handed to the API as a row id, put back in the
+// box, and carried in the paginator's link beside the other two filters.
+func TestHandleAuditLogViewerGet_TheUserIdFilterReachesTheApiAndThePage(t *testing.T) {
+	testCases := []struct {
+		name       string
+		rawQuery   string
+		wantUserId int64
+		wantBox    string
+		wantLink   string
+	}{
+		{
+			name:     "no user filter",
+			rawQuery: "page=1",
+			wantLink: "/admin/settings/audit-log-viewer",
+		},
+		{
+			name:     "the user id alone",
+			rawQuery: "userId=42", wantUserId: 42, wantBox: "42",
+			wantLink: "/admin/settings/audit-log-viewer?userId=42",
+		},
+		{
+			name:     "an empty box is no filter",
+			rawQuery: "userId=", wantBox: "",
+			wantLink: "/admin/settings/audit-log-viewer",
+		},
+		{
+			// A pasted id often brings a space with it, as a request id does.
+			name:     "spaces around the id",
+			rawQuery: "userId=%2042%20", wantUserId: 42, wantBox: "42",
+			wantLink: "/admin/settings/audit-log-viewer?userId=42",
+		},
+		{
+			name:     "all three filters",
+			rawQuery: "auditEvent=user_login&requestId=x%26page%3D9&userId=7", wantUserId: 7, wantBox: "7",
+			wantLink: "/admin/settings/audit-log-viewer?auditEvent=user_login&requestId=x%26page%3D9&userId=7",
+		},
+		{
+			name:     "the largest row id",
+			rawQuery: "userId=9223372036854775807", wantUserId: 9223372036854775807, wantBox: "9223372036854775807",
+			wantLink: "/admin/settings/audit-log-viewer?userId=9223372036854775807",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			bind, apiClient := renderAuditLogsWithQuery(t, tc.rawQuery, 50)
+
+			assert.Equal(t, []int64{tc.wantUserId}, apiClient.userIds, "the user id the API was asked for")
+			assert.Equal(t, tc.wantBox, bind["selectedUserId"], "selectedUserId")
+			assert.Equal(t, tc.wantLink, bind["paginatorLink"], "paginatorLink")
+			assert.Nil(t, bind["error"], "a usable id is no error")
+		})
+	}
+}
+
+// The clamp repeats the whole call, as for the other two filters: one that forgot the user would
+// page through every user's events while the box still showed an id.
+func TestHandleAuditLogViewerGet_TheUserIdFilterSurvivesTheSecondQuery(t *testing.T) {
+	_, apiClient := renderAuditLogsWithQuery(t, "page=99&userId=42", 50)
+
+	require.Len(t, apiClient.asked, 2, "the clamp should have cost a second query")
+	assert.Equal(t, []int64{42, 42}, apiClient.userIds, "the user filter was dropped on the way")
+}
+
+// A User id that is not a positive whole number is the box's error, on the page: never an error
+// page, and never the unfiltered log, which would list every user's events under a filter the
+// administrator believes is set (decision 3). The value stays in the box, so it can be corrected.
+func TestHandleAuditLogViewerGet_AUserIdThatIsNoPositiveNumberIsTheBoxsError(t *testing.T) {
+	for _, raw := range []string{"abc", "0", "-3", "4.5", "1e3", "0x2A", "9223372036854775808", "42abc"} {
+		t.Run(raw, func(t *testing.T) {
+			bind, apiClient := renderAuditLogsWithQuery(t, "auditEvent=user_login&userId="+url.QueryEscape(raw), 50)
+
+			assert.Empty(t, apiClient.asked, "no page of events was asked for")
+			assert.Equal(t, "Enter the user id as a whole number above 0.", bind["error"])
+			assert.Equal(t, "userId", bind["errorField"])
+			assert.Equal(t, raw, bind["selectedUserId"], "the box keeps what was typed")
+			assert.Equal(t, "user_login", bind["selectedEvent"], "the other filters stay as they were")
+
+			result, ok := bind["pageResult"].(AuditLogsPageResult)
+			require.True(t, ok, "pageResult")
+			assert.Empty(t, result.Rows, "no rows are listed under a filter that is not set")
+		})
+	}
+}
+
+func TestAuditLogViewerLink_CarriesTheUserId(t *testing.T) {
+	assert.Equal(t, "/admin/settings/audit-log-viewer?userId=42", auditLogViewerLink("", "", 42))
+	assert.Equal(t, "/admin/settings/audit-log-viewer?auditEvent=user_login&requestId=an-id&userId=7",
+		auditLogViewerLink("user_login", "an-id", 7))
+	assert.Equal(t, "/admin/settings/audit-log-viewer?auditEvent=user_login", auditLogViewerLink("user_login", "", 0),
+		"0 is no user filter")
 }

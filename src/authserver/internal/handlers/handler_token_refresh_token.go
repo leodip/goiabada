@@ -82,6 +82,8 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 		}
 		tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
 			"code_id":           refreshToken.Code.Id,
+			"user_id":           refreshToken.Code.UserId,
+			"client_id":         refreshToken.Code.ClientId,
 			"refresh_token_jti": refreshToken.RefreshTokenJti,
 			"flow":              "auth_code",
 		})

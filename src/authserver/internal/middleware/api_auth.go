@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -129,6 +130,9 @@ func (m *BearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 // check finds no user to check anything about. The middleware also passes through when the request has no bearer token at all, since
 // enforcing "must be authenticated" belongs to a scope middleware running alongside this one.
 //
+// A live user's token puts that user's id on the context with reqctx.WithActingUserId, the user
+// the check has just read, so the audit logger records who acted without reading the user again.
+//
 // Reads reqctx.BearerTokenFrom (set by JwtAuthorizationHeaderToContext),
 // not reqctx.ValidatedTokenFrom, so it works regardless of whether a scope
 // middleware ran first.
@@ -160,6 +164,12 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 			sid := verdict.SessionIdentifier
 			switch verdict.Refusal {
 			case liveness.Live:
+				// The user the check found is the one whose token made the request, which the
+				// audit logger records as its logged_in_user_id; a client credentials token has
+				// none (#780 decision 2).
+				if verdict.User != nil {
+					r = r.WithContext(reqctx.WithActingUserId(r.Context(), verdict.User.Id))
+				}
 				next.ServeHTTP(w, r)
 				return
 			case liveness.NotAnAccessTokenHeader:
@@ -224,4 +234,15 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 			m.refusals.invalidToken(w, r, "Session has been terminated")
 		})
 	}
+}
+
+// ActingUser answers the audit logger's acting user: the user whose token RequireValidSession
+// found live, read off the context it wrote. It sits beside that guard because it reads what the
+// guard wrote, as AuditSwitches sits beside Settings, and it is the logger's port so the audit
+// package reads nothing off a context itself (#433). A request the guard never ran for, a browser
+// sign-in, the recover command and a client credentials token answer none (#780 decision 2).
+type ActingUser struct{}
+
+func (ActingUser) ActingUserId(ctx context.Context) (int64, bool) {
+	return reqctx.ActingUserIdFrom(ctx)
 }

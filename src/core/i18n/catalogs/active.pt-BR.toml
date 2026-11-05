@@ -407,6 +407,7 @@
 "adminconsole.user_tabs.permissions" = "Permissões"
 "adminconsole.user_tabs.groups" = "Grupos"
 "adminconsole.user_tabs.legal_documents" = "Documentos legais"
+"adminconsole.user_header.audit_events_link" = "Mostrar eventos de auditoria"
 
 # --- Páginas isoladas da adminconsole ---------------------------------------
 
@@ -458,6 +459,7 @@
 "adminconsole.refusal.settings_tokens.offline_idle_timeout_invalid" = "Informe o tempo ocioso offline como um número inteiro de segundos."
 "adminconsole.refusal.settings_tokens.offline_max_lifetime_invalid" = "Informe a duração máxima offline como um número inteiro de segundos."
 "adminconsole.refusal.settings_audit_logs.retention_days_invalid" = "Informe a retenção como um número inteiro de dias."
+"adminconsole.refusal.audit_log_viewer.user_id_invalid" = "Informe o id do usuário como um número inteiro maior que 0."
 "adminconsole.refusal.settings_email.port_invalid" = "Informe a porta como um número inteiro."
 "adminconsole.refusal.user_new.email_required" = "O endereço de e-mail não pode ficar vazio."
 "adminconsole.refusal.user_delete.email_required" = "Digite o e-mail do usuário para confirmar."
@@ -1020,6 +1022,7 @@
 "adminconsole.admin_users.delete.field.confirm_email" = "Para confirmar, digite o e-mail do usuário"
 "adminconsole.admin_users.delete.delete_button" = "Excluir usuário"
 
+"adminconsole.admin_users.details.field.user_id" = "Id do usuário"
 "adminconsole.admin_users.details.field.subject" = "Subject"
 "adminconsole.admin_users.details.field.full_name" = "Nome"
 "adminconsole.admin_users.details.field.email" = "E-mail"
@@ -1711,6 +1714,10 @@
 "adminconsole.admin_settings.audit_log_viewer.col_event" = "Evento"
 "adminconsole.admin_settings.audit_log_viewer.col_request_id" = "Id da requisição"
 "adminconsole.admin_settings.audit_log_viewer.request_events_link" = "mostrar todos os eventos desta requisição"
+"adminconsole.admin_settings.audit_log_viewer.col_user_id" = "Id do usuário"
+"adminconsole.admin_settings.audit_log_viewer.row_user" = "Usuário"
+"adminconsole.admin_settings.audit_log_viewer.row_acted_by" = "Feito por"
+"adminconsole.admin_settings.audit_log_viewer.user_events_link" = "mostrar todos os eventos sobre este usuário ou feitos por ele"
 "adminconsole.admin_settings.audit_log_viewer.col_details" = "Detalhes"
 "adminconsole.admin_settings.audit_log_viewer.no_details" = "Nenhum"
 "adminconsole.admin_settings.audit_log_viewer.empty" = "Nenhum evento de auditoria ainda."

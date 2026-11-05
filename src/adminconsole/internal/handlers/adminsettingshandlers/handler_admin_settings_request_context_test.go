@@ -47,7 +47,7 @@ func (s *ctxRecordingApiClient) UpdateSettingsAuditLogs(ctx context.Context, _ s
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAuditLogsPaginated(ctx context.Context, _ string, _, _ int, _, _ string) (*api.GetAuditLogsResponse, error) {
+func (s *ctxRecordingApiClient) GetAuditLogsPaginated(ctx context.Context, _ string, _, _ int, _, _ string, _ int64) (*api.GetAuditLogsResponse, error) {
 	return nil, s.record(ctx)
 }
 

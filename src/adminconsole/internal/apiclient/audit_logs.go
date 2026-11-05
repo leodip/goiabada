@@ -29,7 +29,7 @@ func (c *AuthServerClient) UpdateSettingsAuditLogs(ctx context.Context, accessTo
 }
 
 func (c *AuthServerClient) GetAuditLogsPaginated(ctx context.Context, accessToken string, page, pageSize int, auditEvent string,
-	requestId string) (*api.GetAuditLogsResponse, error) {
+	requestId string, userId int64) (*api.GetAuditLogsResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/audit-logs?page=%d&size=%d", c.baseURL, page, pageSize)
 	// Both filters are escaped. The request id is whatever the client put in X-Request-Id, so it
 	// can carry an & or a # and would otherwise be read as another parameter or truncate the
@@ -40,6 +40,10 @@ func (c *AuthServerClient) GetAuditLogsPaginated(ctx context.Context, accessToke
 	}
 	if requestId != "" {
 		fullURL += fmt.Sprintf("&requestId=%s", url.QueryEscape(requestId))
+	}
+	// The user filter is a row id; 0 is none, and the API reads a missing parameter as none.
+	if userId > 0 {
+		fullURL += fmt.Sprintf("&userId=%d", userId)
 	}
 
 	return execute[api.GetAuditLogsResponse](ctx, c, accessToken, apiRequest{

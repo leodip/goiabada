@@ -23,20 +23,25 @@ func TestGetAuditLogsPaginated_BothFiltersReachTheServerEscaped(t *testing.T) {
 		name       string
 		auditEvent string
 		requestId  string
+		userId     int64
+		wantUserId string
 	}{
-		{"neither", "", ""},
-		{"the event alone", "user_login", ""},
-		{"the id alone", "", "host/Ppg6bHPK5f-000012"},
-		{"both", "user_login", "host/Ppg6bHPK5f-000012"},
-		{"an id carrying a query separator", "", "x&page=9"},
-		{"an id carrying a fragment marker", "", "x#y"},
-		{"an id carrying a space and a plus", "", "x +y"},
-		{"an id carrying a quote and a tag", "", `"><script>`},
-		{"an id that is only an equals sign", "", "="},
+		{"neither", "", "", 0, ""},
+		{"the event alone", "user_login", "", 0, ""},
+		{"the id alone", "", "host/Ppg6bHPK5f-000012", 0, ""},
+		{"both", "user_login", "host/Ppg6bHPK5f-000012", 0, ""},
+		{"an id carrying a query separator", "", "x&page=9", 0, ""},
+		{"an id carrying a fragment marker", "", "x#y", 0, ""},
+		{"an id carrying a space and a plus", "", "x +y", 0, ""},
+		{"an id carrying a quote and a tag", "", `"><script>`, 0, ""},
+		{"an id that is only an equals sign", "", "=", 0, ""},
 		// auditEvent's values come from a fixed list, so nothing can get a separator
 		// into it today. The case exists so the escaping added beside requestId's is
 		// held by something rather than resting on that argument staying true.
-		{"an event carrying a query separator", "a&page=9", ""},
+		{"an event carrying a query separator", "a&page=9", "", 0, ""},
+		// The user filter is a row id, sent in decimal; 0 is no filter (#780).
+		{"the user alone", "", "", 42, "42"},
+		{"all three", "user_login", "x&page=9", 9007199254740993, "9007199254740993"},
 	}
 
 	for _, tc := range testCases {
@@ -53,7 +58,7 @@ func TestGetAuditLogsPaginated_BothFiltersReachTheServerEscaped(t *testing.T) {
 			defer server.Close()
 
 			client := NewAuthServerClient(server.URL, nil, nil)
-			resp, err := client.GetAuditLogsPaginated(context.Background(), "an-access-token", 1, 20, tc.auditEvent, tc.requestId)
+			resp, err := client.GetAuditLogsPaginated(context.Background(), "an-access-token", 1, 20, tc.auditEvent, tc.requestId, tc.userId)
 			require.NoError(t, err)
 			require.NotNil(t, resp)
 
@@ -66,6 +71,8 @@ func TestGetAuditLogsPaginated_BothFiltersReachTheServerEscaped(t *testing.T) {
 			assert.Equal(t, tc.auditEvent, got.Get("auditEvent"), "the event did not survive the URL")
 			assert.LessOrEqual(t, len(got["requestId"]), 1, "requestId arrived more than once")
 			assert.LessOrEqual(t, len(got["auditEvent"]), 1, "auditEvent arrived more than once")
+			assert.Equal(t, tc.wantUserId, got.Get("userId"), "the user id did not reach the server")
+			assert.LessOrEqual(t, len(got["userId"]), 1, "userId arrived more than once")
 
 			// An empty filter is absent rather than present and empty, which is what the
 			// API reads as "no filter" either way but is what the URL says today.
@@ -75,10 +82,13 @@ func TestGetAuditLogsPaginated_BothFiltersReachTheServerEscaped(t *testing.T) {
 			if tc.auditEvent == "" {
 				assert.Empty(t, got["auditEvent"], "an empty event was still sent")
 			}
+			if tc.userId == 0 {
+				assert.Empty(t, got["userId"], "no user filter was still sent as one")
+			}
 
 			// Nothing the id carried became another parameter.
 			for key := range got {
-				assert.Contains(t, []string{"page", "size", "auditEvent", "requestId"}, key,
+				assert.Contains(t, []string{"page", "size", "auditEvent", "requestId", "userId"}, key,
 					"an unexpected parameter %q reached the server", key)
 			}
 		})

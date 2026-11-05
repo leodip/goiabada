@@ -358,12 +358,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// revocation.TerminateUserSessionTx writes. Without it a handover is the one termination a consumer
 		// watching that stream never sees. Its loggedInUser is empty for the same reason.
 		assert.Equal(t, int64(7), deletedPayload["user_session_id"])
+		// The session's user, the one handed over from, not the user signing in (#780 decision 5).
+		assert.Equal(t, int64(1), deletedPayload["user_id"])
 		assert.Contains(t, deletedPayload, "logged_in_user")
 		assert.Empty(t, deletedPayload["logged_in_user"])
 		// And why it went, which is what tells this deletion from a sign-in's own sweep in the
 		// lifecycle stream without correlating it with the event above (#564 decision 7).
 		assert.Equal(t, "replaced_by_other_user", deletedPayload["reason"])
-		assert.Len(t, deletedPayload, 3)
+		assert.Len(t, deletedPayload, 4)
 
 		// No audit event before the commit, and the reason before the replacement. An event
 		// written before the transaction commits would attest to a termination that could still
@@ -597,6 +599,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(1).(string)) }
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
 			"user_session_id": int64(7),
+			"user_id":         int64(1),
 			"logged_in_user":  "",
 			"reason":          "replaced_by_sign_in",
 		}).Run(recordEvent).Return().Once()
@@ -665,7 +668,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			name: "a replacement failure after the commit audits the rows it removed and answers 500",
 			removed: []usersession.Removal{
 				{Session: record.UserSession{Id: 7, UserId: 1}, Reason: "replaced_by_sign_in"},
-				{Session: record.UserSession{Id: 9, UserId: 1}, Reason: "same_device"},
+				// Another user's session on the same device: the event names its own user, not the
+				// one signing in (#780 decision 5).
+				{Session: record.UserSession{Id: 9, UserId: 5}, Reason: "same_device"},
 			},
 			events: []string{audit.EventDeletedUserSession, audit.EventDeletedUserSession},
 		},
@@ -729,12 +734,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			var events []string
 			var auditedIds []int64
 			var auditedReasons []interface{}
+			var auditedUserIds []interface{}
 			var answered bool
 			auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything).Run(func(args mock.Arguments) {
 				assert.False(t, answered, "every removal is audited before the 500 is written")
 				events = append(events, args.Get(1).(string))
 				auditedIds = append(auditedIds, args.Get(2).(map[string]interface{})["user_session_id"].(int64))
 				auditedReasons = append(auditedReasons, args.Get(2).(map[string]interface{})["reason"])
+				auditedUserIds = append(auditedUserIds, args.Get(2).(map[string]interface{})["user_id"])
 			}).Return().Maybe()
 
 			startError := errors.New("unable to rotate the browser session identifier")
@@ -768,6 +775,11 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			}
 			assert.Equal(t, wantIds, auditedIds)
 			assert.Equal(t, wantReasons, auditedReasons, "each event carries the reason its removal was reported with")
+			if tc.removed != nil {
+				assert.Equal(t, []interface{}{int64(1), int64(5)}, auditedUserIds, "each event names its own session's user")
+			} else {
+				assert.Nil(t, auditedUserIds)
+			}
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything)
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			noDeviceCookieIn(t, rr)
@@ -3678,6 +3690,7 @@ func expectForeignSessionEnded(ceremonyStore *handlersmocks.CeremonyStore, datab
 	}).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
 		"user_session_id": foreignSession.Id,
+		"user_id":         foreignSession.UserId,
 		"logged_in_user":  "",
 		"reason":          audit.DeletedUserSessionReplacedByOtherUser,
 	}).Return().Once()

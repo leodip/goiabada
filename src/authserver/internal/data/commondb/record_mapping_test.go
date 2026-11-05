@@ -869,23 +869,28 @@ func keyPairMapping() mappingCase {
 // auditLogMapping has no update: an audit log is written once and never rewritten. Its page is
 // read with each combination of filters, since each is its own statement.
 func auditLogMapping() mappingCase {
-	page := func(auditEvent, requestId string) func(ctx context.Context, d *Database) (any, error) {
+	page := func(filter record.AuditLogFilter) func(ctx context.Context, d *Database) (any, error) {
 		return func(ctx context.Context, d *Database) (any, error) {
-			logs, _, err := d.GetAuditLogsPaginated(ctx, nil, 2, 10, auditEvent, requestId)
+			logs, _, err := d.GetAuditLogsPaginated(ctx, nil, 2, 10, filter)
 			return firstOf(logs, err)
 		}
 	}
-	// The distinct values the row carries, so the request-id guard keeps it.
-	event, request := distinctString("audit_event"), distinctString("request_id")
+	// The distinct values the row carries, so the request-id guard keeps it. The user filter has
+	// no guard after the scan, so any id reads the row the driver answers.
+	event, request, user := distinctString("audit_event"), distinctString("request_id"), int64(41)
 	return mappingCase{
 		name:   "audit log",
 		table:  "audit_logs",
 		record: reflect.TypeOf(record.AuditLog{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetAuditLogsPaginated":                      page("", ""),
-			"GetAuditLogsPaginated by event":             page(event, ""),
-			"GetAuditLogsPaginated by request id":        page("", request),
-			"GetAuditLogsPaginated by event and request": page(event, request),
+			"GetAuditLogsPaginated":                      page(record.AuditLogFilter{}),
+			"GetAuditLogsPaginated by event":             page(record.AuditLogFilter{AuditEvent: event}),
+			"GetAuditLogsPaginated by request id":        page(record.AuditLogFilter{RequestId: request}),
+			"GetAuditLogsPaginated by user":              page(record.AuditLogFilter{UserId: user}),
+			"GetAuditLogsPaginated by event and request": page(record.AuditLogFilter{AuditEvent: event, RequestId: request}),
+			"GetAuditLogsPaginated by event and user":    page(record.AuditLogFilter{AuditEvent: event, UserId: user}),
+			"GetAuditLogsPaginated by request and user":  page(record.AuditLogFilter{RequestId: request, UserId: user}),
+			"GetAuditLogsPaginated by all three":         page(record.AuditLogFilter{AuditEvent: event, RequestId: request, UserId: user}),
 		},
 		// CreateAuditLog stamps created_at from the clock whatever the record held; the value
 		// written is checked against the record as it returned, which carries the stamp.

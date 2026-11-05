@@ -15,11 +15,13 @@ Goiabada records security events as they happen: sign-ins, refused passwords, to
 
 1. In the admin console, open **Admin**, **Audit log**.
 
-2. Pick an event from the list, or paste a request id into **Request id**, and click **Filter**.
+2. Pick an event from the list, paste a request id into **Request id**, or type a user's id into **User id**, and click **Filter**. The filters you set combine.
 
-3. Read the entries, newest first. Each one shows its **Time**, its **Event** and its **Details**, with its **Request id** under the event when it has one.
+3. Read the entries, newest first. Each one shows its **Time**, its **Event** and its **Details**. Under the event are its **Request id**, the **User** it's about and the user it was **Acted by**, when it has them. Each one links to every event of that request or that user.
 
 </Steps>
+
+To see everything about one user, open them in **Users** and click **Show audit events**. That's the log filtered by their id: the events about them and the ones they made. A user's id is shown on their **Details** tab, as **User id**. A deleted user's events stay listed under their id.
 
 By default, events are kept for 180 days and then deleted. To change that, or where events go, open **Admin**, **Audit logging**.
 
@@ -33,8 +35,8 @@ These record who can administer Goiabada and who tried to reach past that. See [
 
 | Event | Written when | Details |
 |---|---|---|
-| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. It also covers reading an administrator client's secret, reading or setting the secret of a client listed for the `authserver` resource, rewording an administrative permission's description, switching a client's **May request administrative scopes**, deleting a group holding an administrative permission, and listing the `authserver` resource among a client's introspection resources. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `permission_ids` for a grant or a description change, `group_ids` for a group membership change, and `resource_ids` for a client's introspection resources |
-| `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. It's written after the change's own entries, such as `added_user_permission` or `user_added_to_group`, never instead of them. Deleting an administrator or an administrative group writes only its own deletion entry. | `change` (`granted` or `revoked`), `target_kind` and `target_id`, `permission_identifiers` (such as `authserver:manage`), `group_id` for a membership change, and `logged_in_user`, or `command` for the `recover` command's grant |
+| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. It also covers reading an administrator client's secret, reading or setting the secret of a client listed for the `authserver` resource, rewording an administrative permission's description, switching a client's **May request administrative scopes**, deleting a group holding an administrative permission, and listing the `authserver` resource among a client's introspection resources. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `user_id` when the target is a user, `permission_ids` for a grant or a description change, `group_ids` for a group membership change, and `resource_ids` for a client's introspection resources |
+| `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. It's written after the change's own entries, such as `added_user_permission` or `user_added_to_group`, never instead of them. Deleting an administrator or an administrative group writes only its own deletion entry. | `change` (`granted` or `revoked`), `target_kind` and `target_id`, `user_id` when the target is a user, `permission_identifiers` (such as `authserver:manage`), `group_id` for a membership change, and `logged_in_user`, or `command` for the `recover` command's grant |
 | `updated_client_administrative_scopes` | A client's **May request administrative scopes** switch was saved, on or off. An allowed client is an administrator client, so watch this beside `administrative_permission_changed`. The Admin API writes it for every call to that route, even one that keeps the value it had; the admin console's **Save** calls it only when the switch changed. | `client_id`, `client_identifier`, `allowed` (the new value) and `logged_in_user` |
 | `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused (see the answers on [Authorize](/reference/endpoints/authorize/#administrative-scopes) and [Token](/reference/endpoints/token/#administrative-scopes)). It's written at the authorization endpoint when the browser holds a valid session and the request doesn't ask for `prompt=login`, at the last step before a code or tokens are issued, and on the token endpoint's authorization code, refresh token and password grants. A refusal at the authorization endpoint with no valid session, or held back until after the password because of `prompt=login`, writes a Warn log record instead, since anyone can reach that endpoint. | `client_id`, `client_identifier`, `scopes`, `checkpoint` (`"authorize"`, `"issue"`, `"authorization_code"`, `"refresh_token"` or `"password"`) and `user_id` |
 | `viewed_client_secret` | Someone read a client's secret through `GET /api/v1/admin/clients/{id}/secret`. The admin console reads it there each time you open a confidential client's **Authentication** tab. Reading a client with no secret writes nothing. | `client_id`, `client_identifier` and `logged_in_user` |
@@ -95,6 +97,10 @@ Each stored event is one row:
 | `audit_event` | The event's name. |
 | `details` | The details, as JSON text. |
 | `request_id` | The id of the request that raised it, or empty when there was none. |
+| `user_id` | The row id of the user the event is about, the `user_id` in its details, or `NULL` when it's about no user. |
+| `logged_in_user_id` | The row id of the user whose access token made the request: the administrator on the Admin API, the user themselves on the Account API. `NULL` when no user's token made it, as on a sign-in in the browser or a call with a client credentials token. |
+
+`user_id` and `logged_in_user_id` each have an index, so `WHERE user_id = 42 OR logged_in_user_id = 42` finds the events about user 42 and the ones they made. Neither is a foreign key: the rows stay when the user is deleted, until retention removes them.
 
 ## Details
 
@@ -148,7 +154,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `kind` | A legal document's kind: `must_accept` for terms users must accept, `for_information` for a privacy notice. |
 | `legal_document_id` | The legal document's row id. |
 | `limiter` | The name of the rate limiter that refused. |
-| `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. |
+| `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. A user's token also fills the entry's `logged_in_user_id` column with that user's row id. |
 | `max_user_sessions_per_user` | Under `old` and `new`: the most sessions one user can hold, 0 for no limit. |
 | `method` | The HTTP method of a refused Admin API request. |
 | `new` | The default token settings, the session settings, or the Turnstile settings, after the change, keyed as below. |
@@ -196,7 +202,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `turnstile_enabled` | Under `old` and `new`: whether the Turnstile challenge is on. |
 | `turnstile_site_key` | Under `old` and `new`: the site key of the Turnstile widget. |
 | `user_attribute_id` | The row id of a user's custom attribute. |
-| `user_id` | The user's row id. |
+| `user_id` | The row id of the user the entry is about. It also fills the entry's `user_id` column, which the Admin API's `userId` filter matches. |
 | `user_session_id` | The row id of a user's session. |
 | `user_session_idle_timeout_in_seconds` | Under `old` and `new`: the session idle timeout, in seconds. |
 | `user_session_max_lifetime_in_seconds` | Under `old` and `new`: the session maximum lifetime, in seconds. |
@@ -204,7 +210,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 
 ## Why a session was deleted
 
-Every `deleted_user_session` entry has a `reason`:
+Every `deleted_user_session` entry names the session's user by `user_id`, and has a `reason`:
 
 | `reason` | Why the session was deleted |
 |---|---|
@@ -218,7 +224,7 @@ Every `deleted_user_session` entry has a `reason`:
 
 ## The Admin API
 
-- [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (1 to 200; anything else gets the default, 20), and the `auditEvent` and `requestId` filters, each an exact match.
+- [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (1 to 200; anything else gets the default, 20), and three filters. `auditEvent` and `requestId` are each an exact match. `userId`, a user's row id, lists the events about that user and the ones they made: those whose `user_id` or `logged_in_user_id` column holds it, each once. It finds a deleted user's events too. The filters you set combine, so `userId=42&auditEvent=deleted_user_session` lists the session deletions about user 42 and the ones user 42 made, such as an administrator ending another user's session. Each entry carries the two columns as `userId` and `loggedInUserId`, `null` when the event names no such user.
 - [`GET /api/v1/admin/audit-logs/event-types`](/reference/api/admin/operations/getauditeventtypes/) returns every event name the server can write. The viewer's event list comes from here, so it includes events that haven't happened yet.
 - [`GET /api/v1/admin/settings/audit-logs`](/reference/api/admin/operations/getsettingsauditlogs/) and [`PUT`](/reference/api/admin/operations/updatesettingsauditlogs/) read and change the two switches and the retention.
 

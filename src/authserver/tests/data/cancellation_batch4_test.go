@@ -177,7 +177,7 @@ func TestGetAuditLogsPaginated_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	require.NoError(t, database.CreateAuditLog(context.Background(), nil,
 		&record.AuditLog{AuditEvent: "cancellation_probe", Details: `{}`}))
 
-	logs, total, err := database.GetAuditLogsPaginated(cancelled(), nil, 1, 10, "", "")
+	logs, total, err := database.GetAuditLogsPaginated(cancelled(), nil, 1, 10, record.AuditLogFilter{})
 
 	require.Error(t, err, "a paged read must not be issued on behalf of a caller that is already gone")
 	require.ErrorIs(t, err, context.Canceled)

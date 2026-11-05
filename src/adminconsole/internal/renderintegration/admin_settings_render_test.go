@@ -135,3 +135,88 @@ func TestRender_AdminSettingsKeysLocalizesTheCreatedAtCell(t *testing.T) {
 	assert.Contains(t, out, `<td data-label="Criada">16/09/2026 12:00</td>`, "the created-at cell is not localized")
 	assert.NotContains(t, out, "16 Sep 2026", "an English month name is what the old layout produced")
 }
+
+func int64Ptr(v int64) *int64 { return &v }
+
+// The user filter on the audit log page (#780, decision 8). Under each row's event, beside its
+// request id, the row names the user it is about and the user who acted, each by id and each
+// linking to that user's events; a row naming neither names no one. The User id box holds the id
+// filtered on, and Clear filters and the filtered empty state count it as a filter.
+func TestRender_AdminSettingsAuditLogViewerNamesEachRowsUsers(t *testing.T) {
+	at := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
+	logs := []api.AuditLogResponse{
+		{Id: 1, CreatedAt: at, AuditEvent: "updated_user_profile", Details: `{}`,
+			UserId: int64Ptr(42), LoggedInUserId: int64Ptr(7)},
+		{Id: 2, CreatedAt: at, AuditEvent: "user_login", Details: `{}`, UserId: int64Ptr(42)},
+		{Id: 3, CreatedAt: at, AuditEvent: "client_created", Details: `{}`},
+	}
+	rows := make([]adminsettingshandlers.AuditLogRow, 0, len(logs))
+	for _, entry := range logs {
+		rows = append(rows, adminsettingshandlers.AuditLogRow{AuditLogResponse: entry, DetailsParsed: true})
+	}
+
+	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
+		"pageResult": adminsettingshandlers.AuditLogsPageResult{
+			AuditLogs: logs, Rows: rows, Total: 3, Page: 1, PageSize: 20, UserId: "42",
+		},
+		"paginator":           pagination.New(3, 20, 1, 5),
+		"selectedEvent":       "",
+		"selectedRequestId":   "",
+		"selectedUserId":      "42",
+		"paginatorLink":       "/admin/settings/audit-log-viewer?userId=42",
+		"auditEventTypes":     []string{"user_login"},
+		"auditLogsInDatabase": true,
+	})
+
+	assert.Contains(t, out, `Usuário: <a class="text-link inline-block font-mono" href="/admin/settings/audit-log-viewer?userId=42">42`+
+		`<span class="sr-only"> – mostrar todos os eventos sobre este usuário ou feitos por ele</span></a>`)
+	assert.Contains(t, out, `Feito por: <a class="text-link inline-block font-mono" href="/admin/settings/audit-log-viewer?userId=7">7`+
+		`<span class="sr-only"> – mostrar todos os eventos sobre este usuário ou feitos por ele</span></a>`)
+	assert.Equal(t, 2, strings.Count(out, "Usuário: <a"), "the row about no user names none")
+	assert.Equal(t, 1, strings.Count(out, "Feito por: <a"), "only the row made with a user's token names who acted")
+
+	assert.Contains(t, out, `<label class="field-label" for="userIdFilter">Id do usuário</label>`)
+	assert.Contains(t, out, `<input class="control" id="userIdFilter" type="search" name="userId" value="42" inputmode="numeric" autocomplete="off" spellcheck="false">`)
+	assert.Contains(t, out, `<a class="text-link" href="/admin/settings/audit-log-viewer">Limpar filtros</a>`,
+		"the user id alone is a filter to clear")
+}
+
+// With the user filter alone set and nothing found, the page says no event matches the filters.
+func TestRender_AdminSettingsAuditLogViewerUserFilterFindsNothing(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
+		"pageResult":          adminsettingshandlers.AuditLogsPageResult{Page: 1, PageSize: 20, UserId: "42"},
+		"paginator":           pagination.New(0, 20, 1, 5),
+		"selectedEvent":       "",
+		"selectedRequestId":   "",
+		"selectedUserId":      "42",
+		"paginatorLink":       "/admin/settings/audit-log-viewer?userId=42",
+		"auditEventTypes":     []string{"user_login"},
+		"auditLogsInDatabase": true,
+	})
+
+	assert.Contains(t, out, `<p class="empty-state">Nenhum evento de auditoria corresponde a estes filtros.</p>`)
+}
+
+// A User id that is not a positive whole number is the box's error: the box is marked invalid,
+// described by the error and focused, keeps what was typed, escaped, and the page lists nothing,
+// not even the empty state, since no filter was applied.
+func TestRender_AdminSettingsAuditLogViewerRefusedUserId(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
+		"pageResult":          adminsettingshandlers.AuditLogsPageResult{Page: 1, PageSize: 20, UserId: `"><b>x</b>`},
+		"paginator":           pagination.New(0, 20, 1, 5),
+		"selectedEvent":       "",
+		"selectedRequestId":   "",
+		"selectedUserId":      `"><b>x</b>`,
+		"paginatorLink":       "/admin/settings/audit-log-viewer",
+		"auditEventTypes":     []string{"user_login"},
+		"auditLogsInDatabase": true,
+		"error":               "Informe o id do usuário como um número inteiro maior que 0.",
+		"errorField":          "userId",
+	})
+
+	assert.Contains(t, out, `<input class="control" id="userIdFilter" type="search" name="userId" value="&#34;&gt;&lt;b&gt;x&lt;/b&gt;" inputmode="numeric" autocomplete="off" spellcheck="false" aria-invalid="true" aria-describedby="userIdFilter-error" autofocus>`)
+	assert.Contains(t, out, `<p class="field-error" id="userIdFilter-error">Informe o id do usuário como um número inteiro maior que 0.</p>`)
+	assert.NotContains(t, out, "<b>x</b>")
+	assert.NotContains(t, out, `class="empty-state"`, "no filter was applied, so nothing was found or not found")
+	assert.NotContains(t, out, `id="auditLogsTable"`)
+}

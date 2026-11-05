@@ -514,8 +514,11 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	}
 
 	for _, removal := range removedSessions {
+		// The removed session's own user, which a same-device sweep can tell from the user signing
+		// in.
 		o.auditLogger.Log(ctx, audit.EventDeletedUserSession, map[string]interface{}{
 			"user_session_id": removal.Session.Id,
+			"user_id":         removal.Session.UserId,
 			"logged_in_user":  "",
 			"reason":          removal.Reason,
 		})
@@ -559,6 +562,7 @@ func (o *Completion) terminateForeignSession(ctx context.Context, authContext *c
 	// TerminateUserSessionTx writes (#129 decision 9).
 	o.auditLogger.Log(ctx, audit.EventDeletedUserSession, map[string]interface{}{
 		"user_session_id": userSession.Id,
+		"user_id":         userSession.UserId,
 		"logged_in_user":  "",
 		"reason":          audit.DeletedUserSessionReplacedByOtherUser,
 	})

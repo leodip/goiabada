@@ -3800,9 +3800,9 @@ paths:
       tags: [Audit Logs]
       summary: Query audit logs
       description: |
-        Get a page of audit log entries, most recent first, optionally narrowed to
-        a single audit event, a single request id, or both. Entries are only present
-        when audit logging to the database is enabled.
+        Get a page of audit log entries, most recent first, optionally narrowed by
+        audit event, request id and user. The filters set combine with AND. Entries are
+        only present when audit logging to the database is enabled.
       operationId: getAuditLogs
       parameters:
         - name: auditEvent
@@ -3818,6 +3818,17 @@ paths:
           description: Return only entries carrying this request id, matched exactly
           schema:
             type: string
+        - name: userId
+          in: query
+          description: |
+            Return only entries about this user or made by them: those whose `userId` or
+            whose `loggedInUserId` is this id, each entry once. A value that is not a
+            positive integer answers 400 `VALIDATION_ERROR`. An id that names no user, or a
+            deleted one, answers the entries that name it, often none.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
         - $ref: '#/components/parameters/PageParam'
         - name: size
           in: query
@@ -3836,6 +3847,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetAuditLogsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -7752,12 +7765,30 @@ components:
             The request's id as the application log carries it, so the same value
             appears in the log's request_id attribute. Empty when the entry was not
             written on a request.
+        userId:
+          type: integer
+          format: int64
+          nullable: true
+          description: |
+            The row id of the user the entry is about, the `user_id` in its details.
+            Null when it is about no user.
+        loggedInUserId:
+          type: integer
+          format: int64
+          nullable: true
+          description: |
+            The row id of the user whose access token made the request: the administrator
+            on the Admin API, the user themselves on the Account API. Null when no user's
+            token made it, as on a sign-in in the browser or a call with a client
+            credentials token.
       required:
         - id
         - createdAt
         - auditEvent
         - details
         - requestId
+        - userId
+        - loggedInUserId
 
     GetAuditEventTypesResponse:
       type: object

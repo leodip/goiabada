@@ -549,7 +549,7 @@ type Database interface {
 
 	CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *record.AuditLog) error
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
-	GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]record.AuditLog, int, error)
+	GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, filter record.AuditLogFilter) ([]record.AuditLog, int, error)
 
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
 	UpdateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
