@@ -38,11 +38,14 @@ const (
 // says nothing about that, so dropping the entry would log a usable token in the
 // clear (#145). recoveryCodes is PUT /api/v1/account/otp's set of recovery codes, each a second
 // factor that signs in once, whose name the substring net below does not catch (#257).
+// recoveryCode is one of them, sent up by POST /api/v1/account/deletion: a refused deletion
+// leaves it unspent, so it still signs in (#783).
 var sensitiveKeys = foldKeySet(
 	"password", "currentPassword", "newPassword",
 	"otpCode", "secretKey", "base64Image",
 	"smtpPassword", "clientSecret", "client_secret",
 	"verificationCode", "logoutUrl", "recoveryCodes",
+	"recoveryCode",
 )
 
 // The backstop for credential fields nobody remembers to add above. It over-redacts

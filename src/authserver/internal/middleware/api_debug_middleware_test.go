@@ -591,6 +591,7 @@ func TestDebugLog_RedactsSensitiveKeysInBodies(t *testing.T) {
 		{"verificationCode", true},
 		{"logoutUrl", true},
 		{"recoveryCodes", true},
+		{"recoveryCode", true},
 
 		// Caught by the substring net, and harmless: the accepted over-redaction.
 		{"passwordPolicy", true},
@@ -1086,6 +1087,38 @@ func TestAPIDebug_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 	assert.Contains(t, output, "password")
 	assert.Contains(t, output, "otpCode")
 	assert.Contains(t, output, "secretKey")
+	assert.Contains(t, output, redactedValue)
+}
+
+// POST /api/v1/account/deletion carries the password and a recovery code. A refused deletion
+// spends no code, so a logged one would still sign in beside the password. The body is the
+// request struct's own marshalling, so a renamed tag fails here.
+func TestAPIDebug_DoesNotLogARealAccountDeletionRequest(t *testing.T) {
+	logged := logtest.CaptureSlog(t)
+
+	sent := api.DeleteAccountRequest{
+		Password:     "SENTINEL-account-password",
+		RecoveryCode: "7KQ2-M9XH-4TRW-B3NP-J6VD-EGAC",
+	}
+	body, err := json.Marshal(sent)
+	require.NoError(t, err)
+
+	router := debugAPIRouter(t, http.MethodPost, "/deletion", func(w http.ResponseWriter, r *http.Request) {
+		var received api.DeleteAccountRequest
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&received))
+		assert.Equal(t, sent, received,
+			"the handler must receive the credentials intact after the middleware read the body to log it")
+		w.WriteHeader(http.StatusBadRequest)
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/account/deletion", bytes.NewReader(body)))
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+
+	output := logged.Text()
+	assert.NotContains(t, output, "SENTINEL-account-password", "the account password must not reach the log")
+	assert.NotContains(t, output, sent.RecoveryCode, "nor the recovery code, which a refused deletion leaves unspent")
+	assert.Contains(t, output, "recoveryCode")
 	assert.Contains(t, output, redactedValue)
 }
 
