@@ -238,10 +238,11 @@ client's back-channel logout URI (#784).
 - Address guard (decision 7): a delivery to a client created through DCR, whoever set its URI, goes
   through `backchannel.newDeliveryClients`' guarded client: no proxy, and a `net.Dialer.Control`
   that refuses any dialed address `publicUnicast` rejects (loopback, RFC 1918, `fc00::/7`,
-  link-local, `100.64.0.0/10`, unspecified, multicast, broadcast, documentation ranges, and their
-  IPv4-mapped forms). Control sees the resolved address, so DNS rebinding gains nothing. A refusal
-  is final, `blocked`. An administrator's client uses a separate transport with the environment's
-  proxy and reaches any address
+  link-local, unspecified, multicast, broadcast, and every IANA special-purpose block that is not
+  globally reachable, with 6to4, IPv4-compatible and site-local; IPv4-mapped and NAT64
+  `64:ff9b::/96` addresses are judged by the IPv4 address they carry). Control sees the resolved
+  address, so DNS rebinding gains nothing. A refusal is final, `blocked`. An administrator's client
+  uses a separate transport with the environment's proxy and reaches any address
 - Each delivery counts on `goiabada_backchannel_logout_deliveries_total` by outcome, writes
   `sent_logout_token` when it finishes, and one Warn record when it was not delivered (decision 8)
 - Discovery advertises `backchannel_logout_supported` and `backchannel_logout_session_supported`

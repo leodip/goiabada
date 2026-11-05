@@ -21,7 +21,7 @@ import (
 
 // TestPublicUnicast_RefusesEveryAddressThatIsNotPublicUnicast is #784 decision 7's list, each range
 // at its edges, and the IPv4-mapped form of each: a delivery to a self-registered client reaches
-// only a public unicast address.
+// only a public unicast address. A NAT64 address is judged by the IPv4 address it carries.
 func TestPublicUnicast_RefusesEveryAddressThatIsNotPublicUnicast(t *testing.T) {
 	refused := map[string][]string{
 		"loopback":                  {"127.0.0.1", "127.255.255.254", "::1"},
@@ -33,14 +33,33 @@ func TestPublicUnicast_RefusesEveryAddressThatIsNotPublicUnicast(t *testing.T) {
 		"multicast":                 {"224.0.0.1", "239.255.255.255", "ff02::1", "ff0e::1"},
 		"broadcast":                 {"255.255.255.255"},
 		"documentation":             {"192.0.2.1", "198.51.100.1", "203.0.113.255", "2001:db8::1", "3fff::1"},
-		"IPv4-mapped loopback":      {"::ffff:127.0.0.1"},
-		"IPv4-mapped private":       {"::ffff:10.0.0.1", "::ffff:172.16.0.1", "::ffff:192.168.1.1"},
-		"IPv4-mapped link-local":    {"::ffff:169.254.169.254"},
-		"IPv4-mapped shared":        {"::ffff:100.64.0.1"},
-		"IPv4-mapped unspecified":   {"::ffff:0.0.0.0"},
-		"IPv4-mapped multicast":     {"::ffff:224.0.0.1"},
-		"IPv4-mapped broadcast":     {"::ffff:255.255.255.255"},
-		"IPv4-mapped documentation": {"::ffff:192.0.2.1", "::ffff:198.51.100.1", "::ffff:203.0.113.1"},
+		"this network (0.0.0.0/8)":  {"0.0.0.1", "0.1.2.3", "0.255.255.255"},
+		"IETF protocol assignments": {"192.0.0.0", "192.0.0.8", "192.0.0.170", "192.0.0.255"},
+		"6to4 relay anycast":        {"192.88.99.0", "192.88.99.255"},
+		"benchmarking":              {"198.18.0.0", "198.18.0.1", "198.19.255.255", "2001:2::", "2001:2:0:ffff::1"},
+		"reserved (240.0.0.0/4)":    {"240.0.0.0", "240.0.0.1", "255.255.255.254"},
+		"IPv4-compatible":           {"::a00:1", "::808:808", "::ffff:ffff"},
+		"local-use translation":     {"64:ff9b:1::", "64:ff9b:1::a00:1", "64:ff9b:1::808:808", "64:ff9b:1:ffff:ffff:ffff:ffff:ffff"},
+		"NAT64 to a non-public address": {
+			"64:ff9b::", "64:ff9b::a00:1", "64:ff9b::7f00:1", "64:ff9b::a9fe:a9fe", "64:ff9b::6440:1",
+			"64:ff9b::c612:1", "64:ff9b::f000:1",
+		},
+		"discard-only and dummy":           {"100::", "100::ffff:ffff:ffff:ffff", "100:0:0:1::", "100:0:0:1:ffff:ffff:ffff:ffff"},
+		"IETF protocol assignments (IPv6)": {"2001::", "2001:0:4136:e378:8000:63bf:3fff:fdd2", "2001:10::1", "2001:1ff:ffff:ffff::1"},
+		"6to4":                             {"2002::", "2002:a00:1::1", "2002:808:808::1", "2002:ffff:ffff:ffff::1"},
+		"SRv6 segment identifiers":         {"5f00::", "5f00::1", "5f00:ffff:ffff:ffff::1"},
+		"site-local":                       {"fec0::", "fec0::1", "feff:ffff:ffff:ffff::1"},
+		"IPv4-mapped loopback":             {"::ffff:127.0.0.1"},
+		"IPv4-mapped private":              {"::ffff:10.0.0.1", "::ffff:172.16.0.1", "::ffff:192.168.1.1"},
+		"IPv4-mapped link-local":           {"::ffff:169.254.169.254"},
+		"IPv4-mapped shared":               {"::ffff:100.64.0.1"},
+		"IPv4-mapped unspecified":          {"::ffff:0.0.0.0"},
+		"IPv4-mapped multicast":            {"::ffff:224.0.0.1"},
+		"IPv4-mapped broadcast":            {"::ffff:255.255.255.255"},
+		"IPv4-mapped documentation":        {"::ffff:192.0.2.1", "::ffff:198.51.100.1", "::ffff:203.0.113.1"},
+		"IPv4-mapped special-purpose": {
+			"::ffff:0.1.2.3", "::ffff:192.0.0.8", "::ffff:192.88.99.1", "::ffff:198.18.0.1", "::ffff:240.0.0.1",
+		},
 	}
 	for name, addresses := range refused {
 		for _, address := range addresses {
@@ -59,8 +78,12 @@ func TestPublicUnicast_RefusesEveryAddressThatIsNotPublicUnicast(t *testing.T) {
 		"169.253.255.255", "169.255.0.0",
 		"100.63.255.255", "100.128.0.0",
 		"192.0.3.1", "198.51.101.1", "203.0.114.1",
+		"1.0.0.0", "192.0.1.0", "192.88.98.255", "192.88.100.0", "198.17.255.255", "198.20.0.0",
 		"2606:4700:4700::1111", "2001:4860:4860::8888",
+		"2001:200::1", "2001:1c00::1", "2003::1", "2001:db9::1",
 		"::ffff:8.8.8.8",
+		// NAT64 to a public IPv4 address, as DNS64 answers for an IPv4-only app.
+		"64:ff9b::808:808", "64:ff9b::101:101",
 	}
 	for _, address := range public {
 		t.Run("public "+address, func(t *testing.T) {
