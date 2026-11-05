@@ -140,12 +140,20 @@ type Sender struct {
 func NewSender(database KeyDatabase, dataCipher *encryption.DataCipher, jobs Jobs, auditLogger AuditLogger,
 	recorder *Recorder) *Sender {
 
+	s := NewCommandSender(database, dataCipher, auditLogger)
+	s.jobs, s.recorder = jobs, recorder
+	return s
+}
+
+// NewCommandSender builds the sender of a process with no after-response jobs and no metrics
+// listener, the recover command, which delivers through SendAndWait (#784 decision 11). Its
+// deliveries follow the same rules and write the same Warn records and audit events, and are counted
+// nowhere.
+func NewCommandSender(database KeyDatabase, dataCipher *encryption.DataCipher, auditLogger AuditLogger) *Sender {
 	return &Sender{
 		database:    database,
 		dataCipher:  dataCipher,
-		jobs:        jobs,
 		auditLogger: auditLogger,
-		recorder:    recorder,
 		// The environment's proxy is honoured, as the Turnstile client honours it, and no redirect is
 		// ever followed: a 3xx is the app's answer (#784 decisions 5 and 7). There is no client-wide
 		// timeout; each attempt has its own deadline.
@@ -197,6 +205,30 @@ func (s *Sender) Send(ctx context.Context, issuer string, deliveries []Delivery)
 	}
 }
 
+// SendAndWait starts every delivery at once, as Send does, and returns once each has finished,
+// calling finished with each delivery's outcome as it does, one call at a time on the caller's
+// goroutine. It is Send for a caller that waits for its deliveries rather than handing them to the
+// after-response jobs: the recover command, which says what each came to (#784 decision 11). No job
+// budget applies, so none is dropped.
+func (s *Sender) SendAndWait(ctx context.Context, issuer string, deliveries []Delivery,
+	finished func(Delivery, Outcome)) {
+
+	type done struct {
+		delivery Delivery
+		outcome  Outcome
+	}
+	results := make(chan done, len(deliveries))
+	for _, delivery := range deliveries {
+		go func() {
+			results <- done{delivery: delivery, outcome: s.deliver(ctx, issuer, delivery)}
+		}()
+	}
+	for range deliveries {
+		result := <-results
+		finished(result.delivery, result.outcome)
+	}
+}
+
 // result is what one delivery came to.
 type result struct {
 	outcome  Outcome
@@ -206,13 +238,15 @@ type result struct {
 	err    error
 }
 
-// deliver runs one delivery to its end and records it: the metric, a Warn record when it did not
-// succeed, and the audit event.
-func (s *Sender) deliver(ctx context.Context, issuer string, delivery Delivery) {
+// deliver runs one delivery to its end, records it, the metric when the sender has a recorder, a
+// Warn record when it did not succeed, and the audit event, and answers how it ended.
+func (s *Sender) deliver(ctx context.Context, issuer string, delivery Delivery) Outcome {
 	jti := uuid.New()
 	res := s.run(ctx, issuer, delivery, jti)
 
-	s.recorder.deliveries.Inc(string(res.outcome))
+	if s.recorder != nil {
+		s.recorder.deliveries.Inc(string(res.outcome))
+	}
 	// The status when an answer came, the error when none did; never the token.
 	switch {
 	case res.outcome == Delivered:
@@ -234,6 +268,7 @@ func (s *Sender) deliver(ctx context.Context, issuer string, delivery Delivery) 
 			"status", res.status)
 	}
 	LogSentLogoutToken(ctx, s.auditLogger, delivery, jti, res.outcome, res.attempts)
+	return res.outcome
 }
 
 // run checks the stored URI again, signs the token once, and makes the attempts: each at its offset,

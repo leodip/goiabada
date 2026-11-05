@@ -11,10 +11,12 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/recovery"
 	"github.com/leodip/goiabada/core/builtin"
@@ -44,8 +46,11 @@ A new password is held to the stored password policy, and one that is empty, or 
 whitespace, is refused.
 
 Whatever is asked for the user, their sessions end and their authentication generation advances,
-so nothing signed in before the recovery survives it. An unknown or disabled user is refused, and
-so is a database whose schema is not the one this binary carries.
+so nothing signed in before the recovery survives it. Once it has committed, each app that knew
+the user and registered a back-channel logout URI is told the user was signed out, which can take
+up to about a minute when an app does not answer; an app that was not told leaves the exit status
+as it is. An unknown or disabled user is refused, and so is a database whose schema is not the one
+this binary carries.
 
 One action names no user, and needs no --email:
   --disable-turnstile    turn the Turnstile challenge off, keeping its site key and secret key
@@ -116,9 +121,29 @@ func readPasswordLine(r io.Reader) (string, error) {
 type recoverDatabaseOpener func(ctx context.Context, dbConfig *config.DatabaseConfig,
 	logSQL bool) (datafactory.Migratable, error)
 
+// recoverDataKey is the data cipher the recover command decrypts the signing key with, to sign the
+// logout tokens it sends, or why the configured data key gives none (#784 decision 11).
+type recoverDataKey struct {
+	cipher *encryption.DataCipher
+	err    error
+}
+
+// readRecoverDataKey builds the recover command's data cipher from the configured data key, as the
+// server's start builds its own. An unusable key is no refusal: the recovery needs no key, and only
+// its logout tokens go unsent (see tellRecoveredUsersApps).
+func readRecoverDataKey(cfg *config.Config) recoverDataKey {
+	current, _, err := cfg.DataKeys()
+	if err != nil {
+		return recoverDataKey{err: err}
+	}
+	cipher, err := encryption.NewDataCipher(current)
+	return recoverDataKey{cipher: cipher, err: err}
+}
+
 // runRecoverCommand runs the invocation readRecoverCommand read, opening the database through
-// open.
-func runRecoverCommand(inv recoverInvocation, open recoverDatabaseOpener, stdout, stderr io.Writer) int {
+// open, with the data key the logout tokens are signed under.
+func runRecoverCommand(inv recoverInvocation, open recoverDatabaseOpener, dataKey recoverDataKey,
+	stdout, stderr io.Writer) int {
 	if inv.help {
 		outf(stdout, "%s\n", recoverUsage)
 		return migrateExitOK
@@ -159,7 +184,8 @@ func runRecoverCommand(inv recoverInvocation, open recoverDatabaseOpener, stdout
 	// way the running server does, so a deployment that has turned either target off is
 	// obeyed here too.
 	return runRecover(ctx, database, m,
-		audit.NewLogger(database, middleware.NewAuditSwitches(database), middleware.ActingUser{}), inv, stdout, stderr)
+		audit.NewLogger(database, middleware.NewAuditSwitches(database), middleware.ActingUser{}), inv,
+		dataKey, stdout, stderr)
 }
 
 // recoverInvocation is what parseRecoverArgs made of the arguments after `recover`.
@@ -262,6 +288,13 @@ func parseRecoverArgs(args []string, db config.DatabaseConfig) (recoverInvocatio
 	return inv, nil
 }
 
+// recoverDatabase is what runRecover reads and writes: the recovery's, and the signing key its
+// logout tokens are signed with.
+type recoverDatabase interface {
+	recovery.Database
+	backchannel.KeyDatabase
+}
+
 // schemaVersionReader is what runRecover asks of the migrator: the version the database records
 // and the one this binary carries.
 type schemaVersionReader interface {
@@ -273,8 +306,8 @@ type schemaVersionReader interface {
 // the database, its migrator, the audit logger to record what it did, and somewhere to print. It
 // answers the process exit code, so a test can run it against a database it seeded, as the
 // migrate tests run runMigrate against one.
-func runRecover(ctx context.Context, database recovery.Database, m schemaVersionReader,
-	auditLogger recovery.AuditLogger, inv recoverInvocation, stdout, stderr io.Writer) int {
+func runRecover(ctx context.Context, database recoverDatabase, m schemaVersionReader,
+	auditLogger recovery.AuditLogger, inv recoverInvocation, dataKey recoverDataKey, stdout, stderr io.Writer) int {
 
 	// The schema must be the one this binary's data tier writes, as the server's start requires
 	// before it serves: a database a newer release migrated holds columns and rules this binary
@@ -336,7 +369,99 @@ func runRecover(ctx context.Context, database recovery.Database, m schemaVersion
 	outf(stdout, "  sessions ended: %d, refresh tokens revoked: %d, authentication generation %d to %d\n",
 		len(outcome.Revocation.TerminatedSessionIdentifiers), len(outcome.Revocation.RevokedRefreshTokenJtis),
 		outcome.Revocation.OldGeneration, outcome.Revocation.NewGeneration)
+
+	// The recovery has committed, so its exit status is decided: telling the apps comes after it,
+	// and a delivery that does not succeed leaves the status as it is (#784 decision 11).
+	tellRecoveredUsersApps(ctx, database, auditLogger, outcome, dataKey, stdout, stderr)
 	return migrateExitOK
+}
+
+// tellRecoveredUsersApps delivers the logout tokens of the recovery's user-wide end, every one at
+// once, and waits for them all, saying on stdout what it is doing as it does it: before the
+// deliveries start, how many apps it is telling and that it can take up to about a minute, since an
+// app that does not answer is retried; one line per app once each of its deliveries has finished,
+// naming its client identifier and the outcome; and a last line counting the apps told and not
+// told. An app requiring sid is sent one token per valid session it was on, and is told only when
+// each of them was delivered; its line names the outcome of the first that was not. With no app to
+// tell it says so in one line and waits for nothing (#784 decision 11).
+//
+// Each delivery follows the server's rules, retries included, and writes its Warn record and its
+// sent_logout_token, naming the command as the actor, as every record the command writes does. No
+// metric counts it: the command has no metrics listener.
+func tellRecoveredUsersApps(ctx context.Context, database backchannel.KeyDatabase, auditLogger recovery.AuditLogger,
+	outcome recovery.Outcome, dataKey recoverDataKey, stdout, stderr io.Writer) {
+
+	deliveries := outcome.Revocation.LogoutDeliveries
+	if len(deliveries) == 0 {
+		outf(stdout, "no app to tell that the user was signed out\n")
+		return
+	}
+
+	// Each app's deliveries, counted, so its line is printed when its last one finishes.
+	pending := map[int64]int{}
+	for _, delivery := range deliveries {
+		pending[delivery.ClientId]++
+	}
+	apps := countedApps(len(pending))
+
+	// The signing key is sealed under the data key, which the recovery itself never needed.
+	if dataKey.err != nil || dataKey.cipher == nil {
+		reason := errs.New("no data encryption key is configured")
+		if dataKey.err != nil {
+			reason = dataKey.err
+		}
+		outf(stderr, "unable to tell %s that the user was signed out, because no logout token can be "+
+			"signed without the data encryption key: %v\n", apps, reason)
+		return
+	}
+
+	outf(stdout, "telling %s that the user was signed out; this can take up to about a minute when an app "+
+		"does not answer\n", apps)
+	sender := backchannel.NewCommandSender(database, dataKey.cipher, commandAuditLogger{auditLogger})
+	// The first outcome other than delivered each app's deliveries came to.
+	notTold := map[int64]backchannel.Outcome{}
+	told, untold := 0, 0
+	sender.SendAndWait(ctx, outcome.Issuer, deliveries, func(delivery backchannel.Delivery, delivered backchannel.Outcome) {
+		if _, already := notTold[delivery.ClientId]; !already && delivered != backchannel.Delivered {
+			notTold[delivery.ClientId] = delivered
+		}
+		pending[delivery.ClientId]--
+		if pending[delivery.ClientId] > 0 {
+			return
+		}
+		appOutcome, failed := notTold[delivery.ClientId]
+		if !failed {
+			appOutcome = backchannel.Delivered
+			told++
+		} else {
+			untold++
+		}
+		outf(stdout, "  %s: %s\n", delivery.ClientIdentifier, appOutcome)
+	})
+	outf(stdout, "apps told: %d, not told: %d\n", told, untold)
+}
+
+// countedApps answers "1 app" or "n apps".
+func countedApps(n int) string {
+	if n == 1 {
+		return "1 app"
+	}
+	return fmt.Sprintf("%d apps", n)
+}
+
+// commandAuditLogger records what the command's deliveries write naming the command as the actor,
+// under the key the recovery's own records use (recovery.Actor).
+type commandAuditLogger struct {
+	inner recovery.AuditLogger
+}
+
+func (l commandAuditLogger) Log(ctx context.Context, auditEvent string, details map[string]interface{}) {
+	withActor := make(map[string]interface{}, len(details)+1)
+	for key, value := range details {
+		withActor[key] = value
+	}
+	withActor["command"] = recovery.Actor
+	l.inner.Log(ctx, auditEvent, withActor)
 }
 
 // checkRecoverSchema answers why the recovery must not write to this database, or "" when the

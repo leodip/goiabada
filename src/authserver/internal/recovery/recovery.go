@@ -82,7 +82,11 @@ type Outcome struct {
 	OTPRemoved        bool // false when no authenticator was enrolled
 	ManageGranted     bool // false when the user already held it
 	TurnstileDisabled bool // false when the challenge was already off
-	Revocation        revocation.UserAuthStateResult
+	// Revocation is the sweep's result. Its LogoutDeliveries are the logout tokens a user-wide end
+	// sends (#784 decisions 3 and 11), which the caller delivers now that the recovery committed.
+	Revocation revocation.UserAuthStateResult
+	// Issuer is the logout tokens' iss, the issuer setting as Run read it.
+	Issuer string
 }
 
 // RefusedError is a recovery Run would not make, for a reason the operator can act on: an
@@ -133,6 +137,13 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 		}
 	}
 
+	// The settings give the password policy, the issuer the logout tokens name and the session
+	// lifetimes that say which of the user's sessions were still valid when the recovery ended them.
+	settings, err := database.GetSettingsById(ctx, nil, 1)
+	if err != nil {
+		return Outcome{}, errs.Wrap(err, "unable to read the settings")
+	}
+
 	// A password is held to the stored policy, as the Admin API holds one: the database
 	// credentials are the command's authority over WHO signs in, not a licence to weaken what
 	// a password must look like, and the deployment's rule is the one every form applies
@@ -146,10 +157,6 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 		if strings.TrimSpace(req.Password) == "" {
 			return Outcome{}, refused("the password is blank: it holds only whitespace, which " +
 				"sign-in refuses")
-		}
-		settings, settingsErr := database.GetSettingsById(ctx, nil, 1)
-		if settingsErr != nil {
-			return Outcome{}, errs.Wrap(settingsErr, "unable to read the settings")
 		}
 		if settings == nil {
 			return Outcome{}, refused("the database holds no settings row, so there is no " +
@@ -201,9 +208,19 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// reads afresh, each write is a compare-and-set, an idempotent column write or an insert
 	// whose absence was just read, and the outcome is reset first, so it is whatever the
 	// committing attempt produced (#301).
+	//
+	// A recovery ends every session of the user and keeps none, a user-wide end, so the sweep
+	// collects a logout token for every app that knew the user (#784 decisions 3 and 11). A
+	// database with no settings row has no issuer to sign them as, and tells nobody.
 	outcome := Outcome{Email: email, UserId: user.Id}
+	var notice revocation.LogoutNotice
+	if settings != nil {
+		outcome.Issuer = settings.Issuer
+		notice = revocation.LogoutNotice{Subject: user.Subject, UserWide: true,
+			Live: revocation.LiveUnder(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds)}
+	}
 	var turnstile turnstileChange
-	result, err := revocation.RevokeUserAuthStateTx(ctx, database, user.Id, "", revocation.LogoutNotice{}, func(tx *sql.Tx) error {
+	result, err := revocation.RevokeUserAuthStateTx(ctx, database, user.Id, "", notice, func(tx *sql.Tx) error {
 		outcome.PasswordSet, outcome.OTPRemoved, outcome.ManageGranted = false, false, false
 		outcome.TurnstileDisabled, turnstile = false, turnstileChange{}
 

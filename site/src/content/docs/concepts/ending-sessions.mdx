@@ -47,7 +47,7 @@ Ending a session also tells the apps the session was signed in to. Each one with
 - an app redeems an authorization code from it twice;
 - the user changes their own password, which ends their other sessions.
 
-A session that has expired tells nobody, whatever removes it. Disabling or deleting a user, a password reset and an administrator setting the password tell every app that knew the user instead, expired sessions or not: see [Credential changes](#credential-changes).
+A session that has expired tells nobody, whatever removes it. Disabling or deleting a user, a password reset, an administrator setting the password and the `recover` command tell every app that knew the user instead, expired sessions or not: see [Credential changes](#credential-changes).
 
 The tokens go out once the session has ended, and the request that ended it doesn't wait for them. An app that can't be reached, doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429 is sent the same token again about 15 seconds and about a minute later. Each delivery leaves a `sent_logout_token` entry in the audit log, whose `outcome` says whether the app was told.
 
@@ -94,7 +94,7 @@ That covers every grant, offline refresh tokens whose session has already expire
 
 ### Telling the apps that knew the user
 
-A password reset, an administrator setting the password and disabling the user end every session the user has, and so does deleting the user. Each of these [tells](#telling-your-apps) every app that knew the user: each app with a back-channel logout URI that was on any of the user's sessions, expired ones included, or holds one of the user's refresh tokens that's still unrevoked and unexpired. It's sent one logout token naming the user (`sub`) and no session. A token without `sid` asks the app to end every session it has for that user, so it reaches an app whose own session outlived the user's session here, and an app holding only an offline refresh token.
+A password reset, an administrator setting the password and disabling the user end every session the user has, and so do deleting the user and [recovering them](/troubleshooting/locked-out-of-the-admin-console/#recover-the-user-with-the-auth-server) with the `recover` command. Each of these [tells](#telling-your-apps) every app that knew the user: each app with a back-channel logout URI that was on any of the user's sessions, expired ones included, or holds one of the user's refresh tokens that's still unrevoked and unexpired. It's sent one logout token naming the user (`sub`) and no session. A token without `sid` asks the app to end every session it has for that user, so it reaches an app whose own session outlived the user's session here, and an app holding only an offline refresh token.
 
 An app that [requires the session identifier](/concepts/clients/#back-channel-logout) is sent a token naming the session instead, one for each of the user's sessions it was on that was still valid. It's told nothing for a refresh token alone.
 

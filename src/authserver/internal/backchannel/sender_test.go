@@ -523,3 +523,48 @@ func TestLogSentLogoutToken(t *testing.T) {
 		"attempts":           2,
 	}, auditLogger.events[0].details)
 }
+
+// TestSendAndWait_StartsEveryDeliveryAtOnceAndReportsEachAsItFinishes: the recover command's sender
+// starts all of an end's deliveries at once, as Send does (#784 decision 5), and returns only once
+// each has finished, having reported each one's outcome. It has no metrics listener, so nothing is
+// counted, and each delivery still writes its audit event (#784 decision 11).
+func TestSendAndWait_StartsEveryDeliveryAtOnceAndReportsEachAsItFinishes(t *testing.T) {
+	h := newHarness(t)
+	sender := NewCommandSender(h.sender.database, h.sender.dataCipher, h.audit)
+
+	// Each request is held until both have arrived, so the deliveries finish only when they ran
+	// together. One run after the other, the first is answered 400 once the wait gives up.
+	var arrived sync.WaitGroup
+	arrived.Add(2)
+	together := make(chan struct{})
+	go func() { arrived.Wait(); close(together) }()
+	statuses := map[string]int{"/accepts": http.StatusOK, "/refuses": http.StatusBadRequest}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		arrived.Done()
+		select {
+		case <-together:
+			w.WriteHeader(statuses[r.URL.Path])
+		case <-time.After(3 * time.Second):
+			w.WriteHeader(http.StatusConflict)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	accepts, refuses := confidential(server.URL+"/accepts"), confidential(server.URL+"/refuses")
+	accepts.ClientIdentifier, refuses.ClientIdentifier = "app-accepts", "app-refuses"
+	accepts.ClientId, refuses.ClientId = 1, 2
+
+	got := map[string]Outcome{}
+	sender.SendAndWait(context.Background(), testIssuer, []Delivery{accepts, refuses}, func(d Delivery, o Outcome) {
+		got[d.ClientIdentifier] = o
+	})
+
+	assert.Equal(t, map[string]Outcome{"app-accepts": Delivered, "app-refuses": Refused}, got)
+	require.Len(t, h.audit.events, 2)
+	outcomes := map[interface{}]interface{}{}
+	for _, event := range h.audit.events {
+		assert.Equal(t, audit.EventSentLogoutToken, event.name)
+		outcomes[event.details["client_id"]] = event.details["outcome"]
+	}
+	assert.Equal(t, map[interface{}]interface{}{int64(1): "delivered", int64(2): "refused"}, outcomes)
+}

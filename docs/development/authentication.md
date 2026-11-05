@@ -205,8 +205,12 @@ client's back-channel logout URI (#784).
   refresh token (`GetUsableRefreshTokenClientIdsByUserId`, read before the sweep revokes them); an
   app with `backchannel_logout_session_required` gets `sub`+`sid` per valid session instead, and
   nothing for a grant alone. The user's own password change is session-specific: `sub`+`sid` per
-  app on each ended valid session, never the kept one. The `recover` command passes the zero notice,
-  which tells nobody
+  app on each ended valid session, never the kept one. The `recover` command is a user-wide end too
+  (decision 11): `recovery.Run` builds the notice from the settings it reads, and the command
+  delivers `Outcome.Revocation.LogoutDeliveries` itself after the commit, through
+  `backchannel.NewCommandSender`'s `SendAndWait`, which runs them at once and waits; no job budget
+  and no metric apply, and its `sent_logout_token` entries name the command under `command`. An
+  unusable data key leaves the recovery committed and the apps untold, said on stderr
 - Recipients are collected inside the end's transaction: the session's row is taken first
   (`AcquireUserSessionRow`, each of a user's sessions in id order), then `backchannel.SessionDeliveries`
   reads its `user_session_clients` with their clients, before the deletion cascades them away. A row already gone names nobody. The
