@@ -159,7 +159,7 @@ func runRecoverCommand(inv recoverInvocation, open recoverDatabaseOpener, stdout
 	// way the running server does, so a deployment that has turned either target off is
 	// obeyed here too.
 	return runRecover(ctx, database, m,
-		audit.NewLogger(database, middleware.NewAuditSwitches(database)), inv, stdout, stderr)
+		audit.NewLogger(database, middleware.NewAuditSwitches(database), middleware.ActingUser{}), inv, stdout, stderr)
 }
 
 // recoverInvocation is what parseRecoverArgs made of the arguments after `recover`.

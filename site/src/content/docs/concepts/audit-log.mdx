@@ -152,7 +152,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `kind` | A legal document's kind: `must_accept` for terms users must accept, `for_information` for a privacy notice. |
 | `legal_document_id` | The legal document's row id. |
 | `limiter` | The name of the rate limiter that refused. |
-| `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. |
+| `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. A user's token also fills the entry's `logged_in_user_id` column with that user's row id. |
 | `max_user_sessions_per_user` | Under `old` and `new`: the most sessions one user can hold, 0 for no limit. |
 | `method` | The HTTP method of a refused Admin API request. |
 | `new` | The default token settings, the session settings, or the Turnstile settings, after the change, keyed as below. |

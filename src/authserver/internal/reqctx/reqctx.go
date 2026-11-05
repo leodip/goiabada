@@ -1,7 +1,7 @@
-// Package reqctx holds the auth server's six request-scoped values: the settings, the browser's
+// Package reqctx holds the auth server's seven request-scoped values: the settings, the browser's
 // session identifier and that session's user, the bearer token read off the request, the token a
-// scope guard validated, and the credential reservation a failures-only rate-limit tier holds
-// (#439). Each is written by
+// scope guard validated, the credential reservation a failures-only rate-limit tier holds
+// (#439), and the user whose token the session guard found live (#780). Each is written by
 // one middleware and read back through a typed accessor, over an unexported key, so nothing
 // outside this package can write one or read it under the wrong type (#433).
 package reqctx
@@ -25,6 +25,7 @@ const (
 	bearerTokenKey
 	validatedTokenKey
 	credentialReservationKey
+	actingUserIdKey
 )
 
 // ErrNoSettings is what a reader answers its request with when the settings middleware did
@@ -134,4 +135,18 @@ func WithCredentialReservation(ctx context.Context, res *CredentialReservation) 
 func CredentialReservationFrom(ctx context.Context) (*CredentialReservation, bool) {
 	res, ok := ctx.Value(credentialReservationKey).(*CredentialReservation)
 	return res, ok && res != nil
+}
+
+// WithActingUserId records the user whose access token made the request, which the session guard
+// found live, so the audit logger can record who acted without reading the user again (#780
+// decision 2).
+func WithActingUserId(ctx context.Context, userId int64) context.Context {
+	return context.WithValue(ctx, actingUserIdKey, userId)
+}
+
+// ActingUserIdFrom answers false when no user's token made the request: a browser flow, a client
+// credentials token, or a request the session guard never ran for.
+func ActingUserIdFrom(ctx context.Context) (int64, bool) {
+	userId, ok := ctx.Value(actingUserIdKey).(int64)
+	return userId, ok
 }
