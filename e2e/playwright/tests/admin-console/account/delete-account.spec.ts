@@ -113,6 +113,8 @@ test("a deletion with the password lands on /account/deleted, mails the user and
 });
 
 test("with two-factor authentication on, a deletion with the authentication code", async ({ browser, request, users }) => {
+  // Three codes from three steps: the enrolment's, the sign-in's and the deletion's.
+  test.setTimeout(150_000);
   const user = await users.create({ emailVerified: true });
   const { secret } = await turnOnTwoFactor(browser, user);
   const own = await signInToConsole(browser, { ...user, otpSecret: secret }, "/account/delete");

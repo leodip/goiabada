@@ -354,7 +354,7 @@ test("account deletion is on, as seeded, and is saved off and on again, the acco
     ((await (await request.get(`${env.authUrl}/api/public/settings`)).json()) as { accountDeletionEnabled: boolean }).accountDeletionEnabled;
 
   await withSettingsRestored(page, general, async () => {
-    const box = page.getByRole("checkbox", { name: "Let users delete their own account", exact: true });
+    const box = page.getByRole("checkbox", { name: /^Let users delete their own account/ });
     // A new installation lets users delete their own account, and an upgraded one too (#783).
     await expect(box).toBeChecked();
     await expect(box).toHaveAccessibleDescription(
