@@ -7,10 +7,11 @@
 
 export const googleAnalyticsId = 'G-CYZXDTHNB1';
 
-// Google's cookies last 390 days from the latest page view: gtag renews them on each
-// one, as its cookie_update default does, so the Privacy page and Cookie settings say
-// the thirteen months count from the latest visit. Thirteen months, whichever months
-// they span, is at least 393 days, so the cookies never outlive what those pages say.
+// Google's cookies last 390 days from the latest page view that loads the tag: gtag
+// renews them on each one, as its cookie_update default does, so the Privacy page and
+// Cookie settings count the thirteen months from the latest visit. Thirteen months,
+// whichever months they span, is at least 393 days, so the cookies never outlive what
+// those pages say.
 const googleCookieSeconds = 390 * 24 * 60 * 60;
 
 // Adds Google's tag to the page, once, set to keep as little as it can: no Google
