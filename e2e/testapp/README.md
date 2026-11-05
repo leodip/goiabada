@@ -8,6 +8,7 @@ claims and answers.
 |---|---|---|
 | `/web` | `testapp-web`, confidential | Add sign-in to a web app, Sign users out, Require two-factor authentication |
 | `/web2` | `testapp-web2`, confidential | Single sign-on across clients |
+| `/web3` | `testapp-web3`, confidential, no back-channel logout URI | Sign users out: what the auth server does with the tokens of an app that isn't told a session ended |
 | `/spa` | `testapp-spa`, public | Add sign-in to a SPA or mobile app |
 | `/service` | `testapp-service`, client credentials | Protect an API |
 | `/api/products` | `testapp-api`, confidential, introspects | Protect an API: checks and introspects the token, answers 401 or 403 |
@@ -37,15 +38,17 @@ which `e2e/infra/prepare.sh` wrote, and add the `http://localhost:3000/...` addr
 3. **`testapp-web2`**: the same, with `/web2/callback`, `/web2/signed-out` and
    `/web2/backchannel-logout` (on `https://e2e-webtest2.goiabada.dev` in the e2e environment). Its
    secret goes to `WEB2_CLIENT_SECRET`.
-4. **`testapp-spa`** (Add sign-in to a SPA or mobile app, steps 1 to 4). Create it with
+4. **`testapp-web3`**: the same as `testapp-web`, with `/web3/callback` and `/web3/signed-out`, and
+   no back-channel logout URI. Its secret goes to `WEB3_CLIENT_SECRET`.
+5. **`testapp-spa`** (Add sign-in to a SPA or mobile app, steps 1 to 4). Create it with
    **Authorization code flow with PKCE** on, choose **Public client** on **Authentication** and confirm with **Yes**, add
    `https://e2e-webtest1.goiabada.dev/spa` as both its redirect URI and its sign-out redirect URI,
    and the web origin
    `https://e2e-webtest1.goiabada.dev`.
-5. **`testapp-service`** (Protect an API, "Let a service call your API", steps 1 and 2). Create
+6. **`testapp-service`** (Protect an API, "Let a service call your API", steps 1 and 2). Create
    it with **Client credentials flow** on and **Authorization code flow with PKCE** off, grant it `product-api` `read` on **Permissions**, and
    copy its secret to `SERVICE_CLIENT_SECRET`.
-6. **`testapp-api`** (Protect an API, "Ask the auth server about a token", steps 1 and 2). Create
+7. **`testapp-api`** (Protect an API, "Ask the auth server about a token", steps 1 and 2). Create
    it with **Authorization code flow with PKCE** on, choose `product-api` on its **Introspection**
    tab, click **Add resource** and **Save**, and copy its secret to `API_CLIENT_SECRET`.
 

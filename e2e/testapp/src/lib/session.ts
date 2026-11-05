@@ -27,7 +27,7 @@ export type Result = {
   at: number;
 };
 
-// One entry per client: "web", "web2", "service".
+// One entry per client: "web", "web2", "web3", "service".
 export type ClientState = {
   pending?: Pending;
   signIn?: SignIn;

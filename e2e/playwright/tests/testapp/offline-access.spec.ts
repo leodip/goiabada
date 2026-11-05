@@ -1,16 +1,18 @@
 // Refresh tokens that outlive the session: the offline_access scope, which always asks the user, and
-// which ending the session doesn't reach (Ending sessions, "What it doesn't reach").
+// which ending the session doesn't reach (Ending sessions, "What it doesn't reach"). The app holding
+// the grant is the third web app, which registered no back-channel logout URI: one that did is told
+// the session ended and drops its tokens (backchannel-logout.spec.ts).
 import { expect, test } from "../../lib/fixtures";
 import { expectResult, resultBody, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
 
 test("offline_access asks for consent, and its refresh token keeps working after the whole session ends", async ({ browser, users }) => {
   const user = await users.create();
   const { context, page: app } = await userBrowser(browser);
-  await signInToWebApp(app, testapp.web, user, { scope: "openid email offline_access" });
+  await signInToWebApp(app, testapp.web3, user, { scope: "openid email offline_access" });
   await expect(app).toHaveURL(/\/auth\/consent/);
   await expect(app.getByText("Keep access while you're away, without asking you again")).toBeVisible();
   await app.getByRole("button", { name: "Allow", exact: true }).click();
-  await app.waitForURL(testapp.web.url);
+  await app.waitForURL(testapp.web3.url);
   await expectResult(app, "Signed in");
   expect(String((await resultBody(app)).scope).split(" ")).toContain("offline_access");
 
@@ -24,14 +26,14 @@ test("offline_access asks for consent, and its refresh token keeps working after
   await app.waitForURL(testapp.web2.url);
   await expectResult(app, "Signed out");
 
-  await app.goto(testapp.web.url);
+  await app.goto(testapp.web3.url);
   await app.getByRole("button", { name: "Refresh the tokens" }).click();
   await expectResult(app, "Refreshed");
   // The refreshed access token names no session, so /userinfo goes on accepting it.
   await app.getByRole("button", { name: "Call /userinfo" }).click();
   await expectResult(app, "/userinfo answered");
   // Consent for offline access is asked every time.
-  await signInToWebApp(app, testapp.web, user, { scope: "openid email offline_access" });
+  await signInToWebApp(app, testapp.web3, user, { scope: "openid email offline_access" });
   await expect(app).toHaveURL(/\/auth\/consent/);
   await context.close();
 });

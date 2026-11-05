@@ -6,10 +6,13 @@ import { submitPassword } from "./browser-sign-in";
 import { env } from "./environment";
 
 export const testapp = {
-  // The first host serves the web app, the SPA, the service and the API; the second the second web
-  // app, so single sign-on is tried across two sites.
+  // The first host serves the web app, the third web app, the SPA, the service and the API; the second
+  // the second web app, so single sign-on is tried across two sites.
   web: { clientId: "testapp-web", url: `${env.webtest1Url}/web` },
   web2: { clientId: "testapp-web2", url: `${env.webtest2Url}/web2` },
+  // A third web app, on the first host, that registered no back-channel logout URI: it keeps its
+  // tokens when the user's session ends, so tests can try them after the end.
+  web3: { clientId: "testapp-web3", url: `${env.webtest1Url}/web3` },
   spa: { clientId: "testapp-spa", url: `${env.webtest1Url}/spa`, origin: env.webtest1Url },
   service: { clientId: "testapp-service", url: `${env.webtest1Url}/service` },
   api: {
