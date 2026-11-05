@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/liveness"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // RequireBearerTokenScope requires a bearer token carrying requiredScope.
@@ -283,4 +284,61 @@ func (m *BearerToken) RequireAdminConsoleClient() func(http.Handler) http.Handle
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// RequireBearerTokenScopeSetAnyOf requires a bearer token carrying EVERY scope of at least one of
+// requiredScopeSets: OR over the sets, AND within each.
+//
+// It is RequireBearerTokenScopeAnyOf for a route that reads more than one domain, which a single
+// scope of a granular domain does not reach. The user export is the one such route: it holds the
+// user's audit events, which belong to the settings domain, so it takes admin-read, manage, or
+// manage-users together with manage-settings (#781 decision 1). A token reaching no set is refused
+// as a token with none of a route's scopes is, 403 INSUFFICIENT_SCOPE, and a request with no token
+// is the same realm-only 401.
+//
+// An empty set, or none at all, would admit every token, so building the guard with one panics:
+// it is a wiring fault in routes.go, found when the server starts.
+func (m *BearerToken) RequireBearerTokenScopeSetAnyOf(requiredScopeSets [][]string) func(http.Handler) http.Handler {
+	if len(requiredScopeSets) == 0 {
+		panic("RequireBearerTokenScopeSetAnyOf needs at least one set of scopes")
+	}
+	for _, set := range requiredScopeSets {
+		if len(set) == 0 {
+			panic("RequireBearerTokenScopeSetAnyOf was given an empty set of scopes, which every token holds")
+		}
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			jwtToken, ok := reqctx.BearerTokenFrom(r.Context())
+			if !ok {
+				m.refusals.missing(w, r)
+				return
+			}
+
+			if !holdsEveryScopeOfASet(jwtToken, requiredScopeSets) {
+				m.refusals.forbidden(w, r, "INSUFFICIENT_SCOPE", "Insufficient scope.")
+				return
+			}
+
+			next.ServeHTTP(w, r.WithContext(reqctx.WithValidatedToken(r.Context(), jwtToken)))
+		})
+	}
+}
+
+// holdsEveryScopeOfASet reports whether the token carries every scope of at least one set.
+func holdsEveryScopeOfASet(jwtToken oauth.JwtToken, sets [][]string) bool {
+	for _, set := range sets {
+		holdsAll := true
+		for _, scope := range set {
+			if !jwtToken.HasScope(scope) {
+				holdsAll = false
+				break
+			}
+		}
+		if holdsAll {
+			return true
+		}
+	}
+	return false
 }

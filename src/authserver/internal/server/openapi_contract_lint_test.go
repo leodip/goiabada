@@ -720,15 +720,16 @@ func handlerConstructor(e ast.Expr) (string, bool) {
 }
 
 // scopeGuards are the middlewares that can answer 403 INSUFFICIENT_SCOPE before a handler
-// runs. All three live in internal/middleware/api_auth.go, and each returns 403 rather than
+// runs. All four live in internal/middleware/api_auth.go, and each returns 403 rather than
 // 401 when the token is valid but does not carry what the route demands.
 //
-// Listed by name rather than detected structurally, so a fourth one is a deliberate addition
+// Listed by name rather than detected structurally, so a fifth one is a deliberate addition
 // here rather than something that silently starts or stops being checked.
 var scopeGuards = map[string]bool{
-	"RequireBearerTokenScope":      true,
-	"RequireBearerTokenScopeAnyOf": true,
-	"RequireUserBoundToken":        true,
+	"RequireBearerTokenScope":         true,
+	"RequireBearerTokenScopeAnyOf":    true,
+	"RequireBearerTokenScopeSetAnyOf": true,
+	"RequireUserBoundToken":           true,
 }
 
 // mentionsScopeGuard looks for one of those in the .With(...) chain a verb hangs off, which is

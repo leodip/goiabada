@@ -367,6 +367,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   applying to all apps or listing the client a sign-in names, each with its current version. The
   registration form reads them through it, the acceptance step asks it what a user owes, and the
   account and admin APIs read back the versions a user accepted (#622)
+- `internal/userexport/` - The document holding everything the auth server holds about one user,
+  which an operator hands a person asking for their data: `Build` takes the user and returns it,
+  whoever asks, and `FileName` is the name it is saved as. The admin API's export route answers it
+  (#781)
 - `internal/legalmarkdown/` - A legal document's Markdown rendered to HTML through goldmark, for the
   admin API's preview and the public pages alike: CommonMark and tables, raw HTML left out,
   dangerous addresses dropped, images drawn as links. Its output is the auth server's one

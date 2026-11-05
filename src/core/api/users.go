@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -288,4 +289,42 @@ type UserConsentResponse struct {
 
 type GetUserConsentsResponse struct {
 	Consents []UserConsentResponse `json:"consents"`
+}
+
+// UserExportResponse is everything the auth server holds about one user, in one document, as GET
+// /api/v1/admin/users/{id}/export answers it: what an operator hands a person who asked for their
+// data (#781). Each part is the entry the matching admin API read answers, inside this versioned
+// wrapper, and every list is in id order, oldest first, so two exports of one person compare line
+// by line (decision 3). FormatVersion goes up only for a change that breaks a reader; a field added
+// to a reused entry appears here too, and is additive.
+//
+// Groups, RefreshTokens, ProfilePicture and AuditEvents are shapes no admin API read answers yet:
+// they are [] and null until their entries are defined.
+type UserExportResponse struct {
+	FormatVersion int       `json:"formatVersion"`
+	ExportedAt    time.Time `json:"exportedAt"`
+	// Issuer is the auth server's issuer, since a subject is a stable identifier only together
+	// with its issuer (OpenID Connect Core 1.0 section 5.7).
+	Issuer                   string                            `json:"issuer"`
+	Identifiers              UserExportIdentifiersResponse     `json:"identifiers"`
+	User                     UserResponse                      `json:"user"`
+	Attributes               []UserAttributeResponse           `json:"attributes"`
+	Groups                   []json.RawMessage                 `json:"groups"`
+	Permissions              []PermissionResponse              `json:"permissions"`
+	Consents                 []UserConsentResponse             `json:"consents"`
+	Sessions                 []UserSessionDetailResponse       `json:"sessions"`
+	RefreshTokens            []json.RawMessage                 `json:"refreshTokens"`
+	LegalDocumentAcceptances []LegalDocumentAcceptanceResponse `json:"legalDocumentAcceptances"`
+	ProfilePicture           json.RawMessage                   `json:"profilePicture"`
+	AuditEvents              []json.RawMessage                 `json:"auditEvents"`
+}
+
+// UserExportIdentifiersResponse is what the user is known by, to search older audit rows and the
+// logs with: the row id, the subject, the email address, and EmailDigest, the SHA-256 hex digest
+// of that address, which is how an audit entry about an address records it.
+type UserExportIdentifiersResponse struct {
+	Id          int64  `json:"id"`
+	Subject     string `json:"subject"`
+	Email       string `json:"email"`
+	EmailDigest string `json:"emailDigest"`
 }

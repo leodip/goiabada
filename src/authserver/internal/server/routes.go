@@ -276,6 +276,16 @@ func (s *Server) initRoutes(branches appBranches) {
 			scope(builtin.ManagePermissionIdentifier),
 		}
 
+		// The user export reads the user and the user's audit events, so its token must reach both
+		// the users and the settings domain: admin-read or manage alone, or manage-users together
+		// with manage-settings. manage-users alone does not read the audit log, which holds an
+		// administrator's settings and client actions (#781 decision 1).
+		scopesUserExport := [][]string{
+			{scope(builtin.AdminReadPermissionIdentifier)},
+			{scope(builtin.ManagePermissionIdentifier)},
+			{scope(builtin.ManageUsersPermissionIdentifier), scope(builtin.ManageSettingsPermissionIdentifier)},
+		}
+
 		// User management routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/search", apihandlers.HandleUsersSearchGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}", apihandlers.HandleUserGet(s.database))
@@ -292,6 +302,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleUserProfilePictureDelete(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender, s.dataCipher, baseURL))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleUserDelete(s.database, auditLogger, notifier))
+		r.With(apiBearer.RequireBearerTokenScopeSetAnyOf(scopesUserExport)).Get("/users/{id}/export", apihandlers.HandleUserExportGet(s.database, auditLogger))
 
 		// User attributes routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/attributes", apihandlers.HandleUserAttributesGet(s.database))

@@ -254,6 +254,12 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
+// Unwrap answers the writer beneath, which is how http.ResponseController reaches the
+// connection's write deadline: the user export lifts its own, debugging on or off (#781).
+func (rw *responseWriter) Unwrap() http.ResponseWriter {
+	return rw.ResponseWriter
+}
+
 // captured is the response as the log sees it.
 func (rw *responseWriter) captured() capturedBody {
 	return capturedBody{head: rw.body.Bytes(), size: rw.size}

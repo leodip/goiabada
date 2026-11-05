@@ -255,6 +255,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateUserResponse` | both-apps | — |
 | `core/api` | `UserAttributeResponse` | both-apps | — |
 | `core/api` | `UserConsentResponse` | both-apps | — |
+| `core/api` | `UserExportIdentifiersResponse` | contract | The identifiers part of the user export, `GET /api/v1/admin/users/{id}/export`, a published admin API answer whose wire types live here as every one does (#781 decision 3). The auth server writes it and no admin console file reads it. |
+| `core/api` | `UserExportResponse` | contract | The document `GET /api/v1/admin/users/{id}/export` answers, a published admin API answer whose wire types live here as every one does (#781 decision 3). The auth server writes it and no admin console file reads it. |
 | `core/api` | `UserResponse` | both-apps | — |
 | `core/api` | `UserSessionDetailResponse` | both-apps | — |
 | `core/api` | `UserSessionResponse` | reachable | — |
