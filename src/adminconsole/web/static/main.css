@@ -340,6 +340,9 @@
   .grow {
     flex-grow: 1;
   }
+  .basis-40 {
+    flex-basis: calc(var(--spacing) * 40);
+  }
   .basis-64 {
     flex-basis: calc(var(--spacing) * 64);
   }

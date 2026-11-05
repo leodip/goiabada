@@ -340,14 +340,14 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetAuditLogsPaginated",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetAuditLogsPaginated(ctx, charAccessToken, 2, 25, "AuditUserLogin", "a request id")
+				got, err := c.GetAuditLogsPaginated(ctx, charAccessToken, 2, 25, "AuditUserLogin", "a request id", 42)
 				if err != nil {
 					return nil, err
 				}
 				return got.Total, nil
 			},
 			verb: "GET", path: "/api/v1/admin/audit-logs",
-			query:         "page=2&size=25&auditEvent=AuditUserLogin&requestId=a+request+id",
+			query:         "page=2&size=25&auditEvent=AuditUserLogin&requestId=a+request+id&userId=42",
 			contentType:   charJSON,
 			successStatus: 200, reply: `{"auditLogs":[],"total":7}`, want: 7,
 		},

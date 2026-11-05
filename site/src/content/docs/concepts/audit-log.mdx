@@ -15,11 +15,13 @@ Goiabada records security events as they happen: sign-ins, refused passwords, to
 
 1. In the admin console, open **Admin**, **Audit log**.
 
-2. Pick an event from the list, or paste a request id into **Request id**, and click **Filter**.
+2. Pick an event from the list, paste a request id into **Request id**, or type a user's id into **User id**, and click **Filter**. The filters you set combine.
 
-3. Read the entries, newest first. Each one shows its **Time**, its **Event** and its **Details**, with its **Request id** under the event when it has one.
+3. Read the entries, newest first. Each one shows its **Time**, its **Event** and its **Details**. Under the event are its **Request id**, the **User** it's about and the user it was **Acted by**, when it has them. Each one links to every event of that request or that user.
 
 </Steps>
+
+To see everything about one user, open them in **Users** and click **Show audit events**. That's the log filtered by their id: the events about them and the ones they made. A user's id is the number in the address of their pages, such as `42` in `/admin/users/42/details`. A deleted user's events stay listed under their id.
 
 By default, events are kept for 180 days and then deleted. To change that, or where events go, open **Admin**, **Audit logging**.
 

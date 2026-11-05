@@ -280,3 +280,20 @@ func TestRender_AdminUsersAuthentication_SaysWhenTheAuthenticatorIsDisabled(t *t
 		})
 	}
 }
+
+// Every page of a user opens with the user header, which links to that user's audit events: the
+// audit log filtered by their id (#780, decision 8).
+func TestRender_AdminUserHeaderLinksToTheUsersAuditEvents(t *testing.T) {
+	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
+		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", Enabled: true},
+		"userFullName":      "",
+		"page":              "1",
+		"query":             "",
+		"savedSuccessfully": false,
+		"userCreated":       false,
+	})
+
+	assert.Contains(t, out, `<div class="page-actions">
+    <a class="button" href="/admin/settings/audit-log-viewer?userId=7">Mostrar eventos de auditoria</a>
+  </div>`)
+}

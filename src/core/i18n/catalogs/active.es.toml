@@ -429,6 +429,7 @@
 "adminconsole.user_tabs.permissions" = "Permisos"
 "adminconsole.user_tabs.groups" = "Grupos"
 "adminconsole.user_tabs.legal_documents" = "Documentos legales"
+"adminconsole.user_header.audit_events_link" = "Mostrar eventos de auditoría"
 
 # --- Adminconsole standalone pages (error, not-found, unauthorized, welcome) -
 
@@ -490,6 +491,7 @@
 "adminconsole.refusal.settings_tokens.offline_idle_timeout_invalid" = "Escribe el tiempo de inactividad de las sesiones offline en segundos enteros."
 "adminconsole.refusal.settings_tokens.offline_max_lifetime_invalid" = "Escribe la duración máxima de las sesiones offline en segundos enteros."
 "adminconsole.refusal.settings_audit_logs.retention_days_invalid" = "Escribe el período de conservación en días enteros."
+"adminconsole.refusal.audit_log_viewer.user_id_invalid" = "Escribe el ID de usuario como un número entero mayor que 0."
 "adminconsole.refusal.settings_email.port_invalid" = "Escribe el puerto como un número entero."
 "adminconsole.refusal.user_new.email_required" = "La dirección de correo electrónico no puede estar vacía."
 "adminconsole.refusal.user_delete.email_required" = "Escribe el correo electrónico del usuario para confirmar."
@@ -1782,6 +1784,10 @@
 "adminconsole.admin_settings.audit_log_viewer.col_event" = "Evento"
 "adminconsole.admin_settings.audit_log_viewer.col_request_id" = "ID de solicitud"
 "adminconsole.admin_settings.audit_log_viewer.request_events_link" = "mostrar todos los eventos de esta solicitud"
+"adminconsole.admin_settings.audit_log_viewer.col_user_id" = "ID de usuario"
+"adminconsole.admin_settings.audit_log_viewer.row_user" = "Usuario"
+"adminconsole.admin_settings.audit_log_viewer.row_acted_by" = "Hecho por"
+"adminconsole.admin_settings.audit_log_viewer.user_events_link" = "mostrar todos los eventos sobre este usuario o hechos por él"
 "adminconsole.admin_settings.audit_log_viewer.col_details" = "Detalles"
 "adminconsole.admin_settings.audit_log_viewer.no_details" = "Ninguno"
 "adminconsole.admin_settings.audit_log_viewer.empty" = "Todavía no hay eventos de auditoría."

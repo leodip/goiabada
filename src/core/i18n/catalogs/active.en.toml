@@ -424,6 +424,7 @@
 "adminconsole.user_tabs.permissions" = "Permissions"
 "adminconsole.user_tabs.groups" = "Groups"
 "adminconsole.user_tabs.legal_documents" = "Legal documents"
+"adminconsole.user_header.audit_events_link" = "Show audit events"
 
 # --- Adminconsole standalone pages (error, not-found, unauthorized, welcome) -
 
@@ -485,6 +486,7 @@
 "adminconsole.refusal.settings_tokens.offline_idle_timeout_invalid" = "Enter the offline idle timeout as a whole number of seconds."
 "adminconsole.refusal.settings_tokens.offline_max_lifetime_invalid" = "Enter the offline maximum lifetime as a whole number of seconds."
 "adminconsole.refusal.settings_audit_logs.retention_days_invalid" = "Enter the retention as a whole number of days."
+"adminconsole.refusal.audit_log_viewer.user_id_invalid" = "Enter the user id as a whole number above 0."
 "adminconsole.refusal.settings_email.port_invalid" = "Enter the port as a whole number."
 "adminconsole.refusal.user_new.email_required" = "The email address cannot be empty."
 "adminconsole.refusal.user_delete.email_required" = "Type the user's email to confirm."
@@ -1777,6 +1779,10 @@
 "adminconsole.admin_settings.audit_log_viewer.col_event" = "Event"
 "adminconsole.admin_settings.audit_log_viewer.col_request_id" = "Request id"
 "adminconsole.admin_settings.audit_log_viewer.request_events_link" = "show every event of this request"
+"adminconsole.admin_settings.audit_log_viewer.col_user_id" = "User id"
+"adminconsole.admin_settings.audit_log_viewer.row_user" = "User"
+"adminconsole.admin_settings.audit_log_viewer.row_acted_by" = "Acted by"
+"adminconsole.admin_settings.audit_log_viewer.user_events_link" = "show every event about or by this user"
 "adminconsole.admin_settings.audit_log_viewer.col_details" = "Details"
 "adminconsole.admin_settings.audit_log_viewer.no_details" = "None"
 "adminconsole.admin_settings.audit_log_viewer.empty" = "No audit events yet."
