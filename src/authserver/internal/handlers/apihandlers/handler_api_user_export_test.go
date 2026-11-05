@@ -504,6 +504,36 @@ func TestHandleUserExportGet_RecordsTheExportAfterTheAnswer(t *testing.T) {
 	}
 }
 
+// interruptedWriter is a connection that takes the first half of the answer, then breaks.
+type interruptedWriter struct{ *httptest.ResponseRecorder }
+
+func (w *interruptedWriter) Write(p []byte) (int, error) {
+	n, _ := w.ResponseRecorder.Write(p[:len(p)/2])
+	return n, io.ErrClosedPipe
+}
+
+// An answer the caller did not receive whole is still recorded: part of the data has left the
+// server either way (decision 8).
+func TestHandleUserExportGet_RecordsAnExportTheCallerDidNotReceiveWhole(t *testing.T) {
+	for _, acceptEncoding := range []string{"", "gzip"} {
+		t.Run("Accept-Encoding "+acceptEncoding, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			auditLogger := &exportAudit{recorder: rr}
+
+			HandleUserExportGet(exportDatabase(), auditLogger, "https://auth.example.com").ServeHTTP(
+				&interruptedWriter{rr}, exportRequest("42", acceptEncoding))
+
+			require.Positive(t, rr.Body.Len(), "part of the document left the server")
+			require.Len(t, auditLogger.events, 1)
+			assert.Equal(t, "exported_user_data", auditLogger.events[0].event)
+			assert.Equal(t, map[string]interface{}{
+				"user_id":        int64(42),
+				"logged_in_user": "the-administrator",
+			}, auditLogger.events[0].details)
+		})
+	}
+}
+
 // A refused or failed export answers the API's error envelope, uncompressed whatever the caller
 // accepts, and records nothing.
 func TestHandleUserExportGet_RefusalsAndFailuresAreUncompressedAndUnrecorded(t *testing.T) {
@@ -621,9 +651,10 @@ func exportEverythingDatabase(now time.Time) *userExportStore {
 			DeviceName: "Safari", DeviceType: "mobile", DeviceOS: "iOS", UserAgent: "Mozilla/5.0 (iPhone)", UserId: 42},
 	}
 	store.sessionClients = map[int64][]record.UserSessionClient{
-		61: {{UserSessionId: 61, ClientId: 101}, {UserSessionId: 61, ClientId: 100}},
-		60: {{UserSessionId: 60, ClientId: 100}},
-		62: {{UserSessionId: 62, ClientId: 100}},
+		// Session 61's forum association is the later one, answered first.
+		61: {{Id: 802, UserSessionId: 61, ClientId: 101}, {Id: 801, UserSessionId: 61, ClientId: 100}},
+		60: {{Id: 800, UserSessionId: 60, ClientId: 100}},
+		62: {{Id: 803, UserSessionId: 62, ClientId: 100}},
 	}
 
 	// The database answers acceptances in the order they were stored; AcceptedBy turns them the
@@ -654,7 +685,7 @@ func exportEverythingDatabase(now time.Time) *userExportStore {
 
 // exportEverythingParts is what the document holds for exportEverythingDatabase beside the user,
 // written out by hand: each entry as the matching admin API read answers it, every list in id
-// order, the expired session left out, and the picture as its content type and base64 bytes. The
+// order, a session's apps by their association's, the expired session left out, and the picture as its content type and base64 bytes. The
 // four %s are the live sessions' times: session 60's start and last access, then session 61's.
 const exportEverythingParts = `{
 	"attributes": [
@@ -706,9 +737,9 @@ const exportEverythingParts = `{
 			"lastAccessed": %[4]s, "authMethods": "pwd otp", "acrLevel": "urn:goiabada:level2_mandatory", "authTime": %[3]s,
 			"ipAddress": "203.0.113.7", "deviceName": "Firefox", "deviceType": "desktop", "deviceOS": "Linux",
 			"userAgent": "Mozilla/5.0 (X11)", "userId": 42, "isCurrent": false,
-			"clientIdentifiers": ["forum", "shop"], "clients": [
-				{"clientIdentifier": "forum", "name": "forum", "nameUnverified": false},
-				{"clientIdentifier": "shop", "name": "Shop", "nameUnverified": false}]}
+			"clientIdentifiers": ["shop", "forum"], "clients": [
+				{"clientIdentifier": "shop", "name": "Shop", "nameUnverified": false},
+				{"clientIdentifier": "forum", "name": "forum", "nameUnverified": false}]}
 	],
 	"legalDocumentAcceptances": [
 		{"id": 70, "acceptedAt": "2025-01-02T00:00:00Z", "legalDocumentId": 90, "shortName": "terms", "version": 1,

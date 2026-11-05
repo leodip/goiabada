@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -76,6 +77,40 @@ func TestHandleExportPost_PassesTheExportThroughUntouched(t *testing.T) {
 	assert.Equal(t, `attachment; filename="user-7-2026-11-05.json"`, rec.Header().Get("Content-Disposition"))
 	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 	assert.True(t, body.closed, "the export's body is closed once copied")
+}
+
+// deadlineRecorder is a response recorder that, like a real connection, takes a write deadline.
+type deadlineRecorder struct {
+	*httptest.ResponseRecorder
+	deadlines []time.Time
+}
+
+func (d *deadlineRecorder) SetWriteDeadline(deadline time.Time) error {
+	d.deadlines = append(d.deadlines, deadline)
+	return nil
+}
+
+// The console's listener gives this answer five minutes to reach the browser, in place of its 60
+// seconds, as the auth server's does (decision 5).
+func TestHandleExportPost_LiftsTheWriteDeadlineToFiveMinutes(t *testing.T) {
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	apiClient := &userExportApiClient{export: &apiclient.UserExport{
+		ContentType: "application/json",
+		Body:        io.NopCloser(bytes.NewReader([]byte(`{"formatVersion":1}`))),
+	}}
+
+	rec := &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
+	req := handlertest.Request(http.MethodPost, "/admin/users/7/export",
+		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "7"))
+	before := time.Now()
+	HandleExportPost(httpHelper, apiClient).ServeHTTP(rec, req)
+	after := time.Now()
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	require.Len(t, rec.deadlines, 1)
+	assert.False(t, rec.deadlines[0].Before(before.Add(5*time.Minute)) || rec.deadlines[0].After(after.Add(5*time.Minute)),
+		"the deadline %v is not five minutes after the request", rec.deadlines[0])
 }
 
 // A plain answer is passed on plain: no encoding is claimed for bytes that carry none, and no

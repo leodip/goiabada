@@ -6302,8 +6302,7 @@ components:
           description: |
             When the user signed in: at the sign-in the token came from, or, for a password-grant
             token, when the password was checked. A rotated token keeps it, so it can be earlier
-            than `issuedAt`. Null when it isn't stored, as on a password-grant token issued before
-            the auth server recorded it.
+            than `issuedAt`. Null when no authentication time is stored.
           type: string
           format: date-time
           nullable: true

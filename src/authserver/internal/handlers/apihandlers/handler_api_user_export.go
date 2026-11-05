@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"bytes"
+	"cmp"
 	"compress/gzip"
 	"context"
 	"database/sql"
@@ -153,6 +154,11 @@ func buildUserExport(ctx context.Context, database userExportDatabase, user *rec
 	}
 	if err = database.UserSessionsLoadClients(ctx, nil, userSessions); err != nil {
 		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the clients of the user's sessions for the export")
+	}
+	// A session's apps in the order of their association rows, which the read leaves unordered
+	// and the mapping drops the ids of (decision 3).
+	for i := range userSessions {
+		slices.SortStableFunc(userSessions[i].Clients, func(a, b record.UserSessionClient) int { return cmp.Compare(a.Id, b.Id) })
 	}
 	sessions, err := buildSessionDetails(ctx, database, userSessions, settings, "")
 	if err != nil {
