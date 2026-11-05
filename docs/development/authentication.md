@@ -195,9 +195,21 @@ client's back-channel logout URI (#784).
     session; a hintless one ends the session in a transaction that reads every app first (decision 2);
   - a reused code's session, in `revocation.RevokeOnAuthCodeReuse`, whose `SessionLive` argument
     (`revocation.LiveUnder` over the settings) is the token endpoint's judgement
+  - the credential sites, through `revocation.RevokeUserAuthStateTx`'s `LogoutNotice`, and the
+    deletion of a user, through `revocation.UserWideDeliveries` inside the deletion's transaction,
+    under `GetUserByIdForUpdate` and before `DeleteUser` cascades the sessions and grants away. Every
+    deletion of a user must call it there
+- Two shapes (decision 3). A user-wide end (`LogoutNotice.UserWide`: disabling or deleting the
+  user, a password reset, an administrator setting the password) sends one `sub`-only token to each
+  app with a URI on any stored session of the user, valid or not, or holding an unrevoked, unexpired
+  refresh token (`GetUsableRefreshTokenClientIdsByUserId`, read before the sweep revokes them); an
+  app with `backchannel_logout_session_required` gets `sub`+`sid` per valid session instead, and
+  nothing for a grant alone. The user's own password change is session-specific: `sub`+`sid` per
+  app on each ended valid session, never the kept one. The `recover` command passes the zero notice,
+  which tells nobody
 - Recipients are collected inside the end's transaction: the session's row is taken first
-  (`AcquireUserSessionRow`), then `backchannel.SessionDeliveries` reads its `user_session_clients`
-  with their clients, before the deletion cascades them away. A row already gone names nobody. The
+  (`AcquireUserSessionRow`, each of a user's sessions in id order), then `backchannel.SessionDeliveries`
+  reads its `user_session_clients` with their clients, before the deletion cascades them away. A row already gone names nobody. The
   user's subject is read before the transaction, so it holds no users row lock while holding the
   session's. The caller hands `TerminationResult.LogoutDeliveries` to `backchannel.Sender.Send`
   after the commit, beside its audit events
@@ -217,7 +229,8 @@ client's back-channel logout URI (#784).
 - Discovery advertises `backchannel_logout_supported` and `backchannel_logout_session_supported`
 - Implementation: `backchannel`, `revocation/revocation.go`, `authflow/completion.go`,
   `usersession/usersession_manager.go`, `handler_logout.go`, `handler_token.go`,
-  `handler_api_account_sessions.go`, `handler_api_users_sessions.go`
+  `handler_api_account_sessions.go`, `handler_api_users_sessions.go`, `handler_api_users_crud.go`,
+  `handler_api_account_password.go`, `accounthandlers/handler_reset_password.go`
 
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**

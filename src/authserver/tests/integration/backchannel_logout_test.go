@@ -148,7 +148,8 @@ func verifiedLogoutToken(t *testing.T, raw string) (map[string]interface{}, jwt.
 }
 
 // assertLogoutToken holds what arrived to Back-Channel Logout 1.0 section 2.4 and #784 decision 4,
-// for a token about the session sid of the user subject, to the client clientIdentifier.
+// for a token about the session sid of the user subject, or about every session of the user when
+// sid is empty, to the client clientIdentifier.
 func assertLogoutToken(t *testing.T, got logoutPost, clientIdentifier, subject, sid string) jwt.MapClaims {
 	t.Helper()
 
@@ -162,7 +163,11 @@ func assertLogoutToken(t *testing.T, got logoutPost, clientIdentifier, subject, 
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, clientIdentifier, claims["aud"])
 	assert.Equal(t, subject, claims["sub"])
-	assert.Equal(t, sid, claims["sid"])
+	if sid == "" {
+		assert.NotContains(t, claims, "sid", "a token about every session of the user carries sub alone")
+	} else {
+		assert.Equal(t, sid, claims["sid"])
+	}
 	assert.Equal(t, map[string]interface{}{"http://schemas.openid.net/event/backchannel-logout": map[string]interface{}{}},
 		claims["events"])
 	assert.NotContains(t, claims, "nonce")

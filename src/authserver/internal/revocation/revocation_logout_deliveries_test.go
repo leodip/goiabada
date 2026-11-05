@@ -169,3 +169,222 @@ func TestRevokeOnAuthCodeReuse_ALiveSessionNamesTheAppsToTell(t *testing.T) {
 		})
 	}
 }
+
+// The two sessions and the apps of the user-wide and session-specific fixtures below: session 1
+// still valid, session 2 not. Liveness is the notice's judgement, so the fixture names it directly.
+const (
+	liveSessionId    = int64(1)
+	liveSessionSid   = "sid-live"
+	expiredSessionId = int64(2)
+	expiredSid       = "sid-expired"
+)
+
+func noticeSessions() []record.UserSession {
+	// Out of id order, as the query may answer them: the rows are taken in id order.
+	return []record.UserSession{
+		{Id: expiredSessionId, UserId: revokeUserId, SessionIdentifier: expiredSid},
+		{Id: liveSessionId, UserId: revokeUserId, SessionIdentifier: liveSessionSid},
+	}
+}
+
+func liveOnly(session *record.UserSession) bool { return session.SessionIdentifier == liveSessionSid }
+
+// The apps: onBoth (21) is on both sessions; onExpired (22) on the expired one; noURI (23) on the live
+// one with no back-channel logout URI; sidRequired (24) requires sid and is on both; grantOnly (25)
+// holds only a refresh token; grantNoURI (26) holds one and has no URI.
+var (
+	onBoth      = record.Client{Id: 21, ClientIdentifier: "on-both", BackchannelLogoutURI: "https://both.example/bc"}
+	onExpired   = record.Client{Id: 22, ClientIdentifier: "on-expired", BackchannelLogoutURI: "https://expired.example/bc"}
+	noURI       = record.Client{Id: 23, ClientIdentifier: "no-uri"}
+	sidRequired = record.Client{Id: 24, ClientIdentifier: "sid-required", BackchannelLogoutURI: "https://sid.example/bc",
+		BackchannelLogoutSessionRequired: true}
+	grantOnly = record.Client{Id: 25, ClientIdentifier: "grant-only", BackchannelLogoutURI: "https://grant.example/bc",
+		IsPublic: true, CreatedViaDCR: true}
+	grantNoURI = record.Client{Id: 26, ClientIdentifier: "grant-no-uri"}
+)
+
+// expectSessionApps registers the row and the apps of one session.
+func expectSessionApps(db *datamocks.Database, sid string, sessionId int64, held bool, clients ...record.Client) {
+	db.On("AcquireUserSessionRow", mock.Anything, revokeTx, sid).Return(held, nil).Once()
+	if !held {
+		return
+	}
+	sessionClients := make([]record.UserSessionClient, len(clients))
+	for i, client := range clients {
+		sessionClients[i] = record.UserSessionClient{UserSessionId: sessionId, ClientId: client.Id}
+	}
+	db.On("GetUserSessionClientsByUserSessionId", mock.Anything, revokeTx, sessionId).Return(sessionClients, nil).Once()
+	db.On("UserSessionClientsLoadClients", mock.Anything, revokeTx, sessionClients).Run(func(args mock.Arguments) {
+		loaded := args.Get(2).([]record.UserSessionClient)
+		for i := range loaded {
+			loaded[i].Client = clients[i]
+		}
+	}).Return(nil).Once()
+}
+
+// expectSweep registers the generation increment and the sweep of the two sessions with no tokens,
+// keeping keptSid's session when it is set.
+func expectSweep(db *datamocks.Database, keptSid string) {
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).Return(revokeNewGeneration, nil).Once()
+	db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).Return(noticeSessions(), nil).Once()
+	for _, session := range noticeSessions() {
+		if session.SessionIdentifier == keptSid {
+			db.On("PromoteUserSessionGeneration", mock.Anything, revokeTx, session.Id, revokeNewGeneration).Return(nil).Once()
+			continue
+		}
+		db.On("DeleteUserSession", mock.Anything, revokeTx, session.Id).Return(nil).Once()
+	}
+	db.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, revokeUserId).Return([]*record.RefreshToken{}, nil).Once()
+	if keptSid != "" {
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, keptSid).Return([]*record.RefreshToken{}, nil).Once()
+	}
+	db.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, revokeNewGeneration).Return(nil).Once()
+}
+
+// subOnly is the sub-only token to client a user-wide end sends.
+func subOnly(client record.Client) backchannel.Delivery {
+	return backchannel.Delivery{ClientId: client.Id, ClientIdentifier: client.ClientIdentifier,
+		URI: client.BackchannelLogoutURI, IsPublic: client.IsPublic, CreatedViaDCR: client.CreatedViaDCR,
+		UserId: revokeUserId, Subject: "subject-of-7"}
+}
+
+// withSid is the sub+sid token about session sid to client.
+func withSid(client record.Client, sid string) backchannel.Delivery {
+	delivery := subOnly(client)
+	delivery.SessionIdentifier = sid
+	return delivery
+}
+
+// TestRevokeUserAuthState_AUserWideEndTellsEveryAppThatKnewTheUser: a user-wide end sends one sub-only
+// token to each app with a URI that was on any of the user's sessions, valid or not, or holds one of
+// the user's usable refresh tokens, and a sub+sid token for each valid session to an app requiring
+// sid, which a grant alone tells nothing (#784 decision 3). The apps are read under each session's
+// row, in id order, before the session's deletion, and the grants before the token sweep.
+func TestRevokeUserAuthState_AUserWideEndTellsEveryAppThatKnewTheUser(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	expectSweep(db, "")
+	expectSessionApps(db, liveSessionSid, liveSessionId, true, onBoth, noURI, sidRequired)
+	expectSessionApps(db, expiredSid, expiredSessionId, true, onBoth, onExpired, sidRequired)
+	db.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, revokeTx, revokeUserId, mock.Anything).
+		Return([]int64{grantOnly.Id, onBoth.Id, sidRequired.Id, grantNoURI.Id}, nil).Once()
+	// onBoth was read on a session already; the others are read now.
+	db.On("GetClientsByIds", mock.Anything, revokeTx, []int64{grantOnly.Id, sidRequired.Id, grantNoURI.Id}).
+		Return([]record.Client{grantOnly, sidRequired, grantNoURI}, nil).Once()
+
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "",
+		LogoutNotice{Subject: "subject-of-7", UserWide: true, Live: liveOnly})
+	require.NoError(t, err)
+
+	assert.Equal(t, []backchannel.Delivery{
+		withSid(sidRequired, liveSessionSid),
+		subOnly(onBoth),
+		subOnly(onExpired),
+		subOnly(grantOnly),
+	}, result.LogoutDeliveries)
+
+	// Each session's row is taken, and its apps read, before any session is deleted; the grants are
+	// read before the sweep revokes them.
+	firstDelete := callIndex(t, db, "DeleteUserSession")
+	for _, call := range db.Calls[firstDelete:] {
+		assert.NotEqual(t, "GetUserSessionClientsByUserSessionId", call.Method, "a session's apps are read before any deletion")
+	}
+	assert.Less(t, callIndex(t, db, "GetUsableRefreshTokenClientIdsByUserId"), callIndex(t, db, "GetRefreshTokensByUserId"))
+	var acquired []string
+	for _, call := range db.Calls {
+		if call.Method == "AcquireUserSessionRow" {
+			acquired = append(acquired, call.Arguments[2].(string))
+		}
+	}
+	assert.Equal(t, []string{liveSessionSid, expiredSid}, acquired, "the rows are taken in id order")
+}
+
+// TestRevokeUserAuthState_AUserWideEndSkipsASessionAlreadyGone: a session whose row is gone when the
+// end holds its transaction was ended by someone else, so its apps are not read; an app on it that
+// holds a grant is still told through the grant.
+func TestRevokeUserAuthState_AUserWideEndSkipsASessionAlreadyGone(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	expectSweep(db, "")
+	expectSessionApps(db, liveSessionSid, liveSessionId, false)
+	expectSessionApps(db, expiredSid, expiredSessionId, true, onExpired)
+	db.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, revokeTx, revokeUserId, mock.Anything).
+		Return([]int64{onExpired.Id}, nil).Once()
+
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "",
+		LogoutNotice{Subject: "subject-of-7", UserWide: true, Live: liveOnly})
+	require.NoError(t, err)
+
+	assert.Equal(t, []backchannel.Delivery{subOnly(onExpired)}, result.LogoutDeliveries)
+	db.AssertNotCalled(t, "GetUserSessionClientsByUserSessionId", mock.Anything, revokeTx, liveSessionId)
+	db.AssertNotCalled(t, "GetClientsByIds", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestRevokeUserAuthState_ASessionSpecificEndTellsTheEndedValidSessionsApps: the user's own password
+// change keeps one session and ends the others. Each app on an ended session that was still valid
+// gets a sub+sid token for it, whether or not it requires sid; the expired session, the kept session
+// and the grants tell nobody, so none of them is read (#784 decisions 1 and 3).
+func TestRevokeUserAuthState_ASessionSpecificEndTellsTheEndedValidSessionsApps(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	sessions := []record.UserSession{
+		{Id: 3, UserId: revokeUserId, SessionIdentifier: revokeKeepSid},
+		{Id: liveSessionId, UserId: revokeUserId, SessionIdentifier: liveSessionSid},
+		{Id: expiredSessionId, UserId: revokeUserId, SessionIdentifier: expiredSid},
+	}
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).Return(revokeNewGeneration, nil).Once()
+	db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).Return(sessions, nil).Once()
+	db.On("PromoteUserSessionGeneration", mock.Anything, revokeTx, int64(3), revokeNewGeneration).Return(nil).Once()
+	db.On("DeleteUserSession", mock.Anything, revokeTx, liveSessionId).Return(nil).Once()
+	db.On("DeleteUserSession", mock.Anything, revokeTx, expiredSessionId).Return(nil).Once()
+	db.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, revokeUserId).Return([]*record.RefreshToken{}, nil).Once()
+	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, revokeKeepSid).Return([]*record.RefreshToken{}, nil).Once()
+	db.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, revokeNewGeneration).Return(nil).Once()
+	expectSessionApps(db, liveSessionSid, liveSessionId, true, onBoth, noURI, sidRequired)
+
+	live := func(session *record.UserSession) bool { return session.SessionIdentifier != expiredSid }
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, revokeKeepSid,
+		LogoutNotice{Subject: "subject-of-7", Live: live})
+	require.NoError(t, err)
+
+	assert.Equal(t, []backchannel.Delivery{
+		withSid(onBoth, liveSessionSid),
+		withSid(sidRequired, liveSessionSid),
+	}, result.LogoutDeliveries)
+	assert.Less(t, callIndex(t, db, "GetUserSessionClientsByUserSessionId"), callIndex(t, db, "DeleteUserSession"))
+	db.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, revokeTx, revokeKeepSid)
+	db.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, revokeTx, expiredSid)
+	db.AssertNotCalled(t, "GetUsableRefreshTokenClientIdsByUserId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestRevokeUserAuthState_NoNoticeTellsNobody: without a subject the revocation reads no app at all.
+func TestRevokeUserAuthState_NoNoticeTellsNobody(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	expectSweep(db, "")
+
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "",
+		LogoutNotice{UserWide: true, Live: liveOnly})
+	require.NoError(t, err)
+
+	assert.Empty(t, result.LogoutDeliveries)
+	db.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "GetUsableRefreshTokenClientIdsByUserId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestUserWideDeliveries_ReadsTheUsersSessionsAndGrants: the deletion's collection is the user-wide
+// shape over the user's sessions as it reads them.
+func TestUserWideDeliveries_ReadsTheUsersSessionsAndGrants(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, revokeUserId).Return(noticeSessions(), nil).Once()
+	expectSessionApps(db, liveSessionSid, liveSessionId, true, sidRequired)
+	expectSessionApps(db, expiredSid, expiredSessionId, true, onExpired, sidRequired)
+	db.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, revokeTx, revokeUserId, mock.Anything).
+		Return([]int64{grantOnly.Id}, nil).Once()
+	db.On("GetClientsByIds", mock.Anything, revokeTx, []int64{grantOnly.Id}).Return([]record.Client{grantOnly}, nil).Once()
+
+	deliveries, err := UserWideDeliveries(context.Background(), db, revokeTx, revokeUserId, "subject-of-7", liveOnly)
+	require.NoError(t, err)
+
+	assert.Equal(t, []backchannel.Delivery{
+		withSid(sidRequired, liveSessionSid),
+		subOnly(onExpired),
+		subOnly(grantOnly),
+	}, deliveries)
+}

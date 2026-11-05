@@ -131,7 +131,7 @@ func (rt *resetNoticeTest) serve(t *testing.T, settings *record.Settings) {
 	req = req.WithContext(reqctx.WithSettings(ctx, settings))
 
 	HandleResetPasswordPost(rt.pageRenderer, store, rt.database, passwordValidator, rt.auditLogger,
-		testAdminConsoleBaseURL, accountnotice.New(rt.pageRenderer, rt.emailSender, rt.jobs)).
+		testAdminConsoleBaseURL, accountnotice.New(rt.pageRenderer, rt.emailSender, rt.jobs), &recordingLogoutTokens{}).
 		ServeHTTP(httptest.NewRecorder(), req)
 }
 

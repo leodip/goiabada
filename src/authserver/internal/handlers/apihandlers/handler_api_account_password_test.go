@@ -45,6 +45,9 @@ func stubSweep(database *datamocks.Database, userId int64, newGeneration int64) 
 		Return(nil).Once()
 	database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, userId).
 		Return([]record.UserSession{}, nil).Once()
+	// A user-wide end of a user with a subject reads the apps holding the user's grants; none do.
+	database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, apiRevokeTx, userId, mock.Anything).
+		Return([]int64(nil), nil).Maybe()
 }
 
 func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current, next string) *http.Request {
@@ -84,7 +87,7 @@ func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T
 		Return(i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": 6})).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{})).
+	HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}), &recordingLogoutTokens{}).
 		ServeHTTP(rr, accountPasswordRequest(t, map[string]interface{}{"sub": "the-subject"}, currentPassword, "next"))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -152,7 +155,7 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}), &recordingLogoutTokens{})
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "sid": callerSid, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -214,7 +217,7 @@ func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}), &recordingLogoutTokens{})
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": subject, "auth_time": float64(1)},
 		currentPassword, newPassword))
@@ -257,7 +260,7 @@ func TestHandleAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 		Return(int64(0), errors.New("increment failed")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}))
+	handler := HandleAccountPasswordPut(database, passwordValidator, auditLogger, unlimitedCredentials{}, heldNotifier(t, &heldJobs{}), &recordingLogoutTokens{})
 	handler.ServeHTTP(rr, accountPasswordRequest(t,
 		map[string]interface{}{"sub": "the-subject", "sid": "sid-caller", "auth_time": float64(1)},
 		currentPassword, "N3wP4ss!word"))

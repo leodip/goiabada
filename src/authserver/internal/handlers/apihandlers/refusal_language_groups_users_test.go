@@ -386,7 +386,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name: "a password set to nothing",
 			serve: func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 				rr := httptest.NewRecorder()
-				HandleUserPasswordPut(datamocks.NewDatabase(t), accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), heldNotifier(t, &heldJobs{})).
+				HandleUserPasswordPut(datamocks.NewDatabase(t), accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), heldNotifier(t, &heldJobs{}), &recordingLogoutTokens{}).
 					ServeHTTP(rr, userRequest(http.MethodPut, "/api/v1/admin/users/73/password", `{"newPassword":""}`, acceptLanguage))
 				return rr
 			},

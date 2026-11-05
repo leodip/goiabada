@@ -56,7 +56,7 @@ The user's page has these tabs: **Details**, **Profile**, **Picture**, **Email**
 
 ## Enabled and disabled
 
-A disabled user can't sign in. Turning off **Enabled** on the **Details** tab also ends every session the user has and revokes their refresh tokens, so no client can get a new token for them. Turning it back on lets them sign in again, and gives back nothing that was revoked.
+A disabled user can't sign in. Turning off **Enabled** on the **Details** tab also ends every session the user has and revokes their refresh tokens, so no client can get a new token for them, and [tells the apps that knew them](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user). Turning it back on lets them sign in again, and gives back nothing that was revoked.
 
 To remove a user for good, delete them: see [Deleting users](#deleting-users).
 
@@ -77,14 +77,14 @@ Either way, the deletion removes:
 - their picture;
 - their group memberships, permissions and attributes;
 - the consents they gave clients;
-- their sessions and refresh tokens, so they're signed out everywhere and no client can get a new token for them. The auth server refuses their access tokens from then on. An API that checks an access token without asking the auth server accepts it until it expires.
+- their sessions and refresh tokens, so they're signed out everywhere, no client can get a new token for them, and the [apps that knew them are told](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user). The auth server refuses their access tokens from then on. An API that checks an access token without asking the auth server accepts it until it expires.
 
 It leaves:
 
 - the [audit log](/concepts/audit-log/)'s entries about the user, which name them by their ID, not their email address, until the [retention](/concepts/audit-log/#retention) removes them;
 - the server logs, which can include the user's IP address;
 - backups made before the deletion;
-- what clients already received about the user, such as their name and email address. Clients aren't told the user is gone.
+- what clients already received about the user, such as their name and email address. The apps that are told learn that the user's sessions ended, not that the user is gone.
 
 Whoever deletes the account, the user is emailed that it's gone: see [emails about account changes](/reference/security/#emails-about-account-changes).
 

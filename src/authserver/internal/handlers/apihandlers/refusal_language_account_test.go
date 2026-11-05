@@ -96,7 +96,7 @@ func TestAccountEmailAndPasswordRefusals_AreInTheRequestsLanguage(t *testing.T) 
 		return serveAccount(http.MethodPut, "/api/v1/account/password", body, &record.Settings{PasswordPolicy: record.PasswordPolicyLow}, expect,
 			func(t *testing.T, database *datamocks.Database) http.Handler {
 				return HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), handlersmocks.NewAuditLogger(t), unlimitedCredentials{},
-					heldNotifier(t, &heldJobs{}))
+					heldNotifier(t, &heldJobs{}), &recordingLogoutTokens{})
 			})
 	}
 	send := func(settings *record.Settings, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {

@@ -43,9 +43,16 @@ func enabledRequest(t *testing.T, userId string, enabled bool) *http.Request {
 		bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.SetPathValue("id", userId)
-	return setTokenContextWithClaims(req, map[string]interface{}{
+	return setTokenContextWithClaims(withSessionSettings(req), map[string]interface{}{
 		"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1),
 	})
+}
+
+// withSessionSettings puts settings on r's context, which a removal of a user reads its issuer and
+// the sessions' lifetimes from.
+func withSessionSettings(r *http.Request) *http.Request {
+	return r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{Issuer: "https://issuer.example",
+		UserSessionIdleTimeoutInSeconds: 3600, UserSessionMaxLifetimeInSeconds: 86400}))
 }
 
 // TestHandleUserEnabledPut_RevocationConditionality is the four-row matrix from #106 findings 4
@@ -137,7 +144,7 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 				Return(&record.User{Id: userId, Enabled: tc.requestedEnabled}, nil).Once()
 
 			rr := httptest.NewRecorder()
-			handler := HandleUserEnabledPut(database, auditLogger)
+			handler := HandleUserEnabledPut(database, auditLogger, &recordingLogoutTokens{})
 			handler.ServeHTTP(rr, enabledRequest(t, "42", tc.requestedEnabled))
 
 			assert.Equal(t, http.StatusOK, rr.Code)
@@ -191,7 +198,7 @@ func TestHandleUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 		Return(int64(0), assert.AnError).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleUserEnabledPut(database, auditLogger)
+	handler := HandleUserEnabledPut(database, auditLogger, &recordingLogoutTokens{})
 	handler.ServeHTTP(rr, enabledRequest(t, "42", false))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -244,7 +251,7 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 		map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
 
 	rr := httptest.NewRecorder()
-	handler := HandleUserPasswordPut(database, passwordValidator, auditLogger, heldNotifier(t, &heldJobs{}))
+	handler := HandleUserPasswordPut(database, passwordValidator, auditLogger, heldNotifier(t, &heldJobs{}), &recordingLogoutTokens{})
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)

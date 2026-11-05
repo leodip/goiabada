@@ -51,6 +51,8 @@ Preserve the row locks that make security decisions atomic:
   Issuance takes that row before inserting its code or signing implicit tokens in the same
   transaction, so neither slips past a termination's sweep before its commit (#139), and a sign-in
   adding an app to the session is either read by the termination or finds the session gone (#784).
+  A credential change and a user's deletion that tell apps take each of the user's session rows
+  this way, in id order, after the user's row: the deletion takes it with `GetUserByIdForUpdate`.
 - Refresh rotation takes the user's row first (`AcquireUserRow`), as credential changes do through
   their write and generation increment. A rotation cannot stamp a child from a token a revocation
   already moved past, and the revocation's sweep cannot miss that child (#131).

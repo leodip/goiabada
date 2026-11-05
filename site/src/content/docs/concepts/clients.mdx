@@ -138,7 +138,7 @@ A back-channel logout URI is an address on your app's server where the auth serv
 - **It's an absolute URI that names a host,** at most 2048 bytes, with no user name or password and no fragment. A query is allowed, and kept exactly as you enter it.
 - **The client needs a flow that signs users in,** the authorization code flow or the implicit flow. A client with neither has no session to end.
 
-A client can also require the session identifier, `sid`, in every logout token it's sent. Turn that on when your app finds its sessions by `sid` alone.
+A client can also require the session identifier, `sid`, in every logout token it's sent. Turn that on when your app finds its sessions by `sid` alone. Without it, disabling or deleting the user, a password reset or an administrator setting the password sends your app one token naming only the user, which asks it to end every session it has for them. With it, your app is sent one token for each of the user's sessions it was on instead. See [Credential changes](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user).
 
 In the admin console, open the client's **Back-channel logout** tab, enter the URI, such as `https://app.example.com/backchannel-logout`, tick **Require the session identifier** if your app needs `sid`, then click **Save**. Empty the field and save to send nothing.
 

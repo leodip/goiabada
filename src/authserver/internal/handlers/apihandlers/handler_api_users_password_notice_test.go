@@ -89,7 +89,7 @@ func stubAdminPasswordSet(database *datamocks.Database, auditLogger *handlersmoc
 func adminPasswordNoticeHandler(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, jobs *heldJobs,
 	pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) http.Handler {
 	return HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger,
-		accountnotice.New(pageRenderer, emailSender, jobs))
+		accountnotice.New(pageRenderer, emailSender, jobs), &recordingLogoutTokens{})
 }
 
 func TestHandleUserPasswordPut_TellsTheUserAnAdministratorChangedIt(t *testing.T) {

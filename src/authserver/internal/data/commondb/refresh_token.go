@@ -204,6 +204,32 @@ var selectRefreshTokensByUserIdAndClientId = statement{
 		"WHERE refresh_tokens.user_id = @p3 AND refresh_tokens.client_id = @p4",
 }
 
+// selectUsableRefreshTokenClientIds binds the user id, false for revoked and the instant once per
+// branch: the code's user, then the token's. UNION rather than UNION ALL, so a client holding several
+// such tokens is named once.
+var selectUsableRefreshTokenClientIds = statement{
+	sqlite: "SELECT codes.client_id FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		"UNION SELECT refresh_tokens.client_id FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		"AND refresh_tokens.client_id IS NOT NULL",
+	mysql: "SELECT codes.client_id FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		"UNION SELECT refresh_tokens.client_id FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		"AND refresh_tokens.client_id IS NOT NULL",
+	postgres: "SELECT codes.client_id FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = $1 AND refresh_tokens.revoked = $2 AND refresh_tokens.expires_at > $3 " +
+		"UNION SELECT refresh_tokens.client_id FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = $4 AND refresh_tokens.revoked = $5 AND refresh_tokens.expires_at > $6 " +
+		"AND refresh_tokens.client_id IS NOT NULL",
+	mssql: "SELECT codes.client_id FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = @p1 AND refresh_tokens.revoked = @p2 AND refresh_tokens.expires_at > @p3 " +
+		"UNION SELECT refresh_tokens.client_id FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = @p4 AND refresh_tokens.revoked = @p5 AND refresh_tokens.expires_at > @p6 " +
+		"AND refresh_tokens.client_id IS NOT NULL",
+}
+
 // selectRefreshTokensByClientId binds the client id once per branch: the code's, then the token's.
 var selectRefreshTokensByClientId = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
@@ -642,6 +668,23 @@ func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, use
 	}
 
 	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByUserId.text(d.Dialect), []any{userId, userId})
+}
+
+// GetUsableRefreshTokenClientIdsByUserId answers the clients holding one of the user's refresh tokens that
+// is still unrevoked and unexpired at now, each once, through either linkage shape: codes.client_id
+// for an authorization-code token and refresh_tokens.client_id for a password grant, the two
+// branches GetRefreshTokensByUserId reads. A user-wide end tells each of them that the user was
+// signed out (#784 decision 3). A zero userId names no client.
+func (d *Database) GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64,
+	now time.Time) ([]int64, error) {
+
+	if userId == 0 {
+		return nil, nil
+	}
+
+	return queryAll(ctx, d, tx, []int64(nil), selectUsableRefreshTokenClientIds.text(d.Dialect),
+		[]any{userId, false, now, userId, false, now},
+		func(row rowScanner, clientId *int64) error { return row.Scan(clientId) }, "client id")
 }
 
 // GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds with one

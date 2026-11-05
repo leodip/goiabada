@@ -203,7 +203,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// committing attempt produced (#301).
 	outcome := Outcome{Email: email, UserId: user.Id}
 	var turnstile turnstileChange
-	result, err := revocation.RevokeUserAuthStateTx(ctx, database, user.Id, "", func(tx *sql.Tx) error {
+	result, err := revocation.RevokeUserAuthStateTx(ctx, database, user.Id, "", revocation.LogoutNotice{}, func(tx *sql.Tx) error {
 		outcome.PasswordSet, outcome.OTPRemoved, outcome.ManageGranted = false, false, false
 		outcome.TurnstileDisabled, turnstile = false, turnstileChange{}
 

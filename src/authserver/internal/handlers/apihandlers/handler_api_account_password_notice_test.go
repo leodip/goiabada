@@ -96,7 +96,7 @@ func stubPasswordChange(database *datamocks.Database, auditLogger *handlersmocks
 func passwordNoticeHandler(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, jobs *heldJobs,
 	pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) http.Handler {
 	return HandleAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, unlimitedCredentials{},
-		accountnotice.New(pageRenderer, emailSender, jobs))
+		accountnotice.New(pageRenderer, emailSender, jobs), &recordingLogoutTokens{})
 }
 
 func TestHandleAccountPasswordPut_TellsTheUserAfterTheResponse(t *testing.T) {

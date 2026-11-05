@@ -52,7 +52,7 @@ func TestAccountHandlers_ACallerWithoutATokenOrSubjectIsAWiringFault(t *testing.
 			return HandleAccountOTPPut(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), nil, testDataCipher, heldNotifier(t, &heldJobs{}))
 		},
 		"HandleAccountPasswordPut": func(t *testing.T) http.HandlerFunc {
-			return HandleAccountPasswordPut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t), nil, nil)
+			return HandleAccountPasswordPut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t), nil, nil, &recordingLogoutTokens{})
 		},
 		"HandleAccountPhonePut": func(t *testing.T) http.HandlerFunc {
 			return HandleAccountPhonePut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t))

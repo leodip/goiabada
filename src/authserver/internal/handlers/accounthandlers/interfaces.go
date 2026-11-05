@@ -7,6 +7,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -48,6 +49,13 @@ type linkMarkerSessionStore interface {
 // one in a request-path package (#328).
 type AuditLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})
+}
+
+// logoutTokenSender tells the apps that knew a user that the user's sessions ended, with the logout
+// tokens the end collected, once it has committed (#784). *backchannel.Sender satisfies it; issuer
+// is the tokens' iss, the request's issuer setting.
+type logoutTokenSender interface {
+	Send(ctx context.Context, issuer string, deliveries []backchannel.Delivery)
 }
 
 // PageRenderer renders this package's pages and its two email bodies. These handlers answer
