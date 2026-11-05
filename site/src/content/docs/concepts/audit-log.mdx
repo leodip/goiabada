@@ -95,6 +95,10 @@ Each stored event is one row:
 | `audit_event` | The event's name. |
 | `details` | The details, as JSON text. |
 | `request_id` | The id of the request that raised it, or empty when there was none. |
+| `user_id` | The row id of the user the event is about, the `user_id` in its details, or `NULL` when it's about no user. |
+| `logged_in_user_id` | The row id of the user whose access token made the request: the administrator on the Admin API, the user themselves on the Account API. `NULL` when no user's token made it, as on a sign-in in the browser or a call with a client credentials token. |
+
+`user_id` and `logged_in_user_id` each have an index, so `WHERE user_id = 42 OR logged_in_user_id = 42` finds the events about user 42 and the ones they made. Neither is a foreign key: the rows stay when the user is deleted, until retention removes them.
 
 ## Details
 
