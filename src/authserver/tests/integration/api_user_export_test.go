@@ -527,6 +527,7 @@ func newExportedUserParts(t *testing.T, user *record.User) exportedUserParts {
 		AuthMethods:       "pwd",
 		AcrLevel:          "urn:goiabada:pwd",
 		AuthTime:          now.Add(-25 * time.Hour),
+		PasswordAuthTime:  now.Add(-25 * time.Hour),
 		IpAddress:         "192.0.2.99",
 		UserId:            user.Id,
 	}
