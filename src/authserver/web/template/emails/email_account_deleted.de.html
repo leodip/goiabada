@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} – Ihr Konto wurde gelöscht{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Guten Tag {{.name}},</p>
+
+    <p>Ihr Konto bei {{ .appName }} wurde in Ihren Kontoeinstellungen gelöscht. Sie können sich damit nicht mehr anmelden, und Apps erhalten keinen Zugriff mehr darauf.</p>
+
+    <p>Falls Sie diese Änderung selbst vorgenommen haben, brauchen Sie nichts zu tun.</p>
+
+    <p><strong>Andernfalls kannte jemand anderes Ihr Passwort.</strong> Wenden Sie sich an Ihre Administration.</p>
+
+    <p>Mit freundlichen Grüßen<br />{{ .appName }}</p>
+</div>
+
+{{end}}

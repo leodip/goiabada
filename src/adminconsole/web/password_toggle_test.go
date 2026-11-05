@@ -20,6 +20,7 @@ var passwordFieldKinds = map[string]map[string]string{
 		"newPasswordConfirmation": "new_password_confirmation",
 	},
 	"template/account_email.html":                {"currentPassword": "current_password"},
+	"template/account_delete.html":               {"password": "password"},
 	"template/account_otp.html":                  {"password": "password", "recovery-codes-password": "password"},
 	"template/admin_users_new.html":              {"password": "password"},
 	"template/admin_users_authentication.html":   {"newPassword": "new_password"},
@@ -32,6 +33,7 @@ var passwordFieldKinds = map[string]map[string]string{
 var passwordFieldCount = map[string]int{
 	"template/account_change_password.html":      3,
 	"template/account_email.html":                1,
+	"template/account_delete.html":               1,
 	"template/account_otp.html":                  3,
 	"template/admin_users_new.html":              1,
 	"template/admin_users_authentication.html":   1,

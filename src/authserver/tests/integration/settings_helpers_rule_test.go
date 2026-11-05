@@ -51,6 +51,7 @@ func populatedSettings() record.Settings {
 		SMTPEncryption:                          "none",
 		SMTPEnabled:                             true,
 		PKCERequired:                            true,
+		AccountDeletionEnabled:                  true,
 		AuditLogsInConsoleEnabled:               true,
 		AuditLogsInDatabaseEnabled:              true,
 		AuditLogRetentionDays:                   180,
@@ -173,9 +174,10 @@ func TestRestoreSettings_PutsTheRowBackWhenTheTestEnds(t *testing.T) {
 
 		resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/admin/settings/general",
 			accessToken, api.UpdateSettingsGeneralRequest{
-				AppName:        "Restore probe",
-				Issuer:         "https://restore.example.org",
-				PasswordPolicy: "high",
+				AppName:                "Restore probe",
+				Issuer:                 "https://restore.example.org",
+				PasswordPolicy:         "high",
+				AccountDeletionEnabled: accountDeletionOf(true),
 			})
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode)

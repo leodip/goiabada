@@ -31,6 +31,10 @@ type Settings struct {
 	// chooses on the password page) or never (#743). Migration 000081 gives an existing installation
 	// ask, the seed's value.
 	KeepSignedIn KeepSignedIn `db:"keep_signed_in"`
+	// AccountDeletionEnabled is whether users may delete their own account from their account
+	// pages (#783). Administrators delete any user whatever it says. Migration 000083 turns it on
+	// for an existing installation, as the seed does for a new one.
+	AccountDeletionEnabled bool `db:"account_deletion_enabled"`
 	// AESEncryptionKeyLegacy is the data key as historically stored in the DB.
 	// The key now comes from the environment ((*config.Config).DataKeys, issue
 	// #83). Do NOT use it for encrypt/decrypt at runtime.

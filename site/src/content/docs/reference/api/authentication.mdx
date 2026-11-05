@@ -111,7 +111,7 @@ There are three ways, and which one fits depends on who's making the change:
 
 ## The bearer token
 
-Every operation under `/api/v1/` takes an access token in the `Authorization` header, as `Bearer` followed by the token. The reference also lists one public operation outside `/api/v1/`, the client logo, `GET /client/logo/{clientIdentifier}`, which takes none.
+Every operation under `/api/v1/` takes an access token in the `Authorization` header, as `Bearer` followed by the token. The reference also lists two public operations outside `/api/v1/`, which take none: the client logo, `GET /client/logo/{clientIdentifier}`, and the public settings, `GET /api/public/settings`.
 
 The token must be an access token the auth server issued for the `authserver` resource, which is what asking for an `authserver:` scope gets you. An ID token or a refresh token is refused.
 
@@ -120,6 +120,8 @@ The token must be an access token the auth server issued for the `authserver` re
 The Admin API accepts a client's token from the client credentials flow, and a user's token from the authorization code flow when the client may [request the administrative scopes on a user's behalf](/reference/api/scopes/#administrative-scopes-on-a-users-behalf).
 
 The Account API accepts only a token issued for a user. A token from the client credentials flow is answered `403`: with `INSUFFICIENT_SCOPE` when it doesn't carry `authserver:manage-account`, which is the usual case, and with `USER_CONTEXT_REQUIRED` when its client was granted that permission.
+
+Deleting the account, `POST /api/v1/account/deletion`, accepts only a token issued to the admin console's own client. Any other client's token is answered `403` with `CLIENT_NOT_ALLOWED`, whatever its scopes.
 
 ## When a token stops working
 

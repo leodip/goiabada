@@ -176,6 +176,9 @@ key per cause, each a whole sentence.
 | `handler.account_otp.code_required` | (none) | Enter the 6-digit code from your authenticator app. |
 | `handler.account_otp.code_invalid` | (none) | The code is 6 digits. Enter the one your authenticator app shows. |
 | `handler.account_otp.enrollment_not_pending` | (none) | No OTP enrollment is pending, or the one you started has expired. Request a new one with GET /api/v1/account/otp/enrollment and try again. |
+| `handler.account_deletion.disabled` | (none) | Account deletion is turned off. Ask your administrator to delete your account. |
+| `handler.account_deletion.last_administrator` | (none) | You're the last administrator, so you can't delete your account. Give another user authserver:manage first. |
+| `handler.account_deletion.one_second_factor` | (none) | Send an authentication code or a recovery code, not both. |
 | `handler.account_logout.post_logout_redirect_uri_required` | (none) | postLogoutRedirectUri is required |
 | `handler.account_logout.client_identifier_invalid` | (none) | Invalid client identifier |
 | `handler.account_logout.client_unresolved` | (none) | Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier. |
@@ -315,6 +318,7 @@ cause, each a whole sentence.
 | `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL. |
 | `handler.settings_general.issuer_too_long` | `max` (int) | Issuer is too long. The maximum length is {{.max}} characters. |
 | `handler.settings_general.password_policy_invalid` | (none) | Invalid password policy |
+| `handler.settings_general.account_deletion_enabled_required` | (none) | Choose whether to let users delete their own account. |
 | `handler.settings_sessions.idle_timeout_not_positive` | (none) | The idle timeout must be greater than zero. |
 | `handler.settings_sessions.max_lifetime_not_positive` | (none) | The maximum lifetime must be greater than zero. |
 | `handler.settings_sessions.idle_timeout_too_large` | `max` (int) | The idle timeout can't be more than {{.max}} seconds. |

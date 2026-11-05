@@ -243,6 +243,10 @@ const (
 	EventSentEmailVerificationMessage = "sent_email_verification_message"
 	EventFailedEmailVerificationCode  = "failed_email_verification_code"
 	EventFailedResetPasswordCode      = "failed_reset_password_code"
+	// EventDeletedOwnAccount records a user deleting their own account through the Account API,
+	// written after the deletion commits, naming the user by user_id and logged_in_user and never by
+	// address (#783 decision 7). EventDeletedUser keeps meaning an administrator's deletion.
+	EventDeletedOwnAccount = "deleted_own_account"
 	// EventFailedAccountActivationCode records a refused self-registration activation link, the
 	// twin of EventFailedResetPasswordCode: both emailed-link flows answer every refusal with one
 	// page, so this entry is the only place the cause is visible, and a burst of them is what
@@ -693,6 +697,7 @@ var auditEventTypes = []string{
 	EventDeleteGroupAttribute,
 	EventDeletedGroupPermission,
 	EventDeletedLegalDocument,
+	EventDeletedOwnAccount,
 	EventDeletedOwnProfilePicture,
 	EventDeletedOwnUserConsent,
 	EventDeletedResource,

@@ -57,6 +57,8 @@ func TestFrench_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"recovery_code_used", "Un code de récupération a été utilisé pour vous connecter", "Il vous reste 3 codes de récupération inutilisés."},
 			{"recovery_codes_replaced", "Vos codes de récupération ont été remplacés", "Vos anciens codes de récupération ne fonctionnent plus"},
 			{"otp_lockout", "Votre application d’authentification a été bloquée après trop de codes erronés", "Connectez-vous avec l’un de vos codes de récupération"},
+			{"account_deleted", "Votre compte a été supprimé", "Sinon, une autre personne connaissait votre mot de passe."},
+			{"account_deleted_by_administrator", "Un administrateur a supprimé votre compte", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)

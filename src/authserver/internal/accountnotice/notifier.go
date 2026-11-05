@@ -2,8 +2,8 @@
 // the email change's notice to the previous address (#404 decisions 9 and 11), and the security
 // notices that tell a user their password was changed, by them or an administrator, or reset, that
 // their two-factor authentication was set up or turned off, that their authenticator was disabled
-// after too many wrong codes, that a recovery code signed in, and that a new set of recovery codes
-// was made (#724, #737).
+// after too many wrong codes, that a recovery code signed in, that a new set of recovery codes
+// was made (#724, #737), and that they or an administrator deleted their account (#783).
 //
 // Every notice follows the same rules, which is why they live here once rather than beside each
 // handler. A handler calls Send after its change has committed, and only for the request whose
@@ -92,6 +92,14 @@ const (
 	// RecoveryCodesReplaced tells a user a new set of recovery codes was made on the Account pages,
 	// which voids the old set (#737). The set an authenticator comes with is OTPEnabled's.
 	RecoveryCodesReplaced Notice = "recovery_codes_replaced"
+	// AccountDeleted tells a user they deleted their own account on the Account pages (#783
+	// decision 9). The recipient is captured from the row the deletion's transaction read, so the
+	// job needs nothing of the account, which is gone by the time it runs.
+	AccountDeleted Notice = "account_deleted"
+	// AccountDeletedByAdministrator tells a user an administrator deleted their account, naming no
+	// administrator (#783 decision 10). Like AccountDeleted, the recipient is captured from the row
+	// the deletion's transaction read.
+	AccountDeletedByAdministrator Notice = "account_deleted_by_administrator"
 )
 
 // class is the job class whose budget the notice is admitted against: every notice but the email
@@ -200,6 +208,10 @@ func (n *Notifier) deliver(ctx context.Context, r *http.Request, notice Notice, 
 		page, subject = "/emails/email_recovery_code_used.html", "email.recovery_code_used.subject"
 	case RecoveryCodesReplaced:
 		page, subject = "/emails/email_recovery_codes_replaced.html", "email.recovery_codes_replaced.subject"
+	case AccountDeleted:
+		page, subject = "/emails/email_account_deleted.html", "email.account_deleted.subject"
+	case AccountDeletedByAdministrator:
+		page, subject = "/emails/email_account_deleted_by_administrator.html", "email.account_deleted_by_administrator.subject"
 	default:
 		slog.ErrorContext(ctx, "unable to render an account notice",
 			"notice", string(notice), "user_id", to.UserId, "error", errUnknownNotice)

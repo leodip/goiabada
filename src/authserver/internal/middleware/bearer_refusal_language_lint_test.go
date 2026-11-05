@@ -65,6 +65,7 @@ var bearerEnglishRefusals = map[string]bool{
 	// forbidden: a valid token that does not reach the route, 403.
 	"Insufficient scope.": true,
 	"This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted.": true,
+	"This endpoint accepts only access tokens issued to the admin console's own client.":                                               true,
 }
 
 // bearerRefusalDir is the package that holds the bearer guards, relative to the source root.

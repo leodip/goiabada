@@ -79,14 +79,14 @@ func settingsSectionSaves() []settingsSectionSave {
 			path: "/api/v1/admin/settings/general",
 			body: func(*testing.T) string {
 				return `{"appName":"Mine","issuer":"https://before.example","passwordPolicy":"medium",` +
-					`"selfRegistrationEnabled":false,"pkceRequired":false}`
+					`"selfRegistrationEnabled":false,"pkceRequired":false,"accountDeletionEnabled":false}`
 			},
 			handler: func(database settingsSaveDatabase, auditLogger AuditLogger) http.Handler {
 				return HandleSettingsGeneralPut(database, auditLogger, "http://localhost:9090")
 			},
 			owns: []string{"AppName", "Issuer", "SelfRegistrationEnabled", "SelfRegistrationRequiresEmailVerification",
 				"DynamicClientRegistrationEnabled", "PasswordPolicy", "PKCERequired", "ImplicitFlowEnabled",
-				"ResourceOwnerPasswordCredentialsEnabled"},
+				"ResourceOwnerPasswordCredentialsEnabled", "AccountDeletionEnabled"},
 		},
 		{
 			name: "ui theme",
@@ -237,6 +237,7 @@ func settingsSavedMeanwhile() record.Settings {
 		PKCERequired:                              true,
 		ImplicitFlowEnabled:                       true,
 		ResourceOwnerPasswordCredentialsEnabled:   true,
+		AccountDeletionEnabled:                    true,
 		AuditLogsInConsoleEnabled:                 true,
 		AuditLogsInDatabaseEnabled:                true,
 		AuditLogRetentionDays:                     31,

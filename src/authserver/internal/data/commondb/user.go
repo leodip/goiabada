@@ -788,9 +788,11 @@ func (d *Database) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query s
 	return users, count, nil
 }
 
-// DeleteUser removes the user and, by ON DELETE CASCADE, every row that references it.
-// Refresh tokens are cleared explicitly first because SQL Server cannot cascade them: see
-// deleteRefreshTokensByColumn.
+// DeleteUser removes the user and, by ON DELETE CASCADE, every row that references it,
+// except refresh tokens, which it deletes explicitly before the user's row:
+// refresh_tokens.user_id is NO ACTION on all four engines (each schema.golden), so on every
+// engine a token issued without a code, as the ROPC grant issues them, would otherwise block
+// the delete. See deleteRefreshTokensByColumn.
 //
 // THE SESSION ROWS GO BEFORE BOTH OF THOSE, and the order is load bearing rather than
 // tidiness to be folded back into the cascade. The cascade would remove the same rows one

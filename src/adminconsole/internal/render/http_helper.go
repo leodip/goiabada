@@ -173,6 +173,9 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled
+	// The account menu lists Delete account only while users may delete their own account (#783
+	// decision 6).
+	data["accountDeletionEnabled"] = settings.AccountDeletionEnabled
 	data["goiabadaVersion"] = buildinfo.Version + " (" + buildinfo.BuildDate + ")"
 	// Inject the request context so templates can call {{ T $.ctx "..." }}
 	// and every other locale-reading template function. This is this

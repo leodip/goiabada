@@ -162,6 +162,14 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 			portuguese: "Política de senhas inválida",
 		},
 		{
+			name:       "no account deletion choice",
+			serve:      general(map[string]any{}),
+			status:     http.StatusBadRequest,
+			code:       "handler.settings_general.account_deletion_enabled_required",
+			english:    "Choose whether to let users delete their own account.",
+			portuguese: "Escolha se os usuários podem excluir a própria conta.",
+		},
+		{
 			name:       "a session idle timeout of zero",
 			serve:      sessions(0, 100),
 			status:     http.StatusBadRequest,

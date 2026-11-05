@@ -23,24 +23,26 @@ func TestCreateSettings(t *testing.T) {
 		UserSessionMaxLifetimeInSeconds:           43200,
 		MaxUserSessionsPerUser:                    35,
 		KeepSignedIn:                              record.KeepSignedInNever,
-		IncludeOpenIDConnectClaimsInAccessToken:   true,
-		IncludeOpenIDConnectClaimsInIdToken:       true,
-		AESEncryptionKeyLegacy:                    []byte("testaes"),
-		SMTPHost:                                  "smtp.test.com",
-		SMTPPort:                                  587,
-		SMTPUsername:                              "testuser",
-		SMTPPasswordEncrypted:                     []byte("testpassword"),
-		SMTPFromName:                              "Test Sender",
-		SMTPFromEmail:                             "sender@test.com",
-		SMTPEncryption:                            "starttls",
-		SMTPEnabled:                               true,
-		TurnstileEnabled:                          true,
-		TurnstileSiteKey:                          "1x00000000000000000000AA",
-		TurnstileSecretKeyEncrypted:               []byte("testturnstilesecret"),
-		DynamicClientRegistrationEnabled:          true,
-		PKCERequired:                              true,
-		ImplicitFlowEnabled:                       true,
-		ResourceOwnerPasswordCredentialsEnabled:   true,
+		// Off, against the column's default of on, so reading it back shows the insert wrote it.
+		AccountDeletionEnabled:                  false,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
+		AESEncryptionKeyLegacy:                  []byte("testaes"),
+		SMTPHost:                                "smtp.test.com",
+		SMTPPort:                                587,
+		SMTPUsername:                            "testuser",
+		SMTPPasswordEncrypted:                   []byte("testpassword"),
+		SMTPFromName:                            "Test Sender",
+		SMTPFromEmail:                           "sender@test.com",
+		SMTPEncryption:                          "starttls",
+		SMTPEnabled:                             true,
+		TurnstileEnabled:                        true,
+		TurnstileSiteKey:                        "1x00000000000000000000AA",
+		TurnstileSecretKeyEncrypted:             []byte("testturnstilesecret"),
+		DynamicClientRegistrationEnabled:        true,
+		PKCERequired:                            true,
+		ImplicitFlowEnabled:                     true,
+		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
 
 	err := database.CreateSettings(context.Background(), nil, settings)
@@ -84,6 +86,8 @@ func TestUpdateSettings(t *testing.T) {
 	// default of 20 (#564).
 	settings.MaxUserSessionsPerUser = 0
 	settings.KeepSignedIn = record.KeepSignedInAlways
+	// From off to on: read back as on, it shows both the update and the read carry the column.
+	settings.AccountDeletionEnabled = true
 	settings.IncludeOpenIDConnectClaimsInAccessToken = false
 	settings.IncludeOpenIDConnectClaimsInIdToken = false
 	// AESEncryptionKeyLegacy is migration-only (dont-update); UpdateSettings must
@@ -158,6 +162,7 @@ func createTestSettings(t *testing.T) *record.Settings {
 		UserSessionMaxLifetimeInSeconds:           43200,
 		MaxUserSessionsPerUser:                    35,
 		KeepSignedIn:                              record.KeepSignedInNever,
+		AccountDeletionEnabled:                    false,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
 		IncludeOpenIDConnectClaimsInIdToken:       true,
 		AESEncryptionKeyLegacy:                    []byte("testaes"),
@@ -223,6 +228,9 @@ func compareSettings(t *testing.T, expected, actual *record.Settings) {
 	}
 	if actual.KeepSignedIn != expected.KeepSignedIn {
 		t.Errorf("Expected KeepSignedIn %q, got %q", expected.KeepSignedIn, actual.KeepSignedIn)
+	}
+	if actual.AccountDeletionEnabled != expected.AccountDeletionEnabled {
+		t.Errorf("Expected AccountDeletionEnabled %v, got %v", expected.AccountDeletionEnabled, actual.AccountDeletionEnabled)
 	}
 	if actual.IncludeOpenIDConnectClaimsInAccessToken != expected.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken %v, got %v", expected.IncludeOpenIDConnectClaimsInAccessToken, actual.IncludeOpenIDConnectClaimsInAccessToken)

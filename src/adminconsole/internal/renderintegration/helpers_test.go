@@ -73,8 +73,17 @@ func renderPageAt(t *testing.T, path, layout, page string, bind map[string]inter
 	idTokenClaims jwt.MapClaims, locale string, smtpEnabled bool) string {
 
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
 	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: smtpEnabled}
+	return renderPageWith(t, path, layout, page, bind, idTokenClaims, locale, settings)
+}
+
+// renderPageWith is renderPageAt with the auth server's public settings named whole, for a page
+// that reads one of them beside smtpEnabled, such as accountDeletionEnabled.
+func renderPageWith(t *testing.T, path, layout, page string, bind map[string]interface{},
+	idTokenClaims jwt.MapClaims, locale string, settings *api.PublicSettingsResponse) string {
+
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 	if idTokenClaims != nil {
 		jwtInfo := oauthclient.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}

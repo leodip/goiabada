@@ -368,6 +368,7 @@
 "adminconsole.account_menu.manage_consents" = "Consensi"
 "adminconsole.account_menu.sessions" = "Sessioni"
 "adminconsole.account_menu.legal_documents" = "Documenti legali"
+"adminconsole.account_menu.delete_account" = "Elimina account"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
 
@@ -729,6 +730,25 @@
 "adminconsole.account.sessions.modal_confirm_title" = "Chiudere questa sessione?"
 "adminconsole.account.sessions.end_confirm" = "Vuoi chiudere la sessione su {{.device}}? Le applicazioni a cui hai effettuato l'accesso da lì, comprese quelle che continuano a funzionare in background, ti chiederanno di accedere di nuovo."
 "adminconsole.account.sessions.end_current_confirm" = "Vuoi chiudere la sessione su {{.device}}? È il dispositivo che stai usando, quindi verrai disconnesso. Le applicazioni a cui hai effettuato l'accesso da lì ti chiederanno di accedere di nuovo."
+
+# --- Account deletion (#783) ------------------------------------------------
+
+"adminconsole.account.delete.page_title" = "Elimina il tuo account"
+"adminconsole.account.delete.lead" = "Il tuo account {{.appName}} viene eliminato subito. L'operazione non si può annullare."
+"adminconsole.account.delete.deleted_label" = "Cosa viene eliminato:"
+"adminconsole.account.delete.deleted" = "il tuo profilo, l'indirizzo email, il telefono e l'indirizzo; la password, l'autenticatore e i codici di recupero; la tua immagine; i tuoi gruppi, permessi e attributi; i consensi che hai dato alle app; e le tue sessioni, quindi esci ovunque e le app non possono più accedere al tuo account."
+"adminconsole.account.delete.kept_label" = "Cosa no:"
+"adminconsole.account.delete.kept" = "le voci del registro di audit sul tuo account, che lo indicano con un ID e non con il tuo indirizzo email, finché il periodo di conservazione della tua organizzazione non le rimuove; i log del server, che possono includere il tuo indirizzo IP; i backup fatti prima di oggi, finché non vengono sostituiti; e ciò che le app hanno già ricevuto su di te, come il tuo nome e il tuo indirizzo email. Chiedi a ogni app di eliminare ciò che conserva."
+"adminconsole.account.delete.field.password" = "Password"
+"adminconsole.account.delete.field.otp" = "Codice di autenticazione"
+"adminconsole.account.delete.field.recovery_code" = "Codice di recupero"
+"adminconsole.account.delete.use_recovery_code" = "Usa invece un codice di recupero"
+"adminconsole.account.delete.use_authenticator" = "Usa invece l'app di autenticazione"
+"adminconsole.account.delete.button" = "Elimina il mio account"
+"adminconsole.account.delete.confirm_title" = "Eliminare il tuo account?"
+"adminconsole.account.delete.confirm_body" = "L'operazione non si può annullare."
+"adminconsole.account_deleted.title" = "Il tuo account è stato eliminato"
+"adminconsole.account_deleted.message" = "Il tuo account {{.appName}} non esiste più e sei uscito ovunque. Le app che hai usato conservano ciò che hanno già ricevuto; chiedi loro di eliminarlo."
 
 # === Adminconsole — admin clients =============================================
 
@@ -1618,6 +1638,9 @@
 "adminconsole.admin_settings.general.email_settings_link" = "Impostazioni email"
 "adminconsole.admin_settings.general.field.dynamic_client_registration" = "Registrazione dinamica dei client"
 "adminconsole.admin_settings.general.dynamic_client_registration_tooltip" = "I client possono registrarsi autonomamente su /connect/register (RFC 7591), che viene quindi indicato nel documento di discovery. Utile per MCP e altre integrazioni che si registrano durante l'esecuzione."
+"adminconsole.admin_settings.general.section_account_deletion" = "Eliminazione dell'account"
+"adminconsole.admin_settings.general.field.account_deletion_enabled" = "Consenti agli utenti di eliminare il proprio account"
+"adminconsole.admin_settings.general.account_deletion_enabled_tooltip" = "Gli utenti eliminano il proprio account dalle pagine del loro account, con la password e, se l'autenticazione a due fattori è attiva, un codice. Puoi eliminare qualsiasi utente in entrambi i casi."
 "adminconsole.admin_settings.general.section_flows" = "Flussi OAuth"
 "adminconsole.admin_settings.general.flows_lead" = "Si applicano a ogni client, salvo diversa configurazione nella scheda Flussi OAuth2."
 "adminconsole.admin_settings.general.field.pkce_required" = "Richiedi PKCE"
@@ -2004,6 +2027,9 @@
 "handler.account_otp.code_required" = "Inserisci il codice a 6 cifre della tua app di autenticazione."
 "handler.account_otp.code_invalid" = "Il codice è di 6 cifre. Inserisci quello mostrato dalla tua app di autenticazione."
 "handler.account_otp.enrollment_not_pending" = "Non ci sono configurazioni OTP in corso oppure quella avviata è scaduta. Richiedine una nuova con GET /api/v1/account/otp/enrollment e riprova."
+"handler.account_deletion.disabled" = "L'eliminazione dell'account è disattivata. Chiedi al tuo amministratore di eliminare il tuo account."
+"handler.account_deletion.last_administrator" = "Sei l'ultimo amministratore, quindi non puoi eliminare il tuo account. Assegna prima authserver:manage a un altro utente."
+"handler.account_deletion.one_second_factor" = "Invia un codice di autenticazione o un codice di recupero, non entrambi."
 "handler.account_logout.post_logout_redirect_uri_required" = "postLogoutRedirectUri è obbligatorio"
 "handler.account_logout.client_identifier_invalid" = "Identificatore client non valido"
 "handler.account_logout.client_unresolved" = "Non è possibile identificare il client da postLogoutRedirectUri; fornisci clientIdentifier."
@@ -2015,6 +2041,7 @@
 "handler.settings_general.issuer_uri_invalid" = "Issuer non valido. Inserisci un URL https senza query, frammento o informazioni utente, oppure l'URL di base del server di autenticazione."
 "handler.settings_general.issuer_too_long" = "L'issuer è troppo lungo. Il massimo è {{.max}} caratteri."
 "handler.settings_general.password_policy_invalid" = "Criteri delle password non validi"
+"handler.settings_general.account_deletion_enabled_required" = "Scegli se gli utenti possono eliminare il proprio account."
 
 "handler.settings_sessions.idle_timeout_not_positive" = "Il timeout di inattività deve essere maggiore di zero."
 "handler.settings_sessions.max_lifetime_not_positive" = "La durata massima deve essere maggiore di zero."
@@ -2161,6 +2188,8 @@
 "email.otp_disabled_by_administrator.subject" = "Un amministratore ha disattivato la tua autenticazione a due fattori"
 "email.recovery_code_used.subject" = "È stato usato un codice di recupero per accedere"
 "email.recovery_codes_replaced.subject" = "I tuoi codici di recupero sono stati sostituiti"
+"email.account_deleted.subject" = "Il tuo account è stato eliminato"
+"email.account_deleted_by_administrator.subject" = "Un amministratore ha eliminato il tuo account"
 "email.otp_lockout.subject" = "La tua app di autenticazione è stata bloccata dopo troppi codici errati"
 
 # --- JS bootstrap ------------------------------------------------------------

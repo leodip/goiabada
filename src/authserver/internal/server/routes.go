@@ -141,8 +141,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
-	publicSettingsHandler := handlers.NewPublicSettings(s.database)
-	api.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
+	api.Get("/api/public/settings", handlers.HandlePublicSettingsGet(s.database))
 
 	// One route boundary and one client-error responder, shared by every ceremony route: the
 	// ceremony load, its id check, the state gate, the step redirects and the error responses to a
@@ -292,7 +291,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/{id}/profile-picture", apihandlers.HandleUserProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/profile-picture", apihandlers.HandleUserProfilePictureDelete(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleUserCreatePost(httpHelper, s.database, userCreator, emailValidator, profileValidator, passwordValidator, auditLogger, emailSender, s.dataCipher, baseURL))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleUserDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}", apihandlers.HandleUserDelete(s.database, auditLogger, notifier))
 
 		// User attributes routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/attributes", apihandlers.HandleUserAttributesGet(s.database))
@@ -488,6 +487,13 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/otp/recovery-codes", apihandlers.HandleAccountRecoveryCodesGet(s.database))
 		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Post("/otp/recovery-codes",
 			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter, notifier))
+		// Deleting the account answers only the admin console's own client, so an application the
+		// user granted manage-account cannot delete it (#783 decision 3). The client guard comes
+		// first, so another client's token spends nothing. The deletion checks the password and a
+		// code, so it spends the bucket the changes above share; it sends one notice, and only when
+		// it succeeds, so it takes no account_credential_change (decision 4).
+		r.With(apiBearer.RequireAdminConsoleClient(), rateLimiter.LimitAccountPassword).Post("/deletion",
+			apihandlers.HandleAccountDeletionPost(s.database, auditLogger, rateLimiter, s.dataCipher, notifier))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
 		// The legal document versions the caller accepted (#622 decision 10).

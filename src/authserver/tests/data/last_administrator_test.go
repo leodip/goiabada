@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
@@ -166,6 +167,12 @@ func serveAsManage(handler http.HandlerFunc, method, target string, params map[s
 	return rr
 }
 
+// noNotices is the notifier for a deletion whose notice the test is not about: serveAsManage's
+// settings have SMTP off, so the real one would send nothing either.
+type noNotices struct{}
+
+func (noNotices) Send(*http.Request, accountnotice.Notice, accountnotice.Recipient) {}
+
 // Two removals of the last two administrators at the same instant: one deletes A, the other
 // disables B, two different writes on two different rows that share nothing but the manage
 // permission row both take first. The deletion is parked at the end of its transaction, having
@@ -200,7 +207,7 @@ func TestLastAdministrator_TwoConcurrentRemovalsOfTheLastTwoEndWithOneRefused(t 
 	first := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
 		aId := strconv.FormatInt(a.Id, 10)
-		first <- serveAsManage(apihandlers.HandleUserDelete(&parkedAfterTheRemovalCounted{Database: h.DB, b: parked}, auditLogger),
+		first <- serveAsManage(apihandlers.HandleUserDelete(&parkedAfterTheRemovalCounted{Database: h.DB, b: parked}, auditLogger, noNotices{}),
 			http.MethodDelete, "/api/v1/admin/users/"+aId, map[string]string{"id": aId}, nil)
 	}()
 	holder := parked.awaitParked(t)

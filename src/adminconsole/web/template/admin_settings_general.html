@@ -136,6 +136,20 @@
   </div>
 
   <div class="panel-body stacked">
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_settings.general.section_account_deletion" }}</h2>
+    <div class="check-list">
+      <label class="check-row" for="accountDeletionEnabled">
+        <input type="checkbox" id="accountDeletionEnabled" name="accountDeletionEnabled" aria-describedby="{{ if .error }}{{ if eq .errorField "accountDeletionEnabled" }}general-error {{ end }}{{ end }}accountDeletionHint"{{ if .settings.AccountDeletionEnabled }} checked{{ end }}
+          {{- if .error }}{{ if eq .errorField "accountDeletionEnabled" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.general.field.account_deletion_enabled" }}</span>
+          <span class="field-hint" id="accountDeletionHint">{{ T $.ctx "adminconsole.admin_settings.general.account_deletion_enabled_tooltip" }}</span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <div class="panel-body stacked">
     <div>
       <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_settings.general.section_flows" }}</h2>
       <p class="field-hint mt-1">{{ T $.ctx "adminconsole.admin_settings.general.flows_lead" }}</p>

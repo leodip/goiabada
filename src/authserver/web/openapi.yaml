@@ -11,8 +11,8 @@ info:
     ```
     Authorization: Bearer <access_token>
     ```
-    `getClientLogoImage`, at `/client/logo/{clientIdentifier}` outside `/api/v1`, is
-    public and marked `security: []`.
+    `getClientLogoImage`, at `/client/logo/{clientIdentifier}`, and `getPublicSettings`, at
+    `/api/public/settings`, are outside `/api/v1`: they are public and marked `security: []`.
 
     ## API Groups
 
@@ -239,7 +239,9 @@ paths:
     delete:
       tags: [Users]
       summary: Delete user
-      description: Delete a user by ID
+      description: |
+        Delete a user by ID. The user is emailed that an administrator deleted their account, when
+        SMTP is configured and their address is verified.
       operationId: deleteUser
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -3142,7 +3144,9 @@ paths:
     put:
       tags: [Settings]
       summary: Update general settings
-      description: Update general system settings
+      description: |
+        Update general system settings. `accountDeletionEnabled` is required: a request without
+        it, or with it `null`, is refused with `400`.
       operationId: updateSettingsGeneral
       requestBody:
         required: true
@@ -3166,6 +3170,26 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/public/settings:
+    get:
+      tags: [Settings]
+      summary: Get public settings
+      description: |
+        The settings the admin console reads before anyone holds a token: the app name, the UI
+        theme, whether SMTP is configured, the issuer, the password rules, and whether users can
+        delete their own account. This is a public endpoint that does not require
+        authentication.
+      operationId: getPublicSettings
+      security: []
+      responses:
+        '200':
+          description: Public settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicSettingsResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/admin/settings/email:
     get:
       tags: [Settings]
@@ -4212,7 +4236,7 @@ paths:
 
         A wrong or blank password is refused with 400 (`AUTHENTICATION_FAILED`). A wrong password
         counts against the `account_password` rate limit, shared with the account's password,
-        email and recovery-code changes. Every request counts against the
+        email and recovery-code changes and its deletion. Every request counts against the
         `account_credential_change` rate limit, 10 per hour per account, shared with the account's
         password change and new sets of recovery codes.
 
@@ -4315,7 +4339,7 @@ paths:
         A wrong or blank password is refused with 400 (`AUTHENTICATION_FAILED`), and a user without
         an authenticator with 400 (`OTP_NOT_ENABLED`). A wrong password counts against the
         `account_password` rate limit, shared with the account's password, two-factor and email
-        changes. Every request counts against the `account_credential_change` rate limit, 10 per
+        changes and its deletion. Every request counts against the `account_credential_change` rate limit, 10 per
         hour per account, shared with the account's password and two-factor changes.
       operationId: createAccountRecoveryCodes
       requestBody:
@@ -4339,6 +4363,76 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/account/deletion:
+    post:
+      tags: [Account]
+      summary: Delete own account
+      description: |
+        Deletes the authenticated user's account, at once. This can't be undone. Requires the
+        user's password and, while two-factor authentication is on, a current code from the
+        authenticator (`otpCode`) or one of the user's recovery codes (`recoveryCode`), not both.
+
+        The deletion removes the user's profile, password, authenticator, recovery codes, picture,
+        groups, permissions, attributes and consents, and every session they have, so their refresh
+        tokens are revoked and their access tokens are refused from then on. The audit log records
+        it as `deleted_own_account`. The user is emailed that their account was deleted, when SMTP
+        is configured and their address is verified.
+
+        Only a token issued to the admin console's own client may call this. Any other client's
+        token is refused with 403 (`CLIENT_NOT_ALLOWED`), whatever its scopes, and the
+        `WWW-Authenticate` header says `error="insufficient_scope"`. When an administrator has
+        turned off **Let users delete their own account**, the request is refused with 403
+        (`ACCOUNT_DELETION_DISABLED`).
+
+        The last enabled user holding `authserver:manage` can't delete their account: the request
+        is refused with 409 (`LAST_ADMINISTRATOR`) before the password or a code is checked, so
+        nothing is spent.
+
+        A wrong or blank password is refused with 400 (`AUTHENTICATION_FAILED`). With two-factor
+        authentication on, no code is refused with 400 (`OTP_CODE_REQUIRED`), a wrong or already
+        used authenticator code with 400 (`INVALID_OTP_CODE`), the authenticator's next code, which
+        only a device whose clock runs ahead shows, with 400 (`OTP_CLOCK_AHEAD`), and a wrong or
+        already used recovery code with 400 (`INVALID_RECOVERY_CODE`). Both codes at once are
+        refused with 400 (`VALIDATION_ERROR`). A refused deletion spends no recovery code.
+
+        A wrong password, authenticator code or recovery code counts against the `account_password`
+        rate limit, shared with the account's password, two-factor and email changes and new sets
+        of recovery codes.
+      operationId: deleteAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '200':
+          description: The account was deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            The user is the last enabled user holding authserver:manage. error_code is
+            LAST_ADMINISTRATOR; nothing was deleted. Grant authserver:manage to another user first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -7317,6 +7411,67 @@ components:
     # =========================================================================
     # Settings Schemas
     # =========================================================================
+    PublicSettingsResponse:
+      type: object
+      properties:
+        appName:
+          type: string
+        uiTheme:
+          type: string
+          description: The name of the UI theme the pages use.
+        smtpEnabled:
+          type: boolean
+          description: When true, SMTP is configured, so the auth server can send email.
+        issuer:
+          type: string
+          description: The issuer the auth server writes into the iss claim of every token it signs.
+        accountDeletionEnabled:
+          type: boolean
+          description: >-
+            When true, users can delete their own account from their account pages in the admin
+            console. The same setting as accountDeletionEnabled in the general settings.
+        passwordRules:
+          $ref: '#/components/schemas/PasswordRulesResponse'
+      required:
+        - appName
+        - uiTheme
+        - smtpEnabled
+        - issuer
+        - accountDeletionEnabled
+        - passwordRules
+
+    PasswordRulesResponse:
+      type: object
+      description: What the general settings' password policy asks of a new password.
+      properties:
+        minLength:
+          type: integer
+          description: The minimum length, in characters.
+        requiresLowercase:
+          type: boolean
+        requiresUppercase:
+          type: boolean
+        requiresNumber:
+          type: boolean
+        requiresSymbol:
+          type: boolean
+        refusesCommon:
+          type: boolean
+          description: When true, a commonly used password is refused.
+        refusesAccountWords:
+          type: boolean
+          description: >-
+            When true, a password too close to the account's email address, username or the app
+            name is refused.
+      required:
+        - minLength
+        - requiresLowercase
+        - requiresUppercase
+        - requiresNumber
+        - requiresSymbol
+        - refusesCommon
+        - refusesAccountWords
+
     SettingsGeneralResponse:
       type: object
       properties:
@@ -7344,6 +7499,11 @@ components:
         resourceOwnerPasswordCredentialsEnabled:
           type: boolean
           description: When true, grant_type=password is enabled server-wide (RFC 6749 section 4.3). Deprecated in OAuth 2.1
+        accountDeletionEnabled:
+          type: boolean
+          description: >-
+            When true, users can delete their own account from their account pages in the admin
+            console. Administrators can delete any user either way.
       required:
         - appName
         - issuer
@@ -7354,6 +7514,7 @@ components:
         - pkceRequired
         - implicitFlowEnabled
         - resourceOwnerPasswordCredentialsEnabled
+        - accountDeletionEnabled
 
     UpdateSettingsGeneralRequest:
       type: object
@@ -7401,6 +7562,15 @@ components:
         resourceOwnerPasswordCredentialsEnabled:
           type: boolean
           description: When true, allows grant_type=password at the token endpoint (RFC 6749 section 4.3). Deprecated in OAuth 2.1
+        accountDeletionEnabled:
+          type: boolean
+          description: >-
+            When true, users can delete their own account from their account pages in the admin
+            console. Administrators can delete any user either way. Required: a request without it,
+            or with it null, is refused with 400
+            handler.settings_general.account_deletion_enabled_required.
+      required:
+        - accountDeletionEnabled
 
     SettingsEmailResponse:
       type: object
@@ -7989,6 +8159,25 @@ components:
         password:
           type: string
           description: The user's current password.
+      required:
+        - password
+
+    DeleteAccountRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          description: The user's current password.
+        otpCode:
+          type: string
+          description: >-
+            A current 6-digit code from the user's authenticator. Required while two-factor
+            authentication is on, unless recoveryCode is sent instead.
+        recoveryCode:
+          type: string
+          description: >-
+            One of the user's unused recovery codes, in place of otpCode. Send one or the other,
+            not both.
       required:
         - password
 

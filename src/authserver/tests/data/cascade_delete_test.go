@@ -118,7 +118,7 @@ func TestDeleteClient_ROPCRefreshTokenDoesNotBlockDeletion(t *testing.T) {
 // Exhaustive: every table with a foreign key to the parent
 // =============================================================================
 
-// TestDeleteUser_RemovesAllDependentRows covers all eight tables that reference
+// TestDeleteUser_RemovesAllDependentRows covers all ten tables that reference
 // users(id), plus the two second-hop tables that hang off them
 // (user_session_clients under user_sessions, refresh_tokens under codes).
 func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
@@ -140,6 +140,10 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 	legalDocument := createLegalDocument(t, record.LegalDocumentKindMustAccept)
 	acceptedVersion := publishVersion(t, legalDocument.Id, 1, "Terms of use", "Be nice.")
 	acceptLegalDocumentVersion(t, user.Id, acceptedVersion.Id)
+	recoveryCodes := recoveryCodeHashes(3)
+	replaceRecoveryCodes(t, user.Id, recoveryCodes)
+	require.True(t, useRecoveryCode(t, user.Id, recoveryCodes[0]), "sanity: one code of the set is used")
+	require.Equal(t, 2, unusedRecoveryCodes(t, user.Id), "sanity: the other two codes are unused")
 
 	// Second hop: a refresh token under the code, and the session's client row.
 	codeLinkedToken := createCodeLinkedRefreshToken(t, code.Id)
@@ -203,6 +207,14 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 
 	// legal_document_acceptances
 	assert.Empty(t, acceptedVersionIds(t, user.Id), "legal_document_acceptances must cascade from users")
+
+	// user_recovery_codes, the used code and the unused ones alike
+	for i, codeHash := range recoveryCodes {
+		exists, existsErr := database.UserRecoveryCodeExists(context.Background(), nil, user.Id, codeHash)
+		require.NoError(t, existsErr, "UserRecoveryCodeExists")
+		assert.False(t, exists, "user_recovery_codes must cascade from users (code %d)", i)
+	}
+	assert.Zero(t, unusedRecoveryCodes(t, user.Id), "no unused recovery code may outlive its user")
 
 	// The group, resource and permission are independent of the user and must
 	// survive: cascade must not travel up an association table.

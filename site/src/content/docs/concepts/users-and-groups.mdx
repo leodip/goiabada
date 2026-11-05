@@ -58,7 +58,35 @@ The user's page has these tabs: **Details**, **Profile**, **Picture**, **Email**
 
 A disabled user can't sign in. Turning off **Enabled** on the **Details** tab also ends every session the user has and revokes their refresh tokens, so no client can get a new token for them. Turning it back on lets them sign in again, and gives back nothing that was revoked.
 
-Deleting a user deletes everything attached to them: their permissions, their group memberships and their attributes.
+To remove a user for good, delete them: see [Deleting users](#deleting-users).
+
+## Deleting users
+
+You delete a user from the **Users** list, with the user's **Delete** link, typing their email to confirm.
+
+Users can also delete their own account, under **Delete account** in the admin console's **Account** pages. They confirm with their password and, while two-factor authentication is on, a code from their authenticator or one of their recovery codes. The account is deleted at once.
+
+Whether users can do this is **Let users delete their own account**, under **Admin**, **Settings**, **General**, **Account deletion**. It's on by default. Turned off, the **Delete account** page is gone and only an administrator can delete users. It never limits what you can delete.
+
+Goiabada refuses to delete the last enabled user holding `authserver:manage`, whoever asks: see [the last administrator](/reference/api/administrators/#the-last-administrator).
+
+Either way, the deletion removes:
+
+- the user's profile, email address, phone and address;
+- their password, authenticator and recovery codes;
+- their picture;
+- their group memberships, permissions and attributes;
+- the consents they gave clients;
+- their sessions and refresh tokens, so they're signed out everywhere and no client can get a new token for them. The auth server refuses their access tokens from then on. An API that checks an access token without asking the auth server accepts it until it expires.
+
+It leaves:
+
+- the [audit log](/concepts/audit-log/)'s entries about the user, which name them by their ID, not their email address, until the [retention](/concepts/audit-log/#retention) removes them;
+- the server logs, which can include the user's IP address;
+- backups made before the deletion;
+- what clients already received about the user, such as their name and email address. Clients aren't told the user is gone.
+
+Whoever deletes the account, the user is emailed that it's gone: see [emails about account changes](/reference/security/#emails-about-account-changes).
 
 ## Passwords
 

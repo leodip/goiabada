@@ -34,6 +34,7 @@ func HandleSettingsGeneralGet() http.HandlerFunc {
 			PKCERequired:                              settings.PKCERequired,
 			ImplicitFlowEnabled:                       settings.ImplicitFlowEnabled,
 			ResourceOwnerPasswordCredentialsEnabled:   settings.ResourceOwnerPasswordCredentialsEnabled,
+			AccountDeletionEnabled:                    settings.AccountDeletionEnabled,
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)
@@ -100,6 +101,14 @@ func HandleSettingsGeneralPut(
 			return
 		}
 
+		// The account deletion choice is required: a PUT replaces the whole section, and an absent or
+		// null value read as false would turn deletion off for a caller that does not know the field
+		// (#783 decision 5).
+		if req.AccountDeletionEnabled == nil {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralAccountDeletionEnabledRequired, nil))
+			return
+		}
+
 		// Apply updates, onto the row as stored when the save runs (#407)
 		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
 			stored.AppName = appName
@@ -116,6 +125,7 @@ func HandleSettingsGeneralPut(
 			stored.PKCERequired = req.PKCERequired
 			stored.ImplicitFlowEnabled = req.ImplicitFlowEnabled
 			stored.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled
+			stored.AccountDeletionEnabled = *req.AccountDeletionEnabled
 		})
 		if err != nil {
 			writeInternalServerError(w, r, err)
@@ -137,6 +147,7 @@ func HandleSettingsGeneralPut(
 			PKCERequired:                              saved.PKCERequired,
 			ImplicitFlowEnabled:                       saved.ImplicitFlowEnabled,
 			ResourceOwnerPasswordCredentialsEnabled:   saved.ResourceOwnerPasswordCredentialsEnabled,
+			AccountDeletionEnabled:                    saved.AccountDeletionEnabled,
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)

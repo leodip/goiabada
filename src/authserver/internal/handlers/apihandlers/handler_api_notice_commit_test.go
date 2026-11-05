@@ -95,6 +95,17 @@ func noticeRoutes() []noticeRoute {
 			},
 		},
 		{
+			name: "an administrator's deletion", page: "/emails/email_account_deleted_by_administrator.html",
+			user: func(*testing.T) *record.User { return adminDeletionNoticeRow() },
+			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
+				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
+				locked := *before
+				stubAdminDeletion(database, auditLogger, before, &locked)
+				return adminDeletionNoticeHandler(database, auditLogger, jobs, pageRenderer, emailSender),
+					adminDeletionNoticeRequest(passwordNoticeSettings())
+			},
+		},
+		{
 			name: "a new set of recovery codes", page: "/emails/email_recovery_codes_replaced.html",
 			user: recoveryNoticeUser,
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
@@ -130,8 +141,10 @@ func answerLockedRead(t *testing.T, database *datamocks.Database, current *recor
 func TestCredentialNotices_ACommittedChangeIsToldWhenItsResponseCannotBeRead(t *testing.T) {
 	routes := noticeRoutes()
 	for _, route := range routes {
-		if route.page == "/emails/email_password_changed.html" || route.page == "/emails/email_recovery_codes_replaced.html" {
-			// Answered from what was read before the change: no read after it to fail.
+		if route.page == "/emails/email_password_changed.html" || route.page == "/emails/email_recovery_codes_replaced.html" ||
+			route.page == "/emails/email_account_deleted_by_administrator.html" {
+			// Answered from what was read before the change, or with no read at all: no read after
+			// it to fail.
 			continue
 		}
 		t.Run(route.name, func(t *testing.T) {

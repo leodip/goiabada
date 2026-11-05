@@ -347,7 +347,7 @@ var userTargetWrites = []targetWrite{
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string) *httptest.ResponseRecorder {
 			r := targetRequest(http.MethodDelete, "/api/v1/admin/users/52", "", scope, map[string]string{"id": "52"})
 			rr := httptest.NewRecorder()
-			HandleUserDelete(database, auditLogger).ServeHTTP(rr, r)
+			HandleUserDelete(database, auditLogger, discardNotices{}).ServeHTTP(rr, r)
 			return rr
 		},
 		expectReads:      func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
@@ -858,7 +858,7 @@ func TestTargetCeiling_TheWritesAnswerTheirOwnFourHundredsFirst(t *testing.T) {
 
 		r := targetRequest(http.MethodDelete, "/api/v1/admin/users/52", "", granularScopeOfTarget, map[string]string{"id": "52"})
 		rr := httptest.NewRecorder()
-		HandleUserDelete(database, auditLogger).ServeHTTP(rr, r)
+		HandleUserDelete(database, auditLogger, discardNotices{}).ServeHTTP(rr, r)
 
 		assert.Equal(t, http.StatusNotFound, rr.Code)
 		assertNoTargetPolicyRead(t, database)

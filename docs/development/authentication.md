@@ -604,7 +604,7 @@ columns are `dont-update` (#242).
 ## Rate limiting
 
 Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, account password, OTP
-and email changes, email verification and its resend, forgot/reset password, self-registration,
+and email changes, account deletion, email verification and its resend, forgot/reset password, self-registration,
 activation, DCR, and the authorization endpoint, both methods of which share one admission budget
 per client block, #504). Credential checks count failures only, so a successful attempt spends
 nothing. Two tiers count every request beside a credential check: the email change's, since past
@@ -612,7 +612,10 @@ the password it says whether another account holds the address (#683), and
 `account_credential_change`, 10 an hour per account shared by the Account API's password change,
 two-factor change and new set of recovery codes, mounted ahead of `account_password` so it counts
 refused requests too. Without it nothing bounds how often one account succeeds at those changes,
-and each sends a security notice (#724 decision 3). The limits counted by a user or by an
+and each sends a security notice (#724 decision 3). Account deletion is on `account_password`
+alone, without `account_credential_change`: a wrong password, authenticator code or recovery code
+each spends it, a blank password or a missing code spends nothing, and the last administrator is
+refused before any credential is checked (#783 decision 4). The limits counted by a user or by an
 email apply whatever
 `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` says: those counted by a user something has already
 authenticated, the signing-in user or a token's subject (OTP, account password, credential change,
@@ -678,3 +681,13 @@ names (section 2.2.2).
   scopes (read routes also accept `authserver:admin-read`); see
   `src/authserver/internal/server/routes.go`
 - `/api/v1/account/*` - User self-service API (requires `authserver:manage-account` permission)
+  - `POST /api/v1/account/deletion` also requires a token issued to `admin-console-client`:
+    `RequireAdminConsoleClient` answers any other client 403 `CLIENT_NOT_ALLOWED` with the
+    `insufficient_scope` challenge, and is the route guard to reuse for another console-only
+    route. It takes the password and, while two-factor authentication is on, an authenticator code
+    or a recovery code. `DeleteUser` runs under the administrators' lock, which refuses the last
+    enabled holder of `authserver:manage` there and in an earlier check made before the
+    credentials. The credentials are checked against the first read of the user, so the row read
+    under the deletion's lock must still hold the same password hash and, while two-factor is on,
+    the authenticator generation the code was accepted for; a recovery code is claimed in the
+    deletion's transaction (#783).

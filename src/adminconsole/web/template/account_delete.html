@@ -1,0 +1,68 @@
+{{define "title"}}{{ T $.ctx "adminconsole.account.delete.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "account_menu" . }}{{end}}
+{{define "head"}}
+{{ if .otpEnabled }}<script src="{{ asset "/static/pages/account-delete.js" }}" defer></script>{{ end }}
+{{end}}
+
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.menu.account" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.account.delete.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.account.delete.lead" "appName" .appName }}</p>
+  </div>
+</div>
+
+{{/* The Delete account page (#783 decision 9): what the deletion removes and what it leaves, then
+     the password and, while two-factor authentication is on, one second factor. Both code fields
+     are drawn; the one not chosen is hidden and disabled, so the form posts the other alone, and
+     account-delete.js swaps them when the user takes the other choice, whose button is drawn
+     hidden for the script to show. errorField names the field a refusal is about, which is marked
+     invalid and described by the notice; every field comes back empty, so focus goes to the
+     password. The deletion is asked first
+     in a confirm dialog, whose second button is the danger action. The hidden field names the
+     account the password belongs to, for password managers; it has no name, so it is never
+     posted. */}}
+<form class="panel" method="post" action="/account/delete" novalidate data-confirm-dialog="confirmDeletion" data-confirm-title="{{ T $.ctx "adminconsole.account.delete.confirm_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.account.delete.confirm_body" }}">
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="delete-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
+
+    <p><strong>{{ T $.ctx "adminconsole.account.delete.deleted_label" }}</strong> {{ T $.ctx "adminconsole.account.delete.deleted" }}</p>
+    <p><strong>{{ T $.ctx "adminconsole.account.delete.kept_label" }}</strong> {{ T $.ctx "adminconsole.account.delete.kept" }}</p>
+
+    {{ with .loggedInUser }}<input type="email" value="{{ .Email }}" autocomplete="username" aria-label="{{ T $.ctx "adminconsole.account.email.field.current_email" }}" hidden>{{ end }}
+
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="password">{{ T $.ctx "adminconsole.account.delete.field.password" }}</label>
+        <div class="input-row">
+          <input class="control" id="password" type="password" name="password" autocomplete="current-password" spellcheck="false" autocapitalize="none" autocorrect="off"{{ if .error }}{{ if eq .errorField "password" }} aria-invalid="true" aria-describedby="delete-error"{{ end }} autofocus{{ end }}>
+          <button class="button" type="button" data-password-toggle aria-controls="password" aria-label="{{ T $.ctx "adminconsole.password_toggle.show_password" }}" data-hide-name="{{ T $.ctx "adminconsole.password_toggle.hide_password" }}" data-hide-label="{{ T $.ctx "adminconsole.password_toggle.hide" }}" data-shown-status="{{ T $.ctx "adminconsole.password_toggle.shown" }}" data-hidden-status="{{ T $.ctx "adminconsole.password_toggle.hidden" }}" hidden>{{ T $.ctx "adminconsole.password_toggle.show" }}</button>
+        </div>
+      </div>
+      {{ if .otpEnabled }}
+      <div class="field" id="otp-field"{{ if .useRecoveryCode }} hidden{{ end }}>
+        <label class="field-label" for="otp">{{ T $.ctx "adminconsole.account.delete.field.otp" }}</label>
+        <input class="control control-mono" id="otp" type="text" name="otp" inputmode="numeric" autocomplete="one-time-code" autocapitalize="none" spellcheck="false"{{ if .error }}{{ if eq .errorField "otp" }} aria-invalid="true" aria-describedby="delete-error"{{ end }}{{ end }}{{ if .useRecoveryCode }} disabled{{ end }}>
+      </div>
+      <div class="field" id="recovery-code-field"{{ if not .useRecoveryCode }} hidden{{ end }}>
+        <label class="field-label" for="recoveryCode">{{ T $.ctx "adminconsole.account.delete.field.recovery_code" }}</label>
+        <input class="control control-mono" id="recoveryCode" type="text" name="recoveryCode" autocomplete="off" autocapitalize="none" spellcheck="false"{{ if .error }}{{ if eq .errorField "recoveryCode" }} aria-invalid="true" aria-describedby="delete-error"{{ end }}{{ end }}{{ if not .useRecoveryCode }} disabled{{ end }}>
+      </div>
+      <div>
+        <button class="button button-quiet button-sm" type="button" data-second-factor-toggle data-use-recovery-code="{{ T $.ctx "adminconsole.account.delete.use_recovery_code" }}" data-use-authenticator="{{ T $.ctx "adminconsole.account.delete.use_authenticator" }}" hidden>{{ if .useRecoveryCode }}{{ T $.ctx "adminconsole.account.delete.use_authenticator" }}{{ else }}{{ T $.ctx "adminconsole.account.delete.use_recovery_code" }}{{ end }}</button>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  <div class="panel-footer">
+    <button class="button button-danger" type="submit">{{ T $.ctx "adminconsole.account.delete.button" }}</button>
+  </div>
+</form>
+{{ template "modal_dialog" (args "confirmDeletion" "confirm" $.ctx (T $.ctx "adminconsole.account.delete.button") (T $.ctx "adminconsole.account.delete.confirm_title")) }}
+{{end}}

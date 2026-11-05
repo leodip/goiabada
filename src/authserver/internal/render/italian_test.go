@@ -57,6 +57,8 @@ func TestItalian_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"recovery_code_used", "È stato usato un codice di recupero per accedere", "Ti restano 3 codici di recupero inutilizzati."},
 			{"recovery_codes_replaced", "I tuoi codici di recupero sono stati sostituiti", "I codici di recupero precedenti non funzionano più"},
 			{"otp_lockout", "La tua app di autenticazione è stata bloccata dopo troppi codici errati", "Accedi con uno dei tuoi codici di recupero"},
+			{"account_deleted", "Il tuo account è stato eliminato", "Altrimenti, qualcun altro conosceva la tua password."},                                  //nolint:misspell // the it catalog's text: "eliminato" is Italian, not a misspelling of "elimination"
+			{"account_deleted_by_administrator", "Un amministratore ha eliminato il tuo account", "Se non te lo aspettavi, contatta il tuo amministratore."}, //nolint:misspell // the it catalog's text: "eliminato" is Italian, not a misspelling of "elimination"
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)

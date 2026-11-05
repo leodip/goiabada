@@ -52,6 +52,15 @@ type CreateAccountRecoveryCodesResponse struct {
 	RecoveryCodes []string `json:"recoveryCodes"`
 }
 
+// DeleteAccountRequest asks POST /api/v1/account/deletion to delete the caller's own account. The
+// password is the user's own. While two-factor authentication is on, it carries an authenticator
+// code or a recovery code in its place, never both (#783 decisions 2 and 3).
+type DeleteAccountRequest struct {
+	Password     string `json:"password"`
+	OtpCode      string `json:"otpCode,omitempty"`
+	RecoveryCode string `json:"recoveryCode,omitempty"`
+}
+
 // AccountOTPEnrollmentResponse contains the enrollment QR code image (base64)
 // and the secret key to set up TOTP in an authenticator app.
 type AccountOTPEnrollmentResponse struct {

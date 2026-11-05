@@ -31,6 +31,12 @@ type PublicSettingsResponse struct {
 	SMTPEnabled bool   `json:"smtpEnabled"`
 	Issuer      string `json:"issuer"`
 
+	// AccountDeletionEnabled is whether users may delete their own account, which the admin
+	// console's account menu and page read, as SMTPEnabled gates Email verification. It is a
+	// policy, not data about anyone, so an anonymous caller learning it is harmless (#783
+	// decision 6).
+	AccountDeletionEnabled bool `json:"accountDeletionEnabled"`
+
 	PasswordRules PasswordRulesResponse `json:"passwordRules"`
 }
 
@@ -65,6 +71,8 @@ type SettingsGeneralResponse struct {
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
 	ResourceOwnerPasswordCredentialsEnabled bool `json:"resourceOwnerPasswordCredentialsEnabled"`
+	// AccountDeletionEnabled is whether users may delete their own account (#783).
+	AccountDeletionEnabled bool `json:"accountDeletionEnabled"`
 }
 
 // UpdateSettingsGeneralRequest contains the general settings fields
@@ -84,6 +92,10 @@ type UpdateSettingsGeneralRequest struct {
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
 	ResourceOwnerPasswordCredentialsEnabled bool `json:"resourceOwnerPasswordCredentialsEnabled"`
+	// AccountDeletionEnabled is required on the wire. It is a pointer so an absent or null field
+	// is told from false and refused, rather than turning deletion off for a caller that does not
+	// know the field (#783 decision 5).
+	AccountDeletionEnabled *bool `json:"accountDeletionEnabled"`
 }
 
 // SettingsEmailResponse represents the email/SMTP settings returned by the API
