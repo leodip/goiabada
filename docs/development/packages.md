@@ -379,7 +379,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `template.HTML` built from data, which its `trusted_html_lint_test.go` holds (#622 decision 4)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlmatch,uuid}/` - The authserver-only utilities
   #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and
-  origin predicates, UUIDs (#360); `oidc` also holds the grant type list every grant-type reader
+  origin predicates, UUIDs (#360); `urlmatch` also holds the back-channel logout URI rule every intake
+  and delivery checks (#784); `oidc` also holds the grant type list every grant-type reader
   consults and the `amr` values (#437); the encrypted id_token_hint's JWE, keyed from a client
   secret and sharing nothing with the data cipher, left `encryption` for `internal/idtokenhint`
   (#434)

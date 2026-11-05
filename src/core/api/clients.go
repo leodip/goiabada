@@ -59,6 +59,12 @@ type ClientResponse struct {
 	// client, as stored. It is always true for a confidential client, which every writer keeps on;
 	// a public client starts with it off (#711 decisions 4 and 6).
 	RememberConsent bool `json:"rememberConsent"`
+	// BackchannelLogoutURI is where the auth server POSTs a logout token when a session the client
+	// was on ends, empty when it has none, and BackchannelLogoutSessionRequired whether the client
+	// requires the session identifier in every logout token (OpenID Connect Back-Channel Logout 1.0
+	// section 2.2). Both change only through UpdateClientBackchannelLogoutRequest (#784 decision 9).
+	BackchannelLogoutURI             string `json:"backchannelLogoutUri"`
+	BackchannelLogoutSessionRequired bool   `json:"backchannelLogoutSessionRequired"`
 	// CreatedViaDCR is read-only on purpose. It records that the client registered itself through
 	// /connect/register, which is a fact about where the client came from rather than a setting, so
 	// UpdateClientSettingsRequest deliberately does not carry it and neither an administrator nor the
@@ -196,6 +202,17 @@ type UpdateClientRedirectURIsRequest struct {
 type UpdateClientPostLogoutRedirectURIsRequest struct {
 	PostLogoutRedirectURIs         []string `json:"postLogoutRedirectURIs"`
 	ExpectedPostLogoutRedirectURIs []string `json:"expectedPostLogoutRedirectURIs"`
+}
+
+// UpdateClientBackchannelLogoutRequest sets a client's back-channel logout settings, on PUT
+// /clients/{id}/backchannel-logout (#784 decision 9). Both fields are required, so a body that
+// leaves one out cannot clear it by accident: BackchannelLogoutURI is the URI, or "" for none, and
+// BackchannelLogoutSessionRequired whether the client requires the session identifier in every
+// logout token. Setting or changing the URI takes authserver:manage; clearing it, or changing the
+// flag alone, takes either clients scope (#784 decision 15).
+type UpdateClientBackchannelLogoutRequest struct {
+	BackchannelLogoutURI             *string `json:"backchannelLogoutUri"`
+	BackchannelLogoutSessionRequired *bool   `json:"backchannelLogoutSessionRequired"`
 }
 
 // UpdateClientWebOriginsRequest is used to replace the full set of

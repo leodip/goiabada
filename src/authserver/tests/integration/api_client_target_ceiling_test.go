@@ -194,6 +194,19 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 		},
 	},
 	{
+		// The session-required flag alone, which a granular token may change on an ordinary client:
+		// setting the URI would meet the back-channel logout URI ceiling instead (#784 decision 15).
+		name: "PUT clients backchannel logout", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/backchannel-logout",
+		prepare: noClientPrepare,
+		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/backchannel-logout", f.clientId),
+				map[string]any{"backchannelLogoutUri": storedClient(t, f.clientId).BackchannelLogoutURI, "backchannelLogoutSessionRequired": true})
+		},
+		changed: func(t *testing.T, f *clientTargetFixture) bool {
+			return storedClient(t, f.clientId).BackchannelLogoutSessionRequired
+		},
+	},
+	{
 		name: "PUT clients web origins", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/web-origins",
 		prepare: func(t *testing.T, f *clientTargetFixture) {
 			f.before = "https://attacker-" + strings.ToLower(fake.LetterN(8)) + ".example"

@@ -16218,6 +16218,81 @@ func (_c *Database_SetClientAdministrativeScopesAllowed_Call) RunAndReturn(run f
 	return _c
 }
 
+// SetClientBackchannelLogout provides a mock function for the type Database
+func (_mock *Database) SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error {
+	ret := _mock.Called(ctx, tx, clientId, uri, sessionRequired)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetClientBackchannelLogout")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string, bool) error); ok {
+		r0 = returnFunc(ctx, tx, clientId, uri, sessionRequired)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_SetClientBackchannelLogout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetClientBackchannelLogout'
+type Database_SetClientBackchannelLogout_Call struct {
+	*mock.Call
+}
+
+// SetClientBackchannelLogout is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientId int64
+//   - uri string
+//   - sessionRequired bool
+func (_e *Database_Expecter) SetClientBackchannelLogout(ctx any, tx any, clientId any, uri any, sessionRequired any) *Database_SetClientBackchannelLogout_Call {
+	return &Database_SetClientBackchannelLogout_Call{Call: _e.mock.On("SetClientBackchannelLogout", ctx, tx, clientId, uri, sessionRequired)}
+}
+
+func (_c *Database_SetClientBackchannelLogout_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool)) *Database_SetClientBackchannelLogout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 bool
+		if args[4] != nil {
+			arg4 = args[4].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetClientBackchannelLogout_Call) Return(err error) *Database_SetClientBackchannelLogout_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_SetClientBackchannelLogout_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error) *Database_SetClientBackchannelLogout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetClientPublic provides a mock function for the type Database
 func (_mock *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {
 	ret := _mock.Called(ctx, tx, clientId)

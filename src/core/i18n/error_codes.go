@@ -246,6 +246,18 @@ const (
 	ErrCodeClientPostLogoutRedirectURINotAbsolute     = "handler.client_post_logout_redirect_uris.not_absolute"  // Args: {"uri": string}
 	ErrCodeClientPostLogoutRedirectURIsDuplicate      = "handler.client_post_logout_redirect_uris.duplicate"
 
+	// The back-channel logout save's refusals, one per field and rule, so a refusal marks the field
+	// it is about (#784 decisions 6, 9 and 15).
+	ErrCodeClientBackchannelLogoutURIRequired             = "handler.client_backchannel_logout.uri_required"
+	ErrCodeClientBackchannelLogoutSessionRequiredRequired = "handler.client_backchannel_logout.session_required_required"
+	ErrCodeClientBackchannelLogoutNoSignInFlow            = "handler.client_backchannel_logout.no_sign_in_flow"
+	ErrCodeClientBackchannelLogoutURITooLong              = "handler.client_backchannel_logout.uri_too_long"           // Args: {"length": int, "max": int, "prefix": string}
+	ErrCodeClientBackchannelLogoutURIInvalid              = "handler.client_backchannel_logout.uri_invalid"            // Args: {"uri": string}
+	ErrCodeClientBackchannelLogoutURISchemeInvalid        = "handler.client_backchannel_logout.uri_scheme_invalid"     // Args: {"uri": string}
+	ErrCodeClientBackchannelLogoutURIUserinfo             = "handler.client_backchannel_logout.uri_userinfo"           // Args: {"uri": string}
+	ErrCodeClientBackchannelLogoutURIHTTPPublicClient     = "handler.client_backchannel_logout.uri_http_public_client" // Args: {"uri": string}
+	ErrCodeClientBackchannelLogoutChangedSinceLoaded      = "handler.client_backchannel_logout.changed_since_loaded"
+
 	ErrCodeClientWebOriginEmpty            = "handler.client_web_origins.empty"
 	ErrCodeClientWebOriginInvalid          = "handler.client_web_origins.invalid"  // Args: {"origin": string}
 	ErrCodeClientWebOriginTooLong          = "handler.client_web_origins.too_long" // Args: {"length": int, "max": int, "origin": string}

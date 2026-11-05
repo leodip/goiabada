@@ -130,6 +130,18 @@ The [redirect URI rules](#redirect-uris) apply to each one, with these differenc
 
 Through the Admin API, replace the list whole with [`PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris`](/reference/api/admin/operations/updateclientpostlogoutredirecturis/), sending the list as you read it in `expectedPostLogoutRedirectURIs`. Each save leaves an `updated_post_logout_redirect_uris` entry in the [audit log](/concepts/audit-log/).
 
+## Back-channel logout
+
+A back-channel logout URI is an address on your app's server where the auth server tells your app that a user's session ended. It POSTs a signed logout token there, as [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) describes. A client without one is sent nothing.
+
+- **It uses `https`.** A confidential client may use plain `http` on any host, such as `http://app:3000/backchannel-logout` on a private network. A public client can't.
+- **It's an absolute URI that names a host,** at most 2048 bytes, with no user name or password and no fragment. A query is allowed, and kept exactly as you enter it.
+- **The client needs a flow that signs users in,** the authorization code flow or the implicit flow. A client with neither has no session to end.
+
+A client can also require the session identifier, `sid`, in every logout token it's sent. Turn that on when your app finds its sessions by `sid` alone.
+
+Through the Admin API, set both with [`PUT /api/v1/admin/clients/{id}/backchannel-logout`](/reference/api/admin/operations/updateclientbackchannellogout/): `backchannelLogoutUri`, empty for none, and `backchannelLogoutSessionRequired`. Setting or changing the URI takes `authserver:manage`, because the auth server sends requests to whatever address it names, inside your network included. `authserver:manage-clients` can still clear it and change `backchannelLogoutSessionRequired`. Each save leaves an `updated_client_backchannel_logout` entry in the [audit log](/concepts/audit-log/).
+
 ## Web origins
 
 Register a web origin when JavaScript in the browser calls `/auth/token`, `/auth/revoke`, `/auth/logout` or `/userinfo` directly, such as a single-page app. Without it, the browser blocks the call (CORS).

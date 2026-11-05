@@ -117,6 +117,11 @@ func TestMigration000080_ClientRememberConsent(t *testing.T) {
 		identifier, sqlBool000080(true), sqlBool000080(false), sqlBool000080(true), sqlBool000080(true),
 		sqlBool000080(false)))
 	require.NoErrorf(t, err, "insert a public client without remember_consent on %s", dbType())
+	// The read goes through the ORM, which reads every column the record carries, so it runs at
+	// head; no later migration writes remember_consent.
+	if upErr := h.Migrator.Up(ctx); upErr != nil && !errors.Is(upErr, migrator.ErrNoChange) {
+		require.NoError(t, upErr, "migrate to head for the read")
+	}
 	inserted, err := h.DB.GetClientByClientIdentifier(ctx, nil, identifier)
 	require.NoError(t, err)
 	require.NotNil(t, inserted)

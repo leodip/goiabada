@@ -620,6 +620,15 @@ const (
 	//
 	// Payload: client_id, the client saved, and logged_in_user.
 	EventUpdatedPostLogoutRedirectURIs = "updated_post_logout_redirect_uris"
+
+	// EventUpdatedClientBackchannelLogout records an administrator's save of a client's
+	// back-channel logout URI and whether it requires the session identifier, through PUT
+	// /api/v1/admin/clients/{id}/backchannel-logout, written once the save has committed (#784
+	// decision 9). A save that would set or change the URI without authserver:manage is refused
+	// and writes administrator_change_refused instead (#784 decision 15).
+	//
+	// Payload: client_id, the client saved, and logged_in_user.
+	EventUpdatedClientBackchannelLogout = "updated_client_backchannel_logout"
 )
 
 // The reason field of EventDeletedUserSession, one value per cause, which every row of that event
@@ -763,6 +772,7 @@ var auditEventTypes = []string{
 	EventUpdatedAuditLogsSettings,
 	EventUpdatedClientAdministrativeScopes,
 	EventUpdatedClientAuthentication,
+	EventUpdatedClientBackchannelLogout,
 	EventUpdatedClientIntrospectionResources,
 	EventUpdatedClientLogo,
 	EventUpdatedClientOAuth2Flows,

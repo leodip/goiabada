@@ -43,14 +43,24 @@ type Client struct {
 	// that loaded the client while it was confidential would otherwise write it on over a switch to
 	// public made meanwhile. CreateClient, SetClientRememberConsent and SetClientPublic's transition
 	// write it.
-	RememberConsent          bool `db:"remember_consent" fieldtag:"dont-update"`
-	ShowLogo                 bool `db:"show_logo"`
-	ShowDisplayName          bool `db:"show_display_name"`
-	ShowDescription          bool `db:"show_description"`
-	ShowWebsiteURL           bool `db:"show_website_url"`
-	IsPublic                 bool `db:"is_public"`
-	AuthorizationCodeEnabled bool `db:"authorization_code_enabled"`
-	ClientCredentialsEnabled bool `db:"client_credentials_enabled"`
+	RememberConsent bool `db:"remember_consent" fieldtag:"dont-update"`
+	// BackchannelLogoutURI is where the auth server POSTs a logout token when a session this client
+	// was on ends (OpenID Connect Back-Channel Logout 1.0 section 2.2), empty for none, and
+	// BackchannelLogoutSessionRequired whether the client needs the session identifier in every
+	// one (#784 decision 14). Both are tagged dont-update, so the whole-row UpdateClient never
+	// writes them: the other client saves read the row earlier in their request, and a
+	// manage-clients token can make each one, so a save racing a change of the URI would write back
+	// the one it read, which only an authserver:manage token may set (#784 decision 15).
+	// CreateClient and SetClientBackchannelLogout write them.
+	BackchannelLogoutURI             string `db:"backchannel_logout_uri" fieldtag:"dont-update"`
+	BackchannelLogoutSessionRequired bool   `db:"backchannel_logout_session_required" fieldtag:"dont-update"`
+	ShowLogo                         bool   `db:"show_logo"`
+	ShowDisplayName                  bool   `db:"show_display_name"`
+	ShowDescription                  bool   `db:"show_description"`
+	ShowWebsiteURL                   bool   `db:"show_website_url"`
+	IsPublic                         bool   `db:"is_public"`
+	AuthorizationCodeEnabled         bool   `db:"authorization_code_enabled"`
+	ClientCredentialsEnabled         bool   `db:"client_credentials_enabled"`
 	// PKCERequired overrides global setting if set.
 	// nil = use global setting, true = PKCE required, false = PKCE optional
 	PKCERequired *bool `db:"pkce_required"`

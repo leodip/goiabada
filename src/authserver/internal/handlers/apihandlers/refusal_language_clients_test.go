@@ -635,3 +635,90 @@ func TestClientTokenRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 	})
 }
+
+// TestClientBackchannelLogoutRefusals_AreInTheRequestsLanguage covers the back-channel logout save,
+// whose refusals name the field and, for the URI, the value refused (#784 decisions 6 and 9).
+func TestClientBackchannelLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) {
+	save := func(client *record.Client, body string) func(*testing.T, string) *httptest.ResponseRecorder {
+		return serveClient(http.MethodPut, "/api/v1/admin/clients/7/backchannel-logout", body, client, nil,
+			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.Handler {
+				return HandleClientBackchannelLogoutPut(database, auditLogger)
+			})
+	}
+	saveURI := func(client *record.Client, uri string) func(*testing.T, string) *httptest.ResponseRecorder {
+		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
+			return save(client, backchannelLogoutBody(t, uri, false))(t, acceptLanguage)
+		}
+	}
+	codeFlow := func() *record.Client { return &record.Client{Id: 7, AuthorizationCodeEnabled: true} }
+	publicCodeFlow := func() *record.Client { return &record.Client{Id: 7, AuthorizationCodeEnabled: true, IsPublic: true} }
+	overlong := "https://example.com/" + strings.Repeat("x", 2048)
+
+	assertRefusalLanguages(t, []refusalCase{
+		{
+			name:       "no URI",
+			serve:      save(codeFlow(), `{"backchannelLogoutSessionRequired": true}`),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_backchannel_logout.uri_required",
+			english:    "backchannelLogoutUri is required: send the back-channel logout URI, or an empty string for none.",
+			portuguese: "backchannelLogoutUri é obrigatório: envie a URI de logout back-channel, ou uma string vazia para nenhuma.",
+		},
+		{
+			name:       "no session-required flag",
+			serve:      save(codeFlow(), `{"backchannelLogoutUri": ""}`),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_backchannel_logout.session_required_required",
+			english:    "backchannelLogoutSessionRequired is required: send true or false.",
+			portuguese: "backchannelLogoutSessionRequired é obrigatório: envie true ou false.",
+		},
+		{
+			name:       "a client with no flow that signs users in",
+			serve:      saveURI(&record.Client{Id: 7}, "https://example.com/bcl"),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_backchannel_logout.no_sign_in_flow",
+			english:    "A back-channel logout URI is used by clients that sign users in through the authorization code with PKCE flow or the implicit flow, and neither is enabled for this client.",
+			portuguese: "Uma URI de logout back-channel serve a um cliente que faz o login dos usuários pelo fluxo authorization code com PKCE ou pelo fluxo implicit, e nenhum deles está habilitado para este cliente.",
+		},
+		{
+			name:       "a URI past the bound",
+			serve:      saveURI(codeFlow(), overlong),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_backchannel_logout.uri_too_long",
+			english:    "Back-channel logout URI is too long (2068 bytes, the maximum is 2048): https://example.com/" + strings.Repeat("x", 60) + "...",
+			portuguese: "A URI de logout back-channel é longa demais (2068 bytes, o máximo é 2048): https://example.com/" + strings.Repeat("x", 60) + "...",
+		},
+		{
+			name:       "a URI with a fragment",
+			serve:      saveURI(codeFlow(), "https://example.com/bcl#x"),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_backchannel_logout.uri_invalid",
+			english:    "Back-channel logout URI must be an absolute URI that names a host, with no fragment, well-formed percent-escapes and no spaces or characters a URI excludes: https://example.com/bcl#x",
+			portuguese: "A URI de logout back-channel precisa ser uma URI absoluta que nomeie um host, sem fragmento, com escapes por porcentagem bem formados e sem espaços ou caracteres que uma URI exclui: https://example.com/bcl#x",
+		},
+		{
+			name:       "a URI of another scheme",
+			serve:      saveURI(codeFlow(), "ftp://example.com/bcl"),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_backchannel_logout.uri_scheme_invalid",
+			english:    "Back-channel logout URI must use https or http: ftp://example.com/bcl",
+			portuguese: "A URI de logout back-channel precisa usar https ou http: ftp://example.com/bcl",
+		},
+		{
+			name:       "a URI with userinfo",
+			serve:      saveURI(codeFlow(), "https://me@example.com/bcl"),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_backchannel_logout.uri_userinfo",
+			english:    "Back-channel logout URI must not carry a user name or password: https://me@example.com/bcl",
+			portuguese: "A URI de logout back-channel não pode conter nome de usuário nem senha: https://me@example.com/bcl",
+		},
+		{
+			name:    "an http URI on a public client",
+			serve:   saveURI(publicCodeFlow(), "http://app.internal/bcl"),
+			status:  http.StatusBadRequest,
+			code:    "handler.client_backchannel_logout.uri_http_public_client",
+			english: "Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client: http://app.internal/bcl",
+			//nolint:misspell // the pt-BR catalog's text: "confidencial" is Portuguese, not a misspelling of "confidential"
+			portuguese: "A URI de logout back-channel precisa usar https em um cliente público. http simples só é permitido em um cliente confidencial: http://app.internal/bcl",
+		},
+	})
+}

@@ -2677,6 +2677,63 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/clients/{id}/backchannel-logout:
+    put:
+      tags: [Clients]
+      summary: Update back-channel logout
+      description: |
+        Set a client's back-channel logout URI, where the auth server POSTs a logout token when a
+        session the client was on ends (OpenID Connect Back-Channel Logout 1.0), and whether the
+        client requires the session identifier (`sid`) in every logout token. Send both fields; an
+        empty `backchannelLogoutUri` clears the URI.
+
+        The URI is an absolute `https` URI that names a host, at most 2048 bytes, with no user name
+        or password and no fragment. A query is kept as sent. A confidential client may use plain
+        `http` on any host; a public client can't. The client needs the authorization code flow or
+        the implicit flow.
+
+        Setting the URI, or changing the stored one, needs `authserver:manage`: another token is
+        refused 403 `MANAGE_SCOPE_REQUIRED`, and the refusal is recorded as
+        `administrator_change_refused`. `authserver:manage-clients` can clear the URI and change
+        `backchannelLogoutSessionRequired` alone. On a client that may act as an administrator,
+        only `authserver:manage` may save at all. Each save is recorded as
+        `updated_client_backchannel_logout`.
+      operationId: updateClientBackchannelLogout
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientBackchannelLogoutRequest'
+      responses:
+        '200':
+          description: Back-channel logout settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateClientResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            A token without `authserver:manage` sent back the URI as it read it, and another save
+            changed the URI since. error_code is CONCURRENT_UPDATE; nothing was saved. Read the
+            client again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/clients/{id}/web-origins:
     put:
       tags: [Clients]
@@ -7265,6 +7322,16 @@ components:
             Whether a user's earlier approval skips the consent screen for this client. Always true
             for a confidential client. A public client starts with it off, so users are asked
             whenever the consent screen is owed, even if they approved the app before.
+        backchannelLogoutUri:
+          type: string
+          description: >-
+            Where the auth server POSTs a logout token when a session the client was on ends; empty
+            when it has none. Set through PUT /api/v1/admin/clients/{id}/backchannel-logout
+        backchannelLogoutSessionRequired:
+          type: boolean
+          description: >-
+            Whether the client requires the session identifier (sid) in every logout token. Set
+            through PUT /api/v1/admin/clients/{id}/backchannel-logout
         createdViaDcr:
           type: boolean
           description: Read-only. True when the client registered itself through /connect/register
@@ -7356,6 +7423,8 @@ components:
         - enabled
         - consentRequired
         - rememberConsent
+        - backchannelLogoutUri
+        - backchannelLogoutSessionRequired
         - createdViaDcr
         - administrativeScopesAllowed
         - showLogo
@@ -7535,6 +7604,22 @@ components:
           description: The redirect URIs as last read; [] if there were none.
           items:
             type: string
+
+    UpdateClientBackchannelLogoutRequest:
+      type: object
+      required: [backchannelLogoutUri, backchannelLogoutSessionRequired]
+      properties:
+        backchannelLogoutUri:
+          type: string
+          maxLength: 2048
+          description: >-
+            The back-channel logout URI, or an empty string for none. Surrounding spaces are
+            trimmed. A URI that breaks the rules is refused with 400 and nothing is written;
+            error_code is the refusal's catalog key, such as
+            handler.client_backchannel_logout.uri_http_public_client.
+        backchannelLogoutSessionRequired:
+          type: boolean
+          description: Whether the client requires the session identifier (sid) in every logout token.
 
     UpdateClientPostLogoutRedirectURIsRequest:
       type: object

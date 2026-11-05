@@ -502,6 +502,8 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		Enabled:                                 client.Enabled,
 		ConsentRequired:                         client.ConsentRequired,
 		RememberConsent:                         client.RememberConsent,
+		BackchannelLogoutURI:                    client.BackchannelLogoutURI,
+		BackchannelLogoutSessionRequired:        client.BackchannelLogoutSessionRequired,
 		CreatedViaDCR:                           client.CreatedViaDCR,
 		AdministrativeScopesAllowed:             client.MayRequestAdministrativeScopes(),
 		ShowLogo:                                client.ShowLogo,

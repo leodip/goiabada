@@ -567,6 +567,8 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 		Enabled:                                 true,
 		ConsentRequired:                         true,
 		RememberConsent:                         true,
+		BackchannelLogoutURI:                    "http://app.internal:3000/backchannel-logout?tenant=a",
+		BackchannelLogoutSessionRequired:        true,
 		ShowLogo:                                true,
 		ShowDisplayName:                         true,
 		ShowWebsiteURL:                          true,
@@ -613,7 +615,9 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 		return `"clientIdentifier":"` + identifier + `","description":"the web app",` +
 			`"websiteUrl":"https://app.example","privacyPolicyUrl":"https://app.example/privacy",` +
 			`"termsOfServiceUrl":"https://app.example/terms","displayName":"Web App","enabled":true,` +
-			`"consentRequired":true,"rememberConsent":true,"createdViaDcr":false,"administrativeScopesAllowed":` + flag +
+			`"consentRequired":true,"rememberConsent":true,` +
+			`"backchannelLogoutUri":"http://app.internal:3000/backchannel-logout?tenant=a",` +
+			`"backchannelLogoutSessionRequired":true,"createdViaDcr":false,"administrativeScopesAllowed":` + flag +
 			`,"showLogo":true,"showDisplayName":true,` +
 			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,"isSystemLevelClient":` + flag +
 			`,"authorizationCodeEnabled":true,"clientCredentialsEnabled":false,` +

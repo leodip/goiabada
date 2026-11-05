@@ -32,12 +32,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The three ceilings a row can name, spelled as the policy's refusal records them (#402 decisions
-// 1, 5 and 7).
+// The four ceilings a row can name, spelled as the policy's refusal records them (#402 decisions
+// 1, 5 and 7, #784 decision 15).
 const (
-	adminCeilingGrant    = "grant"
-	adminCeilingTarget   = "target"
-	adminCeilingSettings = "settings"
+	adminCeilingGrant                = "grant"
+	adminCeilingTarget               = "target"
+	adminCeilingSettings             = "settings"
+	adminCeilingBackchannelLogoutURI = "backchannel_logout_uri"
 )
 
 // adminPolicyCeilings is every function in the handler package that applies a ceiling, and the
@@ -57,6 +58,7 @@ var adminPolicyCeilings = map[string]string{
 	"permissionDescriptionCeilingAllows": adminCeilingTarget,
 	"introspectionResourceCeilingAllows": adminCeilingGrant,
 	"settingsCeilingAllows":              adminCeilingSettings,
+	"backchannelLogoutURICeilingAllows":  adminCeilingBackchannelLogoutURI,
 }
 
 // adminPolicyRefusal is the function every ceiling answers a refusal through.
@@ -139,6 +141,7 @@ var adminRouteClassification = map[string]adminRouteClass{
 	"PUT /api/v1/admin/clients/{id}/oauth2-flows":              appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/redirect-uris":             appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris": appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/backchannel-logout":        appliesCeilings(adminCeilingTarget, adminCeilingBackchannelLogoutURI),
 	"PUT /api/v1/admin/clients/{id}/web-origins":               appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/tokens":                    appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/permissions":               appliesCeilings(adminCeilingGrant, adminCeilingTarget),
@@ -294,7 +297,8 @@ func adminRouteRowDisagrees(class adminRouteClass, applied []string) string {
 		return "a row names its ceilings or why it needs none, and this names both"
 	}
 	for _, ceiling := range class.ceilings {
-		if ceiling != adminCeilingGrant && ceiling != adminCeilingTarget && ceiling != adminCeilingSettings {
+		if ceiling != adminCeilingGrant && ceiling != adminCeilingTarget && ceiling != adminCeilingSettings &&
+			ceiling != adminCeilingBackchannelLogoutURI {
 			return "names \"" + ceiling + "\", which is no ceiling"
 		}
 	}
@@ -692,8 +696,10 @@ func adminCallName(fun ast.Expr) string {
 	return "a call"
 }
 
-// adminCeilingOrder is the order ceilings are named in: grant, target, settings.
-var adminCeilingOrder = map[string]int{adminCeilingGrant: 0, adminCeilingTarget: 1, adminCeilingSettings: 2}
+// adminCeilingOrder is the order ceilings are named in: grant, target, settings,
+// backchannel_logout_uri.
+var adminCeilingOrder = map[string]int{adminCeilingGrant: 0, adminCeilingTarget: 1, adminCeilingSettings: 2,
+	adminCeilingBackchannelLogoutURI: 3}
 
 // sortedCeilings is ceilings in adminCeilingOrder, each once, never nil.
 func sortedCeilings(ceilings []string) []string {
