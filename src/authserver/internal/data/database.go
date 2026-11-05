@@ -550,6 +550,10 @@ type Database interface {
 	CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *record.AuditLog) error
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
 	GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, filter record.AuditLogFilter) ([]record.AuditLog, int, error)
+	// GetAuditLogsByUserId answers every audit row about the user or made by them (user_id or
+	// logged_in_user_id is userId), each once, in id order, oldest first, and unpaged, as a
+	// user's data export lists them (#781 decision 5).
+	GetAuditLogsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.AuditLog, error)
 
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
 	UpdateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error

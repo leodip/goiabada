@@ -407,6 +407,25 @@ func TestServerRecordStatements_TheEnginesPageTheAuditLogs(t *testing.T) {
 	}
 }
 
+// TestServerRecordStatements_TheEnginesReadOneUsersAuditLogsWhole holds one user's audit events to
+// the rows about the user or made by them, the id bound to each column, in id order and unpaged on
+// every engine (#781 decision 5).
+func TestServerRecordStatements_TheEnginesReadOneUsersAuditLogsWhole(t *testing.T) {
+	for _, dialect := range allDialects {
+		t.Run(string(dialect), func(t *testing.T) {
+			assertNarrowWriteOn(t, narrowWrite{
+				run: func(ctx context.Context, d *Database) (any, error) {
+					_, err := d.GetAuditLogsByUserId(ctx, nil, 41)
+					return nil, err
+				},
+				statements: []string{
+					"SELECT <columns> FROM audit_logs WHERE (user_id = 41 OR logged_in_user_id = 41) ORDER BY id",
+				},
+			}, dialect, true)
+		})
+	}
+}
+
 // TestServerRecordStatements_TheEmailCasePreFlightAsksTheEngineToLowerEveryAddress holds the
 // pre-flight's read, through the pool and through the migration runner's connection, to every
 // users row, unfiltered, with the engine's own LOWER(email) beside the address.

@@ -891,6 +891,9 @@ func auditLogMapping() mappingCase {
 			"GetAuditLogsPaginated by event and user":    page(record.AuditLogFilter{AuditEvent: event, UserId: user}),
 			"GetAuditLogsPaginated by request and user":  page(record.AuditLogFilter{RequestId: request, UserId: user}),
 			"GetAuditLogsPaginated by all three":         page(record.AuditLogFilter{AuditEvent: event, RequestId: request, UserId: user}),
+			"GetAuditLogsByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAuditLogsByUserId(ctx, nil, user))
+			},
 		},
 		// CreateAuditLog stamps created_at from the clock whatever the record held; the value
 		// written is checked against the record as it returned, which carries the stamp.

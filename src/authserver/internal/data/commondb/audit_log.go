@@ -221,6 +221,18 @@ var countAuditLogsByEventRequestIdAndUser = statement{
 		"AND (user_id = @p3 OR logged_in_user_id = @p4)",
 }
 
+// selectAuditLogsByUser is one user's audit events, all of them, as a user's data export lists
+// them (#781 decision 5): the user filter's match on either user column, a row naming the user in
+// both listed once, with the id bound once for each. It is in id order, oldest first, and unpaged,
+// so two reads of one user compare row by row; paging the newest-first page while rows arrive
+// would list a row twice.
+var selectAuditLogsByUser = statement{
+	sqlite:   "SELECT " + auditLogColumns.sqlite + " FROM audit_logs WHERE (user_id = ? OR logged_in_user_id = ?) ORDER BY id",
+	mysql:    "SELECT " + auditLogColumns.mysql + " FROM audit_logs WHERE (user_id = ? OR logged_in_user_id = ?) ORDER BY id",
+	postgres: "SELECT " + auditLogColumns.postgres + " FROM audit_logs WHERE (user_id = $1 OR logged_in_user_id = $2) ORDER BY id",
+	mssql:    "SELECT " + auditLogColumns.mssql + " FROM audit_logs WHERE (user_id = @p1 OR logged_in_user_id = @p2) ORDER BY id",
+}
+
 // auditLogsQueries answers the page and the count for the filters given.
 func auditLogsQueries(byEvent, byRequestId, byUser bool) (page statement, count statement) {
 	switch {
@@ -348,4 +360,10 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 	}
 
 	return auditLogs, total, nil
+}
+
+func (d *Database) GetAuditLogsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.AuditLog, error) {
+	// Once for user_id and once for logged_in_user_id.
+	return queryAll(ctx, d, tx, nil, selectAuditLogsByUser.text(d.Dialect), []any{userId, userId},
+		scanAuditLog, "audit log")
 }
