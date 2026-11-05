@@ -364,7 +364,10 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		UserSessionMaxLifetimeInSeconds:         86400,    // 24 hours
 		MaxUserSessionsPerUser:                  20,       // Migration 000063 gives an existing installation the same
 		// Let each user choose; migration 000081 gives an existing installation the same (#743).
-		KeepSignedIn:                            record.KeepSignedInAsk,
+		KeepSignedIn: record.KeepSignedInAsk,
+		// Users may delete their own account; migration 000083 gives an existing installation the
+		// same (#783 decision 5).
+		AccountDeletionEnabled:                  true,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
 		IncludeOpenIDConnectClaimsInIdToken:     true,  // Industry standard (Auth0, Microsoft, Keycloak)
 		PKCERequired:                            true,  // OAuth 2.1 recommendation

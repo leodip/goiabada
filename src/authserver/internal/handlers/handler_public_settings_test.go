@@ -89,6 +89,25 @@ func TestPublicSettings_CarriesTheStoredPolicysRules(t *testing.T) {
 	}
 }
 
+// Whether users may delete their own account rides with the public settings, as stored, so the
+// admin console draws its account menu from the settings it already caches (#783 decision 6).
+func TestPublicSettings_CarriesAccountDeletionEnabled(t *testing.T) {
+	for _, stored := range []bool{true, false} {
+		database := datamocks.NewDatabase(t)
+		database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+			Id: 1, AppName: "Goiabada", AccountDeletionEnabled: stored,
+		}, nil).Once()
+
+		recorder := httptest.NewRecorder()
+		NewPublicSettings(database).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+
+		require.Equal(t, http.StatusOK, recorder.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+		assert.Equal(t, stored, body["accountDeletionEnabled"], "stored %v", stored)
+	}
+}
+
 func TestPublicSettings_DatabaseError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := NewPublicSettings(database)
@@ -177,6 +196,10 @@ var publicSettingsAllowedFields = map[string]string{
 	// fields (#550 decision 11). Already readable by anyone who opens the registration form
 	// while registration is on, and NIST SP 800-63B assumes an attacker knows them.
 	"PasswordRules": "passwordRules",
+	// Whether users may delete their own account, which the admin console's account menu and page
+	// read (#783 decision 6). A policy, not data about anyone: an anonymous caller learning it is
+	// harmless.
+	"AccountDeletionEnabled": "accountDeletionEnabled",
 }
 
 // publicPasswordRulesAllowedFields is the complete set of fields the password rules carry: the

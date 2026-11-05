@@ -1614,6 +1614,9 @@
 "adminconsole.admin_settings.general.email_settings_link" = "Paramètres des e-mails"
 "adminconsole.admin_settings.general.field.dynamic_client_registration" = "Enregistrement dynamique des clients"
 "adminconsole.admin_settings.general.dynamic_client_registration_tooltip" = "Les clients peuvent s’enregistrer eux-mêmes sur /connect/register (RFC 7591), qui est alors annoncé dans le document de découverte. Utile pour MCP et les autres intégrations qui s’enregistrent à l’exécution."
+"adminconsole.admin_settings.general.section_account_deletion" = "Suppression de compte"
+"adminconsole.admin_settings.general.field.account_deletion_enabled" = "Permettre aux utilisateurs de supprimer leur propre compte"
+"adminconsole.admin_settings.general.account_deletion_enabled_tooltip" = "Les utilisateurs suppriment leur compte depuis leurs pages de compte, avec leur mot de passe et, si l’authentification à deux facteurs est activée, un code. Vous pouvez supprimer n’importe quel utilisateur dans les deux cas."
 "adminconsole.admin_settings.general.section_flows" = "Flux OAuth"
 "adminconsole.admin_settings.general.flows_lead" = "Ces paramètres s’appliquent à chaque client, sauf indication contraire dans son onglet Flux OAuth2."
 "adminconsole.admin_settings.general.field.pkce_required" = "Exiger PKCE"
@@ -2011,6 +2014,7 @@
 "handler.settings_general.issuer_uri_invalid" = "Émetteur invalide. Saisissez une URL https sans paramètres de requête, fragment ni informations utilisateur, ou l’URL de base du serveur d’authentification."
 "handler.settings_general.issuer_too_long" = "L’émetteur est trop long. Il ne doit pas dépasser {{.max}} caractères."
 "handler.settings_general.password_policy_invalid" = "Politique de mots de passe invalide."
+"handler.settings_general.account_deletion_enabled_required" = "Choisissez si les utilisateurs peuvent supprimer leur propre compte."
 
 "handler.settings_sessions.idle_timeout_not_positive" = "Le délai d’inactivité doit être supérieur à zéro."
 "handler.settings_sessions.max_lifetime_not_positive" = "La durée maximale doit être supérieure à zéro."

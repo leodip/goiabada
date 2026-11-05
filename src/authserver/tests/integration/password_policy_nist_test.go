@@ -23,9 +23,10 @@ func TestAPISettingsGeneralPut_AcceptsAndReturnsNist(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        settings.AppName,
-		Issuer:         settings.Issuer,
-		PasswordPolicy: "nist",
+		AppName:                settings.AppName,
+		Issuer:                 settings.Issuer,
+		PasswordPolicy:         "nist",
+		AccountDeletionEnabled: accountDeletionOf(settings.AccountDeletionEnabled),
 	})
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)

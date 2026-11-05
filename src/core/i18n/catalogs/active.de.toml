@@ -1615,6 +1615,9 @@
 "adminconsole.admin_settings.general.email_settings_link" = "E-Mail-Einstellungen"
 "adminconsole.admin_settings.general.field.dynamic_client_registration" = "Dynamische Client-Registrierung"
 "adminconsole.admin_settings.general.dynamic_client_registration_tooltip" = "Clients können sich unter /connect/register selbst registrieren (RFC 7591). Das Discovery-Dokument weist dann darauf hin. Hilfreich für MCP und andere Integrationen, die sich zur Laufzeit registrieren."
+"adminconsole.admin_settings.general.section_account_deletion" = "Kontolöschung"
+"adminconsole.admin_settings.general.field.account_deletion_enabled" = "Löschen des eigenen Kontos erlauben"
+"adminconsole.admin_settings.general.account_deletion_enabled_tooltip" = "Konten werden auf den eigenen Kontoseiten gelöscht, mit dem Passwort und, wenn die Zwei-Faktor-Authentifizierung aktiv ist, einem Code. Sie selbst können jedes Konto unabhängig davon löschen."
 "adminconsole.admin_settings.general.section_flows" = "OAuth-Flows"
 "adminconsole.admin_settings.general.flows_lead" = "Diese gelten für jeden Client, sofern sein Tab „OAuth2-Flows“ nichts anderes festlegt."
 "adminconsole.admin_settings.general.field.pkce_required" = "PKCE verlangen"
@@ -2012,6 +2015,7 @@
 "handler.settings_general.issuer_uri_invalid" = "Ungültiger Issuer. Geben Sie eine HTTPS-URL ohne Query, Fragment oder Benutzerinformationen oder die Basis-URL des Authentifizierungsservers ein."
 "handler.settings_general.issuer_too_long" = "Der Issuer ist zu lang. Er darf höchstens {{.max}} Zeichen lang sein."
 "handler.settings_general.password_policy_invalid" = "Ungültige Passwortrichtlinie."
+"handler.settings_general.account_deletion_enabled_required" = "Wählen Sie, ob das Löschen des eigenen Kontos erlaubt ist."
 
 "handler.settings_sessions.idle_timeout_not_positive" = "Das Inaktivitätslimit muss größer als null sein."
 "handler.settings_sessions.max_lifetime_not_positive" = "Die maximale Gültigkeitsdauer muss größer als null sein."

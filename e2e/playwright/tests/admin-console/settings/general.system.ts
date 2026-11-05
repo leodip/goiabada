@@ -349,6 +349,32 @@ test("registering an address that already has an account answers the same, and m
   });
 });
 
+test("account deletion is on, as seeded, and is saved off and on again", async ({ page, request }) => {
+  const published = async () =>
+    ((await (await request.get(`${env.authUrl}/api/public/settings`)).json()) as { accountDeletionEnabled: boolean }).accountDeletionEnabled;
+
+  await withSettingsRestored(page, general, async () => {
+    const box = page.getByRole("checkbox", { name: "Let users delete their own account", exact: true });
+    // A new installation lets users delete their own account, and an upgraded one too (#783).
+    await expect(box).toBeChecked();
+    await expect(box).toHaveAccessibleDescription(
+      "Users delete their account from their account pages, with their password and, when two-factor authentication is on, a code. You can delete any user either way.",
+    );
+    await expect(page.getByRole("heading", { name: "Account deletion", level: 2 })).toBeVisible();
+    expect(await published()).toBe(true);
+
+    await fillSettingsForm(page, { accountDeletionEnabled: false });
+    await saveSettings(page);
+    await expect(box).not.toBeChecked();
+    expect(await published()).toBe(false);
+
+    await fillSettingsForm(page, { accountDeletionEnabled: true });
+    await saveSettings(page);
+    await expect(box).toBeChecked();
+    expect(await published()).toBe(true);
+  });
+});
+
 test("dynamic client registration opens the registration endpoint, and closes it again", async ({ page, request }) => {
   const discovery = async () => (await (await request.get(`${env.authUrl}/.well-known/openid-configuration`)).json()) as Record<string, unknown>;
   const register = () =>

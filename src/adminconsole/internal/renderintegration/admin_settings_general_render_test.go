@@ -271,3 +271,63 @@ func TestRender_AdminSettingsGeneralRegistrationEmailStringsInPtBR(t *testing.T)
 	assert.Contains(t, html.UnescapeString(out), "Isso exige o e-mail configurado.")
 	assert.NotContains(t, out, "adminconsole.admin_settings.general.")
 }
+
+// accountDeletionBoxRe matches the "Let users delete their own account" checkbox.
+var accountDeletionBoxRe = regexp.MustCompile(`<input type="checkbox" id="accountDeletionEnabled"[^>]*>`)
+
+// Account deletion is a section of its own, right after Registration and before the OAuth flows,
+// with the one checkbox "Let users delete their own account" and its hint, ticked as stored (#783
+// decisions 5 and 9).
+func TestRender_AdminSettingsGeneralShowsAccountDeletionAfterRegistration(t *testing.T) {
+	for _, stored := range []bool{true, false} {
+		out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+			"settings": adminsettingshandlers.SettingsGeneral{PasswordPolicy: "low", AccountDeletionEnabled: stored},
+		}, "en", true)
+		text := html.UnescapeString(out)
+
+		registration := strings.Index(out, `<input type="checkbox" id="dynamicClientRegistrationEnabled"`)
+		section := strings.Index(out, `<h2 class="panel-title">Account deletion</h2>`)
+		flows := strings.Index(out, `<h2 class="panel-title">OAuth flows</h2>`)
+		require.NotEqual(t, -1, registration)
+		require.NotEqual(t, -1, section, "the section is titled Account deletion")
+		require.NotEqual(t, -1, flows)
+		assert.Less(t, registration, section, "the section follows Registration")
+		assert.Less(t, section, flows, "the section comes before the OAuth flows")
+
+		box := accountDeletionBoxRe.FindString(out)
+		require.NotEmpty(t, box)
+		assert.Less(t, section, strings.Index(out, box))
+		assert.Less(t, strings.Index(out, box), flows)
+		assert.Contains(t, box, `name="accountDeletionEnabled"`)
+		assert.Contains(t, box, `aria-describedby="accountDeletionHint"`)
+		assert.Equal(t, stored, strings.Contains(box, " checked"), "stored %v", stored)
+		assert.Contains(t, text, `<span class="choice-label">Let users delete their own account</span>`)
+		assert.Contains(t, text, `<span class="field-hint" id="accountDeletionHint">Users delete their account from their account pages, with their password and, when two-factor authentication is on, a code. You can delete any user either way.</span>`)
+	}
+}
+
+// A refusal of the setting marks its checkbox and names the notice in its description.
+func TestRender_AdminSettingsGeneralMarksARefusedAccountDeletion(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+		"settings":   adminsettingshandlers.SettingsGeneral{PasswordPolicy: "low"},
+		"error":      "Choose whether to let users delete their own account.",
+		"errorField": "accountDeletionEnabled",
+	}, "en", true)
+
+	box := accountDeletionBoxRe.FindString(out)
+	require.NotEmpty(t, box)
+	assert.Contains(t, box, `aria-describedby="general-error accountDeletionHint"`)
+	assert.Contains(t, box, ` aria-invalid="true" autofocus`)
+}
+
+// The section in Brazilian Portuguese, from that catalog, with no raw key leaking.
+func TestRender_AdminSettingsGeneralAccountDeletionInPtBR(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+		"settings": adminsettingshandlers.SettingsGeneral{PasswordPolicy: "low", AccountDeletionEnabled: true},
+	}, "pt-BR", true)
+	text := html.UnescapeString(out)
+
+	assert.Contains(t, text, `<h2 class="panel-title">Exclusão de conta</h2>`)
+	assert.Contains(t, text, `<span class="choice-label">Permitir que os usuários excluam a própria conta</span>`)
+	assert.NotContains(t, out, "adminconsole.admin_settings.general.")
+}

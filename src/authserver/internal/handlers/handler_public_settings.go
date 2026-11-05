@@ -29,7 +29,8 @@ func NewPublicSettings(database publicSettingsDatabase) *PublicSettings {
 
 // ServeHTTP answers GET /api/public/settings, which needs no authentication: the settings the
 // admin console needs before anyone holds a token, the application name, the UI theme, whether
-// SMTP is configured, the issuer and the stored password policy's rules, as JSON, or the API's JSON 500 when the settings row cannot
+// SMTP is configured, the issuer, the stored password policy's rules and whether users may delete
+// their own account, as JSON, or the API's JSON 500 when the settings row cannot
 // be read (#279 decision 17).
 //
 // The route is registered for GET only, so the router answers any other method itself, 405 with
@@ -65,12 +66,18 @@ func (h *PublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// PasswordRules is here because the admin console states them under its password fields
 	// (#550 decision 11). The registration form already states them to anyone while registration
 	// is on, and NIST SP 800-63B assumes an attacker knows them.
+	//
+	// AccountDeletionEnabled is here because the admin console's account menu and page read it,
+	// as SMTPEnabled gates Email verification (#783 decision 6). It is a policy, not data about
+	// anyone.
 	response := api.PublicSettingsResponse{
 		AppName:       settings.AppName,
 		UITheme:       settings.UITheme,
 		SMTPEnabled:   settings.SMTPEnabled,
 		Issuer:        settings.Issuer,
 		PasswordRules: apimapping.ToPasswordRulesResponse(settings.PasswordPolicy),
+
+		AccountDeletionEnabled: settings.AccountDeletionEnabled,
 	}
 
 	apiresponse.WriteJSON(w, r, http.StatusOK, response)

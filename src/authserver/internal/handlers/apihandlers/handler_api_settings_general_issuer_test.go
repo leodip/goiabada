@@ -45,6 +45,7 @@ func putGeneralIssuer(t *testing.T, storedIssuer, issuer string) (*httptest.Resp
 		Issuer:                  issuer,
 		SelfRegistrationEnabled: true,
 		PasswordPolicy:          "low",
+		AccountDeletionEnabled:  accountDeletionOf(true),
 	})
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/general", bytes.NewReader(body))

@@ -3142,7 +3142,9 @@ paths:
     put:
       tags: [Settings]
       summary: Update general settings
-      description: Update general system settings
+      description: |
+        Update general system settings. `accountDeletionEnabled` is required: a request without
+        it, or with it `null`, is refused with `400`.
       operationId: updateSettingsGeneral
       requestBody:
         required: true
@@ -7344,6 +7346,11 @@ components:
         resourceOwnerPasswordCredentialsEnabled:
           type: boolean
           description: When true, grant_type=password is enabled server-wide (RFC 6749 section 4.3). Deprecated in OAuth 2.1
+        accountDeletionEnabled:
+          type: boolean
+          description: >-
+            When true, users can delete their own account from their account pages in the admin
+            console. Administrators can delete any user either way.
       required:
         - appName
         - issuer
@@ -7354,6 +7361,7 @@ components:
         - pkceRequired
         - implicitFlowEnabled
         - resourceOwnerPasswordCredentialsEnabled
+        - accountDeletionEnabled
 
     UpdateSettingsGeneralRequest:
       type: object
@@ -7401,6 +7409,15 @@ components:
         resourceOwnerPasswordCredentialsEnabled:
           type: boolean
           description: When true, allows grant_type=password at the token endpoint (RFC 6749 section 4.3). Deprecated in OAuth 2.1
+        accountDeletionEnabled:
+          type: boolean
+          description: >-
+            When true, users can delete their own account from their account pages in the admin
+            console. Administrators can delete any user either way. Required: a request without it,
+            or with it null, is refused with 400
+            handler.settings_general.account_deletion_enabled_required.
+      required:
+        - accountDeletionEnabled
 
     SettingsEmailResponse:
       type: object

@@ -315,6 +315,7 @@ cause, each a whole sentence.
 | `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL. |
 | `handler.settings_general.issuer_too_long` | `max` (int) | Issuer is too long. The maximum length is {{.max}} characters. |
 | `handler.settings_general.password_policy_invalid` | (none) | Invalid password policy |
+| `handler.settings_general.account_deletion_enabled_required` | (none) | Choose whether to let users delete their own account. |
 | `handler.settings_sessions.idle_timeout_not_positive` | (none) | The idle timeout must be greater than zero. |
 | `handler.settings_sessions.max_lifetime_not_positive` | (none) | The maximum lifetime must be greater than zero. |
 | `handler.settings_sessions.idle_timeout_too_large` | `max` (int) | The idle timeout can't be more than {{.max}} seconds. |

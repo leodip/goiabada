@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/boundedread"
+	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -118,4 +119,19 @@ func TestClient_ANonOKAnswerNamesItsStatus(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "503")
 	assert.Contains(t, err.Error(), "the settings row is missing")
+}
+
+// Whether users may delete their own account reaches the console's cached public settings as the
+// auth server publishes it, which the account menu and page read (#783 decision 6).
+func TestCache_CarriesAccountDeletionEnabled(t *testing.T) {
+	for _, published := range []bool{true, false} {
+		body := `{"appName":"Goiabada","issuer":"https://auth.example.com","accountDeletionEnabled":` +
+			map[bool]string{true: "true", false: "false"}[published] + `}`
+		cache := NewCache(NewClient(serveBody(t, body).URL, nil, nil), time.Hour, metrics.NewRegistry())
+
+		settings, err := cache.Get(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, settings)
+		assert.Equal(t, published, settings.AccountDeletionEnabled, "published %v", published)
+	}
 }

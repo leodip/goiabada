@@ -10,12 +10,13 @@ import (
 
 // generalErrorFields maps the general settings' refusals to the field each is about.
 var generalErrorFields = map[string]string{
-	i18n.ErrCodeSettingsGeneralAppNameRequired:  "appName",
-	i18n.ErrCodeSettingsGeneralAppNameTooLong:   "appName",
-	i18n.ErrCodeSettingsAppNameAngleBrackets:    "appName",
-	i18n.ErrCodeSettingsGeneralIssuerURIInvalid: "issuer",
-	i18n.ErrCodeSettingsGeneralIssuerTooLong:    "issuer",
-	i18n.ErrCodeSettingsIssuerAngleBrackets:     "issuer",
+	i18n.ErrCodeSettingsGeneralAppNameRequired:                "appName",
+	i18n.ErrCodeSettingsGeneralAppNameTooLong:                 "appName",
+	i18n.ErrCodeSettingsAppNameAngleBrackets:                  "appName",
+	i18n.ErrCodeSettingsGeneralIssuerURIInvalid:               "issuer",
+	i18n.ErrCodeSettingsGeneralIssuerTooLong:                  "issuer",
+	i18n.ErrCodeSettingsIssuerAngleBrackets:                   "issuer",
+	i18n.ErrCodeSettingsGeneralAccountDeletionEnabledRequired: "accountDeletionEnabled",
 }
 
 // sessionsErrorFields maps the session settings' refusals to the field each is about.
@@ -166,6 +167,8 @@ type SettingsGeneral struct {
 	// ResourceOwnerPasswordCredentialsEnabled enables ROPC grant type (RFC 6749 §4.3)
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
 	ResourceOwnerPasswordCredentialsEnabled bool
+	// AccountDeletionEnabled is "Let users delete their own account", under Account deletion (#783).
+	AccountDeletionEnabled bool
 }
 
 type SettingsKey struct {

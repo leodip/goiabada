@@ -1616,6 +1616,9 @@
 "adminconsole.admin_settings.general.email_settings_link" = "Configuración de correo"
 "adminconsole.admin_settings.general.field.dynamic_client_registration" = "Registro dinámico de clientes"
 "adminconsole.admin_settings.general.dynamic_client_registration_tooltip" = "Los clientes pueden registrarse por su cuenta en /connect/register (RFC 7591), que se anuncia en el documento de descubrimiento. Es útil para MCP y otras integraciones que se registran al ejecutarse."
+"adminconsole.admin_settings.general.section_account_deletion" = "Eliminación de cuentas"
+"adminconsole.admin_settings.general.field.account_deletion_enabled" = "Permitir que los usuarios eliminen su propia cuenta"
+"adminconsole.admin_settings.general.account_deletion_enabled_tooltip" = "Los usuarios eliminan su cuenta desde sus páginas de cuenta, con su contraseña y, si la autenticación de dos factores está activada, un código. Tú puedes eliminar cualquier usuario en ambos casos."
 "adminconsole.admin_settings.general.section_flows" = "Flujos OAuth"
 "adminconsole.admin_settings.general.flows_lead" = "Todos los clientes usan estos valores, salvo que indiquen otros en su pestaña Flujos OAuth2."
 "adminconsole.admin_settings.general.field.pkce_required" = "Exigir PKCE"
@@ -2013,6 +2016,7 @@
 "handler.settings_general.issuer_uri_invalid" = "El emisor no es válido. Escribe una URL https sin parámetros de consulta, fragmento ni datos de usuario, o la URL base del servidor de autenticación."
 "handler.settings_general.issuer_too_long" = "El emisor es demasiado largo. El máximo es de {{.max}} caracteres."
 "handler.settings_general.password_policy_invalid" = "La política de contraseñas no es válida"
+"handler.settings_general.account_deletion_enabled_required" = "Elige si los usuarios pueden eliminar su propia cuenta."
 
 "handler.settings_sessions.idle_timeout_not_positive" = "El tiempo de inactividad debe ser mayor que cero."
 "handler.settings_sessions.max_lifetime_not_positive" = "La duración máxima debe ser mayor que cero."

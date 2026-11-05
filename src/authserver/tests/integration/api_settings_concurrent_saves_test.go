@@ -118,6 +118,7 @@ func TestAPISettingsSections_ConcurrentSavesOfDifferentSectionsAllSurvive(t *tes
 				PKCERequired:                              start.PKCERequired,
 				ImplicitFlowEnabled:                       start.ImplicitFlowEnabled,
 				ResourceOwnerPasswordCredentialsEnabled:   start.ResourceOwnerPasswordCredentialsEnabled,
+				AccountDeletionEnabled:                    accountDeletionOf(start.AccountDeletionEnabled),
 			}},
 			{section: "ui theme", route: "/api/v1/admin/settings/ui-theme", body: api.UpdateSettingsUIThemeRequest{
 				UITheme: theme,

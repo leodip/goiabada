@@ -53,7 +53,8 @@ func TestAPISettingsGeneralPut_Success(t *testing.T) {
 		Issuer:                  "https://example.org",
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
-		PasswordPolicy: "low",
+		PasswordPolicy:         "low",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
@@ -97,7 +98,8 @@ func TestAPISettingsGeneralPut_DisablingSelfRegKeepsTheVerificationChoice(t *tes
 		Issuer:                  "https://issuer-" + strings.ToLower(fake.LetterN(6)) + ".example.org",
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
-		PasswordPolicy: "low",
+		PasswordPolicy:         "low",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, preReq)
@@ -113,7 +115,8 @@ func TestAPISettingsGeneralPut_DisablingSelfRegKeepsTheVerificationChoice(t *tes
 		Issuer:                  preReq.Issuer,
 		SelfRegistrationEnabled: false,
 		SelfRegistrationRequiresEmailVerification: true,
-		PasswordPolicy: "low",
+		PasswordPolicy:         "low",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp2.Body.Close() }()
@@ -137,9 +140,10 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 
 	// App name too long (>30)
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        strings.Repeat("a", 31),
-		Issuer:         "https://example.org",
-		PasswordPolicy: "low",
+		AppName:                strings.Repeat("a", 31),
+		Issuer:                 "https://example.org",
+		PasswordPolicy:         "low",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	})
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
@@ -153,9 +157,10 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	const issuerRule = "Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL."
 	for _, issuer := range []string{"http://", "https://", "goiabada", "invalid issuer", "http://auth.example.org", "https://example.org?tenant=a"} {
 		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-			AppName:        "App",
-			Issuer:         issuer,
-			PasswordPolicy: "low",
+			AppName:                "App",
+			Issuer:                 issuer,
+			PasswordPolicy:         "low",
+			AccountDeletionEnabled: accountDeletionOf(true),
 		})
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, issuer)
 		var errResp api.ErrorResponse
@@ -167,9 +172,10 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 
 	// Issuer too long (>60)
 	resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        "App",
-		Issuer:         "https://example.org/" + strings.Repeat("a", 41),
-		PasswordPolicy: "low",
+		AppName:                "App",
+		Issuer:                 "https://example.org/" + strings.Repeat("a", 41),
+		PasswordPolicy:         "low",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	})
 	defer func() { _ = resp6.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
@@ -179,9 +185,10 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 
 	// Invalid password policy
 	resp7 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        "App",
-		Issuer:         "https://example.org",
-		PasswordPolicy: "invalid-policy",
+		AppName:                "App",
+		Issuer:                 "https://example.org",
+		PasswordPolicy:         "invalid-policy",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	})
 	defer func() { _ = resp7.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp7.StatusCode)
@@ -198,9 +205,10 @@ func TestAPISettingsGeneralPut_TheBaseURLIsAnAcceptedIssuer(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        "App",
-		Issuer:         appConfig.AuthServer.BaseURL,
-		PasswordPolicy: "low",
+		AppName:                "App",
+		Issuer:                 appConfig.AuthServer.BaseURL,
+		PasswordPolicy:         "low",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	})
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -224,6 +232,7 @@ func TestAPISettingsGeneralPut_AStoredIssuerTheRuleRefusesStandsUntilChanged(t *
 		Issuer:                  legacyIssuer,
 		SelfRegistrationEnabled: !before.SelfRegistrationEnabled,
 		PasswordPolicy:          "low",
+		AccountDeletionEnabled:  accountDeletionOf(true),
 	})
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -235,9 +244,10 @@ func TestAPISettingsGeneralPut_AStoredIssuerTheRuleRefusesStandsUntilChanged(t *
 	assert.Equal(t, !before.SelfRegistrationEnabled, stored.SelfRegistrationEnabled)
 
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        "Saved around the issuer",
-		Issuer:         legacyIssuer + "-changed",
-		PasswordPolicy: "low",
+		AppName:                "Saved around the issuer",
+		Issuer:                 legacyIssuer + "-changed",
+		PasswordPolicy:         "low",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -257,11 +267,12 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 
 	// Enable implicit flow
 	req := api.UpdateSettingsGeneralRequest{
-		AppName:             settings.AppName,
-		Issuer:              settings.Issuer,
-		PasswordPolicy:      settings.PasswordPolicy.String(),
-		PKCERequired:        settings.PKCERequired,
-		ImplicitFlowEnabled: true,
+		AppName:                settings.AppName,
+		Issuer:                 settings.Issuer,
+		PasswordPolicy:         settings.PasswordPolicy.String(),
+		PKCERequired:           settings.PKCERequired,
+		ImplicitFlowEnabled:    true,
+		AccountDeletionEnabled: accountDeletionOf(settings.AccountDeletionEnabled),
 	}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -332,6 +343,7 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 		PKCERequired:                            settings.PKCERequired,
 		ImplicitFlowEnabled:                     settings.ImplicitFlowEnabled,
 		ResourceOwnerPasswordCredentialsEnabled: true,
+		AccountDeletionEnabled:                  accountDeletionOf(settings.AccountDeletionEnabled),
 	}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -438,14 +450,16 @@ func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 		wantCode string
 	}{
 		{"app name", api.UpdateSettingsGeneralRequest{
-			AppName:        "Acme <the third>",
-			Issuer:         "https://example.org",
-			PasswordPolicy: "low",
+			AppName:                "Acme <the third>",
+			Issuer:                 "https://example.org",
+			PasswordPolicy:         "low",
+			AccountDeletionEnabled: accountDeletionOf(true),
 		}, "validator.settings.app_name_angle_brackets"},
 		{"issuer", api.UpdateSettingsGeneralRequest{
-			AppName:        "Acme",
-			Issuer:         "https://example.org/<b>",
-			PasswordPolicy: "low",
+			AppName:                "Acme",
+			Issuer:                 "https://example.org/<b>",
+			PasswordPolicy:         "low",
+			AccountDeletionEnabled: accountDeletionOf(true),
 		}, "validator.settings.issuer_angle_brackets"},
 	}
 
@@ -477,9 +491,10 @@ func TestAPISettingsGeneralPut_TheAppNameIsRequiredAndMeasuredTrimmed(t *testing
 
 	for _, appName := range []string{"", "    "} {
 		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-			AppName:        appName,
-			Issuer:         "https://example.org",
-			PasswordPolicy: "low",
+			AppName:                appName,
+			Issuer:                 "https://example.org",
+			PasswordPolicy:         "low",
+			AccountDeletionEnabled: accountDeletionOf(true),
 		})
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "%q", appName)
 		var errResp api.ErrorResponse
@@ -496,9 +511,10 @@ func TestAPISettingsGeneralPut_TheAppNameIsRequiredAndMeasuredTrimmed(t *testing
 
 	thirty := strings.Repeat("é", 30)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        "   " + thirty + "  ",
-		Issuer:         before.Issuer,
-		PasswordPolicy: "low",
+		AppName:                "   " + thirty + "  ",
+		Issuer:                 before.Issuer,
+		PasswordPolicy:         "low",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	})
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -517,9 +533,10 @@ func TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
 
 	req := api.UpdateSettingsGeneralRequest{
-		AppName:        `  R&D "labs"  `,
-		Issuer:         "https://example.org",
-		PasswordPolicy: "low",
+		AppName:                `  R&D "labs"  `,
+		Issuer:                 "https://example.org",
+		PasswordPolicy:         "low",
+		AccountDeletionEnabled: accountDeletionOf(true),
 	}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -534,4 +551,83 @@ func TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	stored, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `R&D "labs"`, stored.AppName)
+}
+
+// PUT /api/v1/admin/settings/general requires accountDeletionEnabled: absent and null are refused
+// with the refusal naming the setting, and nothing is saved (#783 decision 5). The row holds the
+// setting on, so a missing value read as false would show as a change. The body is raw JSON here,
+// so an absent field is absent.
+func TestAPISettingsGeneralPut_AccountDeletionEnabledIsRequired(t *testing.T) {
+	before := changeSettings(t, func(settings *record.Settings) { settings.AccountDeletionEnabled = true })
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
+	rest := `"appName":"Required probe","issuer":"` + before.Issuer + `","passwordPolicy":"low"`
+
+	for name, body := range map[string]string{
+		"absent": `{` + rest + `}`,
+		"null":   `{` + rest + `,"accountDeletionEnabled":null}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPut, url, strings.NewReader(body))
+			require.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer "+accessToken)
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := createHttpClient(t).Do(req)
+			require.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var refusal api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&refusal))
+			assert.Equal(t, "handler.settings_general.account_deletion_enabled_required", refusal.ErrorCode)
+			assert.Equal(t, "Choose whether to let users delete their own account.", refusal.ErrorDescription)
+
+			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			require.NoError(t, err)
+			assert.True(t, after.AccountDeletionEnabled, "nothing is saved")
+			assert.Equal(t, before.AppName, after.AppName, "nothing is saved")
+		})
+	}
+}
+
+// The setting saved off and on through the PUT is stored, answered by the PUT and the GET, and
+// published by GET /api/public/settings, which needs no token (#783 decisions 5 and 6).
+func TestAPISettingsGeneral_AccountDeletionEnabledIsSavedServedAndPublished(t *testing.T) {
+	settings := restoreSettings(t)
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
+
+	for _, enabled := range []bool{false, true} {
+		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
+			AppName:                settings.AppName,
+			Issuer:                 settings.Issuer,
+			PasswordPolicy:         settings.PasswordPolicy.String(),
+			PKCERequired:           settings.PKCERequired,
+			AccountDeletionEnabled: accountDeletionOf(enabled),
+		})
+		require.Equal(t, http.StatusOK, resp.StatusCode, "saved %v", enabled)
+		var saved map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&saved))
+		_ = resp.Body.Close()
+		assert.Equal(t, enabled, saved["accountDeletionEnabled"], "the PUT answers %v", enabled)
+
+		stored, err := database.GetSettingsById(context.Background(), nil, 1)
+		require.NoError(t, err)
+		assert.Equal(t, enabled, stored.AccountDeletionEnabled, "stored %v", enabled)
+
+		got := makeAPIRequest(t, "GET", url, accessToken, nil)
+		require.Equal(t, http.StatusOK, got.StatusCode)
+		var read map[string]any
+		require.NoError(t, json.NewDecoder(got.Body).Decode(&read))
+		_ = got.Body.Close()
+		assert.Equal(t, enabled, read["accountDeletionEnabled"], "the GET answers %v", enabled)
+
+		public, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, public.StatusCode)
+		var published map[string]any
+		require.NoError(t, json.NewDecoder(public.Body).Decode(&published))
+		_ = public.Body.Close()
+		assert.Equal(t, enabled, published["accountDeletionEnabled"], "the public settings publish %v", enabled)
+	}
 }

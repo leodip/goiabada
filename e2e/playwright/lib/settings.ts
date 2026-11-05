@@ -93,6 +93,7 @@ const baseline: Record<string, FormValues> = {
     pkceRequired: true,
     implicitFlowEnabled: false,
     ropcFlowEnabled: false,
+    accountDeletionEnabled: true,
   },
   "/admin/settings/ui-theme": { themeSelection: "" },
   "/admin/settings/sessions": {

@@ -100,3 +100,9 @@ func settingsChanges(before, after *record.Settings) []string {
 	}
 	return changes
 }
+
+// accountDeletionOf is a general settings save's accountDeletionEnabled, which the PUT requires
+// (#783 decision 5).
+func accountDeletionOf(enabled bool) *bool {
+	return &enabled
+}

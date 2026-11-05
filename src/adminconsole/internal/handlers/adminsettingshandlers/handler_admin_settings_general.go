@@ -37,6 +37,7 @@ func settingsGeneralFrom(s *api.SettingsGeneralResponse) SettingsGeneral {
 		PKCERequired:                              s.PKCERequired,
 		ImplicitFlowEnabled:                       s.ImplicitFlowEnabled,
 		ResourceOwnerPasswordCredentialsEnabled:   s.ResourceOwnerPasswordCredentialsEnabled,
+		AccountDeletionEnabled:                    s.AccountDeletionEnabled,
 	}
 }
 
@@ -127,6 +128,7 @@ func HandleGeneralPost(
 			PKCERequired:                              r.FormValue("pkceRequired") == "on",
 			ImplicitFlowEnabled:                       r.FormValue("implicitFlowEnabled") == "on",
 			ResourceOwnerPasswordCredentialsEnabled:   r.FormValue("ropcFlowEnabled") == "on",
+			AccountDeletionEnabled:                    r.FormValue("accountDeletionEnabled") == "on",
 		}
 
 		renderError := func(message, errorField string) {
@@ -154,6 +156,8 @@ func HandleGeneralPost(
 			PKCERequired:                              settingsInfo.PKCERequired,
 			ImplicitFlowEnabled:                       settingsInfo.ImplicitFlowEnabled,
 			ResourceOwnerPasswordCredentialsEnabled:   settingsInfo.ResourceOwnerPasswordCredentialsEnabled,
+			// Always sent, the cleared box as false: the admin API requires it (#783 decision 5).
+			AccountDeletionEnabled: &settingsInfo.AccountDeletionEnabled,
 		}
 
 		updatedResp, err := apiClient.UpdateSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
