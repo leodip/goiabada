@@ -43,10 +43,17 @@ var insertAuditLog = statement{
 // ORDER BY, naming the offset first, so its text numbers the two the other way round. The order is
 // total, created_at DESC and then id DESC, so tied rows cannot drift between pages.
 //
-// mssqldb declares its own GetAuditLogsPaginated, because SQL Server's `=` pads and its request-id
-// filter has to compare the bytes in both statements, so SQL Server never runs these versions. They
-// are spelled as SQL Server would run them all the same, so each statement carries its four
-// versions and the record mapping test reads every one.
+// SQL SERVER'S REQUEST-ID FILTER COMPARES THE BYTES, in the page and the count alike. `=` is not
+// exact on that engine: it pads, so request_id = 'corr' is true of a row holding 'corr ' under
+// every collation SQL Server has, Latin1_General_100_BIN2_UTF8 included, and no collation turns
+// that off (see engineFoldedTheMatch). The guard GetAuditLogsPaginated applies after the scan
+// cannot close it there: SQL Server pages with OFFSET/FETCH, so a row dropped after the fetch
+// leaves a short page, and the count has no rows to drop at all. Measured against the live engine,
+// a guard applied after the fetch gave an empty page under a total of 1 (#328). So the statement
+// closes the fold, the equality staying beside it so the index on request_id can still seek, and
+// the CAST, reading the same parameter, doing the filtering. VARBINARY(512) is the column's whole
+// width: request_id is NVARCHAR(256), which stores UTF-16 even under the UTF-8 collation, so 256
+// characters are 512 bytes and nothing that fits the column is clipped by the cast.
 var selectAuditLogsPage = statement{
 	sqlite: "SELECT " + auditLogColumns.sqlite + " FROM audit_logs " +
 		"ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
@@ -90,7 +97,8 @@ var selectAuditLogsPageByRequestId = statement{
 		"ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
 	postgres: "SELECT " + auditLogColumns.postgres + " FROM audit_logs WHERE request_id = $1 " +
 		"ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3",
-	mssql: "SELECT " + auditLogColumns.mssql + " FROM audit_logs WHERE request_id = @p1 " +
+	mssql: "SELECT " + auditLogColumns.mssql + " FROM audit_logs " +
+		"WHERE request_id = @p1 AND CAST(request_id AS VARBINARY(512)) = CAST(@p1 AS VARBINARY(512)) " +
 		"ORDER BY created_at DESC, id DESC OFFSET @p3 ROWS FETCH NEXT @p2 ROWS ONLY",
 }
 
@@ -98,7 +106,8 @@ var countAuditLogsByRequestId = statement{
 	sqlite:   "SELECT COUNT(*) FROM audit_logs WHERE request_id = ?",
 	mysql:    "SELECT COUNT(*) FROM audit_logs WHERE request_id = ?",
 	postgres: "SELECT COUNT(*) FROM audit_logs WHERE request_id = $1",
-	mssql:    "SELECT COUNT(*) FROM audit_logs WHERE request_id = @p1",
+	mssql: "SELECT COUNT(*) FROM audit_logs " +
+		"WHERE request_id = @p1 AND CAST(request_id AS VARBINARY(512)) = CAST(@p1 AS VARBINARY(512))",
 }
 
 var selectAuditLogsPageByEventAndRequestId = statement{
@@ -108,7 +117,8 @@ var selectAuditLogsPageByEventAndRequestId = statement{
 		"ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
 	postgres: "SELECT " + auditLogColumns.postgres + " FROM audit_logs WHERE audit_event = $1 AND request_id = $2 " +
 		"ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4",
-	mssql: "SELECT " + auditLogColumns.mssql + " FROM audit_logs WHERE audit_event = @p1 AND request_id = @p2 " +
+	mssql: "SELECT " + auditLogColumns.mssql + " FROM audit_logs " +
+		"WHERE audit_event = @p1 AND request_id = @p2 AND CAST(request_id AS VARBINARY(512)) = CAST(@p2 AS VARBINARY(512)) " +
 		"ORDER BY created_at DESC, id DESC OFFSET @p4 ROWS FETCH NEXT @p3 ROWS ONLY",
 }
 
@@ -116,7 +126,8 @@ var countAuditLogsByEventAndRequestId = statement{
 	sqlite:   "SELECT COUNT(*) FROM audit_logs WHERE audit_event = ? AND request_id = ?",
 	mysql:    "SELECT COUNT(*) FROM audit_logs WHERE audit_event = ? AND request_id = ?",
 	postgres: "SELECT COUNT(*) FROM audit_logs WHERE audit_event = $1 AND request_id = $2",
-	mssql:    "SELECT COUNT(*) FROM audit_logs WHERE audit_event = @p1 AND request_id = @p2",
+	mssql: "SELECT COUNT(*) FROM audit_logs " +
+		"WHERE audit_event = @p1 AND request_id = @p2 AND CAST(request_id AS VARBINARY(512)) = CAST(@p2 AS VARBINARY(512))",
 }
 
 // auditLogsQueries answers the page and the count for the filters given.
@@ -152,8 +163,8 @@ func (d *Database) CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *rec
 	return nil
 }
 
-func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
-	requestId string) ([]record.AuditLog, int, error) {
+func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int,
+	filter record.AuditLogFilter) ([]record.AuditLog, int, error) {
 
 	if page < 1 {
 		page = 1
@@ -167,13 +178,13 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 
 	offset := PageOffset(page, pageSize)
 
-	pageQuery, countQuery := auditLogsQueries(auditEvent != "", requestId != "")
+	pageQuery, countQuery := auditLogsQueries(filter.AuditEvent != "", filter.RequestId != "")
 	var filterArgs []any
-	if auditEvent != "" {
-		filterArgs = append(filterArgs, auditEvent)
+	if filter.AuditEvent != "" {
+		filterArgs = append(filterArgs, filter.AuditEvent)
 	}
-	if requestId != "" {
-		filterArgs = append(filterArgs, requestId)
+	if filter.RequestId != "" {
+		filterArgs = append(filterArgs, filter.RequestId)
 	}
 	pageArgs := append(append([]any{}, filterArgs...), pageSize, offset)
 
@@ -193,8 +204,9 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 		// this package would otherwise decide which ids are the same id. A row the engine
 		// folded in carries an id the caller did not ask for, and listing it would put one
 		// request's audit entries under another request's id (#328, and see
-		// engineFoldedTheMatch).
-		if requestId != "" && engineFoldedTheMatch(auditLog.RequestId, requestId) {
+		// engineFoldedTheMatch). On SQL Server the statement has already closed the fold, so
+		// this finds nothing to drop there.
+		if filter.RequestId != "" && engineFoldedTheMatch(auditLog.RequestId, filter.RequestId) {
 			continue
 		}
 		auditLogs = append(auditLogs, auditLog)
@@ -204,8 +216,8 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 	// a stored id that differs from the filter only by a fold `=` accepts at equal length
 	// (a decomposed accent against its precomposed spelling) would be counted and not
 	// listed, showing as a page total one higher than the rows shown. SQLite and
-	// PostgreSQL have no such fold, and SQL Server's are closed in the statement by
-	// mssqldb's own body. Nothing reaches it today: the only writer stores the id as
+	// PostgreSQL have no such fold, and SQL Server's are closed in its statements above.
+	// Nothing reaches it today: the only writer stores the id as
 	// logging.FieldForLog renders it, which percent-escapes every byte outside printable
 	// ASCII, so no combining mark survives into the column. Revisit when a second writer
 	// can store a non-ASCII id, or when the total is read for anything but the pager; a

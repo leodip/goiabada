@@ -14,7 +14,7 @@ import (
 
 // auditLogsDatabase is what the audit log endpoint needs: one page of records.
 type auditLogsDatabase interface {
-	GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]record.AuditLog, int, error)
+	GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, filter record.AuditLogFilter) ([]record.AuditLog, int, error)
 }
 
 func HandleAuditLogsGet(
@@ -51,7 +51,8 @@ func HandleAuditLogsGet(
 		}
 
 		// Get audit logs
-		auditLogs, total, err := database.GetAuditLogsPaginated(r.Context(), nil, page, size, auditEvent, requestId)
+		auditLogs, total, err := database.GetAuditLogsPaginated(r.Context(), nil, page, size,
+			record.AuditLogFilter{AuditEvent: auditEvent, RequestId: requestId})
 		if err != nil {
 			// Both filter values are client-chosen, so both go on the record through
 			// FieldForLog: without it a multi-kilobyte auditEvent lands whole, carrying

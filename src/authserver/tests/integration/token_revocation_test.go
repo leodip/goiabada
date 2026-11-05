@@ -221,7 +221,7 @@ func TestRevoke_RepeatedForeignTokensBoundAuditWrites(t *testing.T) {
 	countEvents := func() int {
 		t.Helper()
 		_, count, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1,
-			audit.EventTokenRevocationRefused, "")
+			record.AuditLogFilter{AuditEvent: audit.EventTokenRevocationRefused})
 		require.NoError(t, err)
 		return count
 	}

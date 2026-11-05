@@ -98,7 +98,7 @@ func TestCreateAuditLog(t *testing.T) {
 					RequestId:  tc.id,
 				}))
 
-				logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, event, "")
+				logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{AuditEvent: event})
 				require.NoError(t, err)
 				require.Equal(t, 1, total)
 				require.Len(t, logs, 1)
@@ -154,7 +154,7 @@ func TestGetAuditLogsPaginated(t *testing.T) {
 	}
 
 	t.Run("Get all logs - first page", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 3, "", "")
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 3, record.AuditLogFilter{})
 		require.NoError(t, err)
 
 		assert.GreaterOrEqual(t, total, 6) // At least 6 from this test
@@ -165,7 +165,7 @@ func TestGetAuditLogsPaginated(t *testing.T) {
 	})
 
 	t.Run("Get all logs - second page", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 2, 3, "", "")
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 2, 3, record.AuditLogFilter{})
 		require.NoError(t, err)
 
 		assert.GreaterOrEqual(t, total, 6)
@@ -173,7 +173,7 @@ func TestGetAuditLogsPaginated(t *testing.T) {
 	})
 
 	t.Run("Filter by audit event", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, "user_login", "")
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{AuditEvent: "user_login"})
 		require.NoError(t, err)
 
 		assert.GreaterOrEqual(t, total, 3) // At least 3 user_login events from this test
@@ -186,7 +186,7 @@ func TestGetAuditLogsPaginated(t *testing.T) {
 	})
 
 	t.Run("Filter with no matches", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, "nonexistent_event_12345", "")
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{AuditEvent: "nonexistent_event_12345"})
 		require.NoError(t, err)
 
 		assert.Equal(t, 0, total)
@@ -194,7 +194,7 @@ func TestGetAuditLogsPaginated(t *testing.T) {
 	})
 
 	t.Run("Invalid page defaults to 1", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 0, 10, "", "")
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 0, 10, record.AuditLogFilter{})
 		require.NoError(t, err)
 
 		assert.Positive(t, total)
@@ -202,7 +202,7 @@ func TestGetAuditLogsPaginated(t *testing.T) {
 	})
 
 	t.Run("Invalid page size defaults to 20", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 0, "", "")
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 0, record.AuditLogFilter{})
 		require.NoError(t, err)
 
 		assert.Positive(t, total)
@@ -225,7 +225,7 @@ func TestGetAuditLogsPaginated_Sorting(t *testing.T) {
 	}
 
 	t.Run("Logs sorted by created_at DESC", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, "", "")
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{})
 		require.NoError(t, err)
 
 		assert.Positive(t, total)
@@ -273,7 +273,7 @@ func TestGetAuditLogsPaginated_RequestIdFilter(t *testing.T) {
 	}
 
 	t.Run("the filter alone returns every entry that request raised", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, "", requestId)
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{RequestId: requestId})
 		require.NoError(t, err)
 
 		assert.Equal(t, 2, total)
@@ -284,7 +284,7 @@ func TestGetAuditLogsPaginated_RequestIdFilter(t *testing.T) {
 	})
 
 	t.Run("combined with the audit event both narrow", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, event, requestId)
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{AuditEvent: event, RequestId: requestId})
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, total)
@@ -294,7 +294,7 @@ func TestGetAuditLogsPaginated_RequestIdFilter(t *testing.T) {
 	})
 
 	t.Run("an id nothing carries yields nothing", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, "", "itest-"+fake.LetterN(16))
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{RequestId: "itest-" + fake.LetterN(16)})
 		require.NoError(t, err)
 
 		assert.Equal(t, 0, total)
@@ -302,7 +302,7 @@ func TestGetAuditLogsPaginated_RequestIdFilter(t *testing.T) {
 	})
 
 	t.Run("an empty id is no filter at all", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, event, "")
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{AuditEvent: event})
 		require.NoError(t, err)
 
 		assert.Equal(t, 2, total, "both entries under this event, whatever request raised them")
@@ -331,15 +331,20 @@ func TestGetAuditLogsPaginated_RequestIdFilterIsByteExact(t *testing.T) {
 		time.Sleep(timestampTick)
 	}
 
+	// With the event and without it, since each is its own statement. The ids are unique to this
+	// test, so the request id alone lists the same rows.
 	for _, tc := range []struct {
-		name   string
-		filter string
+		name       string
+		auditEvent string
+		filter     string
 	}{
-		{name: "the id without the trailing space", filter: unpadded},
-		{name: "the id with the trailing space", filter: padded},
+		{name: "the id without the trailing space", auditEvent: event, filter: unpadded},
+		{name: "the id with the trailing space", auditEvent: event, filter: padded},
+		{name: "the id without the trailing space, alone", filter: unpadded},
+		{name: "the id with the trailing space, alone", filter: padded},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, event, tc.filter)
+			logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, record.AuditLogFilter{AuditEvent: tc.auditEvent, RequestId: tc.filter})
 			require.NoError(t, err)
 
 			require.Len(t, logs, 1)

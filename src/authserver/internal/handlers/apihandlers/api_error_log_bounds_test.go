@@ -78,7 +78,7 @@ func TestHandleAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 	rawRequestId, wantRequestId := oversized(t, "abc\ndef")
 
 	database := datamocks.NewDatabase(t)
-	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, rawEvent, rawRequestId).
+	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: rawEvent, RequestId: rawRequestId}).
 		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
@@ -135,7 +135,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 	const filterId = "goiabada/abc123-7"
 
 	database := datamocks.NewDatabase(t)
-	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, event, filterId).
+	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: event, RequestId: filterId}).
 		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)

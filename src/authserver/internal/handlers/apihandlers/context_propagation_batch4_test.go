@@ -132,7 +132,7 @@ func TestHandleSettingsKeyDelete_MalformedIdReachesNoKeyPort(t *testing.T) {
 func TestHandleAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
+	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, record.AuditLogFilter{}).
 		Return([]record.AuditLog{{Id: 1, AuditEvent: "login"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
@@ -149,7 +149,7 @@ func TestHandleAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
 func TestHandleAuditLogsGet_AnOutOfRangeSizeReachesTheDatabaseClamped(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, "", "").
+	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, record.AuditLogFilter{}).
 		Return([]record.AuditLog{}, 0, nil).Once()
 
 	rr := httptest.NewRecorder()

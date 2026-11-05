@@ -871,7 +871,7 @@ func keyPairMapping() mappingCase {
 func auditLogMapping() mappingCase {
 	page := func(auditEvent, requestId string) func(ctx context.Context, d *Database) (any, error) {
 		return func(ctx context.Context, d *Database) (any, error) {
-			logs, _, err := d.GetAuditLogsPaginated(ctx, nil, 2, 10, auditEvent, requestId)
+			logs, _, err := d.GetAuditLogsPaginated(ctx, nil, 2, 10, record.AuditLogFilter{AuditEvent: auditEvent, RequestId: requestId})
 			return firstOf(logs, err)
 		}
 	}

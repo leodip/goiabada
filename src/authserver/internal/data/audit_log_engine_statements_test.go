@@ -21,11 +21,12 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
-// The audit-log statements the engine packages write themselves, held to the text each engine
+// The audit-log statements as the engine adapters send them, held to the text each engine
 // receives and the arguments it binds (#644): each engine's own cleanup, which commondb does not
 // declare (#438 decision 7), and SQL Server's page, which closes `=`'s padding in the statement
-// (#328). commondb's statements are read by its own scripted-driver tests; these four packages'
-// are read here, over a connector that records what reaches it.
+// (#328). The page is commondb's, which the SQL Server adapter runs as the other three do; it is
+// read here through the adapter, over a connector that records what reaches it, so an override
+// declared in mssqldb again would have to send the same text.
 
 var auditCutoff = time.Date(2005, 5, 5, 0, 0, 0, 0, time.UTC)
 
@@ -67,7 +68,7 @@ func TestDeleteOldAuditLogs_EachEngineSendsItsOwnBoundedDelete(t *testing.T) {
 
 // TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements holds SQL Server's page to
 // each filter it is given: the request id compared as bytes beside the equality in the page and in
-// the count alike, the total order, and the offset and the page size bound to OFFSET … FETCH.
+// the count alike, the total order, and the page size and the offset bound to FETCH and OFFSET.
 func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *testing.T) {
 	t.Parallel()
 
@@ -80,23 +81,23 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 	}{
 		{
 			name: "no filter",
-			page: recordedStatement{columns + " ORDER BY created_at DESC, id DESC OFFSET @p1 ROWS FETCH NEXT @p2 ROWS ONLY",
-				[]driver.Value{int64(20), int64(10)}},
+			page: recordedStatement{columns + " ORDER BY created_at DESC, id DESC OFFSET @p2 ROWS FETCH NEXT @p1 ROWS ONLY",
+				[]driver.Value{int64(10), int64(20)}},
 			count: recordedStatement{"SELECT COUNT(*) FROM audit_logs", nil},
 		},
 		{
 			name:       "by event",
 			auditEvent: "user_created",
-			page: recordedStatement{columns + " WHERE audit_event = @p1 ORDER BY created_at DESC, id DESC OFFSET @p2 ROWS FETCH NEXT @p3 ROWS ONLY",
-				[]driver.Value{"user_created", int64(20), int64(10)}},
+			page: recordedStatement{columns + " WHERE audit_event = @p1 ORDER BY created_at DESC, id DESC OFFSET @p3 ROWS FETCH NEXT @p2 ROWS ONLY",
+				[]driver.Value{"user_created", int64(10), int64(20)}},
 			count: recordedStatement{"SELECT COUNT(*) FROM audit_logs WHERE audit_event = @p1", []driver.Value{"user_created"}},
 		},
 		{
 			name:      "by request id",
 			requestId: "req-1",
 			page: recordedStatement{columns + " WHERE request_id = @p1 AND CAST(request_id AS VARBINARY(512)) = CAST(@p1 AS VARBINARY(512)) " +
-				"ORDER BY created_at DESC, id DESC OFFSET @p2 ROWS FETCH NEXT @p3 ROWS ONLY",
-				[]driver.Value{"req-1", int64(20), int64(10)}},
+				"ORDER BY created_at DESC, id DESC OFFSET @p3 ROWS FETCH NEXT @p2 ROWS ONLY",
+				[]driver.Value{"req-1", int64(10), int64(20)}},
 			count: recordedStatement{"SELECT COUNT(*) FROM audit_logs WHERE request_id = @p1 " +
 				"AND CAST(request_id AS VARBINARY(512)) = CAST(@p1 AS VARBINARY(512))", []driver.Value{"req-1"}},
 		},
@@ -106,8 +107,8 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 			requestId:  "req-1",
 			page: recordedStatement{columns + " WHERE audit_event = @p1 AND request_id = @p2 " +
 				"AND CAST(request_id AS VARBINARY(512)) = CAST(@p2 AS VARBINARY(512)) " +
-				"ORDER BY created_at DESC, id DESC OFFSET @p3 ROWS FETCH NEXT @p4 ROWS ONLY",
-				[]driver.Value{"user_created", "req-1", int64(20), int64(10)}},
+				"ORDER BY created_at DESC, id DESC OFFSET @p4 ROWS FETCH NEXT @p3 ROWS ONLY",
+				[]driver.Value{"user_created", "req-1", int64(10), int64(20)}},
 			count: recordedStatement{"SELECT COUNT(*) FROM audit_logs WHERE audit_event = @p1 AND request_id = @p2 " +
 				"AND CAST(request_id AS VARBINARY(512)) = CAST(@p2 AS VARBINARY(512))",
 				[]driver.Value{"user_created", "req-1"}},
@@ -116,6 +117,11 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			want := record.AuditLog{Id: 41, CreatedAt: auditCutoff, AuditEvent: "the event", Details: "{}", RequestId: "the request"}
+			// A row the engine answers for a request-id filter carries that id, as the byte
+			// comparison makes it; commondb's guard after the scan drops any other.
+			if c.requestId != "" {
+				want.RequestId = c.requestId
+			}
 			connector := &recordingConnector{answer: func(query string) (cols []string, values [][]driver.Value) {
 				if strings.HasPrefix(query, "SELECT COUNT(*)") {
 					return []string{"count"}, [][]driver.Value{{int64(57)}}
@@ -127,7 +133,7 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 			t.Cleanup(func() { _ = db.Close() })
 			d := &mssqldb.Database{Database: commondb.New(db, data.MSSQL, false)}
 
-			logs, total, err := d.GetAuditLogsPaginated(context.Background(), nil, 3, 10, c.auditEvent, c.requestId)
+			logs, total, err := d.GetAuditLogsPaginated(context.Background(), nil, 3, 10, record.AuditLogFilter{AuditEvent: c.auditEvent, RequestId: c.requestId})
 			if err != nil {
 				t.Fatalf("GetAuditLogsPaginated: %v", err)
 			}

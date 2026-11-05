@@ -6799,8 +6799,8 @@ func (_c *Database_GetAllWebOrigins_Call) RunAndReturn(run func(ctx context.Cont
 }
 
 // GetAuditLogsPaginated provides a mock function for the type Database
-func (_mock *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]record.AuditLog, int, error) {
-	ret := _mock.Called(ctx, tx, page, pageSize, auditEvent, requestId)
+func (_mock *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, filter record.AuditLogFilter) ([]record.AuditLog, int, error) {
+	ret := _mock.Called(ctx, tx, page, pageSize, filter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAuditLogsPaginated")
@@ -6809,23 +6809,23 @@ func (_mock *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, pa
 	var r0 []record.AuditLog
 	var r1 int
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int, int, string, string) ([]record.AuditLog, int, error)); ok {
-		return returnFunc(ctx, tx, page, pageSize, auditEvent, requestId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int, int, record.AuditLogFilter) ([]record.AuditLog, int, error)); ok {
+		return returnFunc(ctx, tx, page, pageSize, filter)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int, int, string, string) []record.AuditLog); ok {
-		r0 = returnFunc(ctx, tx, page, pageSize, auditEvent, requestId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int, int, record.AuditLogFilter) []record.AuditLog); ok {
+		r0 = returnFunc(ctx, tx, page, pageSize, filter)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]record.AuditLog)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int, int, string, string) int); ok {
-		r1 = returnFunc(ctx, tx, page, pageSize, auditEvent, requestId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int, int, record.AuditLogFilter) int); ok {
+		r1 = returnFunc(ctx, tx, page, pageSize, filter)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, *sql.Tx, int, int, string, string) error); ok {
-		r2 = returnFunc(ctx, tx, page, pageSize, auditEvent, requestId)
+	if returnFunc, ok := ret.Get(2).(func(context.Context, *sql.Tx, int, int, record.AuditLogFilter) error); ok {
+		r2 = returnFunc(ctx, tx, page, pageSize, filter)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -6842,13 +6842,12 @@ type Database_GetAuditLogsPaginated_Call struct {
 //   - tx *sql.Tx
 //   - page int
 //   - pageSize int
-//   - auditEvent string
-//   - requestId string
-func (_e *Database_Expecter) GetAuditLogsPaginated(ctx any, tx any, page any, pageSize any, auditEvent any, requestId any) *Database_GetAuditLogsPaginated_Call {
-	return &Database_GetAuditLogsPaginated_Call{Call: _e.mock.On("GetAuditLogsPaginated", ctx, tx, page, pageSize, auditEvent, requestId)}
+//   - filter record.AuditLogFilter
+func (_e *Database_Expecter) GetAuditLogsPaginated(ctx any, tx any, page any, pageSize any, filter any) *Database_GetAuditLogsPaginated_Call {
+	return &Database_GetAuditLogsPaginated_Call{Call: _e.mock.On("GetAuditLogsPaginated", ctx, tx, page, pageSize, filter)}
 }
 
-func (_c *Database_GetAuditLogsPaginated_Call) Run(run func(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string)) *Database_GetAuditLogsPaginated_Call {
+func (_c *Database_GetAuditLogsPaginated_Call) Run(run func(ctx context.Context, tx *sql.Tx, page int, pageSize int, filter record.AuditLogFilter)) *Database_GetAuditLogsPaginated_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -6866,13 +6865,9 @@ func (_c *Database_GetAuditLogsPaginated_Call) Run(run func(ctx context.Context,
 		if args[3] != nil {
 			arg3 = args[3].(int)
 		}
-		var arg4 string
+		var arg4 record.AuditLogFilter
 		if args[4] != nil {
-			arg4 = args[4].(string)
-		}
-		var arg5 string
-		if args[5] != nil {
-			arg5 = args[5].(string)
+			arg4 = args[4].(record.AuditLogFilter)
 		}
 		run(
 			arg0,
@@ -6880,7 +6875,6 @@ func (_c *Database_GetAuditLogsPaginated_Call) Run(run func(ctx context.Context,
 			arg2,
 			arg3,
 			arg4,
-			arg5,
 		)
 	})
 	return _c
@@ -6891,7 +6885,7 @@ func (_c *Database_GetAuditLogsPaginated_Call) Return(auditLogs []record.AuditLo
 	return _c
 }
 
-func (_c *Database_GetAuditLogsPaginated_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]record.AuditLog, int, error)) *Database_GetAuditLogsPaginated_Call {
+func (_c *Database_GetAuditLogsPaginated_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, page int, pageSize int, filter record.AuditLogFilter) ([]record.AuditLog, int, error)) *Database_GetAuditLogsPaginated_Call {
 	_c.Call.Return(run)
 	return _c
 }

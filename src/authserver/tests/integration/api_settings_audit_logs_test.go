@@ -217,7 +217,7 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.AuditLogsInDatabaseEnabled = true })
 	accessToken, _ := createAdminClientWithToken(t)
 
-	before, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, audit.EventUpdatedAuditLogsSettings, "")
+	before, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, record.AuditLogFilter{AuditEvent: audit.EventUpdatedAuditLogsSettings})
 	require.NoError(t, err)
 	var lastIdBefore int64
 	if len(before) > 0 {
@@ -233,7 +233,7 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	after, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, audit.EventUpdatedAuditLogsSettings, "")
+	after, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, record.AuditLogFilter{AuditEvent: audit.EventUpdatedAuditLogsSettings})
 	require.NoError(t, err)
 	assert.Positive(t, total, "the settings change must be recorded")
 	assert.NotEmpty(t, after)

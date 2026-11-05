@@ -16,3 +16,13 @@ type AuditLog struct {
 	// column existed, and the startup backfill's row, which has no request to name.
 	RequestId string `db:"request_id"`
 }
+
+// AuditLogFilter narrows a page of audit logs. Each filter is an exact match and applies only when
+// it is set; the empty string sets none, and the filters set combine with AND.
+type AuditLogFilter struct {
+	// AuditEvent lists the rows of that event only.
+	AuditEvent string
+	// RequestId lists the rows written on that request only, compared byte for byte, so an id
+	// differing by a trailing space or a fold names another request (#328).
+	RequestId string
+}
