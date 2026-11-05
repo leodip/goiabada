@@ -6,6 +6,7 @@ package userexport
 
 import (
 	"cmp"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -25,7 +26,8 @@ const FormatVersion = 1
 // read answers it: GET /api/v1/admin/users/{id}/attributes, a group as /groups answers it with the
 // group's own attribute and permission reads, /permissions, /consents, the live sessions of
 // /sessions, and /legal-document-acceptances. ProfilePicture is the stored picture, nil when the
-// user has none. The reads promise no order; Build gives every list one.
+// user has none. RefreshTokens is every refresh token row the auth server holds for the user, with
+// what its entry is read from. The reads promise no order; Build gives every list one.
 type Parts struct {
 	Attributes               []api.UserAttributeResponse
 	Groups                   []api.UserExportGroupResponse
@@ -34,6 +36,19 @@ type Parts struct {
 	Sessions                 []api.UserSessionDetailResponse
 	LegalDocumentAcceptances []api.LegalDocumentAcceptanceResponse
 	ProfilePicture           *record.UserProfilePicture
+	RefreshTokens            []RefreshToken
+}
+
+// RefreshToken is one refresh token row of the user's with what its entry is read from: Code is
+// the authorization code a code-flow token came from, nil for a password-grant token, which has
+// none, or when the code is gone; Client is the token's client, the code's for a code-flow token
+// and the row's own for a password-grant one, nil when it is gone; FamilyRevoked says the token's
+// rotation family is recorded as revoked.
+type RefreshToken struct {
+	Row           *record.RefreshToken
+	Code          *record.Code
+	Client        *record.Client
+	FamilyRevoked bool
 }
 
 // Build is the document for user and what the admin API reads about them, exported at exportedAt
@@ -79,7 +94,7 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 		Permissions:   inIdOrder(parts.Permissions, permissionId),
 		Consents:      inIdOrder(parts.Consents, func(c api.UserConsentResponse) int64 { return c.Id }),
 		Sessions:      inIdOrder(parts.Sessions, func(s api.UserSessionDetailResponse) int64 { return s.Id }),
-		RefreshTokens: []json.RawMessage{},
+		RefreshTokens: refreshTokens(parts.RefreshTokens),
 		LegalDocumentAcceptances: inIdOrder(parts.LegalDocumentAcceptances,
 			func(a api.LegalDocumentAcceptanceResponse) int64 { return a.Id }),
 		ProfilePicture: picture,
@@ -88,6 +103,58 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 }
 
 func permissionId(p api.PermissionResponse) int64 { return p.Id }
+
+// refreshTokens is each token's entry, in the rows' id order (#781 decision 4). A token is revoked
+// when any of the three marks that stop it is set: its own row, its authorization code's, or its
+// rotation family's, so the document never calls a stopped token active. A code-flow token's
+// sign-in, its address, browser and time, is its code's. A password-grant token has no code, so its
+// address and browser are empty and its sign-in time is its own row's, which rotation copies from
+// the parent, the moment the password was checked.
+func refreshTokens(tokens []RefreshToken) []api.UserExportRefreshTokenResponse {
+	sorted := inIdOrder(tokens, func(t RefreshToken) int64 { return t.Row.Id })
+	entries := make([]api.UserExportRefreshTokenResponse, 0, len(sorted))
+	for _, token := range sorted {
+		row := token.Row
+		entry := api.UserExportRefreshTokenResponse{
+			Scope:             row.Scope,
+			Type:              row.RefreshTokenType,
+			IssuedAt:          nullTime(row.IssuedAt),
+			ExpiresAt:         nullTime(row.ExpiresAt),
+			MaxLifetime:       nullTime(row.MaxLifetime),
+			SessionIdentifier: row.SessionIdentifier,
+			Jti:               row.RefreshTokenJti,
+			Revoked:           row.Revoked || token.FamilyRevoked,
+		}
+		if token.Client != nil {
+			entry.ClientIdentifier = token.Client.ClientIdentifier
+			entry.ClientName, entry.ClientNameUnverified = token.Client.NameForUsers()
+		}
+		if row.CodeId.Valid {
+			if code := token.Code; code != nil {
+				entry.Revoked = entry.Revoked || code.Revoked
+				entry.IpAddress = code.IpAddress
+				entry.UserAgent = code.UserAgent
+				if !code.AuthenticatedAt.IsZero() {
+					authenticatedAt := code.AuthenticatedAt
+					entry.AuthenticatedAt = &authenticatedAt
+				}
+			}
+		} else {
+			entry.AuthenticatedAt = nullTime(row.AuthenticatedAt)
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
+// nullTime is a stored instant, or nil where none is stored.
+func nullTime(stored sql.NullTime) *time.Time {
+	if !stored.Valid {
+		return nil
+	}
+	instant := stored.Time
+	return &instant
+}
 
 // inIdOrder is a copy of entries sorted by id, ascending, and never nil.
 func inIdOrder[T any](entries []T, id func(T) int64) []T {

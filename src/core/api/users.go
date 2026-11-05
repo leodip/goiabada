@@ -298,8 +298,7 @@ type GetUserConsentsResponse struct {
 // by line (decision 3). FormatVersion goes up only for a change that breaks a reader; a field added
 // to a reused entry appears here too, and is additive.
 //
-// RefreshTokens and AuditEvents are shapes no admin API read answers yet: they are [] until their
-// entries are defined.
+// AuditEvents is a shape no admin API read answers yet: it is [] until its entries are defined.
 type UserExportResponse struct {
 	FormatVersion int       `json:"formatVersion"`
 	ExportedAt    time.Time `json:"exportedAt"`
@@ -313,7 +312,7 @@ type UserExportResponse struct {
 	Permissions              []PermissionResponse              `json:"permissions"`
 	Consents                 []UserConsentResponse             `json:"consents"`
 	Sessions                 []UserSessionDetailResponse       `json:"sessions"`
-	RefreshTokens            []json.RawMessage                 `json:"refreshTokens"`
+	RefreshTokens            []UserExportRefreshTokenResponse  `json:"refreshTokens"`
 	LegalDocumentAcceptances []LegalDocumentAcceptanceResponse `json:"legalDocumentAcceptances"`
 	ProfilePicture           *UserExportProfilePictureResponse `json:"profilePicture"`
 	AuditEvents              []json.RawMessage                 `json:"auditEvents"`
@@ -343,4 +342,33 @@ type UserExportGroupResponse struct {
 type UserExportProfilePictureResponse struct {
 	ContentType string `json:"contentType"`
 	Data        []byte `json:"data"`
+}
+
+// UserExportRefreshTokenResponse is one refresh token the auth server holds for the user in the
+// user export, rotated-out and revoked ones included (#781 decision 4). ClientName and
+// ClientNameUnverified are the client's name as a consent shows it. MaxLifetime is set on an
+// Offline token, SessionIdentifier on a session-bound (Refresh) one. Jti is the id the audit events
+// name as refresh_token_jti; the token itself is never stored. Revoked is true when the token's own
+// row, its authorization code or its rotation family is marked revoked.
+//
+// IpAddress, UserAgent and AuthenticatedAt are the sign-in the token came from. A code-flow token
+// takes all three from its authorization code. A password-grant token has no code, so its address
+// and browser are empty, and its AuthenticatedAt is when the password was checked, which its row
+// keeps through every rotation and so can differ from IssuedAt; it is nil only where nothing is
+// stored.
+type UserExportRefreshTokenResponse struct {
+	ClientIdentifier     string     `json:"clientIdentifier"`
+	ClientName           string     `json:"clientName"`
+	ClientNameUnverified bool       `json:"clientNameUnverified"`
+	Scope                string     `json:"scope"`
+	Type                 string     `json:"type"`
+	IssuedAt             *time.Time `json:"issuedAt"`
+	ExpiresAt            *time.Time `json:"expiresAt"`
+	MaxLifetime          *time.Time `json:"maxLifetime"`
+	SessionIdentifier    string     `json:"sessionIdentifier"`
+	Jti                  string     `json:"jti"`
+	Revoked              bool       `json:"revoked"`
+	IpAddress            string     `json:"ipAddress"`
+	UserAgent            string     `json:"userAgent"`
+	AuthenticatedAt      *time.Time `json:"authenticatedAt"`
 }

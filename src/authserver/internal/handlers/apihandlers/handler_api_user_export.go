@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -54,6 +55,9 @@ type userExportDatabase interface {
 	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
+	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
+	GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error)
+	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
 }
 
 // HandleUserExportGet - GET /api/v1/admin/users/{id}/export
@@ -168,6 +172,11 @@ func buildUserExport(ctx context.Context, database userExportDatabase, user *rec
 		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the user's profile picture for the export")
 	}
 
+	refreshTokens, err := readUserExportRefreshTokens(ctx, database, user.Id)
+	if err != nil {
+		return api.UserExportResponse{}, err
+	}
+
 	return userexport.Build(user, userexport.Parts{
 		Attributes:               apimapping.ToUserAttributeResponses(attributes),
 		Groups:                   groups,
@@ -176,6 +185,7 @@ func buildUserExport(ctx context.Context, database userExportDatabase, user *rec
 		Sessions:                 sessions,
 		LegalDocumentAcceptances: acceptances,
 		ProfilePicture:           picture,
+		RefreshTokens:            refreshTokens,
 	}, settings.Issuer, exportedAt), nil
 }
 
@@ -213,6 +223,82 @@ func readUserExportGroups(ctx context.Context, database userExportDatabase, user
 		})
 	}
 	return groups, nil
+}
+
+// readUserExportRefreshTokens is every refresh token row the auth server holds for the user, through
+// its authorization code for the code flow and directly for the password grant, rotated-out and
+// revoked rows included, each with its code, its client and whether its family is recorded as
+// revoked (#781 decision 4). A grant rotated every few minutes keeps thousands of rows of one code
+// and one family, so each code and family is read once, and the clients in one read.
+func readUserExportRefreshTokens(ctx context.Context, database userExportDatabase, userId int64) ([]userexport.RefreshToken, error) {
+	rows, err := database.GetRefreshTokensByUserId(ctx, nil, userId)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to read the user's refresh tokens for the export")
+	}
+
+	codes := map[int64]*record.Code{}
+	families := map[string]bool{}
+	clientIds := []int64{}
+	tokens := make([]userexport.RefreshToken, 0, len(rows))
+	for _, row := range rows {
+		token := userexport.RefreshToken{Row: row}
+		if row.CodeId.Valid {
+			code, read := codes[row.CodeId.Int64]
+			if !read {
+				code, err = database.GetCodeById(ctx, nil, row.CodeId.Int64)
+				if err != nil {
+					return nil, errs.Wrapf(err, "unable to read code %d for the export", row.CodeId.Int64)
+				}
+				codes[row.CodeId.Int64] = code
+			}
+			token.Code = code
+		}
+		if clientId, ok := refreshTokenClientId(token); ok && !slices.Contains(clientIds, clientId) {
+			clientIds = append(clientIds, clientId)
+		}
+
+		// Every row records the first jti of its family; one that does not belongs to no family
+		// a record could name.
+		if first := row.FirstRefreshTokenJti; first != "" {
+			revoked, read := families[first]
+			if !read {
+				revoked, err = database.IsRefreshTokenFamilyRevoked(ctx, nil, first)
+				if err != nil {
+					return nil, errs.Wrap(err, "unable to read a refresh token family's revocation for the export")
+				}
+				families[first] = revoked
+			}
+			token.FamilyRevoked = revoked
+		}
+		tokens = append(tokens, token)
+	}
+
+	clients, err := database.GetClientsByIds(ctx, nil, clientIds)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to read the clients of the user's refresh tokens for the export")
+	}
+	byId := make(map[int64]*record.Client, len(clients))
+	for i := range clients {
+		byId[clients[i].Id] = &clients[i]
+	}
+	for i := range tokens {
+		if clientId, ok := refreshTokenClientId(tokens[i]); ok {
+			tokens[i].Client = byId[clientId]
+		}
+	}
+	return tokens, nil
+}
+
+// refreshTokenClientId is the token's client: its code's for a code-flow token, its row's own for a
+// password-grant one. ok is false when there is none to read, as for a code that is gone.
+func refreshTokenClientId(token userexport.RefreshToken) (clientId int64, ok bool) {
+	if token.Row.CodeId.Valid {
+		if token.Code == nil {
+			return 0, false
+		}
+		return token.Code.ClientId, true
+	}
+	return token.Row.ClientId.Int64, token.Row.ClientId.Valid
 }
 
 // permissionResources fills in each permission's resource, as the user and group permission reads

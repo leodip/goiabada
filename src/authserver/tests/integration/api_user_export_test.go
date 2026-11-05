@@ -645,3 +645,192 @@ func TestAPIUserExport_HoldsWhatTheAdminAPIReadsAboutTheUser(t *testing.T) {
 		assert.NotContains(t, lowered, key)
 	}
 }
+
+// exportedRefreshTokens is what newExportedUserRefreshTokens seeds, each row read back from the
+// database, since each engine keeps its own time precision, in the order the rows were made, which
+// is their id order.
+type exportedRefreshTokens struct {
+	shop, cli                   *record.Client
+	signIn, revokedSignIn       *record.Code
+	codeFlow, codeRevoked       *record.RefreshToken
+	rotatedOut, rotated, family *record.RefreshToken
+	passwordCheckedAt           time.Time
+	// codeHashes and the signed refresh tokens are what no entry may carry.
+	codeHashes    []string
+	signedTokens  []string
+	clientSecrets []string
+}
+
+// newExportedUserRefreshTokens gives the user five refresh tokens: a live session-bound one from a
+// sign-in to the shop, an offline one from a sign-in to the shop whose code is marked revoked, a
+// password grant of the command line tool's that was three days ago, rotated once through the token
+// endpoint, so its first token is rotated out and its second is issued now, and a password-grant
+// token whose own row is live but whose family is recorded as revoked, issued before the row
+// recorded when the password was checked.
+func newExportedUserRefreshTokens(t *testing.T, user *record.User) exportedRefreshTokens {
+	t.Helper()
+	ctx := context.Background()
+	var r exportedRefreshTokens
+	now := time.Now().UTC()
+	suffix := strings.ToLower(fake.LetterN(8))
+
+	shopSecret := "export-shop-secret-" + fake.LetterN(12)
+	r.shop = &record.Client{
+		ClientIdentifier:         "export-shop-" + suffix,
+		ClientSecretEncrypted:    []byte(shopSecret),
+		Description:              "The shop",
+		DisplayName:              "Shop",
+		ShowDisplayName:          true,
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		DefaultAcrLevel:          record.AcrLevel1,
+	}
+	require.NoError(t, database.CreateClient(ctx, nil, r.shop))
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, r.shop.Id) })
+
+	newCode := func(revoked bool, ipAddress, userAgent string, authenticatedAt time.Time) *record.Code {
+		codeHash := hashutil.HashString("export-authorization-code-" + fake.LetterN(16))
+		r.codeHashes = append(r.codeHashes, codeHash)
+		code := &record.Code{
+			CodeHash: codeHash, ClientId: r.shop.Id, Scope: "openid profile offline_access", State: "a-state",
+			Nonce: "a-nonce", RedirectURI: "https://shop.example.com/callback", UserId: user.Id,
+			IpAddress: ipAddress, UserAgent: userAgent, ResponseMode: "query", AuthenticatedAt: authenticatedAt,
+			SessionIdentifier: fake.UUID(), AcrLevel: record.AcrLevel1, AuthMethods: "pwd", Used: true, Revoked: revoked,
+			AuthStateGeneration: user.AuthStateGeneration,
+		}
+		require.NoError(t, database.CreateCode(ctx, nil, code))
+		stored, err := database.GetCodeById(ctx, nil, code.Id)
+		require.NoError(t, err)
+		require.Equal(t, revoked, stored.Revoked)
+		return stored
+	}
+	readBack := func(jti string) *record.RefreshToken {
+		row, err := database.GetRefreshTokenByJti(ctx, nil, jti)
+		require.NoError(t, err)
+		require.NotNil(t, row, "no row for %s", jti)
+		return row
+	}
+	at := func(instant time.Time) sql.NullTime { return sql.NullTime{Time: instant, Valid: true} }
+
+	r.signIn = newCode(false, "203.0.113.7", "Mozilla/5.0 (X11; Linux x86_64) Firefox/131.0", now.Add(-2*time.Hour).Truncate(time.Second))
+	jti := fake.UUID()
+	require.NoError(t, database.CreateRefreshToken(ctx, nil, &record.RefreshToken{
+		CodeId: sql.NullInt64{Int64: r.signIn.Id, Valid: true}, RefreshTokenJti: jti, FirstRefreshTokenJti: jti,
+		SessionIdentifier: r.signIn.SessionIdentifier, RefreshTokenType: "Refresh", Scope: "openid profile",
+		IssuedAt: at(now.Add(-2 * time.Hour)), ExpiresAt: at(now.Add(2 * time.Hour)),
+		AuthStateGeneration: user.AuthStateGeneration,
+	}))
+	r.codeFlow = readBack(jti)
+
+	r.revokedSignIn = newCode(true, "198.51.100.4", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)", now.Add(-48*time.Hour).Truncate(time.Second))
+	jti = fake.UUID()
+	require.NoError(t, database.CreateRefreshToken(ctx, nil, &record.RefreshToken{
+		CodeId: sql.NullInt64{Int64: r.revokedSignIn.Id, Valid: true}, RefreshTokenJti: jti, FirstRefreshTokenJti: jti,
+		RefreshTokenType: "Offline", Scope: "openid offline_access",
+		IssuedAt: at(now.Add(-48 * time.Hour)), ExpiresAt: at(now.Add(24 * time.Hour)), MaxLifetime: at(now.Add(300 * 24 * time.Hour)),
+		AuthStateGeneration: user.AuthStateGeneration,
+	}))
+	r.codeRevoked = readBack(jti)
+
+	// The password grant, through the token endpoint's own rotation.
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+	cliSecret := fake.Password(32)
+	r.cli = createROPCClient(t, cliSecret, false)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, r.cli.Id) })
+	f := ropcAuthTimeFixture{client: r.cli, clientSecret: cliSecret, user: user,
+		httpClient: createHttpClient(t), tokenURL: appConfig.AuthServer.BaseURL + "/auth/token/"}
+	r.passwordCheckedAt = now.Add(-72 * time.Hour).Truncate(time.Second)
+	first := issueROPCRefreshToken(t, f, at(r.passwordCheckedAt))
+	status, refreshed := f.refresh(t, first)
+	require.Equal(t, http.StatusOK, status, "the rotation: %v", refreshed)
+	second, ok := refreshed["refresh_token"].(string)
+	require.True(t, ok, "no refresh token: %v", refreshed)
+	r.rotatedOut, r.rotated = tokenRow(t, first), tokenRow(t, second)
+	require.True(t, r.rotatedOut.Revoked, "rotation revokes the parent's row")
+
+	jti = fake.UUID()
+	require.NoError(t, database.CreateRefreshToken(ctx, nil, &record.RefreshToken{
+		UserId: sql.NullInt64{Int64: user.Id, Valid: true}, ClientId: sql.NullInt64{Int64: r.cli.Id, Valid: true},
+		RefreshTokenJti: jti, FirstRefreshTokenJti: jti, RefreshTokenType: "Offline", Scope: "openid",
+		IssuedAt: at(now.Add(-time.Hour)), ExpiresAt: at(now.Add(time.Hour)), MaxLifetime: at(now.Add(24 * time.Hour)),
+		AuthStateGeneration: user.AuthStateGeneration,
+	}))
+	recorded, err := database.RecordRefreshTokenFamilyRevoked(ctx, nil, jti, "replay")
+	require.NoError(t, err)
+	require.True(t, recorded)
+	r.family = readBack(jti)
+	require.False(t, r.family.Revoked, "only the family is marked")
+
+	r.signedTokens = []string{first, second}
+	r.clientSecrets = []string{shopSecret, cliSecret}
+	return r
+}
+
+// expectedExportRefreshTokens is the document's refreshTokens for the seeded tokens, written out by
+// hand from decision 4, in id order.
+func expectedExportRefreshTokens(r exportedRefreshTokens) string {
+	return fmt.Sprintf(`[
+		{"clientIdentifier": %q, "clientName": "Shop", "clientNameUnverified": false, "scope": "openid profile",
+			"type": "Refresh", "issuedAt": %s, "expiresAt": %s, "maxLifetime": null, "sessionIdentifier": %q,
+			"jti": %q, "revoked": false, "ipAddress": "203.0.113.7",
+			"userAgent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/131.0", "authenticatedAt": %s},
+		{"clientIdentifier": %q, "clientName": "Shop", "clientNameUnverified": false, "scope": "openid offline_access",
+			"type": "Offline", "issuedAt": %s, "expiresAt": %s, "maxLifetime": %s, "sessionIdentifier": "",
+			"jti": %q, "revoked": true, "ipAddress": "198.51.100.4",
+			"userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)", "authenticatedAt": %s},
+		{"clientIdentifier": %q, "clientName": %q, "clientNameUnverified": false, "scope": "openid",
+			"type": "Offline", "issuedAt": %s, "expiresAt": %s, "maxLifetime": %s, "sessionIdentifier": "",
+			"jti": %q, "revoked": true, "ipAddress": "", "userAgent": "", "authenticatedAt": %s},
+		{"clientIdentifier": %q, "clientName": %q, "clientNameUnverified": false, "scope": "openid",
+			"type": "Offline", "issuedAt": %s, "expiresAt": %s, "maxLifetime": %s, "sessionIdentifier": "",
+			"jti": %q, "revoked": false, "ipAddress": "", "userAgent": "", "authenticatedAt": %s},
+		{"clientIdentifier": %q, "clientName": %q, "clientNameUnverified": false, "scope": "openid",
+			"type": "Offline", "issuedAt": %s, "expiresAt": %s, "maxLifetime": %s, "sessionIdentifier": "",
+			"jti": %q, "revoked": true, "ipAddress": "", "userAgent": "", "authenticatedAt": null}
+	]`,
+		r.shop.ClientIdentifier, jsonTime(r.codeFlow.IssuedAt), jsonTime(r.codeFlow.ExpiresAt), r.signIn.SessionIdentifier,
+		r.codeFlow.RefreshTokenJti, jsonInstant(r.signIn.AuthenticatedAt),
+		r.shop.ClientIdentifier, jsonTime(r.codeRevoked.IssuedAt), jsonTime(r.codeRevoked.ExpiresAt), jsonTime(r.codeRevoked.MaxLifetime),
+		r.codeRevoked.RefreshTokenJti, jsonInstant(r.revokedSignIn.AuthenticatedAt),
+		r.cli.ClientIdentifier, r.cli.ClientIdentifier, jsonTime(r.rotatedOut.IssuedAt), jsonTime(r.rotatedOut.ExpiresAt),
+		jsonTime(r.rotatedOut.MaxLifetime), r.rotatedOut.RefreshTokenJti, jsonInstant(r.passwordCheckedAt),
+		r.cli.ClientIdentifier, r.cli.ClientIdentifier, jsonTime(r.rotated.IssuedAt), jsonTime(r.rotated.ExpiresAt),
+		jsonTime(r.rotated.MaxLifetime), r.rotated.RefreshTokenJti, jsonInstant(r.passwordCheckedAt),
+		r.cli.ClientIdentifier, r.cli.ClientIdentifier, jsonTime(r.family.IssuedAt), jsonTime(r.family.ExpiresAt),
+		jsonTime(r.family.MaxLifetime), r.family.RefreshTokenJti)
+}
+
+// The document lists every refresh token the auth server holds for the user, a code flow's and a
+// password grant's, rotated-out and revoked ones included, in id order (#781 decision 4). A token
+// is revoked when its own row, its code or its family is marked revoked. A code-flow token carries
+// its sign-in's address, browser and time from its code; a password-grant token has no address or
+// browser, and its sign-in time is when the password was checked, which rotation keeps, so the
+// rotated token's differs from its issue time. Neither a code's hash nor a refresh token itself
+// is in the document, since neither is part of an entry, and the token is never stored.
+func TestAPIUserExport_ListsEveryRefreshToken(t *testing.T) {
+	adminToken, _ := createAdminClientWithToken(t)
+	user, _ := newExportedUser(t)
+	r := newExportedUserRefreshTokens(t, user)
+
+	answer := getUserExport(t, adminToken, user.Id, "gzip")
+
+	require.Equal(t, http.StatusOK, answer.status, "%s", answer.raw)
+	var document map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(answer.document(t), &document))
+	assert.JSONEq(t, expectedExportRefreshTokens(r), string(document["refreshTokens"]))
+
+	var tokens []api.UserExportRefreshTokenResponse
+	require.NoError(t, json.Unmarshal(document["refreshTokens"], &tokens))
+	require.Len(t, tokens, 5)
+	require.NotNil(t, tokens[3].AuthenticatedAt)
+	require.NotNil(t, tokens[3].IssuedAt)
+	assert.Greater(t, tokens[3].IssuedAt.Sub(*tokens[3].AuthenticatedAt), 71*time.Hour,
+		"the rotated token was issued now, three days after the password was checked")
+
+	body := string(answer.document(t))
+	secrets := append(slices.Clone(r.codeHashes), r.signedTokens...)
+	secrets = append(secrets, r.clientSecrets...)
+	for _, secret := range secrets {
+		assert.NotContains(t, body, secret)
+	}
+}

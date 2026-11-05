@@ -48,6 +48,9 @@ type userExportStore struct {
 	legalDocuments   []record.LegalDocument
 	legalVersions    map[int64][]record.LegalDocumentVersion
 	picture          *record.UserProfilePicture
+	refreshTokens    []record.RefreshToken
+	codes            map[int64]record.Code
+	revokedFamilies  map[string]bool
 
 	// failing names the one read that answers err; "" for none, "*" for every read.
 	failing string
@@ -208,6 +211,36 @@ func (d *userExportStore) GetUserProfilePictureByUserId(_ context.Context, _ *sq
 		return nil, err
 	}
 	return d.picture, nil
+}
+
+func (d *userExportStore) GetRefreshTokensByUserId(_ context.Context, _ *sql.Tx, userId int64) ([]*record.RefreshToken, error) {
+	if err := d.read("GetRefreshTokensByUserId", userId); err != nil {
+		return nil, err
+	}
+	tokens := make([]*record.RefreshToken, 0, len(d.refreshTokens))
+	for i := range d.refreshTokens {
+		copied := d.refreshTokens[i]
+		tokens = append(tokens, &copied)
+	}
+	return tokens, nil
+}
+
+func (d *userExportStore) GetCodeById(_ context.Context, _ *sql.Tx, codeId int64) (*record.Code, error) {
+	if err := d.read("GetCodeById", codeId); err != nil {
+		return nil, err
+	}
+	code, ok := d.codes[codeId]
+	if !ok {
+		return nil, nil
+	}
+	return &code, nil
+}
+
+func (d *userExportStore) IsRefreshTokenFamilyRevoked(_ context.Context, _ *sql.Tx, firstRefreshTokenJti string) (bool, error) {
+	if err := d.read("IsRefreshTokenFamilyRevoked", 0); err != nil {
+		return false, err
+	}
+	return d.revokedFamilies[firstRefreshTokenJti], nil
 }
 
 // exportAudit records each event the handler logs, with what the response held at that moment.
@@ -743,11 +776,14 @@ func TestHandleUserExportGet_AFailedReadOfAnyPartIsAFiveHundred(t *testing.T) {
 		"GroupLoadPermissions", "UserLoadPermissions", "GetResourceById", "GetConsentsByUserId",
 		"UserConsentsLoadClients", "GetUserSessionsByUserId", "UserSessionsLoadClients", "GetClientsByIds",
 		"GetLegalDocumentAcceptancesByUserId", "GetAllLegalDocuments", "GetLegalDocumentVersionsByLegalDocumentId",
-		"GetUserProfilePictureByUserId",
+		"GetUserProfilePictureByUserId", "GetRefreshTokensByUserId", "GetCodeById", "IsRefreshTokenFamilyRevoked",
 	} {
 		t.Run(read, func(t *testing.T) {
 			logtest.CaptureSlog(t)
 			database := exportEverythingDatabase(time.Now().UTC())
+			tokens := exportRefreshTokensDatabase()
+			database.refreshTokens, database.codes, database.revokedFamilies = tokens.refreshTokens, tokens.codes, tokens.revokedFamilies
+			database.clients[102] = tokens.clients[102]
 			database.failing, database.err = read, errs.New("the database is down")
 
 			rr, auditLogger := serveExport(t, database, exportRequest("42", "gzip"))
@@ -771,4 +807,167 @@ func TestHandleUserExportGet_AUserWithNothingElseHasEmptyListsAndNoPicture(t *te
 	require.Equal(t, http.StatusOK, rr.Code)
 	assert.JSONEq(t, `{"attributes": [], "groups": [], "permissions": [], "consents": [], "sessions": [],
 		"legalDocumentAcceptances": [], "profilePicture": null}`, exportedParts(t, rr.Body.Bytes()))
+	assert.JSONEq(t, `[]`, exportedPart(t, rr.Body.Bytes(), "refreshTokens"))
+}
+
+// exportedPart is one part of the document, out of a plain body.
+func exportedPart(t *testing.T, body []byte, key string) string {
+	t.Helper()
+	var parts map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &parts), "%q", body)
+	return string(parts[key])
+}
+
+// The secrets the seeded refresh tokens' codes carry: the code's hash, its PKCE challenge and its
+// nonce, none of which is part of a refresh token's entry.
+const (
+	exportSeededCodeHash      = "the-seeded-code-hash-of-the-authorization-code"
+	exportSeededCodeChallenge = "the-seeded-pkce-code-challenge"
+	exportSeededCodeNonce     = "the-seeded-nonce"
+)
+
+// exportRefreshTokensDatabase holds the fixture user with six refresh token rows, answered out of
+// id order: a code-flow grant of the shop's (code 500) rotated once, so its first token is revoked
+// as rotated out and its second is live; an offline code-flow token of the forum's (code 501),
+// whose own row is live but whose code is marked revoked; a password-grant grant of the command
+// line tool's rotated once, its second token issued months after the password was checked; and a
+// password-grant token whose own row is live but whose family is recorded as revoked, issued before
+// the row recorded when the password was checked.
+func exportRefreshTokensDatabase() *userExportStore {
+	at := func(s string) sql.NullTime {
+		parsed, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			panic(err)
+		}
+		return sql.NullTime{Time: parsed, Valid: true}
+	}
+	id := func(n int64) sql.NullInt64 { return sql.NullInt64{Int64: n, Valid: true} }
+	store := exportDatabase()
+
+	store.clients = map[int64]record.Client{
+		100: {Id: 100, ClientIdentifier: "shop", Description: "The shop", DisplayName: "Shop", ShowDisplayName: true,
+			ClientSecretEncrypted: []byte(exportSeededClientSecret)},
+		101: {Id: 101, ClientIdentifier: "forum", Description: "Forum app",
+			ClientSecretEncrypted: []byte(exportSeededClientSecret)},
+		// A client that registered itself: the name it gave is its own claim.
+		102: {Id: 102, ClientIdentifier: "cli-tool", Description: "Ana's command line", CreatedViaDCR: true,
+			ClientSecretEncrypted: []byte(exportSeededClientSecret)},
+	}
+	store.codes = map[int64]record.Code{
+		500: {Id: 500, CodeHash: exportSeededCodeHash, ClientId: 100, Scope: "openid profile email",
+			CodeChallenge: sql.NullString{String: exportSeededCodeChallenge, Valid: true}, Nonce: exportSeededCodeNonce,
+			UserId: 42, IpAddress: "203.0.113.7", UserAgent: "Mozilla/5.0 (X11)",
+			AuthenticatedAt: at("2026-10-01T09:00:00Z").Time, SessionIdentifier: "sid-61", Used: true},
+		501: {Id: 501, CodeHash: exportSeededCodeHash, ClientId: 101, Scope: "openid offline_access",
+			UserId: 42, IpAddress: "198.51.100.4", UserAgent: "Mozilla/5.0 (iPhone)",
+			AuthenticatedAt: at("2026-09-01T08:00:00Z").Time, SessionIdentifier: "sid-60", Used: true, Revoked: true},
+	}
+	store.revokedFamilies = map[string]bool{"jti-84": true}
+	store.refreshTokens = []record.RefreshToken{
+		{Id: 86, UserId: id(42), ClientId: id(102), RefreshTokenJti: "jti-86", PreviousRefreshTokenJti: "jti-83",
+			FirstRefreshTokenJti: "jti-83", RefreshTokenType: "Offline", Scope: "openid offline_access",
+			IssuedAt: at("2026-10-15T07:00:00Z"), ExpiresAt: at("2026-11-14T07:00:00Z"), MaxLifetime: at("2027-08-01T07:00:00Z"),
+			AuthenticatedAt: at("2026-08-01T07:00:00Z")},
+		{Id: 81, CodeId: id(500), RefreshTokenJti: "jti-81", FirstRefreshTokenJti: "jti-81", SessionIdentifier: "sid-61",
+			RefreshTokenType: "Refresh", Scope: "openid profile email",
+			IssuedAt: at("2026-10-01T09:00:05Z"), ExpiresAt: at("2026-10-01T11:00:05Z"), Revoked: true},
+		{Id: 85, CodeId: id(501), RefreshTokenJti: "jti-85", FirstRefreshTokenJti: "jti-85",
+			RefreshTokenType: "Offline", Scope: "openid offline_access",
+			IssuedAt: at("2026-09-01T08:00:02Z"), ExpiresAt: at("2026-10-01T08:00:02Z"), MaxLifetime: at("2027-09-01T08:00:02Z")},
+		{Id: 83, UserId: id(42), ClientId: id(102), RefreshTokenJti: "jti-83", FirstRefreshTokenJti: "jti-83",
+			RefreshTokenType: "Offline", Scope: "openid offline_access",
+			IssuedAt: at("2026-08-01T07:00:00Z"), ExpiresAt: at("2026-08-31T07:00:00Z"), MaxLifetime: at("2027-08-01T07:00:00Z"),
+			Revoked: true, AuthenticatedAt: at("2026-08-01T07:00:00Z")},
+		{Id: 84, UserId: id(42), ClientId: id(102), RefreshTokenJti: "jti-84", FirstRefreshTokenJti: "jti-84",
+			RefreshTokenType: "Offline", Scope: "openid",
+			IssuedAt: at("2025-06-01T07:00:00Z"), ExpiresAt: at("2025-07-01T07:00:00Z"), MaxLifetime: at("2026-06-01T07:00:00Z")},
+		{Id: 82, CodeId: id(500), RefreshTokenJti: "jti-82", PreviousRefreshTokenJti: "jti-81", FirstRefreshTokenJti: "jti-81",
+			SessionIdentifier: "sid-61", RefreshTokenType: "Refresh", Scope: "openid profile",
+			IssuedAt: at("2026-10-01T10:00:00Z"), ExpiresAt: at("2026-10-01T12:00:00Z")},
+	}
+	return store
+}
+
+// exportRefreshTokens is the document's refreshTokens for exportRefreshTokensDatabase, written out
+// by hand from decision 4. In id order: 81 and 82 carry the shop's sign-in from code 500, 81
+// revoked by its own row; 83 and 86 are the password grant's, with no sign-in address or browser
+// and the time the password was checked, which 86 keeps from 83 though it was issued later; 84 is
+// revoked by its family and has no sign-in time stored; 85 is revoked by its code, and as an
+// offline token has a maximum lifetime and no session.
+const exportRefreshTokens = `[
+	{"clientIdentifier": "shop", "clientName": "Shop", "clientNameUnverified": false, "scope": "openid profile email",
+		"type": "Refresh", "issuedAt": "2026-10-01T09:00:05Z", "expiresAt": "2026-10-01T11:00:05Z", "maxLifetime": null,
+		"sessionIdentifier": "sid-61", "jti": "jti-81", "revoked": true,
+		"ipAddress": "203.0.113.7", "userAgent": "Mozilla/5.0 (X11)", "authenticatedAt": "2026-10-01T09:00:00Z"},
+	{"clientIdentifier": "shop", "clientName": "Shop", "clientNameUnverified": false, "scope": "openid profile",
+		"type": "Refresh", "issuedAt": "2026-10-01T10:00:00Z", "expiresAt": "2026-10-01T12:00:00Z", "maxLifetime": null,
+		"sessionIdentifier": "sid-61", "jti": "jti-82", "revoked": false,
+		"ipAddress": "203.0.113.7", "userAgent": "Mozilla/5.0 (X11)", "authenticatedAt": "2026-10-01T09:00:00Z"},
+	{"clientIdentifier": "cli-tool", "clientName": "Ana's command line", "clientNameUnverified": true, "scope": "openid offline_access",
+		"type": "Offline", "issuedAt": "2026-08-01T07:00:00Z", "expiresAt": "2026-08-31T07:00:00Z", "maxLifetime": "2027-08-01T07:00:00Z",
+		"sessionIdentifier": "", "jti": "jti-83", "revoked": true,
+		"ipAddress": "", "userAgent": "", "authenticatedAt": "2026-08-01T07:00:00Z"},
+	{"clientIdentifier": "cli-tool", "clientName": "Ana's command line", "clientNameUnverified": true, "scope": "openid",
+		"type": "Offline", "issuedAt": "2025-06-01T07:00:00Z", "expiresAt": "2025-07-01T07:00:00Z", "maxLifetime": "2026-06-01T07:00:00Z",
+		"sessionIdentifier": "", "jti": "jti-84", "revoked": true,
+		"ipAddress": "", "userAgent": "", "authenticatedAt": null},
+	{"clientIdentifier": "forum", "clientName": "forum", "clientNameUnverified": false, "scope": "openid offline_access",
+		"type": "Offline", "issuedAt": "2026-09-01T08:00:02Z", "expiresAt": "2026-10-01T08:00:02Z", "maxLifetime": "2027-09-01T08:00:02Z",
+		"sessionIdentifier": "", "jti": "jti-85", "revoked": true,
+		"ipAddress": "198.51.100.4", "userAgent": "Mozilla/5.0 (iPhone)", "authenticatedAt": "2026-09-01T08:00:00Z"},
+	{"clientIdentifier": "cli-tool", "clientName": "Ana's command line", "clientNameUnverified": true, "scope": "openid offline_access",
+		"type": "Offline", "issuedAt": "2026-10-15T07:00:00Z", "expiresAt": "2026-11-14T07:00:00Z", "maxLifetime": "2027-08-01T07:00:00Z",
+		"sessionIdentifier": "", "jti": "jti-86", "revoked": false,
+		"ipAddress": "", "userAgent": "", "authenticatedAt": "2026-08-01T07:00:00Z"}
+]`
+
+// The document lists every refresh token row the auth server holds for the user, rotated-out and
+// revoked ones included, in id order (#781 decision 4). A token is revoked when its own row, its
+// authorization code or its rotation family is marked revoked. Its sign-in's address and browser
+// come from its code, and are empty for a password-grant token, which has none; its sign-in time
+// comes from the code, or from a password-grant token's own row, kept through rotation.
+func TestHandleUserExportGet_ListsEveryRefreshToken(t *testing.T) {
+	database := exportRefreshTokensDatabase()
+
+	rr, _ := serveExport(t, database, exportRequest("42", "gzip"))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	reader, err := gzip.NewReader(bytes.NewReader(rr.Body.Bytes()))
+	require.NoError(t, err)
+	body, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	assert.JSONEq(t, exportRefreshTokens, exportedPart(t, body, "refreshTokens"))
+	assert.Equal(t, []int64{42}, database.reads["GetRefreshTokensByUserId"])
+	// Each code is read once, however many of its grant's tokens there are.
+	assert.ElementsMatch(t, []int64{500, 501}, database.reads["GetCodeById"])
+}
+
+// A code-flow token whose code is gone by the time it is read, as when cleanup deleted it between
+// the two reads, is still listed, with nothing of the sign-in or the client to tell.
+func TestHandleUserExportGet_ARefreshTokenWhoseCodeIsGone(t *testing.T) {
+	database := exportRefreshTokensDatabase()
+	database.refreshTokens = []record.RefreshToken{{Id: 90, CodeId: sql.NullInt64{Int64: 599, Valid: true},
+		RefreshTokenJti: "jti-90", FirstRefreshTokenJti: "jti-90", SessionIdentifier: "sid-9",
+		RefreshTokenType: "Refresh", Scope: "openid"}}
+
+	rr, _ := serveExport(t, database, exportRequest("42"))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.JSONEq(t, `[{"clientIdentifier": "", "clientName": "", "clientNameUnverified": false, "scope": "openid",
+		"type": "Refresh", "issuedAt": null, "expiresAt": null, "maxLifetime": null,
+		"sessionIdentifier": "sid-9", "jti": "jti-90", "revoked": false,
+		"ipAddress": "", "userAgent": "", "authenticatedAt": null}]`, exportedPart(t, rr.Body.Bytes(), "refreshTokens"))
+}
+
+// Nothing secret comes with the refresh tokens: their codes carry a hash, a PKCE challenge and a
+// nonce, and their clients an encrypted secret, which no entry copies. A refresh token itself is
+// never stored, only its jti.
+func TestHandleUserExportGet_TheRefreshTokensHoldNoSecret(t *testing.T) {
+	rr, _ := serveExport(t, exportRefreshTokensDatabase(), exportRequest("42"))
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	for _, secret := range []string{exportSeededCodeHash, exportSeededCodeChallenge, exportSeededCodeNonce,
+		exportSeededClientSecret, base64.StdEncoding.EncodeToString([]byte(exportSeededClientSecret))} {
+		assert.NotContains(t, rr.Body.String(), secret)
+	}
 }

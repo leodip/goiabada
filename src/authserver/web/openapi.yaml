@@ -6116,8 +6116,7 @@ components:
     UserExportResponse:
       description: |
         Everything the auth server holds about one user. Each entry is the one the matching Admin
-        API read answers, and every list is in id order, oldest first. `refreshTokens` and
-        `auditEvents` are `[]`.
+        API read answers, and every list is in id order, oldest first. `auditEvents` is `[]`.
       type: object
       properties:
         formatVersion:
@@ -6162,9 +6161,13 @@ components:
           items:
             $ref: '#/components/schemas/UserSessionDetailResponse'
         refreshTokens:
+          description: |
+            Every refresh token the auth server holds for the user, from a sign-in to an app or a
+            password grant, rotated-out and revoked ones included, until they expire and are
+            deleted.
           type: array
           items:
-            type: object
+            $ref: '#/components/schemas/UserExportRefreshTokenResponse'
         legalDocumentAcceptances:
           type: array
           items:
@@ -6213,6 +6216,85 @@ components:
           required:
             - attributes
             - permissions
+
+    UserExportRefreshTokenResponse:
+      description: |
+        A refresh token the auth server holds for the user, with the sign-in it came from. The
+        token itself is never stored, so it is not here.
+      type: object
+      properties:
+        clientIdentifier:
+          type: string
+        clientName:
+          description: The app's name, as the consent screen shows it.
+          type: string
+        clientNameUnverified:
+          description: True when `clientName` is the app's own claim about itself.
+          type: boolean
+        scope:
+          type: string
+        type:
+          description: |
+            `Refresh` for a token bound to a session, `Offline` for one that outlives it.
+          type: string
+          enum: [Refresh, Offline]
+        issuedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        maxLifetime:
+          description: When an `Offline` token stops being renewable; null on a `Refresh` token.
+          type: string
+          format: date-time
+          nullable: true
+        sessionIdentifier:
+          description: The session a `Refresh` token is bound to; empty on an `Offline` token.
+          type: string
+        jti:
+          description: |
+            The token's id, which the audit events name as `refresh_token_jti`.
+          type: string
+        revoked:
+          description: |
+            True when the token, the sign-in it came from or its rotation family is revoked.
+          type: boolean
+        ipAddress:
+          description: |
+            The IP address of the sign-in the token came from; empty for a password-grant
+            token.
+          type: string
+        userAgent:
+          description: |
+            The browser of the sign-in the token came from; empty for a password-grant token.
+          type: string
+        authenticatedAt:
+          description: |
+            When the user signed in: at the sign-in the token came from, or, for a password-grant
+            token, when the password was checked. A rotated token keeps it, so it can be earlier
+            than `issuedAt`. Null when it isn't stored, as on a password-grant token issued before
+            the auth server recorded it.
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - clientIdentifier
+        - clientName
+        - clientNameUnverified
+        - scope
+        - type
+        - issuedAt
+        - expiresAt
+        - maxLifetime
+        - sessionIdentifier
+        - jti
+        - revoked
+        - ipAddress
+        - userAgent
+        - authenticatedAt
 
     UserExportProfilePictureResponse:
       description: The user's profile picture.

@@ -369,8 +369,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   account and admin APIs read back the versions a user accepted (#622)
 - `internal/userexport/` - The document holding everything the auth server holds about one user,
   which an operator hands a person asking for their data: `Build` assembles it from the user and
-  the `Parts` the admin API reads about them, every list in id order, whoever asks, and `FileName`
-  is the name it is saved as. The admin API's export route reads the parts through
+  the `Parts` the admin API reads about them, every list in id order, whoever asks, deciding each
+  refresh token's entry from its row, code and family, and `FileName` is the name it is saved as. The admin API's export route reads the parts through
   `buildUserExport` in `apihandlers`, beside the session and group reads it reuses, and answers it
   (#781)
 - `internal/legalmarkdown/` - A legal document's Markdown rendered to HTML through goldmark, for the
