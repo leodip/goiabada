@@ -481,9 +481,10 @@ func TestHandleAPIErrorJSON_NoOtherStatusCarriesTheSessionEndedCode(t *testing.T
 	}
 }
 
-// IsSessionEnded is what the pages reading something optional ask before carrying on without it,
-// so it is held on its own as well as through the three helpers: the admin API's 401, found
-// through any wrapping, and nothing else (#427 decision 17, final review round 2).
+// IsSessionEnded is what the pages reading something optional ask before carrying on without it, so
+// it is held on its own as well as through the three helpers: the admin API's 401 that ends the
+// session, found through any wrapping, and nothing else, not even the step-up 401 (#427 decision
+// 17, final review round 2).
 func TestIsSessionEnded(t *testing.T) {
 	testCases := []struct {
 		name string

@@ -136,7 +136,8 @@ func apiClientGuardProblems(fset *token.FileSet, file *ast.File, rel string) ([]
 				if !guardReturnsTheError(body, guard.errVar) {
 					problems = append(problems, at(guard.stmt)+"the error from "+guard.method+
 						" is dropped here: a guard that writes no response hands the error back "+
-						"to its caller, or an admin API 401 never signs the administrator out")
+						"to its caller, or an admin API 401 that ends the session never signs the "+
+						"administrator out")
 				}
 				continue
 			}

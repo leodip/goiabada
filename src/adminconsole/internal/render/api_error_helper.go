@@ -57,8 +57,8 @@ func IsSessionEnded(err error) bool {
 // IsStepUpRequired reports whether the API refused the call under its step-up guard: the sign-in
 // behind the token is older than the operation allows or below the level it asks for, answered 401
 // INSUFFICIENT_USER_AUTHENTICATION (RFC 9470 section 3). The token and its session are still good,
-// so it is not IsSessionEnded: the calls no step-up guard covers go on working with the same token,
-// and the guarded ones need the user to sign in again, recently enough and at the level they ask.
+// so it is not IsSessionEnded: this operation refused the sign-in behind the token, and every other
+// call is still answered by its own checks, a step-up guard's own age and level among them.
 //
 // The page in front of a guarded operation checks it before handing the error to a classifier, and
 // sends the browser through the console's sign-in with prompt=login and the level it needs, as the
