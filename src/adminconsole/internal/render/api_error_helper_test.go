@@ -491,6 +491,8 @@ func TestIsSessionEnded(t *testing.T) {
 	}{
 		{"the admin API's 401", &apiclient.APIError{Code: "invalid_token", StatusCode: http.StatusUnauthorized}, true},
 		{"the same 401 wrapped", errs.Wrap(&apiclient.APIError{Code: "invalid_token", StatusCode: http.StatusUnauthorized}, "unable to read the logo"), true},
+		{"the step-up 401", stepUpRefusal, false},
+		{"the step-up 401 wrapped", errs.Wrap(stepUpRefusal, "unable to download the data"), false},
 		{"a 403", &apiclient.APIError{Code: "FORBIDDEN", StatusCode: http.StatusForbidden}, false},
 		{"a 400", &apiclient.APIError{Code: "VALIDATION_ERROR", StatusCode: http.StatusBadRequest}, false},
 		{"a 500", &apiclient.APIError{Code: "INTERNAL_ERROR", StatusCode: http.StatusInternalServerError}, false},
@@ -501,6 +503,93 @@ func TestIsSessionEnded(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, IsSessionEnded(tc.err))
+		})
+	}
+}
+
+// stepUpRefusal is the auth server's RFC 9470 refusal, from RequireRecentAuthentication, as the
+// console's client parses it.
+var stepUpRefusal = &apiclient.APIError{Code: "INSUFFICIENT_USER_AUTHENTICATION",
+	Message:    "The download needs a sign-in within the last 300 seconds at urn:goiabada:level2_optional.",
+	StatusCode: http.StatusUnauthorized}
+
+// IsStepUpRequired is the step-up refusal, found through any wrapping: the 401 with its code, which
+// RFC 9470 section 3 answers with 401 alone, and nothing else (#782).
+func TestIsStepUpRequired(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"the step-up 401", stepUpRefusal, true},
+		{"the same 401 wrapped", errs.Wrap(stepUpRefusal, "unable to download the data"), true},
+		{"any other 401", &apiclient.APIError{Code: "invalid_token", StatusCode: http.StatusUnauthorized}, false},
+		{"the code on a 403", &apiclient.APIError{Code: "INSUFFICIENT_USER_AUTHENTICATION", StatusCode: http.StatusForbidden}, false},
+		{"an error that is not the API's", errs.New("the auth server is unreachable"), false},
+		{"no error", nil, false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsStepUpRequired(tc.err))
+		})
+	}
+}
+
+// A step-up refusal reaches a classifier only from a page that did not answer it first, and the
+// session behind it is still good: each classifier answers it with the 500 writer, naming what the
+// page should have checked, and none sends the browser to the session-ended route or redraws the
+// form (#782).
+func TestClassifiers_AnswerAnUnhandledStepUpRefusalWithThe500Writer(t *testing.T) {
+	assertNamesTheFix := func(t *testing.T, answered error) {
+		t.Helper()
+		require.Error(t, answered)
+		var apiErr *apiclient.APIError
+		require.ErrorAs(t, answered, &apiErr, "the refusal is kept as the cause")
+		assert.Contains(t, answered.Error(), "render.IsStepUpRequired")
+	}
+
+	for name, err := range map[string]error{
+		"the refusal":         stepUpRefusal,
+		"the refusal wrapped": errs.Wrap(stepUpRefusal, "unable to download the data"),
+	} {
+		t.Run(name+"/HandleAPIError", func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			var answered error
+			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) { answered = args.Error(2) }).Return().Once()
+			w := httptest.NewRecorder()
+
+			HandleAPIError(httpHelper, w, httptest.NewRequest(http.MethodPost, "/account/data", nil), err)
+
+			assertNamesTheFix(t, answered)
+			assert.Empty(t, w.Header().Get("Location"))
+		})
+
+		t.Run(name+"/HandleAPIErrorWithCallback", func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			var answered error
+			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) { answered = args.Error(2) }).Return().Once()
+			w := httptest.NewRecorder()
+
+			HandleAPIErrorWithCallback(httpHelper, w, httptest.NewRequest(http.MethodPost, "/account/data", nil), err,
+				func(message string) { t.Errorf("the form was redrawn with %q", message) })
+
+			assertNamesTheFix(t, answered)
+			assert.Empty(t, w.Header().Get("Location"))
+		})
+
+		t.Run(name+"/HandleAPIErrorJSON", func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			captured := captureJSONError(httpHelper)
+
+			HandleAPIErrorJSON(httpHelper, httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/account/data", nil), err)
+
+			assertNamesTheFix(t, *captured)
+			var detail *oauth.ErrorDetail
+			assert.NotErrorAs(t, *captured, &detail,
+				"an *oauth.ErrorDetail is forwarded with its own status and code, where this takes JSONError's 500 branch")
 		})
 	}
 }

@@ -89,7 +89,8 @@ func TestHandlers_ApiClientErrorsReachTheClassifier(t *testing.T) {
 		t.Errorf("%d problem(s) across %d apiClient error guard(s):\n\t%s\n\n"+
 			"Call render.HandleAPIError for a page, HandleAPIErrorWithCallback for a page with a "+
 			"form to redraw, or HandleAPIErrorJSON for JSON. Each routes 401 to the session-ended "+
-			"route, 404 to the console's own not-found answer, 400 (and 409) to the caller, and "+
+			"route, except the step-up refusal, which the page answers first by "+
+			"render.IsStepUpRequired, 404 to the console's own not-found answer, 400 (and 409) to the caller, and "+
 			"everything else to the 500 writer, which is where the stack and the request id belong "+
 			"(#279, #427). A read the page can do without keeps its fallback for everything but "+
 			"render.IsSessionEnded.",

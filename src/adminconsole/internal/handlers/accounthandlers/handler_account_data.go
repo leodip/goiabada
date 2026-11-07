@@ -2,7 +2,6 @@ package accounthandlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -12,11 +11,6 @@ import (
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 )
-
-// stepUpCode is the Account API's code for RFC 9470 section 3's refusal, insufficient_user_authentication:
-// the sign-in behind the token is older than the download allows, or below the level it asks for
-// (#782 decision 1).
-const stepUpCode = "INSUFFICIENT_USER_AUTHENTICATION"
 
 // stepUpAcrValues is the level the download asks for, which the refusal names in its acr_values:
 // the password, and the code from a user who has set up two-factor authentication. Sent as the
@@ -54,12 +48,12 @@ func HandleDataGet(httpHelper HttpHelper) http.HandlerFunc {
 // export pass-through. It is a form's POST rather than a link for the reason that download's is:
 // the origin check covers unsafe methods only.
 //
-// The step-up refusal is told apart by its code before the rule that every 401 means the sign-in
-// ended, which would sign the user out instead (#782 decision 1). The browser goes through the
-// console's own sign-in for signInScope, the account pages' scope, with prompt=login and
-// acr_values, not max_age: prompt=login keeps the user's session and gives it a fresh sign-in time,
-// where a max_age sign-in past the window would replace it and sign the user out of their other
-// apps. The sign-in brings them back to the page, which says to press the button again; the
+// The step-up refusal, render.IsStepUpRequired, is answered here, before the classifier, which
+// would leave the user signed in but answer it with the 500 page (#782 decision 1). The browser
+// goes through the console's own sign-in for signInScope, the account pages' scope, with
+// prompt=login and acr_values, not max_age: prompt=login keeps the user's session and gives it a
+// fresh sign-in time, where a max_age sign-in past the window would replace it and sign the user
+// out of their other apps. The sign-in brings them back to the page, which says to press the button again; the
 // download is not repeated for them, since that would make a POST of a redirect. A 429 is drawn on
 // the page with the console's rate-limit sentence. Any other failure goes to the API error
 // classifier, so any other 401 still ends the session.
@@ -82,8 +76,7 @@ func HandleDataPost(
 
 		export, err := apiClient.GetAccountExport(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusUnauthorized && apiErr.Code == stepUpCode {
+			if render.IsStepUpRequired(err) {
 				redirectBack := baseURL + "/account/data?" + signedInAgainParam + "=1"
 				signInErr := signIn.RedirToAuthorizeWith(w, r, builtin.AdminConsoleClientIdentifier, signInScope, redirectBack,
 					oauthclient.SignInOptions{Prompt: "login", AcrValues: stepUpAcrValues})
