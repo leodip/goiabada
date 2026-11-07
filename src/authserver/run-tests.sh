@@ -123,14 +123,23 @@ print_help() {
     awk 'NR == 1 { next } /^#/ { print; next } { exit }' "$0"
 }
 
+# need_value refuses a flag given as the last argument. Without it, shift 2 failed there, left
+# the flag in place, and the loop below read it again forever.
+need_value() {
+    if [ "$#" -lt 2 ]; then
+        echo "$1 needs a value. Run './run-tests.sh --help' for usage."
+        exit 2
+    fi
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
         -t|--type)
-            TYPE="${2:-}"; shift 2 ;;
+            need_value "$@"; TYPE="$2"; shift 2 ;;
         -d|--db)
-            DB="${2:-}"; shift 2 ;;
+            need_value "$@"; DB="$2"; shift 2 ;;
         -r|--run)
-            RUN_PATTERN="${2:-}"; shift 2 ;;
+            need_value "$@"; RUN_PATTERN="$2"; shift 2 ;;
         -n|--no-build)
             BUILD=false; shift ;;
         -R|--race)

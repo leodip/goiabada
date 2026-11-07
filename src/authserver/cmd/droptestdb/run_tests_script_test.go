@@ -9,6 +9,7 @@ package main
 // the lock moved into the test's own directory so that a real run beside the tests is not met.
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/core/sourceroot"
 	"github.com/stretchr/testify/assert"
@@ -126,7 +128,7 @@ func scriptEnv(bin, lockDir string, set ...string) []string {
 
 // runScript runs run-tests.sh with args from src/authserver, under flock(1) holding heldLock when
 // it is not empty, as another run would hold it, and returns the exit status and the standard
-// error.
+// error. A run that has not ended within a minute is killed and fails the test.
 func runScript(t *testing.T, env []string, heldLock string, args ...string) (int, string) {
 	t.Helper()
 	cwd, err := os.Getwd()
@@ -138,12 +140,15 @@ func runScript(t *testing.T, env []string, heldLock string, args ...string) (int
 	if heldLock != "" {
 		command = append([]string{"flock", heldLock}, command...)
 	}
-	cmd := exec.Command(command[0], command[1:]...)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
 	cmd.Dir = filepath.Join(root, "authserver")
 	cmd.Env = env
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	err = cmd.Run()
+	require.NoError(t, ctx.Err(), "run-tests.sh %v did not end", args)
 
 	var exit *exec.ExitError
 	require.ErrorAs(t, err, &exit, "run-tests.sh did not exit with a status")
@@ -182,6 +187,36 @@ func TestRunTests_AMissingStackVariableIsRefusedFirst(t *testing.T) {
 				assert.Empty(t, toolsRun(t, markers), "a tier's command ran before the refusal")
 			})
 		}
+	}
+}
+
+// TestRunTests_AFlagWithoutItsValueIsRefused: --type, --db and --run given last, with no value
+// after them, exit 2 naming the flag, before any tier starts.
+func TestRunTests_AFlagWithoutItsValueIsRefused(t *testing.T) {
+	for _, args := range [][]string{
+		{"--type"}, {"-t"}, {"--db"}, {"-d"}, {"--run"}, {"-r"},
+		{"--no-build", "--type"}, {"--type", "core", "--run"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			markers := t.TempDir()
+			cwd, err := os.Getwd()
+			require.NoError(t, err)
+			root, err := sourceroot.FindSourceRoot(cwd)
+			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", append([]string{filepath.Join(root, "authserver", "run-tests.sh")}, args...)...)
+			cmd.Dir = filepath.Join(root, "authserver")
+			cmd.Env = scriptEnv(stubBin(t, markers), t.TempDir(), stackVariables...)
+			out, err := cmd.Output()
+
+			require.NoError(t, ctx.Err(), "run-tests.sh %v did not end", args)
+			var exit *exec.ExitError
+			require.ErrorAs(t, err, &exit)
+			assert.Equal(t, 2, exit.ExitCode())
+			assert.Contains(t, string(out), args[len(args)-1]+" needs a value.")
+			assert.Empty(t, toolsRun(t, markers))
+		})
 	}
 }
 
