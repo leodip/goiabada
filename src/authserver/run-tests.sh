@@ -90,6 +90,12 @@
 #     files are removed, and goiabada_data / goiabada_integration are dropped on
 #     mysql, postgres and mssql by cmd/droptestdb, so the server or the data tier
 #     recreates and migrates them, and the integration server seeds its own.
+#   * One data or integration run per container at a time. Those tiers kill whatever
+#     listens on 19090, 19091 and 19190 and remove /tmp/goiabada*.db*, before they
+#     start and again when the run exits, so a second run started beside one is
+#     refused, naming it. The lint, module and setup tiers do neither and can run
+#     beside one with --no-build: a build replaces the binary the integration tier
+#     starts its server from.
 #   * Per-phase output is also written to $LOG_DIR (printed at startup). On
 #     failure the log path plus a FAIL/panic summary is printed at the bottom
 #     so you don't have to scroll up through thousands of PASS lines.
@@ -242,6 +248,41 @@ gha_summary_row() {
     gha_summary "| $1 | $2 | $3 | $4 |"
 }
 
+# ---- one data or integration run per container --------------------------------
+# The data and integration tiers own this container's test server ports and SQLite test files:
+# each run kills whatever listens on 19090, 19091 and 19190 and removes /tmp/goiabada*.db* before
+# it starts and again on exit, so a second run beside the first would take down the first one's
+# server and files. The second is refused instead, naming the first, before it builds over the
+# binary the first is serving or frees anything. The lint, module and setup tiers touch none of
+# that and take no lock.
+#
+# flock(1) is util-linux's, which the dev container and CI's golang image both ship. The kernel
+# drops the lock when the last descriptor on it closes, so a run that dies leaves none behind; the
+# server is started with the descriptor closed, so a server that outlives its run does not hold
+# it. The lock sits in a directory of its own, 0777 and not sticky, because runs here go in as
+# root and as vscode alike, and in sticky /tmp the kernel's protected_regular refuses one user's
+# open of a file another user created. TEST_STACK_LOCK_DIR moves it, which the script's own tests
+# do so that they never meet a real run.
+if should_run_data || should_run_integration; then
+    if ! command -v flock >/dev/null 2>&1; then
+        echo "run-tests.sh: flock is not on PATH; run this inside the dev container, which ships it" >&2
+        exit 2
+    fi
+    stack_lock_dir="${TEST_STACK_LOCK_DIR:-/tmp/goiabada-test-stack}"
+    mkdir -p -m 0777 "$stack_lock_dir"
+    stack_lock="$stack_lock_dir/lock"
+    if ! { (umask 0 && : >> "$stack_lock") && exec 9<>"$stack_lock"; }; then
+        echo "run-tests.sh: unable to open the lock $stack_lock" >&2
+        exit 2
+    fi
+    if ! flock -n 9; then
+        holder=$(cat "$stack_lock" 2>/dev/null)
+        echo "run-tests.sh: another data or integration run is using this container's test server and databases: ${holder:-its pid is not recorded yet}. Start this run after it finishes; the lint, module and setup tiers can run beside it with --no-build." >&2
+        exit 2
+    fi
+    echo "pid $$ (--type $TYPE --db $DB), started $(date '+%Y-%m-%d %H:%M:%S')" > "$stack_lock"
+fi
+
 # ---- output capture ---------------------------------------------------------
 # Every phase writes its full output here so failures are inspectable without
 # scrolling up through tens of thousands of PASS lines.
@@ -339,8 +380,12 @@ cleanup() {
     remove_sqlite_files
 }
 
-# Set trap to cleanup on script exit (normal or error)
-trap cleanup EXIT
+# A data or integration run cleans up when it exits, normal or error. The other tiers start no
+# server and create no SQLite file, and cleaning up after them took down the server and the files
+# of a data or integration run beside them in the same container.
+if should_run_data || should_run_integration; then
+    trap cleanup EXIT
+fi
 
 # Run go test for the given test sub-directory (data|integration).
 # Honors $RUN_PATTERN when set so you can target a single test by name.
@@ -381,8 +426,8 @@ run_tests() {
 
 # Function to start server and wait for it to be ready
 start_server_and_wait() {
-    # Start server and capture PID
-    ./tmp/goiabada-authserver &
+    # Start server and capture PID. 9>&- leaves the run's lock with the run (see above).
+    ./tmp/goiabada-authserver 9>&- &
     server_pid=$!
     echo "Started server with PID: $server_pid"
 
@@ -396,7 +441,7 @@ start_server_and_wait() {
             # Kill any processes that might be holding the ports
             kill_processes_on_ports
             echo "Retrying server start..."
-            ./tmp/goiabada-authserver &
+            ./tmp/goiabada-authserver 9>&- &
             server_pid=$!
             echo "Restarted server with PID: $server_pid"
         fi
@@ -673,10 +718,10 @@ if should_run_lint; then
     #
     # Digests before and after rather than git: git cannot run in here, since a worktree's
     # .git names the main checkout by host path. Comparing digests also means no snapshot
-    # and no restoring trap -- there is one EXIT trap already, and a second would replace
-    # it. A passing run writes nothing, because the generator produced the bytes that were
-    # already there; a failing one leaves the regenerated files in the tree on purpose,
-    # since reviewing and committing them is the whole of the fix.
+    # and no restoring trap -- a data or integration run's cleanup is the EXIT trap, and a
+    # second would replace it. A passing run writes nothing, because the generator produced
+    # the bytes that were already there; a failing one leaves the regenerated files in the
+    # tree on purpose, since reviewing and committing them is the whole of the fix.
     log="$LOG_DIR/00-lint-mocks.log"
     echo "Checking the generated mocks are committed... (log: $log)"
     start=$SECONDS
