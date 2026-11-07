@@ -15,12 +15,12 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
-// The logo is the one read on this page the page can do without, and a 401 is the one failure of
-// it the page does not carry on past: the client read just before it succeeded, so the
-// administrator's session ended between the two calls, and every later call with the same token
-// meets the same refusal. It goes to the session-ended route, which signs the administrator out
-// with the notice, as a 401 from the client read would (#427 decision 17, final review round 2).
-// Every other failure keeps the page, drawn without a logo, with the one Warn record.
+// The logo is the one read on this page the page can do without, and a 401 that ends the session is
+// the one failure of it the page does not carry on past: the client read just before it succeeded,
+// so the administrator's session ended between the two calls, and every later call with the same
+// token meets the same refusal. It goes to the session-ended route, which signs the administrator
+// out with the notice, as a 401 from the client read would (#427 decision 17, final review round
+// 2). Every other failure keeps the page, drawn without a logo, with the one Warn record.
 func TestHandleLogoGet_OnlyASessionEndedLogoReadStopsThePage(t *testing.T) {
 	testCases := []struct {
 		name    string

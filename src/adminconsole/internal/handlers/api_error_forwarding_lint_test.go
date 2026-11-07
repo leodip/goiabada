@@ -332,10 +332,10 @@ func inspectsAPIErrorStatus(body *ast.BlockStmt) bool {
 //
 // A guard that writes no response is held to guardReturnsTheError instead. It used to be out of
 // this rule altogether, on the reading that it chooses no meaning for the failure, and that stopped
-// being true with #427 decision 17: a 401 means the administrator's session has ended however
-// optional the read was. The client logo page logged it as a warning and rendered, until final
-// review round 2 of #427; it now answers a 401 through HandleAPIError and keeps its warning for
-// everything else, which makes it a guard that answers.
+// being true with #427 decision 17: a 401 that render.IsSessionEnded reports means the
+// administrator's session has ended however optional the read was. The client logo page logged it
+// as a warning and rendered, until final review round 2 of #427; it now answers that 401 through
+// HandleAPIError and keeps its warning for everything else, which makes it a guard that answers.
 func guardAnswersTheRequest(body *ast.BlockStmt) bool {
 	answers := false
 	ast.Inspect(body, func(n ast.Node) bool {

@@ -165,12 +165,12 @@ func TestHandleAPIError_RoutesOnStatus(t *testing.T) {
 		// #427 decision 17: the admin API refused the console's access token, so the administrator
 		// is signed out and told why, rather than shown the 500 page.
 		{
-			name:             "a 401 sends the browser to the session-ended route",
+			name:             "an invalid_token 401 sends the browser to the session-ended route",
 			err:              &apiclient.APIError{Code: "invalid_token", Message: "Session has been terminated", StatusCode: http.StatusUnauthorized},
 			wantSessionEnded: true,
 		},
 		{
-			name:             "a wrapped 401 still sends the browser to the session-ended route",
+			name:             "a wrapped invalid_token 401 still sends the browser to the session-ended route",
 			err:              errs.Wrap(&apiclient.APIError{Code: "invalid_token", Message: "Session has expired", StatusCode: http.StatusUnauthorized}, "unable to load the client"),
 			wantSessionEnded: true,
 		},
@@ -244,7 +244,7 @@ func assertSessionEndedRedirect(t *testing.T, w *httptest.ResponseRecorder, want
 		return
 	}
 	assert.NotEqual(t, "/auth/session-ended", w.Header().Get("Location"),
-		"only a 401 signs the administrator out")
+		"only a 401 that IsSessionEnded reports signs the administrator out")
 }
 
 // The form path's own table. A 400 still re-renders the form with the API's sentence, which is what
@@ -257,15 +257,15 @@ func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
 		wantSessionEnded bool
 		wantRendered     string
 	}{
-		// No resubmission can succeed with a token the admin API refused, so a 401 never reaches
-		// the form (#427 decision 17).
+		// No resubmission can succeed with a token the admin API refused, so an invalid_token 401
+		// never reaches the form (#427 decision 17).
 		{
-			name:             "a 401 sends the browser to the session-ended route and never reaches the form",
+			name:             "an invalid_token 401 sends the browser to the session-ended route and never reaches the form",
 			err:              &apiclient.APIError{Code: "invalid_token", Message: "Session has been terminated", StatusCode: http.StatusUnauthorized},
 			wantSessionEnded: true,
 		},
 		{
-			name:             "a wrapped 401 still sends the browser to the session-ended route",
+			name:             "a wrapped invalid_token 401 still sends the browser to the session-ended route",
 			err:              errs.Wrap(&apiclient.APIError{Code: "invalid_token", Message: "Session has expired", StatusCode: http.StatusUnauthorized}, "unable to save the client"),
 			wantSessionEnded: true,
 		},
@@ -413,10 +413,11 @@ func TestHandleAPIErrorJSON_AnswersNotFound(t *testing.T) {
 		"the API's own sentence is not forwarded; the console shows the sentence its 404 page shows")
 }
 
-// #427 decisions 17 and 18, the AJAX half. An admin API 401 is answered 403, since the console has
-// no WWW-Authenticate challenge a 401 would owe, with the code the browser's three fetch sites
-// follow to the session-ended route and the console's own sentence in the request's locale. The
-// API's sentence is not forwarded: it names which of the auth server's checks refused the token.
+// #427 decisions 17 and 18, the AJAX half. An admin API 401 that ends the session is answered
+// 403, since the console has no WWW-Authenticate challenge a 401 would owe, with the code the
+// browser's three fetch sites follow to the session-ended route and the console's own sentence in
+// the request's locale. The API's sentence is not forwarded: it names which of the auth server's
+// checks refused the token.
 func TestHandleAPIErrorJSON_AnswersA401AsTheSessionEnded(t *testing.T) {
 	testCases := []struct {
 		name     string

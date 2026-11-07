@@ -11,11 +11,12 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// sessionEndedPath is the console route an admin API 401 sends the browser to, which clears the
-// stored tokens and leaves a notice on the home page (#427 decision 17).
+// sessionEndedPath is where an admin API 401 that IsSessionEnded reports sends the browser: the
+// console route that clears the stored tokens and leaves a notice on the home page (#427
+// decision 17).
 const sessionEndedPath = "/auth/session-ended"
 
-// sessionEndedCode is the error code HandleAPIErrorJSON answers an admin API 401 with. The three
+// sessionEndedCode is the error code HandleAPIErrorJSON answers such a 401 with. The three
 // fetch sites in web/static/utils.js and web/static/image-upload.js key on this literal, not on the
 // 403 status, to navigate to sessionEndedPath; every other 403 keeps its modal and signs nobody out.
 const sessionEndedCode = "session_ended"
@@ -56,8 +57,8 @@ func IsSessionEnded(err error) bool {
 // IsStepUpRequired reports whether the API refused the call under its step-up guard: the sign-in
 // behind the token is older than the operation allows or below the level it asks for, answered 401
 // INSUFFICIENT_USER_AUTHENTICATION (RFC 9470 section 3). The token and its session are still good,
-// so it is not IsSessionEnded: every other call with the same token goes on working, and the user
-// has only to sign in again.
+// so it is not IsSessionEnded: the calls no step-up guard covers go on working with the same token,
+// and the guarded ones need the user to sign in again, recently enough and at the level they ask.
 //
 // The page in front of a guarded operation checks it before handing the error to a classifier, and
 // sends the browser through the console's sign-in with prompt=login and the level it needs, as the
