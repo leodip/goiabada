@@ -70,7 +70,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &code.Client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: responseTokenType(dpopThumbprint),
+		TokenType: ResponseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 

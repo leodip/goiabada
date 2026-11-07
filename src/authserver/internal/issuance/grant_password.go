@@ -54,7 +54,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)
 
 	response := &oauth.TokenResponse{
-		TokenType: responseTokenType(input.DPoPThumbprint),
+		TokenType: ResponseTokenType(input.DPoPThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 

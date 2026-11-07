@@ -339,7 +339,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &code.Client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: responseTokenType(dpopThumbprint),
+		TokenType: ResponseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -438,7 +438,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &parent.Client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: responseTokenType(dpopThumbprint),
+		TokenType: ResponseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 

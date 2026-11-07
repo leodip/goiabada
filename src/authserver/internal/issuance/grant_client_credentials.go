@@ -21,7 +21,7 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: responseTokenType(dpopThumbprint),
+		TokenType: ResponseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 		Scope:     scope,
 	}

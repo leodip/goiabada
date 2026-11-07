@@ -15,8 +15,8 @@ import (
 
 // The CORS answers as the running server sends them, every CORS header field read off the wire
 // (#462 decision 8, #280): a preflight's grant and its refusal, its request headers split across
-// field lines (#716 item 1), and an ordinary request's, whose grant exposes WWW-Authenticate and
-// Retry-After to script (#716 item 2). The
+// field lines (#716 item 1), and an ordinary request's, whose grant exposes WWW-Authenticate,
+// Retry-After (#716 item 2) and DPoP-Nonce (#42 decision 15) to script. The
 // branches are middleware.CORS's own tests; this holds the middleware mounted, with a registered
 // origin read from the real database.
 func TestCors_TheAnswersOnTheWire(t *testing.T) {
@@ -35,7 +35,7 @@ func TestCors_TheAnswersOnTheWire(t *testing.T) {
 	}))
 
 	preflightVary := []string{"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"}
-	exposed := []string{"WWW-Authenticate, Retry-After"}
+	exposed := []string{"WWW-Authenticate, Retry-After, DPoP-Nonce"}
 
 	tests := []struct {
 		name       string
@@ -61,6 +61,34 @@ func TestCors_TheAnswersOnTheWire(t *testing.T) {
 				"Access-Control-Allow-Headers": {"Authorization, Content-Type"},
 				"Access-Control-Max-Age":       {"600"},
 			},
+		},
+		{
+			name:   "a preflight from a registered origin asking for the DPoP header is granted",
+			method: http.MethodOptions, path: "/auth/token",
+			header: http.Header{
+				"Origin":                         {registered},
+				"Access-Control-Request-Method":  {"POST"},
+				"Access-Control-Request-Headers": {"content-type,dpop"},
+			},
+			wantStatus: http.StatusOK,
+			want: http.Header{
+				"Vary":                         preflightVary,
+				"Access-Control-Allow-Origin":  {registered},
+				"Access-Control-Allow-Methods": {"POST"},
+				"Access-Control-Allow-Headers": {"Content-Type, Dpop"},
+				"Access-Control-Max-Age":       {"600"},
+			},
+		},
+		{
+			name:   "a preflight from an unregistered origin asking for the DPoP header is refused",
+			method: http.MethodOptions, path: "/auth/token",
+			header: http.Header{
+				"Origin":                         {unregistered},
+				"Access-Control-Request-Method":  {"POST"},
+				"Access-Control-Request-Headers": {"content-type,dpop"},
+			},
+			wantStatus: http.StatusOK,
+			want:       http.Header{"Vary": preflightVary},
 		},
 		{
 			name:   "a preflight's request headers on two lines are both granted",

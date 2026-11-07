@@ -98,6 +98,9 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   is `invalid_dpop_proof` with the Warn record `dpop proof refused at the token endpoint`. Both are
   400 and values of the token-refusal metric's error label. A valid proof's thumbprint goes to the
   grant's issuer, which binds the access token.
+- The CORS middleware's global lists allow the `DPoP` request header and expose `DPoP-Nonce`, so a
+  browser app can send a proof and read the nonce (section 8, #42 decision 15). Which origins are
+  granted, and where, is unchanged.
 
 ### Access token liveness
 One check decides whether an access token is one under RFC 9068 and still stands for live state.
@@ -201,7 +204,9 @@ An API, calling as a confidential client, asks whether a token is active.
   Introspection has no side effect: a rotated refresh token is answered inactive and triggers no
   replay containment
 - Every other token is exactly `{"active": false}`. An active access token carries the token's own
-  `scope`, `client_id`, `sub`, `aud`, `iss`, `exp`, `iat`, `nbf`, `jti` and `token_type`; a refresh
+  `scope`, `client_id`, `sub`, `aud`, `iss`, `exp`, `iat`, `nbf`, `jti` and `token_type`, which is
+  `DPoP` beside a `cnf` with the token's `jkt` when the token carries `cnf.jkt`
+  (`issuance.AccessTokenThumbprint`, RFC 9449 section 6.2), `Bearer` otherwise; a refresh
   token `scope`, its client's `client_id`, `sub`, `iss`, `exp`, `iat` and `jti`. Every answer carries
   `Cache-Control: no-store`; a fault answers 500, never inactive. No audit event;
   `goiabada_introspection_requests_total` counts each answer by outcome (#676)

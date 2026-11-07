@@ -280,6 +280,55 @@ func TestHandleIntrospectPost_ALiveAccessTokenForAListedResourceIsActive(t *test
 	}
 }
 
+// A live access token bound to a DPoP key is answered token_type DPoP, and its cnf with the key's
+// thumbprint as jkt, so the API can check the proof against it (RFC 9449 section 6.2: a token_type
+// included MUST be DPoP). The thumbprint is RFC 9449 section 6.1's example. The body's typ stays
+// Bearer on a bound token (#42 decision 3), and is not what decides the answer.
+func TestHandleIntrospectPost_ABoundAccessTokenIsAnsweredDPoPWithItsConfirmation(t *testing.T) {
+	const thumbprint = "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I"
+	e := newIntrospectEndpoint(t)
+	e.callerFound(introspectingCaller(t))
+	token := apiAccessToken(introspectResource)
+	token.Claims["cnf"] = map[string]interface{}{"jkt": thumbprint}
+	e.parses(token)
+	e.accessTokenLive()
+	e.lists(introspectResource)
+
+	rr := e.post(t, apiForm())
+
+	assertIntrospection(t, rr, `{
+		"active": true,
+		"scope": "openid product-api:read",
+		"client_id": "the-app",
+		"sub": "the-subject",
+		"aud": "product-api",
+		"iss": "https://auth.example.com",
+		"exp": 1800000300,
+		"iat": 1800000000,
+		"nbf": 1800000000,
+		"jti": "at-presented",
+		"token_type": "DPoP",
+		"cnf": {"jkt": "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I"}
+	}`)
+	assert.Equal(t, introspectOutcome("active"), e.samples(t))
+}
+
+// A bound access token the caller may not see is answered exactly {"active": false}, its binding
+// included: nothing of the token reaches a caller not listed for it.
+func TestHandleIntrospectPost_ABoundAccessTokenForAResourceNotListedIsInactive(t *testing.T) {
+	e := newIntrospectEndpoint(t)
+	e.callerFound(introspectingCaller(t))
+	token := apiAccessToken(introspectResource)
+	token.Claims["cnf"] = map[string]interface{}{"jkt": "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I"}
+	e.parses(token)
+	e.accessTokenLive()
+	e.lists("other-api")
+
+	rr := e.post(t, apiForm())
+
+	assertIntrospection(t, rr, inactiveAnswer)
+}
+
 // A live access token whose aud names no resource on the caller's list is answered exactly
 // {"active": false}, which says nothing of why (RFC 7662 section 2.2): an empty list, another
 // resource listed, and an audience that only differs in case.

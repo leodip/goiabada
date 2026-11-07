@@ -1,6 +1,10 @@
 package issuance
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/leodip/goiabada/core/oauth"
+)
 
 // TokenType names the typ of a token TokenIssuer produces: the ID token, the access token, and the
 // two kinds of refresh token. The two refresh values are also what refresh_tokens.refresh_token_type
@@ -67,11 +71,22 @@ func HasIDTokenHeader(header map[string]interface{}) bool {
 	return strings.EqualFold(typ, IDTokenHeaderType) || strings.EqualFold(typ, "application/"+IDTokenHeaderType)
 }
 
-// responseTokenType is the token_type a token response answers: DPoP for an access token bound to
-// a proof key, whose thumbprint dpopThumbprint is (RFC 9449 section 5 MUST), and Bearer otherwise.
-func responseTokenType(dpopThumbprint string) string {
+// ResponseTokenType is the token_type a token response, or an introspection of the access token,
+// answers: DPoP for an access token bound to a proof key, whose thumbprint dpopThumbprint is (RFC
+// 9449 sections 5 and 6.2 MUST), and Bearer otherwise.
+func ResponseTokenType(dpopThumbprint string) string {
 	if dpopThumbprint != "" {
 		return "DPoP"
 	}
 	return TokenTypeBearer.String()
+}
+
+// AccessTokenThumbprint reads the proof key's thumbprint an access token is bound to, its cnf.jkt
+// as finishAccessToken writes it (RFC 9449 section 6.1), or "" for a bearer token: one with no cnf,
+// or whose cnf holds no jkt string. The token is one the auth server signed, so its cnf is always
+// the object finishAccessToken wrote, when it has one.
+func AccessTokenThumbprint(token oauth.JwtToken) string {
+	cnf, _ := token.Claims["cnf"].(map[string]interface{})
+	jkt, _ := cnf["jkt"].(string)
+	return jkt
 }
