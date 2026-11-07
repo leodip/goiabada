@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -71,23 +72,30 @@ func exitedPid(t *testing.T) int {
 	return cmd.Process.Pid
 }
 
-// startNamedRun starts bash on a script of its own named run-tests.sh, so that the process's
-// command line names run-tests.sh as a run's does, and returns it.
-func startNamedRun(t *testing.T, body string) *exec.Cmd {
+// namedRun is bash on a script of its own named run-tests.sh, so that the process's command line
+// names run-tests.sh as a run's does, not yet started.
+//
+// Nothing these tests start leaves a child of its own running when it ends: a child whose parent
+// dies is adopted by the container's PID 1, which in the dev container is sleep infinity and never
+// reaps it, so it would stay there as a zombie. The one test that needs such a child reaps it
+// itself (run_tests_script_linux_test.go).
+func namedRun(t *testing.T, body string) *exec.Cmd {
 	t.Helper()
 	script := filepath.Join(t.TempDir(), "run-tests.sh")
 	require.NoError(t, os.WriteFile(script, []byte(body), 0o600))
-	cmd := exec.Command("bash", script)
-	require.NoError(t, cmd.Start())
-	return cmd
+	return exec.Command("bash", script)
 }
 
-// liveRunPid is the pid of a process named as a run is, alive until the test ends.
+// liveRunPid is the pid of a process named as a run is, alive until the test ends. It waits in
+// bash's own read on a pipe this test holds, and ends when the test closes it.
 func liveRunPid(t *testing.T) int {
 	t.Helper()
-	cmd := startNamedRun(t, "while :; do sleep 1; done\n")
+	cmd := namedRun(t, "read -r _\n")
+	stdin, err := cmd.StdinPipe()
+	require.NoError(t, err)
+	require.NoError(t, cmd.Start())
 	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
+		_ = stdin.Close()
 		_ = cmd.Wait()
 	})
 	return cmd.Process.Pid
@@ -97,7 +105,8 @@ func liveRunPid(t *testing.T) int {
 // that it is still in /proc, until the test ends.
 func zombieRunPid(t *testing.T) int {
 	t.Helper()
-	cmd := startNamedRun(t, "exit 0\n")
+	cmd := namedRun(t, "exit 0\n")
+	require.NoError(t, cmd.Start())
 	t.Cleanup(func() { _ = cmd.Wait() })
 	stat := filepath.Join("/proc", strconv.Itoa(cmd.Process.Pid), "stat")
 	require.Eventually(t, func() bool {
@@ -105,6 +114,47 @@ func zombieRunPid(t *testing.T) int {
 		return err == nil && strings.Contains(string(content), ") Z ")
 	}, 10*time.Second, 10*time.Millisecond, "the process did not become a zombie")
 	return cmd.Process.Pid
+}
+
+// holdLock takes the lock file the way another run holds it, flock(2) on a descriptor of its own,
+// from this process, and returns what frees it. The test's end frees it too.
+func holdLock(t *testing.T, lock string) (release func()) {
+	t.Helper()
+	fd, err := syscall.Open(lock, syscall.O_RDWR|syscall.O_CREAT|syscall.O_CLOEXEC, 0o600)
+	require.NoError(t, err)
+	require.NoError(t, syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB))
+	var once sync.Once
+	release = func() { once.Do(func() { _ = syscall.Close(fd) }) }
+	t.Cleanup(release)
+	return release
+}
+
+// releaseOnRequest frees a held lock once a stub asks for it, by creating requested, and then
+// creates released, which the stub waits for. It gives up at the test's end.
+func releaseOnRequest(t *testing.T, release func(), requested, released string) {
+	t.Helper()
+	done := make(chan struct{})
+	t.Cleanup(func() { close(done) })
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-time.After(10 * time.Millisecond):
+			}
+			if _, err := os.Stat(requested); err == nil {
+				release()
+				_ = os.WriteFile(released, nil, 0o600)
+				return
+			}
+		}
+	}()
+}
+
+// requestReleaseStub is a stub body that asks releaseOnRequest to free the lock, by its two files,
+// waits until it has, and then runs then.
+func requestReleaseStub(requested, released, then string) string {
+	return "#!/bin/sh\ntouch '" + requested + "'\nwhile [ ! -e '" + released + "' ]; do :; done\n" + then
 }
 
 // tierTools are the commands a tier's work goes through, stubbed to leave a marker and fail.
@@ -173,16 +223,12 @@ func authserverDir(t *testing.T) string {
 	return filepath.Join(root, "authserver")
 }
 
-// scriptCommand is run-tests.sh with args, run from dir, under flock(1) holding heldLock when it is
-// not empty, as another run would hold it. It runs in a process group of its own, and the end of
-// ctx kills the whole group: killing only flock(1) would leave its bash child running with the
-// output pipes open, and Wait would block on them past any deadline. WaitDelay bounds what is left.
-func scriptCommand(ctx context.Context, dir, heldLock string, args ...string) *exec.Cmd {
-	command := append([]string{"bash", filepath.Join(dir, "run-tests.sh")}, args...)
-	if heldLock != "" {
-		command = append([]string{"flock", heldLock}, command...)
-	}
-	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
+// scriptCommand is run-tests.sh with args, run from dir. It runs in a process group of its own, and
+// the end of ctx kills the whole group: killing only bash would leave a command it started, a stub
+// that hung, running with the output pipes open, and Wait would block on them past any deadline.
+// WaitDelay bounds what is left.
+func scriptCommand(ctx context.Context, dir string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "bash", append([]string{filepath.Join(dir, "run-tests.sh")}, args...)...)
 	cmd.Dir = dir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
@@ -190,14 +236,17 @@ func scriptCommand(ctx context.Context, dir, heldLock string, args ...string) *e
 	return cmd
 }
 
-// runScript runs run-tests.sh with args, under flock(1) holding heldLock when it is not empty, and
-// returns the exit status and the standard error. A run that has not ended within a minute is
-// killed, with everything it started, and fails the test.
+// runScript runs run-tests.sh with args, with heldLock, when it is not empty, held by this process
+// as another run would hold it, and returns the exit status and the standard error. A run that has
+// not ended within a minute is killed, with everything it started, and fails the test.
 func runScript(t *testing.T, env []string, heldLock string, args ...string) (int, string) {
 	t.Helper()
+	if heldLock != "" {
+		holdLock(t, heldLock)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	cmd := scriptCommand(ctx, authserverDir(t), heldLock, args...)
+	cmd := scriptCommand(ctx, authserverDir(t), args...)
 	cmd.Env = env
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
@@ -207,32 +256,6 @@ func runScript(t *testing.T, env []string, heldLock string, args ...string) (int
 	var exit *exec.ExitError
 	require.ErrorAs(t, err, &exit, "run-tests.sh did not exit with a status")
 	return exit.ExitCode(), stderr.String()
-}
-
-// TestScriptCommand_AHungRunUnderTheLockEndsAtItsDeadline: the helper every test here runs the
-// script through ends a run that hangs under flock(1) at its context's deadline, bash and all,
-// rather than waiting on the output pipe bash holds. The script is a stand-in that never ends.
-func TestScriptCommand_AHungRunUnderTheLockEndsAtItsDeadline(t *testing.T) {
-	dir := t.TempDir()
-	pidFile := filepath.Join(dir, "pid")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "run-tests.sh"),
-		[]byte("echo $$ > \""+pidFile+"\"\nwhile :; do sleep 1; done\n"), 0o600))
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	cmd := scriptCommand(ctx, dir, filepath.Join(dir, "lock"))
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-
-	start := time.Now()
-	require.Error(t, cmd.Run())
-
-	assert.Less(t, time.Since(start), 4*time.Second, "the run outlived its deadline")
-	pid, err := os.ReadFile(pidFile)
-	require.NoError(t, err)
-	// Killed, bash is gone, or a zombie until whatever adopted it reaps it.
-	stat, err := os.ReadFile(filepath.Join("/proc", strings.TrimSpace(string(pid)), "stat"))
-	assert.True(t, os.IsNotExist(err) || strings.Contains(string(stat), ") Z "),
-		"bash %s is still running: %s", strings.TrimSpace(string(pid)), stat)
 }
 
 // TestRunTests_AMissingStackVariableIsRefusedFirst: with one of the four unset, or set empty,
@@ -281,7 +304,7 @@ func TestRunTests_AFlagWithoutItsValueIsRefused(t *testing.T) {
 			markers := t.TempDir()
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			cmd := scriptCommand(ctx, authserverDir(t), "", args...)
+			cmd := scriptCommand(ctx, authserverDir(t), args...)
 			cmd.Env = scriptEnv(stubBin(t, markers), t.TempDir(), stackVariables...)
 			out, err := cmd.Output()
 
@@ -373,27 +396,18 @@ func TestRunTests_ARefusedRunReadsTheRecordUntilItsHolderIsAlive(t *testing.T) {
 
 // TestRunTests_ARunWhoseHolderFinishesWhileItWaitsGoesOn: a holder that finishes during the refused
 // run's wait for its record frees the lock, and the run takes it and goes on rather than being
-// refused. The holder is flock(1) holding the lock in a process group of its own, and the sleep
-// stub ends that group during the run's first wait.
+// refused. This process holds the lock, and the sleep stub has it freed during the run's first
+// wait.
 func TestRunTests_ARunWhoseHolderFinishesWhileItWaitsGoesOn(t *testing.T) {
 	markers := t.TempDir()
 	lockDir := t.TempDir()
 	lock := filepath.Join(lockDir, "lock")
-	require.NoError(t, os.WriteFile(lock, nil, 0o600))
-
-	holder := exec.Command("flock", "--close", lock, "sleep", "300")
-	holder.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	require.NoError(t, holder.Start())
-	t.Cleanup(func() {
-		_ = syscall.Kill(-holder.Process.Pid, syscall.SIGKILL)
-		_ = holder.Wait()
-	})
-	require.Eventually(t, func() bool {
-		return exec.Command("flock", "--nonblock", lock, "true").Run() != nil
-	}, 10*time.Second, 10*time.Millisecond, "the holder did not take the lock")
+	release := holdLock(t, lock)
+	requested, released := filepath.Join(markers, "requested"), filepath.Join(markers, "released")
+	releaseOnRequest(t, release, requested, released)
 
 	bin := stubBin(t, markers)
-	writeStub(t, bin, "sleep", "#!/bin/bash\nkill -9 -- -"+strconv.Itoa(holder.Process.Pid)+"\n")
+	writeStub(t, bin, "sleep", requestReleaseStub(requested, released, ""))
 	status, stderr := runScript(t, scriptEnv(bin, lockDir, stackVariables...), "",
 		"--type", "data", "--db", "sqlite", "--no-build")
 
