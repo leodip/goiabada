@@ -70,6 +70,42 @@ func exitedPid(t *testing.T) int {
 	return cmd.Process.Pid
 }
 
+// startNamedRun starts bash on a script of its own named run-tests.sh, so that the process's
+// command line names run-tests.sh as a run's does, and returns it.
+func startNamedRun(t *testing.T, body string) *exec.Cmd {
+	t.Helper()
+	script := filepath.Join(t.TempDir(), "run-tests.sh")
+	require.NoError(t, os.WriteFile(script, []byte(body), 0o600))
+	cmd := exec.Command("bash", script)
+	require.NoError(t, cmd.Start())
+	return cmd
+}
+
+// liveRunPid is the pid of a process named as a run is, alive until the test ends.
+func liveRunPid(t *testing.T) int {
+	t.Helper()
+	cmd := startNamedRun(t, "while :; do sleep 1; done\n")
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	})
+	return cmd.Process.Pid
+}
+
+// zombieRunPid is the pid of a process named as a run is that has exited and not been reaped, so
+// that it is still in /proc, until the test ends.
+func zombieRunPid(t *testing.T) int {
+	t.Helper()
+	cmd := startNamedRun(t, "exit 0\n")
+	t.Cleanup(func() { _ = cmd.Wait() })
+	stat := filepath.Join("/proc", strconv.Itoa(cmd.Process.Pid), "stat")
+	require.Eventually(t, func() bool {
+		content, err := os.ReadFile(stat)
+		return err == nil && strings.Contains(string(content), ") Z ")
+	}, 10*time.Second, 10*time.Millisecond, "the process did not become a zombie")
+	return cmd.Process.Pid
+}
+
 // tierTools are the commands a tier's work goes through, stubbed to leave a marker and fail.
 var tierTools = []string{"go", "curl", "unparam", "golangci-lint"}
 
@@ -222,10 +258,10 @@ func TestRunTests_AFlagWithoutItsValueIsRefused(t *testing.T) {
 
 // TestRunTests_ASecondStackRunIsRefusedNamingTheFirst: while another run holds the lock, a run of
 // the data or the integration tier exits 2 with the holder's record, before it builds, kills a
-// listener or removes a file, and leaves the record as it found it. The holder is this test's own
-// process, which is alive, as a holder is.
+// listener or removes a file, and leaves the record as it found it. The record names a live process
+// named as a run is.
 func TestRunTests_ASecondStackRunIsRefusedNamingTheFirst(t *testing.T) {
-	record := holderRecord(os.Getpid())
+	record := holderRecord(liveRunPid(t))
 	for _, args := range [][]string{
 		{"--type", "data", "--db", "sqlite"},
 		{"--type", "integration", "--db", "sqlite"},
@@ -253,12 +289,15 @@ func TestRunTests_ASecondStackRunIsRefusedNamingTheFirst(t *testing.T) {
 
 // TestRunTests_ARefusedRunReadsTheRecordUntilItsHolderIsAlive: the holder writes its record just
 // after it takes the lock, so a run refused in between finds the file empty or holding the previous
-// holder's record. The refused run reads it again until it names a live process; the sleep stub
-// stands in for the holder, writing its record during the refused run's first wait. A record that
-// never names a live process is reported for what it is.
+// holder's record. The refused run reads it again until it names a live run; the sleep stub stands
+// in for the holder, writing its record during the refused run's first wait. A pid that another
+// program has now, or a zombie's, is not a live run, though both are in /proc. A record that never
+// names a live run is reported for what it is.
 func TestRunTests_ARefusedRunReadsTheRecordUntilItsHolderIsAlive(t *testing.T) {
-	live := holderRecord(os.Getpid())
+	live := holderRecord(liveRunPid(t))
 	exited := holderRecord(exitedPid(t))
+	reused := holderRecord(os.Getpid())
+	zombie := holderRecord(zombieRunPid(t))
 	for _, tc := range []struct {
 		name    string
 		found   string
@@ -267,8 +306,10 @@ func TestRunTests_ARefusedRunReadsTheRecordUntilItsHolderIsAlive(t *testing.T) {
 	}{
 		{"written while it waits, over an empty file", "", live, live + "."},
 		{"written while it waits, over the previous holder's record", exited, live, live + "."},
+		{"written while it waits, over a record whose pid another program now has", reused, live, live + "."},
 		{"never written", "", "", "its pid is not recorded."},
 		{"its holder has exited", exited, "", exited + ", which has exited while commands it started still hold the lock."},
+		{"its holder has exited and is not reaped yet", zombie, "", zombie + ", which has exited while commands it started still hold the lock."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			markers := t.TempDir()

@@ -278,19 +278,30 @@ gha_summary_row() {
 #
 # The holder's record is the lock file's content, and the holder writes it just after taking the
 # lock, so a run refused in between finds it empty or still holding the previous holder's record.
-# stack_lock_holder reads it again for up to a second, until it names a process that is alive. A
-# record whose process has exited past that is a run killed while commands it started, which share
-# its descriptor, still hold the lock.
+# stack_lock_holder reads it again for up to a second, until it names a live run. A record whose
+# run is not live past that is a run killed while commands it started, which share its
+# descriptor, still hold the lock.
+#
+# stack_lock_names_live_run reports whether a record names a live run of this script: a pid whose
+# command line names run-tests.sh. A pid that is merely in /proc is not enough, since a zombie's
+# command line is empty and a pid the kernel has given to another program names that program.
+stack_lock_names_live_run() {
+    local pid=${1#pid }
+    pid=${pid%% *}
+    case "$pid" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    tr '\0' ' ' 2>/dev/null < "/proc/$pid/cmdline" | grep -q 'run-tests\.sh'
+}
+
 stack_lock_holder() {
-    local holder pid tries=0
+    local holder tries=0
     while :; do
         holder=$(cat "$stack_lock" 2>/dev/null)
-        pid=${holder#pid }
-        pid=${pid%% *}
-        case "$pid" in
-            ''|*[!0-9]*) ;;
-            *) if [ -d "/proc/$pid" ]; then echo "$holder"; return; fi ;;
-        esac
+        if stack_lock_names_live_run "$holder"; then
+            echo "$holder"
+            return
+        fi
         tries=$((tries + 1))
         [ "$tries" -ge 10 ] && break
         sleep 0.1
