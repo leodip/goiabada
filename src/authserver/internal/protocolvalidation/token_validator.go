@@ -88,6 +88,10 @@ type ValidateTokenRequestInput struct {
 	// Username and Password are used for ROPC grant (RFC 6749 Section 4.3)
 	Username string
 	Password string
+	// DPoPThumbprint is the RFC 7638 thumbprint of the key the request's valid DPoP proof was signed
+	// with, empty when the request carries no proof (RFC 9449 section 5). A refresh of a token bound
+	// to a key is refused unless it is that key's (#42 decision 11).
+	DPoPThumbprint string
 }
 
 // TokenGrant is what a validated token request is: one type per grant, declared beside the method

@@ -27,8 +27,9 @@ const authCodeNotAuthorizedErrorMsg = "The client associated with the provided c
 const revokedRefreshTokenMessage = "This refresh token has been revoked."
 
 // respondRefreshToken redeems a validated refresh (RFC 6749 section 6) and answers with the new
-// token set. Its three refusals are the redemption's: a replayed token, audited when containment
-// revoked anything; a token whose issuing flow is off for the client (#250); and a lost claim.
+// token set. Its refusals are the redemption's: a replayed token, audited when containment revoked
+// anything; a token whose issuing flow is off for the client (#250); a lost claim; and a bound token
+// without its key (#42 decision 11).
 func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Request,
 	settings *record.Settings, grant *protocolvalidation.RefreshTokenGrant, dpopThumbprint string) {
 
@@ -60,6 +61,13 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 		// why (#132, #259).
 		tr.refuse(w, r, oidc.GrantTypeRefreshToken, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			revokedRefreshTokenMessage, http.StatusBadRequest))
+		return
+	case errors.Is(err, issuance.ErrRefreshTokenBindingMismatch):
+		// The validator refuses a refresh without the bound key before the redemption; the
+		// rotation refusing it again, on the row it holds, gets the validator's answer (#42
+		// decision 11).
+		tr.refuse(w, r, oidc.GrantTypeRefreshToken, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			protocolvalidation.BoundRefreshTokenMessage, http.StatusBadRequest))
 		return
 	case err != nil:
 		tr.refuse(w, r, oidc.GrantTypeRefreshToken, err)

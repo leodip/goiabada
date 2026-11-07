@@ -38,6 +38,13 @@ const invalidGenerationMessage = "The refresh token is invalid because it was su
 // parser's check would tell a forger which one failed.
 const invalidRefreshTokenMessage = "The refresh token is invalid."
 
+// BoundRefreshTokenMessage refuses a refresh token bound to a DPoP key when the request carries no
+// proof by that key: none at all, or a valid one by another key (#42 decision 11). RFC 6749 section
+// 5.2's invalid_grant, as for a refresh token issued to another client: the client cannot use this
+// token without the key, and invalid_dpop_proof would invite a retry that cannot succeed. It names
+// nothing a holder of the token cannot work out, and nothing about the key.
+const BoundRefreshTokenMessage = "The refresh token is bound to a DPoP key, and the request carries no proof by that key."
+
 // expiredRefreshTokenMessage refuses a token the parser found expired, which it says only once the
 // signature verified. It is the one distinction among the parser's refusals a client acts on, and
 // it names nothing a holder of the token cannot read from its exp (#680).
@@ -142,6 +149,30 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	if tokenClientId != client.Id {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
+	}
+
+	// A token bound to a DPoP key is refreshed only with a proof by that key (RFC 9449 section 5, #42
+	// decision 11), whatever the client's type is now: a public client switched to confidential keeps
+	// its grants, and its bound families stay bound. The proof itself was checked at the endpoint,
+	// so what is left is whether its key is the one the family is bound to.
+	//
+	// Below client authentication and ownership, and above every check of the token's state, for the
+	// reason ownership gives: a presenter that has not proved the key learns nothing about the
+	// account or the family. Above the redemption too, so a revoked bound token presented without its
+	// key is refused here and never reaches the containment that would revoke its family: without
+	// the key the token is useless to a thief, and revoking would let anyone holding a leaked token
+	// end the user's grant. Nothing is spent, and the refusal is a Warn record, as a refused client
+	// authentication is.
+	if refreshToken.DPoPJkt.Valid && refreshToken.DPoPJkt.String != input.DPoPThumbprint {
+		reason := "the request's dpop proof is by another key"
+		if input.DPoPThumbprint == "" {
+			reason = "the request carries no dpop proof"
+		}
+		slog.WarnContext(ctx, "refresh token refused for its dpop binding",
+			"reason", reason,
+			"client_identifier", client.ClientIdentifier,
+			"refresh_token_id", refreshToken.Id)
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", BoundRefreshTokenMessage, http.StatusBadRequest)
 	}
 
 	// The PKCE boundary again, on the arm where the exposure is durable (#245). A code

@@ -42,7 +42,9 @@ import (
 // authentication or a failed password (#42 decision 7). Once the grant has validated, the proof is
 // recorded in the replay store, just before anything is minted: a proof used before is refused,
 // and a store that cannot answer is a 500 (decision 9). A valid proof binds the access token of
-// every grant to its key (decision 2). A request without the header is answered as before.
+// every grant to its key (decision 2), and a public client's refresh token too; a refresh token
+// bound to a key is refused without a proof by it (decision 11). A request without the header is
+// answered as before, but for a bound refresh token.
 func HandleTokenPost(
 	jsonWriter JSONWriter,
 	database revocation.Database,
@@ -83,6 +85,8 @@ func HandleTokenPost(
 				responder.refuse(w, r, input.GrantType, err)
 				return
 			}
+			// The proof key, for the refresh grant to hold a bound refresh token to (#42 decision 11).
+			input.DPoPThumbprint = proof.Thumbprint
 		}
 
 		grant, err := tokenValidator.ValidateTokenRequest(r.Context(), settings, input)

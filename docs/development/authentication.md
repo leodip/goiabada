@@ -106,6 +106,21 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   the same Warn record. A request refused earlier records nothing, so its proof stays unspent. A
   store failure is a 500, and nothing is minted. The cleanup worker deletes expired rows on every
   poll, outside the claim.
+- A public client's refresh-token family is bound to a proof key (section 5, #42 decision 11):
+  `refresh_tokens.dpop_jkt` (000086) holds the thumbprint, NULL for an unbound family, tagged
+  `dont-update` like `auth_state_generation`. `issuance.refreshTokenBinding` decides a new row's
+  value: a rotation copies its parent's, never the request's; otherwise, for a family's first token
+  and an unbound family's refresh, the request's thumbprint when the client, as the issuer loaded
+  it, is public, and NULL for a confidential one. The handler passes the proof's thumbprint as
+  `ValidateTokenRequestInput.DPoPThumbprint`; the refresh arm refuses a bound token whose request
+  has no proof by its key `invalid_grant` (`BoundRefreshTokenMessage`), with the Warn record
+  `refresh token refused for its dpop binding`, below client authentication and ownership and
+  above every check of the token's state. It is above the redemption, so a revoked bound token
+  without its key never triggers containment, and nothing is spent. The rotation re-checks on the
+  row it holds and rolls back with `issuance.ErrRefreshTokenBindingMismatch`, so no rotation, however
+  raced, mints from a bound token without its key or inserts an unbound child into a bound family.
+  The binding is enforced whatever the client's current type; refresh tokens carry no `cnf`, and
+  revocation and refresh-token introspection ignore the binding.
 - The CORS middleware's global lists allow the `DPoP` request header and expose `DPoP-Nonce`, so a
   browser app can send a proof and read the nonce (section 8, #42 decision 15). Which origins are
   granted, and where, is unchanged.

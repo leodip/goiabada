@@ -85,6 +85,16 @@ A nonce is good for 10 minutes. After that, the auth server answers `use_dpop_no
 
 At the token endpoint, the nonce is what makes a proof fresh. Your proof still needs an `iat`, but your app's clock doesn't have to be right.
 
+## Refresh tokens bound to your key
+
+A public client's refresh token is bound to its key too. Once your app has a refresh token from a request with a proof, every refresh of it needs a proof by that same key, and so does every refresh token after it. A refresh without a proof, or with a proof by another key, is refused with `invalid_grant`, "The refresh token is bound to a DPoP key, and the request carries no proof by that key." It spends nothing: the refresh token still works with the right key.
+
+**Keep the key as long as you keep the refresh token.** An app that loses its key, or makes a new one, has to sign the user in again.
+
+A public client's refresh token issued without a proof is bound by its first refresh with one, and stays bound from then on. A bound refresh token stays bound even if an administrator makes the client confidential.
+
+A confidential client's refresh token isn't bound: its client authentication already ties the token to it, so it can change keys at any refresh. Each of its access tokens is still bound to the key of the request that got it.
+
 ## Call userinfo and the API with a bound token
 
 Goiabada's own resources, [UserInfo](/reference/endpoints/userinfo/) and the [Admin and Account APIs](/reference/api/authentication/), take a bound token with the `DPoP` scheme, beside a new proof for each call:

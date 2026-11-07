@@ -333,7 +333,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Run(func(args mock.Arguments) { captured = args.Get(2).(*record.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", nil, uuid.New())
+		_, _, err := issuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", nil, uuid.New(), "")
 		require.NoError(t, err, "generateRefreshToken")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)
@@ -359,7 +359,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Run(func(args mock.Arguments) { captured = args.Get(2).(*record.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", parent, uuid.New())
+		_, _, err := issuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", parent, uuid.New(), "")
 		require.NoError(t, err, "generateRefreshToken")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)

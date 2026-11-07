@@ -29,8 +29,12 @@ func grantIsOffline(authorizedScope string, sessionIdentifier string) bool {
 // tx is the transaction the row is inserted in and the session read behind the max lifetime runs
 // in, nil for a grant that runs in none. A rotation hands over its own, so the child commits with
 // the claim on its parent and the check of the family's revocation record (#132, #437).
+//
+// dpopThumbprint is the request's proof key, empty for none, which binds the token when
+// refreshTokenBinding says so; code.Client must be loaded.
 func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *record.RefreshToken, jti string) (string, int64, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *record.RefreshToken, jti string,
+	dpopThumbprint string) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -103,6 +107,7 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, sett
 		RefreshTokenType: claims["typ"].(string),
 		Scope:            claims["scope"].(string),
 		Revoked:          false,
+		DPoPJkt:          refreshTokenBinding(refreshToken, &code.Client, dpopThumbprint),
 	}
 
 	if refreshToken != nil {
@@ -139,6 +144,26 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, sett
 	refreshExpiresIn := claims["exp"].(int64) - now.Unix()
 
 	return rt, refreshExpiresIn, nil
+}
+
+// refreshTokenBinding is the DPoP key a new refresh token is bound to, as its RFC 7638 thumbprint,
+// or NULL for an unbound token (RFC 9449 section 5, #42 decision 11).
+//
+// A rotation's child takes its parent's binding, never the request's: a bound family stays bound to
+// its key whatever the client's type is now, and the rotation has already refused a request whose
+// proof is not by that key (ErrRefreshTokenBindingMismatch). Otherwise, for the family's first token
+// and for the refresh of an unbound family, the token is bound to the request's proof key when the
+// client is public at that moment, and left unbound for a confidential client, whose client
+// authentication already ties the token to it and whose key rotation the binding would take away.
+// client is the client as the issuer loaded it for this grant.
+func refreshTokenBinding(parent *record.RefreshToken, client *record.Client, dpopThumbprint string) sql.NullString {
+	if parent != nil && parent.DPoPJkt.Valid {
+		return parent.DPoPJkt
+	}
+	if client.IsPublic && dpopThumbprint != "" {
+		return sql.NullString{String: dpopThumbprint, Valid: true}
+	}
+	return sql.NullString{}
 }
 
 func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType TokenType, now time.Time, settings *record.Settings,
@@ -201,7 +226,8 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 
 // generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.
 // Unlike auth code flow, ROPC tokens store UserId and ClientId directly on the RefreshToken
-// instead of referencing a Code entity. jti is generateRefreshToken's.
+// instead of referencing a Code entity. jti is generateRefreshToken's, and the binding is decided
+// as it is there, from input.DPoPThumbprint and input.Client.
 func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, previousRefreshToken *record.RefreshToken, jti string) (string, int64, error) {
 
@@ -249,6 +275,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.T
 		Scope:            claims["scope"].(string),
 		Revoked:          false,
 		MaxLifetime:      sql.NullTime{Time: time.Unix(maxLifetime, 0), Valid: true},
+		DPoPJkt:          refreshTokenBinding(previousRefreshToken, input.Client, input.DPoPThumbprint),
 	}
 
 	if previousRefreshToken != nil {

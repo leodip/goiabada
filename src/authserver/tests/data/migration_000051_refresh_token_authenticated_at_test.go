@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"testing"
 
@@ -90,16 +91,21 @@ func assertAuthenticatedAtShape000051(t *testing.T, h *isolatedDB, phase string)
 		"authorization-code token and every pre-000051 ROPC token carries NULL", phase)
 }
 
-// assertSeededTokenHasNoInstant000051 reads the seeded row back through the data layer the token
-// endpoint uses, so NULL is shown to arrive as an invalid sql.NullTime, which is what the refusal
-// tests, and the rest of the row as it was written.
+// assertSeededTokenHasNoInstant000051 reads the seeded row back in SQL, so NULL is shown to arrive as
+// an invalid sql.NullTime, which is what the refusal tests, and the rest of the row as it was
+// written. Not through the data layer, whose statements follow the head schema and name columns a
+// later migration adds, refresh_tokens.dpop_jkt (000086) among them.
 func assertSeededTokenHasNoInstant000051(t *testing.T, h *isolatedDB, jti string, phase string) {
 	t.Helper()
-	token, err := h.DB.GetRefreshTokenByJti(context.Background(), nil, jti)
+	var authenticatedAt sql.NullTime
+	var userId sql.NullInt64
+	var tokenType string
+	err := h.SQL.QueryRowContext(context.Background(), fmt.Sprintf(
+		"SELECT authenticated_at, user_id, refresh_token_type FROM refresh_tokens WHERE refresh_token_jti = '%s'", jti)).
+		Scan(&authenticatedAt, &userId, &tokenType)
 	require.NoErrorf(t, err, "[%s] read the seeded refresh token", phase)
-	require.NotNilf(t, token, "[%s] the seeded refresh token is gone", phase)
-	assert.Falsef(t, token.AuthenticatedAt.Valid, "[%s] a pre-000051 token must read no instant, got %v",
-		phase, token.AuthenticatedAt)
-	assert.Truef(t, token.UserId.Valid, "[%s] the rest of the row must survive", phase)
-	assert.Equalf(t, "Offline", token.RefreshTokenType, "[%s] the rest of the row must survive", phase)
+	assert.Falsef(t, authenticatedAt.Valid, "[%s] a pre-000051 token must read no instant, got %v",
+		phase, authenticatedAt)
+	assert.Truef(t, userId.Valid, "[%s] the rest of the row must survive", phase)
+	assert.Equalf(t, "Offline", tokenType, "[%s] the rest of the row must survive", phase)
 }

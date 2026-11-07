@@ -40,7 +40,8 @@ var ErrCodeNotClaimed = errors.New("the authorization code was no longer unused 
 // a genuine LATER replay of a used code is detected by the validator and cascaded by the token
 // handler (#77).
 //
-// dpopThumbprint binds the access token to the request's proof key, empty for a bearer token.
+// dpopThumbprint binds the access token to the request's proof key, empty for a bearer token, and a
+// public client's refresh token too, the first of its family (#42 decision 11).
 func (t *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings,
 	code *record.Code, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
@@ -128,7 +129,8 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId,
+		dpopThumbprint)
 	if err != nil {
 		if errors.Is(err, errSessionRowGone) {
 			// The code's session has ended since it was issued (a sign-out, a newer sign-in
