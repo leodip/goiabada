@@ -733,6 +733,7 @@ command itself and fails on a tree it changed.
 | `core/metrics` | `RouteHTTPSRedirect` | both-apps | — |
 | `core/metrics` | `RoutePreflight` | own-package | — |
 | `core/metrics` | `Sample` | own-package | — |
+| `core/oauth` | `CheckJWTStructure` | contract | The one structural rule for every signed JWT Goiabada reads: no crit, no nested cty, valid UTF-8, the unpadded base64url alphabet (#709). The auth server's token parser runs it, and the admin console's ID-token reader takes the same rule under #709, so it is written once for both processes rather than copied into each. |
 | `core/oauth` | `ConformErrorDescription` | both-apps | — |
 | `core/oauth` | `ErrorDetail` | both-apps | — |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |
