@@ -205,9 +205,7 @@ func passwordGrantErrors(t *testing.T) map[string]string {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-		handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
-			protocolvalidation.NewTokenValidator(database, nil, fixedPermissionChecker{held: false}, testDataCipher),
-			auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
+		handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, fixedPermissionChecker{held: false}, testDataCipher), auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{}, testTokenProofs())
 
 		req := httptest.NewRequest(http.MethodPost, "/auth/token", strings.NewReader(refusal.form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

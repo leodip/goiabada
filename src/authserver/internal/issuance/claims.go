@@ -48,6 +48,10 @@ type tokenGenerationInput struct {
 	// family shares, its first refresh token's jti (#676 decision 1). Empty for a flow that issues
 	// no refresh token, the implicit flow, whose access token names no grant.
 	GrantId string
+	// DPoPThumbprint is the RFC 7638 thumbprint of the key the request's DPoP proof was signed with,
+	// written to the access token as cnf.jkt (RFC 9449 section 6.1). Empty for a bearer token, and
+	// so for every implicit-flow token, which no proof accompanies.
+	DPoPThumbprint string
 	// GrantIsOffline suppresses the sid claim on ACCESS tokens only. An offline grant
 	// outlives the browser session by design, so binding its access tokens to a session
 	// identifier the middleware will later fail to resolve breaks exactly the use case
@@ -71,13 +75,16 @@ type tokenGenerationInput struct {
 // grantId is the grant's identifier, which the caller fixes before the access token is minted: on
 // the code exchange the jti the first refresh token is about to take, on a refresh the parent's
 // FirstRefreshTokenJti (#676 decision 1).
+//
+// dpopThumbprint binds the access token to the request's proof key, empty for a bearer token.
 func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
-	parentRefreshToken *record.RefreshToken, grantId string) (string, error) {
+	parentRefreshToken *record.RefreshToken, grantId string, dpopThumbprint string) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
 	input.GrantId = grantId
+	input.DPoPThumbprint = dpopThumbprint
 
 	if parentRefreshToken == nil {
 		input.AuthStateGeneration = code.AuthStateGeneration
@@ -220,7 +227,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 	mapper.AddGroupClaims(claims, input.User, scopes)
 	mapper.AddAttributeClaims(claims, input.User, scopes)
 
-	return finishAccessToken(claims, settings, input.Client, input.Scope, now, signingKey, keyIdentifier)
+	return finishAccessToken(claims, settings, input.Client, input.Scope, input.DPoPThumbprint, now, signingKey, keyIdentifier)
 }
 
 // finishAccessToken is the one step that ends every access token, whatever its grant: it writes the
@@ -233,8 +240,13 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 // client too. The auth server's own access-token check reads the client from it and refuses the
 // token once that client is disabled or gone (#676 decision 6). The typ claim is TokenTypeBearer on
 // every access token, and the header's typ is AccessTokenHeaderType (RFC 9068 section 2.1).
+//
+// A token issued for a request with a valid DPoP proof is bound to the proof's key: dpopThumbprint
+// is the key's RFC 7638 thumbprint, written as cnf.jkt (RFC 9449 section 6.1), and empty for a
+// bearer token. The typ claim stays TokenTypeBearer on a bound token: it is the access-token label,
+// not how the token is presented, and cnf.jkt alone says the token is bound (#42 decision 3).
 func finishAccessToken(claims jwt.MapClaims, settings *record.Settings, client *record.Client, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
+	dpopThumbprint string, now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims["iss"] = settings.Issuer
 	claims["client_id"] = client.ClientIdentifier
@@ -244,6 +256,9 @@ func finishAccessToken(claims jwt.MapClaims, settings *record.Settings, client *
 	claims["typ"] = TokenTypeBearer.String()
 	claims["exp"] = now.Add(time.Second * time.Duration(tokenLifetimeSeconds(settings, client))).Unix()
 	claims["scope"] = scope
+	if dpopThumbprint != "" {
+		claims["cnf"] = map[string]string{"jkt": dpopThumbprint}
+	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = keyIdentifier
@@ -383,6 +398,7 @@ func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput) *tokenGene
 		AuthenticatedAt:   input.AuthenticatedAt,
 		SessionIdentifier: "", // ROPC is sessionless: see ROPCGrantInput
 		Nonce:             "", // ROPC doesn't use nonce
+		DPoPThumbprint:    input.DPoPThumbprint,
 	}
 }
 

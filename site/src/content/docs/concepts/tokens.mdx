@@ -9,7 +9,7 @@ This page helps you understand the tokens your app gets, and check one before yo
 
 Your app gets up to three tokens from the [token endpoint](/reference/endpoints/token/):
 
-- **An access token**, which your app sends to an API in an `Authorization: Bearer` header. It says what your app may do there.
+- **An access token**, which your app sends to an API in an `Authorization: Bearer` header. It says what your app may do there. One your app got with [DPoP](/concepts/dpop/) is bound to a key your app holds.
 - **An ID token**, which tells your app who signed in and how. Your app gets one only when it asks for the `openid` scope.
 - **A refresh token**, which your app trades for new tokens without asking the user to sign in again. See [Refresh tokens](/concepts/refresh-tokens/).
 
@@ -93,7 +93,8 @@ An authorization code works once, for 60 seconds. [Refresh tokens](/concepts/ref
 | `aud` | The resource of each permission scope, and `authserver` when the scope has an OpenID Connect scope or `offline_access`. A string when there's one, an array when there are more |
 | `client_id` | The client identifier of the client the token was issued to |
 | `scope` | The scopes the token carries |
-| `typ` | `Bearer` |
+| `typ` | `Bearer`, on every access token, a DPoP-bound one included. It labels the token as an access token, not how it's sent |
+| `cnf` | Only on a [DPoP](/concepts/dpop/)-bound token: `{"jkt": "..."}`, the thumbprint of the key your app signed its proof with. `cnf.jkt` is what says a token is bound, so an API that sees it accepts the token only with a proof signed by that key |
 | `iat`, `nbf`, `exp` | When it was issued, when it becomes valid, which is the same moment, and when it expires |
 | `jti` | The token's own identifier |
 | `auth_time`, `acr`, `amr` | When and how the user signed in. See [ACR and AMR](/concepts/acr-and-amr/) |

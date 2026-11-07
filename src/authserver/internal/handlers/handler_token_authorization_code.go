@@ -16,9 +16,9 @@ import (
 // tokens. A code whose claim was lost is answered as the validator answers an invalid one, since a
 // concurrent redemption and a revocation cannot be told apart from here (#77, #129).
 func (tr tokenResponder) respondAuthorizationCode(w http.ResponseWriter, r *http.Request,
-	settings *record.Settings, grant *protocolvalidation.AuthorizationCodeGrant) {
+	settings *record.Settings, grant *protocolvalidation.AuthorizationCodeGrant, dpopThumbprint string) {
 
-	tokenResponse, err := tr.issuer.IssueAuthorizationCodeGrant(r.Context(), settings, grant.Code)
+	tokenResponse, err := tr.issuer.IssueAuthorizationCodeGrant(r.Context(), settings, grant.Code, dpopThumbprint)
 	if errors.Is(err, issuance.ErrCodeNotClaimed) {
 		tr.refuse(w, r, oidc.GrantTypeAuthorizationCode, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest))

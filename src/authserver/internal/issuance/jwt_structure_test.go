@@ -34,10 +34,10 @@ func TestIssuedTokensPassTheStructuralCheckAndTheParser(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	captureRefreshTokenRow(mockDB)
 
-	codeTokens, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), rfc9068Settings(), code)
+	codeTokens, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), rfc9068Settings(), code, "")
 	require.NoError(t, err)
-	clientTokens, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(),
-		&record.Client{Id: 4, ClientIdentifier: "billing-service"}, "product-api:read")
+	clientTokens, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(), &record.Client{Id: 4, ClientIdentifier: "billing-service"}, "product-api:read", "")
+
 	require.NoError(t, err)
 
 	parserDB := datamocks.NewDatabase(t)

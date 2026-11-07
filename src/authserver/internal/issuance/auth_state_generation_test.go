@@ -151,7 +151,7 @@ func TestAccessToken_SidEmission(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, tc.code, tc.scope, now, privKey, "test-kid", tc.parent, "")
+			tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, tc.code, tc.scope, now, privKey, "test-kid", tc.parent, "", "")
 			require.NoError(t, err, "generateAccessToken")
 
 			claims := parseAccessTokenClaims(t, tokenStr)
@@ -189,7 +189,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 	t.Run("initial code exchange takes the code's generation", func(t *testing.T) {
 		// code 7 against a user already at 9: reading the user would emit 9.
 		code := generationTestCode("openid", sid, 7, 9)
-		tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", nil, "")
+		tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", nil, "", "")
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
 	})
@@ -200,7 +200,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 		// promoted to 7 while its code stayed at 3, and the user has since reached 9.
 		code := generationTestCode("openid", sid, 3, 9)
 		parent := &record.RefreshToken{RefreshTokenType: TokenTypeRefresh.String(), AuthStateGeneration: 7}
-		tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", parent, "")
+		tokenStr, err := issuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-kid", parent, "", "")
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
 	})

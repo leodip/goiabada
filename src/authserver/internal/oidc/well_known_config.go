@@ -38,4 +38,6 @@ type WellKnownConfig struct {
 	// reads an absent flag as false.
 	BackchannelLogoutSupported        bool `json:"backchannel_logout_supported"`
 	BackchannelLogoutSessionSupported bool `json:"backchannel_logout_session_supported"`
+	// RFC 9449 section 5.1: the algorithms a DPoP proof may be signed with (#42 decision 4).
+	DPoPSigningAlgValuesSupported []string `json:"dpop_signing_alg_values_supported"`
 }

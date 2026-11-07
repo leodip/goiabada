@@ -57,12 +57,12 @@ func TestHandleTokenPost_CountsEachTokenResponseUnderItsGrant(t *testing.T) {
 		{"authorization_code", func(e *tokenEndpoint) {
 			code := &record.Code{Id: 1}
 			e.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
-			e.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code).Return(tokenResponse, nil).Once()
+			e.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code, "").Return(tokenResponse, nil).Once()
 		}, "grant_type=authorization_code&code=c&redirect_uri=http://example.com&client_id=test_client"},
 		{"client_credentials", func(e *tokenEndpoint) {
 			client := &record.Client{Id: 1}
 			e.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"})
-			e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p").Return(tokenResponse, nil).Once()
+			e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", "").Return(tokenResponse, nil).Once()
 		}, "grant_type=client_credentials&client_id=test_client&client_secret=s&scope=r:p"},
 		{"password", func(e *tokenEndpoint) {
 			e.validates(&protocolvalidation.PasswordGrant{Client: &record.Client{Id: 1}, User: &record.User{Id: 42}, Scope: "openid"})
@@ -153,7 +153,7 @@ func TestHandleTokenPost_CountsEachRefusalUnderItsGrantAndErrorCode(t *testing.T
 			arm: func(e *tokenEndpoint) {
 				code := &record.Code{Id: 1}
 				e.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
-				e.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code).
+				e.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code, "").
 					Return(nil, issuance.ErrCodeNotClaimed).Once()
 			},
 			form: "grant_type=authorization_code&code=c&redirect_uri=http://example.com&client_id=test_client",

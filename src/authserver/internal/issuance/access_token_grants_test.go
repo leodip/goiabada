@@ -81,7 +81,7 @@ func TestAccessToken_AuthorizationCodeGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), rfc9068Settings(), code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), rfc9068Settings(), code, "")
 	require.NoError(t, err)
 
 	assert.Equal(t, "Bearer", response.TokenType)
@@ -129,7 +129,7 @@ func TestAccessToken_RefreshOfACodeGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	captureRefreshTokenRow(mockDB)
 
-	response, err := tokenIssuer.mintCodeRefreshTokens(context.Background(), nil, rfc9068Settings(), code, parent, "")
+	response, err := tokenIssuer.mintCodeRefreshTokens(context.Background(), nil, rfc9068Settings(), code, parent, "", "")
 	require.NoError(t, err)
 
 	assert.Equal(t, "Bearer", response.TokenType)
@@ -208,7 +208,7 @@ func TestAccessToken_RefreshOfAPasswordGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	captureRefreshTokenRow(mockDB)
 
-	response, err := tokenIssuer.mintROPCRefreshTokens(context.Background(), nil, rfc9068Settings(), parent, "")
+	response, err := tokenIssuer.mintROPCRefreshTokens(context.Background(), nil, rfc9068Settings(), parent, "", "")
 	require.NoError(t, err)
 
 	assert.Equal(t, "Bearer", response.TokenType)
@@ -263,7 +263,7 @@ func TestAccessToken_ClientCredentialsGrant(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			response, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(), tc.client, tc.scope)
+			response, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(), tc.client, tc.scope, "")
 			require.NoError(t, err)
 
 			assert.Equal(t, "Bearer", response.TokenType)

@@ -62,9 +62,8 @@ func headerEndpoints() []headerEndpoint {
 		{
 			name: "token", path: "/auth/token", warning: "client authentication refused at the token endpoint",
 			handler: func(t *testing.T, database *datamocks.Database) http.HandlerFunc {
-				return HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
-					protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher),
-					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
+				return HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil, testDataCipher), handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{}, testTokenProofs())
+
 			},
 			form: url.Values{"grant_type": {"client_credentials"}},
 		},
@@ -246,8 +245,7 @@ func TestClientAuthentication_SpacesAfterBasic(t *testing.T) {
 				mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
 					return input.ClientId == headerClientIdentifier && input.ClientSecret == headerClientSecret
 				})).Return(nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client", "Stops here.", http.StatusBadRequest)).Once()
-			handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
-				validator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
+			handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t), validator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{}, testTokenProofs())
 
 			rr := postWithAuthorization(handler, "/auth/token", url.Values{"grant_type": {"client_credentials"}}, field)
 

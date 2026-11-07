@@ -53,7 +53,7 @@ func newHTTPListenerTestServer(t *testing.T, configure func(*config.AuthServerCo
 	cfg.AuthServer.ListenPortHttp = 9090
 	configure(&cfg.AuthServer)
 
-	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg)
+	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg, testTokenProofs(t))
 	s.registerRoutes()
 	return s
 }

@@ -66,3 +66,12 @@ func HasIDTokenHeader(header map[string]interface{}) bool {
 	typ, _ := header["typ"].(string)
 	return strings.EqualFold(typ, IDTokenHeaderType) || strings.EqualFold(typ, "application/"+IDTokenHeaderType)
 }
+
+// responseTokenType is the token_type a token response answers: DPoP for an access token bound to
+// a proof key, whose thumbprint dpopThumbprint is (RFC 9449 section 5 MUST), and Bearer otherwise.
+func responseTokenType(dpopThumbprint string) string {
+	if dpopThumbprint != "" {
+		return "DPoP"
+	}
+	return TokenTypeBearer.String()
+}

@@ -16,6 +16,8 @@ Your app calls it directly, not through the browser, with a `grant_type` saying 
 | `client_credentials` | Nothing but its own credentials | A client acting for itself, such as a service calling an API |
 | `password` | A user's email and password | The deprecated [ROPC](/legacy-flows/ropc/) flow, off unless an administrator turns it on |
 
+Send a [DPoP](/concepts/dpop/) proof with any of them, in a `DPoP` header, and the access token comes back bound to your app's key. See [DPoP](#dpop).
+
 ## Redeem an authorization code
 
 <Steps>
@@ -167,6 +169,17 @@ Only a confidential client with **Client credentials** turned on can use it. The
 
 See [ROPC](/legacy-flows/ropc/#who-cant-use-it) for who can use it and every refusal.
 
+## DPoP
+
+A request with a `DPoP` header gets an access token bound to the proof's key, on every grant, with `token_type` `DPoP` and the key's thumbprint as `cnf.jkt`. The proof must carry a nonce from the auth server: a request whose proof has none, or one that's expired, is refused with `use_dpop_nonce` and a new nonce in a `DPoP-Nonce` header, and your app retries once with it. Every answer to a request with a `DPoP` header carries a fresh `DPoP-Nonce`. [DPoP](/concepts/dpop/) has the whole round trip and every rule a proof must follow.
+
+| `error` | `error_description` | Why |
+|---|---|---|
+| `use_dpop_nonce` | "Authorization server requires nonce in DPoP proof." | The proof has no nonce, or one that's expired or that the auth server didn't hand out. Retry with the `DPoP-Nonce` of this answer |
+| `invalid_dpop_proof` | "The DPoP proof is invalid." | The request has more than one `DPoP` header, or its proof fails a check: the auth server's log says which |
+
+A request without a `DPoP` header gets a `Bearer` token.
+
 ## Administrative scopes
 
 On the grants where a client acts for a user, a client that isn't [allowed to request the administrative scopes](/concepts/clients/#administrative-scopes) is refused one, never handed a narrower token, and the refusal leaves an `administrative_scope_refused` entry in the [audit log](/concepts/audit-log/#events-to-alert-on). The client credentials grant isn't affected.
@@ -209,7 +222,7 @@ A successful answer is `200 OK` with a JSON body, `Cache-Control: no-store` and 
 | Field | |
 |---|---|
 | `access_token` | The access token, a signed JWT |
-| `token_type` | Always `Bearer` |
+| `token_type` | `DPoP` when the request carried a valid [DPoP](#dpop) proof, and `Bearer` otherwise |
 | `expires_in` | Seconds until the access token expires: the client's own setting, or the server-wide one |
 | `id_token` | When the scope has `openid` and a user signed in |
 | `refresh_token` | On every grant but client credentials |
@@ -240,6 +253,8 @@ Pragma: no-cache
 | `unauthorized_client` | 400 | The grant is off for this client, or this client can't use it |
 | `unsupported_grant_type` | 400 | `grant_type` isn't one of the four: "Unsupported grant_type." |
 | `invalid_scope` | 400 | A scope is malformed, unknown, or more than the client or user may have |
+| `invalid_dpop_proof` | 400 | The [DPoP](#dpop) proof is missing a part, or fails a check |
+| `use_dpop_nonce` | 400 | The [DPoP](#dpop) proof needs the nonce this answer's `DPoP-Nonce` header carries |
 | `server_error` | 500 | Something failed on the server. The description ends with a request id to find it in the logs |
 
 `error_description` is English, with no character outside the ones RFC 6749 allows in it, and at most 512 bytes.

@@ -288,7 +288,9 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   freshness by the nonce or by `iat` within 60 seconds. A failure carries `ErrInvalidProof`; a
   proof whose only fault is its nonce carries `ErrNonceRequired` instead. It returns the key's RFC
   7638 thumbprint, `jti` and the normalized `htu`, and leaves the answer, the log record and the
-  replay record to its caller (#42)
+  replay record to its caller. `Nonces` mints and judges the token endpoint's stateless server
+  nonces under a key derived from the session authentication key. `dpoptest` builds ES256 proofs
+  from two published P-256 keys for tests, importing nothing from `dpop` (#42)
 - `internal/introspectionmetrics/` - `goiabada_introspection_requests_total`, the introspection
   endpoint's answers by outcome, a closed set (#676)
 - `internal/liveness/` - Whether a token the auth server issued is still live. An access token:

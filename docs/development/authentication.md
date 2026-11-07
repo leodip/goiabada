@@ -65,7 +65,10 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   `client_id`, `iat`, `nbf`, `jti`, `typ`, `exp`, `scope`), sets the JOSE header
   `typ: at+jwt` (`issuance.AccessTokenHeaderType`) and signs it. Each grant's builder decides only
   `sub`, `aud` and, for a user's grant, the claims of the sign-in. ID and refresh tokens keep the
-  library's `JWT` header. The `typ: Bearer` claim stays
+  library's `JWT` header. The `typ: Bearer` claim stays on every access token, bound or not. A
+  token issued for a request with a valid DPoP proof also carries `cnf.jkt`, the proof key's RFC
+  7638 thumbprint, written by the same step, and its token response says `token_type: DPoP`
+  (#42 decisions 2 and 3). Implicit-flow tokens are never bound
 - The authorization code, refresh and password grants add `grant_id`, the identifier the grant's
   refresh token family shares (`FirstRefreshTokenJti`). The code exchange and the password grant fix
   it, as the first refresh token's jti, before they mint the access token; a refresh copies its
@@ -76,6 +79,25 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   gets one token for all of them rather than `invalid_scope` (section 3; no RFC 8707), `groups` is
   an array of identifiers rather than SCIM objects (section 2.2.3.1), and the private claims have
   plain names (section 2.2.2 MAY) (#676)
+
+### DPoP at the token endpoint (RFC 9449)
+- A request carrying a `DPoP` header is a DPoP request, on any of the four grants. The handler sets
+  one `DPoP-Nonce` header with a fresh nonce before anything else, so every answer to it carries
+  one, 400s and 500s included (sections 8 and 8.2). The rate limiter's 429 is written before the
+  handler and carries none.
+- The proof is checked once the request is parsed, before `ValidateTokenRequest` authenticates the
+  client, so the nonce round trip is never a client-authentication refusal or a charged password
+  guess (#42 decision 7). `handlers.TokenProofs` holds the `dpop.Checker` for the public base URL,
+  never the internal one, and the `dpop.Nonces`; `main` builds both, from
+  `GOIABADA_AUTHSERVER_BASEURL` and the current session authentication key.
+- Freshness comes from the nonce alone (decision 8). A nonce is a Unix-seconds timestamp and its
+  HMAC-SHA256 tag under an HKDF-derived key, base64url: accepted for ten minutes after minting, and
+  up to a minute before by an instance whose clock runs behind, by every instance sharing the key.
+  The previous session key does not keep old nonces: a rotation costs a client one retry.
+- `dpop.ErrNonceRequired` is answered `use_dpop_nonce` with a Debug record; `dpop.ErrInvalidProof`
+  is `invalid_dpop_proof` with the Warn record `dpop proof refused at the token endpoint`. Both are
+  400 and values of the token-refusal metric's error label. A valid proof's thumbprint goes to the
+  grant's issuer, which binds the access token.
 
 ### Access token liveness
 One check decides whether an access token is one under RFC 9068 and still stands for live state.

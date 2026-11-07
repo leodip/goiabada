@@ -45,7 +45,7 @@ func newHTTPSRoutingTestServer(t *testing.T, database *datamocks.Database) *Serv
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 	cfg.AuthServer.LogHttpRequests = true
 
-	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg)
+	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg, testTokenProofs(t))
 	s.registerRoutes()
 	return s
 }

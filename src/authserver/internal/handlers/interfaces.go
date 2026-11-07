@@ -91,8 +91,11 @@ type CeremonyStore interface {
 // grant from the claim on what is redeemed to the minted tokens, so the handler parses, dispatches,
 // audits and answers, and writes nothing of a grant itself (#437).
 type TokenIssuer interface {
-	IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings, code *record.Code) (*oauth.TokenResponse, error)
-	IssueClientCredentialsGrant(ctx context.Context, settings *record.Settings, client *record.Client, scope string) (*oauth.TokenResponse, error)
+	// IssueAuthorizationCodeGrant and IssueClientCredentialsGrant bind the access token to the
+	// request's DPoP proof key, whose RFC 7638 thumbprint dpopThumbprint is; the other two grants
+	// take it in their inputs. Empty, the token is a bearer token.
+	IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings, code *record.Code, dpopThumbprint string) (*oauth.TokenResponse, error)
+	IssueClientCredentialsGrant(ctx context.Context, settings *record.Settings, client *record.Client, scope string, dpopThumbprint string) (*oauth.TokenResponse, error)
 	IssueRefreshTokenGrant(ctx context.Context, settings *record.Settings, input *issuance.RefreshTokenGrantInput) (*oauth.TokenResponse, *issuance.RefreshOutcome, error)
 	// IssuePasswordGrant issues the resource owner password credentials grant, RFC 6749 section 4.3.
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.

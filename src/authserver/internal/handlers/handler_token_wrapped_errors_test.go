@@ -43,8 +43,7 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 	tokenValidator := handlersmocks.NewTokenValidator(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator,
-		auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
+	handler := HandleTokenPost(jsonWriter, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{}, testTokenProofs())
 
 	formData := "grant_type=authorization_code&code=abc&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))

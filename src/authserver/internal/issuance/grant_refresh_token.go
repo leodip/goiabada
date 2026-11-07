@@ -30,6 +30,9 @@ type RefreshTokenGrantInput struct {
 	RefreshToken   *record.RefreshToken
 	ScopeRequested string
 	IsROPC         bool
+	// DPoPThumbprint binds the new access token to the request's proof key, empty for a bearer
+	// token. The refresh token issued beside it is not bound by it.
+	DPoPThumbprint string
 }
 
 // RefreshOutcome is what a successful refresh did besides answering, for the token handler's audit.
@@ -233,9 +236,9 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		parent.AuthStateGeneration = current.AuthStateGeneration
 
 		if input.IsROPC {
-			tokenResponse, err = t.mintROPCRefreshTokens(ctx, tx, settings, &parent, input.ScopeRequested)
+			tokenResponse, err = t.mintROPCRefreshTokens(ctx, tx, settings, &parent, input.ScopeRequested, input.DPoPThumbprint)
 		} else {
-			tokenResponse, err = t.mintCodeRefreshTokens(ctx, tx, settings, &parent.Code, &parent, input.ScopeRequested)
+			tokenResponse, err = t.mintCodeRefreshTokens(ctx, tx, settings, &parent.Code, &parent, input.ScopeRequested, input.DPoPThumbprint)
 		}
 		return err
 	})
@@ -321,7 +324,7 @@ func (t *TokenIssuer) containRefreshTokenFamily(ctx context.Context, firstRefres
 // transaction: the reads because sqlitedb has one connection, which tx holds, and a read on nil
 // would wait on it until the context expired, dropping the picture claim without an error (#437).
 func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, settings *record.Settings,
-	code *record.Code, parent *record.RefreshToken, scopeRequested string) (*oauth.TokenResponse, error) {
+	code *record.Code, parent *record.RefreshToken, scopeRequested string, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
 	err := t.database.CodeLoadClient(ctx, tx, code)
 	if err != nil {
@@ -336,7 +339,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &code.Client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: TokenTypeBearer.String(),
+		TokenType: responseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -372,7 +375,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	// The PARENT refresh token is the authorizing credential here, not the code, and its family is
 	// the grant the access token names (#676 decision 1).
 	accessTokenStr, err := t.generateAccessToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent,
-		parent.FirstRefreshTokenJti)
+		parent.FirstRefreshTokenJti, dpopThumbprint)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +411,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 // mintROPCRefreshTokens mints the token set for a claimed refresh token the password grant issued,
 // and inserts its child. Unlike a code-descended token's, its user and client are on the token row.
 func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, settings *record.Settings,
-	parent *record.RefreshToken, scopeRequested string) (*oauth.TokenResponse, error) {
+	parent *record.RefreshToken, scopeRequested string, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
 	// The token endpoint refuses a token with no instant before it gets here: without one there is
 	// no auth_time this refresh could issue that OpenID Connect Core 1.0 section 12.2 allows (#125).
@@ -435,7 +438,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &parent.Client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: TokenTypeBearer.String(),
+		TokenType: responseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -469,6 +472,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 		User:            &parent.User,
 		Scope:           scopeToUse,
 		AuthenticatedAt: parent.AuthenticatedAt.Time,
+		DPoPThumbprint:  dpopThumbprint,
 	}
 
 	// access_token -----------------------------------------------------------------------

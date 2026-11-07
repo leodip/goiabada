@@ -30,13 +30,14 @@ const revokedRefreshTokenMessage = "This refresh token has been revoked."
 // token set. Its three refusals are the redemption's: a replayed token, audited when containment
 // revoked anything; a token whose issuing flow is off for the client (#250); and a lost claim.
 func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Request,
-	settings *record.Settings, grant *protocolvalidation.RefreshTokenGrant) {
+	settings *record.Settings, grant *protocolvalidation.RefreshTokenGrant, dpopThumbprint string) {
 
 	tokenResponse, outcome, err := tr.issuer.IssueRefreshTokenGrant(r.Context(), settings, &issuance.RefreshTokenGrantInput{
 		Client:         grant.Client,
 		RefreshToken:   grant.RefreshToken,
 		ScopeRequested: grant.ScopeRequested,
 		IsROPC:         grant.IsROPC,
+		DPoPThumbprint: dpopThumbprint,
 	})
 	var replayed *issuance.RefreshTokenReplayedError
 	switch {

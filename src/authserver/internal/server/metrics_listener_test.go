@@ -57,7 +57,7 @@ func newMetricsTestServer(t *testing.T) *Server {
 	cfg := &config.Config{}
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 
-	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg)
+	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg, testTokenProofs(t))
 	s.registerRoutes()
 	return s
 }

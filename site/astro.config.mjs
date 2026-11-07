@@ -117,6 +117,7 @@ export default defineConfig({
 						{ label: 'prompt', slug: 'concepts/prompt' },
 						{ label: 'id_token_hint', slug: 'concepts/id-token-hint' },
 						{ label: 'PKCE', slug: 'concepts/pkce' },
+						{ label: 'DPoP', slug: 'concepts/dpop' },
 						{ label: 'Audit log', slug: 'concepts/audit-log' },
 						{ label: 'Glossary', slug: 'concepts/glossary' },
 					],

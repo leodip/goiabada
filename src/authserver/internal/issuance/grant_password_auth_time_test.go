@@ -127,13 +127,12 @@ func TestMintROPCRefreshTokens_ATokenWithNoInstantIsRefused(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
-	response, err := issuer.mintROPCRefreshTokens(context.Background(), nil, &record.Settings{},
-		&record.RefreshToken{
-			RefreshTokenJti: "pre-000051-jti",
-			UserId:          sql.NullInt64{Int64: 1, Valid: true},
-			ClientId:        sql.NullInt64{Int64: 1, Valid: true},
-			Scope:           "openid",
-		}, "")
+	response, err := issuer.mintROPCRefreshTokens(context.Background(), nil, &record.Settings{}, &record.RefreshToken{
+		RefreshTokenJti: "pre-000051-jti",
+		UserId:          sql.NullInt64{Int64: 1, Valid: true},
+		ClientId:        sql.NullInt64{Int64: 1, Valid: true},
+		Scope:           "openid",
+	}, "", "")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "records no authentication instant")

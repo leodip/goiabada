@@ -106,10 +106,16 @@ type Server struct {
 	// The same verifier's check of a secret key, which the admin API's Turnstile save asks before it
 	// puts a secret key in use (#642 decision 11).
 	secretKeyChecker *turnstile.Verifier
+
+	// How the token endpoint checks DPoP proofs: against the public base URL, with nonces under a
+	// key derived from the session authentication key, so every instance sharing the configuration
+	// accepts the nonces of the others (#42 decisions 6 and 7). Built by main, which has the
+	// decoded key.
+	tokenProofs handlers.TokenProofs
 }
 
 func NewServer(router *routing.Router, database data.Database, sessionStore *sessionstore.ConditionalStore,
-	dataCipher *encryption.DataCipher, trustedProxies []*net.IPNet, cfg *config.Config) *Server {
+	dataCipher *encryption.DataCipher, trustedProxies []*net.IPNet, cfg *config.Config, tokenProofs handlers.TokenProofs) *Server {
 
 	registry := metrics.NewRegistry()
 	challengeVerifier := turnstile.NewVerifier(registry, dataCipher, cfg.AuthServer.BaseURL, turnstile.SiteverifyURL)
@@ -134,6 +140,8 @@ func NewServer(router *routing.Router, database data.Database, sessionStore *ses
 
 		challengeVerifier: challengeVerifier,
 		secretKeyChecker:  challengeVerifier,
+
+		tokenProofs: tokenProofs,
 	}
 	metrics.RegisterBuildInfo(s.metrics)
 	metrics.RegisterRuntime(s.metrics)

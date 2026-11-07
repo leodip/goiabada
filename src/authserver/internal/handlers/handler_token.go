@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -32,6 +33,13 @@ import (
 //
 // logoutTokens tells the apps of the session a reused code ends, once the cascade has committed
 // (#784).
+//
+// proofs checks a DPoP proof (RFC 9449). A request carrying a DPoP header is a DPoP request, and
+// every answer to it carries exactly one DPoP-Nonce header with a fresh nonce, whatever the answer
+// (sections 8 and 8.2). Its proof is checked once the request is parsed, before the client is
+// authenticated and the grant looked at, so the nonce round trip never counts as a failed client
+// authentication or a failed password (#42 decision 7). A valid proof binds the access token of
+// every grant to its key (decision 2). A request without the header is answered as before.
 func HandleTokenPost(
 	jsonWriter JSONWriter,
 	database revocation.Database,
@@ -41,10 +49,18 @@ func HandleTokenPost(
 	credentialFailures CredentialFailureRecorder,
 	tokenMetrics *tokenmetrics.Recorder,
 	logoutTokens logoutTokenSender,
+	proofs TokenProofs,
 ) http.HandlerFunc {
 	responder := tokenResponder{jsonWriter: jsonWriter, issuer: tokenIssuer, auditLogger: auditLogger, metrics: tokenMetrics}
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		proofValues := r.Header.Values("DPoP")
+		var now time.Time
+		if len(proofValues) > 0 {
+			now = proofs.now()
+			w.Header().Set("DPoP-Nonce", proofs.Nonces.Mint(now))
+		}
+
 		input, err := parseTokenRequest(r)
 		if err != nil {
 			responder.refuse(w, r, requestedGrantType(r), err)
@@ -57,6 +73,15 @@ func HandleTokenPost(
 			return
 		}
 
+		var dpopThumbprint string
+		if len(proofValues) > 0 {
+			dpopThumbprint, err = proofs.checkTokenProof(r, proofValues, now, input.ClientId)
+			if err != nil {
+				responder.refuse(w, r, input.GrantType, err)
+				return
+			}
+		}
+
 		grant, err := tokenValidator.ValidateTokenRequest(r.Context(), settings, input)
 		if err != nil {
 			responder.refuse(w, r, input.GrantType, auditTokenRefusal(r, settings, database, auditLogger, logoutTokens, credentialFailures, input, err))
@@ -65,13 +90,13 @@ func HandleTokenPost(
 
 		switch grant := grant.(type) {
 		case *protocolvalidation.AuthorizationCodeGrant:
-			responder.respondAuthorizationCode(w, r, settings, grant)
+			responder.respondAuthorizationCode(w, r, settings, grant, dpopThumbprint)
 		case *protocolvalidation.ClientCredentialsGrant:
-			responder.respondClientCredentials(w, r, settings, grant)
+			responder.respondClientCredentials(w, r, settings, grant, dpopThumbprint)
 		case *protocolvalidation.RefreshTokenGrant:
-			responder.respondRefreshToken(w, r, settings, grant)
+			responder.respondRefreshToken(w, r, settings, grant, dpopThumbprint)
 		case *protocolvalidation.PasswordGrant:
-			responder.respondPassword(w, r, settings, grant)
+			responder.respondPassword(w, r, settings, grant, dpopThumbprint)
 		default:
 			// Reachable only if the validator returns a grant this endpoint has no responder for.
 			responder.refuse(w, r, input.GrantType, errs.Errorf("the token validator returned a grant (%T) the token endpoint does not answer", grant))

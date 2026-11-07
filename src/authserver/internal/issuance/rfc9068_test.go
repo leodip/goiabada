@@ -112,7 +112,7 @@ func TestRFC9068_AuthorizationCodeGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), rfc9068Settings(), code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), rfc9068Settings(), code, "")
 	require.NoError(t, err)
 
 	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
@@ -146,7 +146,7 @@ func TestRFC9068_RefreshOfACodeGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
 
-	response, err := tokenIssuer.mintCodeRefreshTokens(context.Background(), nil, rfc9068Settings(), code, parent, "")
+	response, err := tokenIssuer.mintCodeRefreshTokens(context.Background(), nil, rfc9068Settings(), code, parent, "", "")
 	require.NoError(t, err)
 
 	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
@@ -198,7 +198,7 @@ func TestRFC9068_RefreshOfAPasswordGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
 
-	response, err := tokenIssuer.mintROPCRefreshTokens(context.Background(), nil, rfc9068Settings(), parent, "")
+	response, err := tokenIssuer.mintROPCRefreshTokens(context.Background(), nil, rfc9068Settings(), parent, "", "")
 	require.NoError(t, err)
 
 	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
@@ -217,8 +217,8 @@ func TestRFC9068_ClientCredentialsGrant(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil)
 
-	response, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(),
-		&record.Client{Id: 4, ClientIdentifier: "billing-service"}, "product-api:read")
+	response, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(), &record.Client{Id: 4, ClientIdentifier: "billing-service"}, "product-api:read", "")
+
 	require.NoError(t, err)
 
 	assertTokenHeaders(t, response.AccessToken, "", "")

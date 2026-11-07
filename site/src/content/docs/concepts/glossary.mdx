@@ -77,6 +77,10 @@ An application that asks the auth server for tokens: your app, an API calling an
 
 A user's approval for a client to receive what it asked for. The auth server asks for it when the client has "Ask users for consent" turned on, when the client asks for `offline_access`, or when the request says `prompt=consent`. It also asks when a client other than the admin console's asks for `authserver:manage-account` and the user hasn't approved that scope for it yet. An earlier approval skips the screen on later sign-ins, except those asking for `offline_access` or saying `prompt=consent`, and except for a public client with "Remember consent" off, whose users are asked every time. See [Consent required](/concepts/clients/#consent-required) for the full rule. Users can revoke a consent under "Consents" in their account.
 
+### DPoP
+
+Demonstrating Proof of Possession ([RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)): your app signs a short JWT, a proof, with a private key it holds, and sends it in a `DPoP` header with each token request. The access token it gets is bound to that key, with `token_type` `DPoP` and the key's thumbprint as `cnf.jkt`, so a copy of it is useless without the key. See [DPoP](/concepts/dpop/).
+
 ### Dynamic client registration (DCR)
 
 A way for a client to register itself, by calling `/connect/register`, instead of an administrator creating it in the admin console. It's off until you turn it on. See [Let clients register themselves (DCR)](/guides/let-clients-register-themselves-dcr/).

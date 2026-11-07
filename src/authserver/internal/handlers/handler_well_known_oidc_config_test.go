@@ -54,6 +54,9 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 		AuthorizationResponseIssParameterSupported: true,
 		BackchannelLogoutSupported:                 true,
 		BackchannelLogoutSessionSupported:          true,
+		// #42 decision 4's list, every algorithm a DPoP proof may be signed with, in its order.
+		DPoPSigningAlgValuesSupported: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512",
+			"RS256", "RS384", "RS512", "Ed25519", "EdDSA"},
 	}
 }
 
@@ -163,4 +166,18 @@ func TestWellKnownConfig_AdvertisesBackchannelLogout(t *testing.T) {
 
 	assert.Equal(t, "true", string(fields["backchannel_logout_supported"]))
 	assert.Equal(t, "true", string(fields["backchannel_logout_session_supported"]))
+}
+
+// TestWellKnownConfig_AdvertisesDPoPAlgorithms pins RFC 9449 section 5.1's list on the wire: the
+// algorithms a proof may be signed with, none and the symmetric ones never among them (#42
+// decision 4).
+func TestWellKnownConfig_AdvertisesDPoPAlgorithms(t *testing.T) {
+	encoded, err := json.Marshal(serveDiscovery(t, &record.Settings{Issuer: "https://example.com"}))
+	require.NoError(t, err)
+
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(encoded, &fields))
+
+	assert.JSONEq(t, `["ES256","ES384","ES512","PS256","PS384","PS512","RS256","RS384","RS512","Ed25519","EdDSA"]`,
+		string(fields["dpop_signing_alg_values_supported"]))
 }

@@ -13,13 +13,15 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// IssueClientCredentialsGrant issues the client credentials grant's access token, RFC 6749 section
+// 4.4.3. dpopThumbprint binds it to the request's proof key, empty for a bearer token.
 func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings *record.Settings,
-	client *record.Client, scope string) (*oauth.TokenResponse, error) {
+	client *record.Client, scope string, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: TokenTypeBearer.String(),
+		TokenType: responseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 		Scope:     scope,
 	}
@@ -62,7 +64,7 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 		claims["aud"] = audCollection
 	}
 
-	accessToken, err := finishAccessToken(claims, settings, client, scope, now, privKey, keyIdentifier)
+	accessToken, err := finishAccessToken(claims, settings, client, scope, dpopThumbprint, now, privKey, keyIdentifier)
 	if err != nil {
 		return nil, err
 	}

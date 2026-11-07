@@ -1,0 +1,115 @@
+---
+title: DPoP
+description: Bind your app's access tokens to a key it holds, so a copied token is useless without it.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps your app get access tokens bound to a key with DPoP, so a token copied away from your app can't be used.
+
+An ordinary access token is a bearer token: whoever holds it can use it. With DPoP (Demonstrating Proof of Possession, [RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)), your app keeps a private key and signs a short JWT, a **proof**, for each request it makes. The auth server binds the access token to that key, so a thief who copies the token, out of a log or a browser, can't make the proof that goes with it.
+
+DPoP is opt-in per request: send a proof with a token request, on any grant, and the access token comes back bound. Without one, nothing changes. Most DPoP client libraries do everything below for you.
+
+## Get a bound access token
+
+<Steps>
+
+1. Make a key pair, such as an ES256 (P-256) key, and keep it for as long as your app keeps its tokens. The private key never leaves your app.
+
+2. Make a proof for the token request. Its header names the algorithm and carries your public key as a JWK:
+
+   ```json
+   {
+     "typ": "dpop+jwt",
+     "alg": "ES256",
+     "jwk": {
+       "kty": "EC",
+       "crv": "P-256",
+       "x": "l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs",
+       "y": "9VE4jf_Ok_o64zbTTlcuNJajHmt6v9TDVrU0CdvGRDA"
+     }
+   }
+   ```
+
+   Its claims name the request it's for:
+
+   ```json
+   {
+     "jti": "e1j3V_bKic8-LAEB",
+     "htm": "POST",
+     "htu": "https://auth.example.com/auth/token",
+     "iat": 1760000000
+   }
+   ```
+
+   Sign it with the private key, and send it in a `DPoP` header with the token request.
+
+3. The first answer asks for a nonce, a value from the auth server that your proof must carry:
+
+   ```http
+   HTTP/1.1 400 Bad Request
+   Content-Type: application/json
+   Cache-Control: no-store
+   DPoP-Nonce: AAAAAGjx...
+
+   {
+     "error": "use_dpop_nonce",
+     "error_description": "Authorization server requires nonce in DPoP proof."
+   }
+   ```
+
+4. Make a new proof with a new `jti`, the `DPoP-Nonce` value as its `nonce` claim, and send the token request again. The answer has `token_type` `DPoP`:
+
+   ```http
+   HTTP/1.1 200 OK
+   Content-Type: application/json
+   Cache-Control: no-store
+   DPoP-Nonce: AAAAAGjx...
+
+   {
+     "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...",
+     "token_type": "DPoP",
+     "expires_in": 300,
+     ...
+   }
+   ```
+
+</Steps>
+
+## The nonce
+
+The nonce is how the auth server knows a proof was made just now, not stored up in advance. Every answer to a token request with a `DPoP` header carries a fresh one in `DPoP-Nonce`, success or error. Use the latest you've seen in your next token request.
+
+A nonce is good for 10 minutes. After that, the auth server answers `use_dpop_nonce` again, with a new nonce, and so it does once after an operator rotates its session authentication key. Your app must always handle `use_dpop_nonce` by retrying once with the new nonce, as DPoP libraries do. It never counts as a failed sign-in or a failed client authentication.
+
+At the token endpoint, the nonce is what makes a proof fresh. Your proof still needs an `iat`, but your app's clock doesn't have to be right.
+
+## What a proof must say
+
+| Part | Rule |
+|---|---|
+| `typ` | `dpop+jwt` |
+| `alg` | One of `ES256`, `ES384`, `ES512`, `PS256`, `PS384`, `PS512`, `RS256`, `RS384`, `RS512`, `Ed25519` and `EdDSA`, as discovery's `dpop_signing_alg_values_supported` lists them. `none` and symmetric algorithms are never accepted |
+| `jwk` | Your public key, of the type the algorithm takes: an EC key on the curve it names, an RSA key of 2048 to 8192 bits, or an Ed25519 key for `Ed25519` and `EdDSA`. A key with any private part is refused |
+| `jti` | A new identifier for each proof |
+| `htm` | The request's method, exactly: `POST` at the token endpoint |
+| `htu` | The URL of the request: the auth server's base URL, `GOIABADA_AUTHSERVER_BASEURL`, followed by the endpoint's path, such as `https://auth.example.com/auth/token`. The query and fragment are ignored. A proof naming the internal base URL is refused |
+| `iat` | When your app made the proof, in seconds since 1970 |
+| `nonce` | At the token endpoint, the latest `DPoP-Nonce` |
+
+Send one `DPoP` header, of at most 8 KiB. A request whose proof fails any of these is refused with `400 Bad Request`, `invalid_dpop_proof`, "The DPoP proof is invalid." The auth server's log has a `dpop proof refused at the token endpoint` warning saying which check failed. See [Logs](/deploy/logs/#records-worth-knowing).
+
+## What a bound token carries
+
+A bound access token's `cnf.jkt` claim is the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) thumbprint of your key: its required members, hashed with SHA-256 and base64url-encoded without padding. That claim is what says a token is bound. Its `typ` claim is still `Bearer`, the label every access token carries. See [The access token](/concepts/tokens/#the-access-token).
+
+Keep a DPoP client's access tokens short-lived. APIs don't hand out nonces, so a proof made in advance for a token, by malware running in your app for example, can work there until the token expires.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Token" description="Every grant, and every refusal, at the token endpoint." href="/reference/endpoints/token/" />
+  <LinkCard title="Tokens" description="What each token carries, and how to check one." href="/concepts/tokens/" />
+  <LinkCard title="Discovery and JWKS" description="The algorithms a proof may use, from the discovery document." href="/reference/endpoints/discovery-and-jwks/" />
+</CardGrid>

@@ -75,7 +75,7 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
@@ -154,7 +154,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
@@ -249,7 +249,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "", "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
@@ -339,7 +339,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	_, err = tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
+	_, err = tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "", "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope")
 }
@@ -878,7 +878,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		}, nil).Once()
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil).Once()
 
-		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 		require.NoError(t, err)
 
 		// Verify access_token AMR is an array
@@ -922,7 +922,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		}, nil).Once()
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil).Once()
 
-		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 		require.NoError(t, err)
 
 		// Verify access_token AMR is an array with both methods
@@ -1099,7 +1099,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			User:              *user,
 		}
 
-		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 		require.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -1130,7 +1130,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			User:              *user,
 		}
 
-		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 		require.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -2013,7 +2013,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, adm
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -2283,7 +2283,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 		captureRefresh()
-		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
 			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
@@ -2291,7 +2291,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 		captureRefresh()
-		response, err := tokenIssuer.mintCodeRefreshTokens(ctx, nil, settings, code, parent, "")
+		response, err := tokenIssuer.mintCodeRefreshTokens(ctx, nil, settings, code, parent, "", "")
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
 			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
@@ -2312,7 +2312,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, parent).Return(nil)
 		mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, parent).Return(nil)
 		captureRefresh()
-		response, err := tokenIssuer.mintROPCRefreshTokens(ctx, nil, settings, parent, "")
+		response, err := tokenIssuer.mintROPCRefreshTokens(ctx, nil, settings, parent, "", "")
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
 			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken

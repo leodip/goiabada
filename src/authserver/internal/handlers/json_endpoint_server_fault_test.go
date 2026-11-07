@@ -45,9 +45,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	tokenValidator := handlersmocks.NewTokenValidator(t)
 
-	handler := HandleTokenPost(render.New(nil, nil),
-		database, handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t),
-		noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{})
+	handler := HandleTokenPost(render.New(nil, nil), database, handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{}, testTokenProofs())
 
 	reuse := &protocolvalidation.AuthCodeReusedError{
 		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",

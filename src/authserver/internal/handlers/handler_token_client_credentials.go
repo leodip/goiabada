@@ -12,9 +12,9 @@ import (
 // respondClientCredentials issues a validated client credentials grant (RFC 6749 section 4.4.3) and
 // answers with its access token.
 func (tr tokenResponder) respondClientCredentials(w http.ResponseWriter, r *http.Request,
-	settings *record.Settings, grant *protocolvalidation.ClientCredentialsGrant) {
+	settings *record.Settings, grant *protocolvalidation.ClientCredentialsGrant, dpopThumbprint string) {
 
-	tokenResponse, err := tr.issuer.IssueClientCredentialsGrant(r.Context(), settings, grant.Client, grant.Scope)
+	tokenResponse, err := tr.issuer.IssueClientCredentialsGrant(r.Context(), settings, grant.Client, grant.Scope, dpopThumbprint)
 	if err != nil {
 		tr.refuse(w, r, oidc.GrantTypeClientCredentials, err)
 		return

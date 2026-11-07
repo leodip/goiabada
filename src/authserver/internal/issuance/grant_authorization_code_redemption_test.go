@@ -75,7 +75,7 @@ func TestIssueAuthorizationCodeGrant_ClaimsBeforeMinting(t *testing.T) {
 	mockDB.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), code.Id).
 		Run(func(mock.Arguments) { note("claim") }).Return(true, nil).Once()
 
-	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code)
+	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code, "")
 
 	require.NoError(t, err)
 	assert.Equal(t, "openid", response.Scope)
@@ -98,7 +98,7 @@ func TestIssueAuthorizationCodeGrant_ALostClaimMintsNothing(t *testing.T) {
 	code := &record.Code{Id: 42}
 	mockDB.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), code.Id).Return(false, nil).Once()
 
-	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code)
+	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code, "")
 
 	require.ErrorIs(t, err, ErrCodeNotClaimed)
 	assert.Nil(t, response)
@@ -123,7 +123,7 @@ func TestIssueAuthorizationCodeGrant_AClaimFailureIsAFault(t *testing.T) {
 	code := &record.Code{Id: 1}
 	mockDB.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), code.Id).Return(false, failure).Once()
 
-	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code)
+	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code, "")
 
 	require.ErrorIs(t, err, failure)
 	require.NotErrorIs(t, err, ErrCodeNotClaimed)
@@ -142,7 +142,7 @@ func TestIssueAuthorizationCodeGrant_AFailedMintAfterTheClaimIsAFault(t *testing
 	mockDB.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), code.Id).Return(true, nil).Once()
 	mockDB.On("CodeLoadClient", mock.Anything, (*sql.Tx)(nil), code).Return(failure).Once()
 
-	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code)
+	response, err := issuer.IssueAuthorizationCodeGrant(context.Background(), codeGrantSettings(), code, "")
 
 	require.ErrorIs(t, err, failure)
 	assert.Nil(t, response)

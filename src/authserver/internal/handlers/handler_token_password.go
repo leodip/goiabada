@@ -20,12 +20,13 @@ import (
 // ID token whenever the browser was logged in as somebody else. ROPC is a direct credential
 // exchange with no session of its own (#106).
 func (tr tokenResponder) respondPassword(w http.ResponseWriter, r *http.Request,
-	settings *record.Settings, grant *protocolvalidation.PasswordGrant) {
+	settings *record.Settings, grant *protocolvalidation.PasswordGrant, dpopThumbprint string) {
 
 	tokenResponse, err := tr.issuer.IssuePasswordGrant(r.Context(), settings, &issuance.ROPCGrantInput{
-		Client: grant.Client,
-		User:   grant.User,
-		Scope:  grant.Scope,
+		Client:         grant.Client,
+		User:           grant.User,
+		Scope:          grant.Scope,
+		DPoPThumbprint: dpopThumbprint,
 	})
 	if err != nil {
 		tr.refuse(w, r, oidc.GrantTypePassword, err)

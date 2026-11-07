@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/dpop"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -75,6 +76,9 @@ func HandleWellKnownOIDCConfigGet(
 			// advertised whether or not any client has registered a URI (#784 decision 4).
 			BackchannelLogoutSupported:        true,
 			BackchannelLogoutSessionSupported: true,
+			// RFC 9449 section 5.1: the fixed list a DPoP proof's alg is checked against (#42
+			// decision 4).
+			DPoPSigningAlgValuesSupported: dpop.SigningAlgorithms(),
 		}
 
 		// Include registration endpoint if DCR is enabled (RFC 7591 §4)

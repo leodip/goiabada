@@ -203,7 +203,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// /auth/token from this route, behind the token branch alone; any other method falls to the
 	// group its path is under, whose chain runs before the 405, as it did when the route was its
 	// own (#435).
-	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics, logoutTokens))
+	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics, logoutTokens, s.tokenProofs))
 	// Token revocation (RFC 7009, #676), outside the /auth group for the reason the token endpoint
 	// is, on a branch of its own that answers a fault 503. No rate limit: the client authenticates
 	// before anything else, as at the token endpoint's grants that have none (decision 10).
