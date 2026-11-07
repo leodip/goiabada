@@ -25,8 +25,8 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// The export of everything held about one user (#781): one JSON document, built whole by
-// userexport.Build, named for download and sent as every admin API answer is, buffered, so any
+// The export of one user's data (#781): one JSON document, built whole by userexport.Build, which
+// leaves out the attributes no app receives (#782 decision 8), named for download and sent as every admin API answer is, buffered, so any
 // failure is a clean 500 (decision 5). Only a token reaching both the users and the settings
 // domain gets here, since the document holds the user's audit events (decision 1); routes.go
 // mounts that check.

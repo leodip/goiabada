@@ -1154,13 +1154,15 @@ paths:
   /api/v1/admin/users/{id}/export:
     get:
       tags: [Users]
-      summary: Export everything held about a user
+      summary: Export a user's data
       description: |
-        One JSON document holding everything the auth server holds about the user, to answer
-        their request for a copy of their data: the identifiers to search older audit rows and
-        the logs with, the profile, and the user's other data as the matching Admin API reads
-        answer it. Nothing secret is in it: no password hash, two-factor secret, recovery code,
-        pending code or token. Every list is in id order, oldest first, and is `[]` when empty,
+        One JSON document holding what the auth server holds about the user, to answer their
+        request for a copy of their data: the identifiers to search older audit rows and the logs
+        with, the profile, and the user's other data as the matching Admin API reads answer it.
+        Nothing secret is in it: no password hash, two-factor secret, recovery code, pending code
+        or token. It leaves out every attribute, the user's own or a group's, whose
+        `includeInIdToken` and `includeInAccessToken` are both false, since no app receives it;
+        groups and permissions are kept in full. Every list is in id order, oldest first, and is `[]` when empty,
         never null. `formatVersion` goes up only for a change that breaks a reader; a field added
         to an entry is additive.
 
@@ -6169,8 +6171,9 @@ components:
 
     UserExportResponse:
       description: |
-        Everything the auth server holds about one user. Each entry is the one the matching Admin
-        API read answers, and every list is in id order, oldest first.
+        What the auth server holds about one user, but for the attributes no app receives. Each
+        entry is the one the matching Admin API read answers, and every list is in id order,
+        oldest first.
       type: object
       properties:
         formatVersion:
@@ -6188,13 +6191,17 @@ components:
         user:
           $ref: '#/components/schemas/UserResponse'
         attributes:
+          description: |
+            The user's attributes that an app receives: those with `includeInIdToken` or
+            `includeInAccessToken` true. One with both false is left out.
           type: array
           items:
             $ref: '#/components/schemas/UserAttributeResponse'
         groups:
           description: |
             The groups the user is a member of, each with the attributes and permissions the user
-            gets through it.
+            gets through it. A group attribute with `includeInIdToken` and `includeInAccessToken`
+            both false is left out.
           type: array
           items:
             $ref: '#/components/schemas/UserExportGroupResponse'
@@ -6283,6 +6290,9 @@ components:
         - type: object
           properties:
             attributes:
+              description: |
+                The group's attributes that an app receives: those with `includeInIdToken` or
+                `includeInAccessToken` true. One with both false is left out.
               type: array
               items:
                 $ref: '#/components/schemas/GroupAttributeResponse'

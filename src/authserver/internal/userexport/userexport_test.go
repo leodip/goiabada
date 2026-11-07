@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -217,5 +218,111 @@ func TestFileName_IsTheUserIdAndTheUTCDate(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			assert.Equal(t, c.want, FileName(c.userId, c.exportedAt))
 		})
+	}
+}
+
+// The parts for the attribute rule (#782 decision 8): the user's own attributes and a group's, one
+// of each flag combination, a group whose only attribute no app receives, a permission the first
+// group gives and one granted directly.
+func releasedAttributesParts() Parts {
+	return Parts{
+		Attributes: []api.UserAttributeResponse{
+			{Id: 13, Key: "both_flags", Value: "b", IncludeInIdToken: true, IncludeInAccessToken: true, UserId: 42},
+			{Id: 12, Key: "access_token_only", Value: "a", IncludeInAccessToken: true, UserId: 42},
+			{Id: 11, Key: "id_token_only", Value: "i", IncludeInIdToken: true, UserId: 42},
+			{Id: 10, Key: "administrators_note", Value: "slow to answer email", UserId: 42},
+		},
+		Groups: []api.UserExportGroupResponse{
+			{
+				GroupResponse: api.GroupResponse{Id: 5, GroupIdentifier: "sales", Description: "Sales team"},
+				Attributes: []api.GroupAttributeResponse{
+					{Id: 33, Key: "group_both_flags", Value: "gb", IncludeInIdToken: true, IncludeInAccessToken: true, GroupId: 5},
+					{Id: 32, Key: "group_access_token_only", Value: "ga", IncludeInAccessToken: true, GroupId: 5},
+					{Id: 31, Key: "group_id_token_only", Value: "gi", IncludeInIdToken: true, GroupId: 5},
+					{Id: 30, Key: "group_note", Value: "under review", GroupId: 5},
+				},
+				Permissions: []api.PermissionResponse{
+					{Id: 20, PermissionIdentifier: "orders:read", Description: "Read orders", ResourceId: 3,
+						Resource: api.ResourceResponse{Id: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
+				},
+			},
+			{
+				GroupResponse: api.GroupResponse{Id: 8, GroupIdentifier: "auditors", Description: "Auditors"},
+				Attributes: []api.GroupAttributeResponse{
+					{Id: 34, Key: "auditors_note", Value: "temporary", GroupId: 8},
+				},
+				Permissions: []api.PermissionResponse{},
+			},
+		},
+		Permissions: []api.PermissionResponse{
+			{Id: 22, PermissionIdentifier: "orders:export", Description: "Export orders", ResourceId: 3,
+				Resource: api.ResourceResponse{Id: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
+		},
+	}
+}
+
+// The attributes, groups and permissions for releasedAttributesParts, written out by hand: every
+// attribute with a flag on, each group whole but for its attributes no app receives, and every
+// permission.
+const releasedAttributesDocument = `{
+	"attributes": [
+		{"id": 11, "createdAt": null, "updatedAt": null, "key": "id_token_only", "value": "i",
+			"includeInIdToken": true, "includeInAccessToken": false, "userId": 42},
+		{"id": 12, "createdAt": null, "updatedAt": null, "key": "access_token_only", "value": "a",
+			"includeInIdToken": false, "includeInAccessToken": true, "userId": 42},
+		{"id": 13, "createdAt": null, "updatedAt": null, "key": "both_flags", "value": "b",
+			"includeInIdToken": true, "includeInAccessToken": true, "userId": 42}
+	],
+	"groups": [
+		{"id": 5, "createdAt": null, "updatedAt": null, "groupIdentifier": "sales", "description": "Sales team",
+			"includeInIdToken": false, "includeInAccessToken": false, "memberCount": 0,
+			"attributes": [
+				{"id": 31, "createdAt": null, "updatedAt": null, "key": "group_id_token_only", "value": "gi",
+					"includeInIdToken": true, "includeInAccessToken": false, "groupId": 5},
+				{"id": 32, "createdAt": null, "updatedAt": null, "key": "group_access_token_only", "value": "ga",
+					"includeInIdToken": false, "includeInAccessToken": true, "groupId": 5},
+				{"id": 33, "createdAt": null, "updatedAt": null, "key": "group_both_flags", "value": "gb",
+					"includeInIdToken": true, "includeInAccessToken": true, "groupId": 5}
+			],
+			"permissions": [
+				{"id": 20, "permissionIdentifier": "orders:read", "description": "Read orders", "resourceId": 3,
+					"resource": {"id": 3, "resourceIdentifier": "orders-api", "description": "Orders API", "isSystemLevelResource": false}}
+			]},
+		{"id": 8, "createdAt": null, "updatedAt": null, "groupIdentifier": "auditors", "description": "Auditors",
+			"includeInIdToken": false, "includeInAccessToken": false, "memberCount": 0,
+			"attributes": [], "permissions": []}
+	],
+	"permissions": [
+		{"id": 22, "permissionIdentifier": "orders:export", "description": "Export orders", "resourceId": 3,
+			"resource": {"id": 3, "resourceIdentifier": "orders-api", "description": "Orders API", "isSystemLevelResource": false}}
+	]
+}`
+
+// Neither download holds an attribute no app receives (#782 decision 8): the user's own attributes
+// and each group's whose Include in ID token and Include in access token are both off are left out,
+// and one with either flag on is kept. Groups and permissions, direct and through a group, are kept
+// in full, a group with no attribute left included, and the format version stays 1.
+func TestBuild_LeavesOutTheAttributesNoAppReceives(t *testing.T) {
+	document, err := Build(exportedUser(), releasedAttributesParts(), "https://auth.example.com",
+		time.Date(2026, 11, 5, 9, 30, 0, 0, time.UTC))
+	require.NoError(t, err)
+
+	encoded, err := json.Marshal(document)
+	require.NoError(t, err)
+	var parts map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(encoded, &parts))
+	picked := map[string]json.RawMessage{}
+	for _, key := range []string{"attributes", "groups", "permissions"} {
+		picked[key] = parts[key]
+	}
+	got, err := json.Marshal(picked)
+	require.NoError(t, err)
+	assert.JSONEq(t, releasedAttributesDocument, string(got))
+	assert.JSONEq(t, `1`, string(parts["formatVersion"]))
+
+	body := string(encoded)
+	for _, left := range []string{"administrators_note", "slow to answer email", "group_note", "under review",
+		"auditors_note", "temporary"} {
+		assert.NotContains(t, body, left)
 	}
 }

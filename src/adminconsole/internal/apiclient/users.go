@@ -217,7 +217,7 @@ type UserExport struct {
 	Body               io.ReadCloser
 }
 
-// GetUserExport asks for one user's export, everything held about them as one JSON document. It
+// GetUserExport asks for one user's export, their data as one JSON document. It
 // asks for gzip and never decodes or reads the answer, so the document's size is not held to the
 // ceiling every other answer is.
 func (c *AuthServerClient) GetUserExport(ctx context.Context, accessToken string, userId int64) (*UserExport, error) {

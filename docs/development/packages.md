@@ -377,8 +377,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   applying to all apps or listing the client a sign-in names, each with its current version. The
   registration form reads them through it, the acceptance step asks it what a user owes, and the
   account and admin APIs read back the versions a user accepted (#622)
-- `internal/userexport/` - The document holding everything the auth server holds about one user,
-  which an operator hands a person asking for their data: `Build` assembles it from the user and
+- `internal/userexport/` - The document holding what the auth server holds about one user, but
+  for the attributes no app receives, which an operator hands a person asking for their data: `Build` assembles it from the user and
   the `Parts` the admin API reads about them, every list in id order, whoever asks, deciding each
   refresh token's entry from its row, code and family, and `FileName` is the name it is saved as. The admin API's export route reads the parts through
   `buildUserExport` in `apihandlers`, beside the session and group reads it reuses, and answers it

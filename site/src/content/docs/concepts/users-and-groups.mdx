@@ -52,7 +52,7 @@ The email address is the user's sign-in name. Two users can't share one, it's st
 
 Every new user gets the `authserver:manage-account` permission, which lets them manage their own account in the admin console's **Account** pages. Nothing else: a new user holds no other permission and is in no group.
 
-The user's page has these tabs: **Details**, **Profile**, **Picture**, **Email**, **Phone**, **Address**, **Authentication**, **Consents**, **Legal documents**, **Sessions**, **Attributes**, **Permissions** and **Groups**. The profile, email, phone and address are what a client reads through [scopes](/concepts/scopes/). **Show audit events**, above the tabs, opens the [audit log](/concepts/audit-log/#see-what-happened) filtered to the events about the user and the ones they made. **Download data**, beside it, saves everything held about the user as one file: see [A request for a person's data](#a-request-for-a-persons-data).
+The user's page has these tabs: **Details**, **Profile**, **Picture**, **Email**, **Phone**, **Address**, **Authentication**, **Consents**, **Legal documents**, **Sessions**, **Attributes**, **Permissions** and **Groups**. The profile, email, phone and address are what a client reads through [scopes](/concepts/scopes/). **Show audit events**, above the tabs, opens the [audit log](/concepts/audit-log/#see-what-happened) filtered to the events about the user and the ones they made. **Download data**, beside it, saves the user's data as one file: see [A request for a person's data](#a-request-for-a-persons-data).
 
 ## Enabled and disabled
 
@@ -95,7 +95,7 @@ When someone asks for a copy of the data you hold about them, as the GDPR lets t
 It holds:
 
 - the user's profile, email, phone and address, with whether the email and phone were verified;
-- their attributes, and their groups with the attributes and permissions each gives them;
+- their attributes, and their groups with the attributes and permissions each gives them, except attributes no app receives;
 - the permissions granted to them directly;
 - the consents they gave clients;
 - their live sessions, with the clients each one served;
@@ -113,6 +113,7 @@ Each download is recorded in the audit log as `exported_user_data`, under the us
 
 The file doesn't hold:
 
+- attributes, the user's own or a group's, with both **Include in the access token** and **Include in the ID token** off. No app receives them, so they're your own notes about the person. They're still on the user's and the group's **Attributes** tabs: add them to the file, or decide to keep them back;
 - audit entries that name the person only by their subject, email address or its digest, not by their id. Search the `audit_logs` table's `details`, or your log pipeline, for the values under `identifiers`. An entry about an address the person used before carries that address's digest, which the file can't know;
 - the server logs, which can include the person's IP address;
 - your backups.

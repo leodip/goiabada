@@ -598,7 +598,7 @@ const (
 	// logged_in_user.
 	EventUpdatedClientAdministrativeScopes = "updated_client_administrative_scopes"
 
-	// EventExportedUserData records an export of everything held about a user through GET
+	// EventExportedUserData records an export of a user's data through GET
 	// /api/v1/admin/users/{id}/export (#781 decision 8). It is written once the answer has been
 	// sent, whether or not the caller received all of it, since the data has left the server
 	// either way; a refused or failed export writes nothing.

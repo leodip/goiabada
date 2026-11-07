@@ -24,8 +24,8 @@ type userExportAPI interface {
 	GetUserExport(ctx context.Context, accessToken string, userId int64) (*apiclient.UserExport, error)
 }
 
-// HandleExportPost answers the Download data form with the user's export, everything held about
-// them as one JSON document the browser saves (#781 decision 7). The auth server's answer is copied
+// HandleExportPost answers the Download data form with the user's export, their data as one JSON
+// document the browser saves (#781 decision 7). The auth server's answer is copied
 // to the browser untouched, still compressed, with its Content-Encoding, so the browser unpacks it,
 // and its Content-Disposition, which names the file; the console never decodes or holds it whole
 // (decision 5). It is a form's POST rather than a link because the origin check covers unsafe
