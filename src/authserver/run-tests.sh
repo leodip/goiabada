@@ -411,9 +411,10 @@ cleanup() {
     remove_sqlite_files
 }
 
-# A data or integration run cleans up when it exits, normal or error. The other tiers start no
-# server and create no SQLite file, and cleaning up after them took down the server and the files
-# of a data or integration run beside them in the same container.
+# A data or integration run cleans up when it exits, normal or error. The other tiers use neither
+# the shared test server, its three ports nor /tmp/goiabada*.db*: the servers and SQLite files
+# their tests make have ports and temporary directories of their own. Cleaning up after them took
+# down the server and the files of a data or integration run beside them in the same container.
 if should_run_data || should_run_integration; then
     trap cleanup EXIT
 fi
