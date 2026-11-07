@@ -257,12 +257,15 @@ gha_summary_row() {
 # that and take no lock.
 #
 # flock(1) is util-linux's, which the dev container and CI's golang image both ship. The kernel
-# drops the lock when the last descriptor on it closes, so a run that dies leaves none behind; the
-# server is started with the descriptor closed, so a server that outlives its run does not hold
-# it. The lock sits in a directory of its own, 0777 and not sticky, because runs here go in as
-# root and as vscode alike, and in sticky /tmp the kernel's protected_regular refuses one user's
-# open of a file another user created. TEST_STACK_LOCK_DIR moves it, which the script's own tests
-# do so that they never meet a real run.
+# drops the lock when the last descriptor on it closes. The commands the run starts inherit its
+# descriptor, so the lock lasts while the run or any of them does: a run that ends leaves none
+# behind, and a run killed on its own leaves it with the commands it was running, such as a go test,
+# until they end too, which keeps a second run off the test databases while they last. The server is
+# started with the descriptor closed, so a server that outlives its run does not hold it. The lock
+# sits in a directory of its own, 0777 and not sticky, because runs here go in as root and as vscode
+# alike, and in sticky /tmp the kernel's protected_regular refuses one user's open of a file another
+# user created. TEST_STACK_LOCK_DIR moves it, which the script's own tests do so that they never
+# meet a real run.
 #
 # The holder's record is the lock file's content, and the holder writes it just after taking the
 # lock, so a run refused in between finds it empty or still holding the previous holder's record.
