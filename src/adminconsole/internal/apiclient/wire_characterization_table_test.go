@@ -47,6 +47,8 @@ var (
 	charUpdateClientIntro = &api.UpdateClientIntrospectionResourcesRequest{ResourceIds: []int64{4}, ExpectedResourceIds: []int64{2}}
 	charAllowed           = true
 	charUpdateClientAdmin = &api.UpdateClientAdministrativeScopesRequest{Allowed: &charAllowed}
+	charRequireDPoP       = false
+	charUpdateClientDPoP  = &api.UpdateClientDPoPRequest{DPoPBoundAccessTokens: &charRequireDPoP}
 
 	charCreateGroupAttr = &api.CreateGroupAttributeRequest{Key: "department", Value: "sales"}
 	charUpdateGroupAttr = &api.UpdateGroupAttributeRequest{Key: "department", Value: "support"}
@@ -613,6 +615,21 @@ func wireCharacterization() []wireCase {
 			// "allowed", so the field's spelling is the contract (#499 decision 5).
 			body: `{"allowed":true}`, successStatus: 200,
 			reply: `{"client":{"id":3,"administrativeScopesAllowed":true}}`, want: true,
+		},
+		{
+			name: "UpdateClientDPoP",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.UpdateClientDPoP(ctx, charAccessToken, 3, charUpdateClientDPoP)
+				if err != nil {
+					return nil, err
+				}
+				return got.DPoPBoundAccessTokens, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/clients/3/dpop", contentType: charJSON,
+			// The literal, not the struct marshalled: the auth server refuses a body without
+			// "dpopBoundAccessTokens", so a false is sent, never left out (#42 decision 12).
+			body: `{"dpopBoundAccessTokens":false}`, successStatus: 200,
+			reply: `{"client":{"id":3,"dpopBoundAccessTokens":false}}`, want: false,
 		},
 		{
 			name: "GetClientLogo",

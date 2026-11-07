@@ -157,6 +157,10 @@ func (s *ctxRecordingApiClient) UpdateClientTokens(ctx context.Context, _ string
 	return nil, s.recordWrite(ctx, "UpdateClientTokens")
 }
 
+func (s *ctxRecordingApiClient) UpdateClientDPoP(ctx context.Context, _ string, _ int64, _ *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
+	return nil, s.recordWrite(ctx, "UpdateClientDPoP")
+}
+
 func (s *ctxRecordingApiClient) UpdateClientWebOrigins(ctx context.Context, _ string, _ int64, _ *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientWebOrigins")
 }

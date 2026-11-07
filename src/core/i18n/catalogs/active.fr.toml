@@ -928,6 +928,9 @@
 "adminconsole.admin_clients.tokens.include_oidc_in_id_tooltip" = "Excluez-les pour un client qui doit passer les tests de conformité OpenID Connect ou qui souhaite des jetons d’identité courts. Incluez-les s’il lit les claims utilisateur dans le jeton d’identité."
 "adminconsole.admin_clients.tokens.id_on" = "Les inclure"
 "adminconsole.admin_clients.tokens.id_off" = "Les exclure"
+"adminconsole.admin_clients.tokens.dpop_required" = "Exiger DPoP pour les demandes de jeton"
+"adminconsole.admin_clients.tokens.dpop_required_tooltip" = "Chaque demande de jeton de ce client doit porter une preuve DPoP, afin que chaque jeton qu’il obtient soit lié à sa clé. Une demande sans preuve est refusée."
+"adminconsole.admin_clients.tokens.dpop_required_implicit" = "Tant que ce réglage est activé, le client ne peut pas obtenir de jetons d’accès par le flux implicite : les types de réponse token et id_token token sont refusés. id_token seul et le flux du code d’autorisation fonctionnent comme avant."
 "adminconsole.admin_clients.tokens.saved_successfully" = "Paramètres des jetons enregistrés."
 
 # --- Client authentication -------------------------------------------------

@@ -214,6 +214,23 @@ func (c *AuthServerClient) UpdateClientAdministrativeScopes(ctx context.Context,
 	return &response.Client, nil
 }
 
+// UpdateClientDPoP sets a client's "Require DPoP for token requests", on the one route that changes
+// it, and answers the client as it now is (#42 decision 12). It accepts 200 alone, as
+// UpdateClientAdministrativeScopes above does.
+func (c *AuthServerClient) UpdateClientDPoP(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/dpop",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &response.Client, nil
+}
+
 // The three logo methods are the exception in this file: each accepts 200 alone, as it was
 // written.
 

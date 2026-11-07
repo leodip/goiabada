@@ -1,4 +1,4 @@
-import { clientUrl, grantClientPermission, readClientSecret, saveAndExpectSaved } from "../../../lib/admin-console";
+import { clientIdFromList, clientUrl, grantClientPermission, readClientSecret, saveAndExpectSaved } from "../../../lib/admin-console";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { clientCredentialsToken } from "../../../lib/oauth";
@@ -178,4 +178,58 @@ test("a refused save keeps what was typed, both claim choices included", async (
   await page.goto(clientUrl(client.id, "tokens"));
   await expect(page.locator('input[name="includeOpenIDConnectClaimsInAccessToken"][value="default"]')).toBeChecked();
   await expect(page.locator('input[name="includeOpenIDConnectClaimsInIdToken"][value="default"]')).toBeChecked();
+});
+
+// "Require DPoP for token requests" is a switch of the tab, saved by its one Save through the auth
+// server's PUT /clients/{id}/dpop, with the implicit-flow restriction said beside it (#42 decisions
+// 12 and 13). What it saves is what the token endpoint applies.
+test("Require DPoP for token requests is saved, shown, and applied by the token endpoint", async ({ page, clients, request }) => {
+  const client = await clients.create({ authorizationCode: false, clientCredentials: true });
+  await grantClientPermission(page, client.id, "authserver", "manage-account");
+  const secret = await readClientSecret(page, client.id);
+  const requireDPoP = page.getByRole("checkbox", { name: "Require DPoP for token requests" });
+
+  await page.goto(clientUrl(client.id, "tokens"));
+  await expect(requireDPoP).not.toBeChecked();
+  await expect(requireDPoP).toHaveAccessibleDescription(
+    /must carry a DPoP proof.*can't get access tokens through the implicit flow: the token and id_token token response types are refused/,
+  );
+
+  await test.step("switched on, a token request without a proof is refused", async () => {
+    await requireDPoP.check();
+    await saveAndExpectSaved(page, saved);
+    await page.reload();
+    await expect(requireDPoP).toBeChecked();
+    const refused = await clientCredentialsToken(request, client.identifier, secret, "authserver:manage-account");
+    expect(refused.status, JSON.stringify(refused.body)).toBe(400);
+    expect(refused.body.error).toBe("invalid_dpop_proof");
+    expect(refused.body.error_description).toBe("This client requires a DPoP proof with every token request.");
+  });
+
+  await test.step("saving the tab's other settings leaves it on", async () => {
+    await page.locator("#tokenExpirationInSeconds").fill("600");
+    await saveAndExpectSaved(page, saved);
+    await page.reload();
+    await expect(page.locator("#tokenExpirationInSeconds")).toHaveValue("600");
+    await expect(requireDPoP).toBeChecked();
+  });
+
+  await test.step("switched off, a token request without a proof is answered again", async () => {
+    await requireDPoP.uncheck();
+    await saveAndExpectSaved(page, saved);
+    await page.reload();
+    await expect(requireDPoP).not.toBeChecked();
+    const answered = await clientCredentialsToken(request, client.identifier, secret, "authserver:manage-account");
+    expect(answered.status, JSON.stringify(answered.body)).toBe(200);
+    expect(answered.body.token_type).toBe("Bearer");
+  });
+});
+
+// The admin console calls the auth server with Bearer tokens, so its own client is not offered the
+// requirement: its Tokens tab draws the rest and no switch (#42 decision 12).
+test("the admin console's client is not offered Require DPoP for token requests", async ({ page }) => {
+  await page.goto(clientUrl(await clientIdFromList(page, "admin-console-client"), "tokens"));
+  await expect(page.locator("#tokenExpirationInSeconds")).toBeVisible();
+  await expect(page.locator("#dpopBoundAccessTokens")).toHaveCount(0);
+  await expect(page.getByText("Require DPoP for token requests")).toHaveCount(0);
 });

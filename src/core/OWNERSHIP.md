@@ -217,7 +217,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateClientAdministrativeScopesRequest` | both-apps | — |
 | `core/api` | `UpdateClientAuthenticationRequest` | both-apps | — |
 | `core/api` | `UpdateClientBackchannelLogoutRequest` | both-apps | — |
-| `core/api` | `UpdateClientDPoPRequest` | contract | The request of `PUT /api/v1/admin/clients/{id}/dpop`, a published admin API route that sets "Require DPoP for token requests" (#42 decision 12). The auth server reads it, and no admin console file writes it until the console's Tokens tab saves through the route. |
+| `core/api` | `UpdateClientDPoPRequest` | both-apps | — |
 | `core/api` | `UpdateClientIntrospectionResourcesRequest` | both-apps | — |
 | `core/api` | `UpdateClientOAuth2FlowsRequest` | both-apps | — |
 | `core/api` | `UpdateClientPermissionsRequest` | both-apps | — |

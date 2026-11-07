@@ -247,12 +247,12 @@ A value of 0 uses the global setting. See [Tokens](/concepts/tokens/).
 
 ## Require DPoP for token requests
 
-Turn this on when every token a client gets must be bound to its key with [DPoP](/concepts/dpop/), so none can be had without a proof.
+Turn this on when every token a client gets must be bound to its key with [DPoP](/concepts/dpop/), so none can be had without a proof. It's a switch on the client's **Tokens** tab, saved with the tab.
 
 - **Every token request needs a `DPoP` proof,** on every grant. One without is refused with `400` `invalid_dpop_proof`, "This client requires a DPoP proof with every token request." A wrong client secret is still refused with `invalid_client`, so a stranger can't learn the setting.
 - **The client can't get access tokens through the [implicit flow](/legacy-flows/implicit/).** They'd travel in the redirect, with no proof. `response_type=token` and `id_token token` are refused with `unauthorized_client`, even for a sign-in already under way when you turn it on. `id_token` alone, and the authorization code flow, work as before.
 - **It's off until you turn it on.** A client that sends a proof gets bound tokens either way: this setting stops it getting tokens without one.
-- **The admin console's client can't have it,** since the console calls the auth server with Bearer tokens.
+- **The admin console's client can't have it,** since the console calls the auth server with Bearer tokens. Its **Tokens** tab doesn't show the switch.
 
 Through the Admin API, set it with [`PUT /api/v1/admin/clients/{id}/dpop`](/reference/api/admin/operations/updateclientdpop/) and `dpopBoundAccessTokens`, which every client the API answers carries. A [self-registered client](#self-registered-clients) asks for it with `dpop_bound_access_tokens`. Each save leaves an `updated_client_dpop` entry in the [audit log](/concepts/audit-log/).
 

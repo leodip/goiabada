@@ -930,6 +930,9 @@
 "adminconsole.admin_clients.tokens.include_oidc_in_id_tooltip" = "No los incluyas si el cliente necesita superar las pruebas de conformidad de OpenID Connect o quiere ID tokens pequeños. Inclúyelos si el cliente lee los claims del usuario del ID token."
 "adminconsole.admin_clients.tokens.id_on" = "Incluir"
 "adminconsole.admin_clients.tokens.id_off" = "No incluir"
+"adminconsole.admin_clients.tokens.dpop_required" = "Exigir DPoP para las solicitudes de token"
+"adminconsole.admin_clients.tokens.dpop_required_tooltip" = "Cada solicitud de token de este cliente debe llevar una prueba DPoP, de modo que cada token que recibe queda vinculado a su clave. Una solicitud sin ella se rechaza."
+"adminconsole.admin_clients.tokens.dpop_required_implicit" = "Mientras esté activado, el cliente no puede obtener tokens de acceso mediante el flujo implícito: se rechazan los tipos de respuesta token e id_token token. id_token solo y el flujo de código de autorización funcionan como antes."
 "adminconsole.admin_clients.tokens.saved_successfully" = "Configuración de tokens guardada."
 
 # --- Client authentication -------------------------------------------------

@@ -74,6 +74,31 @@
     </div>
   </div>
 
+  {{/* Saved by the form's one Save: the console writes it to the auth server's own route for it when
+       it changed (#42 decision 12). The admin console's own client, which calls the auth server with
+       Bearer tokens, is not offered it. */}}
+  {{ if not .client.IsSystemLevelClient }}
+  <div class="panel-body stacked">
+    {{ if .dpopError }}
+    <div class="notice notice-danger" role="alert" id="dpop-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .dpopError }}</p>
+    </div>
+    {{ end }}
+    <div class="check-list">
+      <label class="check-row" for="dpopBoundAccessTokens">
+        <input type="checkbox" id="dpopBoundAccessTokens" name="dpopBoundAccessTokens" aria-describedby="{{ if .dpopError }}dpop-error {{ end }}dpopBoundAccessTokensHint dpopBoundAccessTokensImplicit"
+          {{- if .dpopError }} aria-invalid="true" autofocus{{ end }}{{ if .settings.DPoPBoundAccessTokens }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.tokens.dpop_required" }}</span>
+          <span class="field-hint" id="dpopBoundAccessTokensHint">{{ T $.ctx "adminconsole.admin_clients.tokens.dpop_required_tooltip" }}</span>
+          <span class="field-hint" id="dpopBoundAccessTokensImplicit">{{ T $.ctx "adminconsole.admin_clients.tokens.dpop_required_implicit" }}</span>
+        </span>
+      </label>
+    </div>
+  </div>
+  {{ end }}
+
   <div class="panel-footer">
     <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
   </div>

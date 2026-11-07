@@ -92,6 +92,10 @@ func (*clientPagesAPI) UpdateClientTokens(context.Context, string, int64, *api.U
 	panic("unexpected call to UpdateClientTokens")
 }
 
+func (*clientPagesAPI) UpdateClientDPoP(context.Context, string, int64, *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
+	panic("unexpected call to UpdateClientDPoP")
+}
+
 func (*clientPagesAPI) UpdateClientAuthentication(context.Context, string, int64, *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClientAuthentication")
 }
