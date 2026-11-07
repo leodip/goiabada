@@ -98,6 +98,14 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   is `invalid_dpop_proof` with the Warn record `dpop proof refused at the token endpoint`. Both are
   400 and values of the token-refusal metric's error label. A valid proof's thumbprint goes to the
   grant's issuer, which binds the access token.
+- Each proof is accepted once (section 11.1, #42 decision 9). Once `ValidateTokenRequest` has
+  accepted the grant, just before the issuer mints, `TokenProofs.Replays` inserts the proof's
+  `dpop.Proof.ReplayKey`, the SHA-256 hex of its normalized `htu`, a space and its `jti`, into
+  `dpop_proofs` with its nonce's expiry (`dpop.Nonces.ExpiresAt`). The primary key makes the
+  insert atomic across requests and instances: a taken key is a replay, `invalid_dpop_proof` with
+  the same Warn record. A request refused earlier records nothing, so its proof stays unspent. A
+  store failure is a 500, and nothing is minted. The cleanup worker deletes expired rows on every
+  poll, outside the claim.
 - The CORS middleware's global lists allow the `DPoP` request header and expose `DPoP-Nonce`, so a
   browser app can send a proof and read the nonce (section 8, #42 decision 15). Which origins are
   granted, and where, is unchanged.

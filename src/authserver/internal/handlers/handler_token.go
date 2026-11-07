@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/dpop"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -38,7 +39,9 @@ import (
 // every answer to it carries exactly one DPoP-Nonce header with a fresh nonce, whatever the answer
 // (sections 8 and 8.2). Its proof is checked once the request is parsed, before the client is
 // authenticated and the grant looked at, so the nonce round trip never counts as a failed client
-// authentication or a failed password (#42 decision 7). A valid proof binds the access token of
+// authentication or a failed password (#42 decision 7). Once the grant has validated, the proof is
+// recorded in the replay store, just before anything is minted: a proof used before is refused,
+// and a store that cannot answer is a 500 (decision 9). A valid proof binds the access token of
 // every grant to its key (decision 2). A request without the header is answered as before.
 func HandleTokenPost(
 	jsonWriter JSONWriter,
@@ -73,9 +76,9 @@ func HandleTokenPost(
 			return
 		}
 
-		var dpopThumbprint string
+		var proof *dpop.Proof
 		if len(proofValues) > 0 {
-			dpopThumbprint, err = proofs.checkTokenProof(r, proofValues, now, input.ClientId)
+			proof, err = proofs.checkTokenProof(r, proofValues, now, input.ClientId)
 			if err != nil {
 				responder.refuse(w, r, input.GrantType, err)
 				return
@@ -86,6 +89,15 @@ func HandleTokenPost(
 		if err != nil {
 			responder.refuse(w, r, input.GrantType, auditTokenRefusal(r, settings, database, auditLogger, logoutTokens, credentialFailures, input, err))
 			return
+		}
+
+		var dpopThumbprint string
+		if proof != nil {
+			if err := proofs.recordTokenProof(r, proof, input.ClientId); err != nil {
+				responder.refuse(w, r, input.GrantType, err)
+				return
+			}
+			dpopThumbprint = proof.Thumbprint
 		}
 
 		switch grant := grant.(type) {

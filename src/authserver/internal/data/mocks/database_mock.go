@@ -4396,6 +4396,69 @@ func (_c *Database_DeleteExpiredBrowserSessions_Call) RunAndReturn(run func(ctx 
 	return _c
 }
 
+// DeleteExpiredDPoPProofs provides a mock function for the type Database
+func (_mock *Database) DeleteExpiredDPoPProofs(ctx context.Context, tx *sql.Tx, now time.Time) error {
+	ret := _mock.Called(ctx, tx, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteExpiredDPoPProofs")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, now)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteExpiredDPoPProofs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteExpiredDPoPProofs'
+type Database_DeleteExpiredDPoPProofs_Call struct {
+	*mock.Call
+}
+
+// DeleteExpiredDPoPProofs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - now time.Time
+func (_e *Database_Expecter) DeleteExpiredDPoPProofs(ctx any, tx any, now any) *Database_DeleteExpiredDPoPProofs_Call {
+	return &Database_DeleteExpiredDPoPProofs_Call{Call: _e.mock.On("DeleteExpiredDPoPProofs", ctx, tx, now)}
+}
+
+func (_c *Database_DeleteExpiredDPoPProofs_Call) Run(run func(ctx context.Context, tx *sql.Tx, now time.Time)) *Database_DeleteExpiredDPoPProofs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteExpiredDPoPProofs_Call) Return(err error) *Database_DeleteExpiredDPoPProofs_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteExpiredDPoPProofs_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, now time.Time) error) *Database_DeleteExpiredDPoPProofs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteExpiredRateLimitCounters provides a mock function for the type Database
 func (_mock *Database) DeleteExpiredRateLimitCounters(ctx context.Context, tx *sql.Tx, now time.Time) error {
 	ret := _mock.Called(ctx, tx, now)
@@ -15116,6 +15179,84 @@ func (_c *Database_RecordAccessTokenRevoked_Call) Return(b bool, err error) *Dat
 }
 
 func (_c *Database_RecordAccessTokenRevoked_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time) (bool, error)) *Database_RecordAccessTokenRevoked_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RecordDPoPProof provides a mock function for the type Database
+func (_mock *Database) RecordDPoPProof(ctx context.Context, tx *sql.Tx, proofHash string, expiresAt time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, proofHash, expiresAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RecordDPoPProof")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, tx, proofHash, expiresAt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time) bool); ok {
+		r0 = returnFunc(ctx, tx, proofHash, expiresAt)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, proofHash, expiresAt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RecordDPoPProof_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RecordDPoPProof'
+type Database_RecordDPoPProof_Call struct {
+	*mock.Call
+}
+
+// RecordDPoPProof is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - proofHash string
+//   - expiresAt time.Time
+func (_e *Database_Expecter) RecordDPoPProof(ctx any, tx any, proofHash any, expiresAt any) *Database_RecordDPoPProof_Call {
+	return &Database_RecordDPoPProof_Call{Call: _e.mock.On("RecordDPoPProof", ctx, tx, proofHash, expiresAt)}
+}
+
+func (_c *Database_RecordDPoPProof_Call) Run(run func(ctx context.Context, tx *sql.Tx, proofHash string, expiresAt time.Time)) *Database_RecordDPoPProof_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RecordDPoPProof_Call) Return(b bool, err error) *Database_RecordDPoPProof_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_RecordDPoPProof_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, proofHash string, expiresAt time.Time) (bool, error)) *Database_RecordDPoPProof_Call {
 	_c.Call.Return(run)
 	return _c
 }

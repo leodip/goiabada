@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math"
@@ -276,4 +277,13 @@ func numericDateMember(members map[string]json.RawMessage, name string) (time.Ti
 // 4.1.9).
 func isDPoPMediaType(typ string) bool {
 	return strings.EqualFold(typ, "dpop+jwt") || strings.EqualFold(typ, "application/dpop+jwt")
+}
+
+// ReplayKey is the key the replay store keeps the proof under (#42 decision 9): the SHA-256 hex
+// digest of its normalized htu, a space, and its jti. No URI holds a space, so the pair is read
+// back unambiguously, and the jti, the client's own value, is never stored. One jti at two URLs
+// names two proofs.
+func (p Proof) ReplayKey() string {
+	sum := sha256.Sum256([]byte(p.HTU + " " + p.JTI))
+	return hex.EncodeToString(sum[:])
 }

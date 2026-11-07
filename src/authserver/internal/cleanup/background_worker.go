@@ -54,7 +54,7 @@ const (
 )
 
 // backgroundWorkerDatabase is what the cleanup worker needs: the claim that makes one instance
-// the sweeper, and the eleven deletes it sweeps with.
+// the sweeper, and the twelve deletes it sweeps with.
 type backgroundWorkerDatabase interface {
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
@@ -63,6 +63,7 @@ type backgroundWorkerDatabase interface {
 	DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error
 	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
 	DeleteExpiredRevokedAccessTokens(ctx context.Context, tx *sql.Tx, now time.Time) error
+	DeleteExpiredDPoPProofs(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
 	DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
@@ -171,16 +172,33 @@ func (w *Worker) run(ctx context.Context) {
 
 // poll is what one tick of the worker does, and the two halves are deliberately unequal.
 //
-// The browser session reap, the parked authorization request reap and the rate-limit counter reap
-// run on every instance every time, outside the claim. The rest of the cleanup runs on at most one
-// instance every cleanupInterval, behind the claim. The calls live here rather than inline in run
-// so the pairing is one thing a test can exercise without waiting out the startup delay (#266
-// decision 19, #437, #394).
+// The browser session reap, the parked authorization request reap, the rate-limit counter reap and
+// the DPoP proof reap run on every instance every time, outside the claim. The rest of the cleanup
+// runs on at most one instance every cleanupInterval, behind the claim. The calls live here rather
+// than inline in run so the pairing is one thing a test can exercise without waiting out the
+// startup delay (#266 decision 19, #437, #394, #42).
 func (w *Worker) poll(ctx context.Context) {
 	w.reapBrowserSessions(ctx)
 	w.reapAuthorizeRequests(ctx)
 	w.reapRateLimitCounters(ctx)
+	w.reapDPoPProofs(ctx)
 	w.runIfClaimed(ctx)
+}
+
+// reapDPoPProofs deletes the replay store's records of DPoP proofs that could no longer be accepted.
+//
+// The fourth sweep outside the claim, for the rate it faces. Every DPoP request that succeeds
+// writes a row, at whatever rate DPoP clients make them, and a row has nothing left to refuse once
+// its proof's nonce has expired, ten minutes at most (#42 decision 9). At a hundred requests a
+// second that is some 60,000 live rows, which a sweep every five minutes keeps within half as many
+// again; on the twelve hour claim the table would grow to 72 times its live rows between sweeps.
+//
+// Single-flight is given up on the same terms as the other three: the delete is idempotent and keyed
+// on an indexed column. Do not move this call into performTask.
+func (w *Worker) reapDPoPProofs(ctx context.Context) {
+	if err := w.database.DeleteExpiredDPoPProofs(ctx, nil, time.Now().UTC()); err != nil {
+		slog.ErrorContext(ctx, "unable to delete expired dpop proofs", "error", err)
+	}
 }
 
 // reapRateLimitCounters deletes the shared credential counters whose two windows have both passed.

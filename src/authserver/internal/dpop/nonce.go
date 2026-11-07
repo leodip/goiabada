@@ -57,21 +57,39 @@ func (n *Nonces) Mint(now time.Time) string {
 // Accepts reports whether nonce is one minted under this key that has not expired at now: minted
 // no more than NonceLifetime before now, and no more than a minute after it.
 func (n *Nonces) Accepts(nonce string, now time.Time) bool {
+	minted, ok := n.minted(nonce)
+	if !ok {
+		return false
+	}
+	return !now.After(minted.Add(NonceLifetime)) && !now.Before(minted.Add(-nonceClockSkew))
+}
+
+// ExpiresAt returns the last moment Accepts takes nonce, NonceLifetime after it was minted, for a
+// nonce minted under this key: how long the replay store keeps a proof carrying it (#42 decision
+// 8). It reports false for any other value.
+func (n *Nonces) ExpiresAt(nonce string) (time.Time, bool) {
+	minted, ok := n.minted(nonce)
+	if !ok {
+		return time.Time{}, false
+	}
+	return minted.Add(NonceLifetime), true
+}
+
+// minted returns the moment nonce was minted, in whole seconds, when it was minted under this key.
+func (n *Nonces) minted(nonce string) (time.Time, bool) {
 	// Length and alphabet before decoding: the strict decoder still skips CR and LF.
 	if len(nonce) != base64.RawURLEncoding.EncodedLen(nonceLength) || !isBase64URL(nonce) {
-		return false
+		return time.Time{}, false
 	}
 	raw, err := base64.RawURLEncoding.Strict().DecodeString(nonce)
 	if err != nil || len(raw) != nonceLength {
-		return false
+		return time.Time{}, false
 	}
 	if !hmac.Equal(raw[8:], n.tag(raw[:8])) {
-		return false
+		return time.Time{}, false
 	}
 	//nolint:gosec // G115: the bit pattern Mint wrote, read back as the timestamp it was; a tag under this key proves Mint wrote it
-	minted := int64(binary.BigEndian.Uint64(raw[:8]))
-	age := now.Unix() - minted
-	return age <= int64(NonceLifetime/time.Second) && age >= -int64(nonceClockSkew/time.Second)
+	return time.Unix(int64(binary.BigEndian.Uint64(raw[:8])), 0), true
 }
 
 func (n *Nonces) tag(timestamp []byte) []byte {

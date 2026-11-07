@@ -176,7 +176,7 @@ A request with a `DPoP` header gets an access token bound to the proof's key, on
 | `error` | `error_description` | Why |
 |---|---|---|
 | `use_dpop_nonce` | "Authorization server requires nonce in DPoP proof." | The proof has no nonce, or one that's expired or that the auth server didn't hand out. Retry with the `DPoP-Nonce` of this answer |
-| `invalid_dpop_proof` | "The DPoP proof is invalid." | The request has more than one `DPoP` header, or its proof fails a check: the auth server's log says which |
+| `invalid_dpop_proof` | "The DPoP proof is invalid." | The request has more than one `DPoP` header, its proof was already used, or its proof fails a check: the auth server's log says which |
 
 A request without a `DPoP` header gets a `Bearer` token.
 

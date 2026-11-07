@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -59,6 +60,7 @@ func testTokenProofs() TokenProofs {
 // dpopTokenEndpoint is one HandleTokenPost checking proofs for a public base URL under a session
 // authentication key, at a clock the test sets, over strict doubles of the validator and issuer.
 type dpopTokenEndpoint struct {
+	database           *datamocks.Database
 	issuer             *handlersmocks.TokenIssuer
 	validator          *handlersmocks.TokenValidator
 	auditLogger        *handlersmocks.AuditLogger
@@ -77,6 +79,7 @@ func newDPoPTokenEndpoint(t *testing.T, publicBaseURL string, sessionKey []byte)
 	checker, err := dpop.NewChecker(publicBaseURL)
 	require.NoError(t, err)
 	e := &dpopTokenEndpoint{
+		database:           datamocks.NewDatabase(t),
 		issuer:             handlersmocks.NewTokenIssuer(t),
 		validator:          handlersmocks.NewTokenValidator(t),
 		auditLogger:        handlersmocks.NewAuditLogger(t),
@@ -84,9 +87,9 @@ func newDPoPTokenEndpoint(t *testing.T, publicBaseURL string, sessionKey []byte)
 		registry:           metrics.NewRegistry(),
 		now:                dpopNow,
 	}
-	e.handler = HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), e.issuer, e.validator, e.auditLogger,
+	e.handler = HandleTokenPost(render.New(nil, nil), e.database, e.issuer, e.validator, e.auditLogger,
 		e.credentialFailures, tokenmetrics.Register(e.registry), &recordingLogoutTokens{},
-		TokenProofs{Checker: checker, Nonces: dpop.NewNonces(sessionKey), Now: func() time.Time { return e.now }})
+		TokenProofs{Checker: checker, Nonces: dpop.NewNonces(sessionKey), Replays: e.database, Now: func() time.Time { return e.now }})
 	return e
 }
 
@@ -220,9 +223,12 @@ func TestTokenDPoP_AValidProofBindsTheAccessTokenOnEveryGrant(t *testing.T) {
 	}
 }
 
+// validates has the validator accept the request's grant, and the replay store record its proof as
+// the proof's first use.
 func (e *dpopTokenEndpoint) validates(grant protocolvalidation.TokenGrant) {
 	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(grant, nil).Once()
+	e.database.On("RecordDPoPProof", mock.Anything, (*sql.Tx)(nil), mock.Anything, mock.Anything).Return(true, nil).Once()
 }
 
 // A request without a DPoP header is answered as before: the token is not bound, and the answer
@@ -230,7 +236,9 @@ func (e *dpopTokenEndpoint) validates(grant protocolvalidation.TokenGrant) {
 func TestTokenDPoP_ARequestWithoutAProofIsAnsweredAsBefore(t *testing.T) {
 	e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
 	client := &record.Client{Id: 1}
-	e.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"})
+	// No proof, so nothing is recorded: the database double fails a call nobody expected.
+	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
+		Return(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"}, nil).Once()
 	e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", "").
 		Return(&oauth.TokenResponse{AccessToken: "access_token", TokenType: "Bearer", ExpiresIn: 300}, nil).Once()
 	e.auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()

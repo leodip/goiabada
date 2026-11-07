@@ -92,7 +92,7 @@ At the token endpoint, the nonce is what makes a proof fresh. Your proof still n
 | `typ` | `dpop+jwt` |
 | `alg` | One of `ES256`, `ES384`, `ES512`, `PS256`, `PS384`, `PS512`, `RS256`, `RS384`, `RS512`, `Ed25519` and `EdDSA`, as discovery's `dpop_signing_alg_values_supported` lists them. `none` and symmetric algorithms are never accepted |
 | `jwk` | Your public key, of the type the algorithm takes: an EC key on the curve it names, an RSA key of 2048 to 8192 bits, or an Ed25519 key for `Ed25519` and `EdDSA`. A key with any private part is refused |
-| `jti` | A new identifier for each proof |
+| `jti` | A new identifier for each proof. A proof is accepted once: sent again, it's refused |
 | `htm` | The request's method, exactly: `POST` at the token endpoint |
 | `htu` | The URL of the request: the auth server's base URL, `GOIABADA_AUTHSERVER_BASEURL`, followed by the endpoint's path, such as `https://auth.example.com/auth/token`. The query and fragment are ignored. A proof naming the internal base URL is refused |
 | `iat` | When your app made the proof, in seconds since 1970 |

@@ -866,6 +866,14 @@ type Database interface {
 	// DeleteExpiredRevokedAccessTokens reaps on expires_at alone: past it the token is refused for
 	// its expiry, so its row has nothing left to refuse.
 	DeleteExpiredRevokedAccessTokens(ctx context.Context, tx *sql.Tx, now time.Time) error
+	// RecordDPoPProof stores an accepted DPoP proof's replay key, the SHA-256 hex digest of its
+	// normalized htu and its jti, until expiresAt, and reports whether this call stored it: false is
+	// a replay, the key already stored by an earlier use of the proof, here or at another instance
+	// (#42 decision 9). A key that is not a lower-case SHA-256 hex digest is an error.
+	RecordDPoPProof(ctx context.Context, tx *sql.Tx, proofHash string, expiresAt time.Time) (bool, error)
+	// DeleteExpiredDPoPProofs reaps on expires_at alone: past it the proof could no longer be
+	// accepted, so its record has nothing left to refuse.
+	DeleteExpiredDPoPProofs(ctx context.Context, tx *sql.Tx, now time.Time) error
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
 	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
 	// GetRefreshTokensByFirstRefreshTokenJti returns every member of one rotation family, live and

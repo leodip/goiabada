@@ -3,14 +3,14 @@
 // server's nonce is asked for with use_dpop_nonce, and every answer to a DPoP request carries a fresh
 // one (section 8); and htu names the public URL the client reached, so a proof naming the auth
 // server's internal URL, the hop behind the proxy, is refused (section 4.3). The full validation
-// matrix is in the Go tiers.
+// matrix is in the Go tiers. A proof is single-use (section 11.1): sent again, it is refused.
 import type { Page } from "@playwright/test";
 import { grantClientPermission, readClientSecret } from "../../lib/admin-console";
 import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
 import { dpopKey, dpopProof, expectBoundTokenResponse, expectUseDPoPNonce, nonceOf, postTokenWithDPoP } from "../../lib/dpop";
 import { env } from "../../lib/environment";
 import { expect, test, type TestClient, type TestResource } from "../../lib/fixtures";
-import { basicAuth, expectTokenError, expectTokenResponse, postToken, tokenEndpoint } from "../../lib/rfc6749";
+import { basicAuth, expectInvalidClient, expectTokenError, expectTokenResponse, postToken, tokenEndpoint } from "../../lib/rfc6749";
 import { browserSignInClient, passwordGrantClient } from "../../lib/test-clients";
 
 // A client of the client credentials grant holding a permission of a resource of its own: its Basic
@@ -125,6 +125,36 @@ test("htu names the public URL: a proof naming the internal URL, or another host
     });
   }
   await test.step(`the public URL, ${tokenEndpoint}, is accepted`, async () => {
+    expectBoundTokenResponse(await postToken(request, body, { headers: { ...basic, DPoP: dpopProof(key, { nonce }) } }), key);
+  });
+});
+
+test("a proof is accepted once: sent again, it is invalid_dpop_proof, and a request refused before minting leaves it unspent (section 11.1)", async ({
+  page,
+  clients,
+  resources,
+  request,
+}) => {
+  const { basic, body } = await clientCredentialsClient(page, clients, resources);
+  const key = dpopKey();
+  const nonce = nonceOf(await postToken(request, body, { headers: { ...basic, DPoP: dpopProof(key) } }));
+  const proof = dpopProof(key, { nonce });
+
+  await test.step("refused at client authentication, the proof is not spent", async () => {
+    const wrongSecret = { Authorization: basicAuth("no-such-client", "not-the-secret") };
+    const refused = await postToken(request, body, { headers: { ...wrongSecret, DPoP: proof } });
+    expectInvalidClient(refused, { viaBasic: true });
+  });
+  await test.step("its first use gets a bound token", async () => {
+    expectBoundTokenResponse(await postToken(request, body, { headers: { ...basic, DPoP: proof } }), key);
+  });
+  await test.step("sent again, it is refused, with a fresh nonce", async () => {
+    const replayed = await postToken(request, body, { headers: { ...basic, DPoP: proof } });
+    expectTokenError(replayed, "invalid_dpop_proof");
+    expect(replayed.body.error_description).toBe("The DPoP proof is invalid.");
+    nonceOf(replayed);
+  });
+  await test.step("a new proof with the same nonce is another proof, and accepted", async () => {
     expectBoundTokenResponse(await postToken(request, body, { headers: { ...basic, DPoP: dpopProof(key, { nonce }) } }), key);
   });
 });

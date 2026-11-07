@@ -330,13 +330,14 @@ func run() int {
 	// DPoP proofs at the token endpoint name the public base URL, never the internal one, and carry
 	// nonces under a key derived from the current session authentication key, which every instance
 	// sharing this configuration holds; after a rotation an old nonce costs a client one retry
-	// (#42 decisions 6 and 7).
+	// (#42 decisions 6 and 7). Each proof is recorded in the database, so it is accepted once by
+	// every instance sharing it (decision 9).
 	proofChecker, err := dpop.NewChecker(cfg.AuthServer.BaseURL)
 	if err != nil {
 		slog.Error("the auth server base URL cannot be used to check DPoP proofs", "error", err)
 		return 1
 	}
-	tokenProofs := handlers.TokenProofs{Checker: proofChecker, Nonces: dpop.NewNonces(currentKeys.AuthenticationKey)}
+	tokenProofs := handlers.TokenProofs{Checker: proofChecker, Nonces: dpop.NewNonces(currentKeys.AuthenticationKey), Replays: database}
 
 	r := routing.New()
 	s := server.NewServer(r, database, sessionStore, dataCipher, trustedProxies, cfg, tokenProofs)
