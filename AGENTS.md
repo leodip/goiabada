@@ -31,8 +31,10 @@ Start with the affected tests; run the affected module tier and applicable lint 
 For SQL or migration changes, run the data tier across all four engines. For protocol or API
 behavior, run the relevant integration tests. Use the race detector for concurrent Go code.
 The integration tier builds and starts its server; do not use `--no-build` without a prior build.
-Data and integration runs reset their dedicated test databases and free the dev server ports;
-see the contributing guide before sharing a running dev stack with another task.
+Data and integration runs reset their dedicated test databases and free ports 19090, 19091 and
+19190, stopping `make serve`. One runs per container at a time; lint and the unit tiers can run
+beside it with `--no-build`. See the contributing guide before sharing a running dev stack with
+another task.
 
 The Playwright browser suites in `e2e/` require the maintainer's VPS and SSH access, which external
 contributors do not have. E2e test contributions are welcome; validate their types locally and

@@ -121,7 +121,21 @@ The Admin API accepts a client's token from the client credentials flow, and a u
 
 The Account API accepts only a token issued for a user. A token from the client credentials flow is answered `403`: with `INSUFFICIENT_SCOPE` when it doesn't carry `authserver:manage-account`, which is the usual case, and with `USER_CONTEXT_REQUIRED` when its client was granted that permission.
 
-Deleting the account, `POST /api/v1/account/deletion`, accepts only a token issued to the admin console's own client. Any other client's token is answered `403` with `CLIENT_NOT_ALLOWED`, whatever its scopes.
+Deleting the account, `POST /api/v1/account/deletion`, and downloading its data, `GET /api/v1/account/export`, accept only a token issued to the admin console's own client. Any other client's token is answered `403` with `CLIENT_NOT_ALLOWED`, whatever its scopes.
+
+## A recent sign-in
+
+Downloading the account's data also needs a recent sign-in: within the last 300 seconds, at `urn:goiabada:level2_optional` or above, so with the user's authenticator code if they've set one up. The token's `auth_time` and `acr` claims say when and how the user signed in, and a refreshed token keeps them from the sign-in it came from.
+
+A token whose sign-in is older, or at `urn:goiabada:level1`, is answered `401` with `INSUFFICIENT_USER_AUTHENTICATION` and the step-up challenge of [RFC 9470](https://www.rfc-editor.org/rfc/rfc9470), which names the level and the age a new sign-in must meet:
+
+```
+WWW-Authenticate: Bearer realm="goiabada", error="insufficient_user_authentication",
+  error_description="This endpoint requires a more recent sign-in, or a stronger one.",
+  acr_values="urn:goiabada:level2_optional", max_age="300"
+```
+
+The admin console answers it by sending the user through the sign-in page again with `prompt=login` and that `acr_values`, and the token it gets back downloads.
 
 ## When a token stops working
 

@@ -1,0 +1,41 @@
+{{define "title"}}{{ T $.ctx "adminconsole.account.data.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "account_menu" . }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.menu.account" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.account.data.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.account.data.lead" "appName" .appName }}</p>
+  </div>
+</div>
+
+{{/* The Your data page (#782 decision 6): what the file holds, in the Delete account page's manner,
+     that a sign-in older than a few minutes is asked to sign in again first, and Download my data,
+     which posts here and answers with the file. Back from that sign-in, a notice above the button
+     says to press it again; a refusal the user waits out is drawn at the top. */}}
+<form class="panel" method="post" action="/account/data">
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
+
+    <p><strong>{{ T $.ctx "adminconsole.account.data.included_label" }}</strong> {{ T $.ctx "adminconsole.account.data.included" }}</p>
+    <p>{{ T $.ctx "adminconsole.account.data.sign_in_again" }}</p>
+
+    {{ if .signedInAgain }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.account.data.signed_in_again" }}</p>
+    </div>
+    {{ end }}
+  </div>
+  <div class="panel-footer">
+    <button class="button button-primary" type="submit">{{ T $.ctx "adminconsole.account.data.button" }}</button>
+  </div>
+</form>
+{{end}}

@@ -94,18 +94,19 @@ var apiErrorCodes = map[string]string{
 	// Authentication and authorization. A caller distinguishes "send a token", "the token is not
 	// good enough" and "the session is gone", and retries differently for each.
 	// ACCESS_TOKEN_REQUIRED, INVALID_REQUEST, INVALID_TOKEN, USER_CONTEXT_REQUIRED,
-	// INSUFFICIENT_SCOPE and CLIENT_NOT_ALLOWED are the bearer middleware's; the rest are handlers'. An account handler
+	// INSUFFICIENT_SCOPE, CLIENT_NOT_ALLOWED and INSUFFICIENT_USER_AUTHENTICATION are the bearer middleware's; the rest are handlers'. An account handler
 	// reached without the token or subject that middleware guarantees answers the 500, not a 401
 	// of its own (#522 decision 4).
-	"ACCESS_TOKEN_REQUIRED": "401: no bearer token, so the caller obtains one.",
-	"INVALID_REQUEST":       "400: the bearer token was sent by two methods at once, or its access_token parameter twice: RFC 6750 section 3.1's invalid_request.",
-	"INVALID_TOKEN":         "401: the bearer token did not validate.",
-	"INVALID_SESSION":       "401: the session behind the token is gone.",
-	"USER_CONTEXT_REQUIRED": "403: the endpoint needs a user, and the token carries none.",
-	"INSUFFICIENT_SCOPE":    "403: the token's scopes do not cover the route.",
-	"CLIENT_NOT_ALLOWED":    "403 from RequireAdminConsoleClient: the route answers only tokens issued to the admin console's own client, whatever the token's scopes (#783).",
-	"FORBIDDEN":             "403: the caller may not act on this resource.",
-	"MANAGE_SCOPE_REQUIRED": "403 from the administrative policy: the request acts on an administrator or an administrative permission, which only authserver:manage may do, so no granular scope will ever be enough (#402).",
+	"ACCESS_TOKEN_REQUIRED":            "401: no bearer token, so the caller obtains one.",
+	"INVALID_REQUEST":                  "400: the bearer token was sent by two methods at once, or its access_token parameter twice: RFC 6750 section 3.1's invalid_request.",
+	"INVALID_TOKEN":                    "401: the bearer token did not validate.",
+	"INVALID_SESSION":                  "401: the session behind the token is gone.",
+	"USER_CONTEXT_REQUIRED":            "403: the endpoint needs a user, and the token carries none.",
+	"INSUFFICIENT_SCOPE":               "403: the token's scopes do not cover the route.",
+	"CLIENT_NOT_ALLOWED":               "403 from RequireAdminConsoleClient: the route answers only tokens issued to the admin console's own client, whatever the token's scopes (#783).",
+	"INSUFFICIENT_USER_AUTHENTICATION": "401 from RequireRecentAuthentication, RFC 9470 section 3's step-up refusal: the token's sign-in is too old or below the route's level, so the caller signs the user in again with the challenge's acr_values and max_age (#782).",
+	"FORBIDDEN":                        "403: the caller may not act on this resource.",
+	"MANAGE_SCOPE_REQUIRED":            "403 from the administrative policy: the request acts on an administrator or an administrative permission, which only authserver:manage may do, so no granular scope will ever be enough (#402).",
 
 	// Key rotation, kept by decision 7 where every other 500-adjacent code went: a caller acts on
 	// each, and openapi.yaml documents them.

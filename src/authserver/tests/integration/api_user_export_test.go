@@ -27,8 +27,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// GET /api/v1/admin/users/{id}/export (#781): everything the auth server holds about one user, as
-// one JSON document named for download. It answers only a token that reads both the users and the
+// GET /api/v1/admin/users/{id}/export (#781): what the auth server holds about one user, but for
+// the attributes no app receives (#782 decision 8), as one JSON document named for download. It answers only a token that reads both the users and the
 // audit log (decision 1), is gzip-compressed for a caller that accepts it and never cached
 // (decision 5), is named user-<id>-<date>.json (decision 6), and writes exported_user_data naming
 // the user and who exported them (decision 8).
@@ -49,7 +49,13 @@ type exportAnswer struct {
 // is told not to ask for gzip itself, so what arrives is what the server sent.
 func getUserExport(t *testing.T, accessToken string, id any, acceptEncoding string) exportAnswer {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodGet, appConfig.AuthServer.BaseURL+userExportPath(id), nil)
+	return getExportAt(t, accessToken, userExportPath(id), acceptEncoding)
+}
+
+// getExportAt is getUserExport for the export at path, the administrator's or the account's own.
+func getExportAt(t *testing.T, accessToken, path, acceptEncoding string) exportAnswer {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, appConfig.AuthServer.BaseURL+path, nil)
 	require.NoError(t, err)
 	if accessToken != "" {
 		req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -458,8 +464,8 @@ type exportedUserParts struct {
 }
 
 // newExportedUserParts gives the user one or more of each part the admin API reads about a user:
-// two attributes, a group with an attribute and a permission of its own, a permission granted
-// directly, a consent, a live session with the app it served and one past its idle timeout, three
+// two attributes an app receives and one no app receives, a group with an attribute an app
+// receives, one no app receives and a permission of its own, a permission granted directly, a consent, a live session with the app it served and one past its idle timeout, three
 // legal document acceptances (one of a retired document), and a profile picture.
 func newExportedUserParts(t *testing.T, user *record.User) exportedUserParts {
 	t.Helper()
@@ -476,6 +482,10 @@ func newExportedUserParts(t *testing.T, user *record.User) exportedUserParts {
 		require.NoError(t, err)
 		p.attributes[i] = stored
 	}
+	// No app receives it: an administrators' own note, which the document leaves out (#782
+	// decision 8).
+	require.NoError(t, database.CreateUserAttribute(ctx, nil, &record.UserAttribute{
+		Key: "administrators_note", Value: exportedUserNote, UserId: user.Id}))
 
 	p.resource = createTestResource(t, "export-resource-"+suffix, "Export resource")
 	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, p.resource.Id) })
@@ -485,6 +495,8 @@ func newExportedUserParts(t *testing.T, user *record.User) exportedUserParts {
 	group := createTestGroup(t)
 	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
 	attribute := createTestGroupAttribute(t, group.Id, "region", "south")
+	require.NoError(t, database.CreateGroupAttribute(ctx, nil, &record.GroupAttribute{
+		Key: "group_note", Value: exportedGroupNote, GroupId: group.Id}))
 	createTestGroupPermission(t, group.Id, p.groupPerm.Id)
 	require.NoError(t, database.CreateUserGroup(ctx, nil, &record.UserGroup{UserId: user.Id, GroupId: group.Id}))
 	require.NoError(t, database.CreateUserPermission(ctx, nil, &record.UserPermission{UserId: user.Id, PermissionId: p.directPerm.Id}))
@@ -543,6 +555,13 @@ func newExportedUserParts(t *testing.T, user *record.User) exportedUserParts {
 	return p
 }
 
+// The values of the user's and the group's attribute that no app receives, which the document
+// leaves out (#782 decision 8).
+const (
+	exportedUserNote  = "administrators-note-slow-to-answer"
+	exportedGroupNote = "group-note-under-review"
+)
+
 // jsonInstant is a stored instant as the admin API writes it.
 func jsonInstant(stored time.Time) string {
 	return `"` + stored.Format(time.RFC3339Nano) + `"`
@@ -550,7 +569,8 @@ func jsonInstant(stored time.Time) string {
 
 // expectedExportParts is the document's attributes, groups, permissions, consents, sessions and
 // profile picture for the seeded parts, written out by hand: each entry as the matching admin API
-// read answers it, every list in id order, the expired session left out and no session current.
+// read answers it, every list in id order, the attributes no app receives left out (#782 decision
+// 8), the expired session left out and no session current.
 func expectedExportParts(user *record.User, p exportedUserParts) string {
 	resource := fmt.Sprintf(`{"id": %d, "resourceIdentifier": %q, "description": "Export resource", "isSystemLevelResource": false}`,
 		p.resource.Id, p.resource.ResourceIdentifier)
@@ -608,7 +628,8 @@ func expectedExportParts(user *record.User, p exportedUserParts) string {
 // attributes and permissions the user gets through them, the permissions granted directly,
 // consents, live sessions with the apps they served, legal document acceptances and the profile
 // picture, each entry as the matching read answers it and every list in id order (#781 decision
-// 3). Nothing secret comes with them.
+// 3). It leaves out the user's and the group's attributes no app receives (#782 decision 8).
+// Nothing secret comes with them.
 func TestAPIUserExport_HoldsWhatTheAdminAPIReadsAboutTheUser(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	user, secrets := newExportedUser(t)
@@ -639,11 +660,13 @@ func TestAPIUserExport_HoldsWhatTheAdminAPIReadsAboutTheUser(t *testing.T) {
 
 	body := string(answer.document(t))
 	for name, secret := range map[string]string{
-		"the client secret":         p.clientSecret,
-		"the client secret, base64": base64.StdEncoding.EncodeToString([]byte(p.clientSecret)),
-		"the password hash":         secrets.passwordHash,
-		"the OTP secret":            secrets.otpSecret,
-		"the recovery code's hash":  secrets.recoveryCodeHash,
+		"the user's attribute no app receives":  exportedUserNote,
+		"the group's attribute no app receives": exportedGroupNote,
+		"the client secret":                     p.clientSecret,
+		"the client secret, base64":             base64.StdEncoding.EncodeToString([]byte(p.clientSecret)),
+		"the password hash":                     secrets.passwordHash,
+		"the OTP secret":                        secrets.otpSecret,
+		"the recovery code's hash":              secrets.recoveryCodeHash,
 	} {
 		assert.NotContains(t, body, secret, name)
 	}

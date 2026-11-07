@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// GET /api/v1/admin/users/{id}/export answers everything held about one user as one JSON document,
-// named for download, gzip-compressed for a caller that accepts it, with five minutes to send it,
+// GET /api/v1/admin/users/{id}/export answers one user's data as one JSON document, without the
+// attributes no app receives (#782 decision 8), named for download, gzip-compressed for a caller that accepts it, with five minutes to send it,
 // and records exported_user_data once the answer is written (#781 decisions 3, 5, 6 and 8). The
 // scope rule, decision 1, is the route's middleware, held by the integration tier.
 
@@ -685,8 +685,10 @@ func exportEverythingDatabase(now time.Time) *userExportStore {
 
 // exportEverythingParts is what the document holds for exportEverythingDatabase beside the user,
 // written out by hand: each entry as the matching admin API read answers it, every list in id
-// order, a session's apps by their association's, the expired session left out, and the picture as its content type and base64 bytes. The
-// four %s are the live sessions' times: session 60's start and last access, then session 61's.
+// order, the group attribute no app receives (floor) left out (#782 decision 8), a session's apps
+// by their association's, the expired session left out, and the picture as its content type and
+// base64 bytes. The four %s are the live sessions' times: session 60's start and last access,
+// then session 61's.
 const exportEverythingParts = `{
 	"attributes": [
 		{"id": 11, "createdAt": "2025-02-01T10:00:00Z", "updatedAt": null, "key": "employee_number",
@@ -698,8 +700,6 @@ const exportEverythingParts = `{
 		{"id": 5, "createdAt": "2025-01-10T09:00:00Z", "updatedAt": null, "groupIdentifier": "sales",
 			"description": "Sales team", "includeInIdToken": false, "includeInAccessToken": true, "memberCount": 3,
 			"attributes": [
-				{"id": 30, "createdAt": null, "updatedAt": null, "key": "floor", "value": "2",
-					"includeInIdToken": false, "includeInAccessToken": false, "groupId": 5},
 				{"id": 31, "createdAt": null, "updatedAt": null, "key": "region", "value": "south",
 					"includeInIdToken": true, "includeInAccessToken": false, "groupId": 5}
 			],

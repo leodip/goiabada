@@ -46,7 +46,7 @@ for (const theme of ["light", "dark"] as const) {
       ...(["settings", "permissions", "users-with-permission", "groups-with-permission", "delete"] as const).map((tab) => resourceUrl(resource.id, tab)),
       new URL(grant!, env.adminUrl).href,
       ...["general", "ui-theme", "sessions", "tokens", "keys", "email", "email/send-test-email", "audit-logs", "audit-log-viewer"].map((tab) => `${env.adminUrl}/admin/settings/${tab}`),
-      ...["profile", "picture", "email", "email-verification", "phone", "address", "change-password", "otp", "manage-consents", "legal-documents", "sessions", "delete", "deleted"].map((tab) => `${env.adminUrl}/account/${tab}`),
+      ...["profile", "picture", "email", "email-verification", "phone", "address", "change-password", "otp", "manage-consents", "legal-documents", "sessions", "data", "delete", "deleted"].map((tab) => `${env.adminUrl}/account/${tab}`),
       `${env.adminUrl}/missing-italian-page`, `${env.adminUrl}/auth/callback`, `${env.adminUrl}/auth/logout`,
     ];
     for (const url of urls) {

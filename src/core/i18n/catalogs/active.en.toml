@@ -361,6 +361,7 @@
 "adminconsole.account_menu.manage_consents" = "Consents"
 "adminconsole.account_menu.sessions" = "Sessions"
 "adminconsole.account_menu.legal_documents" = "Legal documents"
+"adminconsole.account_menu.data" = "Your data"
 "adminconsole.account_menu.delete_account" = "Delete account"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
@@ -744,6 +745,16 @@
 "adminconsole.account.delete.confirm_body" = "This can't be undone."
 "adminconsole.account_deleted.title" = "Your account is deleted"
 "adminconsole.account_deleted.message" = "Your {{.appName}} account is gone, and you're signed out everywhere. Apps you used keep what they already received; ask them to delete it."
+
+# --- Your data (#782) -------------------------------------------------------
+
+"adminconsole.account.data.page_title" = "Download your data"
+"adminconsole.account.data.lead" = "A copy of your data in {{.appName}}, in one JSON file."
+"adminconsole.account.data.included_label" = "What's in it:"
+"adminconsole.account.data.included" = "your profile and contact details; your groups and permissions, and the attributes apps can be given; the consents you gave apps; your sessions; the apps that can still get access to your account, with the IP address and browser you signed in from; the legal documents you accepted; your picture; and the audit log's entries about your account. Changes an administrator made say so, without naming them."
+"adminconsole.account.data.sign_in_again" = "If you haven't signed in during the last few minutes, you're asked to sign in again first."
+"adminconsole.account.data.signed_in_again" = "You've signed in again. Select Download my data to get your file."
+"adminconsole.account.data.button" = "Download my data"
 
 # === Adminconsole — admin clients =============================================
 

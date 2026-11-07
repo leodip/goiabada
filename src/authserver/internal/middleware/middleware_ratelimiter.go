@@ -417,15 +417,17 @@ type RateLimiter struct {
 	// accountPassword bounds guessing at the account's own password, at the two account API
 	// routes that verify it. One tier rather than two because it is one secret.
 	accountPassword *failureTier
-	activate        *requestTier
-	register        *requestTier
-	registerEmail   *requestTier
-	resetPwd        *requestTier
-	forgotPwd       *requestTier
-	forgotPwdIp     *requestTier
-	dcr             *requestTier
-	ropcIp          *failureTier // RFC 6749 §4.3.2 MUST protect against brute force
-	ropcIpRequests  *requestTier
+	// accountExport bounds the downloads of their own data an account can make.
+	accountExport  *requestTier
+	activate       *requestTier
+	register       *requestTier
+	registerEmail  *requestTier
+	resetPwd       *requestTier
+	forgotPwd      *requestTier
+	forgotPwdIp    *requestTier
+	dcr            *requestTier
+	ropcIp         *failureTier // RFC 6749 §4.3.2 MUST protect against brute force
+	ropcIpRequests *requestTier
 	// authorize is the admission tier on /auth/authorize, whose GET writes a browser-session
 	// row and whose POST parks a request, on every request that passes its first validation
 	// (#504).
@@ -557,6 +559,14 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// second factor, since the disable branch takes no OTP code at all. Failures only, so
 		// a user changing their password successfully spends nothing (#113, #219).
 		accountPassword: failure("account_password", countedByTokenUser, 5, 15*time.Minute),
+		// per-subject: downloads of the account's own data, every request counted (#782 decision
+		// 5). Each reads everything about the account, every audit row in the retention period and
+		// every refresh token among it, and builds the file in memory; the step-up check in front
+		// bounds a burst in time, not in number. 5 an hour is the email change's figure: room to
+		// retry a download that failed partway, and one account held to 120 such reads a day on each
+		// replica. Mounted after the client check and the step-up check, so a request either refuses
+		// spends nothing.
+		accountExport: request("account_export", countedByTokenUser, "", 5, 60*time.Minute),
 		// per-IP: 10 activation operations per 5 minutes, at the three requests an activation
 		// now costs (the link's GET, the clean GET that renders the password form, and its
 		// POST), shared by both methods. resetPwd's budget for the same chain (#112, #207
@@ -966,6 +976,16 @@ func (m *RateLimiter) LimitAccountCredentialChange(next http.Handler) http.Handl
 	return m.limitRequests(next, m.accountCredentialChange, rejectAPI)
 }
 
+// LimitAccountExport rate limits the account's own data download, GET /api/v1/account/export, on
+// the subject of the access token presented (#782 decision 5). Every request counts: there is no
+// credential to fail, and the cost is the read and the file built in memory. Mounted after
+// RequireAdminConsoleClient and RequireRecentAuthentication, so another client's token and a user
+// sent to sign in again spend nothing. A request with no readable token passes through to the
+// handler, which answers it 500 before reading anything.
+func (m *RateLimiter) LimitAccountExport(next http.Handler) http.Handler {
+	return m.limitRequests(next, m.accountExport, rejectAPI)
+}
+
 // LimitAccountPassword rate limits the account's own password check, on the subject of the
 // access token presented. One middleware over four routes, PUT /api/v1/account/password,
 // PUT /api/v1/account/otp, PUT /api/v1/account/email (#404) and POST
@@ -1003,7 +1023,8 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 // limitRequests writes the body of a limiter every request spends, keyed on what its one tier
 // counts by and refusing in the shape class names. LimitActivate, LimitResetPwd and LimitDCR are
 // this over a tier counted by the client block, and LimitEmailVerificationSend,
-// LimitAccountEmailChange and LimitAccountCredentialChange over one counted by the token's user
+// LimitAccountEmailChange, LimitAccountCredentialChange and LimitAccountExport over one counted by
+// the token's user
 // (#439). LimitRegister was too, until it gained a per-address tier (#207).
 //
 // A request with no subject of the tier's kind passes through to the handler, which answers it

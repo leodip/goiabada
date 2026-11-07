@@ -518,6 +518,10 @@ test("a user's account pages", async ({ page, browser, clients, users, legalDocu
         await expect(own.locator("#recovery-codes")).toBeVisible();
       },
     },
+    // Your data, and the notice it shows on the way back from signing in again (#782). The download
+    // itself saves a file and leaves the page as it was.
+    at(own, "your data", account("data")),
+    at(own, "your data, back from signing in again", `${account("data")}?signed_in_again=1`),
     // Delete account, with two-factor authentication on by now; the deletion itself is never
     // confirmed, so the user stays for the states after it (#783).
     at(own, "delete account, two-factor authentication on", account("delete")),

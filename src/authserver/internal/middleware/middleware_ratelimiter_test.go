@@ -2103,6 +2103,106 @@ func TestLimitAccountCredentialChange_PerSubject(t *testing.T) {
 	})
 }
 
+// runAccountExport drives one request through LimitAccountExport and reports the status, whether the
+// handler ran, and the response. A blank subject carries no token.
+func runAccountExport(m *RateLimiter, subject string) (int, bool, *httptest.ResponseRecorder) {
+	req := limiterRequest(http.MethodGet, "/api/v1/account/export", nil)
+	if subject != "" {
+		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+	}
+	rr := httptest.NewRecorder()
+	reached := false
+	m.LimitAccountExport(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		w.WriteHeader(http.StatusTeapot)
+	})).ServeHTTP(rr, req)
+	return rr.Code, reached, rr
+}
+
+// TestLimitAccountExport_PerSubject is the account download's own tier (#782 decision 5): every
+// download counts against the token's user, 5 per 60 minutes, refused in the API's envelope with the
+// hour as Retry-After, audited once naming the tier and counted on the refusals metric under it, and
+// held whatever the address switch says.
+func TestLimitAccountExport_PerSubject(t *testing.T) {
+	const budget = 5
+	const subject = "66666666-6666-6666-6666-666666666666"
+
+	t.Run("the sixth download in an hour is refused in the API's shape", func(t *testing.T) {
+		m, auditLog, reg := newMeteredTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			if code, reached, _ := runAccountExport(m, subject); code != http.StatusTeapot || !reached {
+				t.Fatalf("download %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		code, reached, rr := runAccountExport(m, subject)
+		if code != http.StatusTooManyRequests || reached {
+			t.Fatalf("download %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+		if got := rr.Header().Get("Retry-After"); got != "3600" {
+			t.Errorf("Retry-After = %q, want the hour the tier counts over", got)
+		}
+		var envelope map[string]string
+		if err := json.Unmarshal(rr.Body.Bytes(), &envelope); err != nil || envelope["error_code"] != "TOO_MANY_REQUESTS" {
+			t.Errorf("body = %q, want the account API's TOO_MANY_REQUESTS envelope", rr.Body.String())
+		}
+		if len(auditLog.events) != 1 {
+			t.Fatalf("got %d audit events, want 1", len(auditLog.events))
+		}
+		if auditLog.events[0].name != "rate_limit_exceeded" {
+			t.Errorf("audit event = %q, want rate_limit_exceeded", auditLog.events[0].name)
+		}
+		want := map[string]interface{}{"limiter": "account_export", "logged_in_user": subject}
+		if !reflect.DeepEqual(auditLog.events[0].details, want) {
+			t.Errorf("audit details = %v, want %v", auditLog.events[0].details, want)
+		}
+		runAccountExport(m, subject)
+		if got := refusalCounts(t, reg); !reflect.DeepEqual(got, everyLimiterAtZeroBut(t, reg, map[string]string{"account_export": "2"})) {
+			t.Errorf("refusals = %v, want two under account_export and none elsewhere", got)
+		}
+	})
+
+	t.Run("each subject has its own budget", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			runAccountExport(m, subject)
+		}
+		if code, _, _ := runAccountExport(m, subject); code != http.StatusTooManyRequests {
+			t.Fatalf("the exhausted subject got code %d, want %d", code, http.StatusTooManyRequests)
+		}
+		if code, reached, _ := runAccountExport(m, "77777777-7777-7777-7777-777777777777"); code != http.StatusTeapot || !reached {
+			t.Errorf("second subject: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("it is no other account tier's budget", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			runAccountExport(m, subject)
+		}
+		if code, reached, _ := runVerificationSend(m, subject); code != http.StatusTeapot || !reached {
+			t.Errorf("the verification send got code %d, handler reached %v, with only the download's budget spent",
+				code, reached)
+		}
+	})
+
+	t.Run("the limiter switched off still limits downloads", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget; i++ {
+			if code, reached, _ := runAccountExport(m, subject); code != http.StatusTeapot || !reached {
+				t.Fatalf("download %d of a budget of %d with the limiter off: got code %d, handler reached %v",
+					i+1, budget, code, reached)
+			}
+		}
+		if code, reached, _ := runAccountExport(m, subject); code != http.StatusTooManyRequests || reached {
+			t.Fatalf("download %d with the limiter off: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+}
+
 // accountPasswordRequest builds a request at one of the two routes LimitAccountPassword
 // covers, carrying the validated token the account API's authentication middleware leaves on
 // the context. target is what tells the two routes apart, and the cases below use it to show
@@ -2876,8 +2976,8 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 //
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
-// test can reach today are two of twenty tiers, and the next tier is what this exists for (#320
-// decision 3). The twenty are thirteen request tiers, two of them the per-address ceilings on
+// test can reach today are two of twenty-one tiers, and the next tier is what this exists for (#320
+// decision 3). The twenty-one are fourteen request tiers, two of them the per-address ceilings on
 // password checks, and five failures-only ones, plus the two failures-only tiers of the password
 // gate, which ratelimit.AccountLimiter counts and accountTiers names (#439, #564).
 func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
@@ -2892,9 +2992,9 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 	// The count is asserted because a walk that silently stopped matching would pass over an
 	// empty set exactly as it passes over a conformant one. It counts instances rather than
 	// distinct names, so a second tier carrying a name an earlier one already used is a
-	// twenty-first tier here rather than a replacement for the twentieth.
-	if len(tiers) != 20 {
-		t.Fatalf("walked %d tiers, expected the 20 the constructor builds: %v", len(tiers), tiers)
+	// twenty-second tier here rather than a replacement for the twenty-first.
+	if len(tiers) != 21 {
+		t.Fatalf("walked %d tiers, expected the 21 the constructor builds: %v", len(tiers), tiers)
 	}
 	for _, found := range tiers {
 		if found.keyField == "" {

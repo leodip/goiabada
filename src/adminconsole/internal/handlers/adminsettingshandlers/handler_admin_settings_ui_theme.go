@@ -91,8 +91,8 @@ func HandleUIThemePost(
 
 		renderError := func(message string) {
 			// Try to get themes from API to populate the dropdown on error. The form is redrawn
-			// without them, but not past a 401: the administrator's session has ended, and a
-			// resubmission would meet the same refusal (#427 decision 17).
+			// without them, but not past a 401 that ends the session: the administrator's session
+			// has ended, and a resubmission would meet the same refusal (#427 decision 17).
 			uiThemes := []string{}
 			if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
 				apiResp, err := apiClient.GetSettingsUITheme(r.Context(), jwtInfo.TokenResponse.AccessToken)

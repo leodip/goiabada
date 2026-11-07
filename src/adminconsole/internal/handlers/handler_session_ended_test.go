@@ -27,12 +27,12 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
-// Seam 6 of #427, the half after the API-error helpers: the route an admin API 401 sends the
-// browser to, and the home page that says why. Both run over the production ServerSideStore on an
-// in-memory backend, and every assertion about the session is read back through the store's own
-// Get with the cookie a browser would hold, because the notice's whole contract is what the *next*
-// request sees: TakeFlash edits the session in memory only, and a handler that forgot to save would
-// pass any test that read the same object back.
+// Seam 6 of #427, the half after the API-error helpers: the route an admin API 401 that ends the
+// session sends the browser to, and the home page that says why. Both run over the production
+// ServerSideStore on an in-memory backend, and every assertion about the session is read back
+// through the store's own Get with the cookie a browser would hold, because the notice's whole
+// contract is what the *next* request sees: TakeFlash edits the session in memory only, and a
+// handler that forgot to save would pass any test that read the same object back.
 
 // indexAuthServerBaseURL is the auth server base URL the home page is built with here. It is not
 // the configuration's default, http://localhost:9090, so a page reading anything but the value it

@@ -290,9 +290,10 @@ type GetUserConsentsResponse struct {
 	Consents []UserConsentResponse `json:"consents"`
 }
 
-// UserExportResponse is everything the auth server holds about one user, in one document, as GET
+// UserExportResponse is what the auth server holds about one user, in one document, as GET
 // /api/v1/admin/users/{id}/export answers it: what an operator hands a person who asked for their
-// data (#781). Each part is the entry the matching admin API read answers, inside this versioned
+// data (#781). It leaves out every attribute, the user's own or a group's, that no app receives,
+// with both include-in-token flags off (#782 decision 8). Each part is the entry the matching admin API read answers, inside this versioned
 // wrapper, and every list is in id order, oldest first, so two exports of one person compare line
 // by line (decision 3). FormatVersion goes up only for a change that breaks a reader; a field added
 // to a reused entry appears here too, and is additive.

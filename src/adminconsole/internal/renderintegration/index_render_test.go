@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// The console's home page through the real renderer, in pt-BR, with and without the notice an
-// admin API 401 leaves for it (#427 decision 17, seam 7). HandleIndexGet's own tests assert when it
-// binds SessionEnded; this is what the bind renders to.
+// The console's home page through the real renderer, in pt-BR, with and without the notice an admin
+// API 401 that ends the session leaves for it (#427 decision 17, seam 7). HandleIndexGet's own
+// tests assert when it binds SessionEnded; this is what the bind renders to.
 func TestRender_IndexPage_TheSessionEndedNotice(t *testing.T) {
 	const notice = "Seu acesso terminou. Entre novamente."
 

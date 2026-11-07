@@ -1,5 +1,5 @@
-// Download data, in the header of every tab of a user, saves everything held about the user as one
-// JSON file, and the export is audited under the user.
+// Download data, in the header of every tab of a user, saves the user's data as one JSON file,
+// without the attributes no app receives, and the export is audited under the user.
 import { readFileSync } from "node:fs";
 import { userUrl } from "../../../lib/admin-console";
 import { env } from "../../../lib/environment";
@@ -9,10 +9,20 @@ import { auditRows } from "../../../lib/sessions";
 test("Download data saves the user's file, without their secrets, and is audited", async ({ page, users }) => {
   const user = await users.create();
 
-  // An attribute and a profile change, for the file to hold.
+  // An attribute and a profile change, for the file to hold. The attribute keeps the form's
+  // default, both token flags on.
   await page.goto(`${env.adminUrl}/admin/users/${user.id}/attributes/add`);
   await page.locator("#attributeKey").fill("employee_id");
   await page.locator('input[name="attributeValue"]').fill("E-2002");
+  await page.locator("#btnSave").click();
+  await expect(page).toHaveURL(new RegExp(`/admin/users/${user.id}/attributes(\\?|$)`));
+  // An attribute with both flags off, which no app receives: an administrators' own note, which
+  // the file leaves out.
+  await page.goto(`${env.adminUrl}/admin/users/${user.id}/attributes/add`);
+  await page.locator("#attributeKey").fill("administrators_note");
+  await page.locator('input[name="attributeValue"]').fill("slow-to-answer-email");
+  await page.locator('input[name="includeInAccessToken"]').uncheck();
+  await page.locator('input[name="includeInIdToken"]').uncheck();
   await page.locator("#btnSave").click();
   await expect(page).toHaveURL(new RegExp(`/admin/users/${user.id}/attributes(\\?|$)`));
   await page.goto(userUrl(user.id, "profile"));
@@ -40,6 +50,8 @@ test("Download data saves the user's file, without their secrets, and is audited
   expect(file.user.givenName).toBe("Playwright");
   expect(file.user.nickname).toBe("exported");
   expect(file.attributes).toEqual([expect.objectContaining({ key: "employee_id", value: "E-2002" })]);
+  expect(text).not.toContain("administrators_note");
+  expect(text).not.toContain("slow-to-answer-email");
 
   // Nothing secret is in it.
   expect(text).not.toContain("passwordHash");

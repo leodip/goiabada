@@ -1,7 +1,7 @@
-// Package userexport builds the document that holds everything the auth server holds about one
-// user (#781): what an operator hands a person who asked for a copy of their data. The admin API's
-// export route answers it, and the account API's own copy (#782) calls the same builder, so the
-// document is one thing whoever asks.
+// Package userexport builds the document that holds what the auth server holds about one user
+// (#781), but for the attributes no app receives (#782 decision 8): what an operator hands a person
+// who asked for a copy of their data. The admin API's export route answers it, and the account
+// API's own copy (#782) calls the same builder, so the document is one thing whoever asks.
 package userexport
 
 import (
@@ -61,7 +61,10 @@ type RefreshToken struct {
 // Each part is the entry the matching admin API read answers, inside the versioned wrapper, so
 // nothing secret reaches it: the user is GET /api/v1/admin/users/{id}'s projection, which carries
 // no password hash, two-factor secret or pending code, and no mapping copies the encrypted secret
-// of a client loaded onto a consent or a session. Every list is in id order, oldest first, a
+// of a client loaded onto a consent or a session. An attribute of the user's or of a group's whose
+// include-in-ID-token and include-in-access-token flags are both off reaches no app: it is an
+// administrators' own note about the person, and is left out (#782 decision 8); groups and
+// permissions are kept in full. Every list is in id order, oldest first, a
 // group's attributes and permissions too, so two exports of one person compare line by line
 // (#781 decision 3). Every list is [] rather than null when it is empty, so a reader never tells
 // "none" from "not read". The audit events name no other person who acted on the user (decision
@@ -72,9 +75,14 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 		return api.UserExportResponse{}, err
 	}
 
+	// inIdOrder's copy is the one DeleteFunc changes, so the parts are left as they were.
+	attributes := slices.DeleteFunc(inIdOrder(parts.Attributes, func(a api.UserAttributeResponse) int64 { return a.Id }),
+		func(a api.UserAttributeResponse) bool { return !a.IncludeInIdToken && !a.IncludeInAccessToken })
 	groups := inIdOrder(parts.Groups, func(g api.UserExportGroupResponse) int64 { return g.Id })
 	for i := range groups {
-		groups[i].Attributes = inIdOrder(groups[i].Attributes, func(a api.GroupAttributeResponse) int64 { return a.Id })
+		groups[i].Attributes = slices.DeleteFunc(
+			inIdOrder(groups[i].Attributes, func(a api.GroupAttributeResponse) int64 { return a.Id }),
+			func(a api.GroupAttributeResponse) bool { return !a.IncludeInIdToken && !a.IncludeInAccessToken })
 		groups[i].Permissions = inIdOrder(groups[i].Permissions, permissionId)
 	}
 
@@ -99,7 +107,7 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 			EmailDigest: hashutil.HashString(user.Email),
 		},
 		User:          *apimapping.ToUserResponse(user),
-		Attributes:    inIdOrder(parts.Attributes, func(a api.UserAttributeResponse) int64 { return a.Id }),
+		Attributes:    attributes,
 		Groups:        groups,
 		Permissions:   inIdOrder(parts.Permissions, permissionId),
 		Consents:      inIdOrder(parts.Consents, func(c api.UserConsentResponse) int64 { return c.Id }),

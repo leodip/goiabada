@@ -16,11 +16,12 @@ import (
 // TestSessionEndedScripts_EveryFetchSiteFollowsTheCode holds the browser's half of #427 decision 17
 // to the Go half HandleAPIErrorJSON writes.
 //
-// An admin API 401 reaches an AJAX request as a 403 carrying sessionEndedCode, and the browser, not
-// the server, has to go to sessionEndedPath: a redirect answered to fetch() is followed invisibly
-// and hands the script the home page's HTML to parse as JSON. So every script that sends a request
-// has to recognise the code, and nothing in this repository executes JavaScript to check that one
-// does. This test is therefore a drift guard and no more:
+// An admin API 401 that ends the session reaches an AJAX request as a 403 carrying
+// sessionEndedCode, and the browser, not the server, has to go to sessionEndedPath: a redirect
+// answered to fetch() is followed invisibly and hands the script the home page's HTML to parse as
+// JSON. So every script that sends a request has to recognise the code, and nothing in this
+// repository executes JavaScript to check that one does. This test is therefore a drift guard and
+// no more:
 //
 //   - utils.js declares the code and the path with the literals the helper emits and the route is
 //     mounted at, so renaming either on one side fails here;
@@ -72,6 +73,7 @@ func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
 	sort.Strings(found)
 	assert.Equal(t, map[string]int{"static/utils.js": 1, "static/image-upload.js": 2}, sites,
 		"a request site was added or removed under web/ (%v): one that can receive an admin API 401 "+
+			"that ends the session "+
 			"must follow %q to %s the way the three handled here do, and then this count moves", found,
 		sessionEndedCode, sessionEndedPath)
 

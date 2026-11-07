@@ -8,7 +8,9 @@
 // A few helpers here render nothing: the display-name join, the session and consent rows, and
 // ParseProfileForm and EchoProfileForm. They live here because the pages that render them are in
 // more than one handler package, the account pages and the admin user pages, and a child handler
-// package takes them from here rather than from its parent or a sibling (#440).
+// package takes them from here rather than from its parent or a sibling (#440). The export
+// pass-through, LiftExportWriteDeadline and ServeExport, is here for the same reason: the
+// administrator's download of a user's data and the user's own share it (#782).
 //
 // The auth server has its own render package, and much of the two is the same code. Each
 // application owns its renderer because the shared one put this console's page data and template

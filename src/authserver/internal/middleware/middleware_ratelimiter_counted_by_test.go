@@ -10,14 +10,14 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// TestRateLimiter_EveryTierDeclaresWhatItCountsBy holds each of the twenty tiers the constructor
-// builds to the kind #522 decision 11 gives it: ten by IP address, three by the account a form
-// names, one by IP address and account, one by the signing-in user and five by the access token's
-// user. The kinds are written here rather than read from the constructor, because the rate-limit
+// TestRateLimiter_EveryTierDeclaresWhatItCountsBy holds each of the twenty-one tiers the
+// constructor builds to the kind #522 decision 11 gives it: ten by IP address, three by the account
+// a form names, one by IP address and account, one by the signing-in user and six by the access
+// token's user, account_export among them (#782 decision 5). The kinds are written here rather than read from the constructor, because the rate-limit
 // table's Counted by column is held to the declaration, and a declaration changed by mistake would
 // carry the table with it through a regenerated reading.
 //
-// Found by walking the struct, as the conventional-key test beside it finds them, so a twenty-first
+// Found by walking the struct, as the conventional-key test beside it finds them, so a twenty-second
 // tier fails the count rather than going unchecked.
 func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 	want := map[string]countedBy{
@@ -41,6 +41,7 @@ func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 		"account_email_change":      countedByTokenUser,
 		"account_credential_change": countedByTokenUser,
 		"account_password":          countedByTokenUser,
+		"account_export":            countedByTokenUser,
 	}
 
 	var tiers []foundTier
@@ -52,7 +53,7 @@ func TestRateLimiter_EveryTierDeclaresWhatItCountsBy(t *testing.T) {
 	for _, found := range tiers {
 		kind, ok := want[found.name]
 		if !ok {
-			t.Errorf("tier %q at %s is not one of the twenty this test knows", found.name, found.where)
+			t.Errorf("tier %q at %s is not one of the twenty-one this test knows", found.name, found.where)
 			continue
 		}
 		if found.countedBy != kind {

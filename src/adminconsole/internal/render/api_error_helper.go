@@ -11,14 +11,19 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// sessionEndedPath is the console route an admin API 401 sends the browser to, which clears the
-// stored tokens and leaves a notice on the home page (#427 decision 17).
+// sessionEndedPath is where an admin API 401 that IsSessionEnded reports sends the browser: the
+// console route that clears the stored tokens and leaves a notice on the home page (#427
+// decision 17).
 const sessionEndedPath = "/auth/session-ended"
 
-// sessionEndedCode is the error code HandleAPIErrorJSON answers an admin API 401 with. The three
+// sessionEndedCode is the error code HandleAPIErrorJSON answers such a 401 with. The three
 // fetch sites in web/static/utils.js and web/static/image-upload.js key on this literal, not on the
 // 403 status, to navigate to sessionEndedPath; every other 403 keeps its modal and signs nobody out.
 const sessionEndedCode = "session_ended"
+
+// stepUpRequiredCode is the auth server's code for RFC 9470 section 3's refusal,
+// insufficient_user_authentication, which RequireRecentAuthentication answers 401 with (#782).
+const stepUpRequiredCode = "INSUFFICIENT_USER_AUTHENTICATION"
 
 // ErrorWriter is what the classifiers below answer through: the two pages and the JSON writer
 // Renderer provides. The classifiers came here from the handlers package with the name helpers,
@@ -30,7 +35,8 @@ type ErrorWriter interface {
 	JSONError(w http.ResponseWriter, r *http.Request, err error)
 }
 
-// IsSessionEnded reports whether the admin API refused the console's access token.
+// IsSessionEnded reports whether the admin API refused the console's access token. The step-up
+// refusal is a 401 too, but not this one (see IsStepUpRequired).
 //
 // RFC 6750 section 3.1: invalid_token is answered 401 when the token "is expired, revoked,
 // malformed, or invalid for other reasons". The admin API's RequireValidSession answers it for an
@@ -45,7 +51,29 @@ type ErrorWriter interface {
 // error to HandleAPIError, which signs the administrator out.
 func IsSessionEnded(err error) bool {
 	var apiErr *apiclient.APIError
-	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusUnauthorized
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusUnauthorized && apiErr.Code != stepUpRequiredCode
+}
+
+// IsStepUpRequired reports whether the API refused the call under its step-up guard: the sign-in
+// behind the token is older than the operation allows or below the level it asks for, answered 401
+// INSUFFICIENT_USER_AUTHENTICATION (RFC 9470 section 3). The token and its session are still good,
+// so it is not IsSessionEnded: this operation refused the sign-in behind the token, and every other
+// call is still answered by its own checks, a step-up guard's own age and level among them.
+//
+// The page in front of a guarded operation checks it before handing the error to a classifier, and
+// sends the browser through the console's sign-in with prompt=login and the level it needs, as the
+// Your data page does. Only the page knows that level and where to bring the user back to, so the
+// classifiers answer the refusal as the page's own fault, with the 500 writer (stepUpUnhandled).
+func IsStepUpRequired(err error) bool {
+	var apiErr *apiclient.APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusUnauthorized && apiErr.Code == stepUpRequiredCode
+}
+
+// stepUpUnhandled is what the classifiers hand the 500 writer for a step-up refusal, which reaches
+// them only from a page that did not check IsStepUpRequired first. The stack and the request id
+// point the developer at that page; the user stays signed in.
+func stepUpUnhandled(err error) error {
+	return errs.Wrap(err, "the page does not answer the API's step-up refusal: check render.IsStepUpRequired before the classifier and sign the user in again")
 }
 
 // IsRateLimited reports whether the admin API refused the call under its rate limit.
@@ -82,8 +110,13 @@ func RateLimitedMessage(ctx context.Context) string {
 // a bookmark to a deleted user told the administrator the server had broken, and spent a stack, a
 // log record and a request id saying so (#279).
 //
-// A 401 sends the browser to sessionEndedPath (see IsSessionEnded).
+// A 401 sends the browser to sessionEndedPath (see IsSessionEnded), except the step-up refusal,
+// which is the 500 page (see IsStepUpRequired).
 func HandleAPIError(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error) {
+	if IsStepUpRequired(err) {
+		httpHelper.InternalServerError(w, r, stepUpUnhandled(err))
+		return
+	}
 	if IsSessionEnded(err) {
 		http.Redirect(w, r, sessionEndedPath, http.StatusFound)
 		return
@@ -114,11 +147,16 @@ func HandleAPIError(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Reque
 // this answered before threw the form away and blamed the server (#425).
 //
 // A 401 sends the browser to sessionEndedPath, as HandleAPIError does: no resubmission of the form
-// can succeed with a token the admin API has refused.
+// can succeed with a token the admin API has refused. The step-up refusal is the 500 page here too
+// (see IsStepUpRequired).
 //
 // A 429 re-renders the form too, with RateLimitedMessage rather than the API's sentence (see
 // IsRateLimited).
 func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error, renderErrorFunc func(string)) {
+	if IsStepUpRequired(err) {
+		httpHelper.InternalServerError(w, r, stepUpUnhandled(err))
+		return
+	}
 	if IsSessionEnded(err) {
 		http.Redirect(w, r, sessionEndedPath, http.StatusFound)
 		return
@@ -173,11 +211,17 @@ func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r
 // 15.5.2 says a 401 "MUST send a WWW-Authenticate header field", and the console signs in with a
 // cookie and has no challenge to send; with 403 the client "MAY repeat the request with new or
 // different credentials", section 15.5.4, which is what signing in again is (#427 decision 18).
+// The step-up refusal is not: it takes JSONError's 500 branch, the detail in the server log and a
+// request id on screen (see IsStepUpRequired).
 //
 // A 429 opens the dialog too, answered 429 with the console's own code and RateLimitedMessage
 // rather than the API's sentence (see IsRateLimited). The status keeps JSONError silent and the
 // dialog's title "Error" rather than "Server error".
 func HandleAPIErrorJSON(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error) {
+	if IsStepUpRequired(err) {
+		httpHelper.JSONError(w, r, stepUpUnhandled(err))
+		return
+	}
 	if IsSessionEnded(err) {
 		httpHelper.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus(sessionEndedCode,
 			i18n.T(r.Context(), "adminconsole.session_ended.message"), http.StatusForbidden))

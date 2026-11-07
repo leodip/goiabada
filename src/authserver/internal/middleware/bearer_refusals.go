@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -32,6 +33,10 @@ type bearerRefusals interface {
 	// is the API envelope's error_code, which says why; the challenge's error is RFC 6750's one
 	// code for any 403.
 	forbidden(w http.ResponseWriter, r *http.Request, apiCode, description string)
+	// insufficientUserAuthentication answers a valid token whose sign-in is too old or too weak for
+	// the route: 401 insufficient_user_authentication with the acr_values and max_age the client
+	// signs the user in again with, per RFC 9470 section 3.
+	insufficientUserAuthentication(w http.ResponseWriter, r *http.Request, description, acrValues string, maxAge time.Duration)
 	// internalError answers a fault the guard could not decide past: 500, logged once. sid is the
 	// session identifier the guard was checking, or empty before it has one; it is the one value the
 	// guards log beside an error.
@@ -64,6 +69,12 @@ func (apiBearerRefusals) invalidToken(w http.ResponseWriter, _ *http.Request, de
 func (apiBearerRefusals) forbidden(w http.ResponseWriter, _ *http.Request, apiCode, description string) {
 	w.Header().Set("WWW-Authenticate", BearerChallenge("insufficient_scope", description))
 	apiresponse.WriteError(w, description, apiCode, http.StatusForbidden)
+}
+
+func (apiBearerRefusals) insufficientUserAuthentication(w http.ResponseWriter, _ *http.Request, description, acrValues string,
+	maxAge time.Duration) {
+	w.Header().Set("WWW-Authenticate", StepUpChallenge(description, acrValues, maxAge))
+	apiresponse.WriteError(w, description, "INSUFFICIENT_USER_AUTHENTICATION", http.StatusUnauthorized)
 }
 
 func (apiBearerRefusals) internalError(w http.ResponseWriter, r *http.Request, err error, sid string) {
@@ -106,6 +117,13 @@ func (u userinfoBearerRefusals) invalidToken(w http.ResponseWriter, r *http.Requ
 
 func (u userinfoBearerRefusals) forbidden(w http.ResponseWriter, r *http.Request, _ string, description string) {
 	u.refuse(w, r, "insufficient_scope", description, http.StatusForbidden)
+}
+
+func (u userinfoBearerRefusals) insufficientUserAuthentication(w http.ResponseWriter, r *http.Request, description,
+	acrValues string, maxAge time.Duration) {
+	u.jsonWriter.JSONError(w, r, protocolvalidation.NewErrorDetailWithHTTPStatusAndWWWAuthenticate(
+		"insufficient_user_authentication", description, http.StatusUnauthorized,
+		StepUpChallenge(description, acrValues, maxAge)))
 }
 
 // internalError answers server_error at 500 through the writer, which logs the one record.

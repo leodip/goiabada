@@ -89,7 +89,8 @@ func TestHandlers_ApiClientErrorsReachTheClassifier(t *testing.T) {
 		t.Errorf("%d problem(s) across %d apiClient error guard(s):\n\t%s\n\n"+
 			"Call render.HandleAPIError for a page, HandleAPIErrorWithCallback for a page with a "+
 			"form to redraw, or HandleAPIErrorJSON for JSON. Each routes 401 to the session-ended "+
-			"route, 404 to the console's own not-found answer, 400 (and 409) to the caller, and "+
+			"route, except the step-up refusal, which the page answers first by "+
+			"render.IsStepUpRequired, 404 to the console's own not-found answer, 400 (and 409) to the caller, and "+
 			"everything else to the 500 writer, which is where the stack and the request id belong "+
 			"(#279, #427). A read the page can do without keeps its fallback for everything but "+
 			"render.IsSessionEnded.",
@@ -135,7 +136,8 @@ func apiClientGuardProblems(fset *token.FileSet, file *ast.File, rel string) ([]
 				if !guardReturnsTheError(body, guard.errVar) {
 					problems = append(problems, at(guard.stmt)+"the error from "+guard.method+
 						" is dropped here: a guard that writes no response hands the error back "+
-						"to its caller, or an admin API 401 never signs the administrator out")
+						"to its caller, or an admin API 401 that ends the session never signs the "+
+						"administrator out")
 				}
 				continue
 			}
@@ -331,10 +333,10 @@ func inspectsAPIErrorStatus(body *ast.BlockStmt) bool {
 //
 // A guard that writes no response is held to guardReturnsTheError instead. It used to be out of
 // this rule altogether, on the reading that it chooses no meaning for the failure, and that stopped
-// being true with #427 decision 17: a 401 means the administrator's session has ended however
-// optional the read was. The client logo page logged it as a warning and rendered, until final
-// review round 2 of #427; it now answers a 401 through HandleAPIError and keeps its warning for
-// everything else, which makes it a guard that answers.
+// being true with #427 decision 17: a 401 that render.IsSessionEnded reports means the
+// administrator's session has ended however optional the read was. The client logo page logged it
+// as a warning and rendered, until final review round 2 of #427; it now answers that 401 through
+// HandleAPIError and keeps its warning for everything else, which makes it a guard that answers.
 func guardAnswersTheRequest(body *ast.BlockStmt) bool {
 	answers := false
 	ast.Inspect(body, func(n ast.Node) bool {

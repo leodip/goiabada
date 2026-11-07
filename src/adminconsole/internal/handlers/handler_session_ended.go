@@ -23,14 +23,14 @@ const flashSessionEnded = "sessionEnded"
 // may refuse again, and nothing here could then stop the loop.
 //
 // The route stays a GET because both of its callers navigate rather than submit: the API-error
-// helpers answer an admin API 401 with a 302 here, and the page scripts follow with
-// window.location, and neither can arrive as a POST. A GET that changes state is the exposure
-// #411 closed on /auth/logout, so the state change here is guarded instead: a navigation the
-// browser itself reports as beginning on another site clears nothing, which is the same evidence
-// the origin check reads first on the unsafe methods beside it (httpmw.CSRF). A browser predating
-// fetch metadata sends no Sec-Fetch-Site at all and is allowed through, the posture those POSTs
-// keep; and a top-level navigation is the only cross-site shape that carries this console's Lax
-// session cookie to a GET anyway (#408).
+// helpers answer an admin API 401 that ends the session with a 302 here, and the page scripts
+// follow with window.location, and neither can arrive as a POST. A GET that changes state is the
+// exposure #411 closed on /auth/logout, so the state change here is guarded instead: a navigation
+// the browser itself reports as beginning on another site clears nothing, which is the same
+// evidence the origin check reads first on the unsafe methods beside it (httpmw.CSRF). A browser
+// predating fetch metadata sends no Sec-Fetch-Site at all and is allowed through, the posture those
+// POSTs keep; and a top-level navigation is the only cross-site shape that carries this console's
+// Lax session cookie to a GET anyway (#408).
 //
 // Such a navigation is sent home with the session untouched rather than refused, because the
 // 302 here does not always begin on this console: fetch metadata reports every hop of a

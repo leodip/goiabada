@@ -598,13 +598,22 @@ const (
 	// logged_in_user.
 	EventUpdatedClientAdministrativeScopes = "updated_client_administrative_scopes"
 
-	// EventExportedUserData records an export of everything held about a user through GET
+	// EventExportedUserData records an administrator's export of a user's data through GET
 	// /api/v1/admin/users/{id}/export (#781 decision 8). It is written once the answer has been
 	// sent, whether or not the caller received all of it, since the data has left the server
-	// either way; a refused or failed export writes nothing.
+	// either way; a refused or failed export writes nothing. A user's download of their own data is
+	// exported_own_user_data, so an alert on every download watches both.
 	//
 	// Payload: user_id, the user exported, and logged_in_user, the subject of the token that asked.
 	EventExportedUserData = "exported_user_data"
+
+	// EventExportedOwnUserData records a user's download of their own data through GET
+	// /api/v1/account/export (#782 decision 4), beside an administrator's exported_user_data. It is
+	// written as that one is: once the answer has been sent, whether or not the caller received all
+	// of it, and never for a refused or failed download.
+	//
+	// Payload: user_id, the user, and logged_in_user, their subject.
+	EventExportedOwnUserData = "exported_own_user_data"
 
 	// EventViewedClientSecret records a read of a client's secret through GET
 	// /api/v1/admin/clients/{id}/secret, the one route that answers one, decrypted. Only a read
@@ -736,6 +745,7 @@ var auditEventTypes = []string{
 	EventDisabledOTP,
 	EventDynamicClientRegistration,
 	EventEnabledOTP,
+	EventExportedOwnUserData,
 	EventExportedUserData,
 	EventFailedAccountActivationCode,
 	EventFailedEmailVerificationCode,

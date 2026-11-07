@@ -366,6 +366,7 @@
 "adminconsole.account_menu.manage_consents" = "Consentimientos"
 "adminconsole.account_menu.sessions" = "Sesiones"
 "adminconsole.account_menu.legal_documents" = "Documentos legales"
+"adminconsole.account_menu.data" = "Tus datos"
 "adminconsole.account_menu.delete_account" = "Eliminar cuenta"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
@@ -749,6 +750,16 @@
 "adminconsole.account.delete.confirm_body" = "No se puede deshacer."
 "adminconsole.account_deleted.title" = "Tu cuenta se ha eliminado"
 "adminconsole.account_deleted.message" = "Tu cuenta de {{.appName}} ya no existe y se ha cerrado tu sesión en todas partes. Las aplicaciones que usaste conservan lo que ya recibieron; pídeles que lo eliminen."
+
+# --- Your data (#782) -------------------------------------------------------
+
+"adminconsole.account.data.page_title" = "Descargar tus datos"
+"adminconsole.account.data.lead" = "Una copia de tus datos en {{.appName}}, en un solo archivo JSON."
+"adminconsole.account.data.included_label" = "Qué contiene:"
+"adminconsole.account.data.included" = "tu perfil y tus datos de contacto; tus grupos y permisos, y los atributos que pueden darse a las aplicaciones; los consentimientos que diste a las aplicaciones; tus sesiones; las aplicaciones que aún pueden acceder a tu cuenta, con la dirección IP y el navegador desde los que iniciaste sesión; los documentos legales que aceptaste; tu foto; y las entradas del registro de auditoría sobre tu cuenta. Los cambios que hizo un administrador lo indican, sin nombrarlo."
+"adminconsole.account.data.sign_in_again" = "Si no has iniciado sesión en los últimos minutos, primero se te pide que vuelvas a iniciar sesión."
+"adminconsole.account.data.signed_in_again" = "Has vuelto a iniciar sesión. Selecciona Descargar mis datos para obtener tu archivo."
+"adminconsole.account.data.button" = "Descargar mis datos"
 
 # === Adminconsole — admin clients =============================================
 

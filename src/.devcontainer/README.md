@@ -141,9 +141,11 @@ docker exec -u vscode -w /workspaces/goiabada/src/authserver \
   "$NAME-devcontainer-1" ./run-tests.sh --type data
 ```
 
-One invocation of `run-tests.sh` per container at a time. It removes `/tmp/goiabada*.db*` and
-kills whatever listens on 19090 and 19091 in its own container, so two concurrent runs in one
-container would collide; separate stacks are unaffected.
+One data or integration run per container at a time. Those tiers kill whatever listens on
+19090, 19091 and 19190 in their own container and remove `/tmp/goiabada*.db*`, before they start
+and again on exit, so a second one started beside the first is refused, naming it. The lint,
+module and setup tiers do neither and can run beside one with `--no-build`, since a build replaces
+the binary the integration tier starts its server from. Separate stacks are unaffected.
 
 From Git Bash on Windows, export `MSYS_NO_PATHCONV=1` first. Otherwise the shell rewrites the
 `-w /workspaces/...` and `/opt/mssql-tools18/...` arguments above into Windows paths before

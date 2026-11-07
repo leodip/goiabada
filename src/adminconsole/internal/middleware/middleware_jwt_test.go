@@ -238,6 +238,13 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 	}
 }
 
+// The scope a page's own sign-in asks for is the one RequiresScope's sign-in asks for (#782): for
+// the account pages, the console's five default scopes, in order.
+func TestSignInScope_IsTheSignInArmsScope(t *testing.T) {
+	assert.Equal(t, "authserver:manage authserver:manage-account email openid profile",
+		(&JWT{}).SignInScope([]string{"authserver:manage-account"}))
+}
+
 func TestBuildScopeString(t *testing.T) {
 	middleware := &JWT{}
 

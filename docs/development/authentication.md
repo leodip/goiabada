@@ -684,11 +684,13 @@ refused requests too. Without it nothing bounds how often one account succeeds a
 and each sends a security notice (#724 decision 3). Account deletion is on `account_password`
 alone, without `account_credential_change`: a wrong password, authenticator code or recovery code
 each spends it, a blank password or a missing code spends nothing, and the last administrator is
-refused before any credential is checked (#783 decision 4). The limits counted by a user or by an
+refused before any credential is checked (#783 decision 4). The account's own data download counts
+every request on `account_export`, mounted after its client and step-up guards (#782 decision 5).
+The limits counted by a user or by an
 email apply whatever
 `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` says: those counted by a user something has already
 authenticated, the signing-in user or a token's subject (OTP, account password, credential change,
-email change, email verification and its resend), since no stranger can spend them (#542), and those counted by an email anyone can
+email change, email verification and its resend, data download), since no stranger can spend them (#542), and those counted by an email anyone can
 type (wrong passwords per account, 100 an hour shared by the sign-in form and the password grant,
 and reset mails and registration notices per address), since only Goiabada can count them (#503).
 The switch governs only the tiers that read the client's address, those counted by an IP address and
@@ -760,3 +762,23 @@ names (section 2.2.2).
     under the deletion's lock must still hold the same password hash and, while two-factor is on,
     the authenticator generation the code was accepted for; a recovery code is claimed in the
     deletion's transaction (#783).
+  - `GET /api/v1/account/export` mounts `RequireAdminConsoleClient`, then
+    `RequireRecentAuthentication(300s, urn:goiabada:level2_optional)`, then the `account_export`
+    tier (5 an hour per token user, every request counted), so a request either guard refuses
+    spends nothing. The step-up guard is RFC 9470 section 3: it refuses a token whose `auth_time`
+    is older than the maximum age or whose `acr` ranks below the minimum, and fails closed on a
+    missing or non-integer `auth_time` or an unknown `acr`, answering 401
+    `INSUFFICIENT_USER_AUTHENTICATION` with `error="insufficient_user_authentication"`,
+    `acr_values` and `max_age` on every refusal. It takes the age, the level and a clock, so it is
+    the guard to reuse in front of another operation. A refresh keeps `auth_time`, so a refreshed
+    token is as old as its sign-in. The answer is the admin export's builder and writer, and
+    `exported_own_user_data` is written after it (#782). In the console, `render.IsStepUpRequired`
+    recognises that 401 by its code and `render.IsSessionEnded` leaves it out, since the token and
+    its session are still good. A page in front of the guard checks `IsStepUpRequired` before the
+    API error classifier and sends the browser through the console's own sign-in with
+    `prompt=login` and the level the operation asks for, never `max_age`, which would replace the
+    session past the window: Your data asks for `urn:goiabada:level2_optional` and returns to
+    `/account/data?signed_in_again=1`. The ordinary sign-in sends neither parameter. A step-up
+    refusal that reaches `HandleAPIError`, `HandleAPIErrorWithCallback` or `HandleAPIErrorJSON` is
+    that page's fault: each answers it with the 500 writer, whose log names the missing check, and
+    leaves the user signed in.

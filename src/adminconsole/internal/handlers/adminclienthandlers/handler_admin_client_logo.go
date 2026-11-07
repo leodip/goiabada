@@ -69,8 +69,9 @@ func HandleLogoGet(
 		var logoUrl string
 		logoInfo, err := apiClient.GetClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
-			// The page renders without the logo, but not past a 401: the administrator's session
-			// has ended, and nothing on the page would work (#427 decision 17).
+			// The page renders without the logo, but not past a 401 that ends the session: the
+			// administrator's session has ended, and nothing on the page would work (#427
+			// decision 17).
 			if render.IsSessionEnded(err) {
 				render.HandleAPIError(httpHelper, w, r, err)
 				return

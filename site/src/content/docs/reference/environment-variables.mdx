@@ -176,6 +176,7 @@ The auth server limits these endpoints. The limits counted by a user or an email
 | `POST /api/v1/account/email/verification/send`<br/>Limiter: `email_verification_send` | 5 per 60 minutes | every request | the token's user | always |
 | `PUT /api/v1/account/email`<br/>Limiter: `account_email_change` | 5 per 60 minutes | every request | the token's user | always |
 | `PUT /api/v1/account/password`, `PUT /api/v1/account/otp` and `POST /api/v1/account/otp/recovery-codes`<br/>Limiter: `account_credential_change` | 10 per 60 minutes, for the three together | every request | the token's user | always |
+| `GET /api/v1/account/export` (downloading one's own data)<br/>Limiter: `account_export` | 5 per 60 minutes | every request | the token's user | always |
 | `PUT /api/v1/account/password`, `PUT /api/v1/account/otp`, `PUT /api/v1/account/email`, `POST /api/v1/account/otp/recovery-codes` and `POST /api/v1/account/deletion`<br/>Limiter: `account_password` | 5 per 15 minutes, for the five together | failed passwords, and on the deletion failed authenticator and recovery codes | the token's user | always |
 | `POST /forgot-password`<br/>Limiter: `forgot_pwd_email` | 5 per 5 minutes | every request | email | always |
 | `POST /forgot-password`<br/>Limiter: `forgot_pwd_ip` | 20 per 5 minutes | every request | IP address | switch on |
