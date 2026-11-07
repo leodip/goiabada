@@ -83,17 +83,23 @@ func toolsRun(t *testing.T, markers string) []string {
 	return ran
 }
 
-// cleanupCalls is how many times each housekeeping stub ran, from markers' cleanup file.
+// cleanupLog is the housekeeping stubs' calls in the order they ran, from markers' cleanup file.
+func cleanupLog(t *testing.T, markers string) []string {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join(markers, "cleanup"))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	require.NoError(t, err)
+	return strings.Fields(string(content))
+}
+
+// cleanupCalls is how many times each housekeeping stub ran.
 func cleanupCalls(t *testing.T, markers string) map[string]int {
 	t.Helper()
 	calls := map[string]int{}
-	content, err := os.ReadFile(filepath.Join(markers, "cleanup"))
-	if os.IsNotExist(err) {
-		return calls
-	}
-	require.NoError(t, err)
-	for _, line := range strings.Fields(string(content)) {
-		calls[line]++
+	for _, call := range cleanupLog(t, markers) {
+		calls[call]++
 	}
 	return calls
 }
@@ -279,7 +285,8 @@ func TestRunTests_TheOtherTiersNeitherLockNorCleanUp(t *testing.T) {
 
 // TestRunTests_AStackRunCleansUpOnExit: a data run frees the ports and removes the SQLite files
 // before its tier and again when it exits, here on its stubbed go test's failure, and records
-// itself in the lock while it holds it.
+// itself in the lock while it holds it. Each cleanup checks the listeners with netstat and then
+// removes the files, so the calls are two runs of netstat, each followed by rm.
 func TestRunTests_AStackRunCleansUpOnExit(t *testing.T) {
 	markers := t.TempDir()
 	lockDir := t.TempDir()
@@ -289,7 +296,12 @@ func TestRunTests_AStackRunCleansUpOnExit(t *testing.T) {
 
 	assert.Equal(t, 1, status, stderr)
 	assert.Contains(t, toolsRun(t, markers), "go")
-	assert.Equal(t, 2, cleanupCalls(t, markers)["rm"], "the SQLite files are removed before the tier and on exit")
+	calls := cleanupLog(t, markers)
+	require.Equal(t, 2, cleanupCalls(t, markers)["rm"], "the SQLite files are removed before the tier and on exit: %v", calls)
+	first := slices.Index(calls, "rm")
+	assert.Positive(t, first, "the ports are freed before the tier: %v", calls)
+	assert.Contains(t, calls[first+1:len(calls)-1], "netstat", "the ports are freed on exit: %v", calls)
+	assert.Equal(t, "rm", calls[len(calls)-1], "the exit cleanup ends with the files: %v", calls)
 	record, err := os.ReadFile(filepath.Join(lockDir, "lock"))
 	require.NoError(t, err)
 	assert.Contains(t, string(record), "(--type data --db sqlite), started ")
