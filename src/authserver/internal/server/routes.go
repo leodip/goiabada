@@ -1,6 +1,8 @@
 package server
 
 import (
+	"time"
+
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -18,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -27,6 +30,10 @@ import (
 	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/routing"
 )
+
+// accountExportMaxAge is how old a sign-in may be for the account's own data download: five
+// minutes, fixed rather than a setting (#782 decision 1).
+const accountExportMaxAge = 300 * time.Second
 
 // initRoutes registers the application's routes on the branches initMiddleware returns
 // rather than on s.router itself: the settings read, the session load and the locale
@@ -511,6 +518,16 @@ func (s *Server) initRoutes(branches appBranches) {
 		// it succeeds, so it takes no account_credential_change (decision 4).
 		r.With(apiBearer.RequireAdminConsoleClient(), rateLimiter.LimitAccountPassword).Post("/deletion",
 			apihandlers.HandleAccountDeletionPost(s.database, auditLogger, rateLimiter, s.dataCipher, notifier, logoutTokens))
+		// The download of the account's own data answers only the admin console's own client, then
+		// only a sign-in within the last five minutes at urn:goiabada:level2_optional or above, with
+		// RFC 9470's step-up challenge (#782 decisions 1 and 3). The client guard comes first, so
+		// another app is told what is true for it and never asked to sign the user in again; the
+		// account_export tier comes last, so a request either guard refuses spends nothing
+		// (decision 5).
+		r.With(apiBearer.RequireAdminConsoleClient(),
+			apiBearer.RequireRecentAuthentication(accountExportMaxAge, record.AcrLevel2Optional, time.Now),
+			rateLimiter.LimitAccountExport).Get("/export",
+			apihandlers.HandleAccountExportGet(s.database, auditLogger, baseURL))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
 		// The legal document versions the caller accepted (#622 decision 10).

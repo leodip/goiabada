@@ -61,10 +61,11 @@ This is every `UPPER_SNAKE` code the two APIs answer.
 | `SEND_FAILED` | `400` | The test email couldn't be sent. `error_description` says what to check. |
 | `ACCESS_TOKEN_REQUIRED` | `401` | No access token was sent. |
 | `INVALID_TOKEN` | `401` | The token is malformed, expired, revoked, not an access token for `authserver`, from another issuer, its grant was revoked, or its client, user or session is gone or disabled. |
+| `INSUFFICIENT_USER_AUTHENTICATION` | `401` | The token's sign-in is too old, or below the level the operation needs. Downloading the account's data needs a sign-in in the last 300 seconds at `urn:goiabada:level2_optional` or above. Sign the user in again and retry with the new token. See [Authentication](/reference/api/authentication/#a-recent-sign-in). |
 | `INVALID_SESSION` | `401` | On `POST /api/v1/account/logout-request`: the token carries no session id (`sid`), its session is gone, or the token's client isn't part of that session. |
 | `INSUFFICIENT_SCOPE` | `403` | The token carries none of the scopes the operation accepts. The `WWW-Authenticate` header says `error="insufficient_scope"`. |
 | `USER_CONTEXT_REQUIRED` | `403` | An Account API call was made with a token that wasn't issued for a user, such as one from the client credentials flow, carrying `authserver:manage-account`. Without it, the answer is `INSUFFICIENT_SCOPE`. |
-| `CLIENT_NOT_ALLOWED` | `403` | The operation answers only tokens issued to the admin console's own client, so no other client reaches it, whatever its scopes. Deleting the account is one. The `WWW-Authenticate` header says `error="insufficient_scope"`. |
+| `CLIENT_NOT_ALLOWED` | `403` | The operation answers only tokens issued to the admin console's own client, so no other client reaches it, whatever its scopes. Deleting the account and downloading its data are the two. The `WWW-Authenticate` header says `error="insufficient_scope"`. |
 | `ACCOUNT_DELETION_DISABLED` | `403` | The account can't be deleted by its user, because an administrator turned that off. An administrator can still delete it. |
 | `FORBIDDEN` | `403` | The token is valid, but the consent or session it names belongs to another user. |
 | `MANAGE_SCOPE_REQUIRED` | `403` | The request acts on an administrator or an administrative permission, which only `authserver:manage` may do. See [Administrators](/reference/api/administrators/). |

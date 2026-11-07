@@ -157,6 +157,10 @@ func TestEventTypes_CriticalEventValuesAreWireValues(t *testing.T) {
 			"token_issued_authorization_code_response"},
 		{"EventStartedNewUserSession", EventStartedNewUserSession, "started_new_user_session"},
 		{"EventDeletedOwnAccount", EventDeletedOwnAccount, "deleted_own_account"},
+		// A user's download of their own data (#782 decision 4), beside an administrator's
+		// exported_user_data: an alert on downloads of a person's data watches both.
+		{"EventExportedOwnUserData", EventExportedOwnUserData, "exported_own_user_data"},
+		{"EventExportedUserData", EventExportedUserData, "exported_user_data"},
 	} {
 		assert.Equal(t, tc.want, tc.constant,
 			"%s is stored data; changing it orphans every audit_logs row carrying it", tc.name)

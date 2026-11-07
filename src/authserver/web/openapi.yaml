@@ -4560,6 +4560,95 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/account/export:
+    get:
+      tags: [Account]
+      summary: Download own data
+      description: |
+        The authenticated user's own data, as one JSON document: the same document, headers and
+        file name as an administrator's export of that user,
+        `GET /api/v1/admin/users/{id}/export`, but for the instant it was made. It leaves out
+        every attribute, the user's own or a group's, whose `includeInIdToken` and
+        `includeInAccessToken` are both false, since no app receives it. An audit event an
+        administrator made about the user says an administrator made it, without saying who.
+
+        The answer is a file to save, named `user-<id>-<date>.json` in `Content-Disposition`, the
+        date being `exportedAt`'s in UTC. It is gzip-compressed (`Content-Encoding: gzip`) when the
+        request's `Accept-Encoding` accepts gzip, and plain JSON otherwise; error answers are never
+        compressed. It is never cached.
+
+        Only a token issued to the admin console's own client may call this. Any other client's
+        token is refused with 403 (`CLIENT_NOT_ALLOWED`), whatever its scopes and however recent
+        its sign-in, and the `WWW-Authenticate` header says `error="insufficient_scope"`.
+
+        The token's sign-in must be at most 300 seconds old, by its `auth_time`, and at
+        `urn:goiabada:level2_optional` or above, by its `acr`: with the user's authenticator code,
+        when they have one. A refreshed token keeps the `auth_time` of the sign-in it came from. An
+        older or weaker sign-in is refused with 401 (`INSUFFICIENT_USER_AUTHENTICATION`) and RFC
+        9470's step-up challenge, `WWW-Authenticate: Bearer realm="goiabada",
+        error="insufficient_user_authentication", error_description="...",
+        acr_values="urn:goiabada:level2_optional", max_age="300"`. Sign the user in again, with
+        `prompt=login` and those `acr_values`, and retry with the new token.
+
+        Each download counts against the `account_export` rate limit, 5 per hour for each user; a
+        request refused by the client or the sign-in check spends nothing. Every download leaves an
+        `exported_own_user_data` audit event naming the user in `user_id` and `logged_in_user`,
+        once the answer has been sent.
+      operationId: exportAccount
+      parameters:
+        - name: Accept-Encoding
+          in: header
+          required: false
+          description: Send `gzip` to receive the document gzip-compressed.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The user's document
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="user-<id>-<date>.json"`, the date in UTC.'
+              schema:
+                type: string
+            Content-Encoding:
+              description: '`gzip` when the request accepted gzip; absent otherwise.'
+              schema:
+                type: string
+            Vary:
+              description: '`Accept-Encoding`.'
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserExportResponse'
+        '401':
+          description: |
+            Missing or invalid bearer token (`ACCESS_TOKEN_REQUIRED`, `INVALID_TOKEN`), or a
+            sign-in older than 300 seconds or below `urn:goiabada:level2_optional`
+            (`INSUFFICIENT_USER_AUTHENTICATION`), whose challenge names the `acr_values` and
+            `max_age` a new sign-in must meet.
+          headers:
+            WWW-Authenticate:
+              description: |
+                The bearer challenge. For `INSUFFICIENT_USER_AUTHENTICATION` it is
+                `error="insufficient_user_authentication"` with
+                `acr_values="urn:goiabada:level2_optional"` and `max_age="300"`.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/account/consents:
     get:
       tags: [Account]

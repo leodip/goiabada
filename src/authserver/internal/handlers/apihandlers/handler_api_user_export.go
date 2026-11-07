@@ -111,8 +111,8 @@ func HandleUserExportGet(database userExportDatabase, auditLogger AuditLogger, b
 
 // buildUserExport reads every part of the user's document and builds it, or answers the first read
 // that failed, so the document is never sent with a part missing (decision 5). It is the one
-// builder of the document, whoever asks: the admin API's export calls it, and the account API's
-// own copy (#782) is to call it too.
+// builder of the document, whoever asks: the admin API's export calls it, and so does the account
+// API's own copy, GET /api/v1/account/export (#782 decision 3).
 //
 // Each part is read as the matching admin API endpoint reads it: the live sessions by the rule
 // GET /users/{id}/sessions applies, and a legal document acceptance with its address built from

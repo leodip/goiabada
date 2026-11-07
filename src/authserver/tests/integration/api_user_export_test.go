@@ -49,7 +49,13 @@ type exportAnswer struct {
 // is told not to ask for gzip itself, so what arrives is what the server sent.
 func getUserExport(t *testing.T, accessToken string, id any, acceptEncoding string) exportAnswer {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodGet, appConfig.AuthServer.BaseURL+userExportPath(id), nil)
+	return getExportAt(t, accessToken, userExportPath(id), acceptEncoding)
+}
+
+// getExportAt is getUserExport for the export at path, the administrator's or the account's own.
+func getExportAt(t *testing.T, accessToken, path, acceptEncoding string) exportAnswer {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, appConfig.AuthServer.BaseURL+path, nil)
 	require.NoError(t, err)
 	if accessToken != "" {
 		req.Header.Set("Authorization", "Bearer "+accessToken)

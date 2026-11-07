@@ -34,6 +34,7 @@ const accountResources = new Map([
 	['legal-document-acceptances', 'Legal documents'],
 	['sessions', 'Sessions'],
 	['logout-request', 'Sign-out'],
+	['export', 'Data download'],
 	['deletion', 'Account deletion'],
 ]);
 
