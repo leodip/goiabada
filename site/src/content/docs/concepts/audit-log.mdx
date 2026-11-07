@@ -324,7 +324,7 @@ These come from the Account API, which users reach through the admin console's a
 | `recovery_codes_created` | A user got a new set of recovery codes: with the authenticator they set up on their account page or when a sign-in required it, or on their own, from their account page, replacing the set they had. The codes aren't recorded. |
 | `deleted_own_user_consent` | A user withdrew the consent they had given a client. |
 | `deleted_own_account` | A user deleted their own account from their account pages. An administrator deleting a user writes `deleted_user` instead, so watch both to see every deletion. |
-| `exported_own_user_data` | A user downloaded their own data through `GET /api/v1/account/export`. `user_id` and `logged_in_user` are both that user. It's written once the file has been sent, and a refused download writes nothing. An administrator downloading a user's data writes `exported_user_data` instead, so watch both to see every download. |
+| `exported_own_user_data` | A user downloaded their own data, with **Download my data** under **Your data** in their account pages or through `GET /api/v1/account/export`. `user_id` and `logged_in_user` are both that user. It's written once the file has been sent, and a refused download writes nothing. An administrator downloading a user's data writes `exported_user_data` instead, so watch both to see every download. |
 
 ### Users
 
