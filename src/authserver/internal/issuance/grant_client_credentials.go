@@ -9,7 +9,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -36,14 +35,10 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 
 	// access_token ---------------------------------------------------------------------------
 
-	claims["iss"] = settings.Issuer
+	// The client is the token's subject. No grant_id: the grant issues no refresh token, so there
+	// is no family to name (#676 decisions 1 and 2). The claims every access token carries,
+	// client_id among them, are finishAccessToken's.
 	claims["sub"] = client.ClientIdentifier
-	// RFC 9068 section 2.2 REQUIRES client_id, though sub names the client too. No grant_id: the
-	// grant issues no refresh token, so there is no family to name (#676 decisions 1 and 2).
-	claims["client_id"] = client.ClientIdentifier
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
-	claims["jti"] = uuid.New()
 
 	audCollection := []string{}
 	for _, scope := range scopes {
@@ -66,16 +61,10 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 	default:
 		claims["aud"] = audCollection
 	}
-	claims["typ"] = TokenTypeBearer.String()
-	claims["exp"] = now.Add(time.Second * time.Duration(tokenExpirationInSeconds)).Unix()
-	claims["scope"] = scope
 
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyIdentifier
-	token.Header["typ"] = AccessTokenHeaderType
-	accessToken, err := token.SignedString(privKey)
+	accessToken, err := finishAccessToken(claims, settings, client, scope, now, privKey, keyIdentifier)
 	if err != nil {
-		return nil, errs.Wrap(err, "unable to sign access_token")
+		return nil, err
 	}
 	tokenResponse.AccessToken = accessToken
 	return &tokenResponse, nil

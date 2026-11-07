@@ -126,7 +126,9 @@ func tokenLifetimeSeconds(settings *record.Settings, client *record.Client) int 
 }
 
 // generateAccessTokenCore creates an access token using the unified tokenGenerationInput.
-// This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
+// This is the single implementation used by the flows that issue for a user (auth code, implicit,
+// ROPC); it decides the claims of the sign-in and hands them to finishAccessToken, as the client
+// credentials grant does its own.
 //
 // tx is the transaction the issuance runs in, nil when it runs in none, and it reaches the one read
 // the builder makes, the claim mapper's picture lookup. A caller that holds a transaction hands it
@@ -138,19 +140,12 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 
 	claims := make(jwt.MapClaims)
 
-	// Standard claims (same for all flows)
-	claims["iss"] = settings.Issuer
+	// The claims of the user's sign-in. Those every access token carries are finishAccessToken's.
 	claims["sub"] = input.User.Subject
-	// RFC 9068 section 2.2 REQUIRES client_id. The auth server's own access-token check reads the
-	// client from it and refuses the token once that client is disabled or gone (#676 decision 6).
-	claims["client_id"] = input.Client.ClientIdentifier
 	if input.GrantId != "" {
 		claims["grant_id"] = input.GrantId
 	}
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
-	claims["jti"] = uuid.New()
 	claims["acr"] = input.AcrLevel.String()
 	// Omit amr rather than signing an empty array. OIDC Core 1.0 section 2 makes amr OPTIONAL, so
 	// absent says nothing about how the user authenticated, where "amr": [] positively asserts that
@@ -202,13 +197,6 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 		claims["aud"] = audCollection
 	}
 
-	claims["typ"] = TokenTypeBearer.String()
-
-	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)
-
-	claims["exp"] = now.Add(time.Second * time.Duration(tokenExpirationInSeconds)).Unix()
-	claims["scope"] = input.Scope
-
 	// Optional nonce claim
 	if len(input.Nonce) > 0 {
 		claims["nonce"] = input.Nonce
@@ -231,6 +219,31 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 	// settings above: a client that turned the OIDC claims off still receives these.
 	mapper.AddGroupClaims(claims, input.User, scopes)
 	mapper.AddAttributeClaims(claims, input.User, scopes)
+
+	return finishAccessToken(claims, settings, input.Client, input.Scope, now, signingKey, keyIdentifier)
+}
+
+// finishAccessToken is the one step that ends every access token, whatever its grant: it writes the
+// claims every access token carries, sets the header and signs the token. claims holds what the
+// grant decides, its subject, its audience and, for a user's grant, the claims of the sign-in, and
+// none of the claims written here, so a claim every access token must carry is written once, for
+// every grant, the client credentials grant's included.
+//
+// client_id is REQUIRED by RFC 9068 section 2.2, though a client credentials token's sub names the
+// client too. The auth server's own access-token check reads the client from it and refuses the
+// token once that client is disabled or gone (#676 decision 6). The typ claim is TokenTypeBearer on
+// every access token, and the header's typ is AccessTokenHeaderType (RFC 9068 section 2.1).
+func finishAccessToken(claims jwt.MapClaims, settings *record.Settings, client *record.Client, scope string,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
+
+	claims["iss"] = settings.Issuer
+	claims["client_id"] = client.ClientIdentifier
+	claims["iat"] = now.Unix()
+	claims["nbf"] = now.Unix()
+	claims["jti"] = uuid.New()
+	claims["typ"] = TokenTypeBearer.String()
+	claims["exp"] = now.Add(time.Second * time.Duration(tokenLifetimeSeconds(settings, client))).Unix()
+	claims["scope"] = scope
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = keyIdentifier

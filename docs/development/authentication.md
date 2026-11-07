@@ -60,9 +60,12 @@ Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does
 
 ### Access token claims (RFC 9068)
 Every access token, from every grant, is an RFC 9068 JWT access token.
-- `generateAccessTokenCore` and the client credentials grant sign it with the JOSE header
-  `typ: at+jwt` (`issuance.AccessTokenHeaderType`) and the claim `client_id`; ID and refresh tokens
-  keep the library's `JWT` header. The `typ: Bearer` claim stays
+- One finishing step, `issuance.finishAccessToken`, ends every grant's access token, the client
+  credentials grant's included: it writes the claims every access token carries (`iss`,
+  `client_id`, `iat`, `nbf`, `jti`, `typ`, `exp`, `scope`), sets the JOSE header
+  `typ: at+jwt` (`issuance.AccessTokenHeaderType`) and signs it. Each grant's builder decides only
+  `sub`, `aud` and, for a user's grant, the claims of the sign-in. ID and refresh tokens keep the
+  library's `JWT` header. The `typ: Bearer` claim stays
 - The authorization code, refresh and password grants add `grant_id`, the identifier the grant's
   refresh token family shares (`FirstRefreshTokenJti`). The code exchange and the password grant fix
   it, as the first refresh token's jti, before they mint the access token; a refresh copies its
