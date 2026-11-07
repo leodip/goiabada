@@ -276,6 +276,19 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a
   refusal stay in `internal/handlers`. It also declares `ChallengeRealm`, the realm the Basic and
   Bearer challenges share, as the lowest package that writes a challenge (#676)
+- `internal/dpop/` - The DPoP proof checker (RFC 9449), the one function the token endpoint and the
+  auth server's own resources will call. `Checker.Check` takes plain values: the request's `DPoP`
+  header values, method and escaped path, the access token presented beside the proof when there
+  is one, the clock, and a nonce judge when freshness comes from a server nonce. It refuses a
+  missing or doubled header and one over 8 KiB, runs `oauth.CheckJWTStructure`, and checks `typ`
+  as a media type, the algorithm against a written-out list (`SigningAlgorithms`), the
+  key against its algorithm (type, curve, an on-curve point, RSA 2048 to 8192 bits, no private
+  member), the signature by the standard library alone, `htm` exactly, `htu` against the public
+  base URL plus the path after RFC 3986 normalization, `ath` when a token is presented, and
+  freshness by the nonce or by `iat` within 60 seconds. A failure carries `ErrInvalidProof`; a
+  proof whose only fault is its nonce carries `ErrNonceRequired` instead. It returns the key's RFC
+  7638 thumbprint, `jti` and the normalized `htu`, and leaves the answer, the log record and the
+  replay record to its caller (#42)
 - `internal/introspectionmetrics/` - `goiabada_introspection_requests_total`, the introspection
   endpoint's answers by outcome, a closed set (#676)
 - `internal/liveness/` - Whether a token the auth server issued is still live. An access token:
