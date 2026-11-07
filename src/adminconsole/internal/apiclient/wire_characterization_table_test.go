@@ -317,6 +317,20 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{}`,
 		},
 		{
+			name: "GetAccountExport",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetAccountExport(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				defer func() { _ = got.Body.Close() }()
+				body, err := io.ReadAll(got.Body)
+				return string(body), err
+			},
+			verb: "GET", path: "/api/v1/account/export",
+			successStatus: 200, reply: `{"formatVersion":1}`, want: `{"formatVersion":1}`,
+		},
+		{
 			name: "DeleteAccount",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
 				return nil, c.DeleteAccount(ctx, charAccessToken, charDeleteAccount)

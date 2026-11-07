@@ -344,6 +344,7 @@
 "adminconsole.account_menu.manage_consents" = "Consentimentos"
 "adminconsole.account_menu.sessions" = "Sessões"
 "adminconsole.account_menu.legal_documents" = "Documentos legais"
+"adminconsole.account_menu.data" = "Seus dados"
 "adminconsole.account_menu.delete_account" = "Excluir conta"
 
 # --- Drawer do lado admin ---------------------------------------------------
@@ -717,6 +718,16 @@
 "adminconsole.account.delete.confirm_body" = "Isso não pode ser desfeito."
 "adminconsole.account_deleted.title" = "Sua conta foi excluída"
 "adminconsole.account_deleted.message" = "Sua conta {{.appName}} não existe mais, e você saiu de todos os lugares. Os aplicativos que você usou mantêm o que já receberam; peça a eles que excluam."
+
+# --- Your data (#782) -------------------------------------------------------
+
+"adminconsole.account.data.page_title" = "Baixar seus dados"
+"adminconsole.account.data.lead" = "Uma cópia dos seus dados em {{.appName}}, em um único arquivo JSON."
+"adminconsole.account.data.included_label" = "O que contém:"
+"adminconsole.account.data.included" = "seu perfil e seus dados de contato; seus grupos e permissões, e os atributos que podem ser passados a aplicativos; os consentimentos que você deu a aplicativos; suas sessões; os aplicativos que ainda podem acessar sua conta, com o endereço IP e o navegador de onde você entrou; os documentos legais que você aceitou; sua foto; e as entradas do log de auditoria sobre sua conta. As alterações feitas por um administrador indicam isso, sem nomeá-lo."
+"adminconsole.account.data.sign_in_again" = "Se você não entrou nos últimos minutos, vai precisar entrar de novo primeiro."
+"adminconsole.account.data.signed_in_again" = "Você entrou de novo. Selecione Baixar meus dados para obter seu arquivo."
+"adminconsole.account.data.button" = "Baixar meus dados"
 
 # === Adminconsole — clientes admin ===========================================
 

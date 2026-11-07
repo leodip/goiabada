@@ -364,6 +364,7 @@
 "adminconsole.account_menu.manage_consents" = "Consentements"
 "adminconsole.account_menu.sessions" = "Sessions"
 "adminconsole.account_menu.legal_documents" = "Documents juridiques"
+"adminconsole.account_menu.data" = "Vos données"
 "adminconsole.account_menu.delete_account" = "Supprimer le compte"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
@@ -747,6 +748,16 @@
 "adminconsole.account.delete.confirm_body" = "Cette action est irréversible."
 "adminconsole.account_deleted.title" = "Votre compte est supprimé"
 "adminconsole.account_deleted.message" = "Votre compte {{.appName}} n’existe plus, et vous êtes déconnecté partout. Les applications que vous utilisiez conservent ce qu’elles ont déjà reçu ; demandez-leur de le supprimer."
+
+# --- Your data (#782) -------------------------------------------------------
+
+"adminconsole.account.data.page_title" = "Télécharger vos données"
+"adminconsole.account.data.lead" = "Une copie de vos données dans {{.appName}}, en un seul fichier JSON."
+"adminconsole.account.data.included_label" = "Ce qu’il contient :"
+"adminconsole.account.data.included" = "votre profil et vos coordonnées ; vos groupes et autorisations, et les attributs qui peuvent être transmis aux applications ; les consentements que vous avez donnés aux applications ; vos sessions ; les applications qui peuvent encore accéder à votre compte, avec l’adresse IP et le navigateur depuis lesquels vous vous êtes connecté ; les documents juridiques que vous avez acceptés ; votre photo ; et les entrées du journal d’audit concernant votre compte. Les modifications faites par un administrateur sont signalées comme telles, sans le nommer."
+"adminconsole.account.data.sign_in_again" = "Si vous ne vous êtes pas connecté au cours des dernières minutes, vous devez d’abord vous reconnecter."
+"adminconsole.account.data.signed_in_again" = "Vous vous êtes reconnecté. Sélectionnez Télécharger mes données pour obtenir votre fichier."
+"adminconsole.account.data.button" = "Télécharger mes données"
 
 # === Adminconsole — admin clients =============================================
 

@@ -368,6 +368,7 @@
 "adminconsole.account_menu.manage_consents" = "Consensi"
 "adminconsole.account_menu.sessions" = "Sessioni"
 "adminconsole.account_menu.legal_documents" = "Documenti legali"
+"adminconsole.account_menu.data" = "I tuoi dati"
 "adminconsole.account_menu.delete_account" = "Elimina account"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
@@ -751,6 +752,16 @@
 "adminconsole.account.delete.confirm_body" = "L'operazione non si può annullare."
 "adminconsole.account_deleted.title" = "Il tuo account è stato eliminato"
 "adminconsole.account_deleted.message" = "Il tuo account {{.appName}} non esiste più e sei uscito ovunque. Le app che hai usato conservano ciò che hanno già ricevuto; chiedi loro di eliminarlo."
+
+# --- Your data (#782) -------------------------------------------------------
+
+"adminconsole.account.data.page_title" = "Scarica i tuoi dati"
+"adminconsole.account.data.lead" = "Una copia dei tuoi dati in {{.appName}}, in un unico file JSON."
+"adminconsole.account.data.included_label" = "Cosa contiene:"
+"adminconsole.account.data.included" = "il tuo profilo e i tuoi recapiti; i tuoi gruppi e permessi, e gli attributi che possono essere dati alle app; i consensi che hai dato alle app; le tue sessioni; le app che possono ancora accedere al tuo account, con l'indirizzo IP e il browser da cui hai effettuato l'accesso; i documenti legali che hai accettato; la tua immagine; e le voci del registro di audit sul tuo account. Le modifiche fatte da un amministratore lo indicano, senza nominarlo."
+"adminconsole.account.data.sign_in_again" = "Se non hai effettuato l'accesso negli ultimi minuti, ti viene chiesto prima di accedere di nuovo."
+"adminconsole.account.data.signed_in_again" = "Hai effettuato di nuovo l'accesso. Seleziona Scarica i miei dati per ottenere il file."
+"adminconsole.account.data.button" = "Scarica i miei dati"
 
 # === Adminconsole — admin clients =============================================
 

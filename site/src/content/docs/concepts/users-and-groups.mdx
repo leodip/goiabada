@@ -111,6 +111,8 @@ An entry an administrator made about the person says an administrator did it, wi
 
 Each download is recorded in the audit log as `exported_user_data`, under the user and under you.
 
+People can also download the same file themselves, with **Download my data** under **Your data** in the admin console's **Account** pages. If they signed in more than five minutes ago, they're asked to sign in again first, with the code from their authenticator if they use two-factor authentication. Their own download is recorded as `exported_own_user_data`.
+
 The file doesn't hold:
 
 - attributes, the user's own or a group's, with both **Include in the access token** and **Include in the ID token** off. No app receives them, so they're your own notes about the person. They're still on the user's and the group's **Attributes** tabs: add them to the file, or decide to keep them back;

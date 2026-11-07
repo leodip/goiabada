@@ -60,7 +60,8 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 	)
 	jwtSessionHandler := middlewareJwt.SessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManagePermissionIdentifier)})
-	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManageAccountPermissionIdentifier)})
+	accountScopes := []string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManageAccountPermissionIdentifier)}
+	requiresAccountScope := middlewareJwt.RequiresScope(accountScopes)
 	// The user's page language sits inside each authenticated chain right after
 	// SessionHandler, which says whether anyone is signed in. It reads the session's
 	// copy of the choice, which the sign-in and the profile page write, and draws the
@@ -163,6 +164,11 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Get("/legal-documents", accounthandlers.HandleLegalDocumentsGet(httpHelper, apiClient))
 		r.Get("/sessions", accounthandlers.HandleSessionsGet(httpHelper, apiClient))
 		r.Post("/sessions", accounthandlers.HandleSessionsEndSessionPost(httpHelper, apiClient))
+		// Your data's download sends a sign-in too old or too weak for it through the account
+		// pages' own sign-in again, asking for what that sign-in asks for (#782 decision 1).
+		r.Get("/data", accounthandlers.HandleDataGet(httpHelper))
+		r.Post("/data", accounthandlers.HandleDataPost(httpHelper, apiClient, authHelper,
+			middlewareJwt.SignInScope(accountScopes), baseURL))
 		r.Get("/delete", accounthandlers.HandleDeleteAccountGet(httpHelper, apiClient))
 		r.Post("/delete", accounthandlers.HandleDeleteAccountPost(httpHelper, s.sessionStore, apiClient, baseURL))
 

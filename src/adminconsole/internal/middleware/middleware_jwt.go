@@ -590,6 +590,13 @@ func (m *JWT) RequiresScope(
 	}
 }
 
+// SignInScope is the scope the sign-in of RequiresScope(scopesAnyOf) asks for, for a page that
+// sends the browser through the sign-in itself, as the Your data page does after the Account API's
+// step-up challenge (#782 decision 1), so that sign-in asks for what the ordinary one does.
+func (m *JWT) SignInScope(scopesAnyOf []string) string {
+	return m.buildScopeString(scopesAnyOf)
+}
+
 func (m *JWT) buildScopeString(customScopes []string) string {
 
 	// Default required scopes.

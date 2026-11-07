@@ -204,6 +204,75 @@ func TestRedirToAuthorize_ASealThatFails(t *testing.T) {
 	assert.Empty(t, w.Result().Cookies(), "no cookie")
 }
 
+// authorizeQuery runs one redirect over the real store and returns the authorize request's query
+// and the handshake its cookie carries.
+func authorizeQuery(t *testing.T, redirect func(*oauthclient.AuthHelper, http.ResponseWriter, *http.Request) error) (url.Values, map[string]string) {
+	t.Helper()
+	store, _ := newHandshakeStore(t, false)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/account/data", nil)
+	require.NoError(t, redirect(oauthclient.NewAuthHelper(store, helperConsoleBase, helperAuthBase), w, r))
+
+	require.Equal(t, http.StatusFound, w.Code)
+	location := w.Header().Get("Location")
+	require.True(t, strings.HasPrefix(location, helperAuthorizePath), "redirects to the authorize endpoint: %s", location)
+	query, err := url.ParseQuery(strings.TrimPrefix(location, helperAuthorizePath))
+	require.NoError(t, err)
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+	handshake, err := store.OpenCookieValues(oauthclient.SignInHandshakeCookie, cookies[0].Value)
+	require.NoError(t, err)
+	return query, handshake
+}
+
+// The console's ordinary sign-in asks the auth server for nothing beyond the sign-in itself: no
+// prompt, no acr_values and no max_age, so a live auth server session signs the user in without
+// asking again (#782).
+func TestRedirToAuthorize_TheOrdinarySignInSendsNoPromptAndNoAcrValues(t *testing.T) {
+	query, _ := authorizeQuery(t, func(h *oauthclient.AuthHelper, w http.ResponseWriter, r *http.Request) error {
+		return h.RedirToAuthorize(w, r, helperClientID, helperScope, helperRedirectBack)
+	})
+	for _, parameter := range []string{"prompt", "acr_values", "max_age"} {
+		assert.NotContainsf(t, query, parameter, "the ordinary sign-in sends no %s", parameter)
+	}
+}
+
+// The sign-in the Your data page sends the browser through after the Account API's step-up
+// challenge asks for a fresh sign-in at the level the challenge names: prompt=login and
+// acr_values, and still no max_age, which would replace the user's session (#782 decision 1). The
+// rest of the request and its handshake are the ordinary sign-in's.
+func TestRedirToAuthorizeWith_SendsPromptAndAcrValuesWhenAsked(t *testing.T) {
+	query, handshake := authorizeQuery(t, func(h *oauthclient.AuthHelper, w http.ResponseWriter, r *http.Request) error {
+		return h.RedirToAuthorizeWith(w, r, helperClientID, helperScope, "https://console.example/account/data",
+			oauthclient.SignInOptions{Prompt: "login", AcrValues: "urn:goiabada:level2_optional"})
+	})
+
+	assert.Equal(t, []string{"login"}, query["prompt"])
+	assert.Equal(t, []string{"urn:goiabada:level2_optional"}, query["acr_values"])
+	assert.NotContains(t, query, "max_age", "no max_age, so the session is kept")
+
+	assert.Equal(t, helperClientID, query.Get("client_id"))
+	assert.Equal(t, helperScope, query.Get("scope"))
+	assert.Equal(t, helperConsoleBase+"/auth/callback", query.Get("redirect_uri"))
+	assert.Equal(t, "form_post", query.Get("response_mode"))
+	assert.Equal(t, "code", query.Get("response_type"))
+	assert.Equal(t, "S256", query.Get("code_challenge_method"))
+	assert.Len(t, handshake, 6, "the six values the callback reads, and nothing else")
+	assert.Equal(t, handshake[sessionkeys.State], query.Get("state"))
+	assert.Equal(t, "https://console.example/account/data", handshake[sessionkeys.RedirectBack])
+}
+
+// Only the options that are set are sent: an empty option is no parameter at all, not an empty one.
+func TestRedirToAuthorizeWith_SendsOnlyTheOptionsThatAreSet(t *testing.T) {
+	query, _ := authorizeQuery(t, func(h *oauthclient.AuthHelper, w http.ResponseWriter, r *http.Request) error {
+		return h.RedirToAuthorizeWith(w, r, helperClientID, helperScope, helperRedirectBack,
+			oauthclient.SignInOptions{Prompt: "login"})
+	})
+	assert.Equal(t, []string{"login"}, query["prompt"])
+	assert.NotContains(t, query, "acr_values")
+}
+
 // Authenticated means an ID token verified onto the request; a token response whose strings are
 // set but whose ID token was never verified is not a signed-in administrator.
 func TestIsAuthenticated(t *testing.T) {

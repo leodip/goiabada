@@ -365,6 +365,7 @@
 "adminconsole.account_menu.manage_consents" = "Zustimmungen"
 "adminconsole.account_menu.sessions" = "Sitzungen"
 "adminconsole.account_menu.legal_documents" = "Rechtsdokumente"
+"adminconsole.account_menu.data" = "Ihre Daten"
 "adminconsole.account_menu.delete_account" = "Konto löschen"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
@@ -748,6 +749,16 @@
 "adminconsole.account.delete.confirm_body" = "Das lässt sich nicht rückgängig machen."
 "adminconsole.account_deleted.title" = "Ihr Konto ist gelöscht"
 "adminconsole.account_deleted.message" = "Ihr Konto bei {{.appName}} gibt es nicht mehr, und Sie sind überall abgemeldet. Apps, die Sie genutzt haben, behalten, was sie bereits erhalten haben; bitten Sie sie, es zu löschen."
+
+# --- Your data (#782) -------------------------------------------------------
+
+"adminconsole.account.data.page_title" = "Ihre Daten herunterladen"
+"adminconsole.account.data.lead" = "Eine Kopie Ihrer Daten bei {{.appName}}, in einer JSON-Datei."
+"adminconsole.account.data.included_label" = "Was sie enthält:"
+"adminconsole.account.data.included" = "Ihr Profil und Ihre Kontaktdaten; Ihre Gruppen und Berechtigungen sowie die Attribute, die Apps erhalten können; die Einwilligungen, die Sie Apps gegeben haben; Ihre Sitzungen; die Apps, die noch auf Ihr Konto zugreifen können, mit der IP-Adresse und dem Browser, mit denen Sie sich angemeldet haben; die Rechtsdokumente, die Sie akzeptiert haben; Ihr Bild; und die Einträge des Audit-Protokolls zu Ihrem Konto. Änderungen durch einen Administrator sind als solche gekennzeichnet, ohne ihn zu nennen."
+"adminconsole.account.data.sign_in_again" = "Wenn Sie sich in den letzten Minuten nicht angemeldet haben, werden Sie zuerst gebeten, sich erneut anzumelden."
+"adminconsole.account.data.signed_in_again" = "Sie haben sich erneut angemeldet. Wählen Sie „Meine Daten herunterladen“, um Ihre Datei zu erhalten."
+"adminconsole.account.data.button" = "Meine Daten herunterladen"
 
 # === Adminconsole — admin clients =============================================
 

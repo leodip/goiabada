@@ -16,13 +16,15 @@ import (
 	"github.com/leodip/goiabada/core/guard"
 )
 
-// This package's production files name one thing from apiclient: the *APIError the classifiers
-// route on.
+// This package's production files name two things from apiclient: the *APIError the classifiers
+// route on, and the *UserExport that ServeExport passes through for both downloads of a user's data.
 //
-// The edge came with the classifiers from the handlers package (#440). It is sound layering only
-// that narrowly: apiclient is a leaf that imports nothing of this module, and the classifier and the
-// error type it reads change together, which is not true of the executor or any of the 106 methods
-// beside them. A renderer that started calling the API would be a page reaching past its handler.
+// The edge came with the classifiers from the handlers package (#440), and the export with the
+// one pass-through the administrator's download and the user's own share (#782). It is sound
+// layering only that narrowly: apiclient is a leaf that imports nothing of this module, and each
+// writer and the type it reads change together, which is not true of the executor or any of the
+// methods beside them. ServeExport calls no method: the handler asks for the export it is handed.
+// A renderer that started calling the API would be a page reaching past its handler.
 //
 // Imports are parsed rather than text matched, so an alias binds the name it binds, and a dot or
 // blank import, which would hide what the file takes, is refused outright.
@@ -31,7 +33,7 @@ import (
 const apiclientPath = "github.com/leodip/goiabada/adminconsole/internal/apiclient"
 
 // apiclientAllowed is every apiclient name a production file here may select.
-var apiclientAllowed = map[string]bool{"APIError": true}
+var apiclientAllowed = map[string]bool{"APIError": true, "UserExport": true}
 
 // apiclientUse is one apiclient name a production file selects, or, with name empty, an import that
 // binds no selectable name at all.
@@ -132,14 +134,14 @@ func assertApiclientEdge(r guard.Reporter, dir string) {
 		}
 		lines = append(lines, use.file+":"+strconv.Itoa(use.line)+": "+use.binding+"."+use.name)
 	}
-	r.Errorf("%d apiclient reference(s) under %s beyond APIError:\n\t%s\n\n"+
-		"render names apiclient.APIError for the classifiers, and nothing else of apiclient "+
-		"(#440): a page that calls the API reaches past its handler.",
+	r.Errorf("%d apiclient reference(s) under %s beyond APIError and UserExport:\n\t%s\n\n"+
+		"render names apiclient.APIError for the classifiers and apiclient.UserExport for ServeExport, "+
+		"and nothing else of apiclient (#440, #782): a page that calls the API reaches past its handler.",
 		len(found), dir, strings.Join(lines, "\n\t"))
 }
 
-// TestApiclientEdge_NamesAPIErrorOnly holds this package's real files to the rule.
-func TestApiclientEdge_NamesAPIErrorOnly(t *testing.T) {
+// TestApiclientEdge_NamesAPIErrorAndUserExportOnly holds this package's real files to the rule.
+func TestApiclientEdge_NamesAPIErrorAndUserExportOnly(t *testing.T) {
 	assertApiclientEdge(t, ".")
 }
 

@@ -115,6 +115,12 @@ test("the sidebar marks the page open, and the section a page belongs to", async
   await account.getByRole("link", { name: "Delete account", exact: true }).click();
   await expect(page).toHaveURL(`${env.adminUrl}/account/delete`);
   await expect(account.getByRole("link", { name: "Delete account", exact: true })).toHaveAttribute("aria-current", "page");
+  // Your data is the item just before Delete account (#782).
+  const accountLinks = account.getByRole("link");
+  await expect(accountLinks.nth((await accountLinks.count()) - 2)).toHaveText("Your data");
+  await account.getByRole("link", { name: "Your data", exact: true }).click();
+  await expect(page).toHaveURL(`${env.adminUrl}/account/data`);
+  await expect(account.getByRole("link", { name: "Your data", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
 test("every page of the console sends the content security policy and the other security headers", async ({ page }) => {

@@ -158,8 +158,9 @@ func (c *AuthServerClient) do(ctx context.Context, accessToken string, r apiRequ
 	return body, nil
 }
 
-// passThroughAPITimeout bounds the one call whose answer passes to the browser as it came, a
-// user's export (#781 decision 5): five minutes, the bound the auth server gives itself to write
+// passThroughAPITimeout bounds the calls whose answer passes to the browser as it came, a user's
+// export, an administrator's download of it or the user's own (#781 decision 5, #782 decision 3):
+// five minutes, the bound the auth server gives itself to write
 // that answer, so a slow connection still finishes. The body is read after the call returns, by
 // whoever copies it on, and the deadline covers that read too.
 const passThroughAPITimeout = 5 * time.Minute

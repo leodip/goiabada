@@ -772,4 +772,8 @@ names (section 2.2.2).
     `acr_values` and `max_age` on every refusal. It takes the age, the level and a clock, so it is
     the guard to reuse in front of another operation. A refresh keeps `auth_time`, so a refreshed
     token is as old as its sign-in. The answer is the admin export's builder and writer, and
-    `exported_own_user_data` is written after it (#782).
+    `exported_own_user_data` is written after it (#782). The console's Your data page recognises
+    that 401 by its code before its every-401-ends-the-session rule, and sends the browser through
+    its own sign-in with `prompt=login` and `acr_values=urn:goiabada:level2_optional`, never
+    `max_age`, which would replace the session past the window; it returns to
+    `/account/data?signed_in_again=1`. The ordinary sign-in sends neither parameter.

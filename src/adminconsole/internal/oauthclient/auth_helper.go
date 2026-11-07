@@ -41,12 +41,41 @@ func NewAuthHelper(sealer handshakeSealer, baseURL, authServerBaseURL string) *A
 	}
 }
 
+// SignInOptions are the authorize request's optional parameters a sign-in may add. The ordinary
+// sign-in, RedirToAuthorize, sends neither; a page that needs a fresh, stronger sign-in than the
+// session's, as the Your data page does after the Account API's step-up challenge, asks for one
+// (#782 decision 1).
+type SignInOptions struct {
+	// Prompt is OpenID Connect Core 1.0 section 3.1.2.1's prompt, such as "login", which asks the
+	// auth server to authenticate the user again even while their session is live.
+	Prompt string
+	// AcrValues is section 3.1.2.1's acr_values, the authentication context classes requested,
+	// space-separated in order of preference.
+	AcrValues string
+}
+
+// RedirToAuthorize sends the browser to the auth server's authorize endpoint for an ordinary
+// sign-in: no prompt, no acr_values and no max_age, so a live auth server session signs the user in
+// without asking again.
 func (s *AuthHelper) RedirToAuthorize(
 	w http.ResponseWriter,
 	r *http.Request,
 	clientIdentifier string,
 	scope string,
 	redirectBack string,
+) error {
+	return s.RedirToAuthorizeWith(w, r, clientIdentifier, scope, redirectBack, SignInOptions{})
+}
+
+// RedirToAuthorizeWith is RedirToAuthorize adding the options that are set. The handshake is the
+// same six values: the callback finishes either sign-in the same way.
+func (s *AuthHelper) RedirToAuthorizeWith(
+	w http.ResponseWriter,
+	r *http.Request,
+	clientIdentifier string,
+	scope string,
+	redirectBack string,
+	options SignInOptions,
 ) error {
 	redirectURI := s.baseURL + "/auth/callback"
 	codeVerifier := securerandom.String(120)
@@ -77,6 +106,12 @@ func (s *AuthHelper) RedirToAuthorize(
 	values.Add("state", state)
 	values.Add("nonce", nonceHash(nonce))
 	values.Add("scope", scope)
+	if options.Prompt != "" {
+		values.Add("prompt", options.Prompt)
+	}
+	if options.AcrValues != "" {
+		values.Add("acr_values", options.AcrValues)
+	}
 
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", s.authServerBaseURL, values.Encode())
 

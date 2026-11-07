@@ -284,3 +284,21 @@ func (c *AuthServerClient) DeleteAccount(ctx context.Context, accessToken string
 	})
 	return err
 }
+
+// GetAccountExport asks for the current user's own export, the document an administrator's
+// GetUserExport answers for them, through GET /api/v1/account/export. It is called and answered as
+// GetUserExport is, to hand to the browser as it came (#782 decision 3). The auth server answers it
+// only for a token issued to the admin console's own client, from a sign-in recent and strong
+// enough: an older or weaker one is refused 401 INSUFFICIENT_USER_AUTHENTICATION (decision 1).
+func (c *AuthServerClient) GetAccountExport(ctx context.Context, accessToken string) (*UserExport, error) {
+	//nolint:bodyclose // the body is the caller's: UserExport hands it on, and the caller closes it
+	resp, err := c.passThrough(ctx, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/account/export",
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return userExportFrom(resp), nil
+}
