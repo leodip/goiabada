@@ -19,7 +19,7 @@
     "hast-util-to-mdast": "^10.1.2",
     "mdast-util-from-markdown": "^2.1.0",
     "mdast-util-gfm-strikethrough": "^2.0.1",
-    "mdast-util-gfm-table": "^2.0.0",
+    "mdast-util-gfm-table": "^2.0.1",
     "mdast-util-gfm-task-list-item": "^2.0.0",
     "mdast-util-to-markdown": "^2.2.1",
     "mdast-util-to-string": "^4.0.0",
