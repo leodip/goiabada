@@ -163,33 +163,76 @@ func scriptEnv(bin, lockDir string, set ...string) []string {
 	return env
 }
 
-// runScript runs run-tests.sh with args from src/authserver, under flock(1) holding heldLock when
-// it is not empty, as another run would hold it, and returns the exit status and the standard
-// error. A run that has not ended within a minute is killed and fails the test.
-func runScript(t *testing.T, env []string, heldLock string, args ...string) (int, string) {
+// authserverDir is src/authserver, where run-tests.sh is and runs from.
+func authserverDir(t *testing.T) string {
 	t.Helper()
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 	root, err := sourceroot.FindSourceRoot(cwd)
 	require.NoError(t, err)
+	return filepath.Join(root, "authserver")
+}
 
-	command := append([]string{"bash", filepath.Join(root, "authserver", "run-tests.sh")}, args...)
+// scriptCommand is run-tests.sh with args, run from dir, under flock(1) holding heldLock when it is
+// not empty, as another run would hold it. It runs in a process group of its own, and the end of
+// ctx kills the whole group: killing only flock(1) would leave its bash child running with the
+// output pipes open, and Wait would block on them past any deadline. WaitDelay bounds what is left.
+func scriptCommand(ctx context.Context, dir, heldLock string, args ...string) *exec.Cmd {
+	command := append([]string{"bash", filepath.Join(dir, "run-tests.sh")}, args...)
 	if heldLock != "" {
 		command = append([]string{"flock", heldLock}, command...)
 	}
+	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
+	cmd.Dir = dir
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = 5 * time.Second
+	return cmd
+}
+
+// runScript runs run-tests.sh with args, under flock(1) holding heldLock when it is not empty, and
+// returns the exit status and the standard error. A run that has not ended within a minute is
+// killed, with everything it started, and fails the test.
+func runScript(t *testing.T, env []string, heldLock string, args ...string) (int, string) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
-	cmd.Dir = filepath.Join(root, "authserver")
+	cmd := scriptCommand(ctx, authserverDir(t), heldLock, args...)
 	cmd.Env = env
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
-	err = cmd.Run()
+	err := cmd.Run()
 	require.NoError(t, ctx.Err(), "run-tests.sh %v did not end", args)
 
 	var exit *exec.ExitError
 	require.ErrorAs(t, err, &exit, "run-tests.sh did not exit with a status")
 	return exit.ExitCode(), stderr.String()
+}
+
+// TestScriptCommand_AHungRunUnderTheLockEndsAtItsDeadline: the helper every test here runs the
+// script through ends a run that hangs under flock(1) at its context's deadline, bash and all,
+// rather than waiting on the output pipe bash holds. The script is a stand-in that never ends.
+func TestScriptCommand_AHungRunUnderTheLockEndsAtItsDeadline(t *testing.T) {
+	dir := t.TempDir()
+	pidFile := filepath.Join(dir, "pid")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "run-tests.sh"),
+		[]byte("echo $$ > \""+pidFile+"\"\nwhile :; do sleep 1; done\n"), 0o600))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	cmd := scriptCommand(ctx, dir, filepath.Join(dir, "lock"))
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+
+	start := time.Now()
+	require.Error(t, cmd.Run())
+
+	assert.Less(t, time.Since(start), 4*time.Second, "the run outlived its deadline")
+	pid, err := os.ReadFile(pidFile)
+	require.NoError(t, err)
+	// Killed, bash is gone, or a zombie until whatever adopted it reaps it.
+	stat, err := os.ReadFile(filepath.Join("/proc", strings.TrimSpace(string(pid)), "stat"))
+	assert.True(t, os.IsNotExist(err) || strings.Contains(string(stat), ") Z "),
+		"bash %s is still running: %s", strings.TrimSpace(string(pid)), stat)
 }
 
 // TestRunTests_AMissingStackVariableIsRefusedFirst: with one of the four unset, or set empty,
@@ -236,14 +279,9 @@ func TestRunTests_AFlagWithoutItsValueIsRefused(t *testing.T) {
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			markers := t.TempDir()
-			cwd, err := os.Getwd()
-			require.NoError(t, err)
-			root, err := sourceroot.FindSourceRoot(cwd)
-			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "bash", append([]string{filepath.Join(root, "authserver", "run-tests.sh")}, args...)...)
-			cmd.Dir = filepath.Join(root, "authserver")
+			cmd := scriptCommand(ctx, authserverDir(t), "", args...)
 			cmd.Env = scriptEnv(stubBin(t, markers), t.TempDir(), stackVariables...)
 			out, err := cmd.Output()
 
