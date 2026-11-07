@@ -85,6 +85,7 @@ The implicit flow goes through the same [authorization endpoint](/reference/endp
 - **The redirect URI matches exactly.** A loopback redirect URI's port isn't ignored, as it is for the authorization code flow, since tokens rather than a code would go to whatever program is listening there.
 - **PKCE doesn't apply.** There's no code to tie it to, and a `code_challenge` is ignored.
 - **The setting is read again just before the tokens are issued,** so a sign-in under way when an administrator turns the flow off ends with `unauthorized_client` and no tokens.
+- **A client that [requires DPoP for token requests](/concepts/clients/#require-dpop-for-token-requests) gets no access token here.** `token` and `id_token token` are refused with `unauthorized_client`, also read again just before the tokens are issued. `id_token` alone still works.
 - **The tokens are tied to the user's session,** which must still be valid when they're issued. Each issue leaves a `token_issued_implicit_response` entry in the [audit log](/concepts/audit-log/).
 
 ## Why it's deprecated

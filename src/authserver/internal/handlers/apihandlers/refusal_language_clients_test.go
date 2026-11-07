@@ -322,6 +322,35 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	})
 }
 
+// TestClientDPoPRefusals_AreInTheRequestsLanguage covers the "Require DPoP for token requests"
+// save (#42 decision 12).
+func TestClientDPoPRefusals_AreInTheRequestsLanguage(t *testing.T) {
+	save := func(client *record.Client, body string) func(*testing.T, string) *httptest.ResponseRecorder {
+		return serveClient(http.MethodPut, "/api/v1/admin/clients/7/dpop", body, client, nil,
+			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.Handler {
+				return HandleClientDPoPPut(database, auditLogger)
+			})
+	}
+	assertRefusalLanguages(t, []refusalCase{
+		{
+			name:       "no dpopBoundAccessTokens",
+			serve:      save(&record.Client{Id: 7, ClientIdentifier: "a-client"}, `{}`),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_dpop.dpop_bound_access_tokens_required",
+			english:    "dpopBoundAccessTokens is required: send true or false.",
+			portuguese: "dpopBoundAccessTokens é obrigatório: envie true ou false.",
+		},
+		{
+			name:       "the admin console's client switched on",
+			serve:      save(&record.Client{Id: 7, ClientIdentifier: builtin.AdminConsoleClientIdentifier}, `{"dpopBoundAccessTokens":true}`),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_dpop.admin_console_not_allowed",
+			english:    "The admin console's client can't require DPoP for token requests.",
+			portuguese: "O cliente do console de administração não pode exigir DPoP nas solicitações de token.",
+		},
+	})
+}
+
 // TestClientPermissionRefusals_AreInTheRequestsLanguage covers the client permissions save.
 func TestClientPermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	assertRefusalLanguages(t, []refusalCase{

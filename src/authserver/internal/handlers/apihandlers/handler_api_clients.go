@@ -58,6 +58,7 @@ type clientsDatabase interface {
 	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientId int64, remember bool) error
 	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error
+	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 }
 

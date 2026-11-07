@@ -9,7 +9,7 @@ This page helps your app get access tokens bound to a key with DPoP, so a token 
 
 An ordinary access token is a bearer token: whoever holds it can use it. With DPoP (Demonstrating Proof of Possession, [RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)), your app keeps a private key and signs a short JWT, a **proof**, for each request it makes. The auth server binds the access token to that key, so a thief who copies the token, out of a log or a browser, can't make the proof that goes with it.
 
-DPoP is opt-in per request: send a proof with a token request, on any grant, and the access token comes back bound. Without one, nothing changes. Most DPoP client libraries do everything below for you.
+DPoP is opt-in per request: send a proof with a token request, on any grant, and the access token comes back bound. Without one, nothing changes, unless an administrator has set your client to [require DPoP for token requests](/concepts/clients/#require-dpop-for-token-requests). Most DPoP client libraries do everything below for you.
 
 ## Get a bound access token
 

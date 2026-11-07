@@ -4,12 +4,13 @@
 // because registration is a global switch, put back afterwards. RFC 7591 section 5 too: a policy_uri
 // or tos_uri is kept only on a redirect URI's scheme and host, and the answer carries what was kept. OpenID Connect Back-Channel
 // Logout 1.0 section 2.2: a backchannel_logout_uri and its session-required flag are stored and echoed, and a self-registered
-// client's http URI is refused with invalid_client_metadata (#784 decision 10). Clients made in the admin console are
+// client's http URI is refused with invalid_client_metadata (#784 decision 10). RFC 9449 section 5.2: dpop_bound_access_tokens
+// is stored and echoed, false when left out, and a value that is not a boolean is refused. Clients made in the admin console are
 // covered by ../admin-console/clients/: a duplicate identifier, a new secret, a switch to public.
 import { clientIdFromList, clientUrl, deleteClient } from "../../lib/admin-console";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
-import { expectNoStore, readAnswer } from "../../lib/rfc6749";
+import { basicAuth, expectNoStore, expectTokenError, postToken, readAnswer } from "../../lib/rfc6749";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 
 test("a public client is registered with no secret, a confidential one with a long secret never cached, and a bad redirect URI is refused", async ({
@@ -125,6 +126,60 @@ test("a back-channel logout URI is stored and echoed with its flag, and a self-r
       expect(refused.body.error).toBe("invalid_client_metadata");
       expect(refused.body.error_description).toContain("backchannel_logout_uri");
       expect(refused.body.client_id).toBeUndefined();
+    });
+  } finally {
+    for (const identifier of registered) await deleteClient(page, await clientIdFromList(page, identifier));
+  }
+});
+
+test("dpop_bound_access_tokens is stored and echoed, false when left out, and a value that is not a boolean is refused", async ({
+  page,
+  request,
+}) => {
+  const register = async (metadata: Record<string, unknown>) =>
+    readAnswer(
+      await request.post(`${env.authUrl}/connect/register`, {
+        data: { client_name: "e2e dpop", redirect_uris: ["https://app.example.com/callback"], ...metadata },
+        failOnStatusCode: false,
+      }),
+    );
+  // A refresh with a token that is no token, from the registered client: one that requires DPoP is
+  // refused for the missing proof once it has authenticated, before the token is read.
+  const refreshWithoutAProof = async (registration: { body: Record<string, unknown> }) =>
+    postToken(
+      request,
+      { grant_type: "refresh_token", refresh_token: "not-a-refresh-token" },
+      { headers: { Authorization: basicAuth(String(registration.body.client_id), String(registration.body.client_secret)) } },
+    );
+  const registered: string[] = [];
+  try {
+    await withSettingsRestored(page, "/admin/settings/general", async () => {
+      await fillSettingsForm(page, { dynamicClientRegistrationEnabled: true });
+      await saveSettings(page);
+
+      const requiring = await register({ dpop_bound_access_tokens: true });
+      expect(requiring.status, requiring.text).toBe(201);
+      registered.push(requiring.body.client_id as string);
+      expect(requiring.body.dpop_bound_access_tokens).toBe(true);
+      const refused = await refreshWithoutAProof(requiring);
+      expectTokenError(refused, "invalid_dpop_proof");
+      expect(refused.body.error_description).toBe("This client requires a DPoP proof with every token request.");
+
+      const leftOut = await register({});
+      expect(leftOut.status, leftOut.text).toBe(201);
+      registered.push(leftOut.body.client_id as string);
+      expect(leftOut.body.dpop_bound_access_tokens).toBe(false);
+      expectTokenError(await refreshWithoutAProof(leftOut), "invalid_grant");
+
+      for (const value of ["true", 1, null]) {
+        await test.step(JSON.stringify(value), async () => {
+          const notABoolean = await register({ dpop_bound_access_tokens: value });
+          expect(notABoolean.status, notABoolean.text).toBe(400);
+          expect(notABoolean.body.error).toBe("invalid_client_metadata");
+          expect(notABoolean.body.error_description).toBe("dpop_bound_access_tokens must be a boolean");
+          expect(notABoolean.body.client_id).toBeUndefined();
+        });
+      }
     });
   } finally {
     for (const identifier of registered) await deleteClient(page, await clientIdFromList(page, identifier));

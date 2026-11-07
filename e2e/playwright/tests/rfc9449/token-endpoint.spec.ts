@@ -5,11 +5,12 @@
 // server's internal URL, the hop behind the proxy, is refused (section 4.3). The full validation
 // matrix is in the Go tiers. A proof is single-use (section 11.1): sent again, it is refused. A
 // public client's refresh token is bound to the key too, and refused without a proof by it, where a
-// confidential client's is left unbound (section 5).
+// confidential client's is left unbound (section 5). A client set to require DPoP is refused every
+// token request without a proof, once it has authenticated, and answered with one (section 5.2).
 import type { Page } from "@playwright/test";
 import { grantClientPermission, readClientSecret } from "../../lib/admin-console";
 import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
-import { dpopKey, dpopProof, expectBoundTokenResponse, expectUseDPoPNonce, nonceOf, postTokenWithDPoP } from "../../lib/dpop";
+import { dpopKey, dpopProof, expectBoundTokenResponse, expectUseDPoPNonce, nonceOf, postTokenWithDPoP, setRequireDPoP } from "../../lib/dpop";
 import { env } from "../../lib/environment";
 import { expect, test, type TestClient, type TestResource } from "../../lib/fixtures";
 import { basicAuth, expectInvalidClient, expectTokenError, expectTokenResponse, postToken, tokenEndpoint } from "../../lib/rfc6749";
@@ -26,6 +27,7 @@ async function clientCredentialsClient(
   const client = await clients.create({ authorizationCode: false, clientCredentials: true });
   await grantClientPermission(page, client.id, resource.identifier, "read");
   return {
+    client,
     basic: { Authorization: basicAuth(client.identifier, await readClientSecret(page, client.id)) },
     body: { grant_type: "client_credentials", scope: `${resource.identifier}:read` },
   };
@@ -208,5 +210,54 @@ test("a proof is accepted once: sent again, it is invalid_dpop_proof, and a requ
   });
   await test.step("a new proof with the same nonce is another proof, and accepted", async () => {
     expectBoundTokenResponse(await postToken(request, body, { headers: { ...basic, DPoP: dpopProof(key, { nonce }) } }), key);
+  });
+});
+
+const requiresDPoPRefusal = "This client requires a DPoP proof with every token request.";
+
+test("a client requiring DPoP is refused a token without a proof once it has authenticated, and answered with one (section 5.2)", async ({
+  page,
+  clients,
+  resources,
+  users,
+  request,
+}) => {
+  const service = await clientCredentialsClient(page, clients, resources);
+  await setRequireDPoP(page, request, clients, service.client.id, true);
+
+  await test.step("without a DPoP header it is invalid_dpop_proof, with no nonce", async () => {
+    const refused = await postToken(request, service.body, { headers: service.basic });
+    expectTokenError(refused, "invalid_dpop_proof");
+    expect(refused.body.error_description).toBe(requiresDPoPRefusal);
+    expect(refused.headers["dpop-nonce"]).toBeUndefined();
+  });
+  await test.step("a wrong secret is still invalid_client, so a stranger learns nothing of the setting", async () => {
+    expectInvalidClient(await postToken(request, service.body, { headers: { Authorization: basicAuth(service.client.identifier, "not-the-secret") } }), {
+      viaBasic: true,
+    });
+  });
+  await test.step("with a proof it is a bound token", async () => {
+    const key = dpopKey();
+    expectBoundTokenResponse(await postTokenWithDPoP(request, service.body, key, { headers: service.basic }), key);
+  });
+
+  await test.step("the password grant is refused before the password is looked at", async () => {
+    const user = await users.create();
+    const { client, secret } = await passwordGrantClient(page, clients);
+    await setRequireDPoP(page, request, clients, client.id, true);
+    const basic = { headers: { Authorization: basicAuth(client.identifier, secret) } };
+    const wrongPassword = await postToken(request, { grant_type: "password", username: user.email, password: "not-the-password", scope: "openid" }, basic);
+    expectTokenError(wrongPassword, "invalid_dpop_proof");
+    expect(wrongPassword.body.error_description).toBe(requiresDPoPRefusal);
+    const key = dpopKey();
+    expectBoundTokenResponse(
+      await postTokenWithDPoP(request, { grant_type: "password", username: user.email, password: user.password, scope: "openid" }, key, basic),
+      key,
+    );
+  });
+
+  await test.step("switched off, the client is answered a bearer token without a proof again", async () => {
+    await setRequireDPoP(page, request, clients, service.client.id, false);
+    expectTokenResponse(await postToken(request, service.body, { headers: service.basic }));
   });
 });

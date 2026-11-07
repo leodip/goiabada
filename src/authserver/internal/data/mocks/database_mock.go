@@ -16588,6 +16588,75 @@ func (_c *Database_SetClientBackchannelLogout_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
+// SetClientDPoPBoundAccessTokens provides a mock function for the type Database
+func (_mock *Database) SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error {
+	ret := _mock.Called(ctx, tx, clientId, required)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetClientDPoPBoundAccessTokens")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, bool) error); ok {
+		r0 = returnFunc(ctx, tx, clientId, required)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_SetClientDPoPBoundAccessTokens_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetClientDPoPBoundAccessTokens'
+type Database_SetClientDPoPBoundAccessTokens_Call struct {
+	*mock.Call
+}
+
+// SetClientDPoPBoundAccessTokens is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientId int64
+//   - required bool
+func (_e *Database_Expecter) SetClientDPoPBoundAccessTokens(ctx any, tx any, clientId any, required any) *Database_SetClientDPoPBoundAccessTokens_Call {
+	return &Database_SetClientDPoPBoundAccessTokens_Call{Call: _e.mock.On("SetClientDPoPBoundAccessTokens", ctx, tx, clientId, required)}
+}
+
+func (_c *Database_SetClientDPoPBoundAccessTokens_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64, required bool)) *Database_SetClientDPoPBoundAccessTokens_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetClientDPoPBoundAccessTokens_Call) Return(err error) *Database_SetClientDPoPBoundAccessTokens_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_SetClientDPoPBoundAccessTokens_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error) *Database_SetClientDPoPBoundAccessTokens_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetClientPublic provides a mock function for the type Database
 func (_mock *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {
 	ret := _mock.Called(ctx, tx, clientId)

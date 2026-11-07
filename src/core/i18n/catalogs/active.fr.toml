@@ -2030,6 +2030,8 @@
 "handler.client_backchannel_logout.uri_userinfo" = "L’URI de déconnexion back-channel ne doit contenir ni nom d’utilisateur ni mot de passe : {{.uri}}"
 "handler.client_backchannel_logout.uri_http_public_client" = "L’URI de déconnexion back-channel doit utiliser https sur un client public. Le http simple n’est permis que sur un client confidentiel créé par un administrateur : {{.uri}}"
 "handler.client_backchannel_logout.uri_http_self_registered" = "L’URI de déconnexion back-channel doit utiliser https sur un client qui s’est enregistré lui-même, quel que soit son type. Le http simple n’est permis que sur un client confidentiel créé par un administrateur : {{.uri}}"
+"handler.client_dpop.dpop_bound_access_tokens_required" = "dpopBoundAccessTokens est obligatoire : envoyez true ou false."
+"handler.client_dpop.admin_console_not_allowed" = "Le client de la console d’administration ne peut pas exiger DPoP pour les demandes de jeton."
 "handler.client_web_origins.empty" = "L’origine web ne peut pas être vide."
 "handler.client_web_origins.invalid" = "Origine web invalide : {{.origin}}. Une origine web comprend un schéma, un hôte et un port facultatif, sans rien après l’hôte, par exemple https://www.example.com ou https://myapp:8080. Le schéma doit être http ou https ; l’hôte doit être en ASCII, sans informations utilisateur, et ne peut être ni une adresse IPv6 littérale ni une adresse IPv4 abrégée ; le port, s’il est présent, doit être un entier décimal inférieur à 65536, sans zéro initial."
 "handler.client_web_origins.too_long" = "L’origine web est trop longue ({{.length}} caractères, maximum {{.max}}) : {{.origin}}"

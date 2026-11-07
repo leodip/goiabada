@@ -47,6 +47,9 @@ const (
 	// issuanceRefuseImplicitDisabled answers unauthorized_client: the ceremony is an implicit one and the
 	// client may no longer use the implicit grant.
 	issuanceRefuseImplicitDisabled
+	// issuanceRefuseImplicitAccessTokenDPoPRequired answers unauthorized_client: the ceremony would
+	// return an access token in the redirect, and the client requires DPoP (#42 decision 13).
+	issuanceRefuseImplicitAccessTokenDPoPRequired
 	// issuanceRefuseCodeDisabled answers unauthorized_client: the ceremony is a code one and the client
 	// may no longer use the authorization code flow.
 	issuanceRefuseCodeDisabled
@@ -78,10 +81,12 @@ type issuanceAnswer struct {
 
 // clientFlows is which authorization flows a client may use, each as the token endpoint reads it:
 // the implicit grant through the client's override and else the global switch, the authorization
-// code flow through the client's own flag.
+// code flow through the client's own flag. requiresDPoP is the client's "Require DPoP for token
+// requests", which withholds the implicit grant's access token (#42 decision 13).
 type clientFlows struct {
-	implicit bool
-	code     bool
+	implicit     bool
+	code         bool
+	requiresDPoP bool
 }
 
 // issuanceFacts is what decideIssuance decides from. The first six are known from the ceremony and
@@ -139,7 +144,9 @@ type issuanceFacts struct {
 //     /auth/authorize: the implicit grant through the client's override and else the global switch.
 //     A disabled client is refused on the page /auth/authorize renders for one, never by redirect,
 //     because answering the client is what disabling it stops; a flow switched off is
-//     unauthorized_client by redirect, as the token endpoint answers it. Last of the client's checks,
+//     unauthorized_client by redirect, as the token endpoint answers it, and so is an implicit
+//     ceremony that would return an access token for a client that now requires DPoP (#42 decision
+//     13). Last of the client's checks,
 //     the scope to be issued names no administrative scope the client may not request, answered
 //     invalid_scope by redirect (#499 decision 6). None of these reads the hint, the session or the
 //     user.
@@ -191,6 +198,9 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	}
 	if isImplicitFlow && !f.flows.implicit {
 		return decided(issuanceRefuseImplicitDisabled)
+	}
+	if isImplicitFlow && rtInfo.HasToken && f.flows.requiresDPoP {
+		return decided(issuanceRefuseImplicitAccessTokenDPoPRequired)
 	}
 	if !isImplicitFlow && !f.flows.code {
 		return decided(issuanceRefuseCodeDisabled)

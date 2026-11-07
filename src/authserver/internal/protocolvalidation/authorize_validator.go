@@ -57,6 +57,9 @@ type ValidateRequestInput struct {
 	Nonce                    string // Needed to validate nonce requirement for id_token, and bounded (#437)
 	State                    string // Bounded, because the ceremony stores it (#437)
 	MaxAge                   string // The raw max_age parameter, empty when absent
+	// DPoPBoundAccessTokens is whether the client requires DPoP for its token requests, which
+	// refuses it the response types that return an access token (#42 decision 13).
+	DPoPBoundAccessTokens bool
 }
 
 func NewAuthorizeValidator(database authorizeValidatorDatabase) *AuthorizeValidator {
@@ -303,6 +306,14 @@ const ImplicitNotAuthorizedErrorMsg = "The client is not authorized to use the i
 	"To enable it, go to the client's settings in the admin console under 'OAuth2 flows'. " +
 	"The switch in 'Admin > General' enables it only for a client set to inherit the global setting."
 
+// ImplicitDPoPRequiredErrorMsg is the refusal of a response type that returns an access token,
+// "token" or "id_token token", for a client that requires DPoP (#42 decision 13): an implicit
+// access token leaves in the redirect, with no token request and so no proof, and would be a plain
+// Bearer token. Two places emit it, as ImplicitNotAuthorizedErrorMsg's two do: ValidateRequest, and
+// /auth/issue, for a client switched to require DPoP while a user sat on a step.
+const ImplicitDPoPRequiredErrorMsg = "This client requires DPoP for its access tokens, so it can't receive one through the " +
+	"implicit grant. Use the authorization code flow with PKCE instead."
+
 // SupportedResponseTypes is the discovery document's response_types_supported. It lists every
 // response type the server implements whatever the implicit switch says, as OIDC Discovery 1.0
 // section 3 defines the field ("values that this OP supports"); a client not allowed the implicit
@@ -372,6 +383,15 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	if isImplicitFlow && !input.ImplicitGrantEnabled {
 		return oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			ImplicitNotAuthorizedErrorMsg, http.StatusBadRequest)
+	}
+
+	// A client that requires DPoP gets its access tokens from the token endpoint alone, which takes
+	// the proof: RFC 6749 section 4.2.2.1 defines unauthorized_client as "not authorized to request
+	// an access token using this method". An implicit response type that returns no access token,
+	// "id_token" alone, keeps its usual rules (#42 decision 13).
+	if isImplicitFlow && rtInfo.HasToken && input.DPoPBoundAccessTokens {
+		return oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
+			ImplicitDPoPRequiredErrorMsg, http.StatusBadRequest)
 	}
 
 	// The authorization code flow asks the same question here as the implicit one above it, and

@@ -99,6 +99,12 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 		return nil, err
 	}
 
+	// Before the code's PKCE binding is checked, and before it is claimed, so the refusal spends
+	// nothing and the code stays redeemable with a proof (#42 decision 12).
+	if err = refuseWithoutRequiredProof(ctx, client, input); err != nil {
+		return nil, err
+	}
+
 	// The PKCE boundary for a public client (#245). A public client authenticates with
 	// nothing, so a code that carries no challenge is bound to nothing and whoever presents
 	// it gets the tokens: that is the parameter-stripping attack in RFC 9700 section 4.8.1.

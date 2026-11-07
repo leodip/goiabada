@@ -131,8 +131,8 @@ func parityAllowlist() []parityRule {
 			Why: "SQLite has no boolean type and stores 0 and 1 whatever the column is declared " +
 				"as. The migrations spelled some of these NUMERIC and some INTEGER, which the " +
 				"catalog reports verbatim; both accept exactly what the data layer writes.",
-			Count:  23,
-			Digest: "f8f00a09211e0819",
+			Count:  24,
+			Digest: "48029acf9819c4a8",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "numeric" && d.Says[data.MySQL] == "bool"

@@ -658,6 +658,61 @@ func TestValidateRequest_ImplicitFlowNotEnabled(t *testing.T) {
 	assert.Contains(t, customErr.Description(), "admin console")
 }
 
+// A client that requires DPoP is refused the response types that return an access token, "token" and
+// "id_token token", with unauthorized_client (RFC 6749 section 4.2.2.1: "not authorized to request an
+// access token using this method"): an implicit access token leaves in the redirect, with no token
+// request and so no proof, and would be a plain Bearer token (#42 decision 13). "id_token" alone and
+// "code" return no access token, and keep their usual rules; a client not requiring DPoP is answered
+// as before.
+func TestValidateRequest_AClientRequiringDPoPIsRefusedImplicitAccessTokens(t *testing.T) {
+	for _, tc := range []struct {
+		responseType string
+		requiresDPoP bool
+		refused      bool
+	}{
+		{"token", true, true},
+		{"id_token token", true, true},
+		{"token id_token", true, true},
+		{"id_token", true, false},
+		{"code", true, false},
+		{"token", false, false},
+		{"id_token token", false, false},
+	} {
+		t.Run(fmt.Sprintf("%s, requires DPoP %v", tc.responseType, tc.requiresDPoP), func(t *testing.T) {
+			validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
+
+			err := validator.ValidateRequest(&ValidateRequestInput{
+				ResponseType:             tc.responseType,
+				AuthorizationCodeEnabled: true,
+				ImplicitGrantEnabled:     true,
+				DPoPBoundAccessTokens:    tc.requiresDPoP,
+				Scope:                    "openid",
+				Nonce:                    "the-nonce",
+			})
+
+			if !tc.refused {
+				require.NoError(t, err)
+				return
+			}
+			var customErr *oauth.ErrorDetail
+			require.ErrorAs(t, err, &customErr)
+			assert.Equal(t, "unauthorized_client", customErr.Code())
+			assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
+			assert.Equal(t, "This client requires DPoP for its access tokens, so it can't receive one through the "+
+				"implicit grant. Use the authorization code flow with PKCE instead.", customErr.Description())
+			assert.Equal(t, ImplicitDPoPRequiredErrorMsg, customErr.Description(), "the message issuance gives too")
+		})
+	}
+
+	// The implicit grant switched off is still answered first, with its own description.
+	err := NewAuthorizeValidator(datamocks.NewDatabase(t)).ValidateRequest(&ValidateRequestInput{
+		ResponseType: "token", AuthorizationCodeEnabled: true, DPoPBoundAccessTokens: true,
+	})
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
+	assert.Equal(t, ImplicitNotAuthorizedErrorMsg, customErr.Description())
+}
+
 // The code flow's own question, asked beside the implicit one since #573: a client whose code
 // flow is off is answered unauthorized_client with the description the token endpoint and
 // issuance give for the same condition, so the client hears one answer wherever it asks (#197).

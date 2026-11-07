@@ -3,7 +3,11 @@
 // so a test comparing it with a token's cnf.jkt checks the server against an answer it did not
 // compute.
 import { createHash, generateKeyPairSync, randomUUID, sign, type KeyObject } from "node:crypto";
-import { expect, type APIRequestContext } from "@playwright/test";
+import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { grantClientPermission, readClientSecret } from "./admin-console";
+import { env } from "./environment";
+import type { TestClient } from "./fixtures";
+import { clientCredentialsToken } from "./oauth";
 import { expectNoStore, postToken, tokenEndpoint, type RawAnswer } from "./rfc6749";
 
 export interface DPoPKey {
@@ -88,4 +92,27 @@ export function expectBoundTokenResponse(answer: RawAnswer, key: DPoPKey) {
   expect(claims.cnf, "cnf.jkt is the proof key's thumbprint").toEqual({ jkt: key.thumbprint });
   nonceOf(answer);
   expectNoStore(answer);
+}
+
+// Sets a client's "Require DPoP for token requests" through the Admin API, PUT
+// /api/v1/admin/clients/{id}/dpop, with the token of a caller client of the test's own holding
+// authserver:manage-clients, and checks the answer carries the value set.
+export async function setRequireDPoP(
+  page: Page,
+  request: APIRequestContext,
+  clients: { create(options: { authorizationCode: boolean; clientCredentials: boolean }): Promise<TestClient> },
+  clientId: number,
+  required: boolean,
+) {
+  const caller = await clients.create({ authorizationCode: false, clientCredentials: true });
+  await grantClientPermission(page, caller.id, "authserver", "manage-clients");
+  const token = await clientCredentialsToken(request, caller.identifier, await readClientSecret(page, caller.id), "authserver:manage-clients");
+  expect(token.status, JSON.stringify(token.body)).toBe(200);
+  const response = await request.put(`${env.authUrl}/api/v1/admin/clients/${clientId}/dpop`, {
+    headers: { Authorization: `Bearer ${String(token.body.access_token)}` },
+    data: { dpopBoundAccessTokens: required },
+    failOnStatusCode: false,
+  });
+  expect(response.status(), await response.text()).toBe(200);
+  expect((await response.json()).client.dpopBoundAccessTokens).toBe(required);
 }

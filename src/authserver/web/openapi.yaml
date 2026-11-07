@@ -3053,6 +3053,55 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/clients/{id}/dpop:
+    put:
+      tags: [Clients]
+      summary: Set whether a client requires DPoP for token requests
+      description: |
+        Set the client's "Require DPoP for token requests" (RFC 9449 section 5.2's
+        `dpop_bound_access_tokens`). While it is on, every token request from the
+        client without a `DPoP` proof is refused with 400 `invalid_dpop_proof`, on
+        every grant, and the authorization endpoint refuses the client the response
+        types that return an access token, `token` and `id_token token`, with
+        `unauthorized_client`. A client starts with it off.
+
+        `dpopBoundAccessTokens` is required: a body without it, or with null, is
+        refused with `handler.client_dpop.dpop_bound_access_tokens_required` rather
+        than read as false. Switching the admin console's own client on is refused
+        with `handler.client_dpop.admin_console_not_allowed`, since the console calls
+        the auth server with Bearer tokens, and an id that is not a number with
+        `VALIDATION_ERROR`. The route takes the scopes of the client's other settings;
+        an administrator client takes `authserver:manage`. Every save, one to the value
+        already stored included, leaves an `updated_client_dpop` audit record naming
+        the client, the new value and the caller. The answer is the client as it now
+        is. No other operation sets or clears `dpopBoundAccessTokens`.
+      operationId: updateClientDPoP
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientDPoPRequest'
+      responses:
+        '200':
+          description: Requirement saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateClientResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/clients/{id}/sessions:
     get:
       tags: [Clients]
@@ -7460,6 +7509,13 @@ components:
           description: >-
             Whether the client requires the session identifier (sid) in every logout token. Set
             through PUT /api/v1/admin/clients/{id}/backchannel-logout
+        dpopBoundAccessTokens:
+          type: boolean
+          description: >-
+            Whether the client requires DPoP for token requests: a token request without a DPoP
+            proof is refused, and so are the implicit response types that return an access token.
+            Set through PUT /api/v1/admin/clients/{id}/dpop, or by dynamic client registration's
+            dpop_bound_access_tokens
         createdViaDcr:
           type: boolean
           description: Read-only. True when the client registered itself through /connect/register
@@ -7553,6 +7609,7 @@ components:
         - rememberConsent
         - backchannelLogoutUri
         - backchannelLogoutSessionRequired
+        - dpopBoundAccessTokens
         - createdViaDcr
         - administrativeScopesAllowed
         - showLogo
@@ -7813,6 +7870,14 @@ components:
             "on" includes the OpenID Connect claims in this client's ID tokens, "off" leaves them out,
             "default" follows the global setting of the same name. Any other value is refused with
             400.
+
+    UpdateClientDPoPRequest:
+      type: object
+      required: [dpopBoundAccessTokens]
+      properties:
+        dpopBoundAccessTokens:
+          type: boolean
+          description: Whether the client requires DPoP for token requests. Required; true on the admin console's own client is refused
 
     UpdateClientAdministrativeScopesRequest:
       type: object

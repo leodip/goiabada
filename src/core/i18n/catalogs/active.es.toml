@@ -2032,6 +2032,8 @@
 "handler.client_backchannel_logout.uri_userinfo" = "La URI de cierre de sesión back-channel no puede llevar un nombre de usuario ni una contraseña: {{.uri}}"
 "handler.client_backchannel_logout.uri_http_public_client" = "La URI de cierre de sesión back-channel debe usar https en un cliente público. http sin cifrar solo se admite en un cliente confidencial creado por un administrador: {{.uri}}"
 "handler.client_backchannel_logout.uri_http_self_registered" = "La URI de cierre de sesión back-channel debe usar https en un cliente que se registró por su cuenta, sea del tipo que sea. http sin cifrar solo se admite en un cliente confidencial creado por un administrador: {{.uri}}"
+"handler.client_dpop.dpop_bound_access_tokens_required" = "El campo dpopBoundAccessTokens es obligatorio: envía true o false."
+"handler.client_dpop.admin_console_not_allowed" = "El cliente de la consola de administración no puede exigir DPoP para las solicitudes de token."
 "handler.client_web_origins.empty" = "El origen web no puede estar vacío"
 "handler.client_web_origins.invalid" = "El origen web no es válido: {{.origin}}. Un origen web consta de un esquema, un host y un puerto opcional, sin nada más; por ejemplo, https://www.example.com o https://myapp:8080. El esquema debe ser http o https. El host debe usar ASCII, no puede incluir datos de usuario ni ser una dirección IPv6 literal o una IPv4 abreviada. Si se indica un puerto, debe ser un número decimal menor que 65536, sin ceros iniciales."
 "handler.client_web_origins.too_long" = "El origen web es demasiado largo ({{.length}} caracteres; el máximo es {{.max}}): {{.origin}}"

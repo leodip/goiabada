@@ -90,6 +90,10 @@ type Database interface {
 	// the session identifier, and nothing else but updated_at. UpdateClient never writes either
 	// column: only this and CreateClient do (#784 decisions 14 and 15).
 	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error
+	// SetClientDPoPBoundAccessTokens writes whether a client requires DPoP for its token requests,
+	// and nothing else but updated_at. UpdateClient never writes the column: only this and
+	// CreateClient do (#42 decision 12).
+	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error
 	// AcquireClientRow takes the client's row inside the caller's transaction and holds it
 	// until that transaction ends, so a read taken afterwards cannot be invalidated by
 	// another writer before the caller writes it back (see #245).

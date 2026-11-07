@@ -1,0 +1,13 @@
+-- A client's "Require DPoP for token requests" (#42 decision 12), RFC 9449 section 5.2's
+-- dpop_bound_access_tokens.
+--
+-- clients.dpop_bound_access_tokens is whether the client always uses DPoP: while it is on, every
+-- token request from the client without a DPoP proof is refused invalid_dpop_proof, and the
+-- authorization endpoint refuses it the response types that return an access token, which would
+-- leave in the redirect without a proof. It is set through the admin API's PUT
+-- /clients/{id}/dpop or by dynamic client registration, and no whole-row client save writes it.
+--
+-- Every existing client starts off through the column's default, so nothing changes for any client
+-- until it is set: there is nothing to backfill. The down migration drops the column, and every
+-- setting made since with it.
+ALTER TABLE clients ADD COLUMN dpop_bound_access_tokens numeric NOT NULL DEFAULT 0;

@@ -89,6 +89,12 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 		return nil, err
 	}
 
+	// Before the account is looked up, so no password is compared, charged to the account's
+	// rate-limit budget or audited as a failed guess for a request refused here (#42 decision 12).
+	if err := refuseWithoutRequiredProof(ctx, client, input); err != nil {
+		return nil, err
+	}
+
 	// A client whose default ACR level is level 2 (mandatory) asks every sign-in for a second
 	// factor, and a password is all this grant ever checks, so the client's floor cannot be
 	// met: refuse rather than issue a level 1 token below it. The level is read only while the

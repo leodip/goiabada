@@ -65,6 +65,11 @@ type ClientResponse struct {
 	// section 2.2). Both change only through UpdateClientBackchannelLogoutRequest (#784 decision 9).
 	BackchannelLogoutURI             string `json:"backchannelLogoutUri"`
 	BackchannelLogoutSessionRequired bool   `json:"backchannelLogoutSessionRequired"`
+	// DPoPBoundAccessTokens is "Require DPoP for token requests" (RFC 9449 section 5.2's
+	// dpop_bound_access_tokens): while it is on, the client's token requests need a DPoP proof, and
+	// it is refused the implicit response types that return an access token. It changes only through
+	// UpdateClientDPoPRequest, or at dynamic client registration (#42 decisions 12 and 13).
+	DPoPBoundAccessTokens bool `json:"dpopBoundAccessTokens"`
 	// CreatedViaDCR is read-only on purpose. It records that the client registered itself through
 	// /connect/register, which is a fact about where the client came from rather than a setting, so
 	// UpdateClientSettingsRequest deliberately does not carry it and neither an administrator nor the
@@ -243,6 +248,14 @@ type UpdateClientTokensRequest struct {
 // decision 5).
 type UpdateClientAdministrativeScopesRequest struct {
 	Allowed *bool `json:"allowed"`
+}
+
+// UpdateClientDPoPRequest sets a client's "Require DPoP for token requests", on PUT
+// /clients/{id}/dpop (#42 decision 12). DPoPBoundAccessTokens is a pointer so that a body without
+// it, or with null, is refused rather than read as switching the requirement off. The admin
+// console's own client is refused it on.
+type UpdateClientDPoPRequest struct {
+	DPoPBoundAccessTokens *bool `json:"dpopBoundAccessTokens"`
 }
 
 type UpdateClientResponse struct {

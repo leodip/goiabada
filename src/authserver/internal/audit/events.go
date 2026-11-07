@@ -638,6 +638,13 @@ const (
 	//
 	// Payload: client_id, the client saved, and logged_in_user.
 	EventUpdatedClientBackchannelLogout = "updated_client_backchannel_logout"
+	// EventUpdatedClientDPoP records an administrator's save of a client's "Require DPoP for token
+	// requests", on or off, through PUT /api/v1/admin/clients/{id}/dpop, written once the save has
+	// committed, for every call to the route, even one that keeps the value it had (#42 decision 12).
+	//
+	// Payload: client_id, client_identifier, dpop_bound_access_tokens (the value saved) and
+	// logged_in_user.
+	EventUpdatedClientDPoP = "updated_client_dpop"
 	// EventSentLogoutToken records one delivery of a logout token to an app's back-channel logout
 	// URI, written when the delivery finishes, after the end of the session it tells of has
 	// committed (#784 decision 8). It is the record that an app was told that this user's session
@@ -792,6 +799,7 @@ var auditEventTypes = []string{
 	EventUpdatedClientAdministrativeScopes,
 	EventUpdatedClientAuthentication,
 	EventUpdatedClientBackchannelLogout,
+	EventUpdatedClientDPoP,
 	EventUpdatedClientIntrospectionResources,
 	EventUpdatedClientLogo,
 	EventUpdatedClientOAuth2Flows,

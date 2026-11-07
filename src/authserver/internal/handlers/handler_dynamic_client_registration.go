@@ -67,7 +67,7 @@ func HandleDynamicClientRegistrationPost(
 		var req oidc.DynamicClientRegistrationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			description := "Invalid request body"
-			if named, ok := dcrBackchannelLogoutTypeRefusal(err); ok {
+			if named, ok := dcrMemberTypeRefusal(err); ok {
 				description = named
 			}
 			refuseDCR(w, r, oidc.DCRErrorInvalidClientMetadata, description, http.StatusBadRequest)
@@ -149,8 +149,11 @@ func HandleDynamicClientRegistrationPost(
 			// Written here, at creation; SetClientBackchannelLogout is their only other writer.
 			BackchannelLogoutURI:             req.BackchannelLogoutURI,
 			BackchannelLogoutSessionRequired: backchannelLogoutSessionRequired,
-			IsPublic:                         isPublic,
-			Enabled:                          true,
+			// "Require DPoP for token requests", as the registration asked (RFC 9449 section 5.2),
+			// written here, at creation; SetClientDPoPBoundAccessTokens is its only other writer.
+			DPoPBoundAccessTokens: bool(req.DPoPBoundAccessTokens),
+			IsPublic:              isPublic,
+			Enabled:               true,
 			// A self-registered client is one nobody here has vetted, and RFC 7591 section 5
 			// requires all of its metadata be treated as self-asserted. Consent is the only
 			// control that binds such a client's identity to the user's authority, so it is on
@@ -256,6 +259,8 @@ func HandleDynamicClientRegistrationPost(
 			// What was stored, so a dropped value is absent (RFC 7591 section 3.2.1).
 			PolicyURI: policyURI,
 			TOSURI:    tosURI,
+			// Stored on every registration, so always echoed (#42 decision 12).
+			DPoPBoundAccessTokens: bool(req.DPoPBoundAccessTokens),
 		}
 		// Both settings whenever a URI was stored, the flag even when false (RFC 7591 section 3.2.1).
 		if req.BackchannelLogoutURI != "" {
@@ -388,16 +393,15 @@ func validateDCRBackchannelLogout(req *oidc.DynamicClientRegistrationRequest) er
 	return nil
 }
 
-// dcrBackchannelLogoutTypeRefusal names the field when a registration body could not be read only
-// because a back-channel logout member held a value of the wrong type, which #784 decision 10
-// refuses naming the field: backchannel_logout_uri is a string and
-// backchannel_logout_session_required a boolean, null included: it is the request's one
-// oidc.NonNullBool, whose refusal encoding/json passes on without the member's name. Any other
+// dcrMemberTypeRefusal names the field when a registration body could not be read only because a
+// member held a value of the wrong type, which #784 decision 10 and #42 decision 12 refuse naming
+// the field: backchannel_logout_uri is a string, and backchannel_logout_session_required and
+// dpop_bound_access_tokens booleans, null included, whose refusal names its member. Any other
 // unreadable body keeps the plain description, so ok is false.
-func dcrBackchannelLogoutTypeRefusal(err error) (description string, ok bool) {
+func dcrMemberTypeRefusal(err error) (description string, ok bool) {
 	var notABoolean *oidc.NotABooleanError
 	if errors.As(err, &notABoolean) {
-		return "backchannel_logout_session_required must be a boolean", true
+		return notABoolean.Member + " must be a boolean", true
 	}
 	var typeErr *json.UnmarshalTypeError
 	if errors.As(err, &typeErr) && typeErr.Field == "backchannel_logout_uri" {

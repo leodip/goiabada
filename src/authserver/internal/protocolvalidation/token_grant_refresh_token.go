@@ -89,6 +89,12 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		return nil, err
 	}
 
+	// Before the refresh token is read, so nothing about it is answered to a request refused here
+	// (#42 decision 12).
+	if err := refuseWithoutRequiredProof(ctx, client, input); err != nil {
+		return nil, err
+	}
+
 	if len(input.RefreshToken) == 0 {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Missing required refresh_token parameter.", http.StatusBadRequest)

@@ -390,6 +390,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 					ResponseMode:             authContext.ResponseMode,
 					PKCERequired:             client.IsPKCERequired(settings.PKCERequired),
 					ImplicitGrantEnabled:     client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
+					DPoPBoundAccessTokens:    client.DPoPBoundAccessTokens,
 					AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
 					Scope:                    requestedScope,
 					Nonce:                    authContext.Nonce,

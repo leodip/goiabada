@@ -54,7 +54,7 @@ While DCR is on, **anyone** who can reach `/connect/register` can create a clien
 
 ## The request
 
-The body is a JSON object. The auth server reads nine fields and ignores every other one, as RFC 7591 asks:
+The body is a JSON object. The auth server reads ten fields and ignores every other one, as RFC 7591 asks:
 
 | Field | What it does |
 |---|---|
@@ -67,6 +67,7 @@ The body is a JSON object. The auth server reads nine fields and ignores every o
 | `tos_uri` | The app's terms of service, which the consent screen links. Kept only on one of the client's hosts, as `policy_uri` is. |
 | `backchannel_logout_uri` | Where the auth server tells the app that a user's session ended: the client's [back-channel logout URI](/concepts/clients/#back-channel-logout). Optional. See [Back-channel logout](#back-channel-logout) below. |
 | `backchannel_logout_session_required` | `true` when the app needs the session identifier, `sid`, in every logout token it's sent. Optional, `false` by default, and stored only with a `backchannel_logout_uri`. |
+| `dpop_bound_access_tokens` | `true` when the app always uses [DPoP](/concepts/dpop/): the client is registered to [require DPoP for token requests](/concepts/clients/#require-dpop-for-token-requests), so a token request without a proof is refused. Optional, `false` by default. |
 
 `refresh_token` is accepted and sets nothing of its own: a client that may use the authorization code flow can redeem the refresh tokens it gets.
 
@@ -130,6 +131,7 @@ A registration is answered `201 Created`, with `Cache-Control: no-store`, and th
 | `tos_uri` | The terms of service URL, when one was sent and [kept](#privacy-policy-and-terms-of-service) |
 | `backchannel_logout_uri` | The back-channel logout URI, when one was sent |
 | `backchannel_logout_session_required` | Whether every logout token names the session, `true` or `false`, beside a `backchannel_logout_uri` |
+| `dpop_bound_access_tokens` | Whether the client requires DPoP for token requests, `true` or `false`, always |
 
 ## Errors
 
@@ -149,7 +151,7 @@ Cache-Control: no-store
 | `error` | Status | Why |
 |---|---|---|
 | `access_denied` | 403 | DCR is off: "Dynamic client registration is not enabled" |
-| `invalid_client_metadata` | 400 | The body isn't JSON or is too large, or a field holds a value the auth server doesn't take: an unknown `token_endpoint_auth_method`, a grant type it doesn't take, `implicit` and `password` included, `client_credentials` on a public client, a `client_name` too long or holding `<` or `>`, a sign-out redirect URI that's malformed, refused for this kind of client, too long, listed twice, or one too many, a [back-channel logout URI](#back-channel-logout) the auth server can't use, or a `backchannel_logout_session_required` that isn't `true` or `false` |
+| `invalid_client_metadata` | 400 | The body isn't JSON or is too large, or a field holds a value the auth server doesn't take: an unknown `token_endpoint_auth_method`, a grant type it doesn't take, `implicit` and `password` included, `client_credentials` on a public client, a `client_name` too long or holding `<` or `>`, a sign-out redirect URI that's malformed, refused for this kind of client, too long, listed twice, or one too many, a [back-channel logout URI](#back-channel-logout) the auth server can't use, or a `backchannel_logout_session_required` or `dpop_bound_access_tokens` that isn't `true` or `false` |
 | `invalid_redirect_uri` | 400 | A redirect URI is missing, malformed, refused for this kind of client, too long, listed twice, or one too many |
 | `server_error` | 500 | The auth server couldn't save the client. Nothing was registered. |
 

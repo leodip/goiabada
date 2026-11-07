@@ -1,10 +1,11 @@
 // RFC 6749 section 4.2, the implicit grant (deprecated by RFC 9700, and off unless enabled): the access
 // token comes back in the redirect URI's fragment (4.2.2), never with a refresh token, and an error
 // comes back in the fragment too (4.2.2.1). Each client here enables it for itself, so no global
-// setting changes.
+// setting changes. A client that requires DPoP (RFC 9449 section 5.2) gets no access token here.
 import type { Browser, Page } from "@playwright/test";
 import { addRedirectUri, grantUserPermission, setImplicitGrant } from "../../lib/admin-console";
 import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
+import { setRequireDPoP } from "../../lib/dpop";
 import { expect, test } from "../../lib/fixtures";
 import { userinfo } from "../../lib/oauth";
 import {
@@ -148,5 +149,46 @@ test("a client without the implicit grant is answered unauthorized_client, in th
   expect(redirect!.search).toBe("");
   expect(redirect!.hash).not.toContain("access_token");
   expectAuthorizeError(redirect!, "unauthorized_client", params.state);
+  await context.close();
+});
+
+// An implicit access token leaves in the redirect, with no token request and so no DPoP proof, so a
+// client set to require DPoP is refused the response types that return one, unauthorized_client in the
+// fragment (section 4.2.2.1: "not authorized to request an access token using this method"). An ID
+// token alone returns no access token, and is still answered.
+test("a client requiring DPoP is refused token and id_token token, and still answered id_token alone", async ({
+  page,
+  browser,
+  clients,
+  users,
+  request,
+}) => {
+  const user = await users.create();
+  const { client, context } = await implicitClientAndSession(page, browser, clients, user);
+  await setRequireDPoP(page, request, clients, client.id, true);
+
+  for (const responseType of ["token", "id_token token"]) {
+    await test.step(responseType, async () => {
+      const params = tokenRequest(client.identifier, { response_type: responseType, nonce: "the-nonce" });
+      const { redirect, page: refusal } = await followAuthorize(context.request, params);
+      expect(redirect, `redirected to the client, not answered on ${refusal ? "a page" : "nothing"}`).toBeDefined();
+      expect(redirect!.hash).not.toContain("access_token");
+      expectAuthorizeError(redirect!, "unauthorized_client", params.state);
+      expect(new URLSearchParams(redirect!.hash.slice(1)).get("error_description")).toBe(
+        "This client requires DPoP for its access tokens, so it can't receive one through the implicit grant. " +
+          "Use the authorization code flow with PKCE instead.",
+      );
+    });
+  }
+
+  await test.step("id_token alone", async () => {
+    const params = tokenRequest(client.identifier, { response_type: "id_token", nonce: "the-nonce" });
+    const { redirect } = await followAuthorize(context.request, params);
+    expect(redirect, "redirected to the client").toBeDefined();
+    const fragment = new URLSearchParams(redirect!.hash.slice(1));
+    expect(fragment.get("error"), redirect!.href).toBeNull();
+    expect(fragment.get("id_token")).toBeTruthy();
+    expect(fragment.get("access_token")).toBeNull();
+  });
   await context.close();
 });

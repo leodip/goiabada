@@ -207,6 +207,20 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 		},
 	},
 	{
+		// Switching on "Require DPoP for token requests", which the admin console's own client is
+		// refused before the ceiling (#42 decision 12).
+		name: "PUT clients dpop", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/dpop",
+		prepare: noClientPrepare,
+		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/dpop", f.clientId),
+				map[string]any{"dpopBoundAccessTokens": true})
+		},
+		changed: func(t *testing.T, f *clientTargetFixture) bool {
+			return storedClient(t, f.clientId).DPoPBoundAccessTokens
+		},
+		notOnTheConsoleClient: true,
+	},
+	{
 		name: "PUT clients web origins", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/web-origins",
 		prepare: func(t *testing.T, f *clientTargetFixture) {
 			f.before = "https://attacker-" + strings.ToLower(fake.LetterN(8)) + ".example"

@@ -42,6 +42,10 @@ func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, c
 		return nil, err
 	}
 
+	if err = refuseWithoutRequiredProof(ctx, client, input); err != nil {
+		return nil, err
+	}
+
 	err = val.database.ClientLoadPermissions(ctx, nil, client)
 	if err != nil {
 		return nil, err

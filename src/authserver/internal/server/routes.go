@@ -415,6 +415,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients), apiBearer.RecordDPoPProof()).Put("/clients/{id}/post-logout-redirect-uris", apihandlers.HandleClientPostLogoutRedirectURIsPut(s.database, auditLogger))
 		// Setting or changing the URI is reserved to authserver:manage by the handler (#784 decision 15).
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients), apiBearer.RecordDPoPProof()).Put("/clients/{id}/backchannel-logout", apihandlers.HandleClientBackchannelLogoutPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients), apiBearer.RecordDPoPProof()).Put("/clients/{id}/dpop", apihandlers.HandleClientDPoPPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients), apiBearer.RecordDPoPProof()).Put("/clients/{id}/web-origins", apihandlers.HandleClientWebOriginsPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients), apiBearer.RecordDPoPProof()).Put("/clients/{id}/tokens", apihandlers.HandleClientTokensPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead), apiBearer.RecordDPoPProof()).Get("/clients/{id}/permissions", apihandlers.HandleClientPermissionsGet(s.database))
