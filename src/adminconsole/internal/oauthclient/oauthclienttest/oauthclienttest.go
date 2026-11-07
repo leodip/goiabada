@@ -10,8 +10,10 @@ package oauthclienttest
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"math/big"
@@ -173,6 +175,19 @@ func SignRS256(t testing.TB, key *rsa.PrivateKey, kid string, claims jwt.MapClai
 	signed, err := token.SignedString(key)
 	require.NoError(t, err)
 	return signed
+}
+
+// SignRawRS256 signs header and payload, given as raw JSON text so a test can hold bytes and members
+// no JSON encoder or JWT library would write, with RS256 (RFC 7518 section 3.3) over the compact
+// signing input. The signature is good: whatever refuses such a token is its header or payload.
+func SignRawRS256(t testing.TB, key *rsa.PrivateKey, header, payload string) string {
+	t.Helper()
+	signingInput := base64.RawURLEncoding.EncodeToString([]byte(header)) + "." +
+		base64.RawURLEncoding.EncodeToString([]byte(payload))
+	digest := sha256.Sum256([]byte(signingInput))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest[:])
+	require.NoError(t, err)
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(signature)
 }
 
 // ValidClaims is an ID token's claims that every check accepts: Issuer, ClientID as the one

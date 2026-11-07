@@ -7,7 +7,9 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -541,6 +543,26 @@ func TestJwkToRSAPublicKey_ValidKey(t *testing.T) {
 	assert.Equal(t, key.E, pub.E)
 }
 
+// modulusOfBits is an odd base64url modulus of exactly bits bits, 2^(bits-1) + 1.
+func modulusOfBits(bits int) string {
+	n := new(big.Int).Lsh(big.NewInt(1), uint(bits-1))
+	n.Add(n, big.NewInt(1))
+	return base64.RawURLEncoding.EncodeToString(n.Bytes())
+}
+
+func exponentOf(e ...byte) string {
+	return base64.RawURLEncoding.EncodeToString(e)
+}
+
+// 2048 bits is the least RFC 7518 section 3.3 allows, and is accepted.
+func TestJwkToRSAPublicKey_AcceptsA2048BitModulus(t *testing.T) {
+	pub, err := jwkToRSAPublicKey(oauth.Jwk{Kty: "RSA", N: modulusOfBits(2048), E: "AQAB"})
+
+	require.NoError(t, err)
+	assert.Equal(t, 2048, pub.N.BitLen())
+	assert.Equal(t, 65537, pub.E)
+}
+
 func TestJwkToRSAPublicKey_Rejections(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	valid := oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)
@@ -555,6 +577,21 @@ func TestJwkToRSAPublicKey_Rejections(t *testing.T) {
 		{"invalid base64 modulus", oauth.Jwk{Kty: "RSA", N: "!!!not base64!!!", E: valid.E}},
 		{"invalid base64 exponent", oauth.Jwk{Kty: "RSA", N: valid.N, E: "!!!not base64!!!"}},
 		{"standard base64 padding is rejected", oauth.Jwk{Kty: "RSA", N: valid.N + "==", E: valid.E}},
+		// RFC 7518 section 3.3: "A key of size 2048 bits or larger MUST be used" (#709 finding 6).
+		{"a 2047-bit modulus", oauth.Jwk{Kty: "RSA", N: modulusOfBits(2047), E: "AQAB"}},
+		{"a 1024-bit modulus", oauth.Jwk{Kty: "RSA", N: modulusOfBits(1024), E: "AQAB"}},
+		{"an empty modulus", oauth.Jwk{Kty: "RSA", N: "", E: "AQAB"}},
+		// An exponent that is even, below 3 or longer than four bytes (#709 finding 6).
+		{"an empty exponent", oauth.Jwk{Kty: "RSA", N: valid.N, E: ""}},
+		{"exponent 0", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x00)}},
+		{"exponent 1", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x01)}},
+		{"exponent 2", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x02)}},
+		{"exponent 4", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x04)}},
+		{"exponent 65536", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x01, 0x00, 0x00)}},
+		{"exponent 65537 in five bytes", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x00, 0x00, 0x01, 0x00, 0x01)}},
+		{"a five-byte exponent", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x01, 0x00, 0x00, 0x00, 0x01)}},
+		{"a nine-byte exponent that overflows an int", oauth.Jwk{Kty: "RSA", N: valid.N,
+			E: exponentOf(0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01)}},
 	}
 
 	for _, tc := range testCases {
@@ -578,8 +615,10 @@ func TestJwkToRSAPublicKey_DecodesExponent(t *testing.T) {
 		want int
 	}{
 		{"single byte", []byte{0x03}, 3},
-		{"two bytes", []byte{0x01, 0x00}, 256},
+		{"two bytes", []byte{0x01, 0x01}, 257},
 		{"the usual 65537", []byte{0x01, 0x00, 0x01}, 65537},
+		{"65537 in four bytes", []byte{0x00, 0x01, 0x00, 0x01}, 65537},
+		{"four bytes", []byte{0x7f, 0xff, 0xff, 0xff}, 2147483647},
 	}
 
 	for _, tc := range testCases {
@@ -652,6 +691,40 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 		assert.Nil(t, tp.getPublicKeyFromCache(""))
 	})
+
+	// #709 finding 7, OIDC Core 1.0 section 10.1: a key whose use is present and not sig, or whose
+	// alg is present and not RS256, is not used, whether a kid names it or it is the only key.
+	for _, tc := range []struct {
+		name   string
+		change func(*oauth.Jwk)
+		usable bool
+	}{
+		{"use sig and alg RS256", func(*oauth.Jwk) {}, true},
+		{"use and alg absent", func(j *oauth.Jwk) { j.Use, j.Alg = "", "" }, true},
+		{"use enc", func(j *oauth.Jwk) { j.Use = "enc" }, false},
+		{"use enc and alg absent", func(j *oauth.Jwk) { j.Use, j.Alg = "enc", "" }, false},
+		{"alg RS512", func(j *oauth.Jwk) { j.Alg = "RS512" }, false},
+		{"alg RS512 and use absent", func(j *oauth.Jwk) { j.Use, j.Alg = "", "RS512" }, false},
+		{"alg none", func(j *oauth.Jwk) { j.Alg = "none" }, false},
+	} {
+		jwk := oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)
+		tc.change(&jwk)
+		for _, kid := range []string{"key-1", ""} {
+			t.Run(tc.name+" under kid "+fmt.Sprintf("%q", kid), func(t *testing.T) {
+				tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+				tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{jwk}}
+
+				pub := tp.getPublicKeyFromCache(kid)
+
+				if tc.usable {
+					require.NotNil(t, pub)
+					assert.Equal(t, key.N, pub.N)
+				} else {
+					assert.Nil(t, pub)
+				}
+			})
+		}
+	}
 
 	t.Run("matching kid on an undecodable key returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
