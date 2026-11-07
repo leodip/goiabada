@@ -263,6 +263,33 @@ gha_summary_row() {
 # root and as vscode alike, and in sticky /tmp the kernel's protected_regular refuses one user's
 # open of a file another user created. TEST_STACK_LOCK_DIR moves it, which the script's own tests
 # do so that they never meet a real run.
+#
+# The holder's record is the lock file's content, and the holder writes it just after taking the
+# lock, so a run refused in between finds it empty or still holding the previous holder's record.
+# stack_lock_holder reads it again for up to a second, until it names a process that is alive. A
+# record whose process has exited past that is a run killed while commands it started, which share
+# its descriptor, still hold the lock.
+stack_lock_holder() {
+    local holder pid tries=0
+    while :; do
+        holder=$(cat "$stack_lock" 2>/dev/null)
+        pid=${holder#pid }
+        pid=${pid%% *}
+        case "$pid" in
+            ''|*[!0-9]*) ;;
+            *) if [ -d "/proc/$pid" ]; then echo "$holder"; return; fi ;;
+        esac
+        tries=$((tries + 1))
+        [ "$tries" -ge 10 ] && break
+        sleep 0.1
+    done
+    if [ -n "$holder" ]; then
+        echo "$holder, which has exited while commands it started still hold the lock"
+    else
+        echo "its pid is not recorded"
+    fi
+}
+
 if should_run_data || should_run_integration; then
     if ! command -v flock >/dev/null 2>&1; then
         echo "run-tests.sh: flock is not on PATH; run this inside the dev container, which ships it" >&2
@@ -275,12 +302,13 @@ if should_run_data || should_run_integration; then
         echo "run-tests.sh: unable to open the lock $stack_lock" >&2
         exit 2
     fi
+    # Built before the lock is taken, so that the write after it is all a refused run can miss.
+    stack_lock_record="pid $$ (--type $TYPE --db $DB), started $(date '+%Y-%m-%d %H:%M:%S')"
     if ! flock -n 9; then
-        holder=$(cat "$stack_lock" 2>/dev/null)
-        echo "run-tests.sh: another data or integration run is using this container's test server and databases: ${holder:-its pid is not recorded yet}. Start this run after it finishes; the lint, module and setup tiers can run beside it with --no-build." >&2
+        echo "run-tests.sh: another data or integration run is using this container's test server and databases: $(stack_lock_holder). Start this run after it finishes; the lint, module and setup tiers can run beside it with --no-build." >&2
         exit 2
     fi
-    echo "pid $$ (--type $TYPE --db $DB), started $(date '+%Y-%m-%d %H:%M:%S')" > "$stack_lock"
+    echo "$stack_lock_record" > "$stack_lock"
 fi
 
 # ---- output capture ---------------------------------------------------------

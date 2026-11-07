@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -42,10 +43,29 @@ func stubBin(t *testing.T, markers string) string {
 		stubs[tool] = "#!/bin/sh\ntouch \"" + markers + "/" + tool + "\"\nexit 1\n"
 	}
 	for name, body := range stubs {
-		require.NoError(t, os.WriteFile(filepath.Join(bin, name), []byte(body), 0o600))
-		require.NoError(t, os.Chmod(filepath.Join(bin, name), 0o700))
+		writeStub(t, bin, name, body)
 	}
 	return bin
+}
+
+// writeStub writes an executable shell script named name into bin, replacing any stub there.
+func writeStub(t *testing.T, bin, name, body string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(filepath.Join(bin, name), []byte(body), 0o600))
+	require.NoError(t, os.Chmod(filepath.Join(bin, name), 0o700))
+}
+
+// holderRecord is the record run-tests.sh writes in the lock for the run holding it.
+func holderRecord(pid int) string {
+	return "pid " + strconv.Itoa(pid) + " (--type integration --db sqlite), started 2026-11-07 10:00:00"
+}
+
+// exitedPid is the pid of a process that has run and been reaped.
+func exitedPid(t *testing.T) int {
+	t.Helper()
+	cmd := exec.Command("true")
+	require.NoError(t, cmd.Run())
+	return cmd.Process.Pid
 }
 
 // tierTools are the commands a tier's work goes through, stubbed to leave a marker and fail.
@@ -161,9 +181,10 @@ func TestRunTests_AMissingStackVariableIsRefusedFirst(t *testing.T) {
 
 // TestRunTests_ASecondStackRunIsRefusedNamingTheFirst: while another run holds the lock, a run of
 // the data or the integration tier exits 2 with the holder's record, before it builds, kills a
-// listener or removes a file, and leaves the record as it found it.
+// listener or removes a file, and leaves the record as it found it. The holder is this test's own
+// process, which is alive, as a holder is.
 func TestRunTests_ASecondStackRunIsRefusedNamingTheFirst(t *testing.T) {
-	const record = "pid 4242 (--type integration --db sqlite), started 2026-11-07 10:00:00"
+	record := holderRecord(os.Getpid())
 	for _, args := range [][]string{
 		{"--type", "data", "--db", "sqlite"},
 		{"--type", "integration", "--db", "sqlite"},
@@ -185,6 +206,45 @@ func TestRunTests_ASecondStackRunIsRefusedNamingTheFirst(t *testing.T) {
 			after, err := os.ReadFile(lock)
 			require.NoError(t, err)
 			assert.Equal(t, record+"\n", string(after))
+		})
+	}
+}
+
+// TestRunTests_ARefusedRunReadsTheRecordUntilItsHolderIsAlive: the holder writes its record just
+// after it takes the lock, so a run refused in between finds the file empty or holding the previous
+// holder's record. The refused run reads it again until it names a live process; the sleep stub
+// stands in for the holder, writing its record during the refused run's first wait. A record that
+// never names a live process is reported for what it is.
+func TestRunTests_ARefusedRunReadsTheRecordUntilItsHolderIsAlive(t *testing.T) {
+	live := holderRecord(os.Getpid())
+	exited := holderRecord(exitedPid(t))
+	for _, tc := range []struct {
+		name    string
+		found   string
+		written string
+		want    string
+	}{
+		{"written while it waits, over an empty file", "", live, live + "."},
+		{"written while it waits, over the previous holder's record", exited, live, live + "."},
+		{"never written", "", "", "its pid is not recorded."},
+		{"its holder has exited", exited, "", exited + ", which has exited while commands it started still hold the lock."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			markers := t.TempDir()
+			lockDir := t.TempDir()
+			lock := filepath.Join(lockDir, "lock")
+			require.NoError(t, os.WriteFile(lock, []byte(tc.found), 0o600))
+			bin := stubBin(t, markers)
+			if tc.written != "" {
+				writeStub(t, bin, "sleep", "#!/bin/sh\nprintf '%s\\n' '"+tc.written+"' > '"+lock+"'\n")
+			}
+
+			status, stderr := runScript(t, scriptEnv(bin, lockDir, stackVariables...), lock,
+				"--type", "data", "--db", "sqlite", "--no-build")
+
+			assert.Equal(t, 2, status)
+			assert.Contains(t, stderr, "another data or integration run is using this container's test server and databases: "+tc.want)
+			assert.Empty(t, toolsRun(t, markers))
 		})
 	}
 }
