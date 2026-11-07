@@ -74,7 +74,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 
 	// Create session first
 	httpClient := createHttpClient(t)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
@@ -123,7 +123,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	// Now request with prompt=consent - should force consent screen
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
-	requestCodeChallenge2 := fake.LetterN(43)
+	requestCodeChallenge2 := randomCodeChallenge()
 
 	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -159,7 +159,7 @@ func TestPromptConsent_NoSession_RequiresLoginFirst(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -197,7 +197,7 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 
 	// Use both prompt=login and prompt=consent
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -249,7 +249,7 @@ func TestPromptLogin_NoSession(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -274,7 +274,7 @@ func TestPromptLogin_MaxAgeIrrelevant(t *testing.T) {
 	httpClient, client, redirectUri, _, _ := createSessionWithAcrLevel1AndPassword(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	// Even with max_age=600 (which would normally allow SSO), prompt=login forces re-auth
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -310,7 +310,7 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 
 	// Request level2_optional with prompt=login
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
@@ -355,7 +355,7 @@ func TestPromptLogin_PreservesNonce(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := "test-nonce-" + fake.LetterN(16)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -448,7 +448,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	}
 
 	httpClient := createHttpClient(t)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
@@ -512,7 +512,7 @@ func TestPromptLogin_WrongPassword(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -567,7 +567,7 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 	}
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +

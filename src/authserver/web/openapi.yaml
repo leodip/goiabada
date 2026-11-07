@@ -8355,6 +8355,7 @@ components:
           type: string
         publicKeyPEM:
           type: string
+          description: The public key's SubjectPublicKeyInfo, PEM-encoded under the `PUBLIC KEY` label.
         publicKeyJWK:
           type: string
       required:

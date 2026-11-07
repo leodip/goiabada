@@ -71,6 +71,8 @@ A claim with no value is left out, as [Scopes](/concepts/scopes/#openid-connect-
 
 The claims are read when you call, so they're current even when the token is older than the user's last change. The answer is plain JSON, never a signed JWT.
 
+Every answer, the claims and each error alike, carries `Cache-Control: no-store` and `Pragma: no-cache`, so no cache keeps a copy of a user's claims.
+
 ## Errors
 
 An error is answered with a `WWW-Authenticate: Bearer realm="goiabada"` header naming the `error` and its `error_description`, and the same two in a JSON body, as [RFC 6750 section 3](https://www.rfc-editor.org/rfc/rfc6750#section-3) defines:
@@ -90,7 +92,7 @@ Pragma: no-cache
 
 | Status | `error` | `error_description` | Why |
 |---|---|---|---|
-| 401 | none | none | No token was sent. The answer has only `WWW-Authenticate: Bearer realm="goiabada"` and no body. |
+| 401 | none | none | No token was sent. The answer has `WWW-Authenticate: Bearer realm="goiabada"` and no body. |
 | 400 | `invalid_request` | "The Authorization header must be sent once.", "The access_token parameter must be sent once." or "The access token must be sent by one method only." | The token was sent twice |
 | 400 | `invalid_request` | "The request body could not be parsed." | A POST body that can't be read |
 | 401 | `invalid_token` | "The access token is invalid." | The token is expired, its signature doesn't verify, it isn't an access token, its `iss` isn't the current issuer, its client is disabled or deleted, or it or its grant was revoked |

@@ -70,7 +70,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -206,7 +206,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -346,7 +346,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -487,7 +487,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -636,7 +636,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -789,7 +789,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -943,7 +943,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -1094,7 +1094,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -1252,7 +1252,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -1405,7 +1405,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -1556,7 +1556,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -1687,7 +1687,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -1809,7 +1809,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -1936,7 +1936,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -2067,7 +2067,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assignPermissionToUser(t, user.Id, permission1.Id)
 	assignPermissionToUser(t, user.Id, permission2.Id)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email " + resource1.ResourceIdentifier + ":" + permission1.PermissionIdentifier + " " +
@@ -2199,7 +2199,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 			resource.ResourceIdentifier+":"+permission.PermissionIdentifier)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 

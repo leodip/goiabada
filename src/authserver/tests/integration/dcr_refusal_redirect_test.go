@@ -228,7 +228,7 @@ func authorizeURLWithScope(clientIdentifier string, redirectURI string, scope st
 		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape(scope) +
 		"&state=" + state +
 		"&nonce=" + fake.LetterN(8)

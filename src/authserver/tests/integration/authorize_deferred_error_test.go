@@ -150,7 +150,7 @@ func TestAuthorize_Deferred_MalformedMaxAgeDeliversAfterLogin(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&state=" + url.QueryEscape(deferralState) +
 		"&scope=openid" +
 		"&max_age=abc"
@@ -214,7 +214,7 @@ func TestAuthorize_Deferred_NonConformingDescriptionMatchesTheImmediatePath(t *t
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&state=" + url.QueryEscape(deferralState) +
 		"&scope=" + url.QueryEscape(emojiScope)
 
@@ -260,7 +260,7 @@ func TestAuthorizePost_Deferred_CookielessRequestIsSentToLogin(t *testing.T) {
 	form.Set("redirect_uri", deferralRedirectURI)
 	form.Set("response_type", "code")
 	form.Set("code_challenge_method", "S256")
-	form.Set("code_challenge", fake.LetterN(43))
+	form.Set("code_challenge", randomCodeChallenge())
 	form.Set("scope", "not_a_valid_scope")
 	form.Set("state", deferralState)
 
@@ -307,7 +307,7 @@ func TestAuthorize_Deferred_LeavesNoUserSession(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape("openid profile email")
 
 	second, err := httpClient.Get(valid)
@@ -363,7 +363,7 @@ func codeFlowDisabledAuthorizeURL(clientIdentifier string) string {
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&state=" + url.QueryEscape(deferralState) +
 		"&scope=openid"
 }
@@ -377,7 +377,7 @@ func deferralAuthorizeURL(clientIdentifier string, responseMode string) string {
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&state=" + url.QueryEscape(deferralState) +
 		"&scope=not_a_valid_scope"
 

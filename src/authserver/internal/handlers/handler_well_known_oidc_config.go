@@ -82,6 +82,16 @@ func HandleWellKnownOIDCConfigGet(
 			wellKnownConfig.RegistrationEndpoint = baseURL + "/connect/register"
 		}
 
+		setMetadataCacheLifetime(w)
 		jsonWriter.EncodeJSON(w, r, wellKnownConfig)
 	}
+}
+
+// setMetadataCacheLifetime lets any cache keep the discovery document or the key set for five
+// minutes (RFC 9111 section 5.2.2.1), written on the success path only, so a fault keeps the no-store
+// its error writer gives it (#714). Five minutes holds across a key rotation: the next key is
+// published before it signs, so a cached set already carries it, and only two rotations within five
+// minutes would leave a cached set without the key that signs.
+func setMetadataCacheLifetime(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "public, max-age=300")
 }

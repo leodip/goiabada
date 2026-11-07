@@ -143,7 +143,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *re
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -253,7 +253,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Cli
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -372,7 +372,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Cl
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"

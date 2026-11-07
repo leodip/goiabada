@@ -430,13 +430,8 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 					"PKCE is required. Ensure code_challenge_method is set to 'S256'.", http.StatusBadRequest)
 			}
 
-			if !hasPKCELength(input.CodeChallenge) {
-				return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
-					"The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.",
-					http.StatusBadRequest)
-			}
-			if !isPKCECharset(input.CodeChallenge) {
-				return codeChallengeCharsetRefusal()
+			if !isBase64URLSHA256(input.CodeChallenge) {
+				return codeChallengeRefusal(true)
 			}
 		} else if pkceProvided {
 			// PKCE is optional but was provided - validate format (strict mode)
@@ -445,13 +440,8 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 					"Invalid code_challenge_method. Only 'S256' is supported.", http.StatusBadRequest)
 			}
 
-			if !hasPKCELength(input.CodeChallenge) {
-				return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
-					"The code_challenge parameter is incorrect. It should be 43 to 128 characters long.",
-					http.StatusBadRequest)
-			}
-			if !isPKCECharset(input.CodeChallenge) {
-				return codeChallengeCharsetRefusal()
+			if !isBase64URLSHA256(input.CodeChallenge) {
+				return codeChallengeRefusal(false)
 			}
 		}
 		// If PKCE is not required and not provided, that's fine - skip validation

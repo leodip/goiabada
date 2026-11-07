@@ -87,7 +87,9 @@ func encodePrivateKeyPEM(privateKey *rsa.PrivateKey) []byte {
 // requires of them. Keys generated before #424 carry "RSA PUBLIC KEY", the PKCS#1 label, over the
 // same SubjectPublicKeyInfo bytes, and are not rewritten: golang-jwt reads either label, which
 // signingkeys' tests hold, and a key is deleted two rotations after it stops being current. A
-// strict reader that trusts the label, such as x509.ParsePKCS1PublicKey, refuses the old one.
+// strict reader that trusts the label, such as x509.ParsePKCS1PublicKey, refuses the old one, so
+// the admin API's export relabels it "PUBLIC KEY" with the same bytes (apimapping.ToPublicKeyPEM,
+// #714).
 func encodePublicKeyPEM(publicKeyDER []byte) []byte {
 	return pem.EncodeToMemory(&pem.Block{
 		Type:  "PUBLIC KEY",

@@ -41,7 +41,7 @@ func with(value string, i int, replacement string) string {
 	return value[:i] + replacement + value[i+1:]
 }
 
-// TestIsPKCEValue pins RFC 7636 4.1 and 4.2's one production, 43*128unreserved, on both edges of the
+// TestIsPKCEValue pins RFC 7636 4.1's code_verifier production, 43*128unreserved, on both edges of the
 // length and on both sides of each class of the set (#244, decision 20).
 func TestIsPKCEValue(t *testing.T) {
 	testCases := []struct {
@@ -92,18 +92,36 @@ func TestIsPKCEValue(t *testing.T) {
 	}
 }
 
-// TestValidateRequest_CodeChallengeGrammar holds the authorization endpoint to RFC 7636 4.2 in both
-// PKCE branches, the one a client that must use PKCE takes and the one a client that merely offers
-// it takes. A challenge of the right length with one character outside the set is refused; the same
-// length with every character inside it is not, so it is the character that decides. The length
-// refusals keep their own text, which the suite and the integration tier pin (#244).
+const (
+	// rfc7636Challenge is RFC 7636 appendix B's S256 challenge, the challenge of testCodeVerifier.
+	// Its last character, 'M', is 001100: the two spare bits a canonical encoding leaves zero.
+	rfc7636Challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+	// rfc7638Thumbprint is RFC 7638 section 3.1's SHA-256 JWK thumbprint, the other value the one
+	// validator answers for (#42 decision 20).
+	rfc7638Thumbprint = "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs"
+)
+
+// The refusal an S256 challenge that cannot be a SHA-256 hash gets at the authorization endpoint,
+// in each PKCE branch. The required branch keeps saying "either missing or", as it did for a missing
+// challenge before (#714).
+const (
+	challengeRefusedRequired = "The code_challenge parameter is either missing or incorrect. It must be the SHA-256 hash of the code_verifier, base64url-encoded without padding: 43 characters of A-Z, a-z, 0-9, '-' and '_'."
+	challengeRefusedOffered  = "The code_challenge parameter is incorrect. It must be the SHA-256 hash of the code_verifier, base64url-encoded without padding: 43 characters of A-Z, a-z, 0-9, '-' and '_'."
+)
+
+// TestValidateRequest_CodeChallengeGrammar holds the authorization endpoint to RFC 7636 4.2 for
+// S256 in both PKCE branches, the one a client that must use PKCE takes and the one a client that
+// merely offers it takes: a challenge is BASE64URL(SHA256(verifier)), so it is the canonical
+// unpadded base64url form of 32 bytes and nothing else (#714, #42 decision 20). Each refused row
+// differs from a real challenge by one character, its length or a spare bit, so it is that
+// difference the validator answers. Every refusal is invalid_request, with one text per branch.
 func TestValidateRequest_CodeChallengeGrammar(t *testing.T) {
 	validator := NewAuthorizeValidator(nil)
 
 	for _, pkceRequired := range []bool{true, false} {
-		branch := "PKCE offered"
+		branch, wantDescription := "PKCE offered", challengeRefusedOffered
 		if pkceRequired {
-			branch = "PKCE required"
+			branch, wantDescription = "PKCE required", challengeRefusedRequired
 		}
 
 		request := func(challenge string) *ValidateRequestInput {
@@ -118,12 +136,10 @@ func TestValidateRequest_CodeChallengeGrammar(t *testing.T) {
 		}
 
 		accepted := map[string]string{
-			"43 characters":           pkceValueOf(43),
-			"128 characters":          pkceValueOf(128),
-			"a real S256 challenge":   oauth.GeneratePKCECodeChallenge(testCodeVerifier),
-			"hyphen, period, tilde":   strings.Repeat("-.~", 15),
-			"underscore and digits":   strings.Repeat("_0", 30),
-			"upper and lower letters": strings.Repeat("aZ", 30),
+			"RFC 7636's example challenge":                    rfc7636Challenge,
+			"RFC 7638's example thumbprint, with '-' and '_'": rfc7638Thumbprint,
+			"32 zero bytes":    strings.Repeat("A", 43),
+			"32 bytes of ones": strings.Repeat("_", 42) + "8",
 		}
 		for name, challenge := range accepted {
 			t.Run(branch+", accepts "+name, func(t *testing.T) {
@@ -132,12 +148,37 @@ func TestValidateRequest_CodeChallengeGrammar(t *testing.T) {
 		}
 
 		refused := map[string]string{
-			"a plus":                with(pkceValueOf(43), 10, "+"),
-			"a slash":               with(pkceValueOf(43), 10, "/"),
-			"padding":               with(pkceValueOf(43), 42, "="),
-			"a space":               with(pkceValueOf(43), 10, " "),
-			"a two-byte character":  pkceValueOf(41) + "é",
-			"the 128 upper bound+ ": with(pkceValueOf(128), 127, "+"),
+			// 43 characters carry 258 bits, two more than 32 bytes: a canonical encoding leaves them
+			// zero. 'M' is 001100, 'N' 001101 and 'O' 001110.
+			"the lower spare bit set":               with(rfc7636Challenge, 42, "N"),
+			"the higher spare bit set":              with(rfc7636Challenge, 42, "O"),
+			"32 bytes of ones with a spare bit set": strings.Repeat("_", 43),
+			"padding appended":                      rfc7636Challenge + "=",
+			"padding in the last place":             with(rfc7636Challenge, 42, "="),
+			"42 characters":                         rfc7636Challenge[:42],
+			"44 characters":                         rfc7636Challenge + "A",
+			"empty":                                 "",
+			// The verifier's grammar, which a challenge used to be held to: 43 to 128 characters
+			// that may also be '.' and '~'.
+			"128 characters of the base64url alphabet": strings.Repeat("A", 128),
+			"128 characters of the verifier's set":     pkceValueOf(128),
+			"a period":                                 with(rfc7636Challenge, 10, "."),
+			"a tilde":                                  with(rfc7636Challenge, 10, "~"),
+			// Standard base64, not base64url.
+			"a plus":  with(rfc7636Challenge, 10, "+"),
+			"a slash": with(rfc7636Challenge, 10, "/"),
+			// The standard library's strict decoder skips CR and LF, so the alphabet is checked
+			// before decoding: in place of a character, and added to a real challenge.
+			"a CR in place of the first character":   with(rfc7636Challenge, 0, "\r"),
+			"an LF in place of a middle character":   with(rfc7636Challenge, 21, "\n"),
+			"a space in place of the last character": with(rfc7636Challenge, 42, " "),
+			"a tab in place of a middle character":   with(rfc7636Challenge, 21, "\t"),
+			"a CR added at the start":                "\r" + rfc7636Challenge,
+			"an LF added in the middle":              rfc7636Challenge[:21] + "\n" + rfc7636Challenge[21:],
+			"a CR and an LF added at the end":        rfc7636Challenge + "\r\n",
+			"a space added at the end":               rfc7636Challenge + " ",
+			"a tab added at the start":               "\t" + rfc7636Challenge,
+			"a two-byte character":                   rfc7636Challenge[:41] + "é",
 		}
 		for name, challenge := range refused {
 			t.Run(branch+", refuses "+name, func(t *testing.T) {
@@ -147,28 +188,9 @@ func TestValidateRequest_CodeChallengeGrammar(t *testing.T) {
 				require.ErrorAs(t, err, &detail)
 				assert.Equal(t, "invalid_request", detail.Code())
 				assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
-				assert.Equal(t, "The code_challenge parameter is incorrect. It may only contain A-Z, a-z, 0-9, '-', '.', '_' and '~'.",
-					detail.Description())
+				assert.Equal(t, wantDescription, detail.Description())
 			})
 		}
-
-		t.Run(branch+", a challenge too short keeps the length text", func(t *testing.T) {
-			err := validator.ValidateRequest(request(pkceValueOf(42)))
-
-			var detail *oauth.ErrorDetail
-			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.Code())
-			assert.Contains(t, detail.Description(), "It should be 43 to 128 characters long.")
-		})
-
-		t.Run(branch+", a challenge too long keeps the length text", func(t *testing.T) {
-			err := validator.ValidateRequest(request(pkceValueOf(129)))
-
-			var detail *oauth.ErrorDetail
-			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.Code())
-			assert.Contains(t, detail.Description(), "It should be 43 to 128 characters long.")
-		})
 	}
 
 	t.Run("no PKCE at all needs no challenge and is not judged", func(t *testing.T) {

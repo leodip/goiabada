@@ -753,7 +753,7 @@ func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedOffered, customErr.Description())
 }
 
 func TestValidateRequest_CodeChallengeTooShort_PKCERequired(t *testing.T) {
@@ -773,7 +773,7 @@ func TestValidateRequest_CodeChallengeTooShort_PKCERequired(t *testing.T) {
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedRequired, customErr.Description())
 }
 
 func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
@@ -793,7 +793,7 @@ func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedOffered, customErr.Description())
 }
 
 func TestValidateRequest_CodeChallengeTooLong_PKCERequired(t *testing.T) {
@@ -813,7 +813,7 @@ func TestValidateRequest_CodeChallengeTooLong_PKCERequired(t *testing.T) {
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedRequired, customErr.Description())
 }
 
 func TestValidateRequest_InvalidResponseMode(t *testing.T) {
@@ -824,7 +824,7 @@ func TestValidateRequest_InvalidResponseMode(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "invalid_mode",
 	}
 	err := validator.ValidateRequest(&input)
@@ -892,7 +892,7 @@ func TestSupportedResponseTypes(t *testing.T) {
 			Scope:                    "openid",
 			Nonce:                    "test-nonce-123",
 			CodeChallengeMethod:      "S256",
-			CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+			CodeChallenge:            rfc7636Challenge,
 		}
 		require.NoError(t, validator.ValidateRequest(&input), "%q is advertised and must be accepted", responseType)
 	}
@@ -909,7 +909,7 @@ func TestValidateRequest_ValidInput(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "query",
 	}
 	err := validator.ValidateRequest(&input)
@@ -927,7 +927,7 @@ func TestValidateRequest_MaxAge(t *testing.T) {
 			AuthorizationCodeEnabled: true,
 			ResponseType:             "code",
 			CodeChallengeMethod:      "S256",
-			CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+			CodeChallenge:            rfc7636Challenge,
 			ResponseMode:             "query",
 			MaxAge:                   maxAge,
 		}
@@ -1035,7 +1035,7 @@ func TestValidateRequest_EmptyResponseMode(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "",
 	}
 	err := validator.ValidateRequest(&input)
@@ -1096,7 +1096,7 @@ func TestValidateRequest_PKCEOptional_ValidPKCEParams_Success(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "query",
 		PKCERequired:             false,
 	}
@@ -1115,7 +1115,7 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallenge_Fails(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "query",
 		PKCERequired:             false,
 	}
@@ -1146,7 +1146,7 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallengeMethod_Fails(t *testing.T
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedOffered, customErr.Description())
 }
 
 func TestValidateRequest_PKCERequired_NoPKCEParams_Fails(t *testing.T) {
@@ -1179,95 +1179,13 @@ func TestValidateRequest_PKCERequired_ValidPKCEParams_Success(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "query",
 		PKCERequired:             true,
 	}
 	err := validator.ValidateRequest(&input)
 
 	assert.NoError(t, err)
-}
-
-func TestValidateRequest_CodeChallenge_Exactly43Chars_Success(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	// Boundary test: exactly 43 characters should be valid
-	codeChallenge := strings.Repeat("a", 43)
-	input := ValidateRequestInput{
-		AuthorizationCodeEnabled: true,
-		ResponseType:             "code",
-		CodeChallengeMethod:      "S256",
-		CodeChallenge:            codeChallenge,
-		ResponseMode:             "query",
-		PKCERequired:             false,
-	}
-	err := validator.ValidateRequest(&input)
-
-	assert.NoError(t, err)
-}
-
-func TestValidateRequest_CodeChallenge_Exactly42Chars_Fails(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	// Boundary test: 42 characters should be invalid (just under minimum)
-	codeChallenge := strings.Repeat("a", 42)
-	input := ValidateRequestInput{
-		AuthorizationCodeEnabled: true,
-		ResponseType:             "code",
-		CodeChallengeMethod:      "S256",
-		CodeChallenge:            codeChallenge,
-		ResponseMode:             "query",
-		PKCERequired:             false,
-	}
-	err := validator.ValidateRequest(&input)
-
-	require.Error(t, err)
-	var customErr *oauth.ErrorDetail
-	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
-}
-
-func TestValidateRequest_CodeChallenge_Exactly128Chars_Success(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	// Boundary test: exactly 128 characters should be valid
-	codeChallenge := strings.Repeat("a", 128)
-	input := ValidateRequestInput{
-		AuthorizationCodeEnabled: true,
-		ResponseType:             "code",
-		CodeChallengeMethod:      "S256",
-		CodeChallenge:            codeChallenge,
-		ResponseMode:             "query",
-		PKCERequired:             false,
-	}
-	err := validator.ValidateRequest(&input)
-
-	assert.NoError(t, err)
-}
-
-func TestValidateRequest_CodeChallenge_Exactly129Chars_Fails(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	// Boundary test: 129 characters should be invalid (just over maximum)
-	codeChallenge := strings.Repeat("a", 129)
-	input := ValidateRequestInput{
-		AuthorizationCodeEnabled: true,
-		ResponseType:             "code",
-		CodeChallengeMethod:      "S256",
-		CodeChallenge:            codeChallenge,
-		ResponseMode:             "query",
-		PKCERequired:             false,
-	}
-	err := validator.ValidateRequest(&input)
-
-	require.Error(t, err)
-	var customErr *oauth.ErrorDetail
-	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
 }
 
 func TestValidateRequest_ValidResponseModes(t *testing.T) {
@@ -1282,7 +1200,7 @@ func TestValidateRequest_ValidResponseModes(t *testing.T) {
 				AuthorizationCodeEnabled: true,
 				ResponseType:             "code",
 				CodeChallengeMethod:      "S256",
-				CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+				CodeChallenge:            rfc7636Challenge,
 				ResponseMode:             mode,
 				PKCERequired:             false,
 			}
@@ -1609,7 +1527,7 @@ func TestValidateRequest_AllSupportedResponseTypes(t *testing.T) {
 			if !tc.isImplicitFlow {
 				// For code flow, provide PKCE
 				input.CodeChallengeMethod = "S256"
-				input.CodeChallenge = "a_valid_code_challenge_that_meets_length_requirements"
+				input.CodeChallenge = rfc7636Challenge
 			}
 
 			err := validator.ValidateRequest(&input)

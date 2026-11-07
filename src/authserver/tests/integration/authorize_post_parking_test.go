@@ -30,7 +30,7 @@ func authorizePostForm(client *record.Client, redirectURI, prompt string) url.Va
 	form.Set("redirect_uri", redirectURI)
 	form.Set("response_type", "code")
 	form.Set("code_challenge_method", "S256")
-	form.Set("code_challenge", fake.LetterN(43))
+	form.Set("code_challenge", randomCodeChallenge())
 	form.Set("scope", "openid profile")
 	form.Set("state", fake.LetterN(8))
 	form.Set("nonce", fake.LetterN(8))

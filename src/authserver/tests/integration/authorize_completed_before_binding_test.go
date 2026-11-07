@@ -73,7 +73,7 @@ func signInUpToCompleted(t *testing.T, extraAuthorizeQuery string) *signedInUpTo
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + state +
 		"&nonce=" + fake.LetterN(8) + extraAuthorizeQuery)

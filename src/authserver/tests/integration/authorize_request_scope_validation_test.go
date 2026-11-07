@@ -246,7 +246,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 	errorDescription := redirectLocation.Query().Get("error_description")
 
 	assert.Equal(t, "invalid_request", errorCode)
-	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", errorDescription)
+	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It must be the SHA-256 hash of the code_verifier, base64url-encoded without padding: 43 characters of A-Z, a-z, 0-9, '-' and '_'.", errorDescription)
 }
 
 func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
@@ -256,8 +256,8 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 		// less than 43
 		{codeChallenge: fake.LetterN(42)},
 
-		// more than 128
-		{codeChallenge: fake.LetterN(129)},
+		// more than 43: the verifier's upper bound, which a challenge was once held to (#714)
+		{codeChallenge: fake.LetterN(128)},
 	}
 
 	for _, testCase := range testCases {
@@ -306,7 +306,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 		errorDescription := redirectLocation.Query().Get("error_description")
 
 		assert.Equal(t, "invalid_request", errorCode)
-		assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", errorDescription)
+		assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It must be the SHA-256 hash of the code_verifier, base64url-encoded without padding: 43 characters of A-Z, a-z, 0-9, '-' and '_'.", errorDescription)
 	}
 }
 
@@ -347,7 +347,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=invalid"
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -406,7 +406,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=invalid"
 
 	// Cookieless: no session, and no prompt parameter, which is the combination every other
@@ -465,7 +465,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=invalid" +
 		"&ui_locales=pt-BR"
 
@@ -515,7 +515,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=query" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
@@ -567,7 +567,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=fragment" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
@@ -620,7 +620,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=form_post" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
@@ -676,7 +676,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 		"&redirect_uri=" + redirectUri.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43)
+		"&code_challenge=" + randomCodeChallenge()
 
 	httpClient := createAuthenticatedHttpClient(t)
 
@@ -729,7 +729,7 @@ func TestAuthorize_ValidateScopes_UserinfoIsAnUnknownPermission(t *testing.T) {
 	params.Add("redirect_uri", redirectUri.URI)
 	params.Add("response_type", "code")
 	params.Add("code_challenge_method", "S256")
-	params.Add("code_challenge", fake.LetterN(43))
+	params.Add("code_challenge", randomCodeChallenge())
 	params.Add("scope", "openid profile authserver:userinfo")
 
 	destUrl := baseUrl + "?" + params.Encode()
@@ -798,7 +798,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
-				"&code_challenge=" + fake.LetterN(43) +
+				"&code_challenge=" + randomCodeChallenge() +
 				"&scope=" + url.QueryEscape(tc.scope)
 
 			httpClient := createAuthenticatedHttpClient(t)
@@ -854,7 +854,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape(scope)
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -918,7 +918,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape(scope)
 
 	httpClient := createAuthenticatedHttpClient(t)
@@ -968,7 +968,7 @@ func TestAuthorize_ValidateScopes_EmojiScope_FormPostDescriptionIsConformed(t *t
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=form_post" +
 		"&scope=" + url.QueryEscape("emoji💣scope")
 

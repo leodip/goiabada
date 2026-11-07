@@ -108,7 +108,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *record.
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"

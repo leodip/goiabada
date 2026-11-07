@@ -139,9 +139,10 @@ func (s *Server) initRoutes(branches appBranches) {
 	// RequireUserBoundToken behind it is what would stop a client's token that ever carried it.
 	// Refresh and ID tokens never get this far: the parse guard admits only an access token
 	// for authserver (#401). GET and POST are separate registrations: a guard added to only one of
-	// them leaves the other reachable.
-	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
-	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
+	// them leaves the other reachable. middleware.NoStore heads both chains, ahead of the guards, so
+	// the claims and every refusal, the bare 401 included, are stored by no cache (#714).
+	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
+	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
 	files.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(files, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(files, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))

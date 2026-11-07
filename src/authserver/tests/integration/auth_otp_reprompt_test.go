@@ -37,7 +37,7 @@ func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *r
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
@@ -232,7 +232,7 @@ func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(optionalRedirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=openid" +
 		"&state=" + fake.LetterN(8) +
 		"&prompt=none"

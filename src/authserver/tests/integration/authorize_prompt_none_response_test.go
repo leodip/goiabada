@@ -19,7 +19,7 @@ func TestPromptNone_Error_QueryModeDefault(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -58,7 +58,7 @@ func TestPromptNone_Error_QueryModeExplicit(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -96,7 +96,7 @@ func TestPromptNone_Error_FragmentMode(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -141,7 +141,7 @@ func TestPromptNone_Success_QueryMode(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -186,7 +186,7 @@ func TestPromptNone_Success_FragmentMode(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -236,7 +236,7 @@ func TestPromptNone_Success_FormPostMode(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -276,7 +276,7 @@ func TestPromptNone_Error_FormPostMode(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -314,7 +314,7 @@ func TestPromptNone_StateEchoedOnError(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := "my-custom-state-" + fake.LetterN(16)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -341,7 +341,7 @@ func TestPromptNone_StateEchoedOnSuccess(t *testing.T) {
 
 	requestState := "success-state-" + fake.LetterN(16)
 	requestNonce := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
@@ -372,7 +372,7 @@ func TestPromptNone_NoStateInRequest(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	// No state parameter
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -407,7 +407,7 @@ func TestPromptNone_EmptyStateInRequest(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 	httpClient := createHttpClient(t)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	// Empty state parameter
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +

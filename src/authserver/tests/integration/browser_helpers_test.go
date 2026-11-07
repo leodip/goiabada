@@ -342,7 +342,7 @@ func navigateToPasswordScreen(t *testing.T, httpClient *http.Client, client *rec
 // but appends an ui_locales query parameter (space-separated BCP 47 tags) when
 // non-empty, exercising the OIDC hint preservation across the redirect chain.
 func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client, client *record.Client, redirectUri, uiLocales string) *http.Response {
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -381,7 +381,7 @@ func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client
 func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *record.Client, user *record.User,
 	password string, redirectUri string) *http.Response {
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -435,7 +435,7 @@ func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *record.C
 func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *record.Client,
 	user *record.User, password string, redirectUri string) *http.Response {
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"

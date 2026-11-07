@@ -70,7 +70,7 @@ The auth server serves its discovery document at two addresses, the one OpenID C
 - `/.well-known/openid-configuration`, which OpenID Connect libraries read.
 - `/.well-known/oauth-authorization-server`, which OAuth clients read. MCP clients try it first.
 
-Both answer `GET` and `HEAD` with the same document.
+Both answer `GET` and `HEAD` with the same document, and `Cache-Control: public, max-age=300`: a client or a proxy may keep it for five minutes.
 
 Keep the issuer the address clients reach the auth server at. A client refuses the discovery document when its `issuer` isn't exactly the URL it fetched the document under, as RFC 8414 section 3.3 and OpenID Connect Discovery 1.0 section 4.3 require. An issuer naming another host breaks discovery at both addresses.
 
@@ -119,6 +119,8 @@ Each endpoint is the auth server's base URL, `GOIABADA_AUTHSERVER_BASEURL`, foll
 - **The previous key**, while there is one: it signed tokens before the last rotation, and some of them may still be valid.
 
 Each key is a 4096-bit RSA key with `alg` `RS256`, `use` `sig`, and a `kid` that the header of every token it signs carries.
+
+The set comes with `Cache-Control: public, max-age=300`, so a client may cache it for five minutes. That's safe across a rotation, since the next key is in the set before it signs anything. When a token's `kid` isn't in your cached set, fetch the set again before you refuse the token.
 
 To rotate, choose **Rotate keys** under **Admin**, **Signing keys** in the admin console. The next key becomes the current one, the current one becomes the previous one, the old previous key is deleted, and a new next key is created. A token signed by the deleted key no longer verifies, refresh tokens included, so don't rotate twice within the lifetime of your longest-lived token.
 

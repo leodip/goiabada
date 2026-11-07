@@ -2,7 +2,9 @@
 // must hold a code issued for a challenge to its verifier, which is what defeats an injected code, and
 // must refuse a verifier for a code issued with no challenge, the downgrade of 4.8. S256 is the only
 // method that keeps the verifier out of the authorization request. A public client must always use
-// PKCE, which ./open-redirection.spec.ts sees refused at the redirect URI.
+// PKCE, which ./open-redirection.spec.ts sees refused at the redirect URI. An S256 challenge is a
+// SHA-256 hash in unpadded base64url (RFC 7636 section 4.2): any other value could never match a
+// verifier, and is refused before a code is issued.
 import type { APIRequestContext } from "@playwright/test";
 import { setPkceRequired } from "../../lib/admin-console";
 import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
@@ -114,5 +116,53 @@ test("a confidential client required to use PKCE is answered invalid_request wit
       expectAuthorizeError(redirect!, "invalid_request", params.state);
     });
   }
+  await signIn.context.close();
+});
+
+test("an S256 challenge that can't be a SHA-256 hash is refused invalid_request, and a real one is answered with a code (RFC 7636 section 4.2)", async ({
+  page,
+  browser,
+  clients,
+  users,
+  request,
+}) => {
+  const user = await users.create();
+  const { client, secret } = await browserSignInClient(page, clients);
+  const redeem = redeemer(request, client.identifier, secret);
+  const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
+
+  // A real challenge's 43rd character carries two spare bits, zero in the canonical encoding: its
+  // index in the base64url alphabet is a multiple of four, and the next index sets the lower bit.
+  const base64url = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  const real = codeRequest(client.identifier);
+  const challenge = real.params.code_challenge;
+  const withLast = (last: string) => challenge.slice(0, 42) + last;
+  const spareBit = withLast(base64url[base64url.indexOf(challenge[42]) + 1]);
+  const impossible: [string, string][] = [
+    ["a spare bit set", spareBit],
+    ["padding", `${challenge}=`],
+    ["42 characters", challenge.slice(0, 42)],
+    ["44 characters", `${challenge}A`],
+    ["128 characters", "A".repeat(128)],
+    ["a period", withLast(".")],
+    ["a tilde", withLast("~")],
+    ["a line feed", `${challenge.slice(0, 21)}\n${challenge.slice(22)}`],
+    ["a space", `${challenge.slice(0, 21)} ${challenge.slice(22)}`],
+  ];
+  for (const [what, value] of impossible) {
+    await test.step(what, async () => {
+      const { params } = codeRequest(client.identifier, { code_challenge: value });
+      const { redirect } = await followAuthorize(signIn.context.request, params);
+      expect(redirect, "answered at the redirect URI").toBeDefined();
+      expectAuthorizeError(redirect!, "invalid_request", params.state);
+    });
+  }
+
+  await test.step("a real challenge", async () => {
+    const { redirect } = await followAuthorize(signIn.context.request, real.params);
+    const code = redirect!.searchParams.get("code");
+    expect(code, "a code at the redirect URI").toBeTruthy();
+    expectTokenResponse(await redeem(code!, real.verifier));
+  });
   await signIn.context.close();
 });

@@ -28,7 +28,9 @@ func HandleCertsGet(
 			return
 		}
 
-		result := oauth.Jwks{}
+		// RFC 7517 section 5: the set MUST have a keys member whose value is an array, so a set with
+		// no keys is [] and never null (#714).
+		result := oauth.Jwks{Keys: []oauth.Jwk{}}
 
 		var nextKey *record.KeyPair
 		var currentKey *record.KeyPair
@@ -82,6 +84,7 @@ func HandleCertsGet(
 			result.Keys = append(result.Keys, publicKeyJwk)
 		}
 
+		setMetadataCacheLifetime(w)
 		jsonWriter.EncodeJSON(w, r, result)
 	}
 }

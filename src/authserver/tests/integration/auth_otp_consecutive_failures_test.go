@@ -117,7 +117,7 @@ func assertPasswordRefusedAt(t *testing.T, client *record.Client, redirectUri *r
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
-		"&response_type=code&code_challenge_method=S256&code_challenge=" + fake.LetterN(43) +
+		"&response_type=code&code_challenge_method=S256&code_challenge=" + randomCodeChallenge() +
 		"&scope=openid&state=" + fake.LetterN(8) + "&nonce=" + fake.LetterN(8))
 	require.NoError(t, err)
 	location := assertRedirect(t, resp, "/auth/level1")

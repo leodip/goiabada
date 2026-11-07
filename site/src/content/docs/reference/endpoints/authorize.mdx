@@ -47,7 +47,7 @@ The link works once, for five minutes, and only on its own: a `request_handle` s
 | `redirect_uri` | Yes | One of the client's [redirect URIs](/concepts/clients/#redirect-uris), matched exactly |
 | `response_type` | Yes | `code`. The legacy [implicit flow](/legacy-flows/implicit/) takes `token`, `id_token` or `id_token token` instead. |
 | `scope` | Yes | One or more [scopes](/concepts/scopes/), separated by single spaces, at most 2048 bytes. Include `openid` to get an ID token. |
-| `code_challenge` | When PKCE is required | 43 to 128 characters of `A-Z`, `a-z`, `0-9`, `-`, `.`, `_` and `~`. See [PKCE](/concepts/pkce/). |
+| `code_challenge` | When PKCE is required | The code verifier's SHA-256 hash, base64url-encoded without padding: 43 characters of `A-Z`, `a-z`, `0-9`, `-` and `_`. See [PKCE](/concepts/pkce/). |
 | `code_challenge_method` | With `code_challenge` | `S256`, the only method supported |
 | `state` | Recommended | Any value up to 2048 bytes. It comes back unchanged with the code or the error, so your app can check the answer is to its own request. |
 | `nonce` | Recommended | Any value up to 2048 bytes. The ID token carries it in its `nonce` claim. |

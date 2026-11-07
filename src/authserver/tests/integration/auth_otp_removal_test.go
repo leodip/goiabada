@@ -152,7 +152,7 @@ func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver(t *t
 		"&redirect_uri=" + url.QueryEscape(level1RedirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=openid" +
 		"&state=" + fake.LetterN(8)
 	resp := loadPage(t, httpClient, authorizeUrl)
@@ -209,7 +209,7 @@ func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsReplacedStartsOver(t *
 				"&redirect_uri=" + url.QueryEscape(level1RedirectUri.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
-				"&code_challenge=" + fake.LetterN(43) +
+				"&code_challenge=" + randomCodeChallenge() +
 				"&scope=openid" +
 				"&state=" + fake.LetterN(8)
 			resp := loadPage(t, httpClient, authorizeUrl)
@@ -266,7 +266,7 @@ func TestOtpCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain(t *tes
 		"&redirect_uri=" + url.QueryEscape(level1RedirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=openid" +
 		"&state=" + fake.LetterN(8) +
 		"&prompt=none"

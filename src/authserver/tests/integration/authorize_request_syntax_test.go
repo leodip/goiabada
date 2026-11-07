@@ -25,7 +25,7 @@ func authorizeRequest(client *record.Client, redirectUri *record.RedirectURI, ov
 		"redirect_uri":          {redirectUri.URI},
 		"response_type":         {"code"},
 		"code_challenge_method": {"S256"},
-		"code_challenge":        {fake.LetterN(43)},
+		"code_challenge":        {randomCodeChallenge()},
 		"scope":                 {"openid profile"},
 		"state":                 {fake.LetterN(8)},
 	}
@@ -80,34 +80,52 @@ func TestAuthorize_ResponseTypeSpellingsAreRefused(t *testing.T) {
 	})
 }
 
-// A code_challenge of the right length that uses a character outside RFC 7636 4.2's set could never
-// equal a BASE64URL digest and used to fail only at the exchange; it is refused where it enters.
-func TestAuthorize_CodeChallengeOutsideTheSetIsRefused(t *testing.T) {
+// An S256 code_challenge is BASE64URL(SHA256(verifier)) (RFC 7636 4.2): exactly 43 characters of the
+// base64url alphabet, the canonical form of 32 bytes. Anything else could never equal the hash the
+// token endpoint computes and used to fail only at the exchange, after the user had signed in; it is
+// refused where it enters (#714, #42 decision 20).
+func TestAuthorize_AnImpossibleS256ChallengeIsRefused(t *testing.T) {
+	const (
+		// RFC 7636 appendix B's challenge. Its last character, 'M', is 001100: the two spare bits
+		// a canonical encoding leaves zero.
+		realChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+		// The client takes the global setting, which requires PKCE.
+		description = "The code_challenge parameter is either missing or incorrect. It must be the SHA-256 hash of the code_verifier, base64url-encoded without padding: 43 characters of A-Z, a-z, 0-9, '-' and '_'."
+	)
 	client, redirectUri := createTestClientAndRedirectURI(t)
 
 	for name, challenge := range map[string]string{
-		"a plus":                             strings.Repeat("a", 20) + "+" + strings.Repeat("a", 22),
-		"a slash":                            strings.Repeat("a", 20) + "/" + strings.Repeat("a", 22),
-		"padding":                            strings.Repeat("a", 42) + "=",
-		"a space":                            strings.Repeat("a", 20) + " " + strings.Repeat("a", 22),
-		"non-ASCII":                          strings.Repeat("a", 41) + "é",
-		"a colon":                            strings.Repeat("a", 20) + ":" + strings.Repeat("a", 22),
-		"128 characters, one of them a plus": strings.Repeat("a", 127) + "+",
+		"the lower spare bit set":  realChallenge[:42] + "N",
+		"the higher spare bit set": realChallenge[:42] + "O",
+		"padding":                  realChallenge + "=",
+		"42 characters":            realChallenge[:42],
+		"44 characters":            realChallenge + "A",
+		"128 characters":           strings.Repeat("aZ09-_", 21) + "aZ",
+		"a period":                 realChallenge[:20] + "." + realChallenge[21:],
+		"a tilde":                  realChallenge[:20] + "~" + realChallenge[21:],
+		"a plus":                   realChallenge[:20] + "+" + realChallenge[21:],
+		"a slash":                  realChallenge[:20] + "/" + realChallenge[21:],
+		"a CR":                     realChallenge[:20] + "\r" + realChallenge[21:],
+		"an LF":                    realChallenge + "\n",
+		"a space":                  " " + realChallenge,
+		"a tab":                    realChallenge[:20] + "\t" + realChallenge[21:],
+		"non-ASCII":                realChallenge[:41] + "é",
 	} {
 		t.Run(name, func(t *testing.T) {
 			resp := answeredAtOnce(t, authorizeRequest(client, redirectUri, map[string]string{"code_challenge": challenge}))
 
-			errorCode, description, _ := getErrorFromUrl(t, resp)
+			errorCode, gotDescription, _ := getErrorFromUrl(t, resp)
 
 			assert.Equal(t, "invalid_request", errorCode)
-			assert.Equal(t, "The code_challenge parameter is incorrect. It may only contain A-Z, a-z, 0-9, '-', '.', '_' and '~'.", description)
+			assert.Equal(t, description, gotDescription)
 		})
 	}
 
-	// Every character the set allows, at both ends of the length, is served.
+	// A real challenge, and RFC 7638 section 3.1's thumbprint, another SHA-256 value in the same
+	// form, go on to the login.
 	for name, challenge := range map[string]string{
-		"43 characters of every class": "aZ09-._~aZ09-._~aZ09-._~aZ09-._~aZ09-._~aZ0",
-		"128 characters":               strings.Repeat("aZ09-._~", 16),
+		"a real challenge":          realChallenge,
+		"a real SHA-256 thumbprint": "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs",
 	} {
 		t.Run("accepts "+name, func(t *testing.T) {
 			resp, err := createHttpClient(t).Get(authorizeRequest(client, redirectUri, map[string]string{"code_challenge": challenge}))

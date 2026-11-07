@@ -49,6 +49,9 @@ import "net/http"
 // Handlers that set their own Cache-Control still win, since Header().Set
 // replaces. Nothing under /api/v1 sets one.
 //
+// It heads both /userinfo chains for the same reason: the endpoint answers a user's claims, and its
+// bare 401 to a request with no token is written by a guard (#714).
+//
 // It also heads the page branch's chain, ahead of the browser session's
 // refresh, which can send the session cookie again on any answer there: a
 // rendered page, a redirect, or the router's 405, so none of them can be

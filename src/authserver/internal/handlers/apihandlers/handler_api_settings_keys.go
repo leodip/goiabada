@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -59,7 +60,7 @@ func HandleSettingsKeysGet(
 				Type:             k.Type,
 				Algorithm:        k.Algorithm,
 				PublicKeyASN1DER: base64.StdEncoding.EncodeToString(k.PublicKeyASN1_DER),
-				PublicKeyPEM:     string(k.PublicKeyPEM),
+				PublicKeyPEM:     apimapping.ToPublicKeyPEM(k.PublicKeyPEM),
 				PublicKeyJWK:     string(k.PublicKeyJWK),
 			})
 		}
