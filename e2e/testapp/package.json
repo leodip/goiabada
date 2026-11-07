@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "jose": "^6.2.15",
-    "next": "16.4.3",
+    "next": "16.4.5",
     "openid-client": "^6.8.9",
     "react": "19.3.1",
     "react-dom": "19.3.1"
