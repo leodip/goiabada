@@ -419,6 +419,33 @@ func TestRunTests_ARunWhoseHolderFinishesWhileItWaitsGoesOn(t *testing.T) {
 	assert.Contains(t, string(record), "(--type data --db sqlite), started ")
 }
 
+// TestRunTests_ARunTakesALockFreedDuringItsLastRead: after its last read of the record, the tenth,
+// the run tries the lock once more, so a holder that finishes during that read leaves the lock to
+// it rather than to a refusal that says the holder's commands still hold it. The cat stub stands in
+// for the read, and has the lock freed during its tenth call.
+func TestRunTests_ARunTakesALockFreedDuringItsLastRead(t *testing.T) {
+	markers := t.TempDir()
+	lockDir := t.TempDir()
+	lock := filepath.Join(lockDir, "lock")
+	release := holdLock(t, lock)
+	requested, released := filepath.Join(markers, "requested"), filepath.Join(markers, "released")
+	releaseOnRequest(t, release, requested, released)
+
+	bin := stubBin(t, markers)
+	counter := filepath.Join(markers, "reads")
+	writeStub(t, bin, "cat", "#!/bin/sh\n"+
+		"n=$(( $(/bin/cat '"+counter+"' 2>/dev/null || echo 0) + 1 ))\necho \"$n\" > '"+counter+"'\n"+
+		"if [ \"$n\" -eq 10 ]; then\n"+
+		strings.TrimPrefix(requestReleaseStub(requested, released, ""), "#!/bin/sh\n")+
+		"fi\nexec /bin/cat \"$@\"\n")
+	status, stderr := runScript(t, scriptEnv(bin, lockDir, stackVariables...), "",
+		"--type", "data", "--db", "sqlite", "--no-build")
+
+	assert.Equal(t, 1, status, "the run did not stop on its stubbed go: %s", stderr)
+	assert.NotContains(t, stderr, "another data or integration run")
+	assert.Contains(t, toolsRun(t, markers), "go")
+}
+
 // TestRunTests_TheOtherTiersNeitherLockNorCleanUp: the lint, module and setup tiers run while
 // another run holds the lock, and neither kill a listener nor remove a SQLite file, on the way in
 // or on exit. Each stops on its stubbed tool, so the tier is known to have started.

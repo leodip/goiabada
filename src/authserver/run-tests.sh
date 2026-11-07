@@ -279,10 +279,11 @@ gha_summary_row() {
 # The holder's record is the lock file's content, and the holder writes it just after taking the
 # lock, so a run turned away in between finds it empty or still holding the previous holder's
 # record. take_stack_lock therefore tries the lock again and reads the record again, for up to a
-# second, until the lock is free or the record names a live run. The holder may finish meanwhile,
-# and the lock is then this run's. A record that still names no live run when the second is up,
-# with the lock still held, is a run killed while commands it started, which share its
-# descriptor, still hold the lock. The refusal never waits on a live run.
+# second, until the lock is free or the record names a live run, and tries the lock once more after
+# its last read. The holder may finish meanwhile, and the lock is then this run's. A record that
+# still names no live run when the second is up, with the lock still held, is a run killed while
+# commands it started, which share its descriptor, still hold the lock. The refusal never waits on
+# a live run.
 #
 # stack_lock_pid is the pid a record names, or nothing for an empty or unreadable record.
 stack_lock_pid() {
@@ -304,18 +305,29 @@ stack_lock_names_live_run() {
     tr '\0' ' ' 2>/dev/null < "/proc/$pid/cmdline" | grep -q 'run-tests\.sh'
 }
 
-# take_stack_lock takes the lock on descriptor 9, or fails with the holder's record, as last read,
-# in stack_lock_holder.
+# take_stack_lock takes the lock on descriptor 9, or fails with what the refusal names its holder
+# by in stack_lock_holder, decided once from the record read last.
 take_stack_lock() {
-    local tries=0
+    local record tries=0
     while :; do
         flock -n 9 && return 0
-        stack_lock_holder=$(cat "$stack_lock" 2>/dev/null)
-        stack_lock_names_live_run "$stack_lock_holder" && return 1
+        record=$(cat "$stack_lock" 2>/dev/null)
+        [ "$tries" -ge 10 ] && break
+        if stack_lock_names_live_run "$record"; then
+            stack_lock_holder=$record
+            return 1
+        fi
         tries=$((tries + 1))
-        [ "$tries" -ge 10 ] && return 1
-        sleep 0.1
+        [ "$tries" -lt 10 ] && sleep 0.1
     done
+    if stack_lock_names_live_run "$record"; then
+        stack_lock_holder=$record
+    elif [ -n "$(stack_lock_pid "$record")" ]; then
+        stack_lock_holder="$record, which has exited while commands it started still hold the lock"
+    else
+        stack_lock_holder="its pid is not recorded"
+    fi
+    return 1
 }
 
 if should_run_data || should_run_integration; then
@@ -333,14 +345,7 @@ if should_run_data || should_run_integration; then
     # Built before the lock is taken, so that the write after it is all a refused run can miss.
     stack_lock_record="pid $$ (--type $TYPE --db $DB), started $(date '+%Y-%m-%d %H:%M:%S')"
     if ! take_stack_lock; then
-        if stack_lock_names_live_run "$stack_lock_holder"; then
-            holder=$stack_lock_holder
-        elif [ -n "$(stack_lock_pid "$stack_lock_holder")" ]; then
-            holder="$stack_lock_holder, which has exited while commands it started still hold the lock"
-        else
-            holder="its pid is not recorded"
-        fi
-        echo "run-tests.sh: another data or integration run is using this container's test server and databases: $holder. Start this run after it finishes; the lint, module and setup tiers can run beside it with --no-build." >&2
+        echo "run-tests.sh: another data or integration run is using this container's test server and databases: $stack_lock_holder. Start this run after it finishes; the lint, module and setup tiers can run beside it with --no-build." >&2
         exit 2
     fi
     echo "$stack_lock_record" > "$stack_lock"
