@@ -152,6 +152,7 @@ export default defineConfig({
 						{ label: 'Upgrade Goiabada', slug: 'deploy/upgrade-goiabada' },
 						{ label: 'Monitoring', slug: 'deploy/monitoring' },
 						{ label: 'Logs', slug: 'deploy/logs' },
+						{ label: 'Personal data', slug: 'deploy/personal-data' },
 						{ label: 'Production checklist', slug: 'deploy/production-checklist' },
 					],
 				},

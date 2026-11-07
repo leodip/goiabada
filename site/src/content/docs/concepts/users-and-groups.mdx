@@ -76,14 +76,15 @@ Either way, the deletion removes:
 - their password, authenticator and recovery codes;
 - their picture;
 - their group memberships, permissions and attributes;
-- the consents they gave clients;
-- their sessions and refresh tokens, so they're signed out everywhere, no client can get a new token for them, and the [apps that knew them are told](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user). The auth server refuses their access tokens from then on. An API that checks an access token without asking the auth server accepts it until it expires.
+- the consents they gave clients, and their acceptances of legal documents;
+- their sessions, authorization codes and refresh tokens, with the IP address and browser each sign-in recorded, so they're signed out everywhere, no client can get a new token for them, and the [apps that knew them are told](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user). The auth server refuses their access tokens from then on. An API that checks an access token without asking the auth server accepts it until it expires.
 
 It leaves:
 
 - the [audit log](/concepts/audit-log/)'s entries about the user, which name them by their ID, not their email address, until the [retention](/concepts/audit-log/#retention) removes them;
 - the server logs, which can include the user's IP address;
 - backups made before the deletion;
+- the encrypted browser-session rows behind the cookies of the user's sign-ins, which can remain until they expire;
 - what clients already received about the user, such as their name and email address. The apps that are told learn that the user's sessions ended, not that the user is gone.
 
 Whoever deletes the account, the user is emailed that it's gone: see [emails about account changes](/reference/security/#emails-about-account-changes).

@@ -1,0 +1,142 @@
+---
+title: Personal data
+description: What a Goiabada deployment stores about people, who receives it, how long each record is kept, and which feature answers each kind of request.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you write your privacy notice and answer people's requests about their data.
+
+## Prepare a deployment
+
+<Steps>
+
+1. **Publish your privacy notice** as a legal document, so people can read it from the sign-in pages. See [Publish legal documents](/guides/publish-legal-documents/). The sections below list what Goiabada stores and shares, for your notice to cover.
+
+2. **Choose how users stay signed in,** with **Keep users signed in after the browser closes** under **Admin**, **Sessions**. **Always** keeps a cookie past the browser's close without asking, which is yours to decide on: see [What's yours to decide](#whats-yours-to-decide).
+
+3. **Set how long audit events are kept,** under **Admin**, **Audit logging**, and decide where the servers' logs go and how long you keep them there. See [How long each record is kept](#how-long-each-record-is-kept).
+
+4. **Decide whether users may delete their own account,** with **Let users delete their own account** under **Admin**, **Settings**, **General**, **Account deletion**. It's on by default.
+
+5. **Name everyone who receives data** in your notice: the apps you register as clients, your mail server, Cloudflare while Turnstile is on, and wherever your logs and backups go. See [What apps receive](#what-apps-receive) and [Who else receives data](#who-else-receives-data).
+
+</Steps>
+
+## Who is responsible
+
+You are. The organization running a Goiabada deployment decides what it collects about people, why, and on what legal basis, and writes the notices that say so. Running your own copy of Goiabada doesn't make its maintainers your processor: they never see your deployment or its data. goiabada.dev's [Privacy](/about/privacy/) page covers the website alone.
+
+Installing Goiabada doesn't make a deployment GDPR compliant, or compliant with any other law. This page gives you the facts to decide with, not legal advice.
+
+Four things are easy to mix up, and each is a different job:
+
+- **A privacy notice** tells people what you do with their data. You publish it as a [legal document](/guides/publish-legal-documents/).
+- **Accepting terms** is a user agreeing to a legal document you ask them to [accept at sign-in](/guides/publish-legal-documents/#accepting-documents-at-sign-in).
+- **The consent screen** is a user approving what a client receives about them. See [Consent required](/concepts/clients/#consent-required).
+- **Cookie consent** is permission to store or read something in a browser. See [Cookies](#cookies).
+
+## Cookies
+
+A stock deployment sets four cookies, two on each server. All four are first-party, set by the server's own host, and used only to sign people in. Neither server keeps anything else in the browser, and while Turnstile is off, no page loads anything from another site. On a plain `http` base URL, the names carry no `__Host-` prefix.
+
+### On the auth server
+
+| Cookie | What it's for | How long it lasts |
+|---|---|---|
+| `__Host-authserver` | The user's session, or a sign-in in progress | 30 minutes while a sign-in is in progress. Once signed in, as **Keep users signed in after the browser closes** decides: see [Closing the browser](/concepts/sessions/#closing-the-browser) |
+| `__Host-authserver_device` | Lets a new sign-in end the user's older sessions from the same browser. It signs nobody in | The session maximum lifetime: see [How the auth server recognizes a browser](/concepts/sessions/#how-the-auth-server-recognizes-a-browser) |
+
+### On the admin console
+
+| Cookie | What it's for | How long it lasts |
+|---|---|---|
+| `__Host-adminconsole` | The user's session in the admin console | Until the browser closes: see [Sessions and cookies](/reference/security/#sessions-and-cookies) |
+| `__Host-adminconsole-signin` | The sign-in handshake, from the redirect to the auth server until the user comes back | 30 minutes at most |
+
+### Why there's no cookie banner
+
+The ePrivacy Directive, in [Article 5(3)](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02002L0058-20091219), asks for consent before anything is stored in a browser or read from it, unless it's strictly necessary to provide a service the user asked for. The Article 29 Working Party's [Opinion 04/2012 on Cookie Consent Exemption](https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2012/wp194_en.pdf) (WP194) explains how that exemption applies to cookies that sign a user in.
+
+Goiabada's cookies are first-party and do nothing but sign people in, the kind of storage that rule exempts. That's why Goiabada ships no consent banner. Whether your deployment needs one is still yours to decide, under your own law and with what you add.
+
+### What's yours to decide
+
+- **Always.** Under **Keep users signed in after the browser closes**, **Always** keeps every user's sign-in cookie past the browser's close, without asking them. WP194, section 3.2, says a persistent login cookie isn't exempt. Under the default, **Let each user choose**, the cookie outlives the browser only when the user ticks **Keep me signed in**, the kind of box section 3.2 calls an appropriate means of gaining consent.
+- **Turnstile.** While it's on, the sign-in, forgot-password and registration forms load Cloudflare's script and frame, so the visitor's browser sends Cloudflare its data. Cloudflare's [Turnstile privacy addendum](https://www.cloudflare.com/turnstile-privacy-policy/) says what it does with it. Your notice, and whether to ask first, are up to you. See [Require a Turnstile challenge](/guides/require-a-turnstile-challenge/).
+- **Your own templates and static files.** They can load anything. A script in the static directory runs, and the [`Content-Security-Policy`](/reference/security/#response-headers) restricts only scripts, so fonts, images and stylesheets from other sites load too. An email template can embed a remote image. Whatever you add needs its own consent before it loads. See [Change the templates](/guides/customize-and-translate-the-pages/#change-the-templates).
+
+Translations can't load anything: the servers show each translated message as plain text.
+
+## What Goiabada stores
+
+Everything is in the auth server's database, plus the servers' logs. The admin console keeps nothing of its own: the auth server stores its browser sessions too.
+
+About each user:
+
+- their profile: names, nickname, website, gender, birthdate, time zone and locale;
+- their email address and phone number, each with whether it's verified, and their address;
+- their password, as a hash, their recovery codes, as digests, and their authenticator's secret, encrypted;
+- their picture;
+- their attributes, groups and permissions;
+- the consents they gave clients: which client, which scopes, and when;
+- the legal documents they accepted.
+
+About their sign-ins:
+
+- each session's IP address, the browser's user agent as it was sent, the device name, type and operating system read from it, when it started and was last used, its [ACR level](/concepts/acr-and-amr/), the clients it served, and a digest of the browser's [device identifier](/concepts/sessions/#how-the-auth-server-recognizes-a-browser);
+- each authorization code's IP address and user agent, from the sign-in it was issued in;
+- each refresh token's client, scope, type and times.
+
+Behind each cookie that names a session is a **browser-session row**, encrypted and with no user column. It holds a sign-in in progress, or a signed-in session. The admin console's rows hold the user's tokens, an ID token with their name and email address among them.
+
+**Pending registrations,** from [self-registration](/concepts/self-registration/), hold an email address until the account is activated.
+
+**Audit events** name the user by their id, hold digests of email addresses, and on some events an IP address. See [the audit log's details](/concepts/audit-log/#details). By default each event is also written to the server's output, so it lands in your logs too.
+
+**The logs** hold more. The HTTP request log records each request's client IP address. It's off unless you turn it on, but every configuration the [setup wizard](/deploy/setup-wizard/) writes turns it on, and the [production checklist](/deploy/production-checklist/#monitoring-and-logs) asks for it. A logout token that couldn't be delivered writes a warning naming the client and the user. See [Logs](/deploy/logs/).
+
+## What apps receive
+
+- **Claims, by scope.** [`/userinfo`](/reference/endpoints/userinfo/) returns the claims of every OpenID Connect scope in the access token it's called with, whatever the claims settings say. **Include OpenID Connect claims in the ID token**, on in a new installation, also puts the profile, email, address and phone claims in ID tokens. **Include OpenID Connect claims in the access token**, off in a new installation, puts them in access tokens. Both are under **Admin**, **Tokens**, and a client can override each on its **Tokens** tab. Turning ID token claims off keeps them out of ID tokens, not away from an app that holds the scopes. Groups and attributes follow their own switches instead. See [Where the claims go](/concepts/scopes/#where-the-claims-go).
+- **The same subject for every client.** `sub` is the user's [subject](/concepts/glossary/#subject), the same in every client's tokens.
+- **Profile pictures,** which anyone who knows the user's subject can load. See [The profile picture](/reference/endpoints/logo-and-picture/#the-profile-picture).
+- **ID tokens,** which apps keep and may send back as `id_token_hint` when they sign a user out. Sent in a query string, the hint lands in the browser's history and in proxies' access logs: [Hiding the hint](/guides/sign-users-out/#hiding-the-hint) shows how to keep it out.
+- **Logout tokens,** naming the user's `sub` and, for one session, its `sid`, sent to each client with a back-channel logout URI. See [The logout token](/reference/endpoints/backchannel-logout/#the-logout-token).
+
+## Who else receives data
+
+- **Your mail server** gets each recipient's address and the message.
+- **Cloudflare,** while Turnstile is on, gets the visitor's browser data through its widget, on the sign-in, forgot-password and registration forms. The auth server's own check with Cloudflare sends only the widget's token and your secret key, not the visitor's IP address.
+- **Your log pipeline and your backups** hold copies of what the servers log and what the database stores.
+
+## How long each record is kept
+
+| Record | How long it's kept |
+|---|---|
+| Sessions | Until their idle timeout or maximum lifetime, under **Admin**, **Sessions**, then the cleanup that runs every 12 hours. See [How long a session lasts](/concepts/sessions/#how-long-a-session-lasts) |
+| Refresh tokens | Until they expire or reach their maximum lifetime, revoked ones included, then the same cleanup. See [How long a refresh token lasts](/concepts/refresh-tokens/#how-long-a-refresh-token-lasts) |
+| Authorization codes | A code works for 60 seconds, but its row, with the sign-in's IP address and user agent, stays while any refresh token issued from it lives, up to the offline maximum lifetime. A code with none goes at the next cleanup |
+| Browser-session rows | 30 minutes for a sign-in in progress. Once signed in, until the session's idle timeout or maximum lifetime. Each is deleted within 5 minutes of expiring |
+| Pending registrations | Until the account is activated. One that can no longer be activated goes at the 12-hourly cleanup |
+| Audit events | The retention under **Admin**, **Audit logging**, where `0` keeps them forever. See [Retention](/concepts/audit-log/#retention) |
+| Logs | Whatever you decide where you collect them |
+| Backups | Until your backups expire |
+
+## Answering requests
+
+- **Access and portability.** Click **Download data** on the user's page, or call the admin export. Users can download the same file themselves, with **Download my data** in their account. Neither holds attributes no app receives. See [A request for a person's data](/concepts/users-and-groups/#a-request-for-a-persons-data).
+- **Rectification.** Users correct their own details in their account pages, and you on the user's tabs in the admin console.
+- **Erasure.** Delete the user from **Users**, or let them use **Delete account** in their account, which is on by default and turned off under **Admin**, **Settings**, **General**, **Account deletion**. A deletion leaves audit entries, logs, backups and what apps already hold, as [Deleting users](/concepts/users-and-groups/#deleting-users) lists. Browser-session rows from the user's sign-ins can remain too, until they expire. A user who deletes their own account also ends the admin console session they did it from, and that row goes at once.
+- **Restriction.** Disable the user. That ends their sessions, revokes their refresh tokens and sends logout tokens. See [Enabled and disabled](/concepts/users-and-groups/#enabled-and-disabled).
+- **Withdrawn consent.** Withdrawing a user's consent to a client, on their **Consents** tab or by the user under **Account**, **Consents**, revokes that client's refresh tokens and unredeemed authorization codes for the user. The app keeps what it already received.
+- **Telling apps (GDPR Article 19).** That's a step you take yourself. A logout token ends sessions; it doesn't ask an app to erase anything. Each `sent_logout_token` entry in the audit log records which app was sent one, and the audit log's **User id** filter finds a person's events by their id. See [See what happened](/concepts/audit-log/#see-what-happened).
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Publish legal documents" description="Publish your privacy notice and terms, and ask users to accept them." href="/guides/publish-legal-documents/" />
+  <LinkCard title="Users and groups" description="Deleting users, and answering a request for a person's data." href="/concepts/users-and-groups/" />
+  <LinkCard title="Audit log" description="Every security event, how long it's kept and how to find a person's." href="/concepts/audit-log/" />
+  <LinkCard title="Production checklist" description="Everything to check before going live." href="/deploy/production-checklist/" />
+</CardGrid>
