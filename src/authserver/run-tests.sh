@@ -277,40 +277,45 @@ gha_summary_row() {
 # meet a real run.
 #
 # The holder's record is the lock file's content, and the holder writes it just after taking the
-# lock, so a run refused in between finds it empty or still holding the previous holder's record.
-# stack_lock_holder reads it again for up to a second, until it names a live run. A record whose
-# run is not live past that is a run killed while commands it started, which share its
-# descriptor, still hold the lock.
+# lock, so a run turned away in between finds it empty or still holding the previous holder's
+# record. take_stack_lock therefore tries the lock again and reads the record again, for up to a
+# second, until the lock is free or the record names a live run. The holder may finish meanwhile,
+# and the lock is then this run's. A record that still names no live run when the second is up,
+# with the lock still held, is a run killed while commands it started, which share its
+# descriptor, still hold the lock. The refusal never waits on a live run.
 #
+# stack_lock_pid is the pid a record names, or nothing for an empty or unreadable record.
+stack_lock_pid() {
+    local pid=${1#pid }
+    pid=${pid%% *}
+    case "$pid" in
+        ''|*[!0-9]*) ;;
+        *) echo "$pid" ;;
+    esac
+}
+
 # stack_lock_names_live_run reports whether a record names a live run of this script: a pid whose
 # command line names run-tests.sh. A pid that is merely in /proc is not enough, since a zombie's
 # command line is empty and a pid the kernel has given to another program names that program.
 stack_lock_names_live_run() {
-    local pid=${1#pid }
-    pid=${pid%% *}
-    case "$pid" in
-        ''|*[!0-9]*) return 1 ;;
-    esac
+    local pid
+    pid=$(stack_lock_pid "$1")
+    [ -n "$pid" ] || return 1
     tr '\0' ' ' 2>/dev/null < "/proc/$pid/cmdline" | grep -q 'run-tests\.sh'
 }
 
-stack_lock_holder() {
-    local holder tries=0
+# take_stack_lock takes the lock on descriptor 9, or fails with the holder's record, as last read,
+# in stack_lock_holder.
+take_stack_lock() {
+    local tries=0
     while :; do
-        holder=$(cat "$stack_lock" 2>/dev/null)
-        if stack_lock_names_live_run "$holder"; then
-            echo "$holder"
-            return
-        fi
+        flock -n 9 && return 0
+        stack_lock_holder=$(cat "$stack_lock" 2>/dev/null)
+        stack_lock_names_live_run "$stack_lock_holder" && return 1
         tries=$((tries + 1))
-        [ "$tries" -ge 10 ] && break
+        [ "$tries" -ge 10 ] && return 1
         sleep 0.1
     done
-    if [ -n "$holder" ]; then
-        echo "$holder, which has exited while commands it started still hold the lock"
-    else
-        echo "its pid is not recorded"
-    fi
 }
 
 if should_run_data || should_run_integration; then
@@ -327,8 +332,15 @@ if should_run_data || should_run_integration; then
     fi
     # Built before the lock is taken, so that the write after it is all a refused run can miss.
     stack_lock_record="pid $$ (--type $TYPE --db $DB), started $(date '+%Y-%m-%d %H:%M:%S')"
-    if ! flock -n 9; then
-        echo "run-tests.sh: another data or integration run is using this container's test server and databases: $(stack_lock_holder). Start this run after it finishes; the lint, module and setup tiers can run beside it with --no-build." >&2
+    if ! take_stack_lock; then
+        if stack_lock_names_live_run "$stack_lock_holder"; then
+            holder=$stack_lock_holder
+        elif [ -n "$(stack_lock_pid "$stack_lock_holder")" ]; then
+            holder="$stack_lock_holder, which has exited while commands it started still hold the lock"
+        else
+            holder="its pid is not recorded"
+        fi
+        echo "run-tests.sh: another data or integration run is using this container's test server and databases: $holder. Start this run after it finishes; the lint, module and setup tiers can run beside it with --no-build." >&2
         exit 2
     fi
     echo "$stack_lock_record" > "$stack_lock"

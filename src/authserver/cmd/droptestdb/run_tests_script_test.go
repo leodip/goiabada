@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -310,6 +311,7 @@ func TestRunTests_ARefusedRunReadsTheRecordUntilItsHolderIsAlive(t *testing.T) {
 		{"never written", "", "", "its pid is not recorded."},
 		{"its holder has exited", exited, "", exited + ", which has exited while commands it started still hold the lock."},
 		{"its holder has exited and is not reaped yet", zombie, "", zombie + ", which has exited while commands it started still hold the lock."},
+		{"unreadable", "pid not-a-pid (--type data --db mysql)", "", "its pid is not recorded."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			markers := t.TempDir()
@@ -329,6 +331,40 @@ func TestRunTests_ARefusedRunReadsTheRecordUntilItsHolderIsAlive(t *testing.T) {
 			assert.Empty(t, toolsRun(t, markers))
 		})
 	}
+}
+
+// TestRunTests_ARunWhoseHolderFinishesWhileItWaitsGoesOn: a holder that finishes during the refused
+// run's wait for its record frees the lock, and the run takes it and goes on rather than being
+// refused. The holder is flock(1) holding the lock in a process group of its own, and the sleep
+// stub ends that group during the run's first wait.
+func TestRunTests_ARunWhoseHolderFinishesWhileItWaitsGoesOn(t *testing.T) {
+	markers := t.TempDir()
+	lockDir := t.TempDir()
+	lock := filepath.Join(lockDir, "lock")
+	require.NoError(t, os.WriteFile(lock, nil, 0o600))
+
+	holder := exec.Command("flock", "--close", lock, "sleep", "300")
+	holder.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	require.NoError(t, holder.Start())
+	t.Cleanup(func() {
+		_ = syscall.Kill(-holder.Process.Pid, syscall.SIGKILL)
+		_ = holder.Wait()
+	})
+	require.Eventually(t, func() bool {
+		return exec.Command("flock", "--nonblock", lock, "true").Run() != nil
+	}, 10*time.Second, 10*time.Millisecond, "the holder did not take the lock")
+
+	bin := stubBin(t, markers)
+	writeStub(t, bin, "sleep", "#!/bin/bash\nkill -9 -- -"+strconv.Itoa(holder.Process.Pid)+"\n")
+	status, stderr := runScript(t, scriptEnv(bin, lockDir, stackVariables...), "",
+		"--type", "data", "--db", "sqlite", "--no-build")
+
+	assert.Equal(t, 1, status, "the run did not stop on its stubbed go: %s", stderr)
+	assert.NotContains(t, stderr, "another data or integration run")
+	assert.Contains(t, toolsRun(t, markers), "go")
+	record, err := os.ReadFile(lock)
+	require.NoError(t, err)
+	assert.Contains(t, string(record), "(--type data --db sqlite), started ")
 }
 
 // TestRunTests_TheOtherTiersNeitherLockNorCleanUp: the lint, module and setup tiers run while
