@@ -46,7 +46,7 @@ The other steps of a sign-in, the one-time code, recovery codes and consent, and
 ## What it costs
 
 - **The three forms need JavaScript.** A visitor whose browser runs no scripts gets no token, and the forms refuse them.
-- **Your visitors' browsers contact Cloudflare.** While the challenge is on, the three forms load the widget's script and frame from `https://challenges.cloudflare.com`, and their `Content-Security-Policy` admits that origin to `script-src`. No other page loads anything from Cloudflare. If you set a policy of your own at a proxy, admit that origin on those three forms.
+- **Your visitors' browsers contact Cloudflare.** While the challenge is on, the three forms load the widget's script and frame from `https://challenges.cloudflare.com`, and their `Content-Security-Policy` admits that origin to `script-src`. No other page loads anything from Cloudflare. If you set a policy of your own at a proxy, admit that origin on those three forms. Telling your visitors, and whether to ask them first, is up to you: see [Personal data](/deploy/personal-data/#whats-yours-to-decide).
 - **The auth server calls Cloudflare.** It sends each token to Cloudflare's siteverify endpoint at `https://challenges.cloudflare.com`, with the secret key, and waits up to 3 seconds for the answer. Let the auth server reach it over HTTPS. Saving a new secret key, or turning the challenge on, needs it too.
 
 <Aside type="danger">

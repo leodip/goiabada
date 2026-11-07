@@ -133,7 +133,7 @@ Closing the browser doesn't end a session with the auth server: the session stil
 | Setting | The password page | The auth server's cookie |
 |---|---|---|
 | **Let each user choose** | Shows a **Keep me signed in** box, unticked | Ticked, it lasts as long as the session, up to 400 days. Unticked, it ends when the browser closes. |
-| **Always** | Shows no box | Lasts as long as the session, up to 400 days |
+| **Always** | Shows no box | Lasts as long as the session, up to 400 days. Whether that needs cookie consent is yours to decide: see [Personal data](/deploy/personal-data/#whats-yours-to-decide). |
 | **Never** | Shows no box | Ends when the browser closes |
 
 When the cookie lasts, reopening the browser within the idle timeout signs the user straight back in, and a restarted machine or a laptop shut for lunch costs nobody a password. When it ends with the browser, the user enters their password again. The session they left behind stays on the server until it expires, or until their next sign-in from that browser ends it, as [How the auth server recognizes a browser](#how-the-auth-server-recognizes-a-browser) describes. On a shared or public computer, leaving the box unticked is what keeps the next person from walking into the account.
