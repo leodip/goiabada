@@ -1,0 +1,61 @@
+# Installs the Tailwind CSS CLI at the version versions.yaml pins, the glibc linux-x64 build, for
+# every job that regenerates web/static/main.css: the test jobs' setup action, Lint's
+# committed-CSS gate and Build validation.
+#
+# The binary is cached under a key holding the pin, in a directory of its own, so a run that
+# restores it downloads nothing. A download tries the release's own link first, then the same file
+# through the GitHub API, which serves it from the same asset store. github.com's releases/download
+# links can fail for hours while the API still serves the file, and an outage of them in November
+# 2026 failed every job at setup. The API calls carry the job's token, since
+# unauthenticated calls share a small hourly allowance per IP address across GitHub's hosted
+# runners. curl does not forward that header when the API redirects to the asset store's host.
+# Reading the API's answer needs jq, which the hosted runners carry and the test container installs.
+
+name: Install the Tailwind CSS CLI
+description: Download the pinned Tailwind CSS CLI, falling back to the GitHub API, cache it and put it on the PATH.
+
+inputs:
+  version:
+    description: The pinned version, without the v
+    required: true
+  token:
+    description: The token for the GitHub API fallback
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Cache the Tailwind CSS CLI
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/tailwind
+        key: tailwind-${{ runner.os }}-linux-x64-${{ inputs.version }}
+    - name: Install the Tailwind CSS CLI
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        TOKEN: ${{ inputs.token }}
+        CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+        dir="$HOME/tailwind"
+        bin="$dir/tailwindcss"
+        asset=tailwindcss-linux-x64
+        if [ "$CACHE_HIT" != "true" ]; then
+          mkdir -p "$dir"
+          if ! curl -sfL --retry 3 --retry-delay 5 -o "$bin" \
+            "https://github.com/tailwindlabs/tailwindcss/releases/download/v$VERSION/$asset"; then
+            echo "::warning::The release link for Tailwind CSS v$VERSION failed; downloading the file through the GitHub API"
+            api=https://api.github.com/repos/tailwindlabs/tailwindcss/releases
+            id=$(curl -sfL --retry 3 --retry-delay 5 \
+              -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" "$api/tags/v$VERSION" |
+              jq -er --arg name "$asset" '.assets[] | select(.name == $name) | .id')
+            curl -sfL --retry 3 --retry-delay 5 -o "$bin" \
+              -H "Authorization: Bearer $TOKEN" -H "Accept: application/octet-stream" "$api/assets/$id"
+          fi
+          chmod +x "$bin"
+        fi
+        "$bin" --help >/dev/null
+        echo "$dir" >> "$GITHUB_PATH"

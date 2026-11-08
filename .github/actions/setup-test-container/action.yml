@@ -30,24 +30,20 @@ runs:
 
     # net-tools supplies netstat, which run-tests.sh's kill_processes_on_ports
     # uses. Without it that function silently finds nothing rather than
-    # failing, so a stale listener would go unnoticed.
+    # failing, so a stale listener would go unnoticed. jq reads the GitHub
+    # API's answer when install-tailwind falls back to it.
     - name: Install OS packages
       shell: bash
       run: |
         set -euo pipefail
         apt-get update -qq
-        apt-get install -y -qq --no-install-recommends net-tools curl zip ca-certificates
+        apt-get install -y -qq --no-install-recommends net-tools curl zip ca-certificates jq
 
     # The glibc build, which the Debian image runs.
     - name: Install Tailwind CLI
-      shell: bash
-      run: |
-        set -euo pipefail
-        curl -sfL --retry 3 --retry-delay 5 \
-          "https://github.com/tailwindlabs/tailwindcss/releases/download/v${{ inputs.tailwind }}/tailwindcss-linux-x64" \
-          -o /usr/local/bin/tailwindcss
-        chmod +x /usr/local/bin/tailwindcss
-        tailwindcss --help >/dev/null
+      uses: ./.github/actions/install-tailwind
+      with:
+        version: ${{ inputs.tailwind }}
 
     # The binary alone, which core/guard's script check runs acorn under. Not the Node.js runtime
     # GitHub injects into container jobs for actions, which is on no PATH and follows no pin.
