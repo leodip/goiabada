@@ -26,10 +26,10 @@ import (
 )
 
 // This file is the DPoP half of the bearer guard set's seam (RFC 9449 section 7, #42 decision 10):
-// the chain routes.go mounts on /userinfo, with the replay guard last, driven through httptest on
-// both surfaces with a real proof checker, proofs signed by dpoptest's published keys, a replay
-// store standing in for the database and a fixed clock. Every expected challenge and body is a
-// literal: the algorithm list is decision 4's, in its order.
+// the chain routes.go mounts on /userinfo, whose parse guard spends each proof it accepts, driven
+// through httptest on both surfaces with a real proof checker, proofs signed by dpoptest's published
+// keys, a replay store standing in for the database and a fixed clock. Every expected challenge and
+// body is a literal: the algorithm list is decision 4's, in its order.
 
 const (
 	dpopResourceBaseURL = "https://auth.example.com"
@@ -115,12 +115,11 @@ func dpopGuards(t *testing.T, surface, baseURL string, store *replayStore) *Bear
 	return NewBearerTokenForUserInfo(parser, render.New(nil, nil), proofs)
 }
 
-// dpopChain is /userinfo's chain as routes.go mounts it, the session guard aside, with the replay
-// guard last.
+// dpopChain is /userinfo's chain as routes.go mounts it, the session guard aside.
 func dpopChain(guards *BearerToken) http.Handler {
 	return guards.JwtAuthorizationHeaderToContext()(
-		guards.RequireBearerTokenScope("openid")(guards.RequireUserBoundToken()(guards.RecordDPoPProof()(http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) })))))
+		guards.RequireBearerTokenScope("openid")(guards.RequireUserBoundToken()(http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) }))))
 }
 
 // dpopRequest is a GET to /userinfo with authorization and every proof given as a DPoP header.
@@ -308,13 +307,14 @@ func TestBearerGuardDPoP_RFC9449OnEachSurface(t *testing.T) {
 					dpopChallengeBare + `, error="invalid_request", error_description="The Authorization header must be sent once."`,
 				`{"error":"invalid_request","error_description":"The Authorization header must be sent once."}`}},
 
-		// A guard behind the parse guard refuses in the scheme used, and the proof is not spent.
+		// A guard behind the parse guard refuses in the scheme used, and the proof the parse guard
+		// accepted is spent.
 		{name: "a bound token lacking the route's scope",
 			request: func() *http.Request { return dpopRequest("DPoP "+tokenBoundNoOpenID, proofFor(tokenBoundNoOpenID)) },
-			api:     apiDPoPScope, userinfo: userinfoDPoPScope},
+			api:     apiDPoPScope, userinfo: userinfoDPoPScope, recorded: 1},
 		{name: "a bound client credentials token",
 			request: func() *http.Request { return dpopRequest("DPoP "+tokenBoundClient, proofFor(tokenBoundClient)) },
-			api:     apiDPoPUserContext, userinfo: userinfoDPoPUserContext},
+			api:     apiDPoPUserContext, userinfo: userinfoDPoPUserContext, recorded: 1},
 	}
 
 	for _, surface := range []string{"api", "userinfo"} {

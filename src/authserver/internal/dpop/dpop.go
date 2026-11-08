@@ -295,9 +295,10 @@ func (p Proof) ReplayKey() string {
 // a record swept the moment the proof expired by one clock could let an instance whose clock reads
 // earlier accept the proof again (RFC 9449 section 11.1). The grace keeps the record while any
 // instance whose clock is within it of the sweeper's could still accept the proof. It is five times
-// the skew the windows themselves allow an instance's clock, and the record point checks freshness
-// again at its own clock, so a request that was still being validated when its proof expired
-// cannot record it as new after the sweep. It is fixed, not a setting.
+// the skew the windows themselves allow an instance's clock. The token endpoint records a proof
+// once its grant has validated, so it checks the nonce's freshness again at its own clock then,
+// and a request that was still being validated when its proof expired cannot record it as new after
+// the sweep; the resources record a proof straight after checking it. It is fixed, not a setting.
 const ReplayRecordGrace = 5 * time.Minute
 
 // RequestPath is the escaped path of the request as its client sent it, the path htu must name

@@ -14,22 +14,19 @@ import (
 // bearerGuardPrefix is the compiler-assigned name every bearer guard's closure starts with.
 const bearerGuardPrefix = "github.com/leodip/goiabada/authserver/internal/middleware.(*BearerToken)."
 
-// TestInitRoutes_EveryBearerRouteRecordsTheDPoPProofAfterItsGuards: a route behind the bearer
-// guards records a DPoP request's proof in the replay store once, after every other middleware on
-// the route has passed, its rate limiters and any other guard included, so a request a guard or a
-// limiter refuses spends nothing and a request that reaches its handler always has (#42 decision
-// 9). The route set is the router's, so a route added later without the replay guard, or with a
-// guard or a limiter behind it, fails here.
-func TestInitRoutes_EveryBearerRouteRecordsTheDPoPProofAfterItsGuards(t *testing.T) {
+// TestInitRoutes_EveryBearerRouteSpendsTheDPoPProofOnce: the parse guard spends a DPoP request's
+// proof in the replay store as soon as it accepts it (#42 decision 9), so every route behind the
+// bearer guards mounts it first, ahead of the other guards, and once. A second parse guard on a
+// route would find the proof spent and refuse every DPoP request as a replay. The route set is the
+// router's, so a route added later with the guard mounted twice fails here.
+func TestInitRoutes_EveryBearerRouteSpendsTheDPoPProofOnce(t *testing.T) {
 	s := newRoutesTestServer(t)
 
 	seen := map[string]bool{}
 	err := s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 		var guards []string
-		var last string
 		for _, mw := range middlewares {
 			name := runtime.FuncForPC(reflect.ValueOf(mw).Pointer()).Name()
-			last = name
 			if guard, ok := strings.CutPrefix(name, bearerGuardPrefix); ok {
 				guards = append(guards, strings.Split(guard, ".")[0])
 			}
@@ -44,16 +41,13 @@ func TestInitRoutes_EveryBearerRouteRecordsTheDPoPProofAfterItsGuards(t *testing
 		}
 		t.Run(method+" "+route, func(t *testing.T) {
 			assert.Equal(t, "JwtAuthorizationHeaderToContext", guards[0], "the parse guard comes first: %v", guards)
-			assert.Equal(t, "RecordDPoPProof", guards[len(guards)-1], "the replay guard comes after every other: %v", guards)
-			assert.True(t, strings.HasPrefix(last, bearerGuardPrefix+"RecordDPoPProof."),
-				"the replay guard is the route's last middleware, behind its limiters, not %s", last)
 			count := 0
 			for _, g := range guards {
-				if g == "RecordDPoPProof" {
+				if g == "JwtAuthorizationHeaderToContext" {
 					count++
 				}
 			}
-			assert.Equal(t, 1, count, "the proof is recorded once: %v", guards)
+			assert.Equal(t, 1, count, "the parse guard, which spends the proof, is mounted once: %v", guards)
 		})
 		return nil
 	})

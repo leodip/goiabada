@@ -11,14 +11,13 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/dpop"
 	"github.com/leodip/goiabada/authserver/internal/dpop/dpoptest"
-	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/httpmw"
 )
 
 // Where and how long the resources record a DPoP proof (RFC 9449 section 11.1, #42 decisions 6, 8
-// and 9): behind every other refusal on its route, rate limiters included; with its freshness
-// judged again at the record point; for long enough that a sweep by one instance's clock never lets
-// an instance whose clock runs behind accept the proof again; and against the path the client sent.
+// and 9): in the parse guard, as soon as it is accepted, so it stays spent whatever answers the
+// request after; for long enough that a sweep by one instance's clock never lets an instance whose
+// clock runs behind accept the proof again; and against the path the client sent.
 
 // sweep deletes the records that expired before now, as the cleanup worker's DeleteExpiredDPoPProofs
 // does by the sweeping instance's clock.
@@ -39,18 +38,15 @@ type resourceInstance struct {
 	chain http.Handler
 }
 
-func newResourceInstance(t *testing.T, store *replayStore, now time.Time, between func(http.Handler) http.Handler) *resourceInstance {
+func newResourceInstance(t *testing.T, store *replayStore, now time.Time) *resourceInstance {
 	t.Helper()
 	checker, err := dpop.NewChecker(dpopResourceBaseURL)
 	require.NoError(t, err)
 	instance := &resourceInstance{now: now}
 	guards := NewBearerTokenForAPI(dpopParser{jkt: dpoptest.RFC7517Key(t).Thumbprint},
 		ResourceProofs{Checker: checker, Replays: store, Now: func() time.Time { return instance.now }})
-	if between == nil {
-		between = func(next http.Handler) http.Handler { return next }
-	}
-	instance.chain = guards.JwtAuthorizationHeaderToContext()(guards.RequireBearerTokenScope("openid")(between(
-		guards.RecordDPoPProof()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("admitted")) })))))
+	instance.chain = guards.JwtAuthorizationHeaderToContext()(guards.RequireBearerTokenScope("openid")(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("admitted")) })))
 	return instance
 }
 
@@ -68,11 +64,11 @@ func TestBearerGuardDPoP_ASweepByAnotherClockNeverLetsAProofBeAcceptedTwice(t *t
 	store := newReplayStore()
 	proof := key.ResourceProof(t, "GET", dpopUserinfoURL, dpopNow, tokenBound)
 
-	first := newResourceInstance(t, store, dpopNow.Add(55*time.Second), nil)
+	first := newResourceInstance(t, store, dpopNow.Add(55*time.Second))
 	require.Equal(t, http.StatusOK, first.serve(proof).Code)
 
 	store.sweep(dpopNow.Add(61 * time.Second))
-	behind := newResourceInstance(t, store, dpopNow.Add(31*time.Second), nil)
+	behind := newResourceInstance(t, store, dpopNow.Add(31*time.Second))
 	rr := behind.serve(proof)
 
 	assert.Equal(t, http.StatusUnauthorized, rr.Code, rr.Body.String())
@@ -82,118 +78,43 @@ func TestBearerGuardDPoP_ASweepByAnotherClockNeverLetsAProofBeAcceptedTwice(t *t
 	// is refused for its iat.
 	store.sweep(dpopNow.Add(60*time.Second + dpop.ReplayRecordGrace + time.Second))
 	assert.Equal(t, 0, store.count())
-	late := newResourceInstance(t, store, dpopNow.Add(60*time.Second+dpop.ReplayRecordGrace), nil)
+	late := newResourceInstance(t, store, dpopNow.Add(60*time.Second+dpop.ReplayRecordGrace))
 	assert.Equal(t, http.StatusUnauthorized, late.serve(proof).Code)
 }
 
-// The iat is judged again where the proof is recorded: a request whose window ended while the
-// guards ahead of the record ran is refused invalid_dpop_proof and records nothing, while one still
-// inside the window at that moment, its last second included, is admitted.
-func TestBearerGuardDPoP_FreshnessIsJudgedAgainAtTheRecordPoint(t *testing.T) {
+// Whatever answers a request after the parse guard accepted its proof, a guard, a route's rate
+// limiter or the handler, success or refusal, the proof stays spent. A proof names the method, the
+// URL and the token, not the body (RFC 9449 section 11.7), so the same proof sent again could carry
+// any other body: it is a replay, refused by the parse guard before anything behind it runs.
+func TestBearerGuardDPoP_WhateverTheRouteAnswersTheProofStaysSpent(t *testing.T) {
 	key := dpoptest.RFC7517Key(t)
-	proof := key.ResourceProof(t, "GET", dpopUserinfoURL, dpopNow, tokenBound)
-
-	for _, tc := range []struct {
-		name     string
-		recordAt time.Time
-		status   int
-		records  int
-	}{
-		{"still inside the window", dpopNow.Add(60 * time.Second), http.StatusOK, 1},
-		{"past the window", dpopNow.Add(60*time.Second + time.Nanosecond), http.StatusUnauthorized, 0},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			store := newReplayStore()
-			var instance *resourceInstance
-			instance = newResourceInstance(t, store, dpopNow.Add(59*time.Second), func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					instance.now = tc.recordAt // the clock moves on while the request is in flight
-					next.ServeHTTP(w, r)
-				})
-			})
-
-			rr := instance.serve(proof)
-
-			assert.Equal(t, tc.status, rr.Code, rr.Body.String())
-			assert.Equal(t, tc.records, store.count())
-			if tc.status != http.StatusOK {
-				assert.Contains(t, rr.Header().Get("WWW-Authenticate"), `error="invalid_dpop_proof"`)
-			}
-		})
-	}
-}
-
-// A request a route's rate limiter refuses leaves its proof unspent, the replay guard mounted
-// behind the limiters as routes.go mounts it: the 429 calls no replay store, and the same proof is
-// accepted once a limiter admits the request.
-func TestBearerGuardDPoP_ARateLimitedRequestLeavesItsProofUnspent(t *testing.T) {
-	const subject = "dpop-credential-change-user"
-	store := newReplayStore()
-	guards := NewBearerTokenForAPI(nil, ResourceProofs{Replays: store, Now: func() time.Time { return dpopNow }})
-	route := func(limiter *RateLimiter, reached *bool) http.Handler {
-		return limiter.LimitAccountCredentialChange(limiter.LimitAccountPassword(guards.RecordDPoPProof()(
-			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				*reached = true
-				w.WriteHeader(http.StatusTeapot)
-			}))))
-	}
-	withProof := func() *http.Request {
-		req := accountPasswordRequest(accountPasswordRoute, subject)
-		return req.WithContext(reqctx.WithDPoPProof(req.Context(), &dpop.Proof{
-			HTU: "https://auth.example.com/api/v1/account/password", JTI: "a-proof-refused-then-sent-again", IssuedAt: dpopNow,
-		}))
-	}
-
-	limiter, _ := newAuditedTestMiddleware(nil, true)
-	for i := 0; i < 10; i++ {
-		status, reached, _ := runAccountCredentialChange(limiter, accountPasswordRoute, subject, false)
-		require.Equal(t, http.StatusTeapot, status)
-		require.True(t, reached)
-	}
-	reached := false
-	rr := httptest.NewRecorder()
-	route(limiter, &reached).ServeHTTP(rr, withProof())
-	require.Equal(t, http.StatusTooManyRequests, rr.Code)
-	assert.False(t, reached)
-	assert.Equal(t, 0, store.count(), "a 429 leaves the proof unspent")
-
-	// The limiter's window has passed: a limiter with a fresh budget admits the same proof, once.
-	admitting, _ := newAuditedTestMiddleware(nil, true)
-	rr = httptest.NewRecorder()
-	route(admitting, &reached).ServeHTTP(rr, withProof())
-	assert.Equal(t, http.StatusTeapot, rr.Code, rr.Body.String())
-	assert.True(t, reached)
-	assert.Equal(t, 1, store.count())
-}
-
-// A request its handler refuses keeps its proof spent. A proof names the method, the URL and the
-// token, not the body (RFC 9449 section 11.7), so the same proof sent again could carry any other
-// body: it is a replay, refused before the handler runs.
-func TestBearerGuardDPoP_AHandlersRefusalKeepsTheProofSpent(t *testing.T) {
-	key := dpoptest.RFC7517Key(t)
-	store := newReplayStore()
 	checker, err := dpop.NewChecker(dpopResourceBaseURL)
 	require.NoError(t, err)
-	guards := NewBearerTokenForAPI(dpopParser{jkt: key.Thumbprint},
-		ResourceProofs{Checker: checker, Replays: store, Now: func() time.Time { return dpopNow }})
-	handled := 0
-	chain := guards.JwtAuthorizationHeaderToContext()(guards.RecordDPoPProof()(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			handled++
-			w.WriteHeader(http.StatusBadRequest)
-		})))
-	proof := key.ResourceProof(t, "GET", dpopUserinfoURL, dpopNow, tokenBound)
+	for _, status := range []int{http.StatusOK, http.StatusBadRequest, http.StatusForbidden,
+		http.StatusTooManyRequests, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			store := newReplayStore()
+			guards := NewBearerTokenForAPI(dpopParser{jkt: key.Thumbprint},
+				ResourceProofs{Checker: checker, Replays: store, Now: func() time.Time { return dpopNow }})
+			reached := 0
+			chain := guards.JwtAuthorizationHeaderToContext()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				reached++
+				w.WriteHeader(status)
+			}))
+			proof := key.ResourceProof(t, "GET", dpopUserinfoURL, dpopNow, tokenBound)
 
-	refused := httptest.NewRecorder()
-	chain.ServeHTTP(refused, dpopRequest("DPoP "+tokenBound, proof))
-	require.Equal(t, http.StatusBadRequest, refused.Code)
-	assert.Equal(t, 1, store.count(), "the refused request spent its proof")
+			first := httptest.NewRecorder()
+			chain.ServeHTTP(first, dpopRequest("DPoP "+tokenBound, proof))
+			require.Equal(t, status, first.Code)
+			assert.Equal(t, 1, store.count(), "the proof is spent")
 
-	replayed := httptest.NewRecorder()
-	chain.ServeHTTP(replayed, dpopRequest("DPoP "+tokenBound, proof))
-	assert.Equal(t, http.StatusUnauthorized, replayed.Code, replayed.Body.String())
-	assert.Contains(t, replayed.Header().Get("WWW-Authenticate"), `error="invalid_dpop_proof"`)
-	assert.Equal(t, 1, handled, "the replay never reached the handler")
+			replayed := httptest.NewRecorder()
+			chain.ServeHTTP(replayed, dpopRequest("DPoP "+tokenBound, proof))
+			assert.Equal(t, http.StatusUnauthorized, replayed.Code, replayed.Body.String())
+			assert.Contains(t, replayed.Header().Get("WWW-Authenticate"), `error="invalid_dpop_proof"`)
+			assert.Equal(t, 1, reached, "the replay never got past the parse guard")
+		})
+	}
 }
 
 // htu names the path the client sent, not the one routing rewrote: behind the trailing-slash strip

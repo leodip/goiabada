@@ -188,7 +188,8 @@ func TestRequireRecentAuthentication_TheChallengeNamesTheGuardsOwnFigures(t *tes
 }
 
 // A token presented with the DPoP scheme is refused in the DPoP challenge, after the bare Bearer
-// one (RFC 9470 section 3, RFC 9449 section 7.2), on each surface, and its proof is not spent.
+// one (RFC 9470 section 3, RFC 9449 section 7.2), on each surface. The parse guard spent its proof,
+// so signing the user in again means a new proof with the new token.
 func TestRequireRecentAuthentication_ADPoPTokenIsRefusedInTheDPoPChallenge(t *testing.T) {
 	key := dpoptest.RFC7517Key(t)
 	api, userinfo := refusalAnswers(http.StatusUnauthorized,
@@ -201,16 +202,16 @@ func TestRequireRecentAuthentication_ADPoPTokenIsRefusedInTheDPoPChallenge(t *te
 			store := newReplayStore()
 			guards := dpopGuards(t, surface, dpopResourceBaseURL, store)
 			chain := guards.JwtAuthorizationHeaderToContext()(guards.RequireRecentAuthentication(300*time.Second,
-				record.AcrLevel2Optional, func() time.Time { return dpopNow })(guards.RecordDPoPProof()(http.HandlerFunc(
+				record.AcrLevel2Optional, func() time.Time { return dpopNow })(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					t.Error("the next handler ran for a sign-in the guard refuses")
-				}))))
+				})))
 			rr := httptest.NewRecorder()
 
 			chain.ServeHTTP(rr, dpopRequest("DPoP "+tokenBound, key.ResourceProof(t, "GET", dpopUserinfoURL, dpopNow, tokenBound)))
 
 			assertChainAnswer(t, want, rr)
-			assert.Equal(t, 0, store.count(), "a refused request spends no proof")
+			assert.Equal(t, 1, store.count(), "the parse guard spent the proof")
 		})
 	}
 }
