@@ -17,13 +17,6 @@ var insertDPoPProof = statement{
 	mssql:    "INSERT INTO dpop_proofs (proof_hash, expires_at) VALUES (@p1, @p2)",
 }
 
-var releaseDPoPProof = statement{
-	sqlite:   "DELETE FROM dpop_proofs WHERE proof_hash = ?",
-	mysql:    "DELETE FROM dpop_proofs WHERE proof_hash = ?",
-	postgres: "DELETE FROM dpop_proofs WHERE proof_hash = $1",
-	mssql:    "DELETE FROM dpop_proofs WHERE proof_hash = @p1",
-}
-
 var deleteExpiredDPoPProofs = statement{
 	sqlite:   "DELETE FROM dpop_proofs WHERE expires_at < ?",
 	mysql:    "DELETE FROM dpop_proofs WHERE expires_at < ?",
@@ -62,25 +55,6 @@ func (d *Database) RecordDPoPProof(ctx context.Context, tx *sql.Tx, proofHash st
 	}
 
 	return true, nil
-}
-
-// ReleaseDPoPProof deletes one proof's record, which unspends the proof: a request the resources
-// refused after recording its proof releases the record, so only a request that succeeded holds a
-// row (#42 decision 9). The caller releases only a key its own RecordDPoPProof call stored, so the
-// row it deletes is the one that call inserted. A key that is not a lower-case SHA-256 hex digest
-// is an error, as at the record; a key with no record is no error.
-func (d *Database) ReleaseDPoPProof(ctx context.Context, tx *sql.Tx, proofHash string) error {
-
-	if !isSHA256Hex(proofHash) {
-		return errs.New("can't release a DPoP proof under a key that is not a lower-case SHA-256 hex digest")
-	}
-
-	_, err := d.ExecSQL(ctx, tx, releaseDPoPProof.text(d.Dialect), proofHash)
-	if err != nil {
-		return errs.Wrap(err, "unable to release the DPoP proof")
-	}
-
-	return nil
 }
 
 // DeleteExpiredDPoPProofs reaps on expires_at alone. Every row it removes names a proof that could

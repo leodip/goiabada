@@ -15660,69 +15660,6 @@ func (_c *Database_RefundRateLimitHit_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
-// ReleaseDPoPProof provides a mock function for the type Database
-func (_mock *Database) ReleaseDPoPProof(ctx context.Context, tx *sql.Tx, proofHash string) error {
-	ret := _mock.Called(ctx, tx, proofHash)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ReleaseDPoPProof")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) error); ok {
-		r0 = returnFunc(ctx, tx, proofHash)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// Database_ReleaseDPoPProof_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReleaseDPoPProof'
-type Database_ReleaseDPoPProof_Call struct {
-	*mock.Call
-}
-
-// ReleaseDPoPProof is a helper method to define mock.On call
-//   - ctx context.Context
-//   - tx *sql.Tx
-//   - proofHash string
-func (_e *Database_Expecter) ReleaseDPoPProof(ctx any, tx any, proofHash any) *Database_ReleaseDPoPProof_Call {
-	return &Database_ReleaseDPoPProof_Call{Call: _e.mock.On("ReleaseDPoPProof", ctx, tx, proofHash)}
-}
-
-func (_c *Database_ReleaseDPoPProof_Call) Run(run func(ctx context.Context, tx *sql.Tx, proofHash string)) *Database_ReleaseDPoPProof_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *sql.Tx
-		if args[1] != nil {
-			arg1 = args[1].(*sql.Tx)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_ReleaseDPoPProof_Call) Return(err error) *Database_ReleaseDPoPProof_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *Database_ReleaseDPoPProof_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, proofHash string) error) *Database_ReleaseDPoPProof_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // ReplaceUserRecoveryCodes provides a mock function for the type Database
 func (_mock *Database) ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error {
 	ret := _mock.Called(ctx, tx, userId, codeHashes)

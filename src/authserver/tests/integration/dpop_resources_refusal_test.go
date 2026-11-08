@@ -22,10 +22,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// A request the resource's handler refuses leaves its DPoP proof unspent, through the running
-// server and its replay table (#42 decision 9): a refusal by the handler's own checks, of the
-// session or of a credential, leaves no record of the proof, and the same proof is admitted once
-// the request is corrected, and only once.
+// A request the resource's handler refuses still spends its DPoP proof, through the running server
+// and its replay table (#42 decision 9, RFC 9449 section 11.1). A proof names the method, the URL
+// and the token, not the body (section 11.7), so a refused request's proof sent again could carry
+// any other body: it is refused as used, and the client corrects the request with a new proof.
 
 // sendJSONWithProof sends body as JSON to the auth server's path with token in the DPoP scheme and
 // proof beside it.
@@ -72,8 +72,9 @@ func proofRecords(t *testing.T, path, proof string) int {
 }
 
 // The logout request needs the token's session, which a password grant token has none of: the
-// handler refuses it 401 INVALID_SESSION, in the DPoP scheme the request used, and records nothing.
-func TestDPoPResources_AHandlersSessionRefusalLeavesTheProofUnspent(t *testing.T) {
+// handler refuses it 401 INVALID_SESSION, in the DPoP scheme the request used, and the proof is
+// spent.
+func TestDPoPResources_AHandlersSessionRefusalSpendsTheProof(t *testing.T) {
 	u := createDPoPUser(t)
 	key := dpoptest.RFC7517Key(t)
 	token := u.boundToken(t, key)
@@ -92,14 +93,13 @@ func TestDPoPResources_AHandlersSessionRefusalLeavesTheProofUnspent(t *testing.T
 	assert.Equal(t, "INVALID_SESSION", refused.body["error_code"])
 	require.Len(t, refused.challenge, 1)
 	assert.Contains(t, refused.challenge[0], dpopChallengeBare)
-	assert.Equal(t, 0, proofRecords(t, path, proof), "the refused request left no record of its proof")
+	assert.Equal(t, 1, proofRecords(t, path, proof), "the refused request spent its proof")
 }
 
-// A wrong current password is refused 400 AUTHENTICATION_FAILED by the handler, and records
-// nothing; the same proof with the right password changes it, and that request spends the proof.
-// (The change revokes the token, so the replay of a spent proof is shown on userinfo, in
-// TestDPoPResources_AReplayedProofIsRefused.)
-func TestDPoPResources_AHandlersCredentialRefusalLeavesTheProofForTheCorrectedRequest(t *testing.T) {
+// A wrong current password is refused 400 AUTHENTICATION_FAILED by the handler, and the proof is
+// spent. The same proof sent again with the right password is refused as used, before the handler
+// runs, so the password is not changed; a new proof with the right password changes it.
+func TestDPoPResources_AProofTheHandlerRefusedCannotCarryAnotherBody(t *testing.T) {
 	u := createDPoPUser(t)
 	key := dpoptest.RFC7517Key(t)
 	token := u.boundToken(t, key)
@@ -110,10 +110,18 @@ func TestDPoPResources_AHandlersCredentialRefusalLeavesTheProofForTheCorrectedRe
 	refused := sendJSONWithProof(t, http.MethodPut, path, token, proof, body)
 	require.Equal(t, http.StatusBadRequest, refused.status, "%v", refused.body)
 	assert.Equal(t, "AUTHENTICATION_FAILED", refused.body["error_code"])
-	assert.Equal(t, 0, proofRecords(t, path, proof), "the refused request left no record of its proof")
+	assert.Equal(t, 1, proofRecords(t, path, proof), "the refused request spent its proof")
 
 	body.CurrentPassword = u.password
-	corrected := sendJSONWithProof(t, http.MethodPut, path, token, proof, body)
-	require.Equal(t, http.StatusOK, corrected.status, "the unspent proof is admitted with the request corrected: %v", corrected.body)
-	assert.Equal(t, 1, proofRecords(t, path, proof), "the request that succeeded spent the proof")
+	replayed := sendJSONWithProof(t, http.MethodPut, path, token, proof, body)
+	require.Equal(t, http.StatusUnauthorized, replayed.status, "%v", replayed.body)
+	assert.Equal(t, "INVALID_DPOP_PROOF", replayed.body["error_code"])
+	require.Len(t, replayed.challenge, 1)
+	assert.Contains(t, replayed.challenge[0], dpopChallengeBare+`, error="invalid_dpop_proof"`)
+
+	fresh := key.ResourceProof(t, http.MethodPut, resourceURL(path), time.Now(), token)
+	corrected := sendJSONWithProof(t, http.MethodPut, path, token, fresh, body)
+	require.Equal(t, http.StatusOK, corrected.status,
+		"a new proof changes the password, so the replay had left it unchanged: %v", corrected.body)
+	assert.Equal(t, 1, proofRecords(t, path, fresh))
 }
