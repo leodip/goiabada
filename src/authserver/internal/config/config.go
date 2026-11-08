@@ -181,6 +181,15 @@ const (
 	defaultConnMaxIdleTime = 5 * time.Minute
 )
 
+// The HTTP and HTTPS listeners' defaults, for a variable unset or empty. The healthcheck command
+// reads the same variables without loading the configuration, from these same defaults, so the
+// listener it asks is the one the server listens on (#808).
+const (
+	DefaultListenHost      = "0.0.0.0"
+	DefaultListenPortHttp  = 9090
+	DefaultListenPortHttps = 9443
+)
+
 type Config struct {
 	AuthServer    AuthServerConfig
 	AdminConsole  AdminConsoleConfig
@@ -227,10 +236,10 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 		AuthServer: AuthServerConfig{
 			BaseURL:                          authServerBaseURL,
 			InternalBaseURL:                  getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
-			ListenHostHttps:                  getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:                  getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443, &malformed),
-			ListenHostHttp:                   getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:                   getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090, &malformed),
+			ListenHostHttps:                  getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", DefaultListenHost),
+			ListenPortHttps:                  getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", DefaultListenPortHttps, &malformed),
+			ListenHostHttp:                   getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", DefaultListenHost),
+			ListenPortHttp:                   getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", DefaultListenPortHttp, &malformed),
 			TrustProxyHeaders:                getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS", &malformed),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_AUTHSERVER_TRUSTED_PROXIES"),
 			LogHttpRequests:                  getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", &malformed),

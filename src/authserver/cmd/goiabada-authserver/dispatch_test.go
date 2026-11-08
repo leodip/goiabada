@@ -54,16 +54,29 @@ func TestDispatch(t *testing.T) {
 			assert.Contains(t, msg, "goiabada-authserver [flags] with no command to start the server")
 			assert.Contains(t, msg, "goiabada-authserver [flags] migrate to <version>")
 			assert.Contains(t, msg, "goiabada-authserver [flags] recover --email <address>")
+			assert.Contains(t, msg, "goiabada-authserver healthcheck, alone,")
 		})
 	}
+
+	// `healthcheck` is recognized only as the first argument, before the parse, so dispatch meets
+	// it only behind a flag or `--`: it takes none, and is refused as such (#808 decision 3).
+	t.Run("refuses healthcheck behind a flag", func(t *testing.T) {
+		rest, command, err := dispatch([]string{"healthcheck"})
+		require.Error(t, err)
+		assert.Empty(t, command)
+		assert.Nil(t, rest)
+		assert.Equal(t, "healthcheck takes no arguments: it reads the listener from the environment, "+
+			"so run goiabada-authserver healthcheck alone", err.Error())
+	})
 
 	t.Run("the refusal in full", func(t *testing.T) {
 		_, _, err := dispatch([]string{"migrat", "to", "44"})
 		require.Error(t, err)
 		assert.Equal(t, `unknown command "migrat": run goiabada-authserver [flags] with no command `+
 			`to start the server, goiabada-authserver [flags] migrate version, or `+
-			`goiabada-authserver [flags] migrate to <version>, to manage the schema, or `+
+			`goiabada-authserver [flags] migrate to <version>, to manage the schema, `+
 			`goiabada-authserver [flags] recover --email <address> [flags], to restore sign-in for `+
-			`one user; the server's flags go before the command`, err.Error())
+			`one user, or goiabada-authserver healthcheck, alone, to check the running server's `+
+			`health; the server's flags go before the command`, err.Error())
 	})
 }

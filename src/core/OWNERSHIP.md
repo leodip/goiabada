@@ -354,8 +354,11 @@ command itself and fails on a tree it changed.
 | `core/guard` | `SourceRoot` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `TokenizeScript` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/hashutil` | `HashString` | both-apps | — |
-| `core/hostport` | `Join` | both-apps | — |
-| `core/hostport` | `Unbracket` | own-package | — |
+| `core/healthcheck` | `ArgumentsRefused` | both-apps | — |
+| `core/healthcheck` | `Listeners` | both-apps | — |
+| `core/healthcheck` | `Run` | both-apps | — |
+| `core/hostport` | `Join` | kernel | — |
+| `core/hostport` | `Unbracket` | kernel | — |
 | `core/hostport/hostporttest` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/hostport/hostporttest` names it in production. |
 | `core/httpmw` | `BodyLimit` | both-apps | — |
 | `core/httpmw` | `BodyLimitPolicy` | both-apps | — |

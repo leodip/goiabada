@@ -113,9 +113,22 @@ func (c *AuthServerConfig) GetEffectiveBaseURL() string {
 	return c.BaseURL
 }
 
+// The HTTP and HTTPS listeners' defaults, for a variable unset or empty. The healthcheck command
+// reads the same variables without loading the configuration, from these same defaults, so the
+// listener it asks is the one the console listens on (#808).
+const (
+	DefaultListenHost      = "0.0.0.0"
+	DefaultListenPortHttp  = 9091
+	DefaultListenPortHttps = 9444
+)
+
 type Config struct {
 	AdminConsole AdminConsoleConfig
 	AuthServer   AuthServerConfig
+
+	// Args is what the flag parse left, in order. The console's flags take no command after them,
+	// so main refuses any of these (#808 decision 5).
+	Args []string
 }
 
 // Load reads the configuration from the environment, registers a flag over each value that has
@@ -134,10 +147,10 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	c := &Config{
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:                          getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
-			ListenHostHttps:                  getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:                  getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444, &malformed),
-			ListenHostHttp:                   getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:                   getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091, &malformed),
+			ListenHostHttps:                  getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", DefaultListenHost),
+			ListenPortHttps:                  getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", DefaultListenPortHttps, &malformed),
+			ListenHostHttp:                   getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", DefaultListenHost),
+			ListenPortHttp:                   getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", DefaultListenPortHttp, &malformed),
 			TrustProxyHeaders:                getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS", &malformed),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"),
 			LogHttpRequests:                  getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", &malformed),
@@ -198,6 +211,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	if err := fs.Parse(args); err != nil {
 		return nil, errs.WithStack(err)
 	}
+	c.Args = fs.Args()
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.

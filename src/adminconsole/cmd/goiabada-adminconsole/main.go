@@ -1,7 +1,12 @@
 // Command goiabada-adminconsole is the Goiabada admin console: the web UI an administrator manages
 // users, groups, clients, resources and settings with, and a user manages their own account with.
 //
-//	goiabada-adminconsole [flags]
+//	goiabada-adminconsole [flags]           start the admin console
+//	goiabada-adminconsole healthcheck       check the running console's /health (#808)
+//
+// The flags take no command after them, and `healthcheck` takes no flags or arguments, reading its
+// listener from the environment; any other word on the command line is refused with exit 2 before
+// the console does anything else (#808 decision 5).
 //
 // It is configured by GOIABADA_ environment variables, most with a flag over them. It keeps no
 // database: everything it reads and writes goes through the auth server's admin and account APIs,
@@ -38,6 +43,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/healthcheck"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/localzone"
 	"github.com/leodip/goiabada/core/logging"
@@ -54,6 +61,13 @@ func main() {
 // run is the process from its start to its stop, and answers the code main exits with, so what it
 // defers is done on every path out of it.
 func run() int {
+	// The health check is recognized before anything else, and does nothing else: it reads its
+	// listener's variables and asks /health, so no other setting, TZ included, can fail it, and a
+	// check every 10 seconds writes no startup records (#808 decisions 2 and 3).
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		return healthcheck.Run(healthcheckListeners, os.Args[2:], os.Stderr)
+	}
+
 	// TZ is resolved again before anything else, so the first record is already in the zone the
 	// deployment chose. The zone database this binary embeds is reachable only from here: a
 	// dependency fixes the local zone during package initialization, before it registers, so on a
@@ -79,6 +93,13 @@ func run() int {
 	cfg, loadErr := config.Load(flag.CommandLine, os.Args[1:])
 	if loadErr != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", loadErr)
+		return 2
+	}
+	// A word the parse left names no command: the console used to ignore it, and every flag after
+	// it, and start. Refused here, with the channel and code of a bad flag, before any key is read
+	// or the auth server is called (#808 decision 5).
+	if err := dispatch(cfg.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 2
 	}
 	if err := logging.Install(cfg.AdminConsole.LogLevel, cfg.AdminConsole.LogFormat); err != nil {
@@ -271,6 +292,37 @@ func run() int {
 
 	slog.Info("admin console stopped")
 	return 0
+}
+
+// healthcheckListeners names the admin console's listener variables, and the defaults its
+// configuration gives them, for the healthcheck command.
+var healthcheckListeners = healthcheck.Listeners{
+	Command:          "goiabada-adminconsole",
+	HTTPHost:         "GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP",
+	HTTPPort:         "GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP",
+	HTTPSHost:        "GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS",
+	HTTPSPort:        "GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS",
+	CertFile:         "GOIABADA_ADMINCONSOLE_CERTFILE",
+	KeyFile:          "GOIABADA_ADMINCONSOLE_KEYFILE",
+	DefaultHost:      config.DefaultListenHost,
+	DefaultHTTPPort:  config.DefaultListenPortHttp,
+	DefaultHTTPSPort: config.DefaultListenPortHttps,
+}
+
+// dispatch refuses the positional arguments the flag parse left, since the console's flags take no
+// command: none serves, and any word is refused, naming it and the commands there are, as the auth
+// server refuses one since #424. `healthcheck` runs before the parse when it is the first argument,
+// so it arrives here only behind a flag or `--`, and is refused for taking none (#808 decision 5).
+func dispatch(args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	if args[0] == "healthcheck" {
+		return healthcheck.ArgumentsRefused("goiabada-adminconsole")
+	}
+	return errs.Errorf("unknown command %q: run goiabada-adminconsole [flags], with no command, to "+
+		"start the admin console, or goiabada-adminconsole healthcheck, alone, to check the running "+
+		"console's health", args[0])
 }
 
 // newTokenClient builds the console's one token client, which makes all three of its grants. The

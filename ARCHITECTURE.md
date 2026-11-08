@@ -106,6 +106,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/gender` | kernel | — |
 | `core/guard` | kernel | — |
 | `core/hashutil` | kernel | — |
+| `core/healthcheck` | kernel | — |
 | `core/hostport` | kernel | — |
 | `core/httpmw` | kernel | — |
 | `core/i18n` | kernel | — |
@@ -170,6 +171,11 @@ Notes on rows that are not self-evident:
   labels take only declared values, the Prometheus text exposition and the request middleware. It is
   written here rather than taken from `prometheus/client_golang`, which would add eight modules and
   link `expvar` into both binaries, and which takes any string as a label value (#400).
+- `core/healthcheck` is kernel because both binaries run it as their `healthcheck` command: one
+  `GET` of the server's own `/health`, which the images' health check and the setup wizard's
+  Compose file run, since an image built `FROM scratch` holds no other program to ask with. Each
+  binary names its own listener variables and defaults; the rule picking the listener, the call
+  and the exit codes are written once, so the two checks cannot disagree (#808).
 - `core/requestid` is kernel because both servers carry the same request id, made the same way:
   adopted from the `X-Request-Id` a client or proxy sent, or minted as `<hostname>/<10 base62>-<counter>`,
   as chi's middleware made it until #462 replaced it. `core/logging`'s handler reads it onto every
