@@ -35,8 +35,8 @@ type record struct {
 	installed string
 	fixed     []string
 	goPackage bool
-	reachable bool     // govulncheck's alone: the vulnerable symbol is called
-	symbols   []string // the symbols govulncheck found called
+	inBinary  bool     // govulncheck's alone: the vulnerable symbol is in the binary
+	symbols   []string // the vulnerable symbols govulncheck detected in the binary
 }
 
 // The identifiers, package names and versions the report writes come from the scanners' databases
@@ -270,7 +270,7 @@ func parseGovulncheck(content []byte, image string) ([]record, error) {
 				return nil, errs.Errorf("govulncheck's finding of %s has no trace", f.OSV)
 			}
 			// The first frame is the vulnerable symbol, and it names a function only when the
-			// binary calls it; a finding at the module or package level is one nothing reaches.
+			// symbol is in the binary; a finding at the module or package level has none in it.
 			frame := f.Trace[0]
 			r := record{
 				scanner:   govulncheck,
@@ -284,7 +284,7 @@ func parseGovulncheck(content []byte, image string) ([]record, error) {
 				r.fixed = []string{f.FixedVersion}
 			}
 			if frame.Function != "" {
-				r.reachable = true
+				r.inBinary = true
 				r.symbols = []string{symbol(frame.Package, frame.Receiver, frame.Function)}
 			}
 			records = append(records, r)

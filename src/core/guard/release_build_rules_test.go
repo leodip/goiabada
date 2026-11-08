@@ -941,6 +941,17 @@ func TestReleaseBuilds_GoBuildCommands(t *testing.T) {
 		{"a separator attached to a word before it too", "go build -o out .;echo -tags=production\n", []goBuild{{1, false, ""}}, nil},
 		{"a Dockerfile's RUN is read like a script line", "FROM golang AS build\nRUN go build -buildvcs=false -tags=production -o ../../bin/a ./cmd/a\n", []goBuild{{2, true, ""}}, nil},
 		{
+			"a cross-compiled Dockerfile's go build is read past its platform assignments",
+			"FROM --platform=$BUILDPLATFORM golang AS build\nARG TARGETOS\nARG TARGETARCH\n" +
+				"RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -buildvcs=false -tags=production -o ../../bin/a ./cmd/a\n",
+			[]goBuild{{4, true, ""}}, nil,
+		},
+		{
+			"and without the tag it is reported",
+			"FROM --platform=$BUILDPLATFORM golang AS build\nRUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o ../../bin/a ./cmd/a\n",
+			[]goBuild{{2, false, ""}}, nil,
+		},
+		{
 			"a command split across backslash-continued lines is read whole",
 			"    GOOS=$os go build -v \\\n        -tags=production \\\n        -o out \\\n        .\n",
 			[]goBuild{{1, true, ""}}, nil,
@@ -1056,6 +1067,12 @@ func TestReleaseBuilds_StampTargets(t *testing.T) {
 			"a Dockerfile's -X inside single quotes is read",
 			"FROM golang AS build\nRUN go build -tags=production -ldflags=\"-w -X 'a.test/p.V=${v}'\" -o out ./cmd/a\n",
 			[]stampTarget{{2, "a.test/p.V", "./cmd/a"}}, nil,
+		},
+		{
+			"a cross-compiled Dockerfile's -X is read past its platform assignments",
+			"FROM --platform=$BUILDPLATFORM golang AS build\nARG TARGETOS\nARG TARGETARCH\n" +
+				"RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags=production -ldflags=\"-w -X 'a.test/p.V=${v}'\" -o out ./cmd/a\n",
+			[]stampTarget{{4, "a.test/p.V", "./cmd/a"}}, nil,
 		},
 		{
 			"flags carried in a shell variable are read from its assignment",
@@ -1553,6 +1570,266 @@ func TestReleaseBuilds_Stamps(t *testing.T) {
 	})
 }
 
+// ---- the image builds' cross-compile -------------------------------------------------------
+
+// A release builds each image for linux/amd64 and linux/arm64 from one Dockerfile. Its go build runs
+// on the builder's platform and compiles for the image's, instead of running under the target's
+// emulation, which takes about ten minutes longer for byte-identical binaries (#808). BuildKit
+// passes the image's platform as TARGETOS and TARGETARCH, which reach a stage only through an ARG
+// naming them there. Each half of the form fails silently: a build stage of the target's platform
+// compiles under emulation, an undeclared ARG leaves GOOS and GOARCH empty and builds the builder's
+// platform into every image, and the image stage given the builder's platform ships that one
+// everywhere. So every go build in the release Dockerfiles is held to running in a stage FROM
+// --platform=$BUILDPLATFORM that declares both ARGs before it, with CGO_ENABLED=0,
+// GOOS=$TARGETOS and GOARCH=$TARGETARCH set on the command, and the last stage, the image, to
+// naming no platform of its own.
+
+// crossCompileFindings reads a release Dockerfile, named file, and returns every way it departs from
+// the cross-compiled form, sorted. A file the shell reader cannot read is checkReleaseBuilds'
+// finding, and one holding no go build too.
+func crossCompileFindings(file, src string) []string {
+	instructions, unparseable := dockerInstructions(src)
+	if unparseable != "" {
+		return []string{fmt.Sprintf("cross-compile: %s %s, which this reader does not parse the way Docker does", file, unparseable)}
+	}
+	script := readShell(src)
+	if len(script.problems) > 0 {
+		return nil
+	}
+
+	// A stage is its FROM's platform and the ARGs it declares, each at the line first naming it. An
+	// ARG with a default is kept as NAME=default, which is not the bare name BuildKit fills in.
+	type stage struct {
+		line     int
+		platform string
+		args     map[string]int
+	}
+	var stages []stage
+	for _, in := range instructions {
+		fields := strings.Fields(in.text)
+		switch {
+		case strings.EqualFold(fields[0], "FROM"):
+			st := stage{line: in.line, args: map[string]int{}}
+			for _, f := range fields[1:] {
+				if !strings.HasPrefix(f, "--") {
+					break
+				}
+				if v, ok := strings.CutPrefix(f, "--platform="); ok {
+					st.platform = v
+				}
+			}
+			stages = append(stages, st)
+		case strings.EqualFold(fields[0], "ARG") && len(stages) > 0:
+			for _, name := range fields[1:] {
+				if _, seen := stages[len(stages)-1].args[name]; !seen {
+					stages[len(stages)-1].args[name] = in.line
+				}
+			}
+		}
+	}
+
+	var findings []string
+	for _, c := range script.commands {
+		if !isGoBuild(c) {
+			continue
+		}
+		at := fmt.Sprintf("cross-compile: %s:%d runs go build", file, c.line)
+		var st *stage
+		for i := range stages {
+			if stages[i].line <= c.line {
+				st = &stages[i]
+			}
+		}
+		if st == nil {
+			findings = append(findings, at+" before any FROM")
+			continue
+		}
+		if !isVariable(st.platform, "BUILDPLATFORM") {
+			findings = append(findings, at+" in a stage not FROM --platform=$BUILDPLATFORM, so each platform's image compiles it under that platform's emulation")
+		}
+		for _, name := range []string{"TARGETOS", "TARGETARCH"} {
+			if line, ok := st.args[name]; !ok || line >= c.line {
+				findings = append(findings, fmt.Sprintf("%s in a stage that declares no ARG %s before it, so $%s is empty and it builds for the builder's platform", at, name, name))
+			}
+		}
+		set := map[string]string{}
+		for _, a := range c.assigns {
+			name, value, _ := strings.Cut(a.value, "=")
+			set[name] = value
+		}
+		if set["CGO_ENABLED"] != "0" {
+			findings = append(findings, at+" without CGO_ENABLED=0, so its static linking is left to the toolchain's default")
+		}
+		for _, v := range []struct{ name, from string }{{"GOOS", "TARGETOS"}, {"GOARCH", "TARGETARCH"}} {
+			if !isVariable(set[v.name], v.from) {
+				findings = append(findings, fmt.Sprintf("%s without %s=$%s, so it does not build for the image's platform", at, v.name, v.from))
+			}
+		}
+	}
+	if n := len(stages); n > 0 && stages[n-1].platform != "" {
+		findings = append(findings, fmt.Sprintf("cross-compile: %s:%d gives its last stage, the image, --platform=%s, where the image must be built for each target platform", file, stages[n-1].line, stages[n-1].platform))
+	}
+	sort.Strings(findings)
+	return findings
+}
+
+// isVariable reports whether value is the expansion of the named variable and nothing else, $name or
+// ${name}.
+func isVariable(value, name string) bool {
+	return value == "$"+name || value == "${"+name+"}"
+}
+
+// checkCrossCompiles holds the release Dockerfiles under root to the cross-compiled form.
+func checkCrossCompiles(root string, files []string) []string {
+	var findings []string
+	for _, rel := range files {
+		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			findings = append(findings, fmt.Sprintf("cross-compile: %s cannot be read: %v", rel, err))
+			continue
+		}
+		findings = append(findings, crossCompileFindings(rel, string(src))...)
+	}
+	return findings
+}
+
+// crossCompiledDockerfile is a release Dockerfile in the cross-compiled form, its go build on line 6
+// and its image stage on line 8.
+const crossCompiledDockerfile = `FROM --platform=$BUILDPLATFORM golang AS build
+ARG version
+WORKDIR /src
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags=production -o /out/one ./cmd/one
+
+FROM scratch AS final
+COPY --from=build /out/one /
+`
+
+func TestReleaseBuilds_CrossCompile(t *testing.T) {
+	const file = "build/Dockerfile-one"
+	const goBuild = "RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build"
+	edit := func(old, replacement string) string {
+		require.Equal(t, 1, strings.Count(crossCompiledDockerfile, old), old)
+		return strings.Replace(crossCompiledDockerfile, old, replacement, 1)
+	}
+	cases := []struct {
+		name string
+		src  string
+		want []string
+	}{
+		{"the cross-compiled form passes", crossCompiledDockerfile, nil},
+		{
+			"braced expansions, one ARG naming both and a lowercase from pass",
+			strings.NewReplacer(
+				"FROM --platform=$BUILDPLATFORM", "from --platform=${BUILDPLATFORM}",
+				"ARG TARGETOS\nARG TARGETARCH\n", "ARG TARGETOS TARGETARCH\n",
+				"GOOS=$TARGETOS GOARCH=$TARGETARCH", `GOARCH="${TARGETARCH}" GOOS=${TARGETOS}`,
+			).Replace(crossCompiledDockerfile),
+			nil,
+		},
+		{
+			"a build stage of the target's platform compiles under emulation",
+			edit("FROM --platform=$BUILDPLATFORM golang AS build", "FROM golang AS build"),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build in a stage not FROM --platform=$BUILDPLATFORM, so each platform's image compiles it under that platform's emulation"},
+		},
+		{
+			"a build stage pinned to one platform is not the builder's",
+			edit("--platform=$BUILDPLATFORM", "--platform=linux/amd64"),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build in a stage not FROM --platform=$BUILDPLATFORM"},
+		},
+		{
+			"a go build without GOOS builds the builder's platform",
+			edit("GOOS=$TARGETOS ", ""),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build without GOOS=$TARGETOS, so it does not build for the image's platform"},
+		},
+		{
+			"a GOOS of one platform is not the image's",
+			edit("GOOS=$TARGETOS", "GOOS=linux"),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build without GOOS=$TARGETOS"},
+		},
+		{
+			"a go build without GOARCH builds the builder's architecture",
+			edit("GOARCH=$TARGETARCH ", ""),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build without GOARCH=$TARGETARCH, so it does not build for the image's platform"},
+		},
+		{
+			"GOARCH taken from the builder's platform is not the image's",
+			edit("GOARCH=$TARGETARCH", "GOARCH=$BUILDARCH"),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build without GOARCH=$TARGETARCH"},
+		},
+		{
+			"the last of two assignments is the one the command sees",
+			edit("GOOS=$TARGETOS", "GOOS=$TARGETOS GOOS=linux"),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build without GOOS=$TARGETOS"},
+		},
+		{
+			"a go build without CGO_ENABLED=0 leaves cgo to the toolchain's default",
+			edit("CGO_ENABLED=0 ", ""),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build without CGO_ENABLED=0, so its static linking is left to the toolchain's default"},
+		},
+		{
+			"CGO_ENABLED=1 is not 0",
+			edit("CGO_ENABLED=0", "CGO_ENABLED=1"),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build without CGO_ENABLED=0"},
+		},
+		{
+			"an undeclared TARGETARCH leaves GOARCH empty",
+			edit("ARG TARGETARCH\n", ""),
+			[]string{"cross-compile: build/Dockerfile-one:5 runs go build in a stage that declares no ARG TARGETARCH before it, so $TARGETARCH is empty and it builds for the builder's platform"},
+		},
+		{
+			"an ARG declared after the go build does not reach it",
+			strings.Replace(edit("ARG TARGETOS\n", ""), "./cmd/one\n\n", "./cmd/one\nARG TARGETOS\n\n", 1),
+			[]string{"cross-compile: build/Dockerfile-one:5 runs go build in a stage that declares no ARG TARGETOS before it"},
+		},
+		{
+			"an ARG declared in an earlier stage does not reach the next",
+			"FROM --platform=$BUILDPLATFORM golang AS deps\nARG TARGETOS\nARG TARGETARCH\n" + edit("ARG TARGETOS\n", ""),
+			[]string{"cross-compile: build/Dockerfile-one:8 runs go build in a stage that declares no ARG TARGETOS before it"},
+		},
+		{
+			"an ARG with a default is not BuildKit's",
+			edit("ARG TARGETOS\n", "ARG TARGETOS=linux\n"),
+			[]string{"cross-compile: build/Dockerfile-one:6 runs go build in a stage that declares no ARG TARGETOS before it"},
+		},
+		{
+			"an image stage of the builder's platform ships that platform everywhere",
+			edit("FROM scratch AS final", "FROM --platform=$BUILDPLATFORM scratch AS final"),
+			[]string{"cross-compile: build/Dockerfile-one:8 gives its last stage, the image, --platform=$BUILDPLATFORM, where the image must be built for each target platform"},
+		},
+		{
+			"a go build moved into the image stage is held to the form too",
+			edit("COPY --from=build /out/one /\n", goBuild+" -tags=production -o /one ./cmd/one\n"),
+			[]string{
+				"cross-compile: build/Dockerfile-one:9 runs go build in a stage not FROM --platform=$BUILDPLATFORM",
+				"cross-compile: build/Dockerfile-one:9 runs go build in a stage that declares no ARG TARGETARCH before it",
+				"cross-compile: build/Dockerfile-one:9 runs go build in a stage that declares no ARG TARGETOS before it",
+			},
+		},
+		{
+			"a go build before any FROM is in no stage",
+			"RUN " + "go build -tags=production ./cmd/one\n" + crossCompiledDockerfile,
+			[]string{"cross-compile: build/Dockerfile-one:1 runs go build before any FROM"},
+		},
+		{
+			"a Dockerfile Docker reads differently is reported",
+			"# escape=`\n" + crossCompiledDockerfile,
+			[]string{"cross-compile: build/Dockerfile-one sets the escape directive, which this reader does not parse the way Docker does"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assertFindings(t, crossCompileFindings(file, c.src), c.want...)
+		})
+	}
+
+	t.Run("a file that cannot be read is reported", func(t *testing.T) {
+		findings := checkCrossCompiles(t.TempDir(), []string{file})
+		assertFindings(t, findings, "cross-compile: build/Dockerfile-one cannot be read")
+	})
+}
+
 // ---- the real tree --------------------------------------------------------------------------
 
 // TestReleaseBuilds_TheRealReleaseBuildsSetProduction holds this repository's release builds to the
@@ -1561,6 +1838,12 @@ func TestReleaseBuilds_Stamps(t *testing.T) {
 // releaseTargets.
 func TestReleaseBuilds_TheRealReleaseBuildsSetProduction(t *testing.T) {
 	assert.Empty(t, checkReleaseBuilds(SourceRoot(t), releaseBuilds, shippedMains, releaseTargets))
+}
+
+// TestReleaseBuilds_TheRealImagesCrossCompile holds both release Dockerfiles to the cross-compiled
+// form: each go build on the builder's platform, compiling for the image's.
+func TestReleaseBuilds_TheRealImagesCrossCompile(t *testing.T) {
+	assert.Empty(t, checkCrossCompiles(SourceRoot(t), releaseDockerfiles))
 }
 
 // TestReleaseBuilds_TheRealStampsNameVariables holds every -X a release build passes to naming a

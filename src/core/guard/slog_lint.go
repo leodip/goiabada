@@ -244,7 +244,9 @@ var slogSpreadSites = []slogSpreadSite{
 //   - Test support: the guards themselves and the refgraph reader they share with ownershipdump,
 //     logtest, hostporttest, sessiontest, handlertest, oauthclienttest, renderintegration, fake and
 //     mailpit. None is compiled into a server.
-//   - The setup wizard, a command run once before either server exists.
+//   - Commands run as processes of their own: the setup wizard, run once before either server
+//     exists, and healthcheck, the command both server binaries run as their health check, which
+//     serves no request and makes one of its own (#808).
 //
 // A package that holds both startup and request work stays out of this list, and its startup
 // functions are admitted by name instead: core/i18n's catalog loading is in slogPlainSites and its
@@ -288,6 +290,7 @@ var slogNoRequestDirs = []string{
 	"authserver/internal/fake",
 	"authserver/internal/testutil/mailpit",
 	"cmd/goiabada-setup",
+	"core/healthcheck",
 }
 
 // slogPlainSite is one top-level function in a request-path package admitted to write a plain

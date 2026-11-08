@@ -5,10 +5,12 @@
 //	goiabada-authserver [flags] migrate [--db-* flags] to <version> step the schema to <version>
 //	goiabada-authserver [flags] recover [--db-* flags] --email <address> [flags]
 //	                                                       restore sign-in for one user (#498)
+//	goiabada-authserver healthcheck                        check the running server's /health (#808)
 //
 // Flags before `migrate` are the server's, and only the --db-* ones among them reach `migrate`;
 // after it, only the --db-* flags are accepted, and one given there overrides the same flag given
-// before. Any other first argument is refused.
+// before. `healthcheck` takes no flags or arguments, and reads its listener from the environment.
+// Any other first argument is refused.
 package main
 
 import (
@@ -37,6 +39,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/healthcheck"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/localzone"
 	"github.com/leodip/goiabada/core/logging"
@@ -51,6 +54,23 @@ func main() {
 // run is the process from its start to its stop, and answers the code main exits with, so what it
 // defers is done on every path out of it.
 func run() int {
+	// The health check is recognized before anything else, and does nothing else: it reads its
+	// listener's variables and asks /health, so no other setting, TZ included, can fail it, and a
+	// check every 10 seconds writes no startup records (#808 decisions 2 and 3).
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		return healthcheck.Run(healthcheckListeners, os.Args[2:], os.Stderr)
+	}
+	// Behind a flag or `--` it is refused here, as a word that names no command is: the command is
+	// found by the flag parse alone, which reads no variable and no file, so a TZ, a malformed
+	// setting or a log level the server cannot use does not answer for a misplaced command (#808
+	// decision 3). A command line whose flags do not parse is left to the configuration's parse.
+	if commandArgs, ok := config.CommandArgs(os.Args[1:]); ok {
+		if _, _, err := dispatch(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			return migrateExitUsage
+		}
+	}
+
 	// TZ is resolved again before anything else, so the first record is already in the zone the
 	// deployment chose. The zone database this binary embeds is reachable only from here: a
 	// dependency fixes the local zone during package initialization, before it registers, so on a
@@ -469,11 +489,27 @@ func logSessionKeysRefused(ctx context.Context, err error, bootstrapFile string)
 	}
 }
 
+// healthcheckListeners names the auth server's listener variables, and the defaults its
+// configuration gives them, for the healthcheck command.
+var healthcheckListeners = healthcheck.Listeners{
+	Command:          "goiabada-authserver",
+	HTTPHost:         "GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP",
+	HTTPPort:         "GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP",
+	HTTPSHost:        "GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS",
+	HTTPSPort:        "GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS",
+	CertFile:         "GOIABADA_AUTHSERVER_CERTFILE",
+	KeyFile:          "GOIABADA_AUTHSERVER_KEYFILE",
+	DefaultHost:      config.DefaultListenHost,
+	DefaultHTTPPort:  config.DefaultListenPortHttp,
+	DefaultHTTPSPort: config.DefaultListenPortHttps,
+}
+
 // dispatch chooses the command from the positional arguments the flag parse left: none serves,
 // a first `migrate` hands the rest to the schema subcommand, a first `recover` to the one that
 // restores sign-in for a user (#498), and anything else is refused, before a database is opened.
 // A typo such as `migrat to 44` used to start the server and migrate the database up, the
-// opposite of what was asked (#424).
+// opposite of what was asked (#424). `healthcheck` runs before the parse when it is the first
+// argument, so it arrives here only behind a flag or `--`, and is refused for taking none (#808).
 func dispatch(args []string) (rest []string, command string, err error) {
 	if len(args) == 0 {
 		return nil, "", nil
@@ -483,12 +519,15 @@ func dispatch(args []string) (rest []string, command string, err error) {
 		return args[1:], "migrate", nil
 	case "recover":
 		return args[1:], "recover", nil
+	case "healthcheck":
+		return nil, "", healthcheck.ArgumentsRefused("goiabada-authserver")
 	}
 	return nil, "", errs.Errorf("unknown command %q: run goiabada-authserver [flags] with no "+
 		"command to start the server, goiabada-authserver [flags] migrate version, or "+
-		"goiabada-authserver [flags] migrate to <version>, to manage the schema, or "+
+		"goiabada-authserver [flags] migrate to <version>, to manage the schema, "+
 		"goiabada-authserver [flags] recover --email <address> [flags], to restore sign-in for "+
-		"one user; the server's flags go before the command", args[0])
+		"one user, or goiabada-authserver healthcheck, alone, to check the running server's "+
+		"health; the server's flags go before the command", args[0])
 }
 
 // newSessionStore builds the auth server's browser session store over backend.

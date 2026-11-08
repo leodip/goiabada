@@ -26,12 +26,11 @@
 # mockery:        Mock generator version (devcontainer)
 # staticcheck:    Static analyzer (devcontainer, make check)
 # unparam:        Unused-parameter analyzer (devcontainer, make check)
-# govulncheck:    Vulnerability scanner (devcontainer)
-# alpine:         Base of the release images' final stage, as major.minor
-#                 (Dockerfile-authserver, Dockerfile-adminconsole)
-# trivy:          Image scanner, built from source in CI's Build validation, which
-#                 fails on a fixable HIGH or CRITICAL finding in the images' Alpine
-#                 packages, and in the weekly Image scan of the published images
+# govulncheck:    Vulnerability scanner (devcontainer, CI's Vulnerabilities job over the
+#                 source, Build validation's scan of the release images' binaries, and
+#                 the weekly Image scan of the published images)
+# trivy:          Image scanner, built from source in the weekly Image scan of the
+#                 published images
 # grype:          Image scanner, built from source in the weekly Image scan of the
 #                 published images, beside Trivy
 # npm-check-updates: Upgrades the npm projects' dependencies (version-manager.sh
@@ -47,13 +46,6 @@
 # is pinned to a pseudo-version and every upstream commit will show up as an
 # available update.
 #
-# alpine is pinned to a minor rather than a patch: the alpine:X.Y tag receives
-# Alpine's patch releases, security fixes included, at the next image build, so
-# only the six-monthly minor release is a bump made here, and
-# `./version-manager.sh check` reports it from alpinelinux.org. It replaced
-# alpine:latest, which moved the release images to a new minor with no change
-# on our side (#396).
-#
 # trivy is built from source, `go install .../cmd/trivy@v<pin>`, never downloaded
 # as a release binary or run from its action or image: Trivy's publishing was
 # compromised in March 2026 (a malicious v0.69.4 release, hijacked trivy-action
@@ -64,9 +56,11 @@
 # release only once GitHub has recorded it public for 3 days; the malicious
 # v0.69.4 was public for about 12 hours (#520).
 #
-# grype is pinned, built and suggested the same way. It runs only in the weekly
-# Image scan, so a second vulnerability database catches an advisory Trivy's is
-# late on; the build-time gate stays Trivy's alone (#520).
+# grype is pinned, built and suggested the same way. It runs in the weekly Image
+# scan beside Trivy, so a second vulnerability database catches an advisory
+# Trivy's is late on (#520). Neither gates a build: the images hold no operating
+# system package, and Build validation gates on govulncheck's scan of their
+# binaries (#808).
 #
 # npm-check-updates, cropperjs and acorn are suggested under the same 3 days,
 # counted from when the npm registry records the release published, and deps
@@ -80,7 +74,6 @@ tools:
   staticcheck: "0.8.2"
   unparam: "0.0.0-20261102141913-394cd0a56cd5"
   govulncheck: "1.9.0"
-  alpine: "3.24"
   trivy: "0.76.1"
   grype: "0.121.1"
   npm-check-updates: "23.1.1"

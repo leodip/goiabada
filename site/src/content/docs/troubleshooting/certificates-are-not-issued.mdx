@@ -58,7 +58,7 @@ So the usual causes are:
    `PROGRAMMED` should be `True`, and both host names should resolve to the `ADDRESS` it shows. Check what the cluster resolves too, since it can remember a name as missing after your machine finds it:
 
    ```bash
-   kubectl run dnscheck --rm -i --restart=Never --image=busybox -- nslookup auth.example.com
+   kubectl run dnscheck --rm -i --restart=Never --image=busybox:1.37 -- nslookup auth.example.com
    ```
 
 4. Under the `Local` traffic policy, check that Envoy runs a pod on every node:

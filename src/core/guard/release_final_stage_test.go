@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,68 +14,130 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The release images are built FROM scratch (#808): each holds its server's binary, the CA bundle
+// the servers' TLS reads, /tmp and, in the auth server's, the two folders it writes, and nothing an
+// image scanner could report or a compromised process could run. No Go test can build an image, so
+// this test holds the release Dockerfiles to the form that gives those contents, and the smoke test
+// CI runs on the built images to the same list of them, which it compares with each image's own.
+
 // releaseDockerfiles are the release images' Dockerfiles, relative to the source root.
 var releaseDockerfiles = []string{"build/Dockerfile-authserver", "build/Dockerfile-adminconsole"}
 
 // imageSmokeTest is the script CI runs on the images it builds, relative to the source root. It
-// holds the same list of packages in FINAL_STAGE_PACKAGES, which it compares with each image's
-// package database.
+// declares each image's contents in an array of its own, which it compares with what the image holds.
 const imageSmokeTest = "build/smoke-test-images.sh"
 
-// finalStagePackages is every Alpine package the release images' final stage holds, and the one
-// list of them (#520): the base layout, keys and release files, BusyBox for the shell and the wget
-// the healthchecks use, the CA bundle the servers' TLS reads, and musl. Sorted, as the package-set
-// check compares it with the package database's names through sort.
-var finalStagePackages = []string{
-	"alpine-baselayout", "alpine-baselayout-data", "alpine-keys", "alpine-release",
-	"busybox", "busybox-binsh", "ca-certificates-bundle", "musl",
+// releaseImage is one release image: its Dockerfile, the server whose binary it runs, the
+// instruction its build stage lays out the image's folders with, the smoke test's array declaring
+// its contents, and those contents, each "<mode> <uid>/<gid> <path>" as tar lists an export of it.
+type releaseImage struct {
+	dockerfile string
+	server     string
+	layout     string
+	smokeList  string
+	contents   []string
+}
+
+// releaseImages are the two images, and the one list of what each holds. /app and its binary are
+// root's and not writable by 10001, so the server cannot replace what the next start runs; /tmp is
+// world-writable and sticky, as on any Linux system; /data, where the wizard's Compose file mounts
+// the SQLite volume, and /bootstrap, where the legacy bootstrap file is written, are 10001's, since
+// Docker copies a mount point's ownership into an empty named volume.
+var releaseImages = []releaseImage{
+	{
+		dockerfile: "build/Dockerfile-authserver",
+		server:     "authserver",
+		layout: "RUN mkdir -p /app/rootfs/tmp /app/rootfs/data /app/rootfs/bootstrap && chmod 1777 /app/rootfs/tmp && " +
+			"chown 10001:10001 /app/rootfs/data /app/rootfs/bootstrap",
+		smokeList: "AUTHSERVER_CONTENTS",
+		contents: []string{
+			"drwxr-xr-x 0/0 app/",
+			"-rwxr-xr-x 0/0 app/goiabada-authserver",
+			"drwxr-xr-x 10001/10001 bootstrap/",
+			"drwxr-xr-x 10001/10001 data/",
+			"drwxr-xr-x 0/0 etc/",
+			"drwxr-xr-x 0/0 etc/ssl/",
+			"drwxr-xr-x 0/0 etc/ssl/certs/",
+			"-rw-r--r-- 0/0 etc/ssl/certs/ca-certificates.crt",
+			"drwxrwxrwt 0/0 tmp/",
+		},
+	},
+	{
+		dockerfile: "build/Dockerfile-adminconsole",
+		server:     "adminconsole",
+		layout:     "RUN mkdir -p /app/rootfs/tmp && chmod 1777 /app/rootfs/tmp",
+		smokeList:  "ADMINCONSOLE_CONTENTS",
+		contents: []string{
+			"drwxr-xr-x 0/0 app/",
+			"-rwxr-xr-x 0/0 app/goiabada-adminconsole",
+			"drwxr-xr-x 0/0 etc/",
+			"drwxr-xr-x 0/0 etc/ssl/",
+			"drwxr-xr-x 0/0 etc/ssl/certs/",
+			"-rw-r--r-- 0/0 etc/ssl/certs/ca-certificates.crt",
+			"drwxrwxrwt 0/0 tmp/",
+		},
+	},
 }
 
 const (
-	// stripCommand is the one instruction that leaves the final stage with finalStagePackages: it
-	// upgrades Alpine's packages, adds the CA bundle, which --purge would otherwise remove as an
-	// orphaned dependency of apk-tools, and deletes the package manager, the OpenSSL and zlib it
-	// links, and the helpers nothing runs.
-	stripCommand = "RUN apk upgrade --no-cache && apk add --no-cache ca-certificates-bundle && " +
-		"apk --no-cache --purge del apk-tools ssl_client scanelf musl-utils"
-	// smokeTestPackagesPrefix opens the smoke test's line declaring its list.
-	smokeTestPackagesPrefix = "FINAL_STAGE_PACKAGES=("
+	// caBundle is where the image holds the CA bundle, the path Go's crypto/x509 reads first on
+	// Linux and the one an operator's mount or SSL_CERT_FILE replaces.
+	caBundle = "/etc/ssl/certs/ca-certificates.crt"
+	// refreshCommand is the certificate refresh stage's one instruction: it upgrades the Go image's
+	// CA bundle from a freshly fetched index, and fails the build when it cannot fetch one.
+	refreshCommand = "RUN apk upgrade --no-cache ca-certificates-bundle"
+	// finalStageFrom opens the image's stage: an empty base, named final for the release builds'
+	// --no-cache-filter.
+	finalStageFrom = "FROM scratch AS final"
+	// imageUser is the image's user, numeric so a Kubernetes runAsNonRoot can verify it without a
+	// passwd file, which the image has none of.
+	imageUser = "USER 10001:10001"
 )
 
-// packageSetCheck is the instruction directly after the strip that fails each platform's build of
-// the final stage whose package database cannot be read, lists any package but finalStagePackages
-// or lacks one, or that has no CA bundle: the release builds amd64 and arm64 from one Dockerfile,
-// and the smoke test runs on CI's amd64 images alone.
-var packageSetCheck = `RUN [ -r /lib/apk/db/installed ] || { echo "unable to read the package database" >&2; exit 1; }; ` +
-	`packages="$(awk '/^P:/ { print substr($0, 3) }' /lib/apk/db/installed | sort | xargs)"; ` +
-	`expected="` + strings.Join(finalStagePackages, " ") + `"; ` +
-	`[ "$packages" = "$expected" ] || { echo "the final stage holds $packages, where it must hold exactly $expected" >&2; exit 1; }; ` +
-	`[ -f /etc/ssl/certs/ca-certificates.crt ] || { echo "the final stage has no /etc/ssl/certs/ca-certificates.crt" >&2; exit 1; }`
-
-// dockerInstruction is one instruction of a Dockerfile as Docker reads it: the text with its
-// continuation lines joined and the comment lines inside a continuation dropped.
-type dockerInstruction struct {
-	text string
+// finalStage is the image stage of server's Dockerfile, instruction by instruction after its FROM:
+// the folders the build stage laid out, the CA bundle from the refresh stage, the binary, and the
+// user, health check and entrypoint the image runs it with.
+func finalStage(server string) []string {
+	binary := "/app/goiabada-" + server
+	return []string{
+		"COPY --from=build /app/rootfs/ /",
+		"COPY --from=certs " + caBundle + " " + caBundle,
+		"COPY --from=build /app/bin/goiabada-" + server + " " + binary,
+		"WORKDIR /app",
+		imageUser,
+		imageHealthcheck(server),
+		`ENTRYPOINT ["` + binary + `"]`,
+	}
 }
 
-var (
-	// escapeDirective is the parser directive that changes the continuation character.
-	escapeDirective = regexp.MustCompile(`(?i)^#\s*escape\s*=`)
-	// checkedList is the list an altered package-set check compares the package database with.
-	checkedList = regexp.MustCompile(`expected="([^"]*)"`)
-)
+// imageHealthcheck is the health check each image declares (#808): its server's own healthcheck
+// command, with the timings the wizard's Compose file gives the auth server.
+func imageHealthcheck(server string) string {
+	return `HEALTHCHECK --interval=10s --timeout=5s --start-period=300s --retries=3 CMD ["/app/goiabada-` + server + `", "healthcheck"]`
+}
+
+// dockerInstruction is one instruction of a Dockerfile as Docker reads it: the text with its
+// continuation lines joined and the comment lines inside a continuation dropped, and the line it
+// begins on.
+type dockerInstruction struct {
+	text string
+	line int
+}
+
+// escapeDirective is the parser directive that changes the continuation character.
+var escapeDirective = regexp.MustCompile(`(?i)^#\s*escape\s*=`)
 
 // dockerInstructions splits a Dockerfile into its instructions as Docker does without heredocs and
 // with the default escape character: a line ending in a backslash continues the instruction, and a
 // comment line or an empty line inside a continuation is dropped. What it cannot read as Docker
 // does, a heredoc or an escape directive, it reports as unparseable rather than guess at: BuildKit
 // keeps a heredoc's terminator untrimmed and an escape directive can turn a backtick into the
-// continuation, and either can make an "apk" line read as an instruction here while Docker reads
-// it as file content or an argument (#542).
+// continuation, and either can make a line read as an instruction here while Docker reads it as
+// file content or an argument (#542).
 func dockerInstructions(src string) ([]dockerInstruction, string) {
 	var out []dockerInstruction
 	continuing := false
-	for _, raw := range strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n") {
+	for n, raw := range strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n") {
 		trimmed := strings.TrimSpace(raw)
 		if strings.HasPrefix(trimmed, "#") && escapeDirective.MatchString(trimmed) {
 			return nil, "sets the escape directive"
@@ -89,7 +152,7 @@ func dockerInstructions(src string) ([]dockerInstruction, string) {
 		case trimmed == "" || strings.HasPrefix(trimmed, "#"):
 			continue
 		default:
-			out = append(out, dockerInstruction{text: strings.TrimSpace(strings.TrimSuffix(trimmed, "\\"))})
+			out = append(out, dockerInstruction{text: strings.TrimSpace(strings.TrimSuffix(trimmed, "\\")), line: n + 1})
 		}
 		continuing = strings.HasSuffix(trimmed, "\\")
 		// Any "<<" is refused, a heredoc of whatever delimiter BuildKit accepts, digits included,
@@ -101,360 +164,573 @@ func dockerInstructions(src string) ([]dockerInstruction, string) {
 	return out, ""
 }
 
-// finalStageFindings is every way the release Dockerfiles under root, and the smoke test beside
-// them, disagree with the final stage #520 holds them to: the strip, then directly the package-set
-// check, both in the final stage, and finalStagePackages the one list of what it keeps. It reads
-// instructions as Docker does, so what counts is an instruction of the final stage, not a line that
-// looks like one.
-func finalStageFindings(root string) ([]string, error) {
-	var findings []string
-	smokeList, err := smokeTestPackages(filepath.Join(root, imageSmokeTest))
-	if err != nil {
-		return nil, err
+// dockerStage is one stage of a Dockerfile: its FROM, the name it is given after AS, lowercased as
+// Docker compares it, the image it starts from, and its instructions after the FROM.
+type dockerStage struct {
+	from         dockerInstruction
+	name, image  string
+	instructions []dockerInstruction
+}
+
+// dockerStages splits a Dockerfile's instructions into stages, each opened by a FROM. Each
+// instruction's text is normalized: its words single-spaced and its keyword upper-cased, as Docker
+// reads keywords in any case.
+func dockerStages(instructions []dockerInstruction) []dockerStage {
+	var stages []dockerStage
+	for _, in := range instructions {
+		fields := strings.Fields(in.text)
+		fields[0] = strings.ToUpper(fields[0])
+		in.text = strings.Join(fields, " ")
+		if fields[0] != "FROM" {
+			if len(stages) > 0 {
+				stages[len(stages)-1].instructions = append(stages[len(stages)-1].instructions, in)
+			}
+			continue
+		}
+		st := dockerStage{from: in}
+		for i := 1; i < len(fields); i++ {
+			switch {
+			case strings.HasPrefix(fields[i], "--"):
+			case strings.EqualFold(fields[i], "AS") && i+1 < len(fields):
+				st.name = strings.ToLower(fields[i+1])
+				i++
+			case st.image == "":
+				st.image = fields[i]
+			}
+		}
+		stages = append(stages, st)
 	}
-	switch {
-	case smokeList == nil:
-		findings = append(findings, imageSmokeTest+" declares no "+smokeTestPackagesPrefix+"...) line, so it "+
-			"cannot hold CI's images to the packages the Dockerfiles keep: it must list exactly "+strings.Join(finalStagePackages, " "))
-	case !slices.Equal(smokeList, finalStagePackages):
-		findings = append(findings, imageSmokeTest+" lists "+strings.Join(smokeList, " ")+", where the release "+
-			"Dockerfiles keep exactly "+strings.Join(finalStagePackages, " ")+": the list is one, the same in both "+
-			"Dockerfiles and the smoke test")
+	return stages
+}
+
+// stageNamed returns the stage the Dockerfile names name, or nil.
+func stageNamed(stages []dockerStage, name string) *dockerStage {
+	for i := range stages {
+		if stages[i].name == name {
+			return &stages[i]
+		}
+	}
+	return nil
+}
+
+// keyword is an instruction's first word, upper-cased by dockerStages.
+func keyword(in dockerInstruction) string {
+	k, _, _ := strings.Cut(in.text, " ")
+	return k
+}
+
+// finalStageFindings is every way the release Dockerfiles under root, and the smoke test beside
+// them, disagree with the scratch image #808 holds them to: the last stage FROM scratch AS final
+// holding exactly finalStage's instructions, the CA bundle copied from a refresh stage named certs
+// on the builder's platform, the folders laid out in the build stage, and the smoke test declaring
+// each image's contents as releaseImages lists them. It reads instructions as Docker does, so what
+// counts is an instruction of a stage, not a line that looks like one.
+func finalStageFindings(root string, images []releaseImage) ([]string, error) {
+	smoke, err := os.ReadFile(filepath.Join(root, imageSmokeTest))
+	if err != nil {
+		return nil, errs.Wrapf(err, "reading %s", imageSmokeTest)
+	}
+	var findings []string
+	for _, img := range images {
+		findings = append(findings, smokeListFindings(string(smoke), img)...)
 	}
 
-	for _, rel := range releaseDockerfiles {
-		src, err := os.ReadFile(filepath.Join(root, rel))
+	for _, img := range images {
+		src, err := os.ReadFile(filepath.Join(root, img.dockerfile))
 		if err != nil {
-			return nil, errs.Wrapf(err, "reading %s", rel)
+			return nil, errs.Wrapf(err, "reading %s", img.dockerfile)
 		}
 		instructions, unparseable := dockerInstructions(string(src))
 		if unparseable != "" {
-			findings = append(findings, rel+" "+unparseable+", which this test does not parse the way Docker does, "+
-				"so it cannot tell whether the final stage really strips its packages: write the release Dockerfiles without it")
+			findings = append(findings, img.dockerfile+" "+unparseable+", which this test does not parse the way Docker does, "+
+				"so it cannot tell what the image holds: write the release Dockerfiles without it")
 			continue
 		}
-		finalFrom := -1
-		for i, in := range instructions {
-			if strings.HasPrefix(strings.ToUpper(in.text), "FROM ") {
-				finalFrom = i
-			}
+		stages := dockerStages(instructions)
+		if len(stages) == 0 {
+			return nil, errs.Errorf("%s has no FROM instruction", img.dockerfile)
 		}
-		if finalFrom < 0 {
-			return nil, errs.Errorf("%s has no FROM instruction", rel)
-		}
-		var apkRuns, checks, alteredChecks []int
-		strippedBuildStage := false
-		for i, in := range instructions {
-			switch {
-			case in.text == packageSetCheck:
-				checks = append(checks, i)
-			case strings.Contains(in.text, "/lib/apk/db/installed"):
-				alteredChecks = append(alteredChecks, i)
-			case strings.Contains(in.text, "apk "):
-				if i > finalFrom {
-					apkRuns = append(apkRuns, i)
-				} else if in.text == stripCommand {
-					strippedBuildStage = true
-				}
-			}
-		}
-
-		// The strip: exactly one apk instruction in the final stage, and that one exactly stripCommand.
-		strip := -1
-		switch {
-		case len(apkRuns) == 0 && strippedBuildStage:
-			findings = append(findings, rel+" strips a build stage, which never reaches the image: move "+
-				stripCommand+" to the final stage")
-		case len(apkRuns) == 0:
-			findings = append(findings, rel+" does not strip its final stage: it must run "+stripCommand)
-		case len(apkRuns) > 1:
-			findings = append(findings, rel+" runs apk in more than one instruction of its final stage, where the "+
-				"strip must be the only one: "+stripCommand)
-		default:
-			strip = apkRuns[0]
-			if text := instructions[strip].text; text != stripCommand {
-				findings = append(findings, rel+" "+stripDiagnosis(text)+": the instruction must be exactly "+stripCommand)
-			}
-		}
-
-		// The package-set check: exactly once, in the final stage, directly after the strip.
-		switch {
-		case len(checks) == 0 && len(alteredChecks) > 0:
-			if m := checkedList.FindStringSubmatch(instructions[alteredChecks[0]].text); m != nil &&
-				!slices.Equal(strings.Fields(m[1]), finalStagePackages) {
-				findings = append(findings, rel+"'s package-set check lists "+m[1]+", where the final stage keeps "+
-					"exactly "+strings.Join(finalStagePackages, " ")+": the list is one, the same in both "+
-					"Dockerfiles and the smoke test")
-			} else {
-				findings = append(findings, rel+" runs an altered package-set check: it must be exactly the "+
-					"instruction packageSetCheck names")
-			}
-		case len(checks) == 0:
-			findings = append(findings, rel+" does not check its package set and CA bundle in its final stage: it "+
-				"must run the check packageSetCheck names, which fails each platform's build that holds any other "+
-				"package or no CA bundle")
-		case len(checks) > 1:
-			findings = append(findings, rel+" checks its package set more than once: keep the one in the final stage")
-		case checks[0] < finalFrom:
-			findings = append(findings, rel+" checks its package set in a build stage, which never reaches the image: "+
-				"move the check to the final stage")
-		case strip >= 0 && checks[0] != strip+1:
-			findings = append(findings, rel+" does not check its package set directly after the strip, where the "+
-				"check sees what the strip left")
-		}
+		findings = append(findings, imageStageFindings(img, stages[len(stages)-1])...)
+		findings = append(findings, refreshStageFindings(img.dockerfile, stages)...)
+		findings = append(findings, layoutFindings(img, stages)...)
 	}
 	return findings, nil
 }
 
-// stripDiagnosis says how an apk instruction differs from stripCommand, as precisely as its shape
-// allows: the CA bundle not added before the delete, a package added beside it, a package left
-// undeleted or deleted beyond the four.
-func stripDiagnosis(text string) string {
-	steps := strings.Split(strings.TrimPrefix(text, "RUN "), "&&")
-	for i := range steps {
-		steps[i] = strings.TrimSpace(steps[i])
+// imageStageFindings holds the last stage, the image, to FROM scratch AS final and exactly
+// finalStage's instructions after it.
+func imageStageFindings(img releaseImage, last dockerStage) []string {
+	rel := img.dockerfile
+	if !strings.EqualFold(last.from.text, finalStageFrom) {
+		return []string{fmt.Sprintf("%s's last stage, the image, is %s, where it must be %s: an empty base, "+
+			"named final for the release builds' --no-cache-filter", rel, last.from.text, finalStageFrom)}
 	}
-	if steps[0] != "apk upgrade --no-cache" {
-		return "runs " + text
-	}
-	added, deleted := "", ""
-	addAt, deleteAt := -1, -1
-	for i, step := range steps {
-		if rest, ok := strings.CutPrefix(step, "apk add --no-cache "); ok && addAt < 0 {
-			added, addAt = rest, i
+	var findings []string
+	want := finalStage(img.server)
+	left := slices.Clone(want)
+	seen := map[string]int{}
+	bundleReported := false
+	for _, in := range last.instructions {
+		k := keyword(in)
+		seen[k]++
+		if i := slices.Index(left, in.text); i >= 0 {
+			left = slices.Delete(left, i, i+1)
+			continue
 		}
-		if rest, ok := strings.CutPrefix(step, "apk --no-cache --purge del "); ok && deleteAt < 0 {
-			deleted, deleteAt = rest, i
-		}
-	}
-	if deleteAt >= 0 && (addAt < 0 || addAt > deleteAt || !slices.Contains(strings.Fields(added), "ca-certificates-bundle")) {
-		return "does not add ca-certificates-bundle before the delete, so --purge removes the CA bundle the servers' TLS reads"
-	}
-	if len(steps) != 3 || addAt != 1 || deleteAt != 2 {
-		return "runs " + text
-	}
-	if extra := slices.DeleteFunc(strings.Fields(added), func(p string) bool { return p == "ca-certificates-bundle" }); len(extra) > 0 {
-		return "adds " + strings.Join(extra, " ") + ", which the final stage must not hold"
-	}
-	want := []string{"apk-tools", "ssl_client", "scanelf", "musl-utils"}
-	var left, beyond []string
-	for _, p := range want {
-		if !slices.Contains(strings.Fields(deleted), p) {
-			left = append(left, p)
-		}
-	}
-	for _, p := range strings.Fields(deleted) {
-		if !slices.Contains(want, p) {
-			beyond = append(beyond, p)
+		switch {
+		case k == "RUN":
+			findings = append(findings, fmt.Sprintf("%s:%d runs %s in its final stage, where nothing can run it: the image "+
+				"holds no shell or other program but the server, so do that work in an earlier stage and COPY its result in",
+				rel, in.line, in.text))
+		case k == "USER":
+			findings = append(findings, fmt.Sprintf("%s:%d sets %s, where the image must run as %s, the numeric ids a "+
+				"Kubernetes runAsNonRoot can verify without a passwd file", rel, in.line, in.text, imageUser))
+		case k == "HEALTHCHECK":
+			findings = append(findings, fmt.Sprintf("%s:%d declares %s, where it must declare exactly %s", rel, in.line,
+				in.text, imageHealthcheck(img.server)))
+		case k == "COPY" && strings.Contains(in.text, "ca-certificates.crt"):
+			bundleReported = true
+			findings = append(findings, fmt.Sprintf("%s:%d copies the CA bundle with %s, where it must copy it from the "+
+				"refresh stage, which every release build reruns: %s", rel, in.line, in.text, want[1]))
+		default:
+			findings = append(findings, fmt.Sprintf("%s:%d holds %s in its final stage, which is not part of the image: "+
+				"the stage holds exactly %s", rel, in.line, in.text, strings.Join(want, "; ")))
 		}
 	}
-	switch {
-	case len(left) > 0:
-		return "leaves " + strings.Join(left, " ") + " installed"
-	case len(beyond) > 0:
-		return "also deletes " + strings.Join(beyond, " ")
+	for _, missing := range left {
+		switch k, _, _ := strings.Cut(missing, " "); {
+		case k == "USER" && seen[k] == 0:
+			findings = append(findings, fmt.Sprintf("%s sets no USER in its final stage, so the server would run as root: "+
+				"it must set %s", rel, imageUser))
+		case k == "HEALTHCHECK" && seen[k] == 0:
+			findings = append(findings, fmt.Sprintf("%s declares no HEALTHCHECK in its final stage: it must declare %s",
+				rel, imageHealthcheck(img.server)))
+		case k == "USER" || k == "HEALTHCHECK" || missing == want[1] && bundleReported:
+			// Already reported as the instruction that stands in its place.
+		default:
+			findings = append(findings, fmt.Sprintf("%s's final stage lacks %s", rel, missing))
+		}
 	}
-	return "runs " + text
+	return findings
 }
 
-// smokeTestPackages reads the list the smoke test declares, nil when it declares none.
-func smokeTestPackages(path string) ([]string, error) {
-	src, err := os.ReadFile(path)
-	if err != nil {
-		return nil, errs.Wrapf(err, "reading %s", path)
+// refreshStageFindings holds the Dockerfile to a certificate refresh stage named certs, on the
+// builder's platform and from the build stage's own Go image, running refreshCommand alone.
+func refreshStageFindings(rel string, stages []dockerStage) []string {
+	build := stageNamed(stages, "build")
+	if build == nil {
+		return []string{rel + " has no stage named build, whose image the certificate refresh stage starts from"}
 	}
-	for _, line := range strings.Split(strings.ReplaceAll(string(src), "\r\n", "\n"), "\n") {
-		if list, ok := strings.CutPrefix(line, smokeTestPackagesPrefix); ok {
-			if list, ok = strings.CutSuffix(strings.TrimRight(list, " \t"), ")"); ok {
-				return strings.Fields(list), nil
+	from := "FROM --platform=$BUILDPLATFORM " + build.image + " AS certs"
+	certs := stageNamed(stages, "certs")
+	if certs == nil {
+		return []string{fmt.Sprintf("%s has no certificate refresh stage, %s then %s, for the image to copy its CA "+
+			"bundle from", rel, from, refreshCommand)}
+	}
+	var findings []string
+	if !strings.EqualFold(certs.from.text, from) {
+		findings = append(findings, fmt.Sprintf("%s:%d opens its refresh stage with %s, where it must be %s: on the "+
+			"builder's platform, since the bundle is the same on every one, and from the build stage's image",
+			rel, certs.from.line, certs.from.text, from))
+	}
+	var body []string
+	for _, in := range certs.instructions {
+		body = append(body, in.text)
+	}
+	if !slices.Equal(body, []string{refreshCommand}) {
+		findings = append(findings, fmt.Sprintf("%s:%d's refresh stage runs %s, where it must run exactly %s and nothing "+
+			"else", rel, certs.from.line, strings.Join(body, "; "), refreshCommand))
+	}
+	return findings
+}
+
+// layoutFindings holds the build stage to laying out the image's folders, once, with the
+// instruction releaseImages gives the image, which the final stage copies whole.
+func layoutFindings(img releaseImage, stages []dockerStage) []string {
+	build := stageNamed(stages, "build")
+	if build == nil {
+		return nil // refreshStageFindings reports it
+	}
+	n := 0
+	for _, in := range build.instructions {
+		if in.text == img.layout {
+			n++
+		}
+	}
+	switch n {
+	case 0:
+		return []string{fmt.Sprintf("%s's build stage does not lay out the image's folders with %s", img.dockerfile, img.layout)}
+	case 1:
+		return nil
+	}
+	return []string{fmt.Sprintf("%s's build stage lays out the image's folders more than once", img.dockerfile)}
+}
+
+// smokeListFindings holds the smoke test's array for img to img's contents, in any order.
+func smokeListFindings(smoke string, img releaseImage) []string {
+	got, ok := smokeTestList(smoke, img.smokeList)
+	if !ok {
+		return []string{fmt.Sprintf("%s declares no %s=( ... ) array, so it cannot hold CI's %s image to its contents: "+
+			"it must list exactly %s", imageSmokeTest, img.smokeList, img.server, strings.Join(img.contents, ", "))}
+	}
+	var extra, missing []string
+	for _, e := range got {
+		if !slices.Contains(img.contents, e) {
+			extra = append(extra, e)
+		}
+	}
+	for _, e := range img.contents {
+		if !slices.Contains(got, e) {
+			missing = append(missing, e)
+		}
+	}
+	var findings []string
+	if len(extra) > 0 {
+		findings = append(findings, fmt.Sprintf("%s's %s lists %s, which the %s image does not hold", imageSmokeTest,
+			img.smokeList, strings.Join(extra, ", "), img.server))
+	}
+	if len(missing) > 0 {
+		findings = append(findings, fmt.Sprintf("%s's %s lacks %s, which the %s image holds", imageSmokeTest,
+			img.smokeList, strings.Join(missing, ", "), img.server))
+	}
+	return findings
+}
+
+// smokeArrayEntry is one double-quoted entry of a smoke test array.
+var smokeArrayEntry = regexp.MustCompile(`"([^"]*)"`)
+
+// smokeTestList reads the array the smoke test assigns name, over as many lines as it runs: its
+// double-quoted entries up to the closing parenthesis. ok is false when it assigns none.
+func smokeTestList(src, name string) ([]string, bool) {
+	src = strings.ReplaceAll(src, "\r\n", "\n")
+	offset := 0
+	for _, line := range strings.SplitAfter(src, "\n") {
+		if strings.HasPrefix(line, name+"=(") {
+			body := src[offset+len(name)+2:]
+			end := strings.IndexByte(body, ')')
+			if end < 0 {
+				return nil, false
 			}
+			var out []string
+			for _, m := range smokeArrayEntry.FindAllStringSubmatch(body[:end], -1) {
+				out = append(out, m[1])
+			}
+			return out, true
 		}
+		offset += len(line)
 	}
-	return nil, nil
+	return nil, false
 }
 
-func TestReleaseDockerfiles_TheFinalStageHoldsTheEightPackages(t *testing.T) {
-	findings, err := finalStageFindings(SourceRoot(t))
+func TestReleaseDockerfiles_TheImagesAreScratch(t *testing.T) {
+	findings, err := finalStageFindings(SourceRoot(t), releaseImages)
 	require.NoError(t, err)
 	for _, f := range findings {
 		t.Error(f)
 	}
 }
 
-// The finder over fixture trees, one case per way a final stage can be wrong, and the ways it is
-// right. joined is what each case's findings say, together, since several can come from one mistake.
+// The finder over fixture trees, one case per way a release Dockerfile or the smoke test can be
+// wrong, and the ways they are right. The fixture image is "one", its Dockerfile and contents
+// written out here rather than taken from releaseImages.
 func TestFinalStageFindings(t *testing.T) {
-	const build = "FROM golang:1.27.3-alpine AS build\nRUN go build ./...\n\n"
-	const final = "FROM alpine:3.24 AS final\nWORKDIR /app\n"
-	// The strip and the check as the release Dockerfiles write them, over several lines each.
-	const strip = "RUN apk upgrade --no-cache \\\n" +
-		"    && apk add --no-cache ca-certificates-bundle \\\n" +
-		"    && apk --no-cache --purge del apk-tools ssl_client scanelf musl-utils\n"
-	const check = `RUN [ -r /lib/apk/db/installed ] || { echo "unable to read the package database" >&2; exit 1; }; \` + "\n" +
-		`    packages="$(awk '/^P:/ { print substr($0, 3) }' /lib/apk/db/installed | sort | xargs)"; \` + "\n" +
-		`    expected="alpine-baselayout alpine-baselayout-data alpine-keys alpine-release busybox busybox-binsh ca-certificates-bundle musl"; \` + "\n" +
-		`    [ "$packages" = "$expected" ] || { echo "the final stage holds $packages, where it must hold exactly $expected" >&2; exit 1; }; \` + "\n" +
-		`    [ -f /etc/ssl/certs/ca-certificates.crt ] || { echo "the final stage has no /etc/ssl/certs/ca-certificates.crt" >&2; exit 1; }` + "\n"
-	const user = "RUN addgroup -S -g 10001 goiabada\nUSER 10001:10001\n"
-	const smoke = "#!/bin/bash\nFINAL_STAGE_PACKAGES=(alpine-baselayout alpine-baselayout-data alpine-keys alpine-release " +
-		"busybox busybox-binsh ca-certificates-bundle musl)\n"
-	tree := func(t *testing.T, dockerfile, smokeTest string) string {
+	const rel = "build/Dockerfile-one"
+	one := releaseImage{
+		dockerfile: rel,
+		server:     "one",
+		layout:     "RUN mkdir -p /app/rootfs/tmp && chmod 1777 /app/rootfs/tmp",
+		smokeList:  "ONE_CONTENTS",
+		contents:   []string{"drwxr-xr-x 0/0 app/", "-rwxr-xr-x 0/0 app/goiabada-one", "drwxrwxrwt 0/0 tmp/"},
+	}
+	const dockerfile = "FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS build\n" +
+		"RUN mkdir -p /app/rootfs/tmp \\\n" +
+		"    && chmod 1777 /app/rootfs/tmp\n" +
+		"RUN CGO_ENABLED=0 go build -o /app/bin/goiabada-one ./cmd/one\n" +
+		"\n" +
+		"FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs\n" +
+		"RUN apk upgrade --no-cache ca-certificates-bundle\n" +
+		"\n" +
+		"FROM scratch AS final\n" +
+		"COPY --from=build /app/rootfs/ /\n" +
+		"COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt\n" +
+		"COPY --from=build /app/bin/goiabada-one /app/goiabada-one\n" +
+		"WORKDIR /app\n" +
+		"USER 10001:10001\n" +
+		`HEALTHCHECK --interval=10s --timeout=5s --start-period=300s --retries=3 CMD ["/app/goiabada-one", "healthcheck"]` + "\n" +
+		`ENTRYPOINT ["/app/goiabada-one"]` + "\n"
+	const smoke = "#!/bin/bash\nONE_CONTENTS=(\n" +
+		"    \"drwxr-xr-x 0/0 app/\"\n" +
+		"    \"-rwxr-xr-x 0/0 app/goiabada-one\"\n" +
+		"    \"drwxrwxrwt 0/0 tmp/\"\n" +
+		")\nOTHER=(\"x\")\n"
+	findingsOf := func(t *testing.T, dockerfileSrc, smokeSrc string) []string {
 		t.Helper()
 		root := t.TempDir()
-		writeFixture(t, root, imageSmokeTest, smokeTest)
-		for _, rel := range releaseDockerfiles {
-			writeFixture(t, root, rel, dockerfile)
-		}
-		return root
-	}
-	joinedWith := func(t *testing.T, dockerfile, smokeTest string) string {
-		t.Helper()
-		got, err := finalStageFindings(tree(t, dockerfile, smokeTest))
+		writeFixture(t, root, imageSmokeTest, smokeSrc)
+		writeFixture(t, root, rel, dockerfileSrc)
+		got, err := finalStageFindings(root, []releaseImage{one})
 		require.NoError(t, err)
-		return strings.Join(got, "\n")
+		return got
 	}
-	joined := func(t *testing.T, dockerfile string) string {
-		t.Helper()
-		return joinedWith(t, dockerfile, smoke)
+	edit := func(old, replacement string) string {
+		require.Equal(t, 1, strings.Count(dockerfile, old), old)
+		return strings.Replace(dockerfile, old, replacement, 1)
 	}
-	// replaced is the strip with one of its packages' text replaced, to alter one step of it.
-	replaced := func(old, with string) string { return strings.Replace(strip, old, with, 1) }
 
-	t.Run("the strip and its check in the final stage", func(t *testing.T) {
-		assert.Empty(t, joined(t, build+final+strip+check+user))
-	})
-	t.Run("the strip and its check each on one line", func(t *testing.T) {
-		assert.Empty(t, joined(t, build+final+stripCommand+"\n"+packageSetCheck+"\n"+user))
-	})
-	t.Run("the same, written with CRLF line endings", func(t *testing.T) {
-		assert.Empty(t, joinedWith(t, strings.ReplaceAll(build+final+strip+check+user, "\n", "\r\n"),
-			strings.ReplaceAll(smoke, "\n", "\r\n")))
-	})
-	t.Run("a lowercase from opening the final stage", func(t *testing.T) {
-		assert.Empty(t, joined(t, build+"from alpine:3.24 as final\n"+strip+check+user))
-	})
-	t.Run("a stock final stage, with neither", func(t *testing.T) {
-		got := joined(t, build+final+user)
-		assert.Contains(t, got, "does not strip its final stage")
-		assert.Contains(t, got, "does not check its package set and CA bundle")
-	})
-	t.Run("#542's upgrade and zlib check in place of both", func(t *testing.T) {
-		got := joined(t, build+final+"RUN apk upgrade --no-cache\n"+
-			`RUN zlib="$(awk '/^P:/ { n++ }' /lib/apk/db/installed)"`+"\n"+user)
-		assert.Contains(t, got, "runs RUN apk upgrade --no-cache: the instruction must be exactly")
-		assert.Contains(t, got, "runs an altered package-set check")
-	})
-	t.Run("the strip without its check", func(t *testing.T) {
-		assert.Contains(t, joined(t, build+final+strip+user), "does not check its package set and CA bundle")
-	})
-	t.Run("the check without the strip", func(t *testing.T) {
-		assert.Contains(t, joined(t, build+final+check+user), "does not strip its final stage")
-	})
-	t.Run("the upgrade gone from the strip", func(t *testing.T) {
-		got := joined(t, build+final+replaced("apk upgrade --no-cache \\\n    && ", "")+check+user)
-		assert.Contains(t, got, "runs RUN apk add --no-cache ca-certificates-bundle")
-	})
-	t.Run("the CA bundle not added", func(t *testing.T) {
-		got := joined(t, build+final+replaced("    && apk add --no-cache ca-certificates-bundle \\\n", "")+check+user)
-		assert.Contains(t, got, "does not add ca-certificates-bundle before the delete")
-	})
-	t.Run("the CA bundle added after the delete", func(t *testing.T) {
-		const late = "RUN apk upgrade --no-cache \\\n" +
-			"    && apk --no-cache --purge del apk-tools ssl_client scanelf musl-utils \\\n" +
-			"    && apk add --no-cache ca-certificates-bundle\n"
-		assert.Contains(t, joined(t, build+final+late+check+user), "does not add ca-certificates-bundle before the delete")
-	})
-	t.Run("a package added beside the CA bundle", func(t *testing.T) {
-		got := joined(t, build+final+replaced("ca-certificates-bundle", "ca-certificates-bundle curl")+check+user)
-		assert.Contains(t, got, "adds curl, which the final stage must not hold")
-	})
-	t.Run("a package left undeleted", func(t *testing.T) {
-		got := joined(t, build+final+replaced(" ssl_client", "")+check+user)
-		assert.Contains(t, got, "leaves ssl_client installed")
-	})
-	t.Run("a package deleted beyond the four", func(t *testing.T) {
-		got := joined(t, build+final+replaced("musl-utils", "musl-utils busybox")+check+user)
-		assert.Contains(t, got, "also deletes busybox")
-	})
-	t.Run("the delete without --purge", func(t *testing.T) {
-		got := joined(t, build+final+replaced("--purge ", "")+check+user)
-		assert.Contains(t, got, "the instruction must be exactly "+stripCommand)
-	})
-	t.Run("a package added in another instruction", func(t *testing.T) {
-		got := joined(t, build+final+"RUN apk add --no-cache curl\n"+strip+check+user)
-		assert.Contains(t, got, "runs apk in more than one instruction of its final stage")
-	})
-	t.Run("the strip twice", func(t *testing.T) {
-		assert.Contains(t, joined(t, build+final+strip+check+strip+user), "more than one instruction")
-	})
-	t.Run("the strip and its check in a build stage only", func(t *testing.T) {
-		got := joined(t, "FROM golang:1.27.3-alpine AS build\n"+strip+check+final+user)
-		assert.Contains(t, got, "strips a build stage")
-		assert.Contains(t, got, "checks its package set in a build stage")
-	})
-	t.Run("the check not directly after the strip", func(t *testing.T) {
-		assert.Contains(t, joined(t, build+final+strip+"WORKDIR /x\n"+check+user), "directly after the strip")
-	})
-	t.Run("the check before the strip", func(t *testing.T) {
-		assert.Contains(t, joined(t, build+final+check+strip+user), "directly after the strip")
-	})
-	t.Run("the check twice", func(t *testing.T) {
-		assert.Contains(t, joined(t, build+final+strip+check+check+user), "more than once")
-	})
-	t.Run("the check altered", func(t *testing.T) {
-		altered := strings.Replace(check, "[ -f /etc/ssl/certs/ca-certificates.crt ]", "true", 1)
-		assert.Contains(t, joined(t, build+final+strip+altered+user), "runs an altered package-set check")
-	})
-	t.Run("the check's list with a ninth package", func(t *testing.T) {
-		altered := strings.Replace(check, " musl\"", " musl zlib\"", 1)
-		got := joined(t, build+final+strip+altered+user)
-		assert.Contains(t, got, "package-set check lists alpine-baselayout alpine-baselayout-data alpine-keys "+
-			"alpine-release busybox busybox-binsh ca-certificates-bundle musl zlib")
-	})
-	t.Run("the smoke test's list differing from the Dockerfiles'", func(t *testing.T) {
-		got := joinedWith(t, build+final+strip+check+user, strings.Replace(smoke, " musl)", ")", 1))
-		assert.Contains(t, got, imageSmokeTest+" lists alpine-baselayout alpine-baselayout-data alpine-keys "+
-			"alpine-release busybox busybox-binsh ca-certificates-bundle, where")
-	})
-	t.Run("the smoke test declaring no list", func(t *testing.T) {
-		got := joinedWith(t, build+final+strip+check+user, "#!/bin/bash\n")
-		assert.Contains(t, got, imageSmokeTest+" declares no FINAL_STAGE_PACKAGES=(...) line")
-	})
-	t.Run("the strip absorbed by a continuation", func(t *testing.T) {
-		got := joined(t, build+final+"RUN echo safe \\\n"+strip+check+user)
-		assert.Contains(t, got, "runs RUN echo safe RUN apk upgrade",
-			"Docker reads the strip as arguments to echo")
-	})
-	t.Run("the strip as a heredoc's content", func(t *testing.T) {
-		assert.Contains(t, joined(t, build+final+"COPY <<EOF /tmp/note\n"+strip+"EOF\n"+check+user),
-			"uses a heredoc")
-	})
-	t.Run("the strip as the content of a heredoc with a numeric delimiter", func(t *testing.T) {
-		assert.Contains(t, joined(t, build+final+"COPY <<1 /tmp/note\n"+strip+"1\n"+check+user),
-			"uses a heredoc")
-	})
-	t.Run("the strip after a terminator BuildKit doesn't recognize", func(t *testing.T) {
-		// "EOF " with a trailing space does not close the heredoc for BuildKit, so the strip after it
-		// is still the file's content.
-		assert.Contains(t, joined(t, build+final+"COPY <<EOF /tmp/note\nEOF \n"+strip+"EOF\n"+check+user),
-			"uses a heredoc")
-	})
-	t.Run("any heredoc, with the real strip after it", func(t *testing.T) {
-		assert.Contains(t, joined(t, build+final+"COPY <<EOF /tmp/note\nnote\nEOF\n"+strip+check+user),
-			"uses a heredoc", "a heredoc is refused outright rather than parsed")
-	})
-	t.Run("the escape directive turning a backtick into the continuation", func(t *testing.T) {
-		assert.Contains(t, joined(t, "# escape=`\n"+build+final+"RUN echo safe `\n"+strip+check+user),
-			"sets the escape directive")
-	})
-	t.Run("a tree it cannot read", func(t *testing.T) {
-		_, err := finalStageFindings(t.TempDir())
-		require.Error(t, err)
-	})
-	t.Run("a smoke test but no Dockerfiles", func(t *testing.T) {
+	cases := []struct {
+		name       string
+		dockerfile string
+		smoke      string
+		want       []string
+	}{
+		{"the scratch form passes", dockerfile, smoke, nil},
+		{
+			"CRLF line endings, lowercase keywords and extra spacing pass",
+			strings.ReplaceAll(strings.NewReplacer(
+				"FROM scratch AS final", "from scratch as final",
+				"USER 10001:10001", "user   10001:10001",
+				"FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs", "from --platform=$BUILDPLATFORM golang:1.27.3-alpine as certs",
+			).Replace(dockerfile), "\n", "\r\n"),
+			strings.ReplaceAll(smoke, "\n", "\r\n"),
+			nil,
+		},
+		{
+			"an Alpine final stage is not an empty base",
+			edit("FROM scratch AS final", "FROM alpine:3.24 AS final"),
+			smoke,
+			[]string{"build/Dockerfile-one's last stage, the image, is FROM alpine:3.24 AS final, where it must be FROM scratch AS final"},
+		},
+		{
+			"a scratch stage not named final escapes the cache filter",
+			edit("FROM scratch AS final", "FROM scratch"),
+			smoke,
+			[]string{"build/Dockerfile-one's last stage, the image, is FROM scratch, where it must be FROM scratch AS final: an empty base, named final for the release builds' --no-cache-filter"},
+		},
+		{
+			"a RUN in the final stage has nothing to run it",
+			edit("WORKDIR /app\n", "WORKDIR /app\nRUN [\"/app/goiabada-one\", \"migrate\"]\n"),
+			smoke,
+			[]string{`build/Dockerfile-one:14 runs RUN ["/app/goiabada-one", "migrate"] in its final stage, where nothing can run it`},
+		},
+		{
+			"no USER runs the server as root",
+			edit("USER 10001:10001\n", ""),
+			smoke,
+			[]string{"build/Dockerfile-one sets no USER in its final stage, so the server would run as root: it must set USER 10001:10001"},
+		},
+		{
+			"a named USER is not one runAsNonRoot can verify",
+			edit("USER 10001:10001", "USER goiabada"),
+			smoke,
+			[]string{"build/Dockerfile-one:14 sets USER goiabada, where the image must run as USER 10001:10001"},
+		},
+		{
+			"root as USER",
+			edit("USER 10001:10001", "USER 0:0"),
+			smoke,
+			[]string{"build/Dockerfile-one:14 sets USER 0:0, where the image must run as USER 10001:10001"},
+		},
+		{
+			"a second USER after the first",
+			edit("ENTRYPOINT", "USER 0\nENTRYPOINT"),
+			smoke,
+			[]string{"build/Dockerfile-one:16 sets USER 0, where the image must run as USER 10001:10001"},
+		},
+		{
+			"no HEALTHCHECK",
+			edit(`HEALTHCHECK --interval=10s --timeout=5s --start-period=300s --retries=3 CMD ["/app/goiabada-one", "healthcheck"]`+"\n", ""),
+			smoke,
+			[]string{`build/Dockerfile-one declares no HEALTHCHECK in its final stage: it must declare HEALTHCHECK --interval=10s --timeout=5s --start-period=300s --retries=3 CMD ["/app/goiabada-one", "healthcheck"]`},
+		},
+		{
+			"a HEALTHCHECK with no start period",
+			edit("--start-period=300s ", ""),
+			smoke,
+			[]string{`build/Dockerfile-one:15 declares HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD ["/app/goiabada-one", "healthcheck"], where it must declare exactly`},
+		},
+		{
+			"a HEALTHCHECK with a start interval, which Docker 24's builders refuse",
+			edit("--retries=3", "--start-interval=2s --retries=3"),
+			smoke,
+			[]string{"build/Dockerfile-one:15 declares HEALTHCHECK --interval=10s --timeout=5s --start-period=300s --start-interval=2s --retries=3"},
+		},
+		{
+			"a HEALTHCHECK running wget",
+			edit(`CMD ["/app/goiabada-one", "healthcheck"]`, `CMD ["wget", "--spider", "http://localhost:9090/health"]`),
+			smoke,
+			[]string{`build/Dockerfile-one:15 declares HEALTHCHECK --interval=10s --timeout=5s --start-period=300s --retries=3 CMD ["wget", "--spider", "http://localhost:9090/health"], where`},
+		},
+		{
+			"the CA bundle copied from the build stage's cached image",
+			edit("COPY --from=certs", "COPY --from=build"),
+			smoke,
+			[]string{"build/Dockerfile-one:11 copies the CA bundle with COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt, where it must copy it from the refresh stage, which every release build reruns"},
+		},
+		{
+			"the CA bundle not copied at all",
+			edit("COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt\n", ""),
+			smoke,
+			[]string{"build/Dockerfile-one's final stage lacks COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt"},
+		},
+		{
+			"the folders not copied",
+			edit("COPY --from=build /app/rootfs/ /\n", ""),
+			smoke,
+			[]string{"build/Dockerfile-one's final stage lacks COPY --from=build /app/rootfs/ /"},
+		},
+		{
+			"a program copied in beside the server",
+			edit("WORKDIR /app\n", "WORKDIR /app\nCOPY --from=build /bin/busybox /bin/sh\n"),
+			smoke,
+			[]string{"build/Dockerfile-one:14 holds COPY --from=build /bin/busybox /bin/sh in its final stage, which is not part of the image"},
+		},
+		{
+			"another entrypoint",
+			edit(`ENTRYPOINT ["/app/goiabada-one"]`, `ENTRYPOINT ["/app/goiabada-one", "serve"]`),
+			smoke,
+			[]string{
+				`build/Dockerfile-one:16 holds ENTRYPOINT ["/app/goiabada-one", "serve"] in its final stage, which is not part of the image`,
+				`build/Dockerfile-one's final stage lacks ENTRYPOINT ["/app/goiabada-one"]`,
+			},
+		},
+		{
+			"no certificate refresh stage",
+			strings.Replace(edit("FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs\nRUN apk upgrade --no-cache ca-certificates-bundle\n", ""),
+				"COPY --from=certs", "COPY --from=build", 1),
+			smoke,
+			[]string{
+				"build/Dockerfile-one:9 copies the CA bundle with COPY --from=build",
+				"build/Dockerfile-one has no certificate refresh stage, FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs then RUN apk upgrade --no-cache ca-certificates-bundle",
+			},
+		},
+		{
+			"a refresh stage under the target's emulation",
+			edit("FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs", "FROM golang:1.27.3-alpine AS certs"),
+			smoke,
+			[]string{"build/Dockerfile-one:6 opens its refresh stage with FROM golang:1.27.3-alpine AS certs, where it must be FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs"},
+		},
+		{
+			"a refresh stage from another image than the build stage's",
+			edit("FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs", "FROM --platform=$BUILDPLATFORM alpine:3.24 AS certs"),
+			smoke,
+			[]string{"build/Dockerfile-one:6 opens its refresh stage with FROM --platform=$BUILDPLATFORM alpine:3.24 AS certs, where it must be"},
+		},
+		{
+			"a refresh that does not upgrade the bundle",
+			edit("RUN apk upgrade --no-cache ca-certificates-bundle", "RUN true"),
+			smoke,
+			[]string{"build/Dockerfile-one:6's refresh stage runs RUN true, where it must run exactly RUN apk upgrade --no-cache ca-certificates-bundle and nothing else"},
+		},
+		{
+			"a refresh that adds a package beside the bundle",
+			edit("RUN apk upgrade --no-cache ca-certificates-bundle", "RUN apk upgrade --no-cache ca-certificates-bundle\nRUN apk add --no-cache busybox-static"),
+			smoke,
+			[]string{"build/Dockerfile-one:6's refresh stage runs RUN apk upgrade --no-cache ca-certificates-bundle; RUN apk add --no-cache busybox-static, where"},
+		},
+		{
+			"the folders not laid out",
+			edit("RUN mkdir -p /app/rootfs/tmp \\\n    && chmod 1777 /app/rootfs/tmp\n", ""),
+			smoke,
+			[]string{"build/Dockerfile-one's build stage does not lay out the image's folders with RUN mkdir -p /app/rootfs/tmp && chmod 1777 /app/rootfs/tmp"},
+		},
+		{
+			"/tmp laid out without its sticky bit",
+			edit("chmod 1777", "chmod 777"),
+			smoke,
+			[]string{"build/Dockerfile-one's build stage does not lay out the image's folders"},
+		},
+		{
+			"the folders laid out twice",
+			edit("RUN CGO_ENABLED=0", "RUN mkdir -p /app/rootfs/tmp && chmod 1777 /app/rootfs/tmp\nRUN CGO_ENABLED=0"),
+			smoke,
+			[]string{"build/Dockerfile-one's build stage lays out the image's folders more than once"},
+		},
+		{
+			"no build stage",
+			strings.Replace(dockerfile, "AS build", "AS compile", 1),
+			smoke,
+			[]string{"build/Dockerfile-one has no stage named build"},
+		},
+		{
+			"a heredoc, which this reader does not parse",
+			edit("WORKDIR /app\n", "COPY <<EOF /note\nRUN x\nEOF\nWORKDIR /app\n"),
+			smoke,
+			[]string{"build/Dockerfile-one uses a heredoc"},
+		},
+		{
+			"the escape directive",
+			"# escape=`\n" + dockerfile,
+			smoke,
+			[]string{"build/Dockerfile-one sets the escape directive"},
+		},
+		{
+			"the smoke test declaring no array for the image",
+			dockerfile,
+			"#!/bin/bash\nOTHER=(\"x\")\n",
+			[]string{"build/smoke-test-images.sh declares no ONE_CONTENTS=( ... ) array, so it cannot hold CI's one image to its contents"},
+		},
+		{
+			"the smoke test listing one more entry",
+			dockerfile,
+			strings.Replace(smoke, "    \"drwxrwxrwt 0/0 tmp/\"\n", "    \"drwxrwxrwt 0/0 tmp/\"\n    \"-rwxr-xr-x 0/0 bin/sh\"\n", 1),
+			[]string{"build/smoke-test-images.sh's ONE_CONTENTS lists -rwxr-xr-x 0/0 bin/sh, which the one image does not hold"},
+		},
+		{
+			"the smoke test leaving one out",
+			dockerfile,
+			strings.Replace(smoke, "    \"drwxrwxrwt 0/0 tmp/\"\n", "", 1),
+			[]string{"build/smoke-test-images.sh's ONE_CONTENTS lacks drwxrwxrwt 0/0 tmp/, which the one image holds"},
+		},
+		{
+			"the smoke test giving /tmp another mode",
+			dockerfile,
+			strings.Replace(smoke, "drwxrwxrwt 0/0 tmp/", "drwxrwxrwx 0/0 tmp/", 1),
+			[]string{
+				"lists drwxrwxrwx 0/0 tmp/, which the one image does not hold",
+				"lacks drwxrwxrwt 0/0 tmp/, which the one image holds",
+			},
+		},
+		{
+			"the smoke test's array on one line, in another order",
+			dockerfile,
+			"ONE_CONTENTS=(\"drwxrwxrwt 0/0 tmp/\" \"drwxr-xr-x 0/0 app/\" \"-rwxr-xr-x 0/0 app/goiabada-one\")\n",
+			nil,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assertFindings(t, findingsOf(t, c.dockerfile, c.smoke), c.want...)
+		})
+	}
+
+	t.Run("a smoke test but no Dockerfile", func(t *testing.T) {
 		root := t.TempDir()
 		writeFixture(t, root, imageSmokeTest, smoke)
-		_, err := finalStageFindings(root)
+		_, err := finalStageFindings(root, []releaseImage{one})
 		require.Error(t, err)
 	})
+	t.Run("no smoke test", func(t *testing.T) {
+		root := t.TempDir()
+		writeFixture(t, root, rel, dockerfile)
+		_, err := finalStageFindings(root, []releaseImage{one})
+		require.Error(t, err)
+	})
+}
+
+// The two images' lists, read against each other: the auth server's holds the admin console's
+// entries, its own binary in place of the console's, and the two folders it writes.
+func TestReleaseImages_TheAuthServerAddsItsTwoFolders(t *testing.T) {
+	require.Len(t, releaseImages, 2)
+	auth, console := releaseImages[0], releaseImages[1]
+	var added []string
+	for _, e := range auth.contents {
+		if !slices.Contains(console.contents, e) {
+			added = append(added, e)
+		}
+	}
+	assert.Equal(t, []string{
+		"-rwxr-xr-x 0/0 app/goiabada-authserver",
+		"drwxr-xr-x 10001/10001 bootstrap/",
+		"drwxr-xr-x 10001/10001 data/",
+	}, added)
 }

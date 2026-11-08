@@ -11,9 +11,9 @@ package main
 // What those runs found, read from the scanners' tables rather than from this program: in each 1.7.2
 // image, musl and musl-utils 1.2.6-r2 carry CVE-2026-107891, fixed in 1.2.6-r3, from Trivy and Grype;
 // the standard library 1.27.2 carries CVE-2026-111943, which Grype and govulncheck call GO-2026-6809,
-// fixed in 1.27.3, with x509.Certificate.Verify called; Grype alone reports busybox's CVE-2025-60876,
+// fixed in 1.27.3, with x509.Certificate.Verify detected in the binary; Grype alone reports busybox's CVE-2025-60876,
 // with no fix; and Trivy and govulncheck report golang.org/x/crypto's GO-2026-5932, with no fix and
-// no call to it. The images built from this branch carry only the last two.
+// no vulnerable symbol of it detected. The images built from this branch carry only the last two.
 
 import (
 	"bytes"
@@ -45,7 +45,7 @@ func report(t *testing.T, dirs ...string) (int, string, string) {
 	return code, stdout.String(), stderr.String()
 }
 
-const published172Report = `The weekly scan of the published images found 2 advisories someone can act on: each has a fixed version, or is in Go code that govulncheck reports reachable. The scan's other findings are in its run's log. The Image scan workflow rewrites this list when it changes, and closes this issue once it is empty.
+const published172Report = `The weekly scan of the published images found 2 advisories someone can act on: each has a fixed version, or is in Go code with a vulnerable symbol govulncheck detects in the binary, which does not prove the code reaches it. The scan's other findings are in its run's log. The Image scan workflow rewrites this list when it changes, and closes this issue once it is empty.
 
 ### [CVE-2026-107891](https://nvd.nist.gov/vuln/detail/CVE-2026-107891)
 
@@ -58,7 +58,7 @@ const published172Report = `The weekly scan of the published images found 2 advi
 - **Images:** adminconsole-latest linux/amd64, authserver-latest linux/amd64
 - **Packages:** ` + "`stdlib`" + ` 1.27.2, fixed in 1.26.10, 1.27.3
 - **Reported by:** Trivy, Grype, govulncheck
-- **Reachable:** yes, govulncheck finds ` + "`crypto/x509.Certificate.Verify`" + ` called in every image listed
+- **Vulnerable symbol in the binary:** yes, govulncheck detects ` + "`crypto/x509.Certificate.Verify`" + ` in every image listed
 `
 
 func TestReport_ThePublished172ImagesListMuslAndTheX509Advisory(t *testing.T) {
@@ -76,12 +76,12 @@ func TestReport_MuslFromBothScannersIsOneEntryNamingBothImages(t *testing.T) {
 
 // Trivy names the standard library's advisory CVE-2026-111943, with GO-2026-6809 among its vendor
 // identifiers; Grype names it GO-2026-6809, related to the CVE; govulncheck GO-2026-6809, aliased to it.
-func TestReport_TheCVEAndTheGoIdentifierOfOneAdvisoryAreOneEntryMarkedReachable(t *testing.T) {
+func TestReport_TheCVEAndTheGoIdentifierOfOneAdvisoryAreOneEntryNamingItsVulnerableSymbol(t *testing.T) {
 	_, out, _ := report(t, published172...)
 	assert.Equal(t, 1, strings.Count(out, "GO-2026-6809]"), "GO-2026-6809 is not one entry:\n%s", out)
 	assert.Equal(t, 1, strings.Count(out, "CVE-2026-111943]"), "CVE-2026-111943 is not one entry:\n%s", out)
 	assert.Contains(t, out, "### [CVE-2026-111943](https://nvd.nist.gov/vuln/detail/CVE-2026-111943) · [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809)\n")
-	assert.Contains(t, out, "- **Reachable:** yes, govulncheck finds `crypto/x509.Certificate.Verify` called in every image listed\n")
+	assert.Contains(t, out, "- **Vulnerable symbol in the binary:** yes, govulncheck detects `crypto/x509.Certificate.Verify` in every image listed\n")
 }
 
 // Linked through one scanner only: with Trivy's vendor identifiers and Grype's related advisories
@@ -100,13 +100,13 @@ func TestReport_OneScannersAliasIsEnoughToMergeTwoIdentifiers(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(out, "GO-2026-6809]"), "GO-2026-6809 is not one entry:\n%s", out)
 }
 
-func TestReport_FindingsWithNoFixThatNothingReachesGoToTheLog(t *testing.T) {
+func TestReport_FindingsWithNoFixAndNoVulnerableSymbolGoToTheLog(t *testing.T) {
 	_, out, log := report(t, published172...)
 	for _, id := range []string{"CVE-2025-60876", "GO-2026-5932", "busybox", "golang.org/x/crypto", "ssl_client"} {
 		assert.NotContains(t, out, id)
 	}
 	assert.Contains(t, log, "CVE-2025-60876 in busybox 1.37.0-r31, busybox-binsh 1.37.0-r31, ssl_client 1.37.0-r31 (adminconsole-latest linux/amd64, authserver-latest linux/amd64), reported by Grype: no fixed version\n")
-	assert.Contains(t, log, "GO-2026-5932 in golang.org/x/crypto 0.58.0 (adminconsole-latest linux/amd64, authserver-latest linux/amd64), reported by Trivy, govulncheck: no fixed version, and govulncheck finds no call to it\n")
+	assert.Contains(t, log, "GO-2026-5932 in golang.org/x/crypto 0.58.0 (adminconsole-latest linux/amd64, authserver-latest linux/amd64), reported by Trivy, govulncheck: no fixed version, and govulncheck detects no vulnerable symbol of it in the binary\n")
 }
 
 func TestReport_NothingActionableGivesAnEmptyReport(t *testing.T) {
@@ -129,8 +129,9 @@ func TestReport_TheSameScansGiveByteIdenticalOutput(t *testing.T) {
 	assert.Equal(t, firstLog, reversedLog)
 }
 
-// A Go finding govulncheck reports reachable is listed with no fix to move to.
-func TestReport_AReachableGoFindingWithNoFixIsListed(t *testing.T) {
+// A Go finding whose vulnerable symbol govulncheck detects in the binary is listed with no fix to
+// move to.
+func TestReport_AGoFindingWithItsVulnerableSymbolInTheBinaryAndNoFixIsListed(t *testing.T) {
 	dirs := editedScans(t, published172, func(scanner string, doc map[string]any) {
 		switch scanner {
 		case "trivy":
@@ -155,11 +156,12 @@ func TestReport_AReachableGoFindingWithNoFixIsListed(t *testing.T) {
 	_, out, _ := report(t, dirs...)
 	assert.Contains(t, out, "found 2 advisories")
 	assert.Contains(t, out, "- **Packages:** `stdlib` 1.27.2, no fixed version\n")
-	assert.Contains(t, out, "- **Reachable:** yes, govulncheck finds `crypto/x509.Certificate.Verify` called in every image listed\n")
+	assert.Contains(t, out, "- **Vulnerable symbol in the binary:** yes, govulncheck detects `crypto/x509.Certificate.Verify` in every image listed\n")
 }
 
-// A Go finding with a fix is listed whether or not anything reaches it, and says it is not reached.
-func TestReport_AGoFindingWithAFixIsListedUnreached(t *testing.T) {
+// A Go finding with a fix is listed whether or not its vulnerable symbol is in the binary, and says
+// when it is not.
+func TestReport_AGoFindingWithAFixIsListedWithNoVulnerableSymbol(t *testing.T) {
 	dirs := editedScans(t, published172, func(scanner string, doc map[string]any) {
 		if finding, ok := doc["finding"].(map[string]any); ok && scanner == "govulncheck" && finding["osv"] == "GO-2026-5932" {
 			finding["fixed_version"] = "v0.59.0"
@@ -167,12 +169,12 @@ func TestReport_AGoFindingWithAFixIsListedUnreached(t *testing.T) {
 	})
 	_, out, log := report(t, dirs...)
 	assert.Contains(t, out, "found 3 advisories")
-	assert.Contains(t, out, "### [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932)\n\n- **Images:** adminconsole-latest linux/amd64, authserver-latest linux/amd64\n- **Packages:** `golang.org/x/crypto` 0.58.0, fixed in 0.59.0\n- **Reported by:** Trivy, govulncheck\n- **Reachable:** no, govulncheck finds no call to it\n")
+	assert.Contains(t, out, "### [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932)\n\n- **Images:** adminconsole-latest linux/amd64, authserver-latest linux/amd64\n- **Packages:** `golang.org/x/crypto` 0.58.0, fixed in 0.59.0\n- **Reported by:** Trivy, govulncheck\n- **Vulnerable symbol in the binary:** no, govulncheck detects none\n")
 	assert.NotContains(t, log, "GO-2026-5932")
 }
 
-// Reached in one image and not in the other: the entry says which.
-func TestReport_ReachabilityIsSaidPerImage(t *testing.T) {
+// The vulnerable symbol in one image's binary and not in the other's: the entry says which.
+func TestReport_TheVulnerableSymbolIsSaidPerImage(t *testing.T) {
 	dirs := editedScans(t, published172[1:], func(scanner string, doc map[string]any) {
 		if finding, ok := doc["finding"].(map[string]any); ok && scanner == "govulncheck" && finding["osv"] == "GO-2026-6809" {
 			for _, frame := range finding["trace"].([]any) {
@@ -182,7 +184,7 @@ func TestReport_ReachabilityIsSaidPerImage(t *testing.T) {
 		}
 	})
 	_, out, _ := report(t, published172[0], dirs[0])
-	assert.Contains(t, out, "- **Reachable:** yes in authserver-latest linux/amd64 (`crypto/x509.Certificate.Verify`); govulncheck finds no call to it in adminconsole-latest linux/amd64\n")
+	assert.Contains(t, out, "- **Vulnerable symbol in the binary:** yes in authserver-latest linux/amd64 (`crypto/x509.Certificate.Verify`); govulncheck detects none in adminconsole-latest linux/amd64\n")
 }
 
 // A scan that cannot be read fails the run and writes no report, never one that reads as all clear.

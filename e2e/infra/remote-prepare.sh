@@ -77,7 +77,7 @@ if [[ "${E2E_SOURCE_BUILD:-false}" == true ]]; then
     { grep -v -e "-$version\$" -e '<none>' || true; } | xargs -r docker image rm >/dev/null
   docker image prune -f --filter label=goiabada-e2e=server >/dev/null
 
-  golang="$(sed -n 's/^FROM \(golang:[^ ]*\) AS build$/\1/p' "$src/build/Dockerfile-authserver")"
+  golang="$(sed -n 's/^FROM --platform=\$BUILDPLATFORM \(golang:[^ ]*\) AS build$/\1/p' "$src/build/Dockerfile-authserver")"
   [[ -n "$golang" ]] || fail "build/Dockerfile-authserver names no golang image"
   log "building $wizard with $golang"
   if ! docker build --output "type=local,dest=$E2E_REMOTE_DIR" --build-arg "version=$version" \

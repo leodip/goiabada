@@ -19,14 +19,14 @@ type finding struct {
 	scanners    map[scanner]bool
 	goPackage   bool
 	govulncheck bool // govulncheck reported it
-	reachable   bool
+	inBinary    bool // govulncheck detected the vulnerable symbol in the binary
 	symbols     map[string]bool
 }
 
-// listed is what the report says about a finding: it has a fix to move to, or govulncheck finds the
-// Go code that carries it called.
+// listed is what the report says about a finding: it has a fix to move to, or govulncheck detects
+// its vulnerable symbol in the binary.
 func (f *finding) listed() bool {
-	return len(f.fixed) > 0 || (f.goPackage && f.reachable)
+	return len(f.fixed) > 0 || (f.goPackage && f.inBinary)
 }
 
 // advisory is one advisory under every identifier any scanner gave it, and its findings.
@@ -85,7 +85,7 @@ func classify(records []record) (listed, left []advisory) {
 		f.scanners[r.scanner] = true
 		f.goPackage = f.goPackage || r.goPackage
 		f.govulncheck = f.govulncheck || r.scanner == govulncheck
-		f.reachable = f.reachable || r.reachable
+		f.inBinary = f.inBinary || r.inBinary
 		for _, v := range r.fixed {
 			f.fixed[normalizeVersion(v)] = true
 		}
@@ -122,7 +122,7 @@ func sortedAdvisories(by map[string]*advisory) []advisory {
 	return out
 }
 
-const reportIntro = "The weekly scan of the published images found %d %s someone can act on: each has a fixed version, or is in Go code that govulncheck reports reachable. The scan's other findings are in its run's log. The Image scan workflow rewrites this list when it changes, and closes this issue once it is empty.\n"
+const reportIntro = "The weekly scan of the published images found %d %s someone can act on: each has a fixed version, or is in Go code with a vulnerable symbol govulncheck detects in the binary, which does not prove the code reaches it. The scan's other findings are in its run's log. The Image scan workflow rewrites this list when it changes, and closes this issue once it is empty.\n"
 
 // renderReport writes the issue's body, or nothing when no advisory is listed.
 func renderReport(advisories []advisory) string {
@@ -144,8 +144,8 @@ func renderReport(advisories []advisory) string {
 		fmt.Fprintf(&b, "- **Images:** %s\n", strings.Join(images(a.findings), ", "))
 		fmt.Fprintf(&b, "- **Packages:** %s\n", strings.Join(packages(a.findings, true), "; "))
 		fmt.Fprintf(&b, "- **Reported by:** %s\n", strings.Join(scanners(a.findings), ", "))
-		if reach := reachability(a.findings); reach != "" {
-			fmt.Fprintf(&b, "- **Reachable:** %s\n", reach)
+		if detected := symbolsInBinary(a.findings); detected != "" {
+			fmt.Fprintf(&b, "- **Vulnerable symbol in the binary:** %s\n", detected)
 		}
 	}
 	return b.String()
@@ -158,7 +158,7 @@ func renderLog(advisories []advisory) []string {
 		reason := "no fixed version"
 		if slices.ContainsFunc(a.findings, func(f *finding) bool { return f.goPackage }) {
 			if slices.ContainsFunc(a.findings, func(f *finding) bool { return f.govulncheck }) {
-				reason += ", and govulncheck finds no call to it"
+				reason += ", and govulncheck detects no vulnerable symbol of it in the binary"
 			} else {
 				reason += ", and govulncheck does not report it"
 			}
@@ -235,48 +235,49 @@ func packages(findings []*finding, withFixes bool) []string {
 	return out
 }
 
-// reachability says, for an advisory in Go code, whether govulncheck finds it called in each image,
-// or nothing for an advisory in no Go code.
-func reachability(findings []*finding) string {
-	reached, called, unreached, unreported := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
+// symbolsInBinary says, for an advisory in Go code, whether govulncheck detects its vulnerable symbol
+// in each image's binary, which does not prove the code reaches it, or nothing for an advisory in no
+// Go code.
+func symbolsInBinary(findings []*finding) string {
+	detected, symbolSet, undetected, unreported := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, f := range findings {
-		if f.goPackage && f.reachable {
-			reached[f.image] = true
+		if f.goPackage && f.inBinary {
+			detected[f.image] = true
 			for s := range f.symbols {
-				called["`"+s+"`"] = true
+				symbolSet["`"+s+"`"] = true
 			}
 		}
 	}
 	for _, f := range findings {
 		switch {
-		case !f.goPackage || reached[f.image]:
+		case !f.goPackage || detected[f.image]:
 		case f.govulncheck:
-			unreached[f.image] = true
+			undetected[f.image] = true
 		default:
 			unreported[f.image] = true
 		}
 	}
-	for image := range unreached {
+	for image := range undetected {
 		delete(unreported, image)
 	}
-	if len(reached)+len(unreached)+len(unreported) == 0 {
+	if len(detected)+len(undetected)+len(unreported) == 0 {
 		return ""
 	}
-	symbols := strings.Join(sortedKeys(called, strings.Compare), ", ")
+	symbols := strings.Join(sortedKeys(symbolSet, strings.Compare), ", ")
 	switch {
-	case len(unreached)+len(unreported) == 0:
-		return "yes, govulncheck finds " + symbols + " called in every image listed"
-	case len(reached)+len(unreported) == 0:
-		return "no, govulncheck finds no call to it"
-	case len(reached)+len(unreached) == 0:
+	case len(undetected)+len(unreported) == 0:
+		return "yes, govulncheck detects " + symbols + " in every image listed"
+	case len(detected)+len(unreported) == 0:
+		return "no, govulncheck detects none"
+	case len(detected)+len(undetected) == 0:
 		return "govulncheck does not report it"
 	}
 	var parts []string
-	if len(reached) > 0 {
-		parts = append(parts, "yes in "+strings.Join(sortedKeys(reached, strings.Compare), ", ")+" ("+symbols+")")
+	if len(detected) > 0 {
+		parts = append(parts, "yes in "+strings.Join(sortedKeys(detected, strings.Compare), ", ")+" ("+symbols+")")
 	}
-	if len(unreached) > 0 {
-		parts = append(parts, "govulncheck finds no call to it in "+strings.Join(sortedKeys(unreached, strings.Compare), ", "))
+	if len(undetected) > 0 {
+		parts = append(parts, "govulncheck detects none in "+strings.Join(sortedKeys(undetected, strings.Compare), ", "))
 	}
 	if len(unreported) > 0 {
 		parts = append(parts, "govulncheck does not report it in "+strings.Join(sortedKeys(unreported, strings.Compare), ", "))

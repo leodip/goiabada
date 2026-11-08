@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"flag"
+	"io"
 	"log/slog"
 	"math"
 	"net"
@@ -181,6 +182,15 @@ const (
 	defaultConnMaxIdleTime = 5 * time.Minute
 )
 
+// The HTTP and HTTPS listeners' defaults, for a variable unset or empty. The healthcheck command
+// reads the same variables without loading the configuration, from these same defaults, so the
+// listener it asks is the one the server listens on (#808).
+const (
+	DefaultListenHost      = "0.0.0.0"
+	DefaultListenPortHttp  = 9090
+	DefaultListenPortHttps = 9443
+)
+
 type Config struct {
 	AuthServer    AuthServerConfig
 	AdminConsole  AdminConsoleConfig
@@ -227,10 +237,10 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 		AuthServer: AuthServerConfig{
 			BaseURL:                          authServerBaseURL,
 			InternalBaseURL:                  getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
-			ListenHostHttps:                  getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:                  getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443, &malformed),
-			ListenHostHttp:                   getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:                   getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090, &malformed),
+			ListenHostHttps:                  getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", DefaultListenHost),
+			ListenPortHttps:                  getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", DefaultListenPortHttps, &malformed),
+			ListenHostHttp:                   getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", DefaultListenHost),
+			ListenPortHttp:                   getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", DefaultListenPortHttp, &malformed),
 			TrustProxyHeaders:                getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS", &malformed),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_AUTHSERVER_TRUSTED_PROXIES"),
 			LogHttpRequests:                  getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", &malformed),
@@ -287,46 +297,8 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 		AESEncryptionKeyPrevious: getEnv("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS", ""),
 	}
 
-	// Auth server
-	fs.StringVar(&c.AuthServer.BaseURL, "authserver-baseurl", c.AuthServer.BaseURL, "Goiabada auth server base URL")
-	fs.StringVar(&c.AuthServer.InternalBaseURL, "authserver-internalbaseurl", c.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
-	fs.StringVar(&c.AuthServer.ListenHostHttps, "authserver-listen-host-https", c.AuthServer.ListenHostHttps, "Auth server https host")
-	fs.IntVar(&c.AuthServer.ListenPortHttps, "authserver-listen-port-https", c.AuthServer.ListenPortHttps, "Auth server https port")
-	fs.StringVar(&c.AuthServer.ListenHostHttp, "authserver-listen-host-http", c.AuthServer.ListenHostHttp, "Auth server http host")
-	fs.IntVar(&c.AuthServer.ListenPortHttp, "authserver-listen-port-http", c.AuthServer.ListenPortHttp, "Auth server http port")
-	fs.BoolVar(&c.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", c.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (X-Forwarded-For, or X-Real-IP when it has no address)")
-	authServerTrustedProxies := strings.Join(c.AuthServer.TrustedProxies, ",")
-	fs.StringVar(&authServerTrustedProxies, "authserver-trusted-proxies", authServerTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (auth server)")
-	fs.BoolVar(&c.AuthServer.LogHttpRequests, "authserver-log-http-requests", c.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
-	fs.StringVar(&c.AuthServer.LogLevel, "authserver-log-level", c.AuthServer.LogLevel, "Lowest level of log record the auth server writes. Options: debug, info, warn, error")
-	fs.StringVar(&c.AuthServer.LogFormat, "authserver-log-format", c.AuthServer.LogFormat, "Format the auth server writes log records in. Options: text, json")
-	fs.StringVar(&c.AuthServer.CertFile, "authserver-certfile", c.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
-	fs.StringVar(&c.AuthServer.KeyFile, "authserver-keyfile", c.AuthServer.KeyFile, "Key file for HTTPS (auth server)")
-	fs.BoolVar(&c.AuthServer.LogSQL, "authserver-log-sql", c.AuthServer.LogSQL, "Log SQL queries for auth server")
-	fs.StringVar(&c.AuthServer.StaticDir, "authserver-staticdir", c.AuthServer.StaticDir, "Static files directory for auth server")
-	fs.StringVar(&c.AuthServer.TemplateDir, "authserver-templatedir", c.AuthServer.TemplateDir, "Template files directory for auth server")
-	fs.BoolVar(&c.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", c.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
-	fs.StringVar(&c.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", c.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
-	fs.BoolVar(&c.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", c.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")
-	fs.BoolVar(&c.AuthServer.MetricsEnabled, "authserver-metrics-enabled", c.AuthServer.MetricsEnabled, "Serve Prometheus metrics on the auth server's metrics listener")
-	fs.StringVar(&c.AuthServer.ListenHostMetrics, "authserver-listen-host-metrics", c.AuthServer.ListenHostMetrics, "Auth server metrics host")
-	fs.IntVar(&c.AuthServer.ListenPortMetrics, "authserver-listen-port-metrics", c.AuthServer.ListenPortMetrics, "Auth server metrics port")
-	fs.StringVar(&c.AuthServer.SMTPEHLOName, "authserver-smtp-ehlo-name", c.AuthServer.SMTPEHLOName, "Name the auth server introduces itself to the SMTP server by: a domain, or an address literal such as [192.0.2.10]; empty is the address of its end of each connection")
-
-	// Admin console: the two values this process reads, and nothing else. A flag the binary
-	// cannot act on is a trap rather than a courtesy, because it reads as having configured
-	// something -- so -adminconsole-log-level and the twelve others beside it are not
-	// registered here, and this binary now refuses them instead of ignoring them (#351).
-	fs.StringVar(&c.AdminConsole.BaseURL, "adminconsole-baseurl", c.AdminConsole.BaseURL, "Goiabada admin console base URL")
-	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
-
-	// Database
-	RegisterDatabaseFlags(fs, &c.Database)
-
-	// Initial setup
-	fs.StringVar(&c.AdminEmail, "admin-email", c.AdminEmail, "Default admin email")
-	fs.StringVar(&c.AdminPassword, "admin-password", c.AdminPassword, "First administrator's password, required on first startup: at least 15 characters and at most 72 bytes")
-	fs.StringVar(&c.AppName, "appname", c.AppName, "Default app name")
+	var authServerTrustedProxies string
+	registerFlags(fs, c, &authServerTrustedProxies)
 
 	// Under flag.CommandLine, built with ExitOnError, a bad flag has already exited by here; a set
 	// built with ContinueOnError answers it, flag.ErrHelp for -h included.
@@ -400,6 +372,69 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+// registerFlags registers every flag of the server's command line on fs, each writing into c and
+// defaulting to the value c already holds, and the trusted proxy list's into trustedProxies, as
+// one comma-separated value. It is the one list of them, for Load and for CommandArgs, so the
+// command CommandArgs finds is the one Load's parse leaves (#808 decision 3).
+func registerFlags(fs *flag.FlagSet, c *Config, trustedProxies *string) {
+	// Auth server
+	fs.StringVar(&c.AuthServer.BaseURL, "authserver-baseurl", c.AuthServer.BaseURL, "Goiabada auth server base URL")
+	fs.StringVar(&c.AuthServer.InternalBaseURL, "authserver-internalbaseurl", c.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
+	fs.StringVar(&c.AuthServer.ListenHostHttps, "authserver-listen-host-https", c.AuthServer.ListenHostHttps, "Auth server https host")
+	fs.IntVar(&c.AuthServer.ListenPortHttps, "authserver-listen-port-https", c.AuthServer.ListenPortHttps, "Auth server https port")
+	fs.StringVar(&c.AuthServer.ListenHostHttp, "authserver-listen-host-http", c.AuthServer.ListenHostHttp, "Auth server http host")
+	fs.IntVar(&c.AuthServer.ListenPortHttp, "authserver-listen-port-http", c.AuthServer.ListenPortHttp, "Auth server http port")
+	fs.BoolVar(&c.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", c.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (X-Forwarded-For, or X-Real-IP when it has no address)")
+	*trustedProxies = strings.Join(c.AuthServer.TrustedProxies, ",")
+	fs.StringVar(trustedProxies, "authserver-trusted-proxies", *trustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (auth server)")
+	fs.BoolVar(&c.AuthServer.LogHttpRequests, "authserver-log-http-requests", c.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
+	fs.StringVar(&c.AuthServer.LogLevel, "authserver-log-level", c.AuthServer.LogLevel, "Lowest level of log record the auth server writes. Options: debug, info, warn, error")
+	fs.StringVar(&c.AuthServer.LogFormat, "authserver-log-format", c.AuthServer.LogFormat, "Format the auth server writes log records in. Options: text, json")
+	fs.StringVar(&c.AuthServer.CertFile, "authserver-certfile", c.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
+	fs.StringVar(&c.AuthServer.KeyFile, "authserver-keyfile", c.AuthServer.KeyFile, "Key file for HTTPS (auth server)")
+	fs.BoolVar(&c.AuthServer.LogSQL, "authserver-log-sql", c.AuthServer.LogSQL, "Log SQL queries for auth server")
+	fs.StringVar(&c.AuthServer.StaticDir, "authserver-staticdir", c.AuthServer.StaticDir, "Static files directory for auth server")
+	fs.StringVar(&c.AuthServer.TemplateDir, "authserver-templatedir", c.AuthServer.TemplateDir, "Template files directory for auth server")
+	fs.BoolVar(&c.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", c.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
+	fs.StringVar(&c.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", c.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
+	fs.BoolVar(&c.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", c.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")
+	fs.BoolVar(&c.AuthServer.MetricsEnabled, "authserver-metrics-enabled", c.AuthServer.MetricsEnabled, "Serve Prometheus metrics on the auth server's metrics listener")
+	fs.StringVar(&c.AuthServer.ListenHostMetrics, "authserver-listen-host-metrics", c.AuthServer.ListenHostMetrics, "Auth server metrics host")
+	fs.IntVar(&c.AuthServer.ListenPortMetrics, "authserver-listen-port-metrics", c.AuthServer.ListenPortMetrics, "Auth server metrics port")
+	fs.StringVar(&c.AuthServer.SMTPEHLOName, "authserver-smtp-ehlo-name", c.AuthServer.SMTPEHLOName, "Name the auth server introduces itself to the SMTP server by: a domain, or an address literal such as [192.0.2.10]; empty is the address of its end of each connection")
+
+	// Admin console: the two values this process reads, and nothing else. A flag the binary
+	// cannot act on is a trap rather than a courtesy, because it reads as having configured
+	// something -- so -adminconsole-log-level and the twelve others beside it are not
+	// registered here, and this binary now refuses them instead of ignoring them (#351).
+	fs.StringVar(&c.AdminConsole.BaseURL, "adminconsole-baseurl", c.AdminConsole.BaseURL, "Goiabada admin console base URL")
+	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
+
+	// Database
+	RegisterDatabaseFlags(fs, &c.Database)
+
+	// Initial setup
+	fs.StringVar(&c.AdminEmail, "admin-email", c.AdminEmail, "Default admin email")
+	fs.StringVar(&c.AdminPassword, "admin-password", c.AdminPassword, "First administrator's password, required on first startup: at least 15 characters and at most 72 bytes")
+	fs.StringVar(&c.AppName, "appname", c.AppName, "Default app name")
+}
+
+// CommandArgs answers what the server's flag parse leaves of args, the command and its arguments,
+// without reading the environment or any file: the flags are registered as Load registers them,
+// over zero values, on a silent set of their own. So main can refuse a command line before TZ is
+// resolved or the configuration loaded, and no other setting can answer for it (#808 decisions 2
+// and 3). A command line that does not parse answers false, and Load's own parse refuses it.
+func CommandArgs(args []string) ([]string, bool) {
+	fs := flag.NewFlagSet("goiabada-authserver", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	var proxies string
+	registerFlags(fs, &Config{}, &proxies)
+	if err := fs.Parse(args); err != nil {
+		return nil, false
+	}
+	return fs.Args(), true
 }
 
 // RegisterDatabaseFlags registers every --db-* flag on fs, each writing into c and

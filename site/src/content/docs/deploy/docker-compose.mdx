@@ -46,7 +46,7 @@ The Compose files run the auth server, the admin console and the database on one
 ## What the files run
 
 - **The database runs beside Goiabada,** in a container of its own for MySQL, PostgreSQL and SQL Server, with its data in a named volume. With SQLite, the auth server keeps the database file in the `sqlite-data` volume. [Database](/deploy/database/) covers using a database server of your own instead.
-- **The auth server starts once the database answers,** and the admin console once the auth server does. A first start or an upgrade has up to five minutes to seed or migrate the database before Docker Compose counts the auth server unhealthy.
+- **The auth server starts once the database answers,** and the admin console once the auth server's [health check](#health-checks), `/app/goiabada-authserver healthcheck`, passes. A first start or an upgrade has up to five minutes to seed or migrate the database before Docker Compose counts the auth server unhealthy.
 - **Both servers publish their ports on `127.0.0.1` alone,** 9090 for the auth server and 9091 for the admin console. Nothing outside the host reaches them, so your proxy is the only way in.
 - **Both servers trust one proxy hop** to tell them the client's IP address: see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#reverse-proxy).
 - **Each server gets up to 60 seconds to stop** when you run `docker compose down` or `restart`, so requests in flight finish.
@@ -92,7 +92,7 @@ If the admin console then can't reach the auth server, see [Can't reach the auth
 
 ## The user the images run as
 
-Both images run as uid 10001 and gid 10001, a user and group named `goiabada`, and never as root. The image names them by number, so a platform that refuses a root container, such as Kubernetes with `runAsNonRoot`, can verify the user without reading the image's `/etc/passwd`. The binary and the `/app` directory holding it belong to root, so the process can't replace what its next start runs.
+Both images run as uid 10001 and gid 10001, and never as root. The image names them by number, since it has no `/etc/passwd`, so a platform that refuses a root container, such as Kubernetes with `runAsNonRoot`, can verify the user. The binary and the `/app` directory holding it belong to root, so the process can't replace what its next start runs.
 
 A file you mount into a container must be readable by uid 10001 or gid 10001: the certificate and key named by `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` (and the admin console's pair), and the templates and static files of a [customization](/guides/customize-and-translate-the-pages/#change-the-templates). A key file left at mode `0600` and owned by root can't be read; give it to the user, or to the group with mode `0640`:
 
@@ -111,11 +111,73 @@ The generated file also drops every capability, keeps the root file system read-
 
 ## What the images contain
 
-Each image holds the server's binary on a minimal Alpine: BusyBox, the CA certificates the servers trust, and the few files Alpine itself needs. There's no package manager, OpenSSL or `ssl_client` in it.
+Each image is built from an empty base, and holds only what its server reads:
 
-Without `ssl_client`, the image's `wget` reaches `http://` addresses only: `wget https://…` fails with `can't execute 'ssl_client'`.
+| Path | Image | What it is |
+|---|---|---|
+| `/app/goiabada-authserver` | Auth server | The server's binary, owned by root |
+| `/app/goiabada-adminconsole` | Admin console | The server's binary, owned by root |
+| `/etc/ssl/certs/ca-certificates.crt` | Both | The certificate authorities the server trusts for the TLS connections it makes, as of the release's build |
+| `/tmp` | Both | An empty folder anyone can write to, as on any Linux system |
+| `/data` | Auth server | Where the SQLite volume mounts, owned by 10001 |
+| `/bootstrap` | Auth server | Where the legacy bootstrap writes its file, owned by 10001 |
 
-To add a tool to an image of your own built on Goiabada's, install it in another stage and copy it in, with any libraries it links. If your Dockerfile switches user, end it with `USER 10001:10001`, by number, for the reason [above](#the-user-the-images-run-as).
+Both run as `10001:10001`. There's nothing else in them: no shell, no package manager and no other program, so an image scanner finds no operating system package to report, and `docker compose exec` has nothing to run but the server. [Debugging without a shell](#debugging-without-a-shell) shows how to look inside a running one.
+
+To trust a certificate authority of your own as well, such as one that signed your SMTP server's certificate, mount its certificate into the container and point `SSL_CERT_FILE` at it. The server then reads that file and every file in `/etc/ssl/certs`, the image's bundle among them. To trust only the authorities you choose, mount your own bundle over `/etc/ssl/certs/ca-certificates.crt` instead:
+
+```yaml
+    volumes:
+      - ./ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt:ro
+```
+
+Either file must be readable by [the user the images run as](#the-user-the-images-run-as).
+
+An image of your own built `FROM leodip/goiabada:…` can `COPY` files in, but can't `RUN` a shell command or install a package in that stage, since it has no shell. Do that work in an earlier stage built from another image, and `COPY` the result in. A program you copy in must be statically linked, as the image has no C library. If your Dockerfile sets `USER`, end it with `USER 10001:10001`, by number, for the reason [above](#the-user-the-images-run-as).
+
+## Health checks
+
+Both binaries check their own server with the `healthcheck` command: one `GET` of `/health` on the server's own listener, which answers whenever the process is up, without asking the database. It prints nothing when the server is healthy, and otherwise one line saying what it met, and exits with:
+
+- `0`: healthy, `/health` answered `200`.
+- `1`: unhealthy: a refused connection, no answer within 3 seconds, or any status but `200`, a redirect included.
+- `2`: a listener variable that doesn't parse, or an argument given. The command takes none.
+
+Each image declares the command as its own health check, every 10 seconds, with a 5-second timeout and 3 retries, and 5 minutes for a first start's seed or an upgrade's migrations before its failures count. The image's check applies wherever nothing sets one of its own: a plain `docker run`, a Docker Swarm service, and the admin console under the wizard's files. The wizard's file gives the auth server the same check, with the same timings, in a `healthcheck` of its own, and starts the admin console once it passes.
+
+To check a container in a Compose file or an orchestrator of your own, use the exec form, with the image's timings:
+
+```yaml
+    healthcheck:
+      test: ["CMD", "/app/goiabada-authserver", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      start_period: 300s
+      retries: 3
+```
+
+For the admin console, the test is `["CMD", "/app/goiabada-adminconsole", "healthcheck"]`. A `CMD-SHELL` test, or one that runs any other program, fails, since the images hold no shell and no other program. On Kubernetes, use an `httpGet` probe on `/health`, as the wizard's manifest does.
+
+The check reads which listener to ask from the environment alone. It asks the HTTP listener, `GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP` and `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP`, whenever that listener is on, and the HTTPS one only when the HTTP listener is off and `GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS`, `GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS`, `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` turn it on. A wildcard host, `0.0.0.0` or `::`, is asked on loopback. Over HTTPS, the check doesn't verify the certificate, which names your public host rather than loopback. The admin console's check reads its own `GOIABADA_ADMINCONSOLE_` variables of the same names.
+
+An automatic health check runs as a process of its own, and doesn't inherit the flags the server was started with. If you set the listener with flags, set it in the container's environment as well, or the check asks the default listener.
+
+## Debugging without a shell
+
+The images hold no shell, so `docker compose exec goiabada-authserver sh` fails with `exec: "sh": executable file not found`. Look inside from a tool container beside the server instead, sharing its network and its processes. From the directory holding the Compose files:
+
+```bash
+container=$(docker compose ps -q goiabada-authserver)
+docker run --rm -it --network container:$container --pid container:$container --user 10001:10001 busybox:1.37
+```
+
+In the tool container, `ps` lists the server as PID 1, the server answers on `127.0.0.1:9090`, and `/proc/1/root/` holds the server's files, such as the SQLite database in `/proc/1/root/data/`. Only the server's own uid and gid can read that folder, so the tool container runs as `10001:10001`: as root, `ls /proc/1/root/` says `Permission denied`. If you run the server as another user, run the tool container as that one. For the admin console, use `goiabada-adminconsole`, which answers on `127.0.0.1:9091`.
+
+To read one file out, `docker compose cp` needs no tool container, and works on the read-only root file system:
+
+```bash
+docker compose cp goiabada-authserver:/etc/ssl/certs/ca-certificates.crt .
+```
 
 ## Recover a locked-out administrator
 

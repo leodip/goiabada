@@ -59,7 +59,7 @@ On SQLite, `unable to connect to database` means the file couldn't be opened. Wh
 2. Check that the database answers from where the auth server runs. On Kubernetes, from a throwaway pod in the same namespace, with your host and port:
 
    ```bash
-   kubectl run -it --rm debug -n goiabada --image=busybox --restart=Never -- \
+   kubectl run -it --rm debug -n goiabada --image=busybox:1.37 --restart=Never -- \
      nc -zv your-db-host 5432
    ```
 

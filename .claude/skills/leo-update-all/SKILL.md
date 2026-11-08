@@ -35,7 +35,7 @@ cd "$ROOT/src/authserver" && ./version-manager.sh check [--now] 2>&1 | sed 's/\x
 ```
 
 Read every section of the output:
-- **Updates Available**: pins in `versions.yaml`. The name maps to its key: Go → `tools.go`, Tailwind CSS → `tools.tailwind`, Node.js → `tools.node`, Alpine → `tools.alpine`, Trivy → `tools.trivy`, Grype → `tools.grype`, cropperjs and acorn → `vendored.*`, and golangci-lint, mockery, staticcheck, unparam, govulncheck and npm-check-updates → `tools.<name>`. A name not in this list means the script has gained a dependency, so find its key in `versions.yaml`.
+- **Updates Available**: pins in `versions.yaml`. The name maps to its key: Go → `tools.go`, Tailwind CSS → `tools.tailwind`, Node.js → `tools.node`, Trivy → `tools.trivy`, Grype → `tools.grype`, cropperjs and acorn → `vendored.*`, and golangci-lint, mockery, staticcheck, unparam, govulncheck and npm-check-updates → `tools.<name>`. A name not in this list means the script has gained a dependency, so find its key in `versions.yaml`.
 - **npm Package Updates**: what `deps` will apply, within each package's major version.
 - **New Major Versions**: npm majors, which `deps` leaves alone. A row marked `(site)` is not a question: step 5 takes it.
 - **Data Source Updates**: generator pins to move in step 7.
@@ -43,7 +43,7 @@ Read every section of the output:
 - **`Check failed`** lines: the version is unknown, not up to date. Report each one.
 
 Sort each pin into one of two kinds:
-- **Routine**: the first number stays the same. staticcheck (0.x), unparam (a pseudo-version that moves with every upstream commit) and an Alpine minor are always routine.
+- **Routine**: the first number stays the same. staticcheck (0.x) and unparam (a pseudo-version that moves with every upstream commit) are always routine.
 - **Major**: the first number changes. Hold it back, because a major version is a migration, not a pin change. golangci-lint and mockery carry their major in module paths (`golangci-lint/v2`, `mockery/v3`) that the dev container Dockerfile, `.github/workflows/check.yml`, `version-manager.sh`'s sed patterns and `generate-mocks.sh` spell out. A Tailwind major changes the generated CSS, and a Node major moves every Node in the tree along with `@types/node`. For each major, list the files that spell the old one (`git grep -n 'mockery/v3'`).
 
 If there are majors (pins, or npm packages outside `site/`), ask once with AskUserQuestion (multiSelect) which to attempt after the routine update is green. Recommend attempting none.
@@ -71,7 +71,6 @@ cd "$ROOT/src/authserver" && ./version-manager.sh update 2>&1 | sed 's/\x1b\[[0-
 The summary must show no `Failed updates`. Check that `git diff --stat` touched what the bumps imply:
 - Go: the dev container Dockerfile, the two release Dockerfiles in `src/build/` and the four `go.mod` files.
 - Node.js: the dev container Dockerfile, `site/Dockerfile` and `e2e/testapp/Dockerfile`.
-- Alpine: the two release Dockerfiles.
 - Tailwind, golangci-lint, staticcheck, unparam and govulncheck: the dev container Dockerfile.
 - mockery: the dev container Dockerfile and `src/mockery-header.txt`.
 - cropperjs and acorn: the vendored files and their digests in `versions.yaml`.

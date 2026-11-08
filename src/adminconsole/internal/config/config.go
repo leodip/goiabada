@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"flag"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -113,6 +114,15 @@ func (c *AuthServerConfig) GetEffectiveBaseURL() string {
 	return c.BaseURL
 }
 
+// The HTTP and HTTPS listeners' defaults, for a variable unset or empty. The healthcheck command
+// reads the same variables without loading the configuration, from these same defaults, so the
+// listener it asks is the one the console listens on (#808).
+const (
+	DefaultListenHost      = "0.0.0.0"
+	DefaultListenPortHttp  = 9091
+	DefaultListenPortHttps = 9444
+)
+
 type Config struct {
 	AdminConsole AdminConsoleConfig
 	AuthServer   AuthServerConfig
@@ -134,10 +144,10 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	c := &Config{
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:                          getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
-			ListenHostHttps:                  getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
-			ListenPortHttps:                  getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444, &malformed),
-			ListenHostHttp:                   getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
-			ListenPortHttp:                   getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091, &malformed),
+			ListenHostHttps:                  getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", DefaultListenHost),
+			ListenPortHttps:                  getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", DefaultListenPortHttps, &malformed),
+			ListenHostHttp:                   getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", DefaultListenHost),
+			ListenPortHttp:                   getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", DefaultListenPortHttp, &malformed),
 			TrustProxyHeaders:                getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS", &malformed),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"),
 			LogHttpRequests:                  getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", &malformed),
@@ -158,40 +168,11 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 			InternalCAFile:                   getEnv("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", ""),
 		},
-		AuthServer: AuthServerConfig{
-			BaseURL:         getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
-			InternalBaseURL: getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
-		},
+		AuthServer: authServerFromEnv(),
 	}
 
-	// Admin console
-	fs.StringVar(&c.AdminConsole.BaseURL, "adminconsole-baseurl", c.AdminConsole.BaseURL, "Goiabada admin console base URL")
-	fs.StringVar(&c.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", c.AdminConsole.ListenHostHttps, "Admin console https host")
-	fs.IntVar(&c.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", c.AdminConsole.ListenPortHttps, "Admin console https port")
-	fs.StringVar(&c.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", c.AdminConsole.ListenHostHttp, "Admin console http host")
-	fs.IntVar(&c.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", c.AdminConsole.ListenPortHttp, "Admin console http port")
-	fs.BoolVar(&c.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", c.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (X-Forwarded-For, or X-Real-IP when it has no address)")
-	adminConsoleTrustedProxies := strings.Join(c.AdminConsole.TrustedProxies, ",")
-	fs.StringVar(&adminConsoleTrustedProxies, "adminconsole-trusted-proxies", adminConsoleTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (admin console)")
-	fs.BoolVar(&c.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", c.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
-	fs.StringVar(&c.AdminConsole.LogLevel, "adminconsole-log-level", c.AdminConsole.LogLevel, "Lowest level of log record the admin console writes. Options: debug, info, warn, error")
-	fs.StringVar(&c.AdminConsole.LogFormat, "adminconsole-log-format", c.AdminConsole.LogFormat, "Format the admin console writes log records in. Options: text, json")
-	fs.StringVar(&c.AdminConsole.CertFile, "adminconsole-certfile", c.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
-	fs.StringVar(&c.AdminConsole.KeyFile, "adminconsole-keyfile", c.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
-	fs.StringVar(&c.AdminConsole.StaticDir, "adminconsole-staticdir", c.AdminConsole.StaticDir, "Static files directory for admin console")
-	fs.StringVar(&c.AdminConsole.TemplateDir, "adminconsole-templatedir", c.AdminConsole.TemplateDir, "Template files directory for admin console")
-	fs.StringVar(&c.AdminConsole.InternalCAFile, "adminconsole-internal-ca-file", c.AdminConsole.InternalCAFile, "PEM file of certificate authorities trusted on top of the system roots for the calls to the auth server (admin console)")
-	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
-	fs.BoolVar(&c.AdminConsole.MetricsEnabled, "adminconsole-metrics-enabled", c.AdminConsole.MetricsEnabled, "Serve Prometheus metrics on the admin console's metrics listener")
-	fs.StringVar(&c.AdminConsole.ListenHostMetrics, "adminconsole-listen-host-metrics", c.AdminConsole.ListenHostMetrics, "Admin console metrics host")
-	fs.IntVar(&c.AdminConsole.ListenPortMetrics, "adminconsole-listen-port-metrics", c.AdminConsole.ListenPortMetrics, "Admin console metrics port")
-
-	// Auth server: the two endpoints this process talks to, and nothing else. A flag the binary
-	// cannot act on is a trap rather than a courtesy, because it reads as having configured
-	// something -- so -db-type, -admin-email and the twenty-six others beside them are not
-	// registered here, and this binary now refuses them instead of ignoring them (#351).
-	fs.StringVar(&c.AuthServer.BaseURL, "authserver-baseurl", c.AuthServer.BaseURL, "Goiabada auth server base URL")
-	fs.StringVar(&c.AuthServer.InternalBaseURL, "authserver-internalbaseurl", c.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
+	var adminConsoleTrustedProxies string
+	registerFlags(fs, c, &adminConsoleTrustedProxies)
 
 	// Under flag.CommandLine, built with ExitOnError, a bad flag has already exited by here; a set
 	// built with ContinueOnError answers it, flag.ErrHelp for -h included.
@@ -227,6 +208,81 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+// registerFlags registers every flag of the console's command line on fs, each writing into c and
+// defaulting to the value c already holds, and the trusted proxy list's into trustedProxies, as
+// one comma-separated value. It is the one list of them, for Load and for CommandArgs, so the
+// words CommandArgs finds are the ones Load's parse leaves (#808 decisions 3 and 5).
+func registerFlags(fs *flag.FlagSet, c *Config, trustedProxies *string) {
+	// Admin console
+	fs.StringVar(&c.AdminConsole.BaseURL, "adminconsole-baseurl", c.AdminConsole.BaseURL, "Goiabada admin console base URL")
+	fs.StringVar(&c.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", c.AdminConsole.ListenHostHttps, "Admin console https host")
+	fs.IntVar(&c.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", c.AdminConsole.ListenPortHttps, "Admin console https port")
+	fs.StringVar(&c.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", c.AdminConsole.ListenHostHttp, "Admin console http host")
+	fs.IntVar(&c.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", c.AdminConsole.ListenPortHttp, "Admin console http port")
+	fs.BoolVar(&c.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", c.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (X-Forwarded-For, or X-Real-IP when it has no address)")
+	*trustedProxies = strings.Join(c.AdminConsole.TrustedProxies, ",")
+	fs.StringVar(trustedProxies, "adminconsole-trusted-proxies", *trustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (admin console)")
+	fs.BoolVar(&c.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", c.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
+	fs.StringVar(&c.AdminConsole.LogLevel, "adminconsole-log-level", c.AdminConsole.LogLevel, "Lowest level of log record the admin console writes. Options: debug, info, warn, error")
+	fs.StringVar(&c.AdminConsole.LogFormat, "adminconsole-log-format", c.AdminConsole.LogFormat, "Format the admin console writes log records in. Options: text, json")
+	fs.StringVar(&c.AdminConsole.CertFile, "adminconsole-certfile", c.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
+	fs.StringVar(&c.AdminConsole.KeyFile, "adminconsole-keyfile", c.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
+	fs.StringVar(&c.AdminConsole.StaticDir, "adminconsole-staticdir", c.AdminConsole.StaticDir, "Static files directory for admin console")
+	fs.StringVar(&c.AdminConsole.TemplateDir, "adminconsole-templatedir", c.AdminConsole.TemplateDir, "Template files directory for admin console")
+	fs.StringVar(&c.AdminConsole.InternalCAFile, "adminconsole-internal-ca-file", c.AdminConsole.InternalCAFile, "PEM file of certificate authorities trusted on top of the system roots for the calls to the auth server (admin console)")
+	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
+	fs.BoolVar(&c.AdminConsole.MetricsEnabled, "adminconsole-metrics-enabled", c.AdminConsole.MetricsEnabled, "Serve Prometheus metrics on the admin console's metrics listener")
+	fs.StringVar(&c.AdminConsole.ListenHostMetrics, "adminconsole-listen-host-metrics", c.AdminConsole.ListenHostMetrics, "Admin console metrics host")
+	fs.IntVar(&c.AdminConsole.ListenPortMetrics, "adminconsole-listen-port-metrics", c.AdminConsole.ListenPortMetrics, "Admin console metrics port")
+
+	// Auth server: the two endpoints this process talks to, and nothing else. A flag the binary
+	// cannot act on is a trap rather than a courtesy, because it reads as having configured
+	// something -- so -db-type, -admin-email and the twenty-six others beside them are not
+	// registered here, and this binary now refuses them instead of ignoring them (#351).
+	fs.StringVar(&c.AuthServer.BaseURL, "authserver-baseurl", c.AuthServer.BaseURL, "Goiabada auth server base URL")
+	fs.StringVar(&c.AuthServer.InternalBaseURL, "authserver-internalbaseurl", c.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
+}
+
+// CommandArgs answers what the console's flag parse leaves of args, without reading the
+// environment or any file: the flags are registered as Load registers them, over zero values, on a
+// silent set of their own. So main can refuse a word before TZ is resolved or the configuration
+// loaded, and no other setting can answer for it (#808 decisions 3, 5 and 6). A command line that
+// does not parse answers false, and Load's own parse refuses it.
+func CommandArgs(args []string) ([]string, bool) {
+	fs := flag.NewFlagSet("goiabada-adminconsole", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	var proxies string
+	registerFlags(fs, &Config{}, &proxies)
+	if err := fs.Parse(args); err != nil {
+		return nil, false
+	}
+	return fs.Args(), true
+}
+
+// authServerFromEnv reads the auth server's two URLs from the environment, for Load and for
+// LoadAuthServerCheck alike.
+func authServerFromEnv() AuthServerConfig {
+	return AuthServerConfig{
+		BaseURL:         getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
+		InternalBaseURL: getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
+	}
+}
+
+// LoadAuthServerCheck reads what the check-authserver command needs, from the environment alone
+// and by Load's own rules: the auth server's two URLs, and the internal CA file read into the pool
+// the console's calls verify the auth server against, nil while the file is unset. Nothing else is
+// read, so a setting the check does not use cannot fail it, and it needs no session key or client
+// secret. A CA file it cannot build a pool from is refused with Load's own line (#808 decision 6).
+func LoadAuthServerCheck() (AuthServerConfig, *x509.CertPool, error) {
+	var malformed malformedValues
+	console := AdminConsoleConfig{InternalCAFile: getEnv("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", "")}
+	readInternalRoots(&console, &malformed)
+	if err := malformed.err(); err != nil {
+		return AuthServerConfig{}, nil, err
+	}
+	return authServerFromEnv(), console.InternalRoots, nil
 }
 
 func getEnv(key string, defaultVal string) string {

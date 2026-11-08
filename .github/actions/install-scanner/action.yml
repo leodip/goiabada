@@ -1,5 +1,5 @@
-# Builds a scanner from source at the version versions.yaml pins, for Build validation's Trivy gate
-# and the weekly Image scan's Trivy, Grype and govulncheck (#520).
+# Builds a scanner from source at the version versions.yaml pins, for Build validation's govulncheck
+# gate on the release binaries and the weekly Image scan's Trivy, Grype and govulncheck (#520).
 #
 # Never a release binary, an action or an image: Trivy's were all hijacked in March 2026
 # (CVE-2026-33634). `go install module@version` builds the source Go's checksum database fixes for

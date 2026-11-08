@@ -43,21 +43,65 @@ The usual causes:
 
 1. Find the URL the admin console calls: its `GOIABADA_AUTHSERVER_INTERNALBASEURL`, or its `GOIABADA_AUTHSERVER_BASEURL` when that's empty.
 
-2. From where the admin console runs, ask that URL for the settings, as the admin console does. For example, with Docker Compose:
+2. Run the admin console's `check-authserver` command where the admin console runs, [with Docker Compose](#run-the-check-with-docker-compose) or [on Kubernetes](#run-the-check-on-kubernetes). It asks that URL for the settings once, as the admin console does: it trusts the same certificate authorities and follows no redirect, for an `http` or an `https` URL alike. It needs no session keys or client secret.
 
-   ```bash
-   docker compose exec goiabada-adminconsole wget -S -O- http://goiabada-authserver:9090/api/public/settings
+   When the auth server answers with its settings, the check prints the URL and exits `0`:
+
+   ```
+   GET http://goiabada-authserver:9090/api/public/settings answered with the auth server's public settings
    ```
 
-   It should print `HTTP/1.1 200 OK`, then the settings as JSON. A `301` and a `Location` mean the address only redirects, even when its `/health` answers: the redirect cause above.
+   Otherwise it prints the error the admin console logs and exits `1`. Match it against the causes above.
 
-   The admin console's image has no `wget` for `https://`, [by design](/deploy/docker-compose/#what-the-images-contain). For an `https` internal URL, send the same request from a machine that reaches the auth server as the admin console does, with an HTTPS client that doesn't follow redirects, such as `curl -i`. Give `curl` your own authority's certificate with `--cacert` when that authority signed the auth server's. A certificate error is the cause listed above: fix the certificate, as below, and keep the URL `https`.
-
-3. Set the admin console's `GOIABADA_AUTHSERVER_INTERNALBASEURL` to the address that answered `200` with the settings, and restart the admin console.
+3. Set the admin console's `GOIABADA_AUTHSERVER_INTERNALBASEURL` to an address the check reaches, and restart the admin console.
 
 </Steps>
 
-For an `https` internal URL, the admin console trusts the operating system's certificate authorities. If your own authority signed the auth server's certificate, set the admin console's [`GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE`](/reference/environment-variables/#urls-and-listeners) to that authority's PEM certificate, and restart the admin console.
+For an `https` internal URL, the admin console trusts the operating system's certificate authorities. If your own authority signed the auth server's certificate, set the admin console's [`GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE`](/reference/environment-variables/#urls-and-listeners) to that authority's PEM certificate, and restart the admin console. The check reads the same file.
+
+## Run the check with Docker Compose
+
+From the directory holding `docker-compose.yml`, run it in the admin console's container:
+
+```bash
+docker compose exec goiabada-adminconsole /app/goiabada-adminconsole check-authserver
+```
+
+When the admin console isn't running, such as when it stopped or never started, run the check in a container of its own. It takes the service's environment, network and mounts, and `--no-deps` leaves the other services as they are:
+
+```bash
+docker compose run --rm --no-deps goiabada-adminconsole check-authserver
+```
+
+To try another address before you change the file, give it to that container:
+
+```bash
+docker compose run --rm --no-deps -e GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090 goiabada-adminconsole check-authserver
+```
+
+## Run the check on Kubernetes
+
+The commands use the wizard's namespace, `goiabada`. While the admin console's container is running, run the check in it. That includes an admin console still waiting for the auth server, which runs but doesn't listen yet:
+
+```bash
+kubectl -n goiabada exec deploy/goiabada-adminconsole -c adminconsole -- /app/goiabada-adminconsole check-authserver
+```
+
+When the container isn't running, find out what stopped it from the pod's status and events, and from its current and previous logs:
+
+```bash
+kubectl -n goiabada get pods -l app=goiabada-adminconsole
+kubectl -n goiabada describe pod <pod>
+kubectl -n goiabada logs <pod> -c adminconsole
+kubectl -n goiabada logs <pod> -c adminconsole --previous
+```
+
+The logs name what stopped it, such as a malformed setting, missing session keys or client secret, or the auth server refusing or redirecting the admin console's client. Two kinds of stop are easy to confuse:
+
+- **The startup probe restarted it.** An admin console waiting for the auth server doesn't listen, so after about 5 minutes its startup probe fails and Kubernetes restarts the container. The previous log ends with a run of `waiting for the auth server to issue the admin console's token` records, and then `admin console stopped`. Each record's `error` is what its attempt met: a name that doesn't resolve, a refused connection, a certificate, or a `5xx`. That `error` is the cause to match above. `kubectl describe pod` shows the last state's exit code as `0`, and a failed startup probe in its events.
+- **The auth server refused or redirected it.** The previous log ends in `the auth server does not accept the admin console's client secret, …`, `the auth server refused the admin console's token request, …` or `the auth server redirected the admin console's token request, …`, and the exit code is `1`. Waiting doesn't help. A refused secret is covered in [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-admin-consoles-client-secret-changed), and a redirect is the redirect cause above.
+
+Don't run the check from a pod of your own. Where the cluster's network plugin enforces NetworkPolicies, the wizard's admits to the auth server's port only pods labelled `app: goiabada-adminconsole`. A pod carrying that label joins the admin console's Service, which then sends administrators to it.
 
 ## When only signing in fails
 
