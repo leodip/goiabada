@@ -36,10 +36,10 @@ import (
 const accountExportPath = "/api/v1/account/export"
 
 // stepUpChallenge is the WWW-Authenticate value of every step-up refusal, written out from RFC 9470
-// section 3 and #782 decision 1.
+// section 3 and #782 decision 1, with the DPoP challenge every 401 carries after the Bearer one.
 const stepUpChallenge = `Bearer realm="goiabada", error="insufficient_user_authentication", ` +
 	`error_description="This endpoint requires a more recent sign-in, or a stronger one.", ` +
-	`acr_values="urn:goiabada:level2_optional", max_age="300"`
+	`acr_values="urn:goiabada:level2_optional", max_age="300", ` + dpopChallengeBare
 
 // getAccountExport asks for the caller's own export with accessToken and the Accept-Encoding given.
 func getAccountExport(t *testing.T, accessToken, acceptEncoding string) exportAnswer {

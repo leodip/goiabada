@@ -1,8 +1,12 @@
 package apihandlers
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"database/sql"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -343,6 +347,53 @@ func TestHandleSettingsKeysGet_OrdersNextCurrentPrevious(t *testing.T) {
 			assert.Len(t, body.Keys, len(tc.given), "no key is lost on the way out")
 
 			database.AssertExpectations(t)
+		})
+	}
+}
+
+// TestHandleSettingsKeysGet_ExportsSubjectPublicKeyInfoAsPublicKey is #714's PEM item: keys created
+// before #424 store SubjectPublicKeyInfo under "RSA PUBLIC KEY", PKCS#1's label, and RFC 7468
+// section 13 labels SubjectPublicKeyInfo "PUBLIC KEY". The export relabels such a row, with the same
+// key bytes, and passes every other PEM through as stored: a current row, and a block that really is
+// PKCS#1, whose label is right.
+func TestHandleSettingsKeysGet_ExportsSubjectPublicKeyInfoAsPublicKey(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	spki, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	require.NoError(t, err)
+	pkcs1 := x509.MarshalPKCS1PublicKey(&privateKey.PublicKey)
+
+	pemOf := func(label string, der []byte) string {
+		return string(pem.EncodeToMemory(&pem.Block{Type: label, Bytes: der}))
+	}
+
+	testCases := []struct {
+		name   string
+		stored string
+		want   string
+	}{
+		{"a legacy row: SubjectPublicKeyInfo under the PKCS#1 label", pemOf("RSA PUBLIC KEY", spki), pemOf("PUBLIC KEY", spki)},
+		{"a current row: SubjectPublicKeyInfo under its own label", pemOf("PUBLIC KEY", spki), pemOf("PUBLIC KEY", spki)},
+		{"PKCS#1 under its own label", pemOf("RSA PUBLIC KEY", pkcs1), pemOf("RSA PUBLIC KEY", pkcs1)},
+		{"text that is no PEM at all", "not a pem", "not a pem"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			key := signingKey(1, record.KeyStateCurrent)
+			key.PublicKeyPEM = []byte(tc.stored)
+			database.On("GetAllSigningKeys", mock.Anything, (*sql.Tx)(nil)).Return([]record.KeyPair{key}, nil).Once()
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/keys", nil)
+			HandleSettingsKeysGet(database).ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusOK, rr.Code)
+			var body api.GetSettingsKeysResponse
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+			require.Len(t, body.Keys, 1)
+			assert.Equal(t, tc.want, body.Keys[0].PublicKeyPEM)
 		})
 	}
 }

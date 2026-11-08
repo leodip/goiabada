@@ -19,25 +19,29 @@ var refreshTokenColumns = columnList{
 		"refresh_tokens.previous_refresh_token_jti, refresh_tokens.first_refresh_token_jti, " +
 		"refresh_tokens.session_identifier, refresh_tokens.refresh_token_type, refresh_tokens.scope, " +
 		"refresh_tokens.issued_at, refresh_tokens.expires_at, refresh_tokens.max_lifetime, " +
-		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at",
+		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at, " +
+		"refresh_tokens.dpop_jkt",
 	mysql: "refresh_tokens.id, refresh_tokens.created_at, refresh_tokens.updated_at, refresh_tokens.code_id, " +
 		"refresh_tokens.user_id, refresh_tokens.client_id, refresh_tokens.refresh_token_jti, " +
 		"refresh_tokens.previous_refresh_token_jti, refresh_tokens.first_refresh_token_jti, " +
 		"refresh_tokens.session_identifier, refresh_tokens.refresh_token_type, refresh_tokens.scope, " +
 		"refresh_tokens.issued_at, refresh_tokens.expires_at, refresh_tokens.max_lifetime, " +
-		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at",
+		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at, " +
+		"refresh_tokens.dpop_jkt",
 	postgres: "refresh_tokens.id, refresh_tokens.created_at, refresh_tokens.updated_at, refresh_tokens.code_id, " +
 		"refresh_tokens.user_id, refresh_tokens.client_id, refresh_tokens.refresh_token_jti, " +
 		"refresh_tokens.previous_refresh_token_jti, refresh_tokens.first_refresh_token_jti, " +
 		"refresh_tokens.session_identifier, refresh_tokens.refresh_token_type, refresh_tokens.scope, " +
 		"refresh_tokens.issued_at, refresh_tokens.expires_at, refresh_tokens.max_lifetime, " +
-		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at",
+		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at, " +
+		"refresh_tokens.dpop_jkt",
 	mssql: "refresh_tokens.id, refresh_tokens.created_at, refresh_tokens.updated_at, refresh_tokens.code_id, " +
 		"refresh_tokens.user_id, refresh_tokens.client_id, refresh_tokens.refresh_token_jti, " +
 		"refresh_tokens.previous_refresh_token_jti, refresh_tokens.first_refresh_token_jti, " +
 		"refresh_tokens.session_identifier, refresh_tokens.refresh_token_type, refresh_tokens.scope, " +
 		"refresh_tokens.issued_at, refresh_tokens.expires_at, refresh_tokens.max_lifetime, " +
-		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at",
+		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at, " +
+		"refresh_tokens.dpop_jkt",
 }
 
 // scanRefreshToken reads one row selected with refreshTokenColumns.
@@ -61,6 +65,7 @@ func scanRefreshToken(row rowScanner, refreshToken *record.RefreshToken) error {
 		&refreshToken.Revoked,
 		&refreshToken.AuthStateGeneration,
 		&refreshToken.AuthenticatedAt,
+		&refreshToken.DPoPJkt,
 	)
 }
 
@@ -81,30 +86,31 @@ func queryRefreshTokens(ctx context.Context, d *Database, tx *sql.Tx, query stri
 }
 
 // insertRefreshToken writes every column but id, the dont-update ones included: a new token is
-// born with its code, user and client, and the generation and instant its grant was authenticated at.
+// born with its code, user and client, the generation and instant its grant was authenticated at,
+// and the DPoP key its family is bound to.
 var insertRefreshToken = statement{
 	sqlite: "INSERT INTO refresh_tokens (created_at, updated_at, code_id, user_id, client_id, " +
 		"refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti, session_identifier, " +
 		"refresh_token_type, scope, issued_at, expires_at, max_lifetime, revoked, auth_state_generation, " +
-		"authenticated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"authenticated_at, dpop_jkt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO refresh_tokens (created_at, updated_at, code_id, user_id, client_id, " +
 		"refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti, session_identifier, " +
 		"refresh_token_type, scope, issued_at, expires_at, max_lifetime, revoked, auth_state_generation, " +
-		"authenticated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"authenticated_at, dpop_jkt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO refresh_tokens (created_at, updated_at, code_id, user_id, client_id, " +
 		"refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti, session_identifier, " +
 		"refresh_token_type, scope, issued_at, expires_at, max_lifetime, revoked, auth_state_generation, " +
-		"authenticated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
-		"$17) RETURNING id",
+		"authenticated_at, dpop_jkt) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, " +
+		"$16, $17, $18) RETURNING id",
 	mssql: "INSERT INTO refresh_tokens (created_at, updated_at, code_id, user_id, client_id, " +
 		"refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti, session_identifier, " +
 		"refresh_token_type, scope, issued_at, expires_at, max_lifetime, revoked, auth_state_generation, " +
-		"authenticated_at) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, " +
-		"@p11, @p12, @p13, @p14, @p15, @p16, @p17)",
+		"authenticated_at, dpop_jkt) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, " +
+		"@p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18)",
 }
 
 // updateRefreshToken writes the whole row but created_at, code_id, user_id, client_id,
-// auth_state_generation and authenticated_at, which are dont-update. Leaving the three foreign keys
+// auth_state_generation, authenticated_at and dpop_jkt, which are dont-update. Leaving the three foreign keys
 // out of the SET list is what keeps SQL Server from re-checking them, and so from taking a shared
 // lock on the parent rows (#139); see record.RefreshToken.
 var updateRefreshToken = statement{
@@ -324,7 +330,7 @@ func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 		refreshToken.ClientId, refreshToken.RefreshTokenJti, refreshToken.PreviousRefreshTokenJti,
 		refreshToken.FirstRefreshTokenJti, refreshToken.SessionIdentifier, refreshToken.RefreshTokenType,
 		refreshToken.Scope, refreshToken.IssuedAt, refreshToken.ExpiresAt, refreshToken.MaxLifetime,
-		refreshToken.Revoked, refreshToken.AuthStateGeneration, refreshToken.AuthenticatedAt)
+		refreshToken.Revoked, refreshToken.AuthStateGeneration, refreshToken.AuthenticatedAt, refreshToken.DPoPJkt)
 	if err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt

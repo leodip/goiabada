@@ -55,8 +55,8 @@ func (_m *TokenIssuer) EXPECT() *TokenIssuer_Expecter {
 }
 
 // IssueAuthorizationCodeGrant provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings, code *record.Code) (*oauth.TokenResponse, error) {
-	ret := _mock.Called(ctx, settings, code)
+func (_mock *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings, code *record.Code, dpopThumbprint string) (*oauth.TokenResponse, error) {
+	ret := _mock.Called(ctx, settings, code, dpopThumbprint)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IssueAuthorizationCodeGrant")
@@ -64,18 +64,18 @@ func (_mock *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, setti
 
 	var r0 *oauth.TokenResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *record.Code) (*oauth.TokenResponse, error)); ok {
-		return returnFunc(ctx, settings, code)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *record.Code, string) (*oauth.TokenResponse, error)); ok {
+		return returnFunc(ctx, settings, code, dpopThumbprint)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *record.Code) *oauth.TokenResponse); ok {
-		r0 = returnFunc(ctx, settings, code)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *record.Code, string) *oauth.TokenResponse); ok {
+		r0 = returnFunc(ctx, settings, code, dpopThumbprint)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*oauth.TokenResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *record.Settings, *record.Code) error); ok {
-		r1 = returnFunc(ctx, settings, code)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *record.Settings, *record.Code, string) error); ok {
+		r1 = returnFunc(ctx, settings, code, dpopThumbprint)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -91,11 +91,12 @@ type TokenIssuer_IssueAuthorizationCodeGrant_Call struct {
 //   - ctx context.Context
 //   - settings *record.Settings
 //   - code *record.Code
-func (_e *TokenIssuer_Expecter) IssueAuthorizationCodeGrant(ctx any, settings any, code any) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
-	return &TokenIssuer_IssueAuthorizationCodeGrant_Call{Call: _e.mock.On("IssueAuthorizationCodeGrant", ctx, settings, code)}
+//   - dpopThumbprint string
+func (_e *TokenIssuer_Expecter) IssueAuthorizationCodeGrant(ctx any, settings any, code any, dpopThumbprint any) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
+	return &TokenIssuer_IssueAuthorizationCodeGrant_Call{Call: _e.mock.On("IssueAuthorizationCodeGrant", ctx, settings, code, dpopThumbprint)}
 }
 
-func (_c *TokenIssuer_IssueAuthorizationCodeGrant_Call) Run(run func(ctx context.Context, settings *record.Settings, code *record.Code)) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
+func (_c *TokenIssuer_IssueAuthorizationCodeGrant_Call) Run(run func(ctx context.Context, settings *record.Settings, code *record.Code, dpopThumbprint string)) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -109,10 +110,15 @@ func (_c *TokenIssuer_IssueAuthorizationCodeGrant_Call) Run(run func(ctx context
 		if args[2] != nil {
 			arg2 = args[2].(*record.Code)
 		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -123,14 +129,14 @@ func (_c *TokenIssuer_IssueAuthorizationCodeGrant_Call) Return(tokenResponse *oa
 	return _c
 }
 
-func (_c *TokenIssuer_IssueAuthorizationCodeGrant_Call) RunAndReturn(run func(ctx context.Context, settings *record.Settings, code *record.Code) (*oauth.TokenResponse, error)) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
+func (_c *TokenIssuer_IssueAuthorizationCodeGrant_Call) RunAndReturn(run func(ctx context.Context, settings *record.Settings, code *record.Code, dpopThumbprint string) (*oauth.TokenResponse, error)) *TokenIssuer_IssueAuthorizationCodeGrant_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // IssueClientCredentialsGrant provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings *record.Settings, client *record.Client, scope string) (*oauth.TokenResponse, error) {
-	ret := _mock.Called(ctx, settings, client, scope)
+func (_mock *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings *record.Settings, client *record.Client, scope string, dpopThumbprint string) (*oauth.TokenResponse, error) {
+	ret := _mock.Called(ctx, settings, client, scope, dpopThumbprint)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IssueClientCredentialsGrant")
@@ -138,18 +144,18 @@ func (_mock *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, setti
 
 	var r0 *oauth.TokenResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *record.Client, string) (*oauth.TokenResponse, error)); ok {
-		return returnFunc(ctx, settings, client, scope)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *record.Client, string, string) (*oauth.TokenResponse, error)); ok {
+		return returnFunc(ctx, settings, client, scope, dpopThumbprint)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *record.Client, string) *oauth.TokenResponse); ok {
-		r0 = returnFunc(ctx, settings, client, scope)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *record.Client, string, string) *oauth.TokenResponse); ok {
+		r0 = returnFunc(ctx, settings, client, scope, dpopThumbprint)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*oauth.TokenResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *record.Settings, *record.Client, string) error); ok {
-		r1 = returnFunc(ctx, settings, client, scope)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *record.Settings, *record.Client, string, string) error); ok {
+		r1 = returnFunc(ctx, settings, client, scope, dpopThumbprint)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -166,11 +172,12 @@ type TokenIssuer_IssueClientCredentialsGrant_Call struct {
 //   - settings *record.Settings
 //   - client *record.Client
 //   - scope string
-func (_e *TokenIssuer_Expecter) IssueClientCredentialsGrant(ctx any, settings any, client any, scope any) *TokenIssuer_IssueClientCredentialsGrant_Call {
-	return &TokenIssuer_IssueClientCredentialsGrant_Call{Call: _e.mock.On("IssueClientCredentialsGrant", ctx, settings, client, scope)}
+//   - dpopThumbprint string
+func (_e *TokenIssuer_Expecter) IssueClientCredentialsGrant(ctx any, settings any, client any, scope any, dpopThumbprint any) *TokenIssuer_IssueClientCredentialsGrant_Call {
+	return &TokenIssuer_IssueClientCredentialsGrant_Call{Call: _e.mock.On("IssueClientCredentialsGrant", ctx, settings, client, scope, dpopThumbprint)}
 }
 
-func (_c *TokenIssuer_IssueClientCredentialsGrant_Call) Run(run func(ctx context.Context, settings *record.Settings, client *record.Client, scope string)) *TokenIssuer_IssueClientCredentialsGrant_Call {
+func (_c *TokenIssuer_IssueClientCredentialsGrant_Call) Run(run func(ctx context.Context, settings *record.Settings, client *record.Client, scope string, dpopThumbprint string)) *TokenIssuer_IssueClientCredentialsGrant_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -188,11 +195,16 @@ func (_c *TokenIssuer_IssueClientCredentialsGrant_Call) Run(run func(ctx context
 		if args[3] != nil {
 			arg3 = args[3].(string)
 		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -203,7 +215,7 @@ func (_c *TokenIssuer_IssueClientCredentialsGrant_Call) Return(tokenResponse *oa
 	return _c
 }
 
-func (_c *TokenIssuer_IssueClientCredentialsGrant_Call) RunAndReturn(run func(ctx context.Context, settings *record.Settings, client *record.Client, scope string) (*oauth.TokenResponse, error)) *TokenIssuer_IssueClientCredentialsGrant_Call {
+func (_c *TokenIssuer_IssueClientCredentialsGrant_Call) RunAndReturn(run func(ctx context.Context, settings *record.Settings, client *record.Client, scope string, dpopThumbprint string) (*oauth.TokenResponse, error)) *TokenIssuer_IssueClientCredentialsGrant_Call {
 	_c.Call.Return(run)
 	return _c
 }

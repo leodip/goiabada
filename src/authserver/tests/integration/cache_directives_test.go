@@ -3,10 +3,12 @@ package integration
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -127,4 +129,83 @@ func TestCacheDirectives_AnApiRefusalIsNotStorable(t *testing.T) {
 		"the request must actually have been refused, or this is not testing a refusal")
 
 	assertNotStorable(t, resp, "an unauthenticated refusal from the account API")
+}
+
+// TestCacheDirectives_EveryUserinfoAnswerIsNotStorable is #714's userinfo item on the wire: the
+// claims a user's token reads, and each way the endpoint refuses, by GET and by POST. RFC 9111
+// section 3.5 keeps a shared cache from storing an answer to a request with Authorization, but not
+// a browser's own cache, and a POST's form-body token is no Authorization header at all.
+func TestCacheDirectives_EveryUserinfoAnswerIsNotStorable(t *testing.T) {
+	openidToken, _ := createUserAccessTokenWithScope(t, "openid")
+	noOpenidToken, _ := createUserAccessTokenWithScope(t,
+		builtin.AuthServerResourceIdentifier+":"+builtin.ManageAccountPermissionIdentifier)
+
+	for _, tc := range []struct {
+		name       string
+		token      string
+		wantStatus int
+		// wantChallenge is the WWW-Authenticate answer, so each row is the refusal it names.
+		wantChallenge string
+	}{
+		{"the claims", openidToken, http.StatusOK, ""},
+		{"no token", "", http.StatusUnauthorized, `Bearer realm="goiabada", ` + dpopChallengeBare},
+		{"a token that is not one", "not-a-token", http.StatusUnauthorized,
+			`Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."` + ", " + dpopChallengeBare},
+		{"a token without openid", noOpenidToken, http.StatusForbidden,
+			`Bearer realm="goiabada", error="insufficient_scope", error_description="Insufficient scope."`},
+	} {
+		for method, call := range map[string]func(*testing.T, string) *http.Response{"GET": userinfoGet, "POST": userinfoPost} {
+			if tc.token == "" {
+				call = userinfoWithoutCredentials(method)
+			}
+			t.Run(method+" "+tc.name, func(t *testing.T) {
+				resp := call(t, tc.token)
+				defer func() { _ = resp.Body.Close() }()
+
+				require.Equal(t, tc.wantStatus, resp.StatusCode)
+				assert.Equal(t, tc.wantChallenge, resp.Header.Get("WWW-Authenticate"))
+				assertNotStorable(t, resp, method+" /userinfo, "+tc.name)
+			})
+		}
+	}
+}
+
+// TestCacheDirectives_DiscoveryAndTheKeySetMayBeCachedForFiveMinutes is #714's metadata item on the
+// wire: both discovery addresses and the key set, by GET and by HEAD, carry a five-minute public
+// lifetime. The next key is published before it signs, so a key set cached that long still holds
+// the key of every token it is asked about after a rotation.
+func TestCacheDirectives_DiscoveryAndTheKeySetMayBeCachedForFiveMinutes(t *testing.T) {
+	httpClient := createHttpClient(t)
+
+	for _, path := range []string{"/.well-known/openid-configuration", "/.well-known/oauth-authorization-server", "/certs"} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			t.Run(method+" "+path, func(t *testing.T) {
+				req, err := http.NewRequest(method, appConfig.AuthServer.BaseURL+path, nil)
+				require.NoError(t, err)
+				resp, err := httpClient.Do(req)
+				require.NoError(t, err)
+				defer func() { _ = resp.Body.Close() }()
+
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+				assert.Equal(t, "public, max-age=300", resp.Header.Get("Cache-Control"))
+				assert.Empty(t, resp.Header.Get("Pragma"))
+			})
+		}
+	}
+}
+
+// userinfoWithoutCredentials calls /userinfo by method with no token anywhere: no Authorization
+// header, and for POST an empty form body.
+func userinfoWithoutCredentials(method string) func(*testing.T, string) *http.Response {
+	return func(t *testing.T, _ string) *http.Response {
+		t.Helper()
+		req, err := http.NewRequest(method, appConfig.AuthServer.BaseURL+"/userinfo", strings.NewReader(""))
+		require.NoError(t, err)
+		if method == http.MethodPost {
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
+		resp, err := createHttpClient(t).Do(req)
+		require.NoError(t, err)
+		return resp
+	}
 }

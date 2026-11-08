@@ -930,6 +930,9 @@
 "adminconsole.admin_clients.tokens.include_oidc_in_id_tooltip" = "No los incluyas si el cliente necesita superar las pruebas de conformidad de OpenID Connect o quiere ID tokens pequeños. Inclúyelos si el cliente lee los claims del usuario del ID token."
 "adminconsole.admin_clients.tokens.id_on" = "Incluir"
 "adminconsole.admin_clients.tokens.id_off" = "No incluir"
+"adminconsole.admin_clients.tokens.dpop_required" = "Exigir DPoP para las solicitudes de token"
+"adminconsole.admin_clients.tokens.dpop_required_tooltip" = "Cada solicitud de token de este cliente debe llevar una prueba DPoP, de modo que cada token que recibe queda vinculado a su clave. Una solicitud sin ella se rechaza."
+"adminconsole.admin_clients.tokens.dpop_required_implicit" = "Mientras esté activado, el cliente no puede obtener tokens de acceso mediante el flujo implícito: se rechazan los tipos de respuesta token e id_token token. id_token solo y el flujo de código de autorización funcionan como antes."
 "adminconsole.admin_clients.tokens.saved_successfully" = "Configuración de tokens guardada."
 
 # --- Client authentication -------------------------------------------------
@@ -2032,6 +2035,8 @@
 "handler.client_backchannel_logout.uri_userinfo" = "La URI de cierre de sesión back-channel no puede llevar un nombre de usuario ni una contraseña: {{.uri}}"
 "handler.client_backchannel_logout.uri_http_public_client" = "La URI de cierre de sesión back-channel debe usar https en un cliente público. http sin cifrar solo se admite en un cliente confidencial creado por un administrador: {{.uri}}"
 "handler.client_backchannel_logout.uri_http_self_registered" = "La URI de cierre de sesión back-channel debe usar https en un cliente que se registró por su cuenta, sea del tipo que sea. http sin cifrar solo se admite en un cliente confidencial creado por un administrador: {{.uri}}"
+"handler.client_dpop.dpop_bound_access_tokens_required" = "El campo dpopBoundAccessTokens es obligatorio: envía true o false."
+"handler.client_dpop.admin_console_not_allowed" = "El cliente de la consola de administración no puede exigir DPoP para las solicitudes de token."
 "handler.client_web_origins.empty" = "El origen web no puede estar vacío"
 "handler.client_web_origins.invalid" = "El origen web no es válido: {{.origin}}. Un origen web consta de un esquema, un host y un puerto opcional, sin nada más; por ejemplo, https://www.example.com o https://myapp:8080. El esquema debe ser http o https. El host debe usar ASCII, no puede incluir datos de usuario ni ser una dirección IPv6 literal o una IPv4 abreviada. Si se indica un puerto, debe ser un número decimal menor que 65536, sin ceros iniciales."
 "handler.client_web_origins.too_long" = "El origen web es demasiado largo ({{.length}} caracteres; el máximo es {{.max}}): {{.origin}}"

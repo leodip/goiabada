@@ -81,7 +81,7 @@ func TestAuthorize_OfflineAccessIsCaseSensitive(t *testing.T) {
 				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
-				"&code_challenge=" + fake.LetterN(43) +
+				"&code_challenge=" + randomCodeChallenge() +
 				"&scope=" + url.QueryEscape("openid "+tc.value) +
 				"&state=" + requestState +
 				"&prompt=none"

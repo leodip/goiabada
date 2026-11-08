@@ -491,7 +491,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
@@ -598,7 +598,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)

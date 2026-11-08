@@ -30,6 +30,10 @@ type RefreshTokenGrantInput struct {
 	RefreshToken   *record.RefreshToken
 	ScopeRequested string
 	IsROPC         bool
+	// DPoPThumbprint is the request's proof key, empty for none. It binds the new access token, and
+	// the new refresh token of a public client's unbound family; a bound family's token is refreshed
+	// only with a proof by its own key (#42 decision 11).
+	DPoPThumbprint string
 }
 
 // RefreshOutcome is what a successful refresh did besides answering, for the token handler's audit.
@@ -71,6 +75,12 @@ var (
 	// committed in that gap. The rotation rolls back, so the claim on the presented token is undone
 	// and no child is inserted (#132, #259).
 	ErrRefreshFamilyRevoked = errors.New("the refresh token's family was revoked before its rotation committed")
+
+	// ErrRefreshTokenBindingMismatch is a refresh of a token bound to a DPoP key whose request did
+	// not prove that key: it carried no proof, or one by another key (#42 decision 11). The token
+	// endpoint's validator refuses such a request before the issuer is asked; the rotation refuses it
+	// again, on the row it holds, and rolls back, so nothing is claimed.
+	ErrRefreshTokenBindingMismatch = errors.New("the refresh token is bound to a DPoP key the request did not prove")
 )
 
 // IssueRefreshTokenGrant redeems a validated refresh (RFC 6749 section 6). In order: it contains the
@@ -92,8 +102,9 @@ var (
 // stamped the child from the copy the validator read and could insert one the next refresh refuses
 // (#131).
 //
-// A refusal is a *RefreshTokenReplayedError, ErrRefreshFlowDisabled, ErrRefreshTokenNotClaimed or
-// ErrRefreshFamilyRevoked, which the token handler answers; anything else is a fault.
+// A refusal is a *RefreshTokenReplayedError, ErrRefreshFlowDisabled, ErrRefreshTokenNotClaimed,
+// ErrRefreshFamilyRevoked or ErrRefreshTokenBindingMismatch, which the token handler answers;
+// anything else is a fault.
 func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *record.Settings,
 	input *RefreshTokenGrantInput) (*oauth.TokenResponse, *RefreshOutcome, error) {
 
@@ -232,10 +243,20 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		parent := *refreshToken
 		parent.AuthStateGeneration = current.AuthStateGeneration
 
+		// The family's DPoP binding, read on the row this rotation holds, and the child takes it
+		// from there (#42 decision 11). The validator refused a request without a proof by the bound
+		// key before this ran; this refuses one again, whatever hands it in, so no rotation mints from
+		// a bound token without its key or inserts an unbound child into a bound family. The claim
+		// above rolls back with it, so the token is not spent.
+		parent.DPoPJkt = current.DPoPJkt
+		if parent.DPoPJkt.Valid && parent.DPoPJkt.String != input.DPoPThumbprint {
+			return ErrRefreshTokenBindingMismatch
+		}
+
 		if input.IsROPC {
-			tokenResponse, err = t.mintROPCRefreshTokens(ctx, tx, settings, &parent, input.ScopeRequested)
+			tokenResponse, err = t.mintROPCRefreshTokens(ctx, tx, settings, &parent, input.ScopeRequested, input.DPoPThumbprint)
 		} else {
-			tokenResponse, err = t.mintCodeRefreshTokens(ctx, tx, settings, &parent.Code, &parent, input.ScopeRequested)
+			tokenResponse, err = t.mintCodeRefreshTokens(ctx, tx, settings, &parent.Code, &parent, input.ScopeRequested, input.DPoPThumbprint)
 		}
 		return err
 	})
@@ -321,7 +342,7 @@ func (t *TokenIssuer) containRefreshTokenFamily(ctx context.Context, firstRefres
 // transaction: the reads because sqlitedb has one connection, which tx holds, and a read on nil
 // would wait on it until the context expired, dropping the picture claim without an error (#437).
 func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, settings *record.Settings,
-	code *record.Code, parent *record.RefreshToken, scopeRequested string) (*oauth.TokenResponse, error) {
+	code *record.Code, parent *record.RefreshToken, scopeRequested string, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
 	err := t.database.CodeLoadClient(ctx, tx, code)
 	if err != nil {
@@ -336,7 +357,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &code.Client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: TokenTypeBearer.String(),
+		TokenType: ResponseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -372,7 +393,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	// The PARENT refresh token is the authorizing credential here, not the code, and its family is
 	// the grant the access token names (#676 decision 1).
 	accessTokenStr, err := t.generateAccessToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent,
-		parent.FirstRefreshTokenJti)
+		parent.FirstRefreshTokenJti, dpopThumbprint)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +416,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to the original refresh token's scope
 	originalRefreshTokenScope := parent.Scope
 	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, tx, settings, code, originalRefreshTokenScope, now, privKey, keyIdentifier, parent,
-		uuid.New())
+		uuid.New(), dpopThumbprint)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +429,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 // mintROPCRefreshTokens mints the token set for a claimed refresh token the password grant issued,
 // and inserts its child. Unlike a code-descended token's, its user and client are on the token row.
 func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, settings *record.Settings,
-	parent *record.RefreshToken, scopeRequested string) (*oauth.TokenResponse, error) {
+	parent *record.RefreshToken, scopeRequested string, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
 	// The token endpoint refuses a token with no instant before it gets here: without one there is
 	// no auth_time this refresh could issue that OpenID Connect Core 1.0 section 12.2 allows (#125).
@@ -435,7 +456,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &parent.Client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: TokenTypeBearer.String(),
+		TokenType: ResponseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -469,6 +490,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 		User:            &parent.User,
 		Scope:           scopeToUse,
 		AuthenticatedAt: parent.AuthenticatedAt.Time,
+		DPoPThumbprint:  dpopThumbprint,
 	}
 
 	// access_token -----------------------------------------------------------------------

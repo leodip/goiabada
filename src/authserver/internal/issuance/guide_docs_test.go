@@ -56,7 +56,7 @@ func signedInIDTokenClaims(t *testing.T) []string {
 
 	settings := codeGrantSettings()
 	settings.IncludeOpenIDConnectClaimsInIdToken = true
-	response, err := issuer.mintAuthorizationCodeTokens(context.Background(), settings, code)
+	response, err := issuer.mintAuthorizationCodeTokens(context.Background(), settings, code, "")
 	if err != nil {
 		t.Fatalf("minting the code's tokens: %v", err)
 	}
@@ -75,7 +75,7 @@ func serviceAccessTokenClaims(t *testing.T) []string {
 
 	settings := &record.Settings{Issuer: "https://auth.example.com", TokenExpirationInSeconds: 300}
 	client := &record.Client{Id: 1, ClientIdentifier: "billing-service"}
-	response, err := issuer.IssueClientCredentialsGrant(context.Background(), settings, client, "product-api:read")
+	response, err := issuer.IssueClientCredentialsGrant(context.Background(), settings, client, "product-api:read", "")
 	if err != nil {
 		t.Fatalf("issuing the client credentials grant: %v", err)
 	}

@@ -33,6 +33,8 @@ type tokensTabAPI struct {
 	// refusal (#617).
 	code  string
 	saved bool
+	// dpopRefusal is the message the DPoP requirement's write is refused with, when set.
+	dpopRefusal string
 }
 
 func (s *tokensTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
@@ -50,6 +52,16 @@ func (s *tokensTabAPI) UpdateClientTokens(_ context.Context, _ string, _ int64,
 	_ *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
 	s.saved = true
 	return nil, &apiclient.APIError{Code: s.code, Message: s.refusal, StatusCode: http.StatusBadRequest}
+}
+
+// UpdateClientDPoP refuses the requirement with dpopRefusal when one is set, and answers the stored
+// client otherwise.
+func (s *tokensTabAPI) UpdateClientDPoP(_ context.Context, _ string, _ int64,
+	_ *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
+	if s.dpopRefusal != "" {
+		return nil, &apiclient.APIError{Code: "VALIDATION_ERROR", Message: s.dpopRefusal, StatusCode: http.StatusBadRequest}
+	}
+	return s.stored, nil
 }
 
 // storedTokensClient is the client as stored: every duration a number, and the two OpenID Connect
@@ -215,4 +227,96 @@ func TestRender_AdminClientTokens_ARefusedSaveKeepsWhatWasSubmitted(t *testing.T
 			assert.Contains(t, invalid[0][0], ` autofocus`)
 		})
 	}
+}
+
+// dpopSwitchRe finds the DPoP requirement's checkbox.
+var dpopSwitchRe = regexp.MustCompile(`<input [^>]*id="dpopBoundAccessTokens"[^>]*>`)
+
+// The Tokens tab draws "Require DPoP for token requests" as a checkbox of the tab's own form, saved
+// by its one Save, ticked as the client stores it, with the implicit-flow restriction said beside it
+// (#42 decisions 12 and 13).
+func TestRender_AdminClientTokens_TheDPoPRequirementIsASwitchOfTheTab(t *testing.T) {
+	for _, stored := range []bool{true, false} {
+		client := storedTokensClient()
+		client.DPoPBoundAccessTokens = stored
+
+		out := serveClientTokens(t,
+			adminclienthandlers.HandleTokensGet(render.New(web.TemplateFS(), web.StaticFS()), newRenderSessionStore(t), &tokensTabAPI{stored: client}),
+			http.MethodGet, nil)
+
+		toggle := dpopSwitchRe.FindString(out)
+		require.NotEmpty(t, toggle, "the switch is drawn")
+		assert.Contains(t, toggle, `type="checkbox"`)
+		assert.Contains(t, toggle, `name="dpopBoundAccessTokens"`)
+		assert.Equal(t, stored, regexp.MustCompile(`\schecked(?:\s|>|$)`).MatchString(toggle), "stored %v", stored)
+		assert.Contains(t, toggle, `aria-describedby="dpopBoundAccessTokensHint dpopBoundAccessTokensImplicit"`)
+
+		assert.Contains(t, out, `<span class="choice-label">Exigir DPoP nas solicitações de token</span>`)
+		assert.Contains(t, out, `<span class="field-hint" id="dpopBoundAccessTokensHint">Toda solicitação de token deste cliente precisa trazer uma prova DPoP`)
+		assert.Contains(t, out, `<span class="field-hint" id="dpopBoundAccessTokensImplicit">Enquanto esta opção estiver ativa, o cliente não consegue tokens de acesso pelo fluxo implícito`)
+
+		// Inside the tab's one form, before its Save.
+		formStart := strings.Index(out, `<form class="panel" method="post"`)
+		switchAt := strings.Index(out, `id="dpopBoundAccessTokens"`)
+		saveAt := strings.Index(out, `id="btnSave"`)
+		formEnd := strings.Index(out, `</form>`)
+		require.True(t, formStart >= 0 && switchAt > formStart && saveAt > switchAt && formEnd > saveAt,
+			"the switch is in the form, before Save")
+		assert.Equal(t, 1, strings.Count(out, `<form `), "the tab has one form")
+	}
+}
+
+// The admin console's own client is not offered the requirement (#42 decision 12): its tab draws
+// neither the switch nor its words.
+func TestRender_AdminClientTokens_TheAdminConsolesClientIsNotOfferedTheDPoPRequirement(t *testing.T) {
+	client := storedTokensClient()
+	client.ClientIdentifier = "admin-console-client"
+	client.IsSystemLevelClient = true
+
+	out := serveClientTokens(t,
+		adminclienthandlers.HandleTokensGet(render.New(web.TemplateFS(), web.StaticFS()), newRenderSessionStore(t), &tokensTabAPI{stored: client}),
+		http.MethodGet, nil)
+
+	assert.Contains(t, out, `id="tokenExpirationInSeconds"`, "the rest of the tab is drawn")
+	assert.NotContains(t, out, `dpopBoundAccessTokens`)
+	assert.NotContains(t, out, `Exigir DPoP`)
+}
+
+// A refused requirement, which comes after the token settings were saved, is shown beside the
+// switch: the notice says so, and the switch is marked invalid, described by the notice and
+// focused, while the tab says the token settings were saved.
+func TestRender_AdminClientTokens_ARefusedRequirementIsShownBesideTheSwitch(t *testing.T) {
+	const refusal = "O cliente do console de administração não pode exigir DPoP nas solicitações de token."
+	apiClient := &tokensTabAPI{stored: storedTokensClient(), dpopRefusal: refusal}
+
+	out := serveClientTokens(t,
+		adminclienthandlers.HandleTokensPost(render.New(web.TemplateFS(), web.StaticFS()), nil, &savingTokensTabAPI{apiClient}, "https://console.example"),
+		http.MethodPost, url.Values{
+			"tokenExpirationInSeconds":                {"300"},
+			"refreshTokenOfflineIdleTimeoutInSeconds": {"3600"},
+			"refreshTokenOfflineMaxLifetimeInSeconds": {"86400"},
+			"includeOpenIDConnectClaimsInAccessToken": {"default"},
+			"includeOpenIDConnectClaimsInIdToken":     {"on"},
+			"dpopBoundAccessTokens":                   {"on"},
+		})
+
+	assert.Contains(t, out, `<div class="notice notice-danger" role="alert" id="dpop-error">`)
+	assert.Contains(t, out, `<p>`+refusal+`</p>`)
+	assert.Contains(t, out, `<p>Configurações de tokens salvas.</p>`, "the token settings were saved first")
+	toggle := dpopSwitchRe.FindString(out)
+	require.NotEmpty(t, toggle)
+	assert.Contains(t, toggle, `aria-describedby="dpop-error dpopBoundAccessTokensHint dpopBoundAccessTokensImplicit"`)
+	assert.Contains(t, toggle, ` aria-invalid="true"`)
+	assert.Contains(t, toggle, ` autofocus`)
+	assert.NotRegexp(t, `\schecked(?:\s|>|$)`, toggle, "the stored requirement, not the refused one")
+}
+
+// savingTokensTabAPI is tokensTabAPI with a token settings write that succeeds, answering the client
+// as stored.
+type savingTokensTabAPI struct{ *tokensTabAPI }
+
+func (s *savingTokensTabAPI) UpdateClientTokens(_ context.Context, _ string, _ int64,
+	_ *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
+	s.saved = true
+	return s.stored, nil
 }

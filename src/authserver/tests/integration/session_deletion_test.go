@@ -66,7 +66,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 	// Step 2: Complete a full login to create a session in the database
 	httpClient := createHttpClient(t)
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -129,7 +129,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 
 	// Step 5: Start a NEW auth flow with the same httpClient (which still has the old session cookie)
 	// This simulates the user clicking "Login" again after their DB session was deleted
-	requestCodeChallenge2 := fake.LetterN(43)
+	requestCodeChallenge2 := randomCodeChallenge()
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
@@ -250,7 +250,7 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + requestState +
 		"&nonce=" + fake.LetterN(8)
@@ -367,7 +367,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 
 	// A second authorization request on the same browser, asking for level 2. The session
 	// is reused, so this ceremony never reaches the password handler.
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -460,7 +460,7 @@ func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
+		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape("openid profile email") +
 		"&state=" + requestState +
 		"&nonce=" + fake.LetterN(8) +

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/dpop/dpoptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/builtin"
@@ -19,13 +20,15 @@ import (
 // sign-in is no older than the maximum age and at least the minimum level, and refuses any other
 // with RFC 9470 section 3's challenge, 401 insufficient_user_authentication carrying the acr_values
 // and max_age the caller signs in again with, and the API envelope's
-// INSUFFICIENT_USER_AUTHENTICATION. The account download mounts it with 300 seconds and
-// urn:goiabada:level2_optional, which these tests use.
+// INSUFFICIENT_USER_AUTHENTICATION. As every 401, it carries the DPoP challenge after the Bearer
+// one, the error in the challenge of the scheme used. The account download mounts it with 300
+// seconds and urn:goiabada:level2_optional, which these tests use.
 
 const (
-	stepUpDescription = "This endpoint requires a more recent sign-in, or a stronger one."
-	challengeStepUp   = `Bearer realm="goiabada", error="insufficient_user_authentication", error_description="` +
-		stepUpDescription + `", acr_values="urn:goiabada:level2_optional", max_age="300"`
+	stepUpDescription  = "This endpoint requires a more recent sign-in, or a stronger one."
+	stepUpRequirements = `error="insufficient_user_authentication", error_description="` + stepUpDescription +
+		`", acr_values="urn:goiabada:level2_optional", max_age="300"`
+	challengeStepUp = `Bearer realm="goiabada", ` + stepUpRequirements + `, ` + dpopChallengeBare
 )
 
 var apiInsufficientUserAuthentication = chainAnswer{http.StatusUnauthorized, challengeStepUp,
@@ -64,7 +67,7 @@ func serveStepUpGuard(t *testing.T, token *oauth.JwtToken) (*httptest.ResponseRe
 	}
 	rr := httptest.NewRecorder()
 	reached := false
-	guard := NewBearerTokenForAPI(nil).RequireRecentAuthentication(300*time.Second, record.AcrLevel2Optional,
+	guard := NewBearerTokenForAPI(nil, ResourceProofs{}).RequireRecentAuthentication(300*time.Second, record.AcrLevel2Optional,
 		func() time.Time { return stepUpNow })
 	guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reached = true
@@ -145,7 +148,7 @@ func TestRequireRecentAuthentication_NoTokenIsTheMissingCredential(t *testing.T)
 // The guard reads the clock on each request, not once when it is built.
 func TestRequireRecentAuthentication_ReadsTheClockOnEachRequest(t *testing.T) {
 	now := stepUpNow
-	guard := NewBearerTokenForAPI(nil).RequireRecentAuthentication(300*time.Second, record.AcrLevel2Optional,
+	guard := NewBearerTokenForAPI(nil, ResourceProofs{}).RequireRecentAuthentication(300*time.Second, record.AcrLevel2Optional,
 		func() time.Time { return now })(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("admitted"))
 	}))
@@ -173,22 +176,51 @@ func TestRequireRecentAuthentication_TheChallengeNamesTheGuardsOwnFigures(t *tes
 	req = req.WithContext(reqctx.WithBearerToken(req.Context(), token))
 	rr := httptest.NewRecorder()
 
-	NewBearerTokenForAPI(nil).RequireRecentAuthentication(10*time.Minute, record.AcrLevel2Mandatory,
+	NewBearerTokenForAPI(nil, ResourceProofs{}).RequireRecentAuthentication(10*time.Minute, record.AcrLevel2Mandatory,
 		func() time.Time { return stepUpNow })(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("the next handler ran for a level the guard refuses")
 	})).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusUnauthorized, rr.Code)
 	assert.Equal(t, `Bearer realm="goiabada", error="insufficient_user_authentication", error_description="`+
-		stepUpDescription+`", acr_values="urn:goiabada:level2_mandatory", max_age="600"`,
+		stepUpDescription+`", acr_values="urn:goiabada:level2_mandatory", max_age="600", `+dpopChallengeBare,
 		rr.Header().Get("WWW-Authenticate"))
+}
+
+// A token presented with the DPoP scheme is refused in the DPoP challenge, after the bare Bearer
+// one (RFC 9470 section 3, RFC 9449 section 7.2), on each surface. The parse guard spent its proof,
+// so signing the user in again means a new proof with the new token.
+func TestRequireRecentAuthentication_ADPoPTokenIsRefusedInTheDPoPChallenge(t *testing.T) {
+	key := dpoptest.RFC7517Key(t)
+	api, userinfo := refusalAnswers(http.StatusUnauthorized,
+		`Bearer realm="goiabada", `+dpopChallengeBare+`, `+stepUpRequirements,
+		"INSUFFICIENT_USER_AUTHENTICATION", "insufficient_user_authentication", stepUpDescription)
+
+	for surface, want := range map[string]chainAnswer{"api": api, "userinfo": userinfo} {
+		t.Run(surface, func(t *testing.T) {
+			logtest.CaptureSlog(t)
+			store := newReplayStore()
+			guards := dpopGuards(t, surface, dpopResourceBaseURL, store)
+			chain := guards.JwtAuthorizationHeaderToContext()(guards.RequireRecentAuthentication(300*time.Second,
+				record.AcrLevel2Optional, func() time.Time { return dpopNow })(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					t.Error("the next handler ran for a sign-in the guard refuses")
+				})))
+			rr := httptest.NewRecorder()
+
+			chain.ServeHTTP(rr, dpopRequest("DPoP "+tokenBound, key.ResourceProof(t, "GET", dpopUserinfoURL, dpopNow, tokenBound)))
+
+			assertChainAnswer(t, want, rr)
+			assert.Equal(t, 1, store.count(), "the parse guard spent the proof")
+		})
+	}
 }
 
 // The guard in the chain the account download mounts: the client guard first, so another client's
 // fresh or old token is CLIENT_NOT_ALLOWED and is never asked to sign the user in again, then the
 // step-up guard.
 func TestRequireRecentAuthentication_AfterTheClientGuard(t *testing.T) {
-	guards := NewBearerTokenForAPI(nil)
+	guards := NewBearerTokenForAPI(nil, ResourceProofs{})
 	chain := guards.RequireAdminConsoleClient()(guards.RequireRecentAuthentication(300*time.Second,
 		record.AcrLevel2Optional, func() time.Time { return stepUpNow })(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) })))

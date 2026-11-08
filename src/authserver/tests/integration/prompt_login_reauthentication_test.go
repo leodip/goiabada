@@ -105,7 +105,7 @@ func (fx *reauthFixture) signIn(t *testing.T, browser *http.Client, client *reco
 
 	authorizeURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
-		"&response_type=code&code_challenge_method=S256&code_challenge=" + fake.LetterN(43) +
+		"&response_type=code&code_challenge_method=S256&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape("openid") + "&state=" + fake.LetterN(8) + "&nonce=" + fake.LetterN(8)
 	if prompt != "" {
 		authorizeURL += "&prompt=" + prompt

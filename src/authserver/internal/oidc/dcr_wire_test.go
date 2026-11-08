@@ -37,6 +37,7 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				TOSURI:                           "https://client.example.org/terms",
 				BackchannelLogoutURI:             "https://client.example.org/backchannel-logout",
 				BackchannelLogoutSessionRequired: true,
+				DPoPBoundAccessTokens:            true,
 			},
 			newValue: func() any { return &DynamicClientRegistrationRequest{} },
 			literal: `{"redirect_uris":["https://client.example.org/callback"],` +
@@ -47,7 +48,8 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				`"policy_uri":"https://client.example.org/privacy",` +
 				`"tos_uri":"https://client.example.org/terms",` +
 				`"backchannel_logout_uri":"https://client.example.org/backchannel-logout",` +
-				`"backchannel_logout_session_required":true}`,
+				`"backchannel_logout_session_required":true,` +
+				`"dpop_bound_access_tokens":true}`,
 		},
 		{
 			// Every field of the request is optional, so the zero value is the empty object.
@@ -74,6 +76,7 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				TOSURI:                           "https://client.example.org/terms",
 				BackchannelLogoutURI:             "https://client.example.org/backchannel-logout",
 				BackchannelLogoutSessionRequired: &falseValue,
+				DPoPBoundAccessTokens:            true,
 			},
 			newValue: func() any { return &DynamicClientRegistrationResponse{} },
 			literal: `{"client_id":"generated-client-id",` +
@@ -89,7 +92,10 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				`"tos_uri":"https://client.example.org/terms",` +
 				`"backchannel_logout_uri":"https://client.example.org/backchannel-logout",` +
 				// false is a value beside a stored URI (#784 decision 10), so it is echoed.
-				`"backchannel_logout_session_required":false}`,
+				`"backchannel_logout_session_required":false,` +
+				// Echoed always, false included: it is stored on every registration (RFC 7591
+				// section 3.2.1).
+				`"dpop_bound_access_tokens":true}`,
 		},
 		{
 			// A public client gets no secret, and the four members RFC 7591 section 3.2.1
@@ -101,7 +107,8 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 			want:     &DynamicClientRegistrationResponse{ClientID: "public-client-id"},
 			newValue: func() any { return &DynamicClientRegistrationResponse{} },
 			literal: `{"client_id":"public-client-id","client_id_issued_at":0,` +
-				`"client_secret_expires_at":0,"token_endpoint_auth_method":"","grant_types":null}`,
+				`"client_secret_expires_at":0,"token_endpoint_auth_method":"","grant_types":null,` +
+				`"dpop_bound_access_tokens":false}`,
 		},
 		{
 			// RFC 7591 section 3.2.2: error is REQUIRED, error_description OPTIONAL.

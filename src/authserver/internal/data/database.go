@@ -90,6 +90,10 @@ type Database interface {
 	// the session identifier, and nothing else but updated_at. UpdateClient never writes either
 	// column: only this and CreateClient do (#784 decisions 14 and 15).
 	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error
+	// SetClientDPoPBoundAccessTokens writes whether a client requires DPoP for its token requests,
+	// and nothing else but updated_at. UpdateClient never writes the column: only this and
+	// CreateClient do (#42 decision 12).
+	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error
 	// AcquireClientRow takes the client's row inside the caller's transaction and holds it
 	// until that transaction ends, so a read taken afterwards cannot be invalidated by
 	// another writer before the caller writes it back (see #245).
@@ -866,6 +870,14 @@ type Database interface {
 	// DeleteExpiredRevokedAccessTokens reaps on expires_at alone: past it the token is refused for
 	// its expiry, so its row has nothing left to refuse.
 	DeleteExpiredRevokedAccessTokens(ctx context.Context, tx *sql.Tx, now time.Time) error
+	// RecordDPoPProof stores an accepted DPoP proof's replay key, the SHA-256 hex digest of its
+	// normalized htu and its jti, until expiresAt, and reports whether this call stored it: false is
+	// a replay, the key already stored by an earlier use of the proof, here or at another instance
+	// (#42 decision 9). A key that is not a lower-case SHA-256 hex digest is an error.
+	RecordDPoPProof(ctx context.Context, tx *sql.Tx, proofHash string, expiresAt time.Time) (bool, error)
+	// DeleteExpiredDPoPProofs reaps on expires_at alone: past it the proof could no longer be
+	// accepted, so its record has nothing left to refuse.
+	DeleteExpiredDPoPProofs(ctx context.Context, tx *sql.Tx, now time.Time) error
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
 	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
 	// GetRefreshTokensByFirstRefreshTokenJti returns every member of one rotation family, live and

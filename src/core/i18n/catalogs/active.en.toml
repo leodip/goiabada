@@ -925,6 +925,9 @@
 "adminconsole.admin_clients.tokens.include_oidc_in_id_tooltip" = "Leave them out for a client that must pass the OpenID Connect conformance tests or wants small ID tokens; include them for one that reads user claims from the ID token."
 "adminconsole.admin_clients.tokens.id_on" = "Include them"
 "adminconsole.admin_clients.tokens.id_off" = "Leave them out"
+"adminconsole.admin_clients.tokens.dpop_required" = "Require DPoP for token requests"
+"adminconsole.admin_clients.tokens.dpop_required_tooltip" = "Every token request from this client must carry a DPoP proof, so each token it gets is bound to its key. A request without one is refused."
+"adminconsole.admin_clients.tokens.dpop_required_implicit" = "While this is on, the client can't get access tokens through the implicit flow: the token and id_token token response types are refused. id_token alone and the authorization code flow work as before."
 "adminconsole.admin_clients.tokens.saved_successfully" = "Token settings saved."
 
 # --- Client authentication -------------------------------------------------
@@ -2027,6 +2030,8 @@
 "handler.client_backchannel_logout.uri_userinfo" = "Back-channel logout URI must not carry a user name or password: {{.uri}}"
 "handler.client_backchannel_logout.uri_http_public_client" = "Back-channel logout URI must use https on a public client. Plain http is allowed only on a confidential client an administrator created: {{.uri}}"
 "handler.client_backchannel_logout.uri_http_self_registered" = "Back-channel logout URI must use https on a client that registered itself, whatever its type. Plain http is allowed only on a confidential client an administrator created: {{.uri}}"
+"handler.client_dpop.dpop_bound_access_tokens_required" = "dpopBoundAccessTokens is required: send true or false."
+"handler.client_dpop.admin_console_not_allowed" = "The admin console's client can't require DPoP for token requests."
 "handler.client_web_origins.empty" = "Web origin cannot be empty"
 "handler.client_web_origins.invalid" = "Invalid web origin: {{.origin}}. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero."
 "handler.client_web_origins.too_long" = "Web origin is too long ({{.length}} characters, the maximum is {{.max}}): {{.origin}}"

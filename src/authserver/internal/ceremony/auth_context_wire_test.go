@@ -2,6 +2,7 @@ package ceremony
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,13 +32,13 @@ const zeroAuthContextJSON = `{"ClientId":"","RedirectURI":"","ResponseType":"","
 // PasswordVerifiedAt and OtpClaimGeneration (#542), AdoptedSessionAuthTime (#538), RecoveryCodes
 // (#257) and KeepSignedIn (#743). A key
 // anywhere else would mean a field had moved.
-const populatedAuthContextJSONReencoded = `{"ClientId":"client-one","RedirectURI":"https://rp.example/cb","ResponseType":"code","CodeChallengeMethod":"S256","CodeChallenge":"challenge","ResponseMode":"query","Scope":"openid profile","ConsentedScope":"openid","MaxAge":"300","AcrValuesFromAuthorizeRequest":"urn:goiabada:level2_optional","State":"state-value","Nonce":"nonce-value","UserAgent":"probe/1.0","IpAddress":"203.0.113.7","AcrLevel":"urn:goiabada:level1","AuthMethods":"pwd otp","UserId":42,"AuthState":"ready_to_issue_code","Prompt":"consent","AuthenticatedAt":"2026-09-15T12:34:56Z","IdTokenHintSub":"sub-value","Level1AuthCompleted":true,"AuthStateGeneration":3,"OtpConfigGeneration":7,"OTPKeyURL":"otpauth://totp/x","CeremonyId":"ceremony-1","UILocales":["pt-BR","en"],"DeferredErrorCode":"invalid_scope","DeferredErrorDescription":"bad scope","TargetAcrLevel":"urn:goiabada:level2_mandatory","RequestedScope":"","PasswordVerifiedAt":null,"OtpClaimGeneration":null,"AdoptedSessionAuthTime":null,"RecoveryCodes":null,"KeepSignedIn":null}`
+const populatedAuthContextJSONReencoded = `{"ClientId":"client-one","RedirectURI":"https://rp.example/cb","ResponseType":"code","CodeChallengeMethod":"S256","CodeChallenge":"challenge","ResponseMode":"query","Scope":"openid profile","ConsentedScope":"openid","MaxAge":"300","AcrValuesFromAuthorizeRequest":"urn:goiabada:level2_optional","State":"state-value","Nonce":"nonce-value","UserAgent":"probe/1.0","IpAddress":"203.0.113.7","AcrLevel":"urn:goiabada:level1","AuthMethods":"pwd otp","UserId":42,"AuthState":"ready_to_issue_code","Prompt":"consent","AuthenticatedAt":"2026-09-15T12:34:56Z","IdTokenHintSub":"sub-value","Level1AuthCompleted":true,"AuthStateGeneration":3,"OtpConfigGeneration":7,"OTPKeyURL":"otpauth://totp/x","CeremonyId":"ceremony-1","UILocales":["pt-BR","en"],"DeferredErrorCode":"invalid_scope","DeferredErrorDescription":"bad scope","TargetAcrLevel":"urn:goiabada:level2_mandatory","RequestedScope":"","PasswordVerifiedAt":null,"OtpClaimGeneration":null,"AdoptedSessionAuthTime":null,"RecoveryCodes":null,"KeepSignedIn":null,"DPoPJkt":""}`
 
-const zeroAuthContextJSONReencoded = `{"ClientId":"","RedirectURI":"","ResponseType":"","CodeChallengeMethod":"","CodeChallenge":"","ResponseMode":"","Scope":"","ConsentedScope":"","MaxAge":"","AcrValuesFromAuthorizeRequest":"","State":"","Nonce":"","UserAgent":"","IpAddress":"","AcrLevel":"","AuthMethods":"","UserId":0,"AuthState":"","Prompt":"","AuthenticatedAt":null,"IdTokenHintSub":"","Level1AuthCompleted":false,"AuthStateGeneration":0,"OtpConfigGeneration":null,"OTPKeyURL":"","CeremonyId":"","UILocales":null,"DeferredErrorCode":"","DeferredErrorDescription":"","TargetAcrLevel":"","RequestedScope":"","PasswordVerifiedAt":null,"OtpClaimGeneration":null,"AdoptedSessionAuthTime":null,"RecoveryCodes":null,"KeepSignedIn":null}`
+const zeroAuthContextJSONReencoded = `{"ClientId":"","RedirectURI":"","ResponseType":"","CodeChallengeMethod":"","CodeChallenge":"","ResponseMode":"","Scope":"","ConsentedScope":"","MaxAge":"","AcrValuesFromAuthorizeRequest":"","State":"","Nonce":"","UserAgent":"","IpAddress":"","AcrLevel":"","AuthMethods":"","UserId":0,"AuthState":"","Prompt":"","AuthenticatedAt":null,"IdTokenHintSub":"","Level1AuthCompleted":false,"AuthStateGeneration":0,"OtpConfigGeneration":null,"OTPKeyURL":"","CeremonyId":"","UILocales":null,"DeferredErrorCode":"","DeferredErrorDescription":"","TargetAcrLevel":"","RequestedScope":"","PasswordVerifiedAt":null,"OtpClaimGeneration":null,"AdoptedSessionAuthTime":null,"RecoveryCodes":null,"KeepSignedIn":null,"DPoPJkt":""}`
 
 // A ceremony written by this binary, with RequestedScope set, which is the shape every context
 // minted after #436 carries.
-const requestedScopeAuthContextJSON = `{"ClientId":"client-one","RedirectURI":"https://rp.example/cb","ResponseType":"code","CodeChallengeMethod":"S256","CodeChallenge":"challenge","ResponseMode":"query","Scope":"openid profile","ConsentedScope":"openid","MaxAge":"300","AcrValuesFromAuthorizeRequest":"urn:goiabada:level2_optional","State":"state-value","Nonce":"nonce-value","UserAgent":"probe/1.0","IpAddress":"203.0.113.7","AcrLevel":"urn:goiabada:level1","AuthMethods":"pwd otp","UserId":42,"AuthState":"ready_to_issue_code","Prompt":"consent","AuthenticatedAt":"2026-09-15T12:34:56Z","IdTokenHintSub":"sub-value","Level1AuthCompleted":true,"AuthStateGeneration":3,"OtpConfigGeneration":7,"OTPKeyURL":"otpauth://totp/x","CeremonyId":"ceremony-1","UILocales":["pt-BR","en"],"DeferredErrorCode":"invalid_scope","DeferredErrorDescription":"bad scope","TargetAcrLevel":"urn:goiabada:level2_mandatory","RequestedScope":"openid profile email","PasswordVerifiedAt":null,"OtpClaimGeneration":null,"AdoptedSessionAuthTime":null,"RecoveryCodes":null,"KeepSignedIn":null}`
+const requestedScopeAuthContextJSON = `{"ClientId":"client-one","RedirectURI":"https://rp.example/cb","ResponseType":"code","CodeChallengeMethod":"S256","CodeChallenge":"challenge","ResponseMode":"query","Scope":"openid profile","ConsentedScope":"openid","MaxAge":"300","AcrValuesFromAuthorizeRequest":"urn:goiabada:level2_optional","State":"state-value","Nonce":"nonce-value","UserAgent":"probe/1.0","IpAddress":"203.0.113.7","AcrLevel":"urn:goiabada:level1","AuthMethods":"pwd otp","UserId":42,"AuthState":"ready_to_issue_code","Prompt":"consent","AuthenticatedAt":"2026-09-15T12:34:56Z","IdTokenHintSub":"sub-value","Level1AuthCompleted":true,"AuthStateGeneration":3,"OtpConfigGeneration":7,"OTPKeyURL":"otpauth://totp/x","CeremonyId":"ceremony-1","UILocales":["pt-BR","en"],"DeferredErrorCode":"invalid_scope","DeferredErrorDescription":"bad scope","TargetAcrLevel":"urn:goiabada:level2_mandatory","RequestedScope":"openid profile email","PasswordVerifiedAt":null,"OtpClaimGeneration":null,"AdoptedSessionAuthTime":null,"RecoveryCodes":null,"KeepSignedIn":null,"DPoPJkt":""}`
 
 // populatedAuthContext is the value populatedAuthContextJSON decodes to.
 func populatedAuthContext() AuthContext {
@@ -99,6 +100,27 @@ func TestAuthContextWire_ZeroRoundTrip(t *testing.T) {
 	encoded, err := json.Marshal(&got)
 	require.NoError(t, err)
 	assert.Equal(t, zeroAuthContextJSONReencoded, string(encoded))
+}
+
+// TestAuthContextWire_DPoPJktRoundTrip is dpop_jkt's key in both directions: it decodes into DPoPJkt
+// and nothing else, and encodes back byte for byte (#42 decision 14). A ceremony written before it
+// existed decodes it as "", which reads as a code bound to no key, as that ceremony asked for none:
+// the Reencoded literals above pin that.
+func TestAuthContextWire_DPoPJktRoundTrip(t *testing.T) {
+	const thumbprint = "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs"
+	want := populatedAuthContext()
+	want.RequestedScope = "openid profile email"
+	want.DPoPJkt = thumbprint
+	wire := strings.Replace(requestedScopeAuthContextJSON, `"DPoPJkt":""`, `"DPoPJkt":"`+thumbprint+`"`, 1)
+	require.NotEqual(t, requestedScopeAuthContextJSON, wire)
+
+	var got AuthContext
+	require.NoError(t, json.Unmarshal([]byte(wire), &got))
+	assert.Equal(t, want, got)
+
+	encoded, err := json.Marshal(&got)
+	require.NoError(t, err)
+	assert.Equal(t, wire, string(encoded))
 }
 
 // TestAuthContextWire_RequestedScopeRoundTrip is the new format in both directions: the key

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/noredirect"
@@ -60,7 +61,7 @@ type JWKSTokenParser struct {
 	fetchMu sync.Mutex
 
 	mu         sync.RWMutex
-	cachedJwks oauth.Jwks
+	cachedJwks publishedKeys
 	fetchedAt  time.Time
 	// generation counts the fetches that replaced cachedJwks; it is how a request that waited
 	// on fetchMu tells that the fetch it was waiting for has already happened.
@@ -188,9 +189,16 @@ func (tp *JWKSTokenParser) DecodeAndValidateStoredIDToken(ctx context.Context, r
 }
 
 // verifyIDToken is the one check every ID token the console accepts goes through, in this
-// order: RS256 and a signature under a published key; iss equal to the expected issuer (OIDC
-// Core 3.1.3.7 step 2); aud exactly the console's client identifier (step 3); and, when
+// order: the structure oauth.CheckJWTStructure requires, checked before any key is fetched; RS256
+// and a signature under a published key fit to verify it (usableSigningKey, jwkToRSAPublicKey);
+// iss equal to the expected issuer (OIDC Core 3.1.3.7 step 2); aud exactly the console's client
+// identifier (step 3); sub and iat present and well formed (OIDC Core 1.0 section 2); and, when
 // acceptingFromResponse, exp required and exp and nbf honoured (step 9).
+//
+// A token the structural check refuses is answered as golang-jwt answers a malformed one, marked
+// jwt.ErrTokenMalformed: the library tolerates CR and LF inside a segment, invalid UTF-8, a crit
+// header it does not understand and a nested JWT's cty, which the compact serialization does not
+// (#709).
 //
 // The iss and aud checks are written here rather than asked of golang-jwt's WithIssuer and
 // WithAudience: WithAudience accepts an aud that merely contains the client, which step 3
@@ -203,6 +211,10 @@ func (tp *JWKSTokenParser) DecodeAndValidateStoredIDToken(ctx context.Context, r
 func (tp *JWKSTokenParser) verifyIDToken(ctx context.Context, raw string, acceptingFromResponse bool) (*oauth.JwtToken, error) {
 	if raw == "" {
 		return nil, errs.New("the id token is empty")
+	}
+
+	if err := oauth.CheckJWTStructure(raw); err != nil {
+		return nil, errs.Errorf("the id token is malformed: %w: %w", jwt.ErrTokenMalformed, err)
 	}
 
 	claims := jwt.MapClaims{}
@@ -239,6 +251,10 @@ func (tp *JWKSTokenParser) verifyIDToken(ctx context.Context, raw string, accept
 		}
 	}
 
+	if err := checkSubjectAndIssuedAt(claims); err != nil {
+		return nil, err
+	}
+
 	if acceptingFromResponse {
 		if err := jwt.NewValidator(jwt.WithExpirationRequired()).Validate(claims); err != nil {
 			return nil, errs.Wrap(err, "the id token is outside its validity period")
@@ -246,6 +262,32 @@ func (tp *JWKSTokenParser) verifyIDToken(ctx context.Context, raw string, accept
 	}
 
 	return &oauth.JwtToken{TokenBase64: raw, Claims: claims}, nil
+}
+
+// maxSubjectLength is OIDC Core 1.0 section 2's bound on sub: it "MUST NOT exceed 255 ASCII
+// characters in length".
+const maxSubjectLength = 255
+
+// checkSubjectAndIssuedAt refuses an ID token without the two claims OIDC Core 1.0 section 2 makes
+// REQUIRED that the other checks do not read: sub, a case-sensitive string, here also non-empty and
+// at most maxSubjectLength characters, and iat, a JSON number (#709 finding 5). Neither refusal is
+// foreign: the token names this issuer and this console, and is wrong in itself.
+func checkSubjectAndIssuedAt(claims jwt.MapClaims) error {
+	sub, ok := claims["sub"].(string)
+	if !ok {
+		return errs.New("the id token's sub is absent or not a string")
+	}
+	if sub == "" {
+		return errs.New("the id token's sub is empty")
+	}
+	if utf8.RuneCountInString(sub) > maxSubjectLength {
+		return errs.Errorf("the id token's sub is longer than %d characters", maxSubjectLength)
+	}
+	// Claims decoded from JSON hold every number as a float64.
+	if _, ok := claims["iat"].(float64); !ok {
+		return errs.New("the id token's iat is absent or not a number")
+	}
+	return nil
 }
 
 // sameAuthentication is OIDC Core 12.2's comparison of a refreshed ID token with the one it
@@ -365,26 +407,103 @@ func (tp *JWKSTokenParser) refreshJwksSince(ctx context.Context, seen uint64) er
 	return tp.refreshJwks(ctx)
 }
 
+// getPublicKeyFromCache answers the cached key kid names, or for a token without a kid the JWKS's
+// only key, when that key is fit to verify an ID token: usableSigningKey and jwkToRSAPublicKey both
+// accept it. Otherwise it answers nil.
 func (tp *JWKSTokenParser) getPublicKeyFromCache(kid string) *rsa.PublicKey {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
 	if kid == "" {
 		// If no kid, attempt current key if single
 		if len(tp.cachedJwks.Keys) == 1 {
-			if pub, err := jwkToRSAPublicKey(tp.cachedJwks.Keys[0]); err == nil {
-				return pub
-			}
+			return verificationKey(tp.cachedJwks.Keys[0])
 		}
 		return nil
 	}
 	for _, k := range tp.cachedJwks.Keys {
 		if k.Kid == kid {
-			if pub, err := jwkToRSAPublicKey(k); err == nil {
+			if pub := verificationKey(k); pub != nil {
 				return pub
 			}
 		}
 	}
 	return nil
+}
+
+// publishedKeys is the auth server's JWKS as the console reads it: each key with what its use and
+// alg members, as the document carries them, say about verifying an ID token.
+type publishedKeys struct {
+	Keys []publishedKey
+}
+
+// publishedKey is one key of the JWKS: its members, and whether its use and alg allow it to
+// verify an ID token (usableSigningKey), judged from the document's own members, since oauth.Jwk
+// holds each as a string and so reads an empty or null member as an absent one.
+type publishedKey struct {
+	oauth.Jwk
+	signing bool
+}
+
+// decodeJWKS reads a JWKS document into its keys. A document that is not a JSON object with a keys
+// array, or a key that is not a JSON object, is an error. A key whose members are not the strings
+// oauth.Jwk holds is kept, under the kid it names, and never used.
+func decodeJWKS(document []byte) (publishedKeys, error) {
+	var raw struct {
+		Keys []json.RawMessage `json:"keys"`
+	}
+	if err := json.Unmarshal(document, &raw); err != nil {
+		return publishedKeys{}, err
+	}
+	keys := make([]publishedKey, 0, len(raw.Keys))
+	for _, member := range raw.Keys {
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal(member, &members); err != nil {
+			return publishedKeys{}, err
+		}
+		var jwk oauth.Jwk
+		// A member of another type fails the decode after every other member is read.
+		fits := json.Unmarshal(member, &jwk) == nil
+		keys = append(keys, publishedKey{Jwk: jwk, signing: fits && usableSigningKey(members)})
+	}
+	return publishedKeys{Keys: keys}, nil
+}
+
+// verificationKey is k as an RSA public key when k may verify an ID token's RS256 signature, and
+// nil otherwise.
+func verificationKey(k publishedKey) *rsa.PublicKey {
+	if !k.signing {
+		return nil
+	}
+	pub, err := jwkToRSAPublicKey(k.Jwk)
+	if err != nil {
+		return nil
+	}
+	return pub
+}
+
+// usableSigningKey reports whether a JWK's members, read by their exact names, allow it to verify
+// an ID token: a use present and not the string sig, or an alg present and not the string RS256,
+// the one algorithm the console accepts, rules the key out (OIDC Core 1.0 section 10.1: "The key
+// usage of the respective keys MUST support signing"; RFC 7517 sections 4.2 and 4.4). Present means
+// present with any value: an empty string, a JSON null or any other JSON value is not sig or RS256,
+// and is not an absent member either (#709 finding 7). Both values compare case-sensitively, as RFC
+// 7517 has them, and so do the member names, so a USE member is another member and not use.
+func usableSigningKey(members map[string]json.RawMessage) bool {
+	return memberAbsentOr(members, "use", "sig") && memberAbsentOr(members, "alg", jwt.SigningMethodRS256.Alg())
+}
+
+// memberAbsentOr reports whether the named member is absent, or present as exactly the JSON string
+// want.
+func memberAbsentOr(members map[string]json.RawMessage, name, want string) bool {
+	raw, present := members[name]
+	if !present {
+		return true
+	}
+	var value string
+	if len(raw) == 0 || raw[0] != '"' || json.Unmarshal(raw, &value) != nil {
+		return false
+	}
+	return value == want
 }
 
 func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
@@ -415,8 +534,8 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var jwks oauth.Jwks
-	if err := json.Unmarshal(body, &jwks); err != nil {
+	jwks, err := decodeJWKS(body)
+	if err != nil {
 		return err
 	}
 	tp.mu.Lock()
@@ -427,6 +546,18 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 	return nil
 }
 
+// minRSAModulusBits is RFC 7518 section 3.3's floor for an RS256 key: "A key of size 2048 bits or
+// larger MUST be used with these algorithms." The auth server generates 4096-bit keys.
+const minRSAModulusBits = 2048
+
+// maxRSAExponentBytes bounds the exponent's encoding, so it is never folded into an int unbounded.
+// Four bytes hold every exponent crypto/rsa accepts, which stops at 2^31 - 1, and 65537 needs three.
+const maxRSAExponentBytes = 4
+
+// jwkToRSAPublicKey builds the RSA public key an RSA JWK describes, refusing one too weak or
+// malformed to verify with (#709 finding 6): a modulus under minRSAModulusBits, and an exponent
+// longer than maxRSAExponentBytes, even, or below 3, which RFC 8017 section 3.1 requires it not to
+// be (3 <= e <= n - 1, and an RSA exponent is odd).
 func jwkToRSAPublicKey(j oauth.Jwk) (*rsa.PublicKey, error) {
 	if j.Kty != "RSA" {
 		return nil, errs.New("unsupported JWK kty")
@@ -439,12 +570,22 @@ func jwkToRSAPublicKey(j oauth.Jwk) (*rsa.PublicKey, error) {
 	if err != nil {
 		return nil, err
 	}
+	n := new(big.Int).SetBytes(nBytes)
+	if n.BitLen() < minRSAModulusBits {
+		return nil, errs.Errorf("the JWK's modulus is %d bits, under %d", n.BitLen(), minRSAModulusBits)
+	}
+	if len(eBytes) > maxRSAExponentBytes {
+		return nil, errs.Errorf("the JWK's exponent is %d bytes, over %d", len(eBytes), maxRSAExponentBytes)
+	}
 	var eInt int
 	for _, b := range eBytes {
 		eInt = eInt<<8 + int(b)
 	}
+	if eInt < 3 || eInt%2 == 0 {
+		return nil, errs.Errorf("the JWK's exponent %d is below 3 or even", eInt)
+	}
 	pub := &rsa.PublicKey{
-		N: new(big.Int).SetBytes(nBytes),
+		N: n,
 		E: eInt,
 	}
 	return pub, nil

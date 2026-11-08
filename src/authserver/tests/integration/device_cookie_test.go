@@ -139,7 +139,7 @@ func newDeviceFixture(t *testing.T) *deviceFixture {
 }
 
 func (f *deviceFixture) authorizeURL() string {
-	return f.authorizeURLFor("openid", fake.LetterN(43))
+	return f.authorizeURLFor("openid", randomCodeChallenge())
 }
 
 func (f *deviceFixture) authorizeURLFor(scope, codeChallenge string) string {

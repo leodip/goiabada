@@ -40,7 +40,7 @@ var authorizeDeliveryParameters = []string{"client_id", "redirect_uri", "respons
 var authorizeRequestParameters = []string{
 	"client_id", "redirect_uri", "response_type", "response_mode",
 	"code_challenge", "code_challenge_method", "max_age", "acr_values", "state", "nonce", "scope",
-	"ui_locales", "prompt", "id_token_hint",
+	"ui_locales", "prompt", "id_token_hint", "dpop_jkt",
 }
 
 // AuthorizeDeliveryParameters answers a copy of the parameters whose repeat is answered on the
@@ -303,6 +303,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		AcrValuesFromAuthorizeRequest: params.Get("acr_values"),
 		State:                         state,
 		Nonce:                         params.Get("nonce"),
+		DPoPJkt:                       params.Get("dpop_jkt"),
 		UserAgent:                     arrival.UserAgent,
 		IpAddress:                     arrival.IpAddress,
 	}
@@ -390,6 +391,8 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 					ResponseMode:             authContext.ResponseMode,
 					PKCERequired:             client.IsPKCERequired(settings.PKCERequired),
 					ImplicitGrantEnabled:     client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
+					DPoPBoundAccessTokens:    client.DPoPBoundAccessTokens,
+					DPoPJkt:                  authContext.DPoPJkt,
 					AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
 					Scope:                    requestedScope,
 					Nonce:                    authContext.Nonce,

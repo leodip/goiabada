@@ -139,7 +139,7 @@ func TestRequireValidSession_RFC9068(t *testing.T) {
 				assert.Empty(t, logs.Records(), "a token let through writes no rejection")
 				return
 			}
-			assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`,
+			assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`+`, DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`,
 				rr.Header().Get("WWW-Authenticate"))
 			var body api.ErrorResponse
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))

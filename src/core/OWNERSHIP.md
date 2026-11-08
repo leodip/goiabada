@@ -217,6 +217,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateClientAdministrativeScopesRequest` | both-apps | — |
 | `core/api` | `UpdateClientAuthenticationRequest` | both-apps | — |
 | `core/api` | `UpdateClientBackchannelLogoutRequest` | both-apps | — |
+| `core/api` | `UpdateClientDPoPRequest` | both-apps | — |
 | `core/api` | `UpdateClientIntrospectionResourcesRequest` | both-apps | — |
 | `core/api` | `UpdateClientOAuth2FlowsRequest` | both-apps | — |
 | `core/api` | `UpdateClientPermissionsRequest` | both-apps | — |
@@ -424,6 +425,8 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeClientBackchannelLogoutURISchemeInvalid` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientBackchannelLogoutURITooLong` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientBackchannelLogoutURIUserinfo` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeClientDPoPAdminConsoleNotAllowed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeClientDPoPBoundAccessTokensRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientDefaultAcrInvalid` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientDefaultAcrNotApplicable` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientDescriptionTooLong` | both-apps | — |
@@ -733,6 +736,7 @@ command itself and fails on a tree it changed.
 | `core/metrics` | `RouteHTTPSRedirect` | both-apps | — |
 | `core/metrics` | `RoutePreflight` | own-package | — |
 | `core/metrics` | `Sample` | own-package | — |
+| `core/oauth` | `CheckJWTStructure` | both-apps | The one structural rule for every signed JWT Goiabada reads: no crit, no nested cty, valid UTF-8, the unpadded base64url alphabet (#709). The auth server's token parser and the admin console's ID-token reader both run it, so it is written once for both processes rather than copied into each. |
 | `core/oauth` | `ConformErrorDescription` | both-apps | — |
 | `core/oauth` | `ErrorDetail` | both-apps | — |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |

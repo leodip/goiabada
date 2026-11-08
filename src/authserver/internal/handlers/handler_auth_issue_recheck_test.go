@@ -344,6 +344,66 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 	})
 }
 
+// A client switched to "Require DPoP for token requests" while a user sat on a step is refused the
+// access token an implicit ceremony would put in the redirect, unauthorized_client by redirect with
+// the sentence /auth/authorize gives the same condition, after the clear and with nothing issued
+// (#42 decision 13). "id_token" alone returns no access token and is issued as before, and so is a
+// code ceremony: its tokens come from the token endpoint, which takes the proof.
+func TestHandleIssueGet_AClientRequiringDPoPIsRefusedAnImplicitAccessToken(t *testing.T) {
+	for _, responseType := range []string{"token", "id_token token"} {
+		t.Run(responseType, func(t *testing.T) {
+			f := newRecheckFixture(t, responseType, "")
+			f.client.DPoPBoundAccessTokens = true
+
+			var order []string
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
+				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
+
+			f.serve()
+
+			require.Equal(t, http.StatusFound, f.rr.Code)
+			params := answerParams(t, f.rr.Header().Get("Location"), true)
+			assert.Equal(t, "unauthorized_client", params.Get("error"))
+			assert.Equal(t, protocolvalidation.ImplicitDPoPRequiredErrorMsg, params.Get("error_description"))
+			assert.Equal(t, "test-state", params.Get("state"))
+			assert.Equal(t, []string{"clear"}, order)
+			f.assertNothingIssued(t)
+			f.database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+
+	t.Run("id_token alone is issued", func(t *testing.T) {
+		f := newRecheckFixture(t, "id_token", "")
+		f.client.DPoPBoundAccessTokens = true
+
+		f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, false, true).
+			Return(&issuance.ImplicitGrantResponse{IdToken: "the-id-token"}, nil).Once()
+		f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return().Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+
+		f.serve()
+
+		assert.Contains(t, f.rr.Header().Get("Location"), "id_token=the-id-token")
+		f.implicitIssuer.AssertExpectations(t)
+	})
+
+	t.Run("a code ceremony is issued its code", func(t *testing.T) {
+		f := newRecheckFixture(t, "code", "")
+		f.client.DPoPBoundAccessTokens = true
+
+		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
+			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+				State: "test-state"}, nil).Once()
+		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+
+		f.serve()
+
+		assert.Contains(t, f.rr.Header().Get("Location"), "code=the-code")
+		f.codeIssuer.AssertExpectations(t)
+	})
+}
+
 // A user disabled since /auth/completed is answered access_denied by redirect, and the event is the
 // one /auth/completed writes for the same condition, so an administrator reading the audit log
 // finds one event wherever it was caught (decision 17).

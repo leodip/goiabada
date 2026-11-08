@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/dpop"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -75,6 +76,9 @@ func HandleWellKnownOIDCConfigGet(
 			// advertised whether or not any client has registered a URI (#784 decision 4).
 			BackchannelLogoutSupported:        true,
 			BackchannelLogoutSessionSupported: true,
+			// RFC 9449 section 5.1: the fixed list a DPoP proof's alg is checked against (#42
+			// decision 4).
+			DPoPSigningAlgValuesSupported: dpop.SigningAlgorithms(),
 		}
 
 		// Include registration endpoint if DCR is enabled (RFC 7591 §4)
@@ -82,6 +86,16 @@ func HandleWellKnownOIDCConfigGet(
 			wellKnownConfig.RegistrationEndpoint = baseURL + "/connect/register"
 		}
 
+		setMetadataCacheLifetime(w)
 		jsonWriter.EncodeJSON(w, r, wellKnownConfig)
 	}
+}
+
+// setMetadataCacheLifetime lets any cache keep the discovery document or the key set for five
+// minutes (RFC 9111 section 5.2.2.1), written on the success path only, so a fault keeps the no-store
+// its error writer gives it (#714). Five minutes holds across a key rotation: the next key is
+// published before it signs, so a cached set already carries it, and only two rotations within five
+// minutes would leave a cached set without the key that signs.
+func setMetadataCacheLifetime(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "public, max-age=300")
 }

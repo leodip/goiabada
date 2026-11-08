@@ -61,7 +61,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -170,7 +170,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -287,7 +287,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -409,7 +409,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -535,7 +535,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -654,7 +654,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -750,7 +750,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
@@ -869,7 +869,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"

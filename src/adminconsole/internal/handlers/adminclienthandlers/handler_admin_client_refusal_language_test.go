@@ -57,6 +57,10 @@ func (*refusingClientApiClient) UpdateClientTokens(context.Context, string, int6
 	panic("unexpected call to UpdateClientTokens")
 }
 
+func (*refusingClientApiClient) UpdateClientDPoP(context.Context, string, int64, *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
+	panic("unexpected call to UpdateClientDPoP")
+}
+
 // The client pages' refusals are the console's own sentences, and they come from the catalog in the
 // language the page is rendered in: English with no language on the request, word for word what
 // they said before, and Portuguese under pt-BR (#559 decision 4).

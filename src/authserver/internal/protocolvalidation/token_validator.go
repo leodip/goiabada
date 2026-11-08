@@ -3,6 +3,7 @@ package protocolvalidation
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 
 	"github.com/leodip/goiabada/core/errs"
@@ -88,6 +89,10 @@ type ValidateTokenRequestInput struct {
 	// Username and Password are used for ROPC grant (RFC 6749 Section 4.3)
 	Username string
 	Password string
+	// DPoPThumbprint is the RFC 7638 thumbprint of the key the request's valid DPoP proof was signed
+	// with, empty when the request carries no proof (RFC 9449 section 5). A refresh of a token bound
+	// to a key is refused unless it is that key's (#42 decision 11).
+	DPoPThumbprint string
 }
 
 // TokenGrant is what a validated token request is: one type per grant, declared beside the method
@@ -143,6 +148,29 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *r
 		// validator's tests hold the two in agreement.
 		return nil, errs.Errorf("grant type %q is accepted at the token endpoint but has no validation", input.GrantType)
 	}
+}
+
+// ClientRequiresDPoPMessage refuses a token request without a DPoP proof from a client set to
+// "Require DPoP for token requests" (#42 decision 12).
+const ClientRequiresDPoPMessage = "This client requires a DPoP proof with every token request."
+
+// refuseWithoutRequiredProof refuses a token request that carries no DPoP proof from a client that
+// requires DPoP, 400 invalid_dpop_proof with a Warn record, as a refused client authentication is
+// (RFC 9449 section 5.2: the server MUST reject token requests from such a client that do not
+// contain the DPoP header). input.DPoPThumbprint is empty exactly when the request had no DPoP
+// header: a header whose proof failed was refused at the endpoint, before the validator ran.
+//
+// Each grant calls it right after it authenticates the client, so a wrong secret is still
+// invalid_client and a stranger cannot learn the setting, and before anything of the grant itself
+// is looked at: no password is compared and no refresh token is read for a request refused here.
+func refuseWithoutRequiredProof(ctx context.Context, client *record.Client, input *ValidateTokenRequestInput) error {
+	if !client.DPoPBoundAccessTokens || input.DPoPThumbprint != "" {
+		return nil
+	}
+	slog.WarnContext(ctx, "token request refused: the client requires dpop",
+		"client_identifier", client.ClientIdentifier,
+		"grant_type", input.GrantType.String())
+	return oauth.NewErrorDetailWithHTTPStatus("invalid_dpop_proof", ClientRequiresDPoPMessage, http.StatusBadRequest)
 }
 
 // asTokenGrant hands a grant method's answer back as a TokenGrant. A refusal comes back as a nil

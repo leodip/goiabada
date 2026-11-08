@@ -43,6 +43,9 @@ export function isWebClientKey(key: string): key is WebClientKey {
 // The SPA is a public client: it runs in the browser, with no secret.
 export const spaClientId = env("SPA_CLIENT_ID", "testapp-spa");
 
+// The SPA with DPoP is another public client, set to require DPoP for token requests.
+export const spaDpopClientId = env("SPA_DPOP_CLIENT_ID", "testapp-spa-dpop");
+
 // The service calls the API on its own, with the client credentials flow.
 export const serviceClient = {
   clientId: env("SERVICE_CLIENT_ID", "testapp-service"),

@@ -14,7 +14,7 @@ var clientColumns = columnList{
 	sqlite: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
 		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
-		"backchannel_logout_session_required, created_via_dcr, " +
+		"backchannel_logout_session_required, dpop_bound_access_tokens, created_via_dcr, " +
 		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
 		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
 		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -25,7 +25,7 @@ var clientColumns = columnList{
 	mysql: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
 		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
-		"backchannel_logout_session_required, created_via_dcr, " +
+		"backchannel_logout_session_required, dpop_bound_access_tokens, created_via_dcr, " +
 		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
 		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
 		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -36,7 +36,7 @@ var clientColumns = columnList{
 	postgres: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
 		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
-		"backchannel_logout_session_required, created_via_dcr, " +
+		"backchannel_logout_session_required, dpop_bound_access_tokens, created_via_dcr, " +
 		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
 		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
 		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -47,7 +47,7 @@ var clientColumns = columnList{
 	mssql: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
 		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
-		"backchannel_logout_session_required, created_via_dcr, " +
+		"backchannel_logout_session_required, dpop_bound_access_tokens, created_via_dcr, " +
 		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
 		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
 		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -75,6 +75,7 @@ func scanClient(row rowScanner, client *record.Client) error {
 		&client.RememberConsent,
 		&client.BackchannelLogoutURI,
 		&client.BackchannelLogoutSessionRequired,
+		&client.DPoPBoundAccessTokens,
 		&client.CreatedViaDCR,
 		&client.AdministrativeScopesAllowed,
 		&client.ShowLogo,
@@ -101,7 +102,8 @@ var insertClient = statement{
 		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
 		"terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
-		"backchannel_logout_session_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
+		"backchannel_logout_session_required, dpop_bound_access_tokens, created_via_dcr, " +
+		"administrative_scopes_allowed, show_logo, " +
 		"show_display_name, show_description, show_website_url, is_public, " +
 		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
 		"implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -109,12 +111,13 @@ var insertClient = statement{
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES (?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
 		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
 		"terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
-		"backchannel_logout_session_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
+		"backchannel_logout_session_required, dpop_bound_access_tokens, created_via_dcr, " +
+		"administrative_scopes_allowed, show_logo, " +
 		"show_display_name, show_description, show_website_url, is_public, " +
 		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
 		"implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -122,12 +125,13 @@ var insertClient = statement{
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES (?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
 		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
 		"terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
-		"backchannel_logout_session_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
+		"backchannel_logout_session_required, dpop_bound_access_tokens, created_via_dcr, " +
+		"administrative_scopes_allowed, show_logo, " +
 		"show_display_name, show_description, show_website_url, is_public, " +
 		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
 		"implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -136,12 +140,13 @@ var insertClient = statement{
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES ($1, $2, $3, $4, " +
 		"$5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, " +
-		"$23, $24, $25, $26, $27, $28, $29, $30, $31, $32) RETURNING id",
+		"$23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33) RETURNING id",
 	mssql: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
 		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
 		"terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
-		"backchannel_logout_session_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
+		"backchannel_logout_session_required, dpop_bound_access_tokens, created_via_dcr, " +
+		"administrative_scopes_allowed, show_logo, " +
 		"show_display_name, show_description, show_website_url, is_public, " +
 		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
 		"implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
@@ -151,14 +156,16 @@ var insertClient = statement{
 		"include_open_id_connect_claims_in_id_token, " +
 		"default_acr_level) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, " +
 		"@p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, " +
-		"@p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32)",
+		"@p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, @p33)",
 }
 
 // updateClient writes the whole row but created_at, administrative_scopes_allowed,
-// remember_consent and the two back-channel logout columns, which are dont-update: the allowance
-// has one writer, SetClientAdministrativeScopesAllowed, Remember consent is written only by
-// CreateClient, SetClientRememberConsent and SetClientPublic's transition, and the back-channel
-// logout columns only by CreateClient and SetClientBackchannelLogout (#499, #711, #784).
+// remember_consent, the two back-channel logout columns and dpop_bound_access_tokens, which are
+// dont-update: the allowance has one writer, SetClientAdministrativeScopesAllowed, Remember consent
+// is written only by CreateClient, SetClientRememberConsent and SetClientPublic's transition, the
+// back-channel logout columns only by CreateClient and SetClientBackchannelLogout, and "Require DPoP
+// for token requests" only by CreateClient and SetClientDPoPBoundAccessTokens (#499, #711, #784,
+// #42).
 var updateClient = statement{
 	sqlite: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
 		"description = ?, website_url = ?, privacy_policy_url = ?, terms_of_service_url = ?, " +
@@ -223,6 +230,15 @@ var setClientBackchannelLogout = statement{
 	mysql:    "UPDATE clients SET backchannel_logout_uri = ?, backchannel_logout_session_required = ?, updated_at = ? WHERE id = ?",
 	postgres: "UPDATE clients SET backchannel_logout_uri = $1, backchannel_logout_session_required = $2, updated_at = $3 WHERE id = $4",
 	mssql:    "UPDATE clients SET backchannel_logout_uri = @p1, backchannel_logout_session_required = @p2, updated_at = @p3 WHERE id = @p4",
+}
+
+// setClientDPoPBoundAccessTokens writes "Require DPoP for token requests"; see
+// SetClientDPoPBoundAccessTokens.
+var setClientDPoPBoundAccessTokens = statement{
+	sqlite:   "UPDATE clients SET dpop_bound_access_tokens = ?, updated_at = ? WHERE id = ?",
+	mysql:    "UPDATE clients SET dpop_bound_access_tokens = ?, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE clients SET dpop_bound_access_tokens = $1, updated_at = $2 WHERE id = $3",
+	mssql:    "UPDATE clients SET dpop_bound_access_tokens = @p1, updated_at = @p2 WHERE id = @p3",
 }
 
 var setClientAdministrativeScopesAllowed = statement{
@@ -298,7 +314,8 @@ func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *record.
 		client.CreatedAt, client.UpdatedAt, client.ClientIdentifier, client.ClientSecretEncrypted,
 		client.Description, client.WebsiteURL, client.PrivacyPolicyURL, client.TermsOfServiceURL,
 		client.DisplayName, client.Enabled, client.ConsentRequired, client.RememberConsent,
-		client.BackchannelLogoutURI, client.BackchannelLogoutSessionRequired, client.CreatedViaDCR,
+		client.BackchannelLogoutURI, client.BackchannelLogoutSessionRequired, client.DPoPBoundAccessTokens,
+		client.CreatedViaDCR,
 		client.AdministrativeScopesAllowed, client.ShowLogo, client.ShowDisplayName, client.ShowDescription, client.ShowWebsiteURL, client.IsPublic, client.AuthorizationCodeEnabled,
 		client.ClientCredentialsEnabled, client.PKCERequired, client.ImplicitGrantEnabled,
 		client.ResourceOwnerPasswordCredentialsEnabled, client.TokenExpirationInSeconds,
@@ -400,6 +417,26 @@ func (d *Database) SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, c
 	if _, err := d.ExecSQL(ctx, tx, setClientBackchannelLogout.text(d.Dialect),
 		uri, sessionRequired, time.Now().UTC(), clientId); err != nil {
 		return errs.Wrap(err, "unable to set the client's back-channel logout")
+	}
+	return nil
+}
+
+// SetClientDPoPBoundAccessTokens writes whether the client requires DPoP for its token requests
+// (RFC 9449 section 5.2's dpop_bound_access_tokens), and nothing else but updated_at (#42 decision
+// 12). UpdateClient leaves the column out (dont-update), so a whole-row save made from a copy read
+// earlier cannot write back a setting switched since; this and CreateClient are its writers.
+//
+// A client that is not there affects no rows and is not reported here, for the reason
+// AcquireClientRow gives.
+func (d *Database) SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error {
+
+	if clientId == 0 {
+		return errs.New("can't set the DPoP requirement of a client with an id of 0")
+	}
+
+	if _, err := d.ExecSQL(ctx, tx, setClientDPoPBoundAccessTokens.text(d.Dialect),
+		required, time.Now().UTC(), clientId); err != nil {
+		return errs.Wrap(err, "unable to set the client's DPoP requirement")
 	}
 	return nil
 }

@@ -47,7 +47,7 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 
 	// prompt=none without acr_values, client default is level2_optional, session is level1
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -78,7 +78,7 @@ func TestPromptNone_ClientDefaultAcrSatisfied(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -149,7 +149,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 	// which the session met, and a code was issued.
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
@@ -186,7 +186,7 @@ func TestPromptNone_InvalidRedirectUri(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	// Use a redirect_uri that doesn't match the client's registered URIs
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape("https://evil.com/callback") +
@@ -214,7 +214,7 @@ func TestPromptNone_InvalidClientId(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=nonexistent-client-12345" +
 		"&redirect_uri=" + url.QueryEscape("https://example.com/callback") +
 		"&response_type=code" +
@@ -242,7 +242,7 @@ func TestPromptNone_InvalidResponseType(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	requestState := fake.LetterN(8)
-	requestCodeChallenge := fake.LetterN(43)
+	requestCodeChallenge := randomCodeChallenge()
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=invalid_type" +

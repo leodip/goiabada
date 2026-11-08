@@ -28,7 +28,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/bootstrap"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
+	"github.com/leodip/goiabada/authserver/internal/dpop"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/server"
 	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
@@ -325,8 +327,20 @@ func run() int {
 
 	slog.Info("initialized server-side session store")
 
+	// DPoP proofs at the token endpoint name the public base URL, never the internal one, and carry
+	// nonces under a key derived from the current session authentication key, which every instance
+	// sharing this configuration holds; after a rotation an old nonce costs a client one retry
+	// (#42 decisions 6 and 7). Each proof is recorded in the database, so it is accepted once by
+	// every instance sharing it (decision 9).
+	proofChecker, err := dpop.NewChecker(cfg.AuthServer.BaseURL)
+	if err != nil {
+		slog.Error("the auth server base URL cannot be used to check DPoP proofs", "error", err)
+		return 1
+	}
+	tokenProofs := handlers.TokenProofs{Checker: proofChecker, Nonces: dpop.NewNonces(currentKeys.AuthenticationKey), Replays: database}
+
 	r := routing.New()
-	s := server.NewServer(r, database, sessionStore, dataCipher, trustedProxies, cfg)
+	s := server.NewServer(r, database, sessionStore, dataCipher, trustedProxies, cfg, tokenProofs)
 
 	// A signal that arrived during the steps above that read no context, the session keys and the
 	// store, is still a stop during startup: the server does not start. From here on a signal is

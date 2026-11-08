@@ -250,6 +250,18 @@ var clientTargetWrites = []clientTargetWrite{
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 	{
+		name: "PUT /clients/{id}/dpop",
+		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string, client *record.Client) *httptest.ResponseRecorder {
+			r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/dpop", `{"dpopBoundAccessTokens":true}`, scope)
+			rr := httptest.NewRecorder()
+			HandleClientDPoPPut(database, auditLogger).ServeHTTP(rr, r)
+			return rr
+		},
+		writes:                            []string{"SetClientDPoPBoundAccessTokens"},
+		expectFirstWrite:                  failingWrite("SetClientDPoPBoundAccessTokens", mock.Anything, (*sql.Tx)(nil), targetClientId, true),
+		refusedEarlierForTheConsoleClient: true,
+	},
+	{
 		name: "PUT /clients/{id}/permissions",
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string, client *record.Client) *httptest.ResponseRecorder {
 			r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/permissions", `{"permissionIds":[],"expectedPermissionIds":[]}`, scope)

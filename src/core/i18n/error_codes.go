@@ -258,6 +258,10 @@ const (
 	ErrCodeClientBackchannelLogoutURIHTTPPublicClient     = "handler.client_backchannel_logout.uri_http_public_client"   // Args: {"uri": string}
 	ErrCodeClientBackchannelLogoutURIHTTPSelfRegistered   = "handler.client_backchannel_logout.uri_http_self_registered" // Args: {"uri": string}
 
+	// The "Require DPoP for token requests" save, PUT /clients/{id}/dpop (#42 decision 12).
+	ErrCodeClientDPoPBoundAccessTokensRequired = "handler.client_dpop.dpop_bound_access_tokens_required"
+	ErrCodeClientDPoPAdminConsoleNotAllowed    = "handler.client_dpop.admin_console_not_allowed"
+
 	ErrCodeClientWebOriginEmpty            = "handler.client_web_origins.empty"
 	ErrCodeClientWebOriginInvalid          = "handler.client_web_origins.invalid"  // Args: {"origin": string}
 	ErrCodeClientWebOriginTooLong          = "handler.client_web_origins.too_long" // Args: {"length": int, "max": int, "origin": string}

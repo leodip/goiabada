@@ -88,7 +88,7 @@ func validCodeFlowInput() ValidateRequestInput {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "query",
 		Scope:                    "openid",
 	}

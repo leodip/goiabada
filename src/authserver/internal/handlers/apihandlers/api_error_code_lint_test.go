@@ -93,13 +93,14 @@ var apiErrorCodes = map[string]string{
 
 	// Authentication and authorization. A caller distinguishes "send a token", "the token is not
 	// good enough" and "the session is gone", and retries differently for each.
-	// ACCESS_TOKEN_REQUIRED, INVALID_REQUEST, INVALID_TOKEN, USER_CONTEXT_REQUIRED,
-	// INSUFFICIENT_SCOPE, CLIENT_NOT_ALLOWED and INSUFFICIENT_USER_AUTHENTICATION are the bearer middleware's; the rest are handlers'. An account handler
-	// reached without the token or subject that middleware guarantees answers the 500, not a 401
-	// of its own (#522 decision 4).
+	// ACCESS_TOKEN_REQUIRED, INVALID_REQUEST, INVALID_TOKEN, INVALID_DPOP_PROOF, USER_CONTEXT_REQUIRED,
+	// INSUFFICIENT_SCOPE, CLIENT_NOT_ALLOWED and INSUFFICIENT_USER_AUTHENTICATION are the bearer
+	// middleware's; the rest are handlers'. An account handler reached without the token or subject
+	// that middleware guarantees answers the 500, not a 401 of its own (#522 decision 4).
 	"ACCESS_TOKEN_REQUIRED":            "401: no bearer token, so the caller obtains one.",
 	"INVALID_REQUEST":                  "400: the bearer token was sent by two methods at once, or its access_token parameter twice: RFC 6750 section 3.1's invalid_request.",
 	"INVALID_TOKEN":                    "401: the bearer token did not validate.",
+	"INVALID_DPOP_PROOF":               "401: the token was sent with the DPoP scheme and its DPoP proof is missing, invalid or used before, so the caller sends a fresh proof (RFC 9449 section 7.1, #42).",
 	"INVALID_SESSION":                  "401: the session behind the token is gone.",
 	"USER_CONTEXT_REQUIRED":            "403: the endpoint needs a user, and the token carries none.",
 	"INSUFFICIENT_SCOPE":               "403: the token's scopes do not cover the route.",

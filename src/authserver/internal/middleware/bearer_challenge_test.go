@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -52,5 +53,5 @@ func TestBearerChallenge(t *testing.T) {
 func TestInsufficientScopeChallenge(t *testing.T) {
 	assert.Equal(t,
 		`Bearer realm="goiabada", error="insufficient_scope", error_description="Only manage.", scope="authserver:manage"`,
-		InsufficientScopeChallenge("Only manage.", "authserver:manage"))
+		InsufficientScopeChallenge(context.Background(), "Only manage.", "authserver:manage"))
 }

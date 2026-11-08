@@ -90,8 +90,8 @@ func parityAllowlist() []parityRule {
 				"stored as whatever the driver writes, which is the same microsecond text the " +
 				"other three keep in datetime(6). Declaring a precision there would be a lie " +
 				"about a type SQLite does not enforce.",
-			Count:  85,
-			Digest: "f109cf7cc08972a8",
+			Count:  86,
+			Digest: "55091b94e0b5fc7b",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "datetime(no declared precision)" &&
@@ -104,8 +104,8 @@ func parityAllowlist() []parityRule {
 				"so a width there would be documentation the engine ignores. The other three " +
 				"enforce theirs, which is why this is recorded as a difference rather than " +
 				"folded onto unbounded: SQLite really does store a value SQL Server would refuse.",
-			Count:  113,
-			Digest: "ca740ac46442303c",
+			Count:  116,
+			Digest: "e17cb6f0026cf9ae",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "string(no declared length)" &&
@@ -131,8 +131,8 @@ func parityAllowlist() []parityRule {
 			Why: "SQLite has no boolean type and stores 0 and 1 whatever the column is declared " +
 				"as. The migrations spelled some of these NUMERIC and some INTEGER, which the " +
 				"catalog reports verbatim; both accept exactly what the data layer writes.",
-			Count:  23,
-			Digest: "f8f00a09211e0819",
+			Count:  24,
+			Digest: "48029acf9819c4a8",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "numeric" && d.Says[data.MySQL] == "bool"

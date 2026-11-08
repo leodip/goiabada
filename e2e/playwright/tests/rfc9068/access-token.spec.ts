@@ -6,6 +6,7 @@
 // ../testapp/protect-an-api.spec.ts.
 import type { Page } from "@playwright/test";
 import { clientUrl, confirmDialog, grantClientPermission, grantUserPermission, readClientSecret } from "../../lib/admin-console";
+import { authServerDPoPChallenge } from "../../lib/dpop";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { clientCredentialsToken, jwtClaims, refreshToken, userTokens, userinfo } from "../../lib/oauth";
@@ -99,7 +100,7 @@ test("the auth server refuses a user's access token while its client is disabled
   });
   expect(refused.status()).toBe(401);
   expect(refused.headers()["www-authenticate"]).toBe(
-    'Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."',
+    `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid.", ${authServerDPoPChallenge}`,
   );
 
   await setClientEnabled(page, client.id, true);

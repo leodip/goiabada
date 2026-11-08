@@ -3,6 +3,8 @@ package integration
 import (
 	"crypto/sha256"
 	"encoding/base64"
+
+	"github.com/leodip/goiabada/authserver/internal/fake"
 )
 
 // testCodeVerifier is a PKCE code_verifier that satisfies RFC 7636 section 4.1, which the token
@@ -18,3 +20,11 @@ var testCodeChallenge = func() string {
 	sum := sha256.Sum256([]byte(testCodeVerifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }()
+
+// randomCodeChallenge is a fresh S256 challenge for an authorization request whose code is never
+// redeemed: the challenge of a random verifier, so the authorization endpoint, which holds a
+// challenge to the canonical base64url form of a SHA-256 hash (#714), accepts it.
+func randomCodeChallenge() string {
+	sum := sha256.Sum256([]byte(fake.LetterN(43)))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}

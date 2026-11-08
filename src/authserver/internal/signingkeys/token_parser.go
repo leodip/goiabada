@@ -81,8 +81,9 @@ func refused(err error) error {
 // no key.
 //
 // A failure of the token itself carries ErrTokenRefused, and an expired token ErrTokenExpired too.
-// A token that is malformed or not RS256 is refused before any key is read. A key that could not be
-// read or decoded leaves the token unchecked, and that error carries neither mark (#680).
+// A token that is malformed, refused by oauth.CheckJWTStructure, or not RS256 is refused before any
+// key is read. A key that could not be read or decoded leaves the token unchecked, and that error
+// carries neither mark (#680).
 //
 // The key always comes from the database. It used to be a parameter every caller passed as nil, so
 // the one branch that used it was never reached in production (#424).
@@ -95,6 +96,13 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 
 	if len(token) == 0 {
 		return result, nil
+	}
+
+	// The library tolerates what the compact serialization does not: CR and LF inside a segment,
+	// invalid UTF-8, a crit header it does not understand and a nested JWT's cty (#709). A token
+	// refused here is a malformed one, marked as the library marks it, and no key is read for it.
+	if err := oauth.CheckJWTStructure(token); err != nil {
+		return nil, refused(errs.Errorf("%w: %w", jwt.ErrTokenMalformed, err))
 	}
 
 	claims := jwt.MapClaims{}

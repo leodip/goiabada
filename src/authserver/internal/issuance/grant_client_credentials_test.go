@@ -93,7 +93,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 				PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 			}, nil)
 
-			response, err := tokenIssuer.IssueClientCredentialsGrant(ctx, settings, tt.client, tt.scope)
+			response, err := tokenIssuer.IssueClientCredentialsGrant(ctx, settings, tt.client, tt.scope, "")
 
 			require.NoError(t, err)
 			assert.NotNil(t, response)
@@ -148,7 +148,7 @@ func TestIssueClientCredentialsGrant_InvalidScope(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.IssueClientCredentialsGrant(ctx, settings, client, "invalid-scope")
+	response, err := tokenIssuer.IssueClientCredentialsGrant(ctx, settings, client, "invalid-scope", "")
 
 	if err == nil {
 		t.Error("Expected an error, but got nil")

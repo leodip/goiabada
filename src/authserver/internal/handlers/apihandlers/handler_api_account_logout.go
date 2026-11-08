@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -140,7 +141,7 @@ func HandleAccountLogoutRequestPost(
 		// Strict session check: current sid must belong to a live session and be associated with this client
 		sid := jwtToken.StringClaim("sid")
 		if sid == "" {
-			writeJSONError(w, "Current token lacks session identifier", "INVALID_SESSION", http.StatusUnauthorized)
+			refuseInvalidSession(w, r, "Current token lacks session identifier")
 			return
 		}
 		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sid)
@@ -151,7 +152,7 @@ func HandleAccountLogoutRequestPost(
 			return
 		}
 		if userSession == nil {
-			writeJSONError(w, "Session not found", "INVALID_SESSION", http.StatusUnauthorized)
+			refuseInvalidSession(w, r, "Session not found")
 			return
 		}
 		if err = database.UserSessionLoadClients(r.Context(), nil, userSession); err != nil {
@@ -170,7 +171,7 @@ func HandleAccountLogoutRequestPost(
 			}
 		}
 		if !hasClient {
-			writeJSONError(w, "Client not part of the current session", "INVALID_SESSION", http.StatusUnauthorized)
+			refuseInvalidSession(w, r, "Client not part of the current session")
 			return
 		}
 
@@ -238,4 +239,14 @@ func HandleAccountLogoutRequestPost(
 		resp := api.AccountLogoutRedirectResponse{LogoutUrl: logoutUrl}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
+}
+
+// refuseInvalidSession answers the 401 INVALID_SESSION of a token whose session cannot sign the
+// user out of the client, with the challenges every 401 of the API carries: Bearer first and DPoP
+// second, invalid_token in the scheme the token was presented with (RFC 9110 section 15.5.2, #42
+// decision 10). RFC 6750 section 3.1's invalid_token covers a token "invalid for other reasons",
+// and a new sign-in is what puts it right.
+func refuseInvalidSession(w http.ResponseWriter, r *http.Request, description string) {
+	w.Header().Set("WWW-Authenticate", middleware.UnauthorizedChallenge(r.Context(), "invalid_token", description))
+	writeJSONError(w, description, "INVALID_SESSION", http.StatusUnauthorized)
 }

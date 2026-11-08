@@ -41,6 +41,11 @@ is that refused code, and `PreviousStepCode` the oldest accepted one, which a te
 the current step's code unspent for a second sign-in. Both wait out the last two seconds of a step,
 so the step cannot turn before the server checks the code.
 
+A test that sends a DPoP proof builds it with `authserver/internal/dpop/dpoptest`, test support like
+`otptest`: ES256 over RFC 7517's and RFC 7515's published P-256 keys, signed with the standard
+library and importing nothing from `dpop`, each key's `Thumbprint` a literal worked out apart from
+Go, so an assertion on `cnf.jkt` does not recompute what the server computes (#42).
+
 **Settings row in the integration tier**: every integration test runs against one server and one
 settings row, which the server reads on every request, so a value a test leaves there is what every
 later test runs against. A test that changes the row, through the admin API or directly, calls

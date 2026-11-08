@@ -37,9 +37,9 @@ var (
 	corsActualVary    = []string{"Origin"}
 
 	// The response headers an allowed actual answer lets script read beyond the CORS-safelisted
-	// ones (Fetch Standard section 2.2.2): the bearer challenge on a 401 and the back-off on a 429
-	// (#716 item 2).
-	corsExposed = []string{"WWW-Authenticate, Retry-After"}
+	// ones (Fetch Standard section 2.2.2): the bearer challenge on a 401, the back-off on a 429
+	// (#716 item 2), and the nonce a DPoP client retries with (RFC 9449 section 8, #42 decision 15).
+	corsExposed = []string{"WWW-Authenticate, Retry-After, DPoP-Nonce"}
 )
 
 // corsAnswer is what a response says about CORS: its status, whether the next handler ran, and the
@@ -138,8 +138,18 @@ func TestCORS_AnAllowedPreflightIsAnsweredWithTheGrant(t *testing.T) {
 		{name: "the token endpoint with a trailing slash", path: "/auth/token/", origin: corsRegisteredOrigin, method: "POST"},
 		{name: "logout from a registered origin", path: "/auth/logout", origin: corsRegisteredOrigin, method: "POST"},
 		{name: "userinfo from a registered origin, with every allowed header", path: "/userinfo", origin: corsRegisteredOrigin, method: "GET",
-			requestHeaders: "authorization,accept, x-csrf-token,content-type,origin",
-			wantHeaders:    []string{"Authorization, Accept, X-Csrf-Token, Content-Type, Origin"}},
+			requestHeaders: "authorization,accept, x-csrf-token,content-type,origin,dpop",
+			wantHeaders:    []string{"Authorization, Accept, X-Csrf-Token, Content-Type, Origin, Dpop"}},
+		// A browser app sends its proof in a DPoP header, which is not CORS-safelisted, so the token
+		// endpoint's preflight asks for it (RFC 9449 section 4.1, #42 decision 15). A browser names
+		// the header lower-cased, and the grant names it in Go's canonical spelling, which a browser
+		// compares without regard to case (Fetch Standard section 4.8).
+		{name: "the token endpoint from a registered origin, with the DPoP header", path: "/auth/token", origin: corsRegisteredOrigin,
+			method: "POST", requestHeaders: "content-type,dpop", wantHeaders: []string{"Content-Type, Dpop"}},
+		{name: "userinfo from a registered origin, with the DPoP header", path: "/userinfo", origin: corsRegisteredOrigin,
+			method: "GET", requestHeaders: "authorization, dpop", wantHeaders: []string{"Authorization, Dpop"}},
+		{name: "the DPoP header spelled as the RFC spells it", path: "/auth/token", origin: corsRegisteredOrigin,
+			method: "POST", requestHeaders: "DPoP", wantHeaders: []string{"Dpop"}},
 		// RFC 9110 section 5.6.1 lets a list put optional whitespace, SP or HTAB, around each comma,
 		// and the library granted all three spellings.
 		{name: "a tab after a comma", path: "/certs", origin: corsAnyOrigin, method: "GET",
@@ -196,6 +206,14 @@ func TestCORS_ARefusedPreflightIsAnsweredWithNoGrant(t *testing.T) {
 		{name: "PUT from an allowed origin", path: "/certs", origin: corsAnyOrigin, method: "PUT"},
 		{name: "PATCH from a registered origin", path: "/userinfo", origin: corsRegisteredOrigin, method: "PATCH"},
 		{name: "a header outside the list", path: "/userinfo", origin: corsRegisteredOrigin, method: "GET", requestHeaders: "authorization, x-requested-with"},
+		// The DPoP header is allowed only where an origin is: the origin rules are unchanged (#42
+		// decision 15).
+		{name: "an unregistered origin at the token endpoint, with the DPoP header", path: "/auth/token", origin: corsUnknownOrigin,
+			method: "POST", requestHeaders: "content-type, dpop"},
+		{name: "a registered origin asking for the DPoP header at the admin API", path: "/api/v1/admin/clients", origin: corsRegisteredOrigin,
+			method: "GET", requestHeaders: "authorization, dpop"},
+		{name: "the DPoP-Nonce response header is not a request header", path: "/auth/token", origin: corsRegisteredOrigin,
+			method: "POST", requestHeaders: "dpop-nonce"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -289,8 +307,8 @@ func TestCORS_OnlyAnOptionsWithOriginAndRequestMethodIsAPreflight(t *testing.T) 
 }
 
 // The ordinary request branch: passed on, varying on Origin, and naming the origin only when it is
-// allowed and the method is one of the five listed, whatever its case, exposing WWW-Authenticate and
-// Retry-After beside it. A refused request exposes nothing, and nothing else is granted.
+// allowed and the method is one of the five listed, whatever its case, exposing WWW-Authenticate,
+// Retry-After and DPoP-Nonce beside it. A refused request exposes nothing, and nothing else is granted.
 func TestCORS_AnOrdinaryRequestNamesAnAllowedOriginOnly(t *testing.T) {
 	tests := []struct {
 		name      string

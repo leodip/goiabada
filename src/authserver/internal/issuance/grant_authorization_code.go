@@ -39,8 +39,11 @@ var ErrCodeNotClaimed = errors.New("the authorization code was no longer unused 
 // case the session is already gone and its grants already swept. Reuse protection is not weakened:
 // a genuine LATER replay of a used code is detected by the validator and cascaded by the token
 // handler (#77).
+//
+// dpopThumbprint binds the access token to the request's proof key, empty for a bearer token, and a
+// public client's refresh token too, the first of its family (#42 decision 11).
 func (t *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings,
-	code *record.Code) (*oauth.TokenResponse, error) {
+	code *record.Code, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
 	claimed, err := t.database.MarkCodeAsUsed(ctx, nil, code.Id)
 	if err != nil {
@@ -53,12 +56,12 @@ func (t *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings 
 		return nil, ErrCodeNotClaimed
 	}
 
-	return t.mintAuthorizationCodeTokens(ctx, settings, code)
+	return t.mintAuthorizationCodeTokens(ctx, settings, code, dpopThumbprint)
 }
 
 // mintAuthorizationCodeTokens mints a claimed code's tokens and inserts its first refresh token.
 func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings *record.Settings,
-	code *record.Code) (*oauth.TokenResponse, error) {
+	code *record.Code, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
 	err := t.database.CodeLoadClient(ctx, nil, code)
 	if err != nil {
@@ -68,7 +71,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, &code.Client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: TokenTypeBearer.String(),
+		TokenType: ResponseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -106,7 +109,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 	grantId := uuid.New()
 
 	// nil parent: this is the initial code exchange, so the code is the authorizing credential.
-	accessTokenStr, err := t.generateAccessToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId)
+	accessTokenStr, err := t.generateAccessToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId, dpopThumbprint)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +129,8 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId,
+		dpopThumbprint)
 	if err != nil {
 		if errors.Is(err, errSessionRowGone) {
 			// The code's session has ended since it was issued (a sign-out, a newer sign-in

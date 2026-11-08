@@ -13,7 +13,7 @@ two Playwright suites against them:
 |---|---|
 | `e2e-auth.goiabada.dev` | Auth server |
 | `e2e-admin.goiabada.dev` | Admin console |
-| `e2e-webtest1.goiabada.dev` | The test app (`testapp/`): the web app, the SPA, the service and the API |
+| `e2e-webtest1.goiabada.dev` | The test app (`testapp/`): the web app, the SPAs, the service and the API |
 | `e2e-webtest2.goiabada.dev` | The test app again, for its second web app: single sign-on across two sites |
 
 The deployment is the docs' [Reverse proxy](https://goiabada.dev/deploy/reverse-proxy/) method, as a
@@ -134,7 +134,8 @@ Tests sit under `playwright/tests/`, one folder per area: the admin console (`ad
 `admin-console/shell`, `admin-console/clients/`, `resources/`, `groups/`, `users/`, `legal-documents/`,
 `account/` and `settings/`), the test app (`testapp/`: a user signing in to its web apps, its SPA and its API, single
 sign-on across its two sites, signing out, being told when a session ends, the authorization parameters, and the auth server's own
-pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), the protocol
+pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), DPoP through the
+real proxy (`rfc9449/`, proofs signed by `lib/dpop.ts` with Node's built-in crypto), the protocol
 itself where no page reaches it (`oauth/`), the Turnstile challenge on the auth server's forms with
 Cloudflare's test keys (`turnstile/`), and accessibility (`accessibility/`: axe over every page and
 state of both applications in the light and the dark scheme, the layout at phone and tablet widths,

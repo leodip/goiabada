@@ -183,8 +183,9 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 		case issuanceFactFlows:
 			// Asked only for a registered client, which the registration check has established.
 			facts.flows = &clientFlows{
-				implicit: client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
-				code:     client.AuthorizationCodeEnabled,
+				implicit:     client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
+				code:         client.AuthorizationCodeEnabled,
+				requiresDPoP: client.DPoPBoundAccessTokens,
 			}
 
 		case issuanceFactUser:
@@ -254,6 +255,9 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 
 	case issuanceRefuseImplicitDisabled:
 		return refuseFlowDisabled(ctx, browser, authContext, client, protocolvalidation.ImplicitNotAuthorizedErrorMsg), nil
+
+	case issuanceRefuseImplicitAccessTokenDPoPRequired:
+		return refuseFlowDisabled(ctx, browser, authContext, client, protocolvalidation.ImplicitDPoPRequiredErrorMsg), nil
 
 	case issuanceRefuseCodeDisabled:
 		return refuseFlowDisabled(ctx, browser, authContext, client, protocolvalidation.AuthorizationCodeNotSupportedErrorMsg), nil
@@ -510,6 +514,7 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 		AuthStateGeneration: authContext.AuthStateGeneration,
 		SessionIdentifier:   sessionIdentifier,
 		OTPClaim:            otpClaimOf(authContext),
+		DPoPJkt:             authContext.DPoPJkt,
 	}
 }
 

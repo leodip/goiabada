@@ -881,6 +881,9 @@
 "adminconsole.admin_clients.tokens.include_oidc_in_id_tooltip" = "Não inclua para um cliente que precisa passar nos testes de conformidade do OpenID Connect ou quer ID tokens pequenos; inclua para um que lê claims do usuário no ID token."
 "adminconsole.admin_clients.tokens.id_on" = "Incluir"
 "adminconsole.admin_clients.tokens.id_off" = "Não incluir"
+"adminconsole.admin_clients.tokens.dpop_required" = "Exigir DPoP nas solicitações de token"
+"adminconsole.admin_clients.tokens.dpop_required_tooltip" = "Toda solicitação de token deste cliente precisa trazer uma prova DPoP, para que cada token que ele recebe fique vinculado à sua chave. Uma solicitação sem prova é recusada."
+"adminconsole.admin_clients.tokens.dpop_required_implicit" = "Enquanto esta opção estiver ativa, o cliente não consegue tokens de acesso pelo fluxo implícito: os tipos de resposta token e id_token token são recusados. id_token sozinho e o fluxo authorization code funcionam como antes."
 "adminconsole.admin_clients.tokens.saved_successfully" = "Configurações de tokens salvas."
 
 "adminconsole.admin_clients.authentication.type_legend" = "Tipo de cliente"
@@ -1937,6 +1940,8 @@
 "handler.client_backchannel_logout.uri_userinfo" = "A URI de logout back-channel não pode conter nome de usuário nem senha: {{.uri}}"
 "handler.client_backchannel_logout.uri_http_public_client" = "A URI de logout back-channel precisa usar https em um cliente público. http simples só é permitido em um cliente confidencial criado por um administrador: {{.uri}}"
 "handler.client_backchannel_logout.uri_http_self_registered" = "A URI de logout back-channel precisa usar https em um cliente que se registrou sozinho, seja qual for o tipo. http simples só é permitido em um cliente confidencial criado por um administrador: {{.uri}}"
+"handler.client_dpop.dpop_bound_access_tokens_required" = "dpopBoundAccessTokens é obrigatório: envie true ou false."
+"handler.client_dpop.admin_console_not_allowed" = "O cliente do console de administração não pode exigir DPoP nas solicitações de token."
 "handler.client_web_origins.empty" = "A origem web não pode ficar vazia"
 "handler.client_web_origins.invalid" = "Origem web inválida: {{.origin}}. Uma origem web é um esquema, um host e uma porta opcional, sem nada depois do host: por exemplo https://www.example.com ou https://myapp:8080. O esquema precisa ser http ou https; o host precisa ser ASCII, não pode conter informações de usuário e não pode ser um literal IPv6 nem um endereço IPv4 abreviado; e a porta, se houver, precisa ser decimal simples abaixo de 65536, sem zero à esquerda."
 "handler.client_web_origins.too_long" = "A origem web é longa demais ({{.length}} caracteres, o máximo é {{.max}}): {{.origin}}"

@@ -66,13 +66,61 @@ Nothing proves an authorization request comes from your app either: another app 
 
 ## In the browser
 
-Your SPA calls the token endpoint from JavaScript, from another origin than the auth server's, so the browser lets it read the answer only when the auth server allows that origin (CORS). The auth server allows every origin registered as a [web origin](/concepts/clients/#web-origins). A web origin is permitted server-wide, for every client, whichever client you register it on. From an allowed origin, your script can also read the `WWW-Authenticate` header of a `401` and the `Retry-After` header of a `429`.
+Your SPA calls the token endpoint from JavaScript, from another origin than the auth server's, so the browser lets it read the answer only when the auth server allows that origin (CORS). The auth server allows every origin registered as a [web origin](/concepts/clients/#web-origins). A web origin is permitted server-wide, for every client, whichever client you register it on. From an allowed origin, your script can also send a [DPoP](/concepts/dpop/) proof in a `DPoP` header, and read the `WWW-Authenticate` header of a `401`, the `Retry-After` header of a `429` and the `DPoP-Nonce` header of a token endpoint answer.
 
 Keep the tokens where other sites can't reach them. Keeping them in memory is the safest: the user signs in again when the page reloads, which single sign-on usually makes a redirect and back, with no password.
 
 <Aside type="caution">
 Refresh from **one** place. When two tabs refresh with the same refresh token, the second can look like a stolen token being replayed, and the auth server then revokes every refresh token of the sign-in, so the user has to sign in again. See [Rotation](/concepts/refresh-tokens/#rotation).
 </Aside>
+
+## Bind the tokens to a key with DPoP
+
+Anyone who copies a token out of your app, or out of a log, can use it until it expires. With [DPoP](/concepts/dpop/), your app keeps a private key and signs a short proof with each request, and its tokens work only beside a proof by that key. Most DPoP client libraries do these steps for you.
+
+<Steps>
+
+1. In the admin console, on your client's **Tokens** tab, turn on **Require DPoP for token requests** and click **Save**. Every token request for your client then needs a proof, so nobody gets a token for it without one. See [Require DPoP for token requests](/concepts/clients/#require-dpop-for-token-requests).
+
+2. When a user signs in, make an ES256 key pair. In a browser, make it with the Web Crypto API with its private key non-extractable, so no script can read it, and keep it in IndexedDB, which stores the key itself. On a phone, keep it in the platform's keystore. Keep the key as long as the refresh token: every refresh needs a proof by the same key.
+
+3. Send the key's thumbprint as `dpop_jkt` with the authorization request, beside the PKCE challenge, so the code is bound to your key from the start:
+
+   ```http
+   GET /auth/authorize?client_id=my-spa&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20email&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&dpop_jkt=NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs&state=af0ifjsldkj&nonce=n-0S6_WzA2Mj HTTP/1.1
+   Host: auth.example.com
+   ```
+
+   The thumbprint is the one [a bound token carries](/concepts/dpop/#what-a-bound-token-carries) in `cnf.jkt`.
+
+4. Redeem the code as in step 6 above, with a proof by the key in a `DPoP` header, `htm` `POST` and `htu` the token endpoint's URL:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/token \
+     -H "DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7..." \
+     -d grant_type=authorization_code \
+     -d client_id=my-spa \
+     -d code=SplxlOBeZQQYbYS6WxSbIA \
+     -d redirect_uri=https://app.example.com/callback \
+     -d code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+   ```
+
+   The first answer is `400` `use_dpop_nonce`, with a nonce in its `DPoP-Nonce` header. Make a new proof carrying that nonce and send the request again: the answer's `token_type` is `DPoP`. [Get a bound access token](/concepts/dpop/#get-a-bound-access-token) shows each proof, and [The nonce](/concepts/dpop/#the-nonce) when to retry.
+
+5. Refresh the same way, with a new proof by the same key, carrying the latest nonce you got.
+
+6. Call `/userinfo`, and your APIs, with the `DPoP` scheme and a new proof for each call, its `htm` and `htu` naming that call and its `ath` the hash of the access token:
+
+   ```http
+   GET /userinfo HTTP/1.1
+   Host: auth.example.com
+   Authorization: DPoP eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...
+   DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7...
+   ```
+
+</Steps>
+
+Keep the access tokens short-lived, as the 5-minute default is: an API takes no nonce, so a proof made in advance can work there until the token expires. Calling `/userinfo` with DPoP needs your app's clock within a minute of the auth server's. Your API must accept DPoP-bound tokens too: see [Accept DPoP-bound tokens](/guides/protect-an-api/#accept-dpop-bound-tokens).
 
 ## On a phone or a desktop
 
@@ -92,4 +140,5 @@ A public client gets a refresh token like any other, and it works the same way: 
   <LinkCard title="Sign users out" description="End the user's session from your app, and bring them back." href="/guides/sign-users-out/" />
   <LinkCard title="Protect an API" description="Let your app call your API with the user's access token." href="/guides/protect-an-api/" />
   <LinkCard title="PKCE" description="How the challenge is made, and what the auth server checks." href="/concepts/pkce/" />
+  <LinkCard title="DPoP" description="What a proof says, the nonce, and how bound tokens are refreshed." href="/concepts/dpop/" />
 </CardGrid>

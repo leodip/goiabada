@@ -51,4 +51,12 @@ type RefreshToken struct {
 	// migration 000051, which the token endpoint refuses to refresh. Tagged dont-update for the
 	// reason AuthStateGeneration is.
 	AuthenticatedAt sql.NullTime `db:"authenticated_at" fieldtag:"dont-update"`
+	// DPoPJkt is the RFC 7638 thumbprint of the DPoP key this token's family is bound to, NULL for
+	// an unbound family (RFC 9449 section 5, #42 decision 11). A public client's family is bound on
+	// its first token issued with a valid proof, the first of the family or the first refresh of an
+	// unbound one, and every rotation copies it from the PARENT, never from the request, so a bound
+	// family never becomes unbound. Refreshing a bound token takes a proof by that key, whatever the
+	// client's type is now. Tagged dont-update for the reason AuthStateGeneration is: once set, no
+	// full-row UpdateRefreshToken can change or clear it.
+	DPoPJkt sql.NullString `db:"dpop_jkt" fieldtag:"dont-update"`
 }

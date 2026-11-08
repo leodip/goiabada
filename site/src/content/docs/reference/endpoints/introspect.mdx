@@ -56,6 +56,31 @@ It's the [RFC 7662](https://www.rfc-editor.org/rfc/rfc7662) token introspection 
 
 Still check `scope` for the permission the operation needs, as [Protect an API](/guides/protect-an-api/) describes.
 
+## A DPoP-bound token
+
+An access token bound to a key with [DPoP](/concepts/dpop/) is answered with `token_type` `DPoP`, and its `cnf`, whose `jkt` is the thumbprint of the key:
+
+```json
+{
+  "active": true,
+  "scope": "product-api:read",
+  "client_id": "my-spa",
+  "sub": "8a1f7c2e-5b3d-4e6f-9a0b-1c2d3e4f5a6b",
+  "aud": "product-api",
+  "iss": "https://auth.example.com",
+  "exp": 1760000300,
+  "iat": 1760000000,
+  "nbf": 1760000000,
+  "jti": "9a6f1c1e-2d0b-4f3e-8a55-0c1b7a3e2f44",
+  "token_type": "DPoP",
+  "cnf": {
+    "jkt": "0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I"
+  }
+}
+```
+
+Introspection doesn't check the proof: your API does. Accept such a token only in a request with the `DPoP` scheme and a `DPoP` proof signed by the key whose thumbprint is `cnf.jkt`, and refuse it sent as a bearer token. Don't send the proof to `/auth/introspect`: the endpoint ignores a `DPoP` header.
+
 ## When a token is active
 
 An access token is active while it's live and its `aud` names a resource on the calling client's introspection resources. Live means it hasn't expired, its `iss` is the current issuer, its user and its client exist and are enabled, and nothing has ended it since, such as its session ending, its user's credentials changing, or it or its grant being revoked. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and APIs make the same checks. See [Ending sessions](/concepts/ending-sessions/).
@@ -81,7 +106,8 @@ The members are read from the token, and they're the same for every client that 
 | `exp`, `iat` | When the token expires and was issued, in seconds since the epoch | The same |
 | `nbf` | When the token became usable | Not sent |
 | `jti` | The token's identifier | The token's identifier |
-| `token_type` | `Bearer` | Not sent |
+| `token_type` | `DPoP` for a [DPoP-bound](#a-dpop-bound-token) token, `Bearer` otherwise | Not sent |
+| `cnf` | For a DPoP-bound token only: `jkt`, the thumbprint of its key | Not sent |
 
 ## The request
 

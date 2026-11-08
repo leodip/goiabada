@@ -50,6 +50,15 @@ type introspection struct {
 	NotBefore int64       `json:"nbf,omitempty"`
 	Jti       string      `json:"jti,omitempty"`
 	TokenType string      `json:"token_type,omitempty"`
+	// Confirmation is a bound access token's cnf, the proof key's thumbprint as jkt (RFC 9449
+	// section 6.2), and absent for every other token.
+	Confirmation *confirmation `json:"cnf,omitempty"`
+}
+
+// confirmation is the cnf member of a bound access token's introspection: the JWK SHA-256
+// thumbprint of the key its proofs are signed with (RFC 9449 section 6.1).
+type confirmation struct {
+	JWKThumbprint string `json:"jkt"`
 }
 
 // HandleIntrospectPost is the token introspection endpoint, RFC 7662 (#676 decisions 5, 7, 9 and 13).
@@ -201,8 +210,11 @@ func (e introspectionEndpoint) introspectAccessToken(w http.ResponseWriter, r *h
 	}
 
 	// The token's own members, not narrowed to the caller's resources (decision 13): the API holds
-	// the token and can read every claim in it anyway.
-	e.active(w, r, introspection{
+	// the token and can read every claim in it anyway. A token bound to a DPoP key is answered
+	// token_type DPoP with its cnf, so the API can check each proof against the key (RFC 9449
+	// section 6.2). The body's typ claim is Bearer on every access token and says nothing of the
+	// binding (#42 decision 3).
+	answer := introspection{
 		Active:    true,
 		Scope:     token.StringClaim("scope"),
 		ClientId:  token.StringClaim("client_id"),
@@ -213,8 +225,13 @@ func (e introspectionEndpoint) introspectAccessToken(w http.ResponseWriter, r *h
 		IssuedAt:  numericDateClaim(token, "iat"),
 		NotBefore: numericDateClaim(token, "nbf"),
 		Jti:       token.StringClaim("jti"),
-		TokenType: "Bearer",
-	})
+	}
+	thumbprint := issuance.AccessTokenThumbprint(token)
+	answer.TokenType = issuance.ResponseTokenType(thumbprint)
+	if thumbprint != "" {
+		answer.Confirmation = &confirmation{JWKThumbprint: thumbprint}
+	}
+	e.active(w, r, answer)
 }
 
 // listsAnAudience reports whether the token's aud names a resource on the client's introspection

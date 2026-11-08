@@ -9,18 +9,19 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// IssueClientCredentialsGrant issues the client credentials grant's access token, RFC 6749 section
+// 4.4.3. dpopThumbprint binds it to the request's proof key, empty for a bearer token.
 func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings *record.Settings,
-	client *record.Client, scope string) (*oauth.TokenResponse, error) {
+	client *record.Client, scope string, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, client)
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: TokenTypeBearer.String(),
+		TokenType: ResponseTokenType(dpopThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 		Scope:     scope,
 	}
@@ -36,14 +37,10 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 
 	// access_token ---------------------------------------------------------------------------
 
-	claims["iss"] = settings.Issuer
+	// The client is the token's subject. No grant_id: the grant issues no refresh token, so there
+	// is no family to name (#676 decisions 1 and 2). The claims every access token carries,
+	// client_id among them, are finishAccessToken's.
 	claims["sub"] = client.ClientIdentifier
-	// RFC 9068 section 2.2 REQUIRES client_id, though sub names the client too. No grant_id: the
-	// grant issues no refresh token, so there is no family to name (#676 decisions 1 and 2).
-	claims["client_id"] = client.ClientIdentifier
-	claims["iat"] = now.Unix()
-	claims["nbf"] = now.Unix()
-	claims["jti"] = uuid.New()
 
 	audCollection := []string{}
 	for _, scope := range scopes {
@@ -66,16 +63,10 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 	default:
 		claims["aud"] = audCollection
 	}
-	claims["typ"] = TokenTypeBearer.String()
-	claims["exp"] = now.Add(time.Second * time.Duration(tokenExpirationInSeconds)).Unix()
-	claims["scope"] = scope
 
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyIdentifier
-	token.Header["typ"] = AccessTokenHeaderType
-	accessToken, err := token.SignedString(privKey)
+	accessToken, err := finishAccessToken(claims, settings, client, scope, dpopThumbprint, now, privKey, keyIdentifier)
 	if err != nil {
-		return nil, errs.Wrap(err, "unable to sign access_token")
+		return nil, err
 	}
 	tokenResponse.AccessToken = accessToken
 	return &tokenResponse, nil

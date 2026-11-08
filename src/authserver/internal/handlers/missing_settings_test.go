@@ -174,9 +174,8 @@ func TestMissingSettings_TheTokenEndpointAnswersItsOwn500(t *testing.T) {
 
 	jsonWriter.On("JSONError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
-	HandleTokenPost(jsonWriter, datamocks.NewDatabase(t),
-		handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t),
-		noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{}).ServeHTTP(rr, req)
+	HandleTokenPost(jsonWriter, datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t), tokenValidator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{}, testTokenProofs()).
+		ServeHTTP(rr, req)
 
 	jsonWriter.AssertExpectations(t)
 	tokenValidator.AssertNotCalled(t, "ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything)

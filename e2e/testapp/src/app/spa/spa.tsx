@@ -3,20 +3,31 @@
 import { decodeJwt } from "jose";
 import * as client from "openid-client";
 import { useEffect, useRef, useState } from "react";
+import { forgetKey, loadKey, publicJwk, saveKey } from "./dpop-key";
 
-type Props = { issuer: string; clientId: string; redirectUri: string; scope: string; apiUrl: string };
-type Tokens = { idToken: string; accessToken: string; refreshToken?: string };
+type Props = { issuer: string; clientId: string; redirectUri: string; scope: string; apiUrl: string; dpop?: boolean };
+type Tokens = { idToken: string; accessToken: string; refreshToken?: string; tokenType: string };
 type Shown = { title: string; ok: boolean; body: unknown };
+type Key = { handle: client.DPoPHandle; jwk: Record<string, unknown>; thumbprint: string };
 
 // Add sign-in to a SPA or mobile app, in the browser. The state, nonce and PKCE verifier wait in
 // sessionStorage while the browser is at the auth server; the tokens live only in memory. The
 // redirect URI is this page, which handles the code when the browser comes back, and the
 // post-logout redirect URI is this page too.
-export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
+//
+// With dpop, the guide's "Bind the tokens to a key with DPoP" too: a key pair kept in IndexedDB
+// (dpop-key.ts), its thumbprint sent as dpop_jkt beside PKCE, and a proof by it with the token
+// requests, userinfo and the API, which openid-client makes, retrying once on use_dpop_nonce with the
+// DPoP-Nonce the auth server sent.
+export function Spa({ issuer, clientId, redirectUri, scope, apiUrl, dpop = false }: Props) {
   const [config, setConfig] = useState<client.Configuration>();
   const [tokens, setTokens] = useState<Tokens>();
+  const [key, setKey] = useState<Key>();
   const [shown, setShown] = useState<Shown>();
   const started = useRef(false);
+  const pendingItem = dpop ? "spa-dpop-pending" : "spa-pending";
+  const logoutItem = dpop ? "spa-dpop-logout-state" : "spa-logout-state";
+  const options = key ? { DPoP: key.handle } : undefined;
 
   useEffect(() => {
     // React runs this twice in development; a code can be redeemed once.
@@ -33,10 +44,10 @@ export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
       }
 
       const here = new URL(window.location.href);
-      const pending = sessionStorage.getItem("spa-pending");
-      const logoutState = sessionStorage.getItem("spa-logout-state");
+      const pending = sessionStorage.getItem(pendingItem);
+      const logoutState = sessionStorage.getItem(logoutItem);
       if (here.searchParams.has("code") || here.searchParams.has("error")) {
-        sessionStorage.removeItem("spa-pending");
+        sessionStorage.removeItem(pendingItem);
         window.history.replaceState(null, "", redirectUri);
         if (!pending) {
           setShown({ title: "Sign-in failed", ok: false, body: { error: "No sign-in was in progress in this tab." } });
@@ -44,53 +55,69 @@ export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
         }
         const { state, nonce, codeVerifier } = JSON.parse(pending);
         try {
-          const answer = await client.authorizationCodeGrant(found, here, {
-            pkceCodeVerifier: codeVerifier,
-            expectedState: state,
-            expectedNonce: nonce,
-            idTokenExpected: true,
-          });
-          setTokens({ idToken: answer.id_token!, accessToken: answer.access_token, refreshToken: answer.refresh_token });
-          setShown({ title: "Signed in", ok: true, body: { scope: answer.scope, expires_in: answer.expiresIn() } });
+          // The code is bound to the key the sign-in started with, so the same key redeems it.
+          let signedInKey: Key | undefined;
+          if (dpop) {
+            const pair = await loadKey();
+            if (!pair) throw new Error("The DPoP key this sign-in started with is gone.");
+            signedInKey = await keyOf(found, pair);
+            setKey(signedInKey);
+          }
+          const answer = await client.authorizationCodeGrant(
+            found,
+            here,
+            { pkceCodeVerifier: codeVerifier, expectedState: state, expectedNonce: nonce, idTokenExpected: true },
+            undefined,
+            signedInKey ? { DPoP: signedInKey.handle } : undefined,
+          );
+          setTokens({ idToken: answer.id_token!, accessToken: answer.access_token, refreshToken: answer.refresh_token, tokenType: answer.token_type });
+          setShown({ title: "Signed in", ok: true, body: { token_type: answer.token_type, scope: answer.scope, expires_in: answer.expiresIn() } });
         } catch (error) {
           setShown({ title: "Sign-in failed", ok: false, body: describe(error) });
         }
       } else if (here.searchParams.has("state") && logoutState) {
-        sessionStorage.removeItem("spa-logout-state");
+        sessionStorage.removeItem(logoutItem);
         window.history.replaceState(null, "", redirectUri);
         const matches = here.searchParams.get("state") === logoutState;
         setShown({ title: matches ? "Signed out" : "Signed out, but the state doesn't match", ok: matches, body: {} });
       }
     })();
-  }, [issuer, clientId, redirectUri]);
+  }, [issuer, clientId, redirectUri, dpop, pendingItem, logoutItem]);
 
   async function signIn() {
     if (!config) return;
     const state = client.randomState();
     const nonce = client.randomNonce();
     const codeVerifier = client.randomPKCECodeVerifier();
-    sessionStorage.setItem("spa-pending", JSON.stringify({ state, nonce, codeVerifier }));
-    const url = client.buildAuthorizationUrl(config, {
+    sessionStorage.setItem(pendingItem, JSON.stringify({ state, nonce, codeVerifier }));
+    const parameters: Record<string, string> = {
       redirect_uri: redirectUri,
       scope,
       code_challenge: await client.calculatePKCECodeChallenge(codeVerifier),
       code_challenge_method: "S256",
       state,
       nonce,
-    });
-    window.location.assign(url.href);
+    };
+    if (dpop) {
+      // A new key for each sign-in, ES256 and non-extractable, and the code bound to it.
+      const pair = await client.randomDPoPKeyPair("ES256");
+      await saveKey(pair);
+      parameters.dpop_jkt = (await keyOf(config, pair)).thumbprint;
+    }
+    window.location.assign(client.buildAuthorizationUrl(config, parameters).href);
   }
 
   async function refresh() {
     if (!config || !tokens?.refreshToken) return;
     try {
-      const answer = await client.refreshTokenGrant(config, tokens.refreshToken);
+      const answer = await client.refreshTokenGrant(config, tokens.refreshToken, undefined, options);
       setTokens({
         idToken: answer.id_token ?? tokens.idToken,
         accessToken: answer.access_token,
         refreshToken: answer.refresh_token ?? tokens.refreshToken,
+        tokenType: answer.token_type,
       });
-      setShown({ title: "Refreshed", ok: true, body: { expires_in: answer.expiresIn(), scope: answer.scope } });
+      setShown({ title: "Refreshed", ok: true, body: { token_type: answer.token_type, expires_in: answer.expiresIn(), scope: answer.scope } });
     } catch (error) {
       setShown({ title: "Refresh failed", ok: false, body: describe(error) });
     }
@@ -100,7 +127,7 @@ export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
     if (!config || !tokens) return;
     try {
       const sub = String(decodeJwt(tokens.idToken).sub);
-      setShown({ title: "/userinfo answered", ok: true, body: await client.fetchUserInfo(config, tokens.accessToken, sub) });
+      setShown({ title: "/userinfo answered", ok: true, body: await client.fetchUserInfo(config, tokens.accessToken, sub, options) });
     } catch (error) {
       setShown({ title: "/userinfo failed", ok: false, body: describe(error) });
     }
@@ -108,14 +135,37 @@ export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
 
   async function callApi() {
     if (!tokens) return;
+    if (!config || !options) {
+      const response = await fetch(apiUrl, { headers: { authorization: `Bearer ${tokens.accessToken}` } });
+      setShown({ title: `The API answered ${response.status}`, ok: response.ok, body: await response.json().catch(() => null) });
+      return;
+    }
+    // With the DPoP scheme and a proof for GET apiUrl carrying the token's hash in ath. A 401 or 403
+    // comes back as a challenge error, with the API's answer on it.
+    let response: Response;
+    try {
+      response = await client.fetchProtectedResource(config, tokens.accessToken, new URL(apiUrl), "GET", undefined, undefined, options);
+    } catch (error) {
+      if (!(error instanceof client.WWWAuthenticateChallengeError)) {
+        setShown({ title: "The API call failed", ok: false, body: describe(error) });
+        return;
+      }
+      response = error.response;
+    }
+    setShown({ title: `The API answered ${response.status}`, ok: response.ok, body: await response.json().catch(() => null) });
+  }
+
+  // The guide's "a bound token sent as Bearer is refused": the bound token with no proof.
+  async function callApiAsBearer() {
+    if (!tokens) return;
     const response = await fetch(apiUrl, { headers: { authorization: `Bearer ${tokens.accessToken}` } });
-    const body = await response.json().catch(() => null);
+    const body = { www_authenticate: response.headers.get("www-authenticate"), body: await response.json().catch(() => null) };
     setShown({ title: `The API answered ${response.status}`, ok: response.ok, body });
   }
 
   // Sign users out: revoke the refresh token, or the access token when there is none, with the
   // client_id alone, which ends the whole grant; then post to /auth/logout. A revocation that fails
-  // keeps the tokens, so the failure shows.
+  // keeps the tokens, so the failure shows. The DPoP key goes with the tokens it was bound to.
   async function signOut() {
     const endpoint = config?.serverMetadata().end_session_endpoint;
     if (!config || !endpoint || !tokens) return;
@@ -125,8 +175,9 @@ export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
       setShown({ title: "Revocation failed", ok: false, body: describe(error) });
       return;
     }
+    if (dpop) await forgetKey();
     const state = client.randomState();
-    sessionStorage.setItem("spa-logout-state", state);
+    sessionStorage.setItem(logoutItem, state);
     const form = document.createElement("form");
     form.method = "post";
     form.action = endpoint;
@@ -142,6 +193,7 @@ export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
       form.appendChild(input);
     }
     setTokens(undefined);
+    setKey(undefined);
     document.body.appendChild(form);
     form.submit();
   }
@@ -158,11 +210,26 @@ export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
       {tokens ? (
         <>
           <p>
-            Signed in as <code>{String(decodeJwt(tokens.idToken).sub)}</code>. Refresh token:{" "}
+            Signed in as <code>{String(decodeJwt(tokens.idToken).sub)}</code>. Token type: <code>{tokens.tokenType}</code>. Refresh token:{" "}
             {tokens.refreshToken ? "yes" : "none"}.
           </p>
           <button onClick={refresh}>Refresh the tokens</button> <button onClick={userinfo}>Call /userinfo</button>{" "}
-          <button onClick={callApi}>Call the API</button> <button onClick={signOut}>Sign out</button>
+          <button onClick={callApi}>Call the API</button>{" "}
+          {dpop ? (
+            <>
+              <button onClick={callApiAsBearer}>Call the API as Bearer (should be refused)</button>{" "}
+            </>
+          ) : null}
+          <button onClick={signOut}>Sign out</button>
+          {key ? (
+            <>
+              <h3>DPoP public key</h3>
+              <pre>{JSON.stringify(key.jwk, null, 2)}</pre>
+              <p>
+                Thumbprint, sent as <code>dpop_jkt</code>: <code>{key.thumbprint}</code>
+              </p>
+            </>
+          ) : null}
           <h3>ID token claims</h3>
           <pre>{JSON.stringify(decodeJwt(tokens.idToken), null, 2)}</pre>
           <h3>Access token claims</h3>
@@ -173,6 +240,12 @@ export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
       ) : null}
     </>
   );
+}
+
+// One DPoP handle per key, so the nonce it learns from one answer goes with the next request.
+async function keyOf(config: client.Configuration, pair: CryptoKeyPair): Promise<Key> {
+  const handle = client.getDPoPHandle(config, pair);
+  return { handle, jwk: await publicJwk(pair), thumbprint: await handle.calculateThumbprint() };
 }
 
 function describe(error: unknown) {

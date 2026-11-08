@@ -38,11 +38,17 @@ export default function Home() {
           <a href={`${docs}/guides/add-sign-in-to-a-spa-or-mobile-app/`}>Add sign-in to a SPA or mobile app</a>
         </li>
         <li>
+          <a href="/spa-dpop">SPA with DPoP</a>: a public client whose tokens are bound to a key.{" "}
+          <a href={`${docs}/guides/add-sign-in-to-a-spa-or-mobile-app/#bind-the-tokens-to-a-key-with-dpop`}>Bind the tokens to a key with DPoP</a>
+        </li>
+        <li>
           <a href="/service">Service</a>: the client credentials flow.{" "}
           <a href={`${docs}/guides/protect-an-api/`}>Protect an API</a>
         </li>
         <li>
-          <a href="/api/products">The API</a>: answers only a token carrying its permission.
+          <a href="/api/products">The API</a>: answers only a token carrying its permission, bound to a
+          key or not.{" "}
+          <a href={`${docs}/guides/protect-an-api/#accept-dpop-bound-tokens`}>Accept DPoP-bound tokens</a>
         </li>
       </ul>
     </main>

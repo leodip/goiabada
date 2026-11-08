@@ -60,9 +60,15 @@ Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does
 
 ### Access token claims (RFC 9068)
 Every access token, from every grant, is an RFC 9068 JWT access token.
-- `generateAccessTokenCore` and the client credentials grant sign it with the JOSE header
-  `typ: at+jwt` (`issuance.AccessTokenHeaderType`) and the claim `client_id`; ID and refresh tokens
-  keep the library's `JWT` header. The `typ: Bearer` claim stays
+- One finishing step, `issuance.finishAccessToken`, ends every grant's access token, the client
+  credentials grant's included: it writes the claims every access token carries (`iss`,
+  `client_id`, `iat`, `nbf`, `jti`, `typ`, `exp`, `scope`), sets the JOSE header
+  `typ: at+jwt` (`issuance.AccessTokenHeaderType`) and signs it. Each grant's builder decides only
+  `sub`, `aud` and, for a user's grant, the claims of the sign-in. ID and refresh tokens keep the
+  library's `JWT` header. The `typ: Bearer` claim stays on every access token, bound or not. A
+  token issued for a request with a valid DPoP proof also carries `cnf.jkt`, the proof key's RFC
+  7638 thumbprint, written by the same step, and its token response says `token_type: DPoP`
+  (#42 decisions 2 and 3). Implicit-flow tokens are never bound
 - The authorization code, refresh and password grants add `grant_id`, the identifier the grant's
   refresh token family shares (`FirstRefreshTokenJti`). The code exchange and the password grant fix
   it, as the first refresh token's jti, before they mint the access token; a refresh copies its
@@ -73,6 +79,98 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   gets one token for all of them rather than `invalid_scope` (section 3; no RFC 8707), `groups` is
   an array of identifiers rather than SCIM objects (section 2.2.3.1), and the private claims have
   plain names (section 2.2.2 MAY) (#676)
+
+### DPoP at the token endpoint (RFC 9449)
+- A request carrying a `DPoP` header is a DPoP request, on any of the four grants.
+  `handlers.TokenDPoPNonce` heads the token route, ahead of the ROPC limiter, and sets one
+  `DPoP-Nonce` header with a fresh nonce and `no-store`, so every answer to it carries one, the
+  limiter's 400 and 429 and the handler's 400s and 500s included (sections 8 and 8.2). It is the
+  only place the endpoint mints a nonce.
+- The proof is checked once the form is parsed, before the client's credentials are read and
+  `ValidateTokenRequest` authenticates the client, so the nonce round trip is never a
+  client-authentication refusal or a charged password guess, however the credentials read (#42
+  decision 7). `handlers.TokenProofs` holds the `dpop.Checker` for the public base URL,
+  never the internal one, and the `dpop.Nonces`; `main` builds both, from
+  `GOIABADA_AUTHSERVER_BASEURL` and the current session authentication key.
+- Freshness comes from the nonce alone (decision 8). A nonce is a Unix-seconds timestamp and its
+  HMAC-SHA256 tag under an HKDF-derived key, base64url: accepted for ten minutes after minting, and
+  up to a minute before by an instance whose clock runs behind, by every instance sharing the key.
+  The previous session key does not keep old nonces: a rotation costs a client one retry.
+- `dpop.ErrNonceRequired` is answered `use_dpop_nonce` with a Debug record; `dpop.ErrInvalidProof`
+  is `invalid_dpop_proof` with the Warn record `dpop proof refused at the token endpoint`. Both are
+  400 and values of the token-refusal metric's error label. A valid proof's thumbprint goes to the
+  grant's issuer, which binds the access token.
+- Each proof is accepted once (section 11.1, #42 decision 9). Once `ValidateTokenRequest` has
+  accepted the grant, just before the issuer mints, `TokenProofs.Replays` inserts the proof's
+  `dpop.Proof.ReplayKey`, the SHA-256 hex of its normalized `htu`, a space and its `jti`, into
+  `dpop_proofs` with its nonce's expiry (`dpop.Nonces.ExpiresAt`) plus `dpop.ReplayRecordGrace`,
+  five minutes, so a sweep by one instance's clock never removes a record while an instance whose
+  clock runs behind could still accept the proof. The nonce is judged again at that moment, by the
+  clock then: one that expired while the grant was validated is `use_dpop_nonce`, so a request in
+  flight across a sweep cannot record a spent proof as new. The primary key makes the insert atomic
+  across requests and instances: a taken key is a replay, `invalid_dpop_proof` with the same Warn
+  record. A request refused earlier records nothing, so its proof stays unspent. A
+  store failure is a 500, and nothing is minted. The cleanup worker deletes expired rows on every
+  poll, outside the claim.
+- A public client's refresh-token family is bound to a proof key (section 5, #42 decision 11):
+  `refresh_tokens.dpop_jkt` (000086) holds the thumbprint, NULL for an unbound family, tagged
+  `dont-update` like `auth_state_generation`. `issuance.refreshTokenBinding` decides a new row's
+  value: a rotation copies its parent's, never the request's; otherwise, for a family's first token
+  and an unbound family's refresh, the request's thumbprint when the client, as the issuer loaded
+  it, is public, and NULL for a confidential one. The handler passes the proof's thumbprint as
+  `ValidateTokenRequestInput.DPoPThumbprint`; the refresh arm refuses a bound token whose request
+  has no proof by its key `invalid_grant` (`BoundRefreshTokenMessage`), with the Warn record
+  `refresh token refused for its dpop binding`, below client authentication and ownership and
+  above every check of the token's state. It is above the redemption, so a revoked bound token
+  without its key never triggers containment, and nothing is spent. The rotation re-checks on the
+  row it holds and rolls back with `issuance.ErrRefreshTokenBindingMismatch`, so no rotation, however
+  raced, mints from a bound token without its key or inserts an unbound child into a bound family.
+  The binding is enforced whatever the client's current type; refresh tokens carry no `cnf`, and
+  revocation and refresh-token introspection ignore the binding.
+- An authorization request's `dpop_jkt` binds its code to a key (section 10, #42 decision 14).
+  `ValidateRequest` refuses it `invalid_request` beside a response type that returns no code, or
+  when it fails `isBase64URLSHA256`, the S256 challenge's validator; an empty value is absent, and a
+  repeat is refused with the other repeated parameters. `AuthContext.DPoPJkt` is a request field,
+  kept by `Restart`, so every step, the parked POST included, carries it to `codes.dpop_jkt`
+  (000088), NULL for none and tagged `dont-update`. The code arm refuses a bound code whose request
+  has no proof by its key `invalid_grant` (`BoundCodeMessage`), with the Warn record `authorization
+  code refused for its dpop binding`, beside PKCE: below client authentication, above the reuse
+  return and every check of the grant's state. The issuer has not claimed the code yet, so a
+  refused attempt spends nothing, and `MarkCodeAsUsed` still lets exactly one redemption mint.
+- The CORS middleware's global lists allow the `DPoP` request header and expose `DPoP-Nonce`, so a
+  browser app can send a proof and read the nonce (section 8, #42 decision 15). Which origins are
+  granted, and where, is unchanged.
+
+### DPoP at the auth server's own resources (RFC 9449 section 7)
+- `/userinfo` and every `/api/v1/*` route take an access token with the `DPoP` scheme as well as
+  Bearer (#42 decision 10). `JwtAuthorizationHeaderToContext` reads the scheme: Bearer in the
+  header or the form body, DPoP in the header only. A token carrying `cnf.jkt` sent by a Bearer
+  method, and a token without it sent with DPoP, are 401 `invalid_token`; a stray `DPoP` header
+  beside an unbound Bearer token is ignored.
+- With the DPoP scheme the guard checks the proof through `middleware.ResourceProofs`, the token
+  endpoint's `dpop.Checker` and replay store with no nonce judge, so `iat` must lie within 60
+  seconds of the server's clock (decision 8). `ath` is the presented token's. A proof problem is
+  401 `invalid_dpop_proof` (`INVALID_DPOP_PROOF` in the API envelope) with the Warn record `dpop
+  proof refused at a resource`; a valid proof by another key than `cnf.jkt` is 401
+  `invalid_token` (figure 16). An accepted proof goes on the context with
+  `reqctx.WithDPoPProof`, which is what makes the guards behind challenge in the DPoP scheme.
+- The guard spends an accepted proof at once, into `dpop_proofs` until
+  `dpop.Proof.IssuedAtWindowEnds` (`iat` plus 60 seconds, rounded up to the second) plus
+  `dpop.ReplayRecordGrace`, before any other guard, rate limiter or handler runs. A replay is
+  `invalid_dpop_proof`, a store failure a 500. The proof stays spent whatever the request is then
+  answered: a proof covers the method, URL and token but not the body (section 11.7), so a refused
+  request's proof left unspent could be resent with another body. A client corrects a refused
+  request with a new proof. A second parse guard on a route would refuse every proof as a replay;
+  `TestInitRoutes_EveryBearerRouteSpendsTheDPoPProofOnce` holds every route to one, first.
+- `htu` is compared with the path the client sent, `dpop.RequestPath` over `RequestURI`, at the
+  token endpoint and the resources alike: `httpmw.StripTrailingSlash` rewrites `r.URL` before
+  routing.
+- Every 401 carries one `WWW-Authenticate` field line with `Bearer realm="goiabada"` first and
+  `DPoP realm="goiabada", algs="…"` second (`dpop.SigningAlgorithms`), the error in the challenge
+  of the scheme used; a request with no credential gets both with no error. A 400 or 403 carries
+  the challenge of each scheme used, Bearer alone when none was, so every Bearer 400 and 403 is
+  unchanged. Handlers behind the guards build theirs with `middleware.UnauthorizedChallenge` and
+  `InsufficientScopeChallenge`, which read the scheme off the context.
 
 ### Access token liveness
 One check decides whether an access token is one under RFC 9068 and still stands for live state.
@@ -176,7 +274,9 @@ An API, calling as a confidential client, asks whether a token is active.
   Introspection has no side effect: a rotated refresh token is answered inactive and triggers no
   replay containment
 - Every other token is exactly `{"active": false}`. An active access token carries the token's own
-  `scope`, `client_id`, `sub`, `aud`, `iss`, `exp`, `iat`, `nbf`, `jti` and `token_type`; a refresh
+  `scope`, `client_id`, `sub`, `aud`, `iss`, `exp`, `iat`, `nbf`, `jti` and `token_type`, which is
+  `DPoP` beside a `cnf` with the token's `jkt` when the token carries `cnf.jkt`
+  (`issuance.AccessTokenThumbprint`, RFC 9449 section 6.2), `Bearer` otherwise; a refresh
   token `scope`, its client's `client_id`, `sub`, `iss`, `exp`, `iat` and `jti`. Every answer carries
   `Cache-Control: no-store`; a fault answers 500, never inactive. No audit event;
   `goiabada_introspection_requests_total` counts each answer by outcome (#676)
@@ -726,9 +826,21 @@ Goiabada implements published standards. When a change touches behavior one of t
 the relevant section of the official text (rfc-editor.org, openid.net) rather than relying on
 memory, and follow its MUST and SHOULD requirements. The main ones: OAuth 2.0 (RFC 6749) and bearer
 tokens (RFC 6750), PKCE (RFC 7636), revocation (RFC 7009), introspection (RFC 7662), dynamic client
-registration (RFC 7591), authorization server metadata (RFC 8414), JWT (RFC 7519) and JWK (RFC
-7517), JWT access tokens (RFC 9068), the OAuth 2.0 Security Best Current Practice (RFC 9700), and
-OpenID Connect Core 1.0, Discovery 1.0 and Back-Channel Logout 1.0.
+registration (RFC 7591), authorization server metadata (RFC 8414), JWT (RFC 7519), JWS (RFC
+7515), JWA (RFC 7518), JWK (RFC 7517) and JWK thumbprints (RFC 7638), JWT access tokens (RFC 9068),
+DPoP (RFC 9449), the OAuth 2.0 Security Best Current Practice (RFC 9700), and OpenID Connect Core
+1.0, Discovery 1.0 and Back-Channel Logout 1.0.
+
+Every JWT the auth server or the admin console reads, its own tokens, the console's ID tokens and
+DPoP proofs, first passes `oauth.CheckJWTStructure` in core, before its signature is checked (#709):
+three segments of the unpadded base64url alphabet only, so `=`, CR, LF and whitespace are refused
+(RFC 7515 sections 2 and 5.2); a header and payload of valid UTF-8 (RFC 7519 section 7.2); no
+`crit` header, whatever its value, since Goiabada understands no extension (RFC 7515 section
+4.1.11); and no `cty` of `JWT` or `application/jwt`, since it supports no nested JWT. Each reader
+answers a refusal as it answers a malformed token. The console's ID-token reader also requires a
+string `sub` of 1 to 255 characters and a numeric `iat` (OpenID Connect Core 1.0 section 2), refuses
+an RSA key under 2048 bits or with an even, small or overlong exponent (RFC 7518 section 3.3), and
+skips a key whose `use` is not `sig` or whose `alg` is not `RS256` (Core section 10.1).
 
 Goiabada departs from three of RFC 9068's SHOULDs and MAYs, and the tokens page documents each:
 a request whose scopes name several resources gets one token naming them all in `aud` (section 3,
@@ -769,9 +881,10 @@ names (section 2.2.2).
     is older than the maximum age or whose `acr` ranks below the minimum, and fails closed on a
     missing or non-integer `auth_time` or an unknown `acr`, answering 401
     `INSUFFICIENT_USER_AUTHENTICATION` with `error="insufficient_user_authentication"`,
-    `acr_values` and `max_age` on every refusal. It takes the age, the level and a clock, so it is
-    the guard to reuse in front of another operation. A refresh keeps `auth_time`, so a refreshed
-    token is as old as its sign-in. The answer is the admin export's builder and writer, and
+    `acr_values` and `max_age` on every refusal, in the challenge of the scheme used. It takes the
+    age, the level and a clock, so it is the guard to reuse in front of another operation. A
+    refresh keeps `auth_time`, so a refreshed token is as old as its sign-in. The answer is the
+    admin export's builder and writer, and
     `exported_own_user_data` is written after it (#782). In the console, `render.IsStepUpRequired`
     recognises that 401 by its code and `render.IsSessionEnded` leaves it out, since the token and
     its session are still good. A page in front of the guard checks `IsStepUpRequired` before the

@@ -82,8 +82,13 @@ func (s *Server) initRoutes(branches appBranches) {
 	// bodies: the admin and account APIs their {error_code, error_description} envelope, /userinfo
 	// the RFC 6749 {error, error_description} shape its handler answers in. The routes choose the
 	// set; nothing reads the request path to decide (#435).
-	apiBearer := middleware.NewBearerTokenForAPI(tokenParser)
-	userinfoBearer := middleware.NewBearerTokenForUserInfo(tokenParser, httpHelper)
+	//
+	// Both check a DPoP proof beside a token presented with the DPoP scheme as the token endpoint
+	// does, with the same checker and the same replay store, and judge its iat by this server's
+	// clock, since the resources take no nonce (#42 decisions 7 to 10).
+	resourceProofs := middleware.ResourceProofs{Checker: s.tokenProofs.Checker, Replays: s.database, Now: s.tokenProofs.Now}
+	apiBearer := middleware.NewBearerTokenForAPI(tokenParser, resourceProofs)
+	userinfoBearer := middleware.NewBearerTokenForUserInfo(tokenParser, httpHelper, resourceProofs)
 
 	authServerConfig := &s.cfg.AuthServer
 	baseURL := authServerConfig.BaseURL
@@ -139,9 +144,10 @@ func (s *Server) initRoutes(branches appBranches) {
 	// RequireUserBoundToken behind it is what would stop a client's token that ever carried it.
 	// Refresh and ID tokens never get this far: the parse guard admits only an access token
 	// for authserver (#401). GET and POST are separate registrations: a guard added to only one of
-	// them leaves the other reachable.
-	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
-	protocol.With(userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
+	// them leaves the other reachable. middleware.NoStore heads both chains, ahead of the guards, so
+	// the claims and every refusal, the bare 401 included, are stored by no cache (#714).
+	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
+	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
 	files.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(files, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(files, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
@@ -201,8 +207,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	// token branch, the protocol branch counting its faults as refusals. The router answers POST
 	// /auth/token from this route, behind the token branch alone; any other method falls to the
 	// group its path is under, whose chain runs before the 405, as it did when the route was its
-	// own (#435).
-	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics, logoutTokens))
+	// own (#435). TokenDPoPNonce heads the route, so an answer the limiter writes to a DPoP request
+	// carries its nonce too (#42 decision 7).
+	token.With(handlers.TokenDPoPNonce(s.tokenProofs), rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics, logoutTokens, s.tokenProofs))
 	// Token revocation (RFC 7009, #676), outside the /auth group for the reason the token endpoint
 	// is, on a branch of its own that answers a fault 503. No rate limit: the client authenticates
 	// before anything else, as at the token endpoint's grants that have none (decision 10).
@@ -405,6 +412,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/post-logout-redirect-uris", apihandlers.HandleClientPostLogoutRedirectURIsPut(s.database, auditLogger))
 		// Setting or changing the URI is reserved to authserver:manage by the handler (#784 decision 15).
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/backchannel-logout", apihandlers.HandleClientBackchannelLogoutPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/dpop", apihandlers.HandleClientDPoPPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/web-origins", apihandlers.HandleClientWebOriginsPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/tokens", apihandlers.HandleClientTokensPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/permissions", apihandlers.HandleClientPermissionsGet(s.database))

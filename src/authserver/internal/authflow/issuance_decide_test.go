@@ -26,6 +26,8 @@ type issuanceWorld struct {
 	clientDisabled bool
 	implicitOff    bool
 	codeOff        bool
+	// requiresDPoP sets the client's "Require DPoP for token requests" (#42 decision 13).
+	requiresDPoP bool
 	// administrativeRefused says the scope to be issued names an administrative scope the client may
 	// no longer request, which is known with the registration (#499).
 	administrativeRefused bool
@@ -89,7 +91,7 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 				facts.refusedAdministrativeScopes = []string{"authserver:manage"}
 			}
 		case issuanceFactFlows:
-			facts.flows = &clientFlows{implicit: !world.implicitOff, code: !world.codeOff}
+			facts.flows = &clientFlows{implicit: !world.implicitOff, code: !world.codeOff, requiresDPoP: world.requiresDPoP}
 		case issuanceFactUser:
 			facts.userLoaded = true
 			if !world.noUser {
@@ -338,6 +340,42 @@ func TestDecideIssuance(t *testing.T) {
 			world:     with(func(w *issuanceWorld) { w.responseType = "id_token token"; w.implicitOff = true }),
 			want:      issuanceAnswer{outcome: issuanceRefuseImplicitDisabled},
 			wantReads: []issuanceFact{registration, flows},
+		},
+		{
+			name:      "a client requiring DPoP is refused an implicit access token: token",
+			world:     with(func(w *issuanceWorld) { w.responseType = "token"; w.requiresDPoP = true }),
+			want:      issuanceAnswer{outcome: issuanceRefuseImplicitAccessTokenDPoPRequired},
+			wantReads: []issuanceFact{registration, flows},
+		},
+		{
+			name:      "a client requiring DPoP is refused an implicit access token: id_token token",
+			world:     with(func(w *issuanceWorld) { w.responseType = "id_token token"; w.requiresDPoP = true }),
+			want:      issuanceAnswer{outcome: issuanceRefuseImplicitAccessTokenDPoPRequired},
+			wantReads: []issuanceFact{registration, flows},
+		},
+		{
+			// The implicit grant switched off says so first, as /auth/authorize does.
+			name: "the implicit grant switched off outranks the DPoP requirement",
+			world: with(func(w *issuanceWorld) {
+				w.responseType = "token"
+				w.implicitOff = true
+				w.requiresDPoP = true
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseImplicitDisabled},
+			wantReads: []issuanceFact{registration, flows},
+		},
+		{
+			// No access token leaves in the redirect, so the ceremony issues.
+			name:      "a client requiring DPoP is issued an id_token alone",
+			world:     with(func(w *issuanceWorld) { w.responseType = "id_token"; w.requiresDPoP = true }),
+			want:      issuanceAnswer{outcome: issuanceIssueImplicit},
+			wantReads: []issuanceFact{registration, flows, session, validity, user, scope},
+		},
+		{
+			name:      "a client requiring DPoP is issued a code",
+			world:     with(func(w *issuanceWorld) { w.requiresDPoP = true }),
+			want:      issuanceAnswer{outcome: issuanceIssueCode},
+			wantReads: []issuanceFact{registration, flows, session, validity, user, scope},
 		},
 		{
 			// The leniency each flow keeps: one switch never refuses the other flow's ceremony.

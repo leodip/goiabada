@@ -25,15 +25,17 @@ type corsDatabase interface {
 // refuse it with 405 whatever this says. OPTIONS is allowed whatever the list says.
 var corsAllowedMethods = []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodDelete, http.MethodOptions}
 
-// corsAllowedHeaders are the request headers a preflight may ask for, in canonical form. Origin is
-// among them because some browsers always ask for it.
-var corsAllowedHeaders = []string{"Accept", "Authorization", "Content-Type", "X-Csrf-Token", "Origin"}
+// corsAllowedHeaders are the request headers a preflight may ask for, in canonical form, which
+// spells DPoP as Dpop. Origin is among them because some browsers always ask for it. DPoP carries a
+// browser app's proof (RFC 9449 section 4.1, #42 decision 15); like the others, it is allowed only
+// where corsOriginAllowed grants the origin, and a route that reads no proof ignores it.
+var corsAllowedHeaders = []string{"Accept", "Authorization", "Content-Type", "X-Csrf-Token", "Origin", "Dpop"}
 
 // corsExposedHeaders are the response headers an allowed actual answer lets script read beyond the
-// CORS-safelisted ones (Fetch Standard section 2.2.2): the bearer challenge on a 401 and the back-off
-// on a 429 (#716 item 2). A preflight carries none, since the browser exposes nothing of it to
-// script.
-const corsExposedHeaders = "WWW-Authenticate, Retry-After"
+// CORS-safelisted ones (Fetch Standard section 2.2.2): the bearer challenge on a 401, the back-off
+// on a 429 (#716 item 2), and the nonce a DPoP client must retry with (RFC 9449 section 8, #42
+// decision 15). A preflight carries none, since the browser exposes nothing of it to script.
+const corsExposedHeaders = "WWW-Authenticate, Retry-After, DPoP-Nonce"
 
 // corsMaxAge is how long, in seconds, a browser may cache a granted preflight: ten minutes. With
 // none, every browser fell back to its own short default and re-preflighted constantly, each one

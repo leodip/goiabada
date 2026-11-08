@@ -1,0 +1,17 @@
+-- The DPoP key a public client's refresh-token family is bound to (#42 decision 11, RFC 9449
+-- section 5).
+--
+-- refresh_tokens.dpop_jkt is the RFC 7638 SHA-256 thumbprint of that key, base64url without
+-- padding, and NULL for an unbound family. A public client's family is bound on its first token
+-- issued for a request with a valid DPoP proof: the family's first token, or the first refresh of an
+-- unbound family. Every rotation copies it from the parent token, never from the request, the way
+-- auth_state_generation travels, and no update writes it, so a bound family never becomes unbound or
+-- moves to another key. Refreshing a bound token takes a proof by that key, whatever the client's
+-- type is by then. A confidential client's family is never bound.
+--
+-- Existing rows land NULL and nothing backfills them: no token issued before this migration was
+-- bound, so every existing family reads unbound, and a public client's is bound by its next refresh
+-- with a proof.
+--
+-- Nullable with no default, so there is no default constraint to name or drop on any engine.
+ALTER TABLE refresh_tokens ADD COLUMN dpop_jkt TEXT;

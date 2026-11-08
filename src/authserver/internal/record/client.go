@@ -54,13 +54,20 @@ type Client struct {
 	// CreateClient and SetClientBackchannelLogout write them.
 	BackchannelLogoutURI             string `db:"backchannel_logout_uri" fieldtag:"dont-update"`
 	BackchannelLogoutSessionRequired bool   `db:"backchannel_logout_session_required" fieldtag:"dont-update"`
-	ShowLogo                         bool   `db:"show_logo"`
-	ShowDisplayName                  bool   `db:"show_display_name"`
-	ShowDescription                  bool   `db:"show_description"`
-	ShowWebsiteURL                   bool   `db:"show_website_url"`
-	IsPublic                         bool   `db:"is_public"`
-	AuthorizationCodeEnabled         bool   `db:"authorization_code_enabled"`
-	ClientCredentialsEnabled         bool   `db:"client_credentials_enabled"`
+	// DPoPBoundAccessTokens is "Require DPoP for token requests", RFC 9449 section 5.2's
+	// dpop_bound_access_tokens: while it is on, a token request from this client without a DPoP
+	// proof is refused, and the authorization endpoint refuses it the response types that return an
+	// access token (#42 decisions 12 and 13). Tagged dont-update, so the whole-row UpdateClient never
+	// writes it: the other client saves read the row earlier in their request, and would write back a
+	// setting switched since. CreateClient and SetClientDPoPBoundAccessTokens write it.
+	DPoPBoundAccessTokens    bool `db:"dpop_bound_access_tokens" fieldtag:"dont-update"`
+	ShowLogo                 bool `db:"show_logo"`
+	ShowDisplayName          bool `db:"show_display_name"`
+	ShowDescription          bool `db:"show_description"`
+	ShowWebsiteURL           bool `db:"show_website_url"`
+	IsPublic                 bool `db:"is_public"`
+	AuthorizationCodeEnabled bool `db:"authorization_code_enabled"`
+	ClientCredentialsEnabled bool `db:"client_credentials_enabled"`
 	// PKCERequired overrides global setting if set.
 	// nil = use global setting, true = PKCE required, false = PKCE optional
 	PKCERequired *bool `db:"pkce_required"`

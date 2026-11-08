@@ -188,6 +188,10 @@ You need a server with Docker and Nginx, two hostnames under one domain, such as
 - **The admin console reaches the auth server inside the Compose network,** not through Nginx: see [The hop to the auth server](/deploy/docker-compose/#the-hop-to-the-auth-server).
 - **Goiabada sets its own security headers,** `Strict-Transport-Security` included once its URLs are `https://`, so Nginx adds none. A header Nginx added as well would reach the browser twice.
 
+## DPoP behind the proxy
+
+[DPoP](/concepts/dpop/) works behind Nginx with no setting of its own. A proof names the URL its app called in `htu`, and the auth server compares it with its public base URL, `GOIABADA_AUTHSERVER_BASEURL`, followed by the request's path, such as `https://auth.example.com/auth/token`. It never rebuilds the URL from the `Host` header Nginx forwards. A proof naming the address Nginx forwards to, such as `http://127.0.0.1:9090/auth/token`, is refused.
+
 ## The authorization endpoint's budget
 
 Every request to `/auth/authorize` that names a real client and redirect URI writes a row to the database, and anyone can send them. With `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, the built-in `authorize` limit bounds how fast one IP address can do that. If you turned it off, rate-limit `/auth/authorize` in Nginx instead. See [Rate limits](/reference/environment-variables/#rate-limits).

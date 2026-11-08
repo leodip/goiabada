@@ -10,6 +10,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/dpop"
+	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/introspectionmetrics"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
@@ -149,4 +151,13 @@ func newTestSessionStoreOver(backend sessionstore.ConditionalBackend) *sessionst
 		panic(err)
 	}
 	return conditional
+}
+
+// testTokenProofs checks DPoP proofs for the token endpoint the way main builds the check, for
+// a server whose tests send none.
+func testTokenProofs(t *testing.T) handlers.TokenProofs {
+	t.Helper()
+	checker, err := dpop.NewChecker("https://auth.example.com")
+	require.NoError(t, err)
+	return handlers.TokenProofs{Checker: checker, Nonces: dpop.NewNonces([]byte("a session authentication key for the tests"))}
 }

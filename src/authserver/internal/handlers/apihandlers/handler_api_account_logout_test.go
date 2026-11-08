@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/dpop"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -300,4 +301,55 @@ func TestHandleAccountLogoutRequestPost_AMissingSessionIsStill401(t *testing.T) 
 
 	requireRefused(t, rr, capture, http.StatusUnauthorized, "INVALID_SESSION")
 	database.AssertNotCalled(t, "UserSessionLoadClients", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// Every 401 the logout request answers itself carries both challenges, Bearer first and DPoP
+// second, the error invalid_token in the scheme the token was presented with, as every 401 of the
+// API does (RFC 9110 section 15.5.2, #42 decision 10): a token with no sid, a sid naming no session,
+// and a session the client is not part of. The status and envelope are unchanged.
+func TestHandleAccountLogoutRequestPost_Every401CarriesBothChallenges(t *testing.T) {
+	const algs = `algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`
+	cases := []struct {
+		name, description string
+		claims            map[string]interface{}
+		arm               func(*datamocks.Database)
+	}{
+		{"a token with no sid", "Current token lacks session identifier",
+			map[string]interface{}{"sub": "the-user"}, func(*datamocks.Database) {}},
+		{"a sid naming no session", "Session not found",
+			map[string]interface{}{"sub": "the-user", "sid": logoutSid}, func(database *datamocks.Database) {
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).Return(nil, nil).Once()
+			}},
+		{"a session the client is not part of", "Client not part of the current session",
+			map[string]interface{}{"sub": "the-user", "sid": logoutSid}, func(database *datamocks.Database) {
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
+					Return(&record.UserSession{Id: 3}, nil).Once()
+				database.On("UserSessionLoadClients", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			}},
+	}
+	for _, tc := range cases {
+		for _, scheme := range []string{"Bearer", "DPoP"} {
+			t.Run(tc.name+"/"+scheme, func(t *testing.T) {
+				database := datamocks.NewDatabase(t)
+				stubResolvedClient(database)
+				tc.arm(database)
+				req := setTokenContextWithClaims(logoutRequest(t, logoutClientIdent), tc.claims)
+				bearer, dpopChallenge := `Bearer realm="goiabada", error="invalid_token", error_description="`+tc.description+`"`,
+					`DPoP realm="goiabada", `+algs
+				if scheme == "DPoP" {
+					req = req.WithContext(reqctx.WithDPoPProof(req.Context(), &dpop.Proof{}))
+					bearer, dpopChallenge = `Bearer realm="goiabada"`,
+						`DPoP realm="goiabada", `+algs+`, error="invalid_token", error_description="`+tc.description+`"`
+				}
+
+				capture := logtest.CaptureSlog(t)
+				rr := httptest.NewRecorder()
+				HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL).ServeHTTP(rr, req)
+
+				requireRefused(t, rr, capture, http.StatusUnauthorized, "INVALID_SESSION")
+				assert.Equal(t, bearer+", "+dpopChallenge, rr.Header().Get("WWW-Authenticate"))
+			})
+		}
+	}
 }

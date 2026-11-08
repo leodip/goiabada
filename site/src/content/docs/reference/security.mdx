@@ -65,6 +65,9 @@ Each notice says what changed and what to do if the user didn't change it, in th
 - **A refresh token works once.** Each refresh replaces it, and two refreshes with the same token at the same moment get at most one new token. See [rotation](/concepts/refresh-tokens/#rotation).
 - **A replayed refresh token revokes its family.** Presenting one that a refresh already replaced revokes every other token in its line of refreshes, and leaves a `refresh_token_replay_detected` entry in the audit log. See [replay](/concepts/refresh-tokens/#replay).
 - **Ending a session revokes what it authorized:** its refresh tokens, offline ones included, and its unredeemed authorization codes. See [what ending a session revokes](/concepts/ending-sessions/#what-ending-a-session-revokes).
+- **Tokens can be bound to a key with DPoP.** An app that sends a proof signed by its key gets access tokens bound to that key, a public client's refresh tokens too, and with `dpop_jkt` its authorization code. A copied token or code is useless without the key. Each proof is accepted once, and at the token endpoint it must carry a nonce the auth server handed out, so a proof can't be made in advance. See [DPoP](/concepts/dpop/).
+- **A bound token is never taken as a bearer token.** UserInfo and the Admin and Account APIs accept a bound token only with the `DPoP` scheme and a proof by its key, as [RFC 9449 section 7.2](https://www.rfc-editor.org/rfc/rfc9449.html#section-7.2) requires. [Protect an API](/guides/protect-an-api/#accept-dpop-bound-tokens) shows your API how to do the same.
+- **A JWT of unexpected structure is refused,** by the auth server and by the admin console, before its signature is checked: one with a `crit` header, a nested JWT, invalid UTF-8, or a character outside base64url, `=` padding and line breaks included. Goiabada never issues one.
 
 ## Sessions and cookies
 

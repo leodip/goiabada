@@ -1,11 +1,11 @@
 // Package tokenmetrics counts, on the metrics listener, the tokens this server issues and the token
 // requests it refuses (#400 decision 5): the issued by grant type, every grant the server issues
-// included, and the refused by the grant the request named and the RFC 6749 section 5.2 error code
-// it was answered with.
+// included, and the refused by the grant the request named and the error code it was answered with:
+// RFC 6749 section 5.2's, or one of RFC 9449's two for a DPoP proof.
 //
 // Both labels are closed sets (#400 decision 4). A grant_type is the request's own parameter, so
 // anything outside the grants this server redeems is recorded as other, and an error code outside
-// section 5.2's and server_error is too; no client identifier or description reaches a label.
+// those and server_error is too; no client identifier or description reaches a label.
 package tokenmetrics
 
 import (
@@ -21,8 +21,8 @@ import (
 // with, which is what render's JSONError writes for one.
 const serverError = "server_error"
 
-// refusalCodes are the error codes RFC 6749 section 5.2 lists for a token request, and the
-// server_error a fault is answered with.
+// refusalCodes are the error codes RFC 6749 section 5.2 lists for a token request, the two RFC 9449
+// adds for a DPoP proof (sections 5 and 8), and the server_error a fault is answered with.
 var refusalCodes = []string{
 	"invalid_request",
 	"invalid_client",
@@ -30,6 +30,8 @@ var refusalCodes = []string{
 	"unauthorized_client",
 	"unsupported_grant_type",
 	"invalid_scope",
+	"invalid_dpop_proof",
+	"use_dpop_nonce",
 	serverError,
 }
 

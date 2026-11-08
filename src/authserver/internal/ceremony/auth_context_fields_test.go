@@ -37,6 +37,7 @@ var requestFields = []string{
 	"DeferredErrorCode",
 	"DeferredErrorDescription",
 	"RequestedScope",
+	"DPoPJkt",
 }
 
 var attemptFields = []string{

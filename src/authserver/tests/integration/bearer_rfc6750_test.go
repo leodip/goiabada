@@ -69,19 +69,19 @@ func TestBearerRFC6750_NoCredentialIsTheRealmAlone(t *testing.T) {
 	for _, method := range []string{"GET", "POST"} {
 		userinfo := sendBearerRequest(t, method, "/userinfo", "", "")
 		assert.Equal(t, http.StatusUnauthorized, userinfo.status, "%s /userinfo: %s", method, userinfo.body)
-		assert.Equal(t, `Bearer realm="goiabada"`, userinfo.challenge, "%s /userinfo", method)
+		assert.Equal(t, `Bearer realm="goiabada", `+dpopChallengeBare, userinfo.challenge, "%s /userinfo", method)
 		assert.Empty(t, userinfo.body, "%s /userinfo: no error information in the body either", method)
 	}
 
 	admin := sendBearerRequest(t, "GET", bearerRFC6750AdminRoute, "", "")
 	assert.Equal(t, http.StatusUnauthorized, admin.status, admin.body)
-	assert.Equal(t, `Bearer realm="goiabada"`, admin.challenge)
+	assert.Equal(t, `Bearer realm="goiabada", `+dpopChallengeBare, admin.challenge)
 	assert.JSONEq(t, `{"error_code":"ACCESS_TOKEN_REQUIRED","error_description":"Access token required."}`, admin.body,
 		"the admin API keeps its documented envelope")
 
 	basic := sendBearerRequest(t, "GET", bearerRFC6750AdminRoute, "Basic dXNlcjpwYXNz", "")
 	assert.Equal(t, http.StatusUnauthorized, basic.status, basic.body)
-	assert.Equal(t, `Bearer realm="goiabada"`, basic.challenge, "another scheme is no bearer credential")
+	assert.Equal(t, `Bearer realm="goiabada", `+dpopChallengeBare, basic.challenge, "another scheme is no bearer credential")
 }
 
 // RFC 6750 section 2.1's scheme is case insensitive (RFC 5234 section 2.3), and resource servers

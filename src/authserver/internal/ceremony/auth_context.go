@@ -255,6 +255,12 @@ type AuthContext struct {
 	// Absent from a context written by an older binary it unmarshals as nil: no answer, the
 	// unticked direction.
 	KeepSignedIn *bool
+	// DPoPJkt is the authorization request's dpop_jkt: the RFC 7638 thumbprint of the DPoP key the
+	// code this ceremony issues is bound to, empty for none (RFC 9449 section 10, #42 decision 14).
+	// A request field, written at /auth/authorize and kept by Restart, so it reaches the code
+	// whatever steps the sign-in takes. Absent from a context written by an older binary it
+	// unmarshals as "", a code bound to no key, which is what that ceremony asked for.
+	DPoPJkt string
 }
 
 func (ac *AuthContext) SetScope(scope string) {

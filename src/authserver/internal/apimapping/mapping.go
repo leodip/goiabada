@@ -6,7 +6,10 @@
 package apimapping
 
 import (
+	"bytes"
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
 	"strconv"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -504,6 +507,7 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		RememberConsent:                         client.RememberConsent,
 		BackchannelLogoutURI:                    client.BackchannelLogoutURI,
 		BackchannelLogoutSessionRequired:        client.BackchannelLogoutSessionRequired,
+		DPoPBoundAccessTokens:                   client.DPoPBoundAccessTokens,
 		CreatedViaDCR:                           client.CreatedViaDCR,
 		AdministrativeScopesAllowed:             client.MayRequestAdministrativeScopes(),
 		ShowLogo:                                client.ShowLogo,
@@ -678,4 +682,21 @@ func nullableId(id sql.NullInt64) *int64 {
 		return nil
 	}
 	return &id.Int64
+}
+
+// ToPublicKeyPEM answers a signing key's stored public PEM as the admin API exports it. Keys
+// created before #424 store SubjectPublicKeyInfo under "RSA PUBLIC KEY", PKCS#1's label; RFC 7468
+// section 13 labels SubjectPublicKeyInfo "PUBLIC KEY", and a reader that trusts the label refuses
+// the old one. Such a block is re-encoded with the same bytes under "PUBLIC KEY". Anything else,
+// a block that really is PKCS#1 included, is answered as stored. The row itself is not rewritten
+// (#714).
+func ToPublicKeyPEM(stored []byte) string {
+	block, rest := pem.Decode(stored)
+	if block == nil || block.Type != "RSA PUBLIC KEY" || len(bytes.TrimSpace(rest)) != 0 {
+		return string(stored)
+	}
+	if _, err := x509.ParsePKIXPublicKey(block.Bytes); err != nil {
+		return string(stored)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: block.Bytes}))
 }

@@ -62,7 +62,7 @@ Optional doesn't mean ignored: a client that sends PKCE when it's optional is he
 
 ## What the auth server checks
 
-At `/auth/authorize`, `code_challenge_method` must be `S256`, and `code_challenge` must be 43 to 128 characters of the set above. `plain` isn't supported, and discovery lists `S256` alone in `code_challenge_methods_supported`. Each failure is refused with `invalid_request`. When the browser has no session, the user sees the sign-in page first and your app gets the error after it, as [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/) explains.
+At `/auth/authorize`, `code_challenge_method` must be `S256`, and `code_challenge` must be what step 2 makes: the verifier's SHA-256 hash, base64url-encoded without padding, which is exactly 43 characters of `A`–`Z`, `a`–`z`, `0`–`9`, `-` and `_`. Any other value could never match a verifier. `plain` isn't supported, and discovery lists `S256` alone in `code_challenge_methods_supported`. Each failure is refused with `invalid_request`. When the browser has no session, the user sees the sign-in page first and your app gets the error after it, as [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/) explains.
 
 At `/auth/token`, the verifier has to match the challenge the code was issued with:
 
@@ -75,6 +75,10 @@ At `/auth/token`, the verifier has to match the challenge the code was issued wi
 | The client is public, and the code was issued without a challenge | `invalid_grant` | "This code was issued without PKCE, and public clients are required to use PKCE. …" |
 
 The last one catches a code issued while the client was confidential and PKCE optional, then redeemed after it became public: start a new authorization request.
+
+## With DPoP
+
+An app that uses [DPoP](/concepts/dpop/) should send `dpop_jkt` with the authorization request too, beside PKCE. PKCE ties the code to the verifier your app holds, and `dpop_jkt` ties it to your app's DPoP key as well, so the code can only be redeemed with a proof by that key. See [Bind the code to your key](/concepts/dpop/#bind-the-code-to-your-key).
 
 ## Next steps
 

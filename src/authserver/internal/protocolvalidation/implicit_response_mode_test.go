@@ -89,7 +89,7 @@ func TestValidateRequest_CodeFlow_ResponseModeUnchanged(t *testing.T) {
 				ResponseType:             "code",
 				ResponseMode:             mode,
 				CodeChallengeMethod:      "S256",
-				CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+				CodeChallenge:            rfc7636Challenge,
 			})
 
 			assert.NoError(t, err)

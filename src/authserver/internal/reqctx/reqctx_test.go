@@ -8,12 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/dpop"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// present reports which of the seven values ctx carries, so a test can say which it expects.
+// present reports which of the eight values ctx carries, so a test can say which it expects.
 func present(ctx context.Context) map[string]bool {
 	_, settings := SettingsFrom(ctx)
 	_, sessionIdentifier := SessionIdentifierFrom(ctx)
@@ -22,6 +23,7 @@ func present(ctx context.Context) map[string]bool {
 	_, validated := ValidatedTokenFrom(ctx)
 	_, reservation := CredentialReservationFrom(ctx)
 	_, actingUserId := ActingUserIdFrom(ctx)
+	_, dpopProof := DPoPProofFrom(ctx)
 	return map[string]bool{
 		"settings":          settings,
 		"sessionIdentifier": sessionIdentifier,
@@ -30,6 +32,7 @@ func present(ctx context.Context) map[string]bool {
 		"validated":         validated,
 		"reservation":       reservation,
 		"actingUserId":      actingUserId,
+		"dpopProof":         dpopProof,
 	}
 }
 
@@ -87,6 +90,20 @@ func TestReqctx_RoundTrip(t *testing.T) {
 		got.MarkFailed()
 		assert.True(t, want.Failed(), "a mark through the reader is not seen by the writer's reservation")
 	})
+
+	t.Run("dpop proof", func(t *testing.T) {
+		want := &dpop.Proof{Thumbprint: "jkt", JTI: "jti-1"}
+		got, ok := DPoPProofFrom(WithDPoPProof(ctx, want))
+		require.True(t, ok)
+		assert.Same(t, want, got)
+	})
+}
+
+// A nil proof is no proof: a request read as sent with the DPoP scheme must carry the one checked.
+func TestReqctx_DPoPProofFromRefusesTypedNil(t *testing.T) {
+	got, ok := DPoPProofFrom(WithDPoPProof(context.Background(), nil))
+	assert.False(t, ok)
+	assert.Nil(t, got)
 }
 
 // A reservation starts unmarked, so a handler that never reaches its credential check leaves
@@ -138,6 +155,7 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 		"validated":         WithValidatedToken(ctx, token),
 		"reservation":       WithCredentialReservation(ctx, &CredentialReservation{}),
 		"actingUserId":      WithActingUserId(ctx, 7),
+		"dpopProof":         WithDPoPProof(ctx, &dpop.Proof{}),
 	}
 
 	for written, writtenCtx := range cases {

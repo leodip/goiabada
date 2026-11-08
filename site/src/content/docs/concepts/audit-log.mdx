@@ -131,6 +131,7 @@ No entry records an email address. An entry about one records `email_digest`, th
 | `code_id` | The row id of an authorization code. |
 | `command` | `goiabada-authserver recover`, on every entry the `recover` command writes. An entry an API request made names its token's subject under `logged_in_user` instead. |
 | `consent_id` | The row id of a consent a user gave a client. |
+| `dpop_bound_access_tokens` | Whether the client now requires DPoP for its token requests. |
 | `email_digest` | The SHA-256 hex digest of the email address the entry is about, in lowercase and, except on a forgot-password request, trimmed: one typed into a form or named by a password grant, an account's, or a test email's recipient. |
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
 | `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
@@ -385,6 +386,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_redirect_uris` | An administrator saved a client's redirect URIs. |
 | `updated_post_logout_redirect_uris` | An administrator saved a client's sign-out redirect URIs. |
 | `updated_client_backchannel_logout` | An administrator saved a client's back-channel logout URI, or whether it requires the session identifier. |
+| `updated_client_dpop` | An administrator saved a client's **Require DPoP for token requests**, on or off. |
 | `updated_web_origins` | An administrator saved a client's web origins. |
 | `updated_client_tokens` | An administrator saved a client's token settings: lifetimes, and which claims go in its tokens. |
 | `updated_client_permissions` | An administrator changed the permissions granted to a client. |

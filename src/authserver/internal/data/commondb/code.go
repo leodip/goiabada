@@ -13,16 +13,16 @@ import (
 var codeColumns = columnList{
 	sqlite: "id, created_at, updated_at, code_hash, client_id, code_challenge, code_challenge_method, scope, " +
 		"state, nonce, redirect_uri, user_id, ip_address, user_agent, response_mode, authenticated_at, " +
-		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation",
+		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation, dpop_jkt",
 	mysql: "id, created_at, updated_at, code_hash, client_id, code_challenge, code_challenge_method, scope, " +
 		"state, nonce, redirect_uri, user_id, ip_address, user_agent, response_mode, authenticated_at, " +
-		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation",
+		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation, dpop_jkt",
 	postgres: "id, created_at, updated_at, code_hash, client_id, code_challenge, code_challenge_method, scope, " +
 		"state, nonce, redirect_uri, user_id, ip_address, user_agent, response_mode, authenticated_at, " +
-		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation",
+		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation, dpop_jkt",
 	mssql: "id, created_at, updated_at, code_hash, client_id, code_challenge, code_challenge_method, scope, " +
 		"state, nonce, redirect_uri, user_id, ip_address, user_agent, response_mode, authenticated_at, " +
-		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation",
+		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation, dpop_jkt",
 }
 
 // scanCode reads one row selected with codeColumns.
@@ -50,34 +50,36 @@ func scanCode(row rowScanner, code *record.Code) error {
 		&code.Used,
 		&code.Revoked,
 		&code.AuthStateGeneration,
+		&code.DPoPJkt,
 	)
 }
 
-// insertCode writes every column but id, the dont-update ones included: a new code starts unrevoked
-// and carries the generation it was issued under.
+// insertCode writes every column but id, the dont-update ones included: a new code starts unrevoked,
+// and carries the generation it was issued under and the DPoP key it is bound to.
 var insertCode = statement{
 	sqlite: "INSERT INTO codes (created_at, updated_at, code_hash, client_id, code_challenge, " +
 		"code_challenge_method, scope, state, nonce, redirect_uri, user_id, ip_address, user_agent, " +
 		"response_mode, authenticated_at, session_identifier, acr_level, auth_methods, used, revoked, " +
-		"auth_state_generation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"auth_state_generation, dpop_jkt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO codes (created_at, updated_at, code_hash, client_id, code_challenge, " +
 		"code_challenge_method, scope, state, nonce, redirect_uri, user_id, ip_address, user_agent, " +
 		"response_mode, authenticated_at, session_identifier, acr_level, auth_methods, used, revoked, " +
-		"auth_state_generation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"auth_state_generation, dpop_jkt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO codes (created_at, updated_at, code_hash, client_id, code_challenge, " +
 		"code_challenge_method, scope, state, nonce, redirect_uri, user_id, ip_address, user_agent, " +
 		"response_mode, authenticated_at, session_identifier, acr_level, auth_methods, used, revoked, " +
-		"auth_state_generation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, " +
-		"$16, $17, $18, $19, $20, $21) RETURNING id",
+		"auth_state_generation, dpop_jkt) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, " +
+		"$15, $16, $17, $18, $19, $20, $21, $22) RETURNING id",
 	mssql: "INSERT INTO codes (created_at, updated_at, code_hash, client_id, code_challenge, " +
 		"code_challenge_method, scope, state, nonce, redirect_uri, user_id, ip_address, user_agent, " +
 		"response_mode, authenticated_at, session_identifier, acr_level, auth_methods, used, revoked, " +
-		"auth_state_generation) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, " +
-		"@p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21)",
+		"auth_state_generation, dpop_jkt) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, " +
+		"@p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22)",
 }
 
-// updateCode writes the whole row but created_at, revoked and auth_state_generation, which are
-// dont-update: a stale record written back cannot unrevoke a code or move its generation.
+// updateCode writes the whole row but created_at, revoked, auth_state_generation and dpop_jkt, which
+// are dont-update: a stale record written back cannot unrevoke a code, move its generation, or change
+// the DPoP key it is bound to.
 var updateCode = statement{
 	sqlite: "UPDATE codes SET updated_at = ?, code_hash = ?, client_id = ?, code_challenge = ?, " +
 		"code_challenge_method = ?, scope = ?, state = ?, nonce = ?, redirect_uri = ?, user_id = ?, " +
@@ -185,7 +187,7 @@ func (d *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code
 		code.CreatedAt, code.UpdatedAt, code.CodeHash, code.ClientId, code.CodeChallenge,
 		code.CodeChallengeMethod, code.Scope, code.State, code.Nonce, code.RedirectURI, code.UserId,
 		code.IpAddress, code.UserAgent, code.ResponseMode, code.AuthenticatedAt, code.SessionIdentifier,
-		code.AcrLevel, code.AuthMethods, code.Used, code.Revoked, code.AuthStateGeneration)
+		code.AcrLevel, code.AuthMethods, code.Used, code.Revoked, code.AuthStateGeneration, code.DPoPJkt)
 	if err != nil {
 		code.CreatedAt = originalCreatedAt
 		code.UpdatedAt = originalUpdatedAt

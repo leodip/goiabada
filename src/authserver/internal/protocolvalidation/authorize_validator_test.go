@@ -658,6 +658,61 @@ func TestValidateRequest_ImplicitFlowNotEnabled(t *testing.T) {
 	assert.Contains(t, customErr.Description(), "admin console")
 }
 
+// A client that requires DPoP is refused the response types that return an access token, "token" and
+// "id_token token", with unauthorized_client (RFC 6749 section 4.2.2.1: "not authorized to request an
+// access token using this method"): an implicit access token leaves in the redirect, with no token
+// request and so no proof, and would be a plain Bearer token (#42 decision 13). "id_token" alone and
+// "code" return no access token, and keep their usual rules; a client not requiring DPoP is answered
+// as before.
+func TestValidateRequest_AClientRequiringDPoPIsRefusedImplicitAccessTokens(t *testing.T) {
+	for _, tc := range []struct {
+		responseType string
+		requiresDPoP bool
+		refused      bool
+	}{
+		{"token", true, true},
+		{"id_token token", true, true},
+		{"token id_token", true, true},
+		{"id_token", true, false},
+		{"code", true, false},
+		{"token", false, false},
+		{"id_token token", false, false},
+	} {
+		t.Run(fmt.Sprintf("%s, requires DPoP %v", tc.responseType, tc.requiresDPoP), func(t *testing.T) {
+			validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
+
+			err := validator.ValidateRequest(&ValidateRequestInput{
+				ResponseType:             tc.responseType,
+				AuthorizationCodeEnabled: true,
+				ImplicitGrantEnabled:     true,
+				DPoPBoundAccessTokens:    tc.requiresDPoP,
+				Scope:                    "openid",
+				Nonce:                    "the-nonce",
+			})
+
+			if !tc.refused {
+				require.NoError(t, err)
+				return
+			}
+			var customErr *oauth.ErrorDetail
+			require.ErrorAs(t, err, &customErr)
+			assert.Equal(t, "unauthorized_client", customErr.Code())
+			assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
+			assert.Equal(t, "This client requires DPoP for its access tokens, so it can't receive one through the "+
+				"implicit grant. Use the authorization code flow with PKCE instead.", customErr.Description())
+			assert.Equal(t, ImplicitDPoPRequiredErrorMsg, customErr.Description(), "the message issuance gives too")
+		})
+	}
+
+	// The implicit grant switched off is still answered first, with its own description.
+	err := NewAuthorizeValidator(datamocks.NewDatabase(t)).ValidateRequest(&ValidateRequestInput{
+		ResponseType: "token", AuthorizationCodeEnabled: true, DPoPBoundAccessTokens: true,
+	})
+	var customErr *oauth.ErrorDetail
+	require.ErrorAs(t, err, &customErr)
+	assert.Equal(t, ImplicitNotAuthorizedErrorMsg, customErr.Description())
+}
+
 // The code flow's own question, asked beside the implicit one since #573: a client whose code
 // flow is off is answered unauthorized_client with the description the token endpoint and
 // issuance give for the same condition, so the client hears one answer wherever it asks (#197).
@@ -753,7 +808,7 @@ func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedOffered, customErr.Description())
 }
 
 func TestValidateRequest_CodeChallengeTooShort_PKCERequired(t *testing.T) {
@@ -773,7 +828,7 @@ func TestValidateRequest_CodeChallengeTooShort_PKCERequired(t *testing.T) {
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedRequired, customErr.Description())
 }
 
 func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
@@ -793,7 +848,7 @@ func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedOffered, customErr.Description())
 }
 
 func TestValidateRequest_CodeChallengeTooLong_PKCERequired(t *testing.T) {
@@ -813,7 +868,7 @@ func TestValidateRequest_CodeChallengeTooLong_PKCERequired(t *testing.T) {
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedRequired, customErr.Description())
 }
 
 func TestValidateRequest_InvalidResponseMode(t *testing.T) {
@@ -824,7 +879,7 @@ func TestValidateRequest_InvalidResponseMode(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "invalid_mode",
 	}
 	err := validator.ValidateRequest(&input)
@@ -892,7 +947,7 @@ func TestSupportedResponseTypes(t *testing.T) {
 			Scope:                    "openid",
 			Nonce:                    "test-nonce-123",
 			CodeChallengeMethod:      "S256",
-			CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+			CodeChallenge:            rfc7636Challenge,
 		}
 		require.NoError(t, validator.ValidateRequest(&input), "%q is advertised and must be accepted", responseType)
 	}
@@ -909,7 +964,7 @@ func TestValidateRequest_ValidInput(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "query",
 	}
 	err := validator.ValidateRequest(&input)
@@ -927,7 +982,7 @@ func TestValidateRequest_MaxAge(t *testing.T) {
 			AuthorizationCodeEnabled: true,
 			ResponseType:             "code",
 			CodeChallengeMethod:      "S256",
-			CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+			CodeChallenge:            rfc7636Challenge,
 			ResponseMode:             "query",
 			MaxAge:                   maxAge,
 		}
@@ -1035,7 +1090,7 @@ func TestValidateRequest_EmptyResponseMode(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "",
 	}
 	err := validator.ValidateRequest(&input)
@@ -1096,7 +1151,7 @@ func TestValidateRequest_PKCEOptional_ValidPKCEParams_Success(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "query",
 		PKCERequired:             false,
 	}
@@ -1115,7 +1170,7 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallenge_Fails(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "query",
 		PKCERequired:             false,
 	}
@@ -1146,7 +1201,7 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallengeMethod_Fails(t *testing.T
 	require.Error(t, err)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
+	assert.Equal(t, challengeRefusedOffered, customErr.Description())
 }
 
 func TestValidateRequest_PKCERequired_NoPKCEParams_Fails(t *testing.T) {
@@ -1179,95 +1234,13 @@ func TestValidateRequest_PKCERequired_ValidPKCEParams_Success(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ResponseType:             "code",
 		CodeChallengeMethod:      "S256",
-		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		CodeChallenge:            rfc7636Challenge,
 		ResponseMode:             "query",
 		PKCERequired:             true,
 	}
 	err := validator.ValidateRequest(&input)
 
 	assert.NoError(t, err)
-}
-
-func TestValidateRequest_CodeChallenge_Exactly43Chars_Success(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	// Boundary test: exactly 43 characters should be valid
-	codeChallenge := strings.Repeat("a", 43)
-	input := ValidateRequestInput{
-		AuthorizationCodeEnabled: true,
-		ResponseType:             "code",
-		CodeChallengeMethod:      "S256",
-		CodeChallenge:            codeChallenge,
-		ResponseMode:             "query",
-		PKCERequired:             false,
-	}
-	err := validator.ValidateRequest(&input)
-
-	assert.NoError(t, err)
-}
-
-func TestValidateRequest_CodeChallenge_Exactly42Chars_Fails(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	// Boundary test: 42 characters should be invalid (just under minimum)
-	codeChallenge := strings.Repeat("a", 42)
-	input := ValidateRequestInput{
-		AuthorizationCodeEnabled: true,
-		ResponseType:             "code",
-		CodeChallengeMethod:      "S256",
-		CodeChallenge:            codeChallenge,
-		ResponseMode:             "query",
-		PKCERequired:             false,
-	}
-	err := validator.ValidateRequest(&input)
-
-	require.Error(t, err)
-	var customErr *oauth.ErrorDetail
-	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
-}
-
-func TestValidateRequest_CodeChallenge_Exactly128Chars_Success(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	// Boundary test: exactly 128 characters should be valid
-	codeChallenge := strings.Repeat("a", 128)
-	input := ValidateRequestInput{
-		AuthorizationCodeEnabled: true,
-		ResponseType:             "code",
-		CodeChallengeMethod:      "S256",
-		CodeChallenge:            codeChallenge,
-		ResponseMode:             "query",
-		PKCERequired:             false,
-	}
-	err := validator.ValidateRequest(&input)
-
-	assert.NoError(t, err)
-}
-
-func TestValidateRequest_CodeChallenge_Exactly129Chars_Fails(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	// Boundary test: 129 characters should be invalid (just over maximum)
-	codeChallenge := strings.Repeat("a", 129)
-	input := ValidateRequestInput{
-		AuthorizationCodeEnabled: true,
-		ResponseType:             "code",
-		CodeChallengeMethod:      "S256",
-		CodeChallenge:            codeChallenge,
-		ResponseMode:             "query",
-		PKCERequired:             false,
-	}
-	err := validator.ValidateRequest(&input)
-
-	require.Error(t, err)
-	var customErr *oauth.ErrorDetail
-	require.ErrorAs(t, err, &customErr)
-	assert.Equal(t, "The code_challenge parameter is incorrect. It should be 43 to 128 characters long.", customErr.Description())
 }
 
 func TestValidateRequest_ValidResponseModes(t *testing.T) {
@@ -1282,7 +1255,7 @@ func TestValidateRequest_ValidResponseModes(t *testing.T) {
 				AuthorizationCodeEnabled: true,
 				ResponseType:             "code",
 				CodeChallengeMethod:      "S256",
-				CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+				CodeChallenge:            rfc7636Challenge,
 				ResponseMode:             mode,
 				PKCERequired:             false,
 			}
@@ -1609,7 +1582,7 @@ func TestValidateRequest_AllSupportedResponseTypes(t *testing.T) {
 			if !tc.isImplicitFlow {
 				// For code flow, provide PKCE
 				input.CodeChallengeMethod = "S256"
-				input.CodeChallenge = "a_valid_code_challenge_that_meets_length_requirements"
+				input.CodeChallenge = rfc7636Challenge
 			}
 
 			err := validator.ValidateRequest(&input)

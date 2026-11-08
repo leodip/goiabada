@@ -61,6 +61,8 @@ If you're writing the tool, this is what it does the first time it runs.
    }
    ```
 
+   If your tool binds its tokens with [DPoP](/concepts/dpop/) on every request, add `"dpop_bound_access_tokens": true`. The auth server then refuses any token request from it without a proof, so every token it gets is bound to a key.
+
 3. Keep the `client_id` from the answer. It's yours for good: there's no endpoint to read or change a registration later, so register again only if you lose it.
 
    ```http
@@ -75,7 +77,8 @@ If you're writing the tool, this is what it does the first time it runs.
      "redirect_uris": ["http://127.0.0.1/callback"],
      "token_endpoint_auth_method": "none",
      "grant_types": ["authorization_code", "refresh_token"],
-     "client_name": "Report builder"
+     "client_name": "Report builder",
+     "dpop_bound_access_tokens": false
    }
    ```
 

@@ -17,8 +17,8 @@ import (
 
 // The statements of the records the server keeps about itself, held on all four engines to what
 // each asks of the engine: the settings row and its two conditional writes, signing keys, audit
-// logs, pending registrations, the shared rate-limit counters, re-encryption, the email-case
-// pre-flight and the empty-database check (#644).
+// logs, pending registrations, the shared rate-limit counters, the DPoP replay store, re-encryption,
+// the email-case pre-flight and the empty-database check (#644, #42).
 //
 // Most of these exist for their condition: a cleanup run is claimed only while the last one is old
 // enough, a key changes state only from the state the caller read, a pending registration is
@@ -31,6 +31,7 @@ import (
 const (
 	serverRecordId = 9
 	keyHash        = "key-1"
+	dpopProofHash  = "462c64cca02281f55a11dd7d75a15fa32a13d06b1c710a6df24776076741b096"
 )
 
 var (
@@ -260,6 +261,26 @@ func serverRecordStatements() []narrowWrite {
 					"verification_code_hash = 'hash-1', verification_code_issued_at = 2001-01-01T00:00:00Z, updated_at = <now> " +
 					"WHERE id = 9 AND verification_code_hash = 'dead-hash'",
 			},
+		},
+
+		// The DPoP replay store (#42 decision 9): one insert, which the primary key makes atomic, and
+		// the sweep.
+		{
+			name: "RecordDPoPProof",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return d.RecordDPoPProof(ctx, nil, dpopProofHash, windowExpires)
+			},
+			answer: true,
+			statements: []string{
+				"INSERT INTO dpop_proofs (proof_hash, expires_at) VALUES ('" + dpopProofHash + "', 2003-03-03T00:00:00Z)",
+			},
+		},
+		{
+			name: "DeleteExpiredDPoPProofs",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return nil, d.DeleteExpiredDPoPProofs(ctx, nil, windowExpires)
+			},
+			statements: []string{"DELETE FROM dpop_proofs WHERE expires_at < 2003-03-03T00:00:00Z"},
 		},
 	}
 }

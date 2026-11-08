@@ -33,6 +33,9 @@ type ROPCGrantInput struct {
 	// stamps the moment of the password grant, and a refresh copies the instant its parent
 	// token recorded (#125).
 	AuthenticatedAt time.Time
+	// DPoPThumbprint binds the access token to the request's proof key, empty for a bearer token, and
+	// a public client's refresh token too (#42 decision 11).
+	DPoPThumbprint string
 }
 
 // IssuePasswordGrant creates tokens for Resource Owner Password Credentials flow.
@@ -52,7 +55,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 	tokenExpirationInSeconds := tokenLifetimeSeconds(settings, input.Client)
 
 	response := &oauth.TokenResponse{
-		TokenType: TokenTypeBearer.String(),
+		TokenType: ResponseTokenType(input.DPoPThumbprint),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 

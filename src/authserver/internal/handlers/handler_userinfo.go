@@ -63,7 +63,7 @@ func HandleUserInfoGetPost(
 			// permitted but told the client to retry a request that can only fail again,
 			// where 401 tells it to obtain a new token, which is the whole point of the
 			// distinction (#279 decision 14).
-			jsonWriter.JSONError(w, r, invalidTokenRefusal("The user could not be found."))
+			jsonWriter.JSONError(w, r, invalidTokenRefusal(r.Context(), "The user could not be found."))
 			return
 		}
 
@@ -75,7 +75,7 @@ func HandleUserInfoGetPost(
 			// 401 invalid_token, for the reason the not-found branch above gives: the
 			// token is no longer valid for this account and the client's remedy is a new
 			// one, not a retry (#279 decision 14).
-			jsonWriter.JSONError(w, r, invalidTokenRefusal("The user account is disabled."))
+			jsonWriter.JSONError(w, r, invalidTokenRefusal(r.Context(), "The user account is disabled."))
 			return
 		}
 
@@ -127,10 +127,11 @@ func HandleUserInfoGetPost(
 }
 
 // invalidTokenRefusal is the handler's own 401 invalid_token, challenged exactly as the bearer
-// guards in front of it challenge theirs: through middleware.BearerChallenge, so the realm and the
-// conformed description are on every bearer challenge this endpoint writes (#435).
-func invalidTokenRefusal(description string) error {
+// guards in front of it challenge theirs: through middleware.UnauthorizedChallenge, so the realm,
+// the conformed description and both schemes, the error in the one the token was presented with,
+// are on every challenge this endpoint writes (#435, #42 decision 10).
+func invalidTokenRefusal(ctx context.Context, description string) error {
 	return protocolvalidation.NewErrorDetailWithHTTPStatusAndWWWAuthenticate(
 		"invalid_token", description, http.StatusUnauthorized,
-		middleware.BearerChallenge("invalid_token", description))
+		middleware.UnauthorizedChallenge(ctx, "invalid_token", description))
 }

@@ -116,7 +116,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
@@ -337,7 +337,7 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 	after := time.Now().UTC()
 
 	require.NoError(t, err)
@@ -478,7 +478,7 @@ func TestMintAuthorizationCodeTokens_SessionRowGone(t *testing.T) {
 	// The swept row: the lookup finds nothing, which is not an error.
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, code.SessionIdentifier).Return(nil, nil)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), settings, code, "")
 
 	require.ErrorIs(t, err, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest))
 	assert.Nil(t, response, "a grant whose session row is gone answers no tokens")
@@ -494,7 +494,7 @@ func TestMintAuthorizationCodeTokens_SessionReadFails(t *testing.T) {
 	failure := errs.New("connection refused")
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, code.SessionIdentifier).Return(nil, failure)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), settings, code, "")
 
 	require.ErrorIs(t, err, failure)
 	require.NotErrorIs(t, err, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest))
@@ -515,7 +515,7 @@ func TestMintAuthorizationCodeTokens_RefreshTokenInsertFails(t *testing.T) {
 	failure := errs.New("connection refused")
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(failure)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), settings, code, "")
 
 	require.ErrorIs(t, err, failure)
 	require.NotErrorIs(t, err, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest))
@@ -607,7 +607,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 	after := time.Now().UTC()
 
 	require.NoError(t, err)
@@ -766,7 +766,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
@@ -888,7 +888,7 @@ func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 	after := time.Now().UTC()
 
 	require.NoError(t, err)

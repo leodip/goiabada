@@ -58,7 +58,7 @@ func TestRequireValidSession_Grant(t *testing.T) {
 			}
 			assert.Equal(t, http.StatusUnauthorized, rr.Code)
 			assert.False(t, nextCalled, "a refused token must not reach the handler")
-			assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`,
+			assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`+`, DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`,
 				rr.Header().Get("WWW-Authenticate"))
 			var body api.ErrorResponse
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
@@ -119,7 +119,7 @@ func TestRequireValidSession_RevokedJti(t *testing.T) {
 			}
 			assert.Equal(t, http.StatusUnauthorized, rr.Code)
 			assert.False(t, nextCalled, "a revoked token must not reach the handler")
-			assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`,
+			assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`+`, DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`,
 				rr.Header().Get("WWW-Authenticate"))
 			var body api.ErrorResponse
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))

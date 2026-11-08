@@ -49,8 +49,11 @@ Send the access token one way:
 
 - **In the `Authorization` header,** as `Bearer` and the token, on a GET or a POST. This is the way to use.
 - **In a POST body,** as the `access_token` parameter, with `Content-Type: application/x-www-form-urlencoded`, as [RFC 6750 section 2.2](https://www.rfc-editor.org/rfc/rfc6750#section-2.2) defines.
+- **With the `DPoP` scheme,** for an access token bound to a key with [DPoP](/concepts/dpop/): `Authorization: DPoP` and the token, beside a `DPoP` header carrying a new proof for this request. See [Call userinfo and the API with a bound token](/concepts/dpop/#call-userinfo-and-the-api-with-a-bound-token).
 
 A token in the query string isn't read, since it would end up in logs and the browser's history. Sending the token twice, in two headers, two parameters or both ways, is refused with `invalid_request`.
+
+A token bound to a key must be sent with `DPoP`, and a token bound to none with `Bearer` or in the body.
 
 The token must be an access token the auth server issued for a user, with `openid` in its scope. A client credentials token never has `openid`, and an ID token or a refresh token isn't accepted.
 
@@ -71,13 +74,15 @@ A claim with no value is left out, as [Scopes](/concepts/scopes/#openid-connect-
 
 The claims are read when you call, so they're current even when the token is older than the user's last change. The answer is plain JSON, never a signed JWT.
 
+Every answer, the claims and each error alike, carries `Cache-Control: no-store` and `Pragma: no-cache`, so no cache keeps a copy of a user's claims.
+
 ## Errors
 
-An error is answered with a `WWW-Authenticate: Bearer realm="goiabada"` header naming the `error` and its `error_description`, and the same two in a JSON body, as [RFC 6750 section 3](https://www.rfc-editor.org/rfc/rfc6750#section-3) defines:
+An error is answered with a `WWW-Authenticate` header naming the `error` and its `error_description`, and the same two in a JSON body, as [RFC 6750 section 3](https://www.rfc-editor.org/rfc/rfc6750#section-3) defines. A `401` names both schemes the endpoint accepts, a `Bearer` challenge first and a `DPoP` challenge listing the proof algorithms second, with the error in the challenge of the scheme your request used:
 
 ```http
 HTTP/1.1 401 Unauthorized
-WWW-Authenticate: Bearer realm="goiabada", error="invalid_token", error_description="Session has been terminated"
+WWW-Authenticate: Bearer realm="goiabada", error="invalid_token", error_description="Session has been terminated", DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"
 Content-Type: application/json
 Cache-Control: no-store
 Pragma: no-cache
@@ -88,12 +93,18 @@ Pragma: no-cache
 }
 ```
 
+A `400` or a `403` carries only the challenge of the scheme your request used, or both when it used both.
+
 | Status | `error` | `error_description` | Why |
 |---|---|---|---|
-| 401 | none | none | No token was sent. The answer has only `WWW-Authenticate: Bearer realm="goiabada"` and no body. |
+| 401 | none | none | No token was sent. The answer has `WWW-Authenticate: Bearer realm="goiabada", DPoP realm="goiabada", algs="…"` and no body. |
 | 400 | `invalid_request` | "The Authorization header must be sent once.", "The access_token parameter must be sent once." or "The access token must be sent by one method only." | The token was sent twice |
 | 400 | `invalid_request` | "The request body could not be parsed." | A POST body that can't be read |
 | 401 | `invalid_token` | "The access token is invalid." | The token is expired, its signature doesn't verify, it isn't an access token, its `iss` isn't the current issuer, its client is disabled or deleted, or it or its grant was revoked |
+| 401 | `invalid_token` | "The access token is bound to a DPoP key and must be sent with the DPoP scheme." | A bound token was sent as `Bearer` or in the body |
+| 401 | `invalid_token` | "The access token is not bound to a DPoP key and must be sent with the Bearer scheme." | A token bound to no key was sent with `DPoP` |
+| 401 | `invalid_dpop_proof` | "The DPoP proof is invalid." | With `DPoP`: no proof, more than one, a proof that fails a [check](/concepts/dpop/#what-a-proof-must-say), or one already used |
+| 401 | `invalid_token` | "The DPoP proof is not signed with the key the access token is bound to." | With `DPoP`: the proof is signed by another key than the token's |
 | 403 | `insufficient_scope` | "Insufficient scope." | The token's scope has no `openid` |
 | 401 | `invalid_token` | "Session has been terminated" | The user signed out, was disabled or deleted, or their credentials changed |
 | 401 | `invalid_token` | "Session has expired" | The session the token was issued in reached its idle timeout or maximum lifetime |
@@ -103,7 +114,7 @@ This makes `/userinfo` stricter than the token's own `exp`: an access token stop
 
 ## Calling it from a browser
 
-JavaScript in a browser can call `/userinfo` when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. Without one, the browser blocks the call.
+JavaScript in a browser can call `/userinfo` when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. It can send a `DPoP` header and read `WWW-Authenticate`, both challenges included. Without one, the browser blocks the call.
 
 ## Next steps
 
