@@ -919,7 +919,7 @@ jobs:
           go-version: ${{ needs.versions.outputs.go }}
           cache-dependency-path: src/**/go.sum
       # Before QEMU and Buildx, whose setup pulls their own images from Docker Hub, and the two
-      # release builds, whose golang and alpine bases come from there. See the note above
+      # release builds, whose golang base comes from there. See the note above
       # permissions.
       - name: Log in to Docker Hub
         if: env.DOCKERHUB_USERNAME != ''
@@ -940,7 +940,10 @@ jobs:
         working-directory: src/cmd/goiabada-setup
         run: ./build-binaries.sh
       # With the build arguments a release passes, so the smoke run below reads
-      # back a version this job chose rather than the "development" default.
+      # back a version this job chose rather than the "development" default, and
+      # with the cache filter a release passes, which reruns the Dockerfiles'
+      # certificate refresh and ships the CA bundle it fetched;
+      # src/core/guard/release_cache_filter_test.go holds both builds to it.
       - name: Build both images
         working-directory: src/build
         env:
@@ -952,8 +955,8 @@ jobs:
             --build-arg "buildDate=$(date +%Y-%m-%d)"
             --build-arg "gitCommit=$(git rev-parse --short HEAD)"
           )
-          docker buildx build --load "${args[@]}" -f Dockerfile-authserver   -t goiabada-authserver:ci   ..
-          docker buildx build --load "${args[@]}" -f Dockerfile-adminconsole -t goiabada-adminconsole:ci ..
+          docker buildx build --load "${args[@]}" --no-cache-filter certs --no-cache-filter final -f Dockerfile-authserver   -t goiabada-authserver:ci   ..
+          docker buildx build --load "${args[@]}" --no-cache-filter certs --no-cache-filter final -f Dockerfile-adminconsole -t goiabada-adminconsole:ci ..
       # Built from source at the pin by the install step the weekly Image scan
       # shares, which says why: never from Trivy's release binaries, its action
       # or its image, which were all hijacked in March 2026 (#520).
@@ -980,10 +983,12 @@ jobs:
             echo "::endgroup::"
           done
           exit $rc
-      # The images carry no zone database, so they are the one host where the
-      # servers' own TZ resolution is observable (#331). Inside a release this
-      # job is part of Checks, which the images job needs, so an image that
-      # fails here is never pushed.
+      # Reads each image's configuration and contents from outside it, starts
+      # it with TZ set, the one host where the servers' own TZ resolution is
+      # observable (#331), and waits for both to turn healthy by their own
+      # check under OpenShift's restrictions; the script says why each. Inside
+      # a release this job is part of Checks, which the images job needs, so an
+      # image that fails here is never pushed.
       - name: Smoke-run both images
         working-directory: src/build
         env:

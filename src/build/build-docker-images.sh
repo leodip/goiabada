@@ -109,6 +109,11 @@ cd "$SCRIPT_DIR/.."
 echo "Working directory: $(pwd)"
 echo ""
 
+# Every build below passes --no-cache-filter certs --no-cache-filter final, which reruns the
+# Dockerfiles' certificate refresh and ships the CA bundle it fetched, while the Go build stays
+# cached: the Dockerfiles say why both stages, and
+# src/core/guard/release_cache_filter_test.go holds each build here to them.
+
 # Setup buildx builder
 #
 # Each build names the builder (--builder) instead of `docker buildx use` making
@@ -146,6 +151,7 @@ if [[ "$PUSH" == true ]]; then
     # tag every unpinned deployment follows changes at that moment rather than
     # whenever CI happens to go green.
     docker buildx build --progress=plain --builder "$BUILDER_NAME" \
+      --no-cache-filter certs --no-cache-filter final \
       --platform "$PLATFORMS" \
       -f ./build/Dockerfile-authserver \
       $(tags_for authserver) \
@@ -161,6 +167,7 @@ if [[ "$PUSH" == true ]]; then
     # Build and push adminconsole (multi-platform)
     echo "=== Building and pushing adminconsole image (multi-platform) ==="
     docker buildx build --progress=plain --builder "$BUILDER_NAME" \
+      --no-cache-filter certs --no-cache-filter final \
       --platform "$PLATFORMS" \
       -f ./build/Dockerfile-adminconsole \
       $(tags_for adminconsole) \
@@ -187,6 +194,7 @@ else
     # tag every unpinned deployment follows changes at that moment rather than
     # whenever CI happens to go green.
     docker buildx build --progress=plain --builder "$BUILDER_NAME" \
+      --no-cache-filter certs --no-cache-filter final \
       --platform linux/amd64 \
       -f ./build/Dockerfile-authserver \
       $(tags_for authserver) \
@@ -201,6 +209,7 @@ else
     # Build adminconsole (local only, single platform)
     echo "=== Building adminconsole image (local) ==="
     docker buildx build --progress=plain --builder "$BUILDER_NAME" \
+      --no-cache-filter certs --no-cache-filter final \
       --platform linux/amd64 \
       -f ./build/Dockerfile-adminconsole \
       $(tags_for adminconsole) \

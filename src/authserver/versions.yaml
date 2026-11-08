@@ -27,8 +27,6 @@
 # staticcheck:    Static analyzer (devcontainer, make check)
 # unparam:        Unused-parameter analyzer (devcontainer, make check)
 # govulncheck:    Vulnerability scanner (devcontainer)
-# alpine:         Base of the release images' final stage, as major.minor
-#                 (Dockerfile-authserver, Dockerfile-adminconsole)
 # trivy:          Image scanner, built from source in CI's Build validation, which
 #                 fails on a fixable HIGH or CRITICAL finding in the images' Alpine
 #                 packages, and in the weekly Image scan of the published images
@@ -46,13 +44,6 @@
 # `./version-manager.sh check` queries. unparam publishes no tags at all, so it
 # is pinned to a pseudo-version and every upstream commit will show up as an
 # available update.
-#
-# alpine is pinned to a minor rather than a patch: the alpine:X.Y tag receives
-# Alpine's patch releases, security fixes included, at the next image build, so
-# only the six-monthly minor release is a bump made here, and
-# `./version-manager.sh check` reports it from alpinelinux.org. It replaced
-# alpine:latest, which moved the release images to a new minor with no change
-# on our side (#396).
 #
 # trivy is built from source, `go install .../cmd/trivy@v<pin>`, never downloaded
 # as a release binary or run from its action or image: Trivy's publishing was
@@ -80,7 +71,6 @@ tools:
   staticcheck: "0.8.2"
   unparam: "0.0.0-20261102141913-394cd0a56cd5"
   govulncheck: "1.9.0"
-  alpine: "3.24"
   trivy: "0.76.1"
   grype: "0.121.1"
   npm-check-updates: "23.1.1"

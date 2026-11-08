@@ -33,6 +33,14 @@ COPY ./core ./core
 
 RUN mkdir -p /app/bin
 
+# The one folder the image holds besides the binary and the CA bundle, laid out here because the
+# final stage has no shell to make it and takes its mode from the COPY that creates it: /tmp, root's,
+# world-writable and sticky, as on any Linux system, where Go writes its temporary files. The admin console
+# keeps nothing on disk, so unlike the auth server's image this one has no folder for it to write.
+# TestReleaseDockerfiles_TheImagesAreScratch, in src/core/guard/release_final_stage_test.go, holds
+# this instruction to this form.
+RUN mkdir -p /app/rootfs/tmp && chmod 1777 /app/rootfs/tmp
+
 WORKDIR /app/src/adminconsole
 # Declared here, after the module downloads, so those layers are the same for every platform.
 ARG TARGETOS
@@ -54,56 +62,48 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -buildvcs=false -ta
 
 # ------------------------------------------------------------------------------
 
-FROM alpine:3.24 AS final
+# The certificate refresh: the CA bundle the image ships, upgraded from a freshly fetched index of
+# the Go image's own Alpine, so a release carries the newest ca-certificates-bundle when it is built
+# rather than the one the Go image was built with. It runs on the builder's platform, since the
+# bundle is the same text on every one. A refresh that cannot fetch the index fails the build
+# rather than ship the image's bundle. --no-cache keeps no index on disk but does nothing against
+# Docker's layer cache, so every release build, build-docker-images.sh and CI's build validation,
+# passes --no-cache-filter certs and --no-cache-filter final: excluding this stage alone reruns it,
+# but the final stage's COPY of its file is cached and ships an earlier build's bundle.
+# TestReleaseBuilds_TheRealImageBuildsRerunTheRefresh, in
+# src/core/guard/release_cache_filter_test.go, holds those builds to both.
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs
+RUN apk upgrade --no-cache ca-certificates-bundle
 
-# The minor is pinned in src/authserver/versions.yaml as tools.alpine and written
-# here by ./version-manager.sh update. A minor tag still receives Alpine's patch
-# releases, so only the six-monthly minor bump is a step of its own (#396).
+# ------------------------------------------------------------------------------
+
+# The image, on an empty base (#808). It holds the binary, the CA bundle the servers' TLS reads at
+# the path Go reads first, where an operator's mount or SSL_CERT_FILE replaces it, and the folders
+# laid out above, and nothing else: no shell, package manager or operating system package for an
+# image scanner to report or a compromised process to run, and so no RUN here. It needs no zone
+# database: the binary embeds one (time/tzdata) and resolves TZ against it before its first record,
+# which CI's smoke run proves (#331). TestReleaseDockerfiles_TheImagesAreScratch, in
+# src/core/guard/release_final_stage_test.go, holds this stage to these instructions, and
+# build/smoke-test-images.sh holds each built image to the contents that test lists.
+FROM scratch AS final
+
+COPY --from=build /app/rootfs/ /
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# Copied with no --chown, so the binary and /app stay root's and writable by root alone, and the
+# process cannot replace what the next start runs.
+COPY --from=build /app/bin/goiabada-adminconsole /app/goiabada-adminconsole
 
 WORKDIR /app
 
-# No zone database is installed: the binary embeds one (time/tzdata) and resolves
-# TZ against it before its first record, so the base image needs no tzdata. CI's
-# build validation starts this image with TZ set to prove it (#331).
-
-# The final stage keeps eight Alpine packages and nothing else (#520): the base
-# layout, keys and release files, BusyBox for the shell and the wget the
-# healthchecks use, the CA bundle the server's TLS reads, and musl. The binary is
-# static and does its own TLS, so the package manager, the OpenSSL and zlib it
-# links, ssl_client and the other helpers go, and with them the advisories an
-# image scanner reports in them. Without ssl_client, BusyBox's wget reaches
-# http:// only. The upgrade first takes Alpine's fixes published since the alpine
-# image was last built. The CA bundle is added before the delete because --purge
-# would otherwise remove it as an orphaned dependency of apk-tools.
-# TestReleaseDockerfiles_TheFinalStageHoldsTheEightPackages, in
-# src/core/guard/release_final_stage_test.go, holds this instruction and the next to
-# this form, and the list to the one build/smoke-test-images.sh checks CI's images
-# against.
-RUN apk upgrade --no-cache \
-    && apk add --no-cache ca-certificates-bundle \
-    && apk --no-cache --purge del apk-tools ssl_client scanelf musl-utils
-# Checked in each platform's build of this stage: the release builds amd64 and arm64
-# from one Dockerfile, and a build whose package database cannot be read, lists any
-# other package or lacks one, or has no CA bundle stops here, so neither image can be
-# pushed that way.
-RUN [ -r /lib/apk/db/installed ] || { echo "unable to read the package database" >&2; exit 1; }; \
-    packages="$(awk '/^P:/ { print substr($0, 3) }' /lib/apk/db/installed | sort | xargs)"; \
-    expected="alpine-baselayout alpine-baselayout-data alpine-keys alpine-release busybox busybox-binsh ca-certificates-bundle musl"; \
-    [ "$packages" = "$expected" ] || { echo "the final stage holds $packages, where it must hold exactly $expected" >&2; exit 1; }; \
-    [ -f /etc/ssl/certs/ca-certificates.crt ] || { echo "the final stage has no /etc/ssl/certs/ca-certificates.crt" >&2; exit 1; }
-
-# The server runs as uid and gid 10001, named goiabada, and never as root (#396).
-# USER is numeric so a Kubernetes runAsNonRoot can verify it without reading
-# /etc/passwd, and the docs tell an operator to make a mounted file readable to
-# these ids. The binary is copied with no --chown, so it stays owned by root and
-# writable by root alone, as /app is, and the process cannot replace what the next
-# start runs. The admin console keeps nothing on disk, so unlike the auth server's
-# image this one creates no directory for it to write.
-RUN addgroup -S -g 10001 goiabada \
-    && adduser -S -D -H -u 10001 -G goiabada goiabada
-
-COPY --from=build /app/bin/goiabada-adminconsole ./
-
+# The server runs as uid and gid 10001 and never as root (#396). USER is numeric so a Kubernetes
+# runAsNonRoot can verify it without a passwd file, which the image has none of, and the docs tell
+# an operator to make a mounted file readable to these ids.
 USER 10001:10001
+
+# The server's own check of its /health, which applies wherever a deployment sets no check of its
+# own: a plain docker run, a Swarm service, a Compose service without one. The start period gives a
+# first start's seed or an upgrade's migrations five minutes before a failure counts. No
+# --start-interval: Docker 24's builders refuse the flag.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=300s --retries=3 CMD ["/app/goiabada-adminconsole", "healthcheck"]
 
 ENTRYPOINT ["/app/goiabada-adminconsole"]

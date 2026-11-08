@@ -1,56 +1,54 @@
 #!/bin/bash
-# Starts each release image with no configuration, before a release pushes it,
-# and checks the two things only a started image can show (#331).
+# Checks each release image before a release pushes it, for what only a built image shows. The
+# images are built FROM scratch (#808): they hold no shell, so everything here reads them from
+# outside, through Docker.
 #
-# The images carry no zone database: the binaries embed their own, and each
-# server resolves TZ against it before its first record. Every unit and
-# integration host has zone data, so no test there can tell that fix from its
-# reversal; these images are the one host where it is observable. So each image
-# is started twice:
+# Each image's configuration, read with docker image inspect:
 #
-#   - With TZ=Asia/Kolkata, which has no daylight saving, its first record must
-#     carry +05:30, and its "build information" record the version the image was
-#     built with. A reverted fix logs in UTC here.
-#   - With a TZ naming no zone, it must exit 2, a malformed variable's code. A
-#     reverted fix logs in UTC and goes on to fail later, on something else.
+#   - Its user must be 10001:10001, the numeric ids a Kubernetes runAsNonRoot can verify without a
+#     passwd file and the ones the docs tell an operator to make a mounted file readable to (#396).
+#   - Its entrypoint must be its server's binary, /app/goiabada-<server>.
+#   - Its health check must be that binary's healthcheck command, every 10 seconds, a 5-second
+#     timeout, a 5-minute start period and 3 retries.
 #
-# With no configuration both servers stop on their own after those records, so
-# each run ends without anything to connect to. The timeout is for a server that
-# does not stop: the run fails rather than hang the job.
+# Each image's contents, read from an export of a container created from it and never started: the
+# exact set of paths, with their owners and modes, AUTHSERVER_CONTENTS or ADMINCONSOLE_CONTENTS,
+# which src/core/guard/release_final_stage_test.go holds to the list it holds the Dockerfiles to.
+# Docker adds a few entries of its own to every container it creates, DOCKER_CREATED, which are
+# left out of the comparison; any other path, one missing, or another owner or mode fails the run.
+# So the binary and /app must be root's and not writable by 10001, so a compromised process cannot
+# replace what the next start runs; /data and /bootstrap, in the auth server's, must be 10001's,
+# since Docker copies a mount point's ownership into an empty named volume; /tmp must be sticky and
+# world-writable; and the CA bundle the servers' TLS reads must be at
+# /etc/ssl/certs/ca-certificates.crt.
 #
-# Each image is then read as the user it is configured to run as, with a shell in
-# place of its entrypoint, because which user that is no Go test can see (#396):
+# The images carry no zone database: the binaries embed their own, and each server resolves TZ
+# against it before its first record. Every unit and integration host has zone data, so no test
+# there can tell that fix from its reversal; these images are the one host where it is observable
+# (#331). So each image is started twice with no configuration:
 #
-#   - It must be uid and gid 10001, the numeric ids a Kubernetes runAsNonRoot can
-#     verify without a passwd lookup and the ones the docs tell an operator to
-#     make a mounted file readable to.
-#   - It must not be able to write its own binary, or the directory holding it,
-#     so a process that is compromised cannot replace what the next start runs.
-#   - The auth server's image must give it /data and /bootstrap to write. Docker
-#     copies a mount point's ownership into an empty named volume, and creates a
-#     mount point the image lacks owned by root, so these two directories are what
-#     lets a fresh SQLite volume or bootstrap volume be written at all.
+#   - With TZ=Asia/Kolkata, which has no daylight saving, its first record must carry +05:30, and
+#     its "build information" record the version the image was built with. A reverted fix logs in
+#     UTC here.
+#   - With a TZ naming no zone, it must exit 2, a malformed variable's code. A reverted fix logs in
+#     UTC and goes on to fail later, on something else.
 #
-# Each image's contents are then read from inside it with no network, and held to
-# what the release Dockerfiles' final stage keeps (#520):
+# With no configuration both servers stop on their own after those records, so each run ends
+# without anything to connect to. The timeout is for a server that does not stop: the run fails
+# rather than hang the job.
 #
-#   - Its package database must list exactly FINAL_STAGE_PACKAGES, which
-#     src/core/guard/release_final_stage_test.go holds to the list both
-#     Dockerfiles check in each platform's build. A package missing or one more,
-#     at any version, fails the run, and so does a database it cannot read.
-#   - It must have no apk command, so nothing installs a package at run time.
-#   - It must have /etc/ssl/certs/ca-certificates.crt, the CA bundle the servers'
-#     TLS reads, which deleting apk-tools with --purge removes unless it is added.
-#
-# Last, the two images are started together and configured, as OpenShift runs them
-# under its restricted-v2 SCC (#686): an arbitrary uid with group 0, a read-only
-# root, every capability dropped and no network, the admin console in the auth
-# server's network namespace. The keys are generated for the run, and the database
-# is SQLite in memory. Each must answer healthy on /health within RUN_TIMEOUT: the
-# auth server only after migrating, seeding and listening, the admin console only
-# after the auth server has issued its token. So anything that start reads or runs
-# that only uid 10001 may, or any write it makes to the image's file system, fails
-# the run. It needs both images, and is skipped when either is missing.
+# Last, the two images are started together and configured, as OpenShift runs them under its
+# restricted-v2 SCC (#686): an arbitrary uid with group 0, a read-only root, every capability
+# dropped and no network, the admin console in the auth server's network namespace. The keys are
+# generated for the run, and the database is SQLite in memory. Each container's own health status,
+# which Docker sets by running the image's health check inside it under those constraints, must
+# read healthy within HEALTH_TIMEOUT: the auth server's only after migrating, seeding and
+# listening, the admin console's only after the auth server has issued its token. So anything that
+# start reads or runs that only uid 10001 may, any write it makes to the image's file system, or a
+# health check that cannot run there fails the run. The wait has a deadline of its own, and stops
+# as soon as the container has exited; on any failure it prints the server's log and the
+# container's health-check history, each probe's exit code and output. It needs both images, and is
+# skipped when either is missing.
 #
 # Usage: ./smoke-test-images.sh --version <version> <image>...
 set -euo pipefail
@@ -68,12 +66,36 @@ done
 [ "${#IMAGES[@]}" -gt 0 ] || { echo "at least one image is required" >&2; exit 2; }
 
 RUN_TIMEOUT=60
+# Independent of the check's own timings: the first probe runs 10 seconds after the start, and a
+# server not yet listening then is probed again 10 seconds later.
+HEALTH_TIMEOUT=120
 UNKNOWN_TZ="Not/AZone"
 RUN_AS="10001:10001"
 ARBITRARY_USER="1000680000:0"
-AUTHSERVER_WRITABLE_DIRS=(/data /bootstrap)
-FINAL_STAGE_PACKAGES=(alpine-baselayout alpine-baselayout-data alpine-keys alpine-release busybox busybox-binsh ca-certificates-bundle musl)
-CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
+# What each image holds, "<mode> <uid>/<gid> <path>" as tar lists an export of it.
+AUTHSERVER_CONTENTS=(
+    "drwxr-xr-x 0/0 app/"
+    "-rwxr-xr-x 0/0 app/goiabada-authserver"
+    "drwxr-xr-x 10001/10001 bootstrap/"
+    "drwxr-xr-x 10001/10001 data/"
+    "drwxr-xr-x 0/0 etc/"
+    "drwxr-xr-x 0/0 etc/ssl/"
+    "drwxr-xr-x 0/0 etc/ssl/certs/"
+    "-rw-r--r-- 0/0 etc/ssl/certs/ca-certificates.crt"
+    "drwxrwxrwt 0/0 tmp/"
+)
+ADMINCONSOLE_CONTENTS=(
+    "drwxr-xr-x 0/0 app/"
+    "-rwxr-xr-x 0/0 app/goiabada-adminconsole"
+    "drwxr-xr-x 0/0 etc/"
+    "drwxr-xr-x 0/0 etc/ssl/"
+    "drwxr-xr-x 0/0 etc/ssl/certs/"
+    "-rw-r--r-- 0/0 etc/ssl/certs/ca-certificates.crt"
+    "drwxrwxrwt 0/0 tmp/"
+)
+# The paths Docker adds to every container it creates, whatever the image holds.
+DOCKER_CREATED=(.dockerenv dev/ dev/console dev/pts/ dev/shm/ etc/hostname etc/hosts etc/mtab etc/resolv.conf proc/ sys/)
 failed=0
 
 fail() {
@@ -81,8 +103,8 @@ fail() {
     failed=1
 }
 
-# The containers this run has started. Leaving, by the last line, a failure,
-# Ctrl-C or SIGTERM, removes them all, so a run cut short leaves none running.
+# The containers this run has created. Leaving, by the last line, a failure, Ctrl-C or SIGTERM,
+# removes them all, so a run cut short leaves none behind.
 CONTAINERS=()
 # shellcheck disable=SC2329 # the EXIT trap below invokes it
 remove_containers() {
@@ -92,9 +114,9 @@ trap remove_containers EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# Runs an image with one TZ and no other configuration, printing its combined
-# output and setting STATUS to its exit code. The container is named so that a
-# run the timeout cuts short is still removed.
+# Runs an image with one TZ and no other configuration, printing its combined output and setting
+# STATUS to its exit code. The container is named so that a run the timeout cuts short is still
+# removed.
 run_image() {
     local image="$1" tz="$2" name
     name="goiabada-smoke-$$-$RANDOM"
@@ -104,35 +126,18 @@ run_image() {
     docker rm -f "$name" >/dev/null 2>&1 || true
 }
 
-# Prints, from inside the image and as the user it runs as, its uid:gid and
-# whether each path after the image is writable to it. A shell replaces the
-# entrypoint and nothing else, so the user is the one the image configures.
-read_user() {
-    local image="$1"
-    shift
-    docker run --rm --network none --entrypoint /bin/sh "$image" -c '
-        echo "id $(id -u):$(id -g)"
-        for path in "$@"; do
-            if [ -w "$path" ]; then echo "$path writable"; else echo "$path not writable"; fi
-        done
-    ' sh "$@"
-}
-
-# Prints, from inside the image and with no network, one "package <name>" line per
-# package its database lists, or "packages unreadable" when it can't be read; then
-# "apk <path>" or "apk absent", and "<path> present" or "<path> absent" for the CA
-# bundle. A shell replaces the entrypoint and nothing else, as in read_user.
+# Prints what the container name, created and never started, holds, one "<mode> <uid>/<gid> <path>"
+# line per entry, sorted, without the paths Docker adds to every container. A symbolic link's line
+# ends in "-> <target>". It fails when the export or its listing does.
 read_contents() {
-    local image="$1"
-    docker run --rm --network none --entrypoint /bin/sh "$image" -c '
-        if [ -r /lib/apk/db/installed ]; then
-            awk "/^P:/ { print \"package \" substr(\$0, 3) }" /lib/apk/db/installed
-        else
-            echo "packages unreadable"
-        fi
-        if apk=$(command -v apk); then echo "apk $apk"; else echo "apk absent"; fi
-        if [ -f "$1" ]; then echo "$1 present"; else echo "$1 absent"; fi
-    ' sh "$CA_BUNDLE"
+    docker export "$1" | tar --numeric-owner -tvf - |
+        awk -v created="${DOCKER_CREATED[*]}" '
+            BEGIN { n = split(created, list, " "); for (i = 1; i <= n; i++) skip[list[i]] = 1 }
+            {
+                line = $1 " " $2 " " $6
+                for (i = 7; i <= NF; i++) line = line " " $i
+                if (!($6 in skip)) print line
+            }' | LC_ALL=C sort
 }
 
 # Prints count random bytes as hex, the form the servers' keys take.
@@ -140,69 +145,96 @@ random_hex() {
     od -An -vtx1 -N "$1" /dev/urandom | tr -d ' \n'
 }
 
-# Waits up to RUN_TIMEOUT seconds for the running container name to answer healthy
-# on /health at port, setting HEALTHY, and stops waiting once the container has
-# exited. Each probe has its own limits, since a server that accepts the connection
-# and never answers would hold BusyBox's wget far longer than RUN_TIMEOUT.
+# Waits up to HEALTH_TIMEOUT seconds for the running container name's own health status to read
+# healthy, setting HEALTHY, and setting WAIT_RESULT to why it stopped waiting otherwise: the
+# container exited, it has no health check, or the deadline passed.
 wait_healthy() {
-    local name="$1" port="$2" deadline=$((SECONDS + RUN_TIMEOUT))
+    local name="$1" deadline=$((SECONDS + HEALTH_TIMEOUT)) state
     HEALTHY=false
-    while [ "$SECONDS" -lt "$deadline" ]; do
-        if [ "$(timeout 5 docker exec "$name" wget -q -T 2 -O - "http://localhost:$port/health" 2>/dev/null)" = healthy ]; then
+    while :; do
+        state=$(timeout 10 docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} {{.State.ExitCode}}' "$name" 2>/dev/null) ||
+            state="unknown unknown unknown"
+        read -r status health code <<<"$state"
+        if [ "$health" = healthy ]; then
             HEALTHY=true
             return
         fi
-        [ "$(timeout 5 docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" = true ] || return 0
+        if [ "$status" != running ]; then
+            WAIT_RESULT="the container is $status, exit code $code"
+            return
+        fi
+        if [ "$health" = none ]; then
+            WAIT_RESULT="the container has no health check"
+            return
+        fi
+        if [ "$SECONDS" -ge "$deadline" ]; then
+            WAIT_RESULT="its health status is still $health after ${HEALTH_TIMEOUT}s"
+            return
+        fi
         sleep 1
     done
 }
 
-# Fails unless the read_user output in USER_OUTPUT carries the line exactly.
-expect_line() {
-    local image="$1" line="$2"
-    if ! grep -q -x -F -e "$line" <<<"$USER_OUTPUT"; then
-        fail "$image: its user does not report \"$line\""
+# Prints a container's log and its health-check history, each probe's exit code and output.
+print_diagnosis() {
+    local name="$1"
+    echo "--- $name: its log"
+    docker logs "$name" 2>&1 || true
+    echo "--- $name: its health checks"
+    docker inspect --format '{{if .State.Health}}{{range .State.Health.Log}}exit {{.ExitCode}} at {{.Start}}: {{printf "%q" .Output}}{{"\n"}}{{end}}{{else}}no health check{{end}}' "$name" 2>&1 || true
+}
+
+# Waits for the started container name, from image, to turn healthy, and fails the run with its log
+# and health history when it does not.
+expect_healthy() {
+    local image="$1" name="$2"
+    wait_healthy "$name"
+    if [ "$HEALTHY" = true ]; then
+        echo "$image as $ARBITRARY_USER on a read-only root: healthy"
+    else
+        fail "$image as $ARBITRARY_USER on a read-only root did not turn healthy: $WAIT_RESULT"
+        print_diagnosis "$name"
     fi
 }
 
-for image in "${IMAGES[@]}"; do
-    echo "=== $image, its user"
-    # The entrypoint's first element is the binary.
-    binary=$(docker image inspect --format '{{index .Config.Entrypoint 0}}' "$image")
-    writable_dirs=()
-    if [[ "$binary" == */goiabada-authserver ]]; then
-        writable_dirs=("${AUTHSERVER_WRITABLE_DIRS[@]}")
-    fi
-    USER_OUTPUT=$(read_user "$image" "$binary" "$(dirname "$binary")" "${writable_dirs[@]}" 2>&1) ||
-        fail "$image: unable to read its user: $USER_OUTPUT"
-    echo "$USER_OUTPUT"
-    expect_line "$image" "id $RUN_AS"
-    expect_line "$image" "$binary not writable"
-    expect_line "$image" "$(dirname "$binary") not writable"
-    for dir in "${writable_dirs[@]}"; do
-        expect_line "$image" "$dir writable"
-    done
+# Fails unless the image's configuration field, read with the Go template format, is want.
+expect_config() {
+    local image="$1" what="$2" format="$3" want="$4" got
+    got=$(docker image inspect --format "$format" "$image" 2>&1) || { fail "$image: unable to read its $what: $got"; return; }
+    echo "$what: $got"
+    [ "$got" = "$want" ] || fail "$image: its $what is $got, where it must be $want"
+}
 
-    echo "=== $image, its packages"
-    CONTENTS_OUTPUT=$(read_contents "$image" 2>&1) ||
-        fail "$image: unable to read its contents: $CONTENTS_OUTPUT"
-    echo "$CONTENTS_OUTPUT"
-    if grep -q -x -F -e "packages unreadable" <<<"$CONTENTS_OUTPUT"; then
-        fail "$image: unable to read its package database"
+for image in "${IMAGES[@]}"; do
+    echo "=== $image, its configuration"
+    # The entrypoint's first element names the server.
+    binary=$(docker image inspect --format '{{index .Config.Entrypoint 0}}' "$image" 2>/dev/null) || binary=""
+    case "$binary" in
+        */goiabada-authserver) server=authserver; contents=("${AUTHSERVER_CONTENTS[@]}"); authserver_image="$image" ;;
+        */goiabada-adminconsole) server=adminconsole; contents=("${ADMINCONSOLE_CONTENTS[@]}"); adminconsole_image="$image" ;;
+        *) fail "$image: its entrypoint, \"$binary\", runs neither server"; continue ;;
+    esac
+    expect_config "$image" user '{{.Config.User}}' "$RUN_AS"
+    expect_config "$image" entrypoint '{{json .Config.Entrypoint}}' "[\"/app/goiabada-$server\"]"
+    expect_config "$image" "health check" '{{json .Config.Healthcheck}}' \
+        "{\"Test\":[\"CMD\",\"/app/goiabada-$server\",\"healthcheck\"],\"Interval\":10000000000,\"Timeout\":5000000000,\"StartPeriod\":300000000000,\"Retries\":3}"
+
+    echo "=== $image, its contents"
+    created="goiabada-smoke-$$-$RANDOM"
+    CONTAINERS+=("$created")
+    if ! got=$(docker create --name "$created" "$image" 2>&1); then
+        fail "$image: unable to create a container to read its contents from: $got"
+    elif got=$(read_contents "$created" 2>&1); then
+        echo "$got"
+        want=$(printf '%s\n' "${contents[@]}" | LC_ALL=C sort)
+        extra=$(LC_ALL=C comm -13 <(echo "$want") <(echo "$got"))
+        missing=$(LC_ALL=C comm -23 <(echo "$want") <(echo "$got"))
+        [ -z "$extra" ] || fail "$image holds what it must not: $(paste -sd ';' <<<"$extra")"
+        [ -z "$missing" ] || fail "$image lacks what it must hold: $(paste -sd ';' <<<"$missing")"
     else
-        packages=$(sed -n 's/^package //p' <<<"$CONTENTS_OUTPUT" | sort)
-        expected=$(printf '%s\n' "${FINAL_STAGE_PACKAGES[@]}" | sort)
-        extra=$(comm -13 <(echo "$expected") <(echo "$packages") | xargs)
-        missing=$(comm -23 <(echo "$expected") <(echo "$packages") | xargs)
-        [ -z "$extra" ] || fail "$image holds packages the final stage must not: $extra"
-        [ -z "$missing" ] || fail "$image lacks packages the final stage keeps: $missing"
+        fail "$image: unable to read its contents: $got"
     fi
-    if ! grep -q -x -F -e "apk absent" <<<"$CONTENTS_OUTPUT"; then
-        fail "$image still has an apk command: $(sed -n 's/^apk //p' <<<"$CONTENTS_OUTPUT")"
-    fi
-    if ! grep -q -x -F -e "$CA_BUNDLE present" <<<"$CONTENTS_OUTPUT"; then
-        fail "$image has no CA bundle at $CA_BUNDLE"
-    fi
+    docker rm -f "$created" >/dev/null 2>&1 || true
 
     echo "=== $image, TZ=Asia/Kolkata"
     run_image "$image" "Asia/Kolkata"
@@ -225,11 +257,6 @@ for image in "${IMAGES[@]}"; do
     if [ "$STATUS" -ne 2 ]; then
         fail "$image with TZ=$UNKNOWN_TZ exited $STATUS, not 2"
     fi
-
-    case "$binary" in
-        */goiabada-authserver) authserver_image="$image" ;;
-        */goiabada-adminconsole) adminconsole_image="$image" ;;
-    esac
 done
 
 if [ -z "${authserver_image:-}" ] || [ -z "${adminconsole_image:-}" ]; then
@@ -242,7 +269,7 @@ else
     urls=(-e GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090 -e GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091)
     client_secret=$(random_hex 32)
     CONTAINERS+=("$authserver_name" "$adminconsole_name")
-    docker run -d --name "$authserver_name" --network none "${restricted[@]}" "${urls[@]}" \
+    if docker run -d --name "$authserver_name" --network none "${restricted[@]}" "${urls[@]}" \
         -e GOIABADA_DB_TYPE=sqlite \
         -e GOIABADA_AES_ENCRYPTION_KEY="$(random_hex 32)" \
         -e GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="$(random_hex 64)" \
@@ -250,21 +277,24 @@ else
         -e GOIABADA_ADMIN_EMAIL=admin@example.com \
         -e GOIABADA_ADMIN_PASSWORD="$(random_hex 16)" \
         -e GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="$client_secret" \
-        "$authserver_image" >/dev/null || fail "$authserver_image: unable to start it as $ARBITRARY_USER"
-    wait_healthy "$authserver_name" 9090
-    docker logs "$authserver_name" 2>&1 || true
+        "$authserver_image" >/dev/null; then
+        expect_healthy "$authserver_image" "$authserver_name"
+    else
+        fail "$authserver_image: unable to start it as $ARBITRARY_USER"
+        HEALTHY=false
+    fi
     if [ "$HEALTHY" = true ]; then
-        docker run -d --name "$adminconsole_name" --network "container:$authserver_name" "${restricted[@]}" "${urls[@]}" \
+        if docker run -d --name "$adminconsole_name" --network "container:$authserver_name" "${restricted[@]}" "${urls[@]}" \
             -e GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY="$(random_hex 64)" \
             -e GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY="$(random_hex 32)" \
             -e GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="$client_secret" \
-            "$adminconsole_image" >/dev/null || fail "$adminconsole_image: unable to start it as $ARBITRARY_USER"
-        wait_healthy "$adminconsole_name" 9091
-        docker logs "$adminconsole_name" 2>&1 || true
-        [ "$HEALTHY" = true ] ||
-            fail "$adminconsole_image as $ARBITRARY_USER on a read-only root did not answer healthy within ${RUN_TIMEOUT}s"
-    else
-        fail "$authserver_image as $ARBITRARY_USER on a read-only root did not answer healthy within ${RUN_TIMEOUT}s"
+            "$adminconsole_image" >/dev/null; then
+            expect_healthy "$adminconsole_image" "$adminconsole_name"
+            # The console's failure can be the auth server's refusal, which only its log shows.
+            [ "$HEALTHY" = true ] || print_diagnosis "$authserver_name"
+        else
+            fail "$adminconsole_image: unable to start it as $ARBITRARY_USER"
+        fi
     fi
     docker rm -f "$adminconsole_name" "$authserver_name" >/dev/null 2>&1 || true
 fi

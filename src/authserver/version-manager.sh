@@ -17,8 +17,8 @@
 #   all     - Run all commands in sequence (check → update → deps)
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
-# golangci-lint, mockery, staticcheck, unparam, govulncheck, the release
-# images' Alpine base, Trivy, Grype, npm-check-updates, cropperjs, acorn), and
+# golangci-lint, mockery, staticcheck, unparam, govulncheck, Trivy, Grype,
+# npm-check-updates, cropperjs, acorn), and
 # the dependencies of the Go modules and of the npm projects in NPM_PROJECTS.
 # check also reports when the pinned sources of generate's data have moved.
 # It does NOT manage the product version.
@@ -186,7 +186,6 @@ get_all_versions() {
         echo "tools.staticcheck=$(get_version 'tools.staticcheck')"
         echo "tools.unparam=$(get_version 'tools.unparam')"
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
-        echo "tools.alpine=$(get_version 'tools.alpine')"
         echo "tools.trivy=$(get_version 'tools.trivy')"
         echo "tools.grype=$(get_version 'tools.grype')"
         echo "tools.npm-check-updates=$(get_version 'tools."npm-check-updates"')"
@@ -283,21 +282,6 @@ node_settled_lts() {
         }
         if (best) console.log(best.join("."));
     ' "$1" "$RELEASE_MIN_AGE_DAYS"
-}
-
-# Reduce Alpine's releases.json, read on stdin, to its newest stable release as
-# major.minor, the form tools.alpine pins.
-#
-# Only an X.Y.Z version counts: edge publishes no release, and a release
-# candidate's version carries a suffix (3.25.0_rc1). A patch release does not
-# make the minor newer, so 3.24.2 reads as 3.24 (#396).
-alpine_latest_minor() {
-    grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' \
-        | cut -d'"' -f4 \
-        | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-        | cut -d. -f1,2 \
-        | sort -V \
-        | tail -1
 }
 
 # The days a release must have been public before check suggests it or deps
@@ -399,15 +383,6 @@ get_github_settled() {
     response=$(curl -s --connect-timeout 10 "https://api.github.com/repos/${repo}/releases?per_page=10" 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$response" ]; then
         echo "$response" | github_settled_release "$(date -u +%s)"
-    fi
-}
-
-# Fetch the newest stable Alpine minor from alpinelinux.org
-get_alpine_latest() {
-    local response
-    response=$(curl -s --connect-timeout 10 "https://alpinelinux.org/releases.json" 2>/dev/null)
-    if [ $? -eq 0 ] && [ -n "$response" ]; then
-        echo "$response" | alpine_latest_minor
     fi
 }
 
@@ -641,7 +616,6 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "staticcheck" "$(get_version 'tools.staticcheck')"
     printf "  %-23s ${GREEN}%s${NC}\n" "unparam" "$(get_version 'tools.unparam')"
     printf "  %-23s ${GREEN}%s${NC}\n" "govulncheck" "$(get_version 'tools.govulncheck')"
-    printf "  %-23s ${GREEN}%s${NC}\n" "alpine" "$(get_version 'tools.alpine')"
     printf "  %-23s ${GREEN}%s${NC}\n" "trivy" "$(get_version 'tools.trivy')"
     printf "  %-23s ${GREEN}%s${NC}\n" "grype" "$(get_version 'tools.grype')"
     printf "  %-23s ${GREEN}%s${NC}\n" "npm-check-updates" "$(get_version 'tools."npm-check-updates"')"
@@ -812,23 +786,6 @@ cmd_check() {
             updates_available+=("govulncheck|$current_govulncheck|$latest_govulncheck|https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck")
         else
             print_success "Up to date ($current_govulncheck)"
-        fi
-    else
-        print_warning "Check failed"
-    fi
-
-    # --- Alpine ---
-    # The release images' final stage. alpine:X.Y picks up patch releases at
-    # the next image build, so only a newer minor is an update (#396).
-    echo -n "Checking Alpine... "
-    local current_alpine=$(get_version 'tools.alpine')
-    local latest_alpine=$(get_alpine_latest)
-    if [ -n "$latest_alpine" ]; then
-        if version_lt "$current_alpine" "$latest_alpine"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            updates_available+=("Alpine|$current_alpine|$latest_alpine|https://alpinelinux.org/releases/")
-        else
-            print_success "Up to date ($current_alpine)"
         fi
     else
         print_warning "Check failed"
@@ -1054,7 +1011,6 @@ cmd_update() {
     local STATICCHECK_VERSION=$(get_version 'tools.staticcheck')
     local UNPARAM_VERSION=$(get_version 'tools.unparam')
     local GOVULNCHECK_VERSION=$(get_version 'tools.govulncheck')
-    local ALPINE_VERSION=$(get_version 'tools.alpine')
     local CROPPER_VERSION=$(get_version 'vendored.cropperjs')
     local ACORN_VERSION=$(get_version 'vendored.acorn')
 
@@ -1193,15 +1149,6 @@ cmd_update() {
             if update_file "$dockerfile" \
                 "s|golang:[0-9.]*-alpine|golang:${GO_VERSION}-alpine|g" \
                 "Go base image"; then
-                ((success_count++))
-            else
-                ((fail_count++))
-            fi
-
-            # Alpine base of the release images' final stage: FROM alpine:X.Y.
-            if update_file "$dockerfile" \
-                "s|^FROM alpine:[0-9.]* |FROM alpine:${ALPINE_VERSION} |" \
-                "Alpine base image"; then
                 ((success_count++))
             else
                 ((fail_count++))
