@@ -63,14 +63,14 @@ RUN GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/air-ve
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/go-critic/go-critic/cmd/gocritic@latest && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v golang.org/x/vuln/cmd/govulncheck@v1.9.0 && \
-    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v mvdan.cc/unparam@v0.0.0-20261011093844-7a2c2c0b7aa6 && \
+    GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v mvdan.cc/unparam@v0.0.0-20261102141913-394cd0a56cd5 && \
     GOPATH=/usr/local/go-tools /usr/local/go/bin/go install -v github.com/vektra/mockery/v3@v3.9.0
 
 # Add Go tools bin directory to PATH (tools are accessible but don't affect project GOPATH)
 ENV PATH="/usr/local/go-tools/bin:${PATH}"
 
 # Install Tailwind CLI tool
-RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/tailwindcss-linux-x64
+RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.4/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 

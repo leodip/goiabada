@@ -73,16 +73,16 @@
 # upgrades the npm projects' dependencies only to releases that old.
 tools:
   go: "1.27.3"
-  tailwind: "4.3.3"
+  tailwind: "4.3.4"
   node: "26.13.0"
   golangci-lint: "2.15.0"
   mockery: "3.9.0"
   staticcheck: "0.8.2"
-  unparam: "0.0.0-20261011093844-7a2c2c0b7aa6"
+  unparam: "0.0.0-20261102141913-394cd0a56cd5"
   govulncheck: "1.9.0"
   alpine: "3.24"
   trivy: "0.76.1"
-  grype: "0.121.0"
+  grype: "0.121.1"
   npm-check-updates: "23.1.1"
 
 # -----------------------------------------------------------------------------
