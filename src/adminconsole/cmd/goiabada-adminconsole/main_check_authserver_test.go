@@ -258,10 +258,11 @@ func TestMain_CheckAuthServerTakesNoArguments(t *testing.T) {
 	}{
 		{"an argument after it", uncheckableEnvironment, []string{"check-authserver", "extra"}},
 		{"a flag after it", uncheckableEnvironment, []string{"check-authserver", "--authserver-internalbaseurl=http://127.0.0.1:1"}},
-		// Before it, the word is no longer the first argument, so it reaches the command line's own
-		// parse, under an environment the parse accepts.
-		{"a flag before it", nil, []string{"--adminconsole-log-level=debug", "check-authserver"}},
-		{"-- before it", nil, []string{"--", "check-authserver"}},
+		// Before it, the word is no longer the first argument, and the flag parse alone finds it,
+		// under the environment the console refuses at start, its internal CA file missing and its
+		// log level unusable: none of them answers for the misplaced command.
+		{"a flag before it", unusableLogLevel, []string{"--adminconsole-log-level=debug", "check-authserver"}},
+		{"-- before it", unusableLogLevel, []string{"--", "check-authserver"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

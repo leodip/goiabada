@@ -400,16 +400,19 @@ func TestMain_HealthcheckTakesNoArguments(t *testing.T) {
 		}
 	})
 
-	// Before it, the word is no longer the first argument, so it reaches the command line's own
-	// parse, under an environment the parse accepts.
+	// Before it, the word is no longer the first argument, and the flag parse alone finds it,
+	// under the environment the server refuses at start and a log level its handler cannot use:
+	// neither TZ, the configuration nor the log handler answers for the misplaced command.
 	t.Run("before it", func(t *testing.T) {
 		for _, args := range [][]string{
 			{"--authserver-log-level=debug", "healthcheck"},
+			{"--authserver-log-sql", "healthcheck"},
 			{"--", "healthcheck"},
 		} {
 			stub := newHealthStub(t, "tcp4", false, healthy)
 
-			run := runMainExactly(t, httpOnly("0.0.0.0", stub.port()), args...)
+			run := runHealthcheck(t, append(httpOnly("0.0.0.0", stub.port()),
+				"GOIABADA_AUTHSERVER_LOG_LEVEL=not-a-level"), args...)
 
 			assert.Equal(t, 2, run.code, "%v", args)
 			assert.Empty(t, run.stdout)
@@ -417,4 +420,26 @@ func TestMain_HealthcheckTakesNoArguments(t *testing.T) {
 			assert.Empty(t, stub.requests())
 		}
 	})
+}
+
+// TestMain_RefusesAWordThatNamesNoCommandBeforeTheConfiguration: a word that names no command is
+// refused by the flag parse alone, under the environment the server refuses at start, so the
+// refusal names the word rather than a setting it has nothing to do with (#808 decision 3).
+func TestMain_RefusesAWordThatNamesNoCommandBeforeTheConfiguration(t *testing.T) {
+	for _, args := range [][]string{
+		{"serve"},
+		{"--authserver-log-level=debug", "serve"},
+		{"--", "serve"},
+	} {
+		run := runHealthcheck(t, []string{"GOIABADA_AUTHSERVER_LOG_LEVEL=not-a-level"}, args...)
+
+		assert.Equal(t, 2, run.code, "%v", args)
+		assert.Empty(t, run.stdout)
+		assert.Equal(t, `unknown command "serve": run goiabada-authserver [flags] with no command `+
+			`to start the server, goiabada-authserver [flags] migrate version, or `+
+			`goiabada-authserver [flags] migrate to <version>, to manage the schema, `+
+			`goiabada-authserver [flags] recover --email <address> [flags], to restore sign-in for `+
+			`one user, or goiabada-authserver healthcheck, alone, to check the running server's `+
+			`health; the server's flags go before the command`+"\n", run.stderr, "%v", args)
+	}
 }

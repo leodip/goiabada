@@ -49,6 +49,10 @@ var unstartableEnvironment = []string{
 	"GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE=/nonexistent/internal-ca.pem",
 }
 
+// unusableLogLevel is the unstartable environment with a log level the console's handler cannot
+// use, so a command refused only after the log handler's install would stop on it instead.
+var unusableLogLevel = append(append([]string{}, unstartableEnvironment...), "GOIABADA_ADMINCONSOLE_LOG_LEVEL=not-a-level")
+
 // commandLineRun is what one `goiabada-adminconsole` process did.
 type commandLineRun struct {
 	code           int
@@ -218,10 +222,12 @@ func TestMain_HealthcheckTakesNoArguments(t *testing.T) {
 	}{
 		{"an argument after it", unstartableEnvironment, []string{"healthcheck", "extra"}},
 		{"a flag after it", unstartableEnvironment, []string{"healthcheck", "--adminconsole-listen-port-http=9091"}},
-		// Before it, the word is no longer the first argument, so it reaches the command line's own
-		// parse, under an environment the parse accepts.
-		{"a flag before it", nil, []string{"--adminconsole-log-level=debug", "healthcheck"}},
-		{"-- before it", nil, []string{"--", "healthcheck"}},
+		// Before it, the word is no longer the first argument, and the flag parse alone finds it,
+		// under the environment the console refuses at start and a log level its handler cannot
+		// use: neither TZ, the configuration nor the log handler answers for the misplaced command.
+		{"a flag before it", unusableLogLevel, []string{"--adminconsole-log-level=debug", "healthcheck"}},
+		{"a boolean flag before it", unusableLogLevel, []string{"--adminconsole-metrics-enabled", "healthcheck"}},
+		{"-- before it", unusableLogLevel, []string{"--", "healthcheck"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -300,5 +306,39 @@ func TestMain_RefusesAWordThatNamesNoCommand(t *testing.T) {
 			assert.Equal(t, unknownCommand(tc.word), run.stderr)
 			assert.Zero(t, authServer.connections.Load(), "no connection is made to the auth server")
 		})
+	}
+}
+
+// TestMain_RefusesAWordThatNamesNoCommandBeforeTheConfiguration is decision 5's "before the
+// console's startup does anything else" under an environment the console refuses at start: a TZ
+// naming no zone, a malformed number and boolean, an internal CA file that is not there, and an
+// unusable log level, each alone and all together. The refusal names the word, not the setting.
+func TestMain_RefusesAWordThatNamesNoCommandBeforeTheConfiguration(t *testing.T) {
+	environments := map[string][]string{
+		"TZ naming no zone":     {"TZ=Not/AZone"},
+		"a malformed number":    {"GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS=91x1"},
+		"a malformed boolean":   {"GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=yes"},
+		"a missing internal CA": {"GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE=/nonexistent/internal-ca.pem"},
+		"an unusable log level": {"GOIABADA_ADMINCONSOLE_LOG_LEVEL=not-a-level"},
+		"the whole unstartable": unusableLogLevel,
+	}
+	for name, env := range environments {
+		for _, args := range [][]string{
+			{"serve"},
+			{"--adminconsole-log-level=debug", "serve"},
+			{"--", "serve"},
+		} {
+			t.Run(name+", "+strings.Join(args, " "), func(t *testing.T) {
+				authServer := newWatchedListener(t)
+
+				run := runMainExactly(t, append(append([]string{}, env...),
+					"GOIABADA_AUTHSERVER_BASEURL="+authServer.url), args...)
+
+				assert.Equal(t, 2, run.code, "%v", args)
+				assert.Empty(t, run.stdout)
+				assert.Equal(t, unknownCommand("serve"), run.stderr, "%v", args)
+				assert.Zero(t, authServer.connections.Load(), "no connection is made to the auth server")
+			})
+		}
 	}
 }

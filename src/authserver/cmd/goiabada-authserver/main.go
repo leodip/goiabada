@@ -60,6 +60,16 @@ func run() int {
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		return healthcheck.Run(healthcheckListeners, os.Args[2:], os.Stderr)
 	}
+	// Behind a flag or `--` it is refused here, as a word that names no command is: the command is
+	// found by the flag parse alone, which reads no variable and no file, so a TZ, a malformed
+	// setting or a log level the server cannot use does not answer for a misplaced command (#808
+	// decision 3). A command line whose flags do not parse is left to the configuration's parse.
+	if commandArgs, ok := config.CommandArgs(os.Args[1:]); ok {
+		if _, _, err := dispatch(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			return migrateExitUsage
+		}
+	}
 
 	// TZ is resolved again before anything else, so the first record is already in the zone the
 	// deployment chose. The zone database this binary embeds is reachable only from here: a

@@ -74,6 +74,18 @@ func run() int {
 	if len(os.Args) > 1 && os.Args[1] == "check-authserver" {
 		return checkAuthServer(os.Args[2:], os.Stdout, os.Stderr)
 	}
+	// A word the parse leaves names no command: the console used to ignore it, and every flag after
+	// it, and start. It is refused here, with the channel and code of a bad flag, before anything
+	// else: the words are found by the flag parse alone, which reads no variable and no file, so a
+	// TZ, a malformed setting or an internal CA file that cannot be read does not answer for them,
+	// and no key is read and the auth server is not called (#808 decisions 3, 5 and 6). A command
+	// line whose flags do not parse is left to the configuration's parse.
+	if commandArgs, ok := config.CommandArgs(os.Args[1:]); ok {
+		if err := dispatch(commandArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			return 2
+		}
+	}
 
 	// TZ is resolved again before anything else, so the first record is already in the zone the
 	// deployment chose. The zone database this binary embeds is reachable only from here: a
@@ -100,13 +112,6 @@ func run() int {
 	cfg, loadErr := config.Load(flag.CommandLine, os.Args[1:])
 	if loadErr != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", loadErr)
-		return 2
-	}
-	// A word the parse left names no command: the console used to ignore it, and every flag after
-	// it, and start. Refused here, with the channel and code of a bad flag, before any key is read
-	// or the auth server is called (#808 decision 5).
-	if err := dispatch(cfg.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return 2
 	}
 	if err := logging.Install(cfg.AdminConsole.LogLevel, cfg.AdminConsole.LogFormat); err != nil {
@@ -316,11 +321,11 @@ var healthcheckListeners = healthcheck.Listeners{
 	DefaultHTTPSPort: config.DefaultListenPortHttps,
 }
 
-// dispatch refuses the positional arguments the flag parse left, since the console's flags take no
+// dispatch refuses the positional arguments the flag parse leaves, since the console's flags take no
 // command: none serves, and any word is refused, naming it and the commands there are, as the auth
-// server refuses one since #424. `healthcheck` and `check-authserver` run before the parse when
-// they are the first argument, so they arrive here only behind a flag or `--`, and are refused for
-// taking none (#808 decisions 5 and 6).
+// server refuses one since #424. `healthcheck` and `check-authserver` run before it when they are
+// the first argument, so they arrive here only behind a flag or `--`, and are refused for taking
+// none (#808 decisions 5 and 6).
 func dispatch(args []string) error {
 	if len(args) == 0 {
 		return nil
