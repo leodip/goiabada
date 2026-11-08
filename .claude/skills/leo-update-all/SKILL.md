@@ -14,8 +14,9 @@ Arguments: `$ARGUMENTS`
 Scope: every pin and dependency `version-manager.sh` manages, and every generator in the tree. The docs site (`site/`) goes further than `deps` does: each of its packages moves to its latest settled release, a new major version or a 0.x minor included. A package the site cannot take is held back alone. Out of scope: GitHub Actions versions (Dependabot updates those), the database and Mailpit images in the dev compose file, and the product version (the git tag).
 
 Where things run:
-- **Host**: `check`, `update` and `deps`, the script's own workflow. They edit files and fetch releases, and `deps` installs Playwright's browsers for the host, where the e2e suites run from. The npm projects' checks and the docs image also run on the host (step 9).
-- **A throwaway stack, `goiabada-update-all`**, built from the bumped dev container Dockerfile: every generator, every Go test tier and govulncheck, so they run with exactly the new pins, as `CLAUDE.md` asks. The human stack (`goiabada`) is never touched.
+- **Host**: `check`, `update` and `deps`, the script's own workflow. They edit files and fetch releases, and `deps` installs Playwright's browsers for the host, where the e2e suites run from. The npm projects' checks also run on the host (step 9).
+- **A throwaway stack, `goiabada-update-all`**, built from the bumped dev container Dockerfile: every generator, the quick Go test tiers and govulncheck, so they run with exactly the new pins, as `CLAUDE.md` asks. The human stack (`goiabada`) is never touched.
+- **CI**: the long tiers. CI runs every check on a push to `main` and on a pull request that is ready for review, so step 9 runs only the quick ones, and step 13 watches CI for the rest.
 
 Do every step yourself. The user answers only the questions below and says whether to commit. Shell variables do not persist between Bash calls, so spell out absolute paths: `$ROOT` below is the repository root, `$ENVF` a file in your scratchpad directory, and `$X` the exec prefix from step 6. Before each step that takes more than a minute, tell the user in one line what is running and roughly how long it takes.
 
@@ -114,7 +115,7 @@ Collect the upgrades for the report: `git diff -U0 -- 'src/**/go.mod'` per Go mo
 
 Wait for step 4's background task, then in one Bash call:
 1. Check that `docker inspect goiabada-update-all-devcontainer-1 --format '{{range .Mounts}}{{.Source}} {{end}}'` names `$ROOT`.
-2. Wait for the three databases with the `wait_for` probes in `src/.devcontainer/README.md` ("Wait for readiness"), with `NAME=goiabada-update-all`. A running database is not yet accepting logins.
+2. Wait for the three databases with the `wait_for` probes in `src/.devcontainer/README.md` ("Wait for readiness"), with `NAME=goiabada-update-all`. A running database is not yet accepting logins, and step 8's `schemadump` reads all four engines.
 3. Write the tests' environment. Compose never reads `containerEnv`, so take CI's: `yq -r '.env | to_entries | .[] | .key + "=" + .value' "$ROOT/.github/workflows/check.yml" > "$ENVF" && echo CGO_ENABLED=0 >> "$ENVF"`.
 
 Every command in the stack then runs as:
@@ -154,27 +155,21 @@ Then check `git status --porcelain` against what the update explains: CSS after 
 
 ## 9. Verify (stack, then host)
 
-Give each call a 10-minute timeout. `run-tests.sh` stops at the first failing tier, and it prints its log directory and a failure summary.
+Run the quick checks, each a few minutes at most. Give each call a 10-minute timeout. `run-tests.sh` stops at the first failing tier, and it prints its log directory and a failure summary.
 
 1. `$X src/authserver ./run-tests.sh --type lint` runs `build.sh`, golangci-lint and unparam over the four modules, and checks that the CSS, the mocks and `OWNERSHIP.md` are what their generators produce.
-2. Start `$X src/authserver ./run-tests.sh --type data` with `run_in_background`. It covers all four engines, because `go get -u` moves the database drivers.
-3. While the data tier runs, which `CLAUDE.md` allows: `$X src/authserver ./run-tests.sh --type modules --no-build`, then `--type setup --no-build`.
-4. After the data tier: `$X src/authserver ./run-tests.sh --type integration --db sqlite`. If a database driver moved (`github.com/go-sql-driver/mysql`, `github.com/jackc/pgx/v5`, `github.com/microsoft/go-mssqldb`, `modernc.org/sqlite`), run `--type integration` across all engines instead.
-5. `$X src sh -c 'for m in core authserver adminconsole cmd/goiabada-setup; do echo "== $m"; (cd $m && govulncheck ./...) || exit 1; done'`.
-6. Each e2e project whose `package.json` or lock file changed, on the host, because the dev container installs Node's binary alone, without npm. `npm ci` first in each, so the check runs on exactly what the committed lock file installs: `cd "$ROOT/e2e/playwright" && npm ci && npm run typecheck`, and `cd "$ROOT/e2e/testapp" && npm ci && npm test && npm run build`. Never run the e2e suites; they run against the maintainer's VPS.
-7. The docs site, on the host, as CI's `docs` job runs it (`.github/workflows/check.yml`). This runs always, because the site's build reads `src/`. It builds the image on the new Node pin, runs the site's tests in its `sources` stage, checks what nginx answers, and opens the pages in Chromium under their Content-Security-Policy:
+2. `$X src/authserver ./run-tests.sh --type modules --no-build`, then `--type setup --no-build`.
+3. `$X src sh -c 'for m in core authserver adminconsole cmd/goiabada-setup; do echo "== $m"; (cd $m && govulncheck ./...) || exit 1; done'`.
+4. Each e2e project whose `package.json` or lock file changed, on the host, because the dev container installs Node's binary alone, without npm. `npm ci` first in each, so the check runs on exactly what the committed lock file installs: `cd "$ROOT/e2e/playwright" && npm ci && npm run typecheck`, and `cd "$ROOT/e2e/testapp" && npm ci && npm test && npm run build`. Never run the e2e suites; they run against the maintainer's VPS.
+5. When the site crossed a major or a 0.x minor: `cd "$ROOT/site" && npm ci && npm test && npm run build` on the host. Step 5's hold-back decision has to be made before anything is pushed. If a site major fails and you cannot fix it with a contained change (config, imports, a renamed option the upgrade guide names), hold that package back to its newest release in its current major (in its current minor for a 0.x package), and rerun this check.
 
-   ```bash
-   cd "$ROOT" && export BUILDX_BUILDER=default &&
-   docker build --target sources -f site/Dockerfile -t goiabada-docs-sources:update-all . &&
-   docker run --rm goiabada-docs-sources:update-all npm test &&
-   docker build -f site/Dockerfile -t goiabada-docs:update-all . &&
-   site/checks/docs-image.sh goiabada-docs:update-all &&
-   (cd site && npm ci && npx playwright install chromium) &&
-   site/checks/docs-browser.sh goiabada-docs:update-all
-   ```
+Left to CI (step 13), each several minutes or more:
+- the data tier on all four engines, and the integration tier on all four;
+- the race-detector runs of the module tiers;
+- the docs job's image, nginx and browser checks;
+- the release images' build validation.
 
-   A failure caused by a site major you cannot fix with a contained change (config, imports, a renamed option the upgrade guide names) holds that package back to its newest release in its current major (in its current minor for a 0.x package). Rerun this step after that.
+CI's four database jobs skip while a pull request is a draft, so an update relies on them only on `main` or on a pull request that is ready for review.
 
 Failures:
 - **A new golangci-lint finding**: fix the code, or suppress a false positive inline with its reason, as `.golangci.yml` asks.
@@ -182,7 +177,7 @@ Failures:
 - **A govulncheck finding**: say whether a fixed version exists. If the settle window kept `deps` from taking it, say that `--now` would.
 - **A bug the update exposes**: fix it in this run or put it to the user. Never leave it as a residual risk.
 
-After a fix, rerun the tier that failed and every tier the fix could affect.
+After a fix, rerun the check that failed and every local check the fix could affect.
 
 ## 10. The majors the user chose
 
@@ -198,7 +193,7 @@ docker compose -p goiabada-update-all \
   down -v
 ```
 
-Then `find "$ROOT" -user root -not -path '*/.git/*' | head` must print nothing. The stack's image and the two `goiabada-docs*:update-all` images stay behind as the build cache for the next run.
+Then `find "$ROOT" -user root -not -path '*/.git/*' | head` must print nothing. The stack's image stays behind as the build cache for the next run.
 
 ## 12. Report, then commit if asked
 
@@ -208,10 +203,10 @@ Report in this order:
 - **npm**: per project, the direct upgrades by name and a count of the transitive ones. For the site, mark the majors and 0.x minors, the changes they needed, and each package held back with its reason.
 - **Data sources**: the moved pins, what changed in each table, and the password list review.
 - **Regenerated**: CSS, mocks, `OWNERSHIP.md`, schema goldens and data tables, whichever changed.
-- **Verification**: each tier and its result, govulncheck's result and the npm checks. Also what stays outside a local run: the e2e suites (print `e2e/run.sh --source`, to run from a clean checkout of `main` after the merge) and CI's build validation of the release images when Go or Alpine moved.
+- **Verification**: each local check and its result, including govulncheck's and the npm checks'. Name what was left to CI. Also print the e2e suites' command, `e2e/run.sh --source`, for the user to run from a clean checkout of `main` once the update is there.
 - **Dev container**: if a pin it installs moved (go, tailwind, node, golangci-lint, mockery, staticcheck, unparam, govulncheck), the human dev container needs a rebuild before the next local work there.
 
-Then ask with AskUserQuestion: commit on a new branch (recommended), commit, push and open a PR, or leave it uncommitted. Add a question that accepts or drops any data source move or major the run made. On `main`, first create `deps/update-<YYYY-MM-DD>`.
+Then ask with AskUserQuestion. The options are: commit and push to `main`, which is how earlier updates landed (`8a050570d`, `df94e5786`) and where CI runs every check; commit on a new branch; commit, push and open a pull request that is ready for review, never a draft; or leave it uncommitted. Add a question that accepts or drops any data source move or major the run made. For a branch or a pull request on `main`, first create `deps/update-<YYYY-MM-DD>`.
 
 Write the commits in the repository's style (`git show 8a050570d` and `git show df94e5786` are examples):
 - The routine pins and the Go and npm upgrades go in one commit. The subject is one plain sentence naming what moved, such as "Update Tailwind CSS, Grype, and the Go and npm dependencies". The body has a `versions.yaml:` paragraph and a `./version-manager.sh deps:` paragraph, naming what was held back.
@@ -219,3 +214,9 @@ Write the commits in the repository's style (`git show 8a050570d` and `git show 
 - End each commit with the attribution trailer the session asks for.
 
 A PR's title is the first commit's subject. Its body is the report, ending with the session's attribution line. Never merge.
+
+## 13. Watch CI
+
+After a push, find the `check.yml` run for the pushed commit: `gh run list --workflow check.yml --commit <sha> --json databaseId,status`. It can take a few seconds to appear. Watch it with `run_in_background` and `gh run watch <id> --exit-status`; a run takes roughly 10 minutes. Tell the user what is pending, then report the result per job.
+
+Treat a failed job like a step 9 failure: read `gh run view <id> --log-failed`, then fix the cause, commit and push the fix the same way the update went, and watch the new run. A job that failed for a reason outside the update, such as a runner or network error, gets one `gh run rerun <id> --failed`. If it fails again, report it.
