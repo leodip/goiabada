@@ -67,11 +67,12 @@ export async function continuePastRecoveryCodes(page: Page): Promise<string[]> {
 }
 
 // Signs the user in through the client in a browser of their own, approving the consent screen if one
-// shows, and returns once the browser is back at the redirect URI with a code. The caller closes the
+// shows, and returns once the browser is back at the redirect URI with a code. Any other
+// authorization parameters, such as dpop_jkt, are added to the request. The caller closes the
 // context.
 export async function signInThroughClient(
   browser: Browser,
-  options: { clientId: string; email: string; password: string; scope: string },
+  options: { clientId: string; email: string; password: string; scope: string; params?: Record<string, string> },
 ): Promise<BrowserSignIn> {
   const { context, page, codeVerifier } = await openSignIn(browser, options);
   await submitPassword(page, options.email, options.password);

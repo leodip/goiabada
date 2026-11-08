@@ -1,0 +1,13 @@
+-- The DPoP key an authorization code is bound to (#42 decision 14, RFC 9449 section 10).
+--
+-- codes.dpop_jkt is the RFC 7638 SHA-256 thumbprint of that key, base64url without padding, and
+-- NULL for a code bound to no key. It is the authorization request's dpop_jkt, carried through the
+-- sign-in to the code. The token endpoint redeems a bound code only with a proof by that key, and
+-- refuses any other attempt before the code is claimed. Only the insert writes it, and no update
+-- does, so a code never moves to another key or loses its binding.
+--
+-- Existing rows land NULL and nothing backfills them: no code issued before this migration was
+-- bound, so every existing code reads as bound to no key, and is redeemed as before.
+--
+-- Nullable with no default, so there is no default constraint to name or drop on any engine.
+ALTER TABLE codes ADD COLUMN dpop_jkt TEXT;

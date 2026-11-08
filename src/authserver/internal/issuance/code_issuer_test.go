@@ -104,6 +104,37 @@ func TestCreateAuthCode(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
+// A code requested with dpop_jkt is written bound to that key, and one requested without it is
+// written unbound, NULL, as every code before #42 decision 14 was.
+func TestCreateAuthCode_WritesTheDPoPJkt(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		dpopJkt string
+		want    sql.NullString
+	}{
+		{"bound", "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs", sql.NullString{String: "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs", Valid: true}},
+		{"unbound", "", sql.NullString{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := datamocks.NewDatabase(t)
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+				Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+			var written *record.Code
+			mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).
+				Run(func(args mock.Arguments) { written = args.Get(2).(*record.Code) }).Return(nil)
+
+			_, err := NewCodeIssuer(mockDB).createAuthCode(context.Background(), nil, &CreateCodeInput{
+				ClientId: "test-client", UserId: 123, Scope: "openid", RedirectURI: "https://example.com/callback",
+				AuthenticatedAt: codeAuthTime(), SessionIdentifier: "session123", DPoPJkt: tc.dpopJkt,
+			})
+
+			require.NoError(t, err)
+			require.NotNil(t, written)
+			assert.Equal(t, tc.want, written.DPoPJkt)
+		})
+	}
+}
+
 // TestCreateAuthCode_BoundsTheUserAgent is decision 5 of #281, and the defect it closes was live:
 // codes.user_agent is varchar(512) on three engines and a User-Agent of 513 bytes or more made
 // CreateCode fail, so /auth/issue answered 500 to that browser after a completed ceremony. The

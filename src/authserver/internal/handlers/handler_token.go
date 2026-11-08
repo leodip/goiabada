@@ -85,7 +85,8 @@ func HandleTokenPost(
 				responder.refuse(w, r, input.GrantType, err)
 				return
 			}
-			// The proof key, for the refresh grant to hold a bound refresh token to (#42 decision 11).
+			// The proof key, for the refresh grant to hold a bound refresh token to and the code grant a
+			// bound code (#42 decisions 11 and 14).
 			input.DPoPThumbprint = proof.Thumbprint
 		}
 

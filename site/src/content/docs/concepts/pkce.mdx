@@ -76,6 +76,10 @@ At `/auth/token`, the verifier has to match the challenge the code was issued wi
 
 The last one catches a code issued while the client was confidential and PKCE optional, then redeemed after it became public: start a new authorization request.
 
+## With DPoP
+
+An app that uses [DPoP](/concepts/dpop/) should send `dpop_jkt` with the authorization request too, beside PKCE. PKCE ties the code to the verifier your app holds, and `dpop_jkt` ties it to your app's DPoP key as well, so the code can only be redeemed with a proof by that key. See [Bind the code to your key](/concepts/dpop/#bind-the-code-to-your-key).
+
 ## Next steps
 
 <CardGrid>

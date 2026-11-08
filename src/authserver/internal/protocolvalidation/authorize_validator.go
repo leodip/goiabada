@@ -60,6 +60,9 @@ type ValidateRequestInput struct {
 	// DPoPBoundAccessTokens is whether the client requires DPoP for its token requests, which
 	// refuses it the response types that return an access token (#42 decision 13).
 	DPoPBoundAccessTokens bool
+	// DPoPJkt is the request's dpop_jkt, empty when absent (RFC 6749 section 3.1: a parameter sent
+	// without a value is treated as omitted). It binds the code to one DPoP key (#42 decision 14).
+	DPoPJkt string
 }
 
 func NewAuthorizeValidator(database authorizeValidatorDatabase) *AuthorizeValidator {
@@ -465,6 +468,20 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 			}
 		}
 		// If PKCE is not required and not provided, that's fine - skip validation
+	}
+
+	// dpop_jkt binds the code to one DPoP key (RFC 9449 section 10, #42 decision 14). With a response
+	// type that returns no code nothing could be bound, so the request is refused whatever the value;
+	// with one that does, the value is held to the canonical form of a SHA-256 JWK thumbprint, the
+	// validator an S256 challenge is held to (decision 20), since a code bound to anything else could
+	// never be redeemed. It stays optional, even for a client that requires DPoP.
+	if input.DPoPJkt != "" {
+		if !rtInfo.HasCode {
+			return dpopJktWithoutCodeRefusal()
+		}
+		if !isBase64URLSHA256(input.DPoPJkt) {
+			return dpopJktRefusal()
+		}
 	}
 
 	// Response mode validation.

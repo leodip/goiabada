@@ -514,6 +514,7 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 		AuthStateGeneration: authContext.AuthStateGeneration,
 		SessionIdentifier:   sessionIdentifier,
 		OTPClaim:            otpClaimOf(authContext),
+		DPoPJkt:             authContext.DPoPJkt,
 	}
 }
 

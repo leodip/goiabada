@@ -6,10 +6,12 @@
 // matrix is in the Go tiers. A proof is single-use (section 11.1): sent again, it is refused. A
 // public client's refresh token is bound to the key too, and refused without a proof by it, where a
 // confidential client's is left unbound (section 5). A client set to require DPoP is refused every
-// token request without a proof, once it has authenticated, and answered with one (section 5.2).
+// token request without a proof, once it has authenticated, and answered with one (section 5.2). A
+// code requested with dpop_jkt is redeemed only with a proof by that key, and a refused attempt
+// leaves it the key holder's to redeem (section 10).
 import type { Page } from "@playwright/test";
 import { grantClientPermission, readClientSecret } from "../../lib/admin-console";
-import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
+import { authorizeAndLand, signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
 import { dpopKey, dpopProof, expectBoundTokenResponse, expectUseDPoPNonce, nonceOf, postTokenWithDPoP, setRequireDPoP } from "../../lib/dpop";
 import { env } from "../../lib/environment";
 import { expect, test, type TestClient, type TestResource } from "../../lib/fixtures";
@@ -259,5 +261,54 @@ test("a client requiring DPoP is refused a token without a proof once it has aut
   await test.step("switched off, the client is answered a bearer token without a proof again", async () => {
     await setRequireDPoP(page, request, clients, service.client.id, false);
     expectTokenResponse(await postToken(request, service.body, { headers: service.basic }));
+  });
+});
+
+// RFC 7636 appendix B's S256 challenge, a real one, so dpop_jkt is the only thing wrong with the request.
+const rfc7636Challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+const boundCodeRefusal = "The authorization code is bound to a DPoP key, and the request carries no proof by that key.";
+
+test("a code requested with dpop_jkt is redeemed only by that key: none or another is refused invalid_grant, and the code stays the key holder's (section 10)", async ({
+  page,
+  browser,
+  clients,
+  users,
+  request,
+}) => {
+  const user = await users.create();
+  const client = await publicSignInClient(page, clients);
+  const key = dpopKey();
+  const signIn = await signInThroughClient(browser, {
+    clientId: client.identifier,
+    email: user.email,
+    password: user.password,
+    scope: "openid",
+    params: { dpop_jkt: key.thumbprint },
+  });
+  await signIn.context.close();
+  const redeem = { grant_type: "authorization_code", client_id: client.identifier, code: signIn.code, code_verifier: signIn.codeVerifier, redirect_uri: testRedirectUri };
+
+  await test.step("a redemption without a proof is refused invalid_grant", async () => {
+    const refused = await postToken(request, redeem);
+    expectTokenError(refused, "invalid_grant");
+    expect(refused.body.error_description).toBe(boundCodeRefusal);
+  });
+  await test.step("a redemption with a proof by another key is refused invalid_grant, with a fresh nonce", async () => {
+    const refused = await postTokenWithDPoP(request, redeem, dpopKey());
+    expectTokenError(refused, "invalid_grant");
+    expect(refused.body.error_description).toBe(boundCodeRefusal);
+    nonceOf(refused);
+  });
+  await test.step("the refusals spent nothing: the redemption by the key is a bound token", async () => {
+    expectBoundTokenResponse(await postTokenWithDPoP(request, redeem, key), key);
+  });
+  await test.step("a dpop_jkt that is not a SHA-256 thumbprint is refused invalid_request, with no code", async () => {
+    const landed = await authorizeAndLand(
+      browser,
+      { client_id: client.identifier, response_type: "code", scope: "openid", state: "s", code_challenge: rfc7636Challenge, code_challenge_method: "S256", dpop_jkt: `${key.thumbprint}=` },
+      user,
+    );
+    expect(landed.searchParams.get("error")).toBe("invalid_request");
+    expect(landed.searchParams.get("code")).toBeNull();
   });
 });

@@ -41,4 +41,10 @@ type Code struct {
 	// user's current value. Tagged dont-update so an ordinary full-row UpdateCode
 	// cannot regress it (#106).
 	AuthStateGeneration int64 `db:"auth_state_generation" fieldtag:"dont-update"`
+	// DPoPJkt is the RFC 7638 thumbprint of the DPoP key the authorization request bound this code
+	// to with dpop_jkt, NULL for a code bound to no key (RFC 9449 section 10, #42 decision 14). The
+	// token endpoint redeems a bound code only with a proof by that key, and refuses any other
+	// attempt before the code is claimed. Written once, by CreateCode, and tagged dont-update so a
+	// full-row UpdateCode cannot change or clear it.
+	DPoPJkt sql.NullString `db:"dpop_jkt" fieldtag:"dont-update"`
 }

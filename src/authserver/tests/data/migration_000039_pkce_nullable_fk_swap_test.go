@@ -415,8 +415,49 @@ func seedCode000039(t *testing.T, h *isolatedDB, client *record.Client, user *re
 		Revoked:             true,
 		AuthStateGeneration: 7,
 	}
-	require.NoError(t, h.DB.CreateCode(context.Background(), nil, code), "seed code")
+	require.NoError(t, insertCode000039(h, code), "seed code")
 	return code
+}
+
+// codeColumns000039 are the codes columns as 000039 leaves them, and the order insertCode000039
+// writes and readCode000039 scans them in. Named here rather than taken from the data layer, whose
+// statements follow the head schema: through it this test named dpop_jkt, which 000088 adds,
+// against a table that does not have it yet, as refreshTokenColumns000039 records for 000051.
+var codeColumns000039 = []string{
+	"created_at", "updated_at", "code_hash", "client_id", "code_challenge", "code_challenge_method",
+	"scope", "state", "nonce", "redirect_uri", "user_id", "ip_address", "user_agent", "response_mode",
+	"authenticated_at", "session_identifier", "acr_level", "auth_methods", "used", "revoked",
+	"auth_state_generation",
+}
+
+// codeFields000039 are code's fields in codeColumns000039's order, as scan targets.
+func codeFields000039(code *record.Code) []any {
+	return []any{
+		&code.CreatedAt, &code.UpdatedAt, &code.CodeHash, &code.ClientId, &code.CodeChallenge,
+		&code.CodeChallengeMethod, &code.Scope, &code.State, &code.Nonce, &code.RedirectURI, &code.UserId,
+		&code.IpAddress, &code.UserAgent, &code.ResponseMode, &code.AuthenticatedAt, &code.SessionIdentifier,
+		&code.AcrLevel, &code.AuthMethods, &code.Used, &code.Revoked, &code.AuthStateGeneration,
+	}
+}
+
+// insertCode000039 writes code over codeColumns000039, its timestamps set as CreateCode sets them,
+// and reads its id back. It returns the insert's error rather than requiring success, because being
+// refused is the assertion on one side of this migration.
+func insertCode000039(h *isolatedDB, code *record.Code) error {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	code.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	code.UpdatedAt = sql.NullTime{Time: now, Valid: true}
+
+	values := make([]any, 0, len(codeColumns000039))
+	for _, field := range codeFields000039(code) {
+		values = append(values, reflect.ValueOf(field).Elem().Interface())
+	}
+	insert := "INSERT INTO codes (" + strings.Join(codeColumns000039, ", ") + ") VALUES (" + seedBinds(len(values)) + ")"
+	if _, err := h.SQL.ExecContext(context.Background(), insert, values...); err != nil {
+		return err
+	}
+	return h.SQL.QueryRowContext(context.Background(),
+		"SELECT id FROM codes WHERE code_hash = "+seedBindAt(1), code.CodeHash).Scan(&code.Id)
 }
 
 // refreshTokenColumns000039 are the refresh_tokens columns as 000039 leaves them, and the order
@@ -501,7 +542,7 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *record.C
 		AcrLevel:            "urn:goiabada:level1",
 		AuthMethods:         "pwd",
 	}
-	err := h.DB.CreateCode(context.Background(), nil, code)
+	err := insertCode000039(h, code)
 	if err == nil && out != nil {
 		*out = *code
 	}
@@ -510,9 +551,10 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *record.C
 
 func readCode000039(t *testing.T, h *isolatedDB, id int64) *record.Code {
 	t.Helper()
-	code, err := h.DB.GetCodeById(context.Background(), nil, id)
-	require.NoErrorf(t, err, "read code %d back", id)
-	require.NotNilf(t, code, "code %d is gone", id)
+	code := &record.Code{Id: id}
+	read := "SELECT " + strings.Join(codeColumns000039, ", ") + " FROM codes WHERE id = " + seedBindAt(1)
+	require.NoErrorf(t, h.SQL.QueryRowContext(context.Background(), read, id).Scan(codeFields000039(code)...),
+		"read code %d back", id)
 	return code
 }
 

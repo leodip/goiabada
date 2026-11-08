@@ -481,6 +481,9 @@ type authCodeOptions struct {
 	// clients alone (#245, D2).
 	user         *record.User
 	userPassword string
+	// dpopJkt is the authorization request's dpop_jkt, which binds the code to that DPoP key (#42
+	// decision 14), left out when empty.
+	dpopJkt string
 }
 
 func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...authCodeOptions) (*http.Client, *record.Code) {
@@ -561,6 +564,9 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 	destUrl += "&scope=" + url.QueryEscape(scope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
+	if opt.dpopJkt != "" {
+		destUrl += "&dpop_jkt=" + url.QueryEscape(opt.dpopJkt)
+	}
 
 	// A cookie jar of its own, so each ceremony is a browser of its own: two for one user keep
 	// two sessions (#564).

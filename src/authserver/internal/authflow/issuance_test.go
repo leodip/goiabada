@@ -38,6 +38,7 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		AuthenticatedAt:     &authenticatedAt,
 		AuthStateGeneration: 9,
 		OtpClaimGeneration:  &otpClaimGeneration,
+		DPoPJkt:             "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs",
 		// Ceremony state issuance does not read, set so that copying it anywhere would show.
 		CeremonyId: "ceremony-id",
 		AuthState:  ceremony.AuthStateReadyToIssueCode,
@@ -64,6 +65,7 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		AuthStateGeneration: 9,
 		SessionIdentifier:   "session-identifier",
 		OTPClaim:            otpcredential.OTPClaim{Claimed: true, Generation: &otpClaimGeneration},
+		DPoPJkt:             "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs",
 	}, got)
 
 	// A field added to CreateCodeInput and not copied here is left zero, which the literal above

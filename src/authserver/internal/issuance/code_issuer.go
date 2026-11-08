@@ -83,6 +83,9 @@ type CreateCodeInput struct {
 	// OTPClaim is the code's claim to a one-time code, checked on the user under the user's row lock
 	// before the code is written (#542).
 	OTPClaim otpcredential.OTPClaim
+	// DPoPJkt is the thumbprint of the DPoP key the code is bound to, empty for none (#42 decision
+	// 14), from the authorization request's dpop_jkt.
+	DPoPJkt string
 }
 
 func NewCodeIssuer(database codeIssuerDatabase) *CodeIssuer {
@@ -231,6 +234,8 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		codeChallenge = sql.NullString{String: input.CodeChallenge, Valid: true}
 		codeChallengeMethod = sql.NullString{String: input.CodeChallengeMethod, Valid: true}
 	}
+	// NULL for a code bound to no key, as every code issued before dpop_jkt existed reads.
+	dpopJkt := sql.NullString{String: input.DPoPJkt, Valid: input.DPoPJkt != ""}
 
 	code := &record.Code{
 		Code:                authCode,
@@ -240,6 +245,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		UserId:              input.UserId,
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
+		DPoPJkt:             dpopJkt,
 		RedirectURI:         input.RedirectURI,
 		Scope:               scope,
 		State:               input.State,

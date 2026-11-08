@@ -159,6 +159,17 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	}
 	// If PKCE was not used and code_verifier was not provided, that's fine
 
+	// A code requested with dpop_jkt is redeemed only with a proof by that key (RFC 9449 section 10,
+	// #42 decision 14). Beside PKCE, the request's other proof that it may redeem the code, and for
+	// the same reasons placed where it is: below client authentication, and above the reuse return
+	// and every check of the grant's state, so a presenter without the key learns nothing about the
+	// account and a used code presented without it never reaches #77's containment. It is decided
+	// here, before the issuer claims the code, so a refused attempt spends nothing and the code stays
+	// redeemable by its key.
+	if err = refuseCodeWithoutItsKey(ctx, client, codeEntity, input.DPoPThumbprint); err != nil {
+		return nil, err
+	}
+
 	if wasReused {
 		return nil, &AuthCodeReusedError{
 			Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",

@@ -121,6 +121,16 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   raced, mints from a bound token without its key or inserts an unbound child into a bound family.
   The binding is enforced whatever the client's current type; refresh tokens carry no `cnf`, and
   revocation and refresh-token introspection ignore the binding.
+- An authorization request's `dpop_jkt` binds its code to a key (section 10, #42 decision 14).
+  `ValidateRequest` refuses it `invalid_request` beside a response type that returns no code, or
+  when it fails `isBase64URLSHA256`, the S256 challenge's validator; an empty value is absent, and a
+  repeat is refused with the other repeated parameters. `AuthContext.DPoPJkt` is a request field,
+  kept by `Restart`, so every step, the parked POST included, carries it to `codes.dpop_jkt`
+  (000088), NULL for none and tagged `dont-update`. The code arm refuses a bound code whose request
+  has no proof by its key `invalid_grant` (`BoundCodeMessage`), with the Warn record `authorization
+  code refused for its dpop binding`, beside PKCE: below client authentication, above the reuse
+  return and every check of the grant's state. The issuer has not claimed the code yet, so a
+  refused attempt spends nothing, and `MarkCodeAsUsed` still lets exactly one redemption mint.
 - The CORS middleware's global lists allow the `DPoP` request header and expose `DPoP-Nonce`, so a
   browser app can send a proof and read the nonce (section 8, #42 decision 15). Which origins are
   granted, and where, is unchanged.
