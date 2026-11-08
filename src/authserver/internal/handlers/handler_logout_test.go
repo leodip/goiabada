@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -803,6 +804,19 @@ var logoutTestSettings = &record.Settings{
 	UserSessionMaxLifetimeInSeconds: 86400,
 }
 
+// clientPartTx is the transaction a hinted sign-out ends an app's part of the session in.
+var clientPartTx = &sql.Tx{}
+
+// expectClientPartEnd stubs what a hinted sign-out reads under the session's row, in its own
+// transaction: the row, held, and the session's apps as committed, here committed. Those apps, not
+// the session as read before the transaction, decide whether the session goes too.
+func expectClientPartEnd(database *datamocks.Database, sessionIdentifier string, userSession *record.UserSession,
+	committed []record.UserSessionClient) {
+	datamocks.ExpectRunInTransaction(database, clientPartTx)
+	database.On("AcquireUserSessionRow", mock.Anything, clientPartTx, sessionIdentifier).Return(true, nil)
+	database.On("GetCommittedUserSessionClients", mock.Anything, clientPartTx, userSession.Id).Return(committed, nil)
+}
+
 func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 	// Item 4. A database error and a session that is simply not there used to be one branch returning
@@ -870,9 +884,8 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).Return(nil)
-		database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, userSession.Clients).Return(nil)
-		database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(1)).Return(nil)
+		expectClientPartEnd(database, sessionIdentifier, userSession, userSession.Clients)
+		database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(1)).Return(nil)
 		// We don't expect DeleteUserSession to be called in this case
 
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
@@ -911,10 +924,9 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).Return(nil)
-		database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, userSession.Clients).Return(nil)
-		database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(1)).Return(nil)
-		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(1)).Return(nil)
+		expectClientPartEnd(database, sessionIdentifier, userSession, userSession.Clients)
+		database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(1)).Return(nil)
+		database.On("DeleteUserSession", mock.Anything, clientPartTx, int64(1)).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
@@ -955,14 +967,69 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).Return(nil)
-		database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, userSession.Clients).Return(nil)
+		expectClientPartEnd(database, sessionIdentifier, userSession, userSession.Clients)
 
 		err := handleExistingSessionOnLogout(r, logoutTestSettings, hintClassification{sessionIdentifier: sessionIdentifier, client: client}, database, auditLogger, &recordingLogoutTokens{})
 
 		require.NoError(t, err) // The function should not return an error if the client is not found in the session
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	// The session's last app, as read before the transaction, is not its last under the session's
+	// row when a sign-in bound another app in between. The session stays, with that app's row: its
+	// part did not end, and deleting the session would cascade its row away untold.
+	t.Run("An app that joined before the session's row was taken keeps the session", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		logoutTokens := &recordingLogoutTokens{}
+
+		hinted := record.UserSessionClient{Id: 1, Client: record.Client{Id: 41, ClientIdentifier: "test-client"}}
+		joined := record.UserSessionClient{Id: 2, Client: record.Client{Id: 42, ClientIdentifier: "joined-client",
+			BackchannelLogoutURI: "https://joined.example/bcl"}}
+		readBefore := &record.UserSession{Id: 1, UserId: 123, Clients: []record.UserSessionClient{hinted}}
+
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(readBefore, nil)
+		expectClientPartEnd(database, "test-session", readBefore, []record.UserSessionClient{hinted, joined})
+		database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(1)).Return(nil)
+		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return().Once()
+
+		err := handleExistingSessionOnLogout(&http.Request{}, logoutTestSettings, hintClassification{
+			sessionIdentifier: "test-session",
+			client:            &record.Client{ClientIdentifier: "test-client"},
+			subject:           "hint-subject",
+		}, database, auditLogger, logoutTokens)
+
+		require.NoError(t, err)
+		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventLogout, mock.Anything)
+		assert.Empty(t, logoutTokens.sent, "the app that joined is told nothing: its part did not end")
+	})
+
+	// A session another request ended between the read and the transaction is held by nothing: that
+	// end deleted it and told its apps, so this one deletes, records and tells nothing.
+	t.Run("A session ended before its row was taken is nothing to end", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		logoutTokens := &recordingLogoutTokens{}
+
+		readBefore := &record.UserSession{Id: 1, UserId: 123, Clients: []record.UserSessionClient{
+			{Id: 1, Client: record.Client{Id: 41, ClientIdentifier: "test-client", BackchannelLogoutURI: "https://app.example/bcl"}},
+		}}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(readBefore, nil)
+		datamocks.ExpectRunInTransaction(database, clientPartTx)
+		database.On("AcquireUserSessionRow", mock.Anything, clientPartTx, "test-session").Return(false, nil)
+
+		err := handleExistingSessionOnLogout(&http.Request{}, logoutTestSettings, hintClassification{
+			sessionIdentifier: "test-session",
+			client:            &record.Client{ClientIdentifier: "test-client"},
+			subject:           "hint-subject",
+		}, database, auditLogger, logoutTokens)
+
+		require.NoError(t, err)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		assert.Empty(t, logoutTokens.sent)
 	})
 
 	// #784 decision 2: the app whose part of a live session ended is told, with a token naming the
@@ -1016,9 +1083,8 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 			logoutTokens := &recordingLogoutTokens{}
 
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(tc.session, nil)
-			database.On("UserSessionLoadClients", mock.Anything, mock.Anything, tc.session).Return(nil)
-			database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, tc.session.Clients).Return(nil)
-			database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(1)).Return(nil)
+			expectClientPartEnd(database, "test-session", tc.session, tc.session.Clients)
+			database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(1)).Return(nil)
 			auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
 
 			err := handleExistingSessionOnLogout(&http.Request{}, logoutTestSettings, hintClassification{
@@ -1174,10 +1240,9 @@ func stubPerClientTeardown(
 	}
 
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
-	database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).Return(nil)
-	database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, userSession.Clients).Return(nil)
-	database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(7)).Return(nil)
-	database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
+	expectClientPartEnd(database, sessionIdentifier, userSession, userSession.Clients)
+	database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(7)).Return(nil)
+	database.On("DeleteUserSession", mock.Anything, clientPartTx, int64(42)).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{

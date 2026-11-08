@@ -164,3 +164,53 @@ func TestLogoutRecipients_ASignInRemovalTellsAnAppThatJoinedBeforeTheSessionLock
 	require.Len(t, removed, 1)
 	race.requireBothTold(t, removed[0].LogoutDeliveries, race.session.SessionIdentifier)
 }
+
+// joinBeforeTheTransactionDatabase runs join once, as the end opens its transaction: after every read
+// the end makes before it, and before it takes the session's row.
+type joinBeforeTheTransactionDatabase struct {
+	data.Database
+	join func() error
+}
+
+func (d *joinBeforeTheTransactionDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	if d.join != nil {
+		join := d.join
+		d.join = nil
+		if err := join(); err != nil {
+			return err
+		}
+	}
+	return d.Database.RunInTransaction(ctx, fn)
+}
+
+// A hinted sign-out ends its app's part of the session, and the session with it when that app is the
+// session's last. Whether it is the last is read under the session's row: an app a sign-in binds to
+// the session after the sign-out read it, and before the sign-out takes its row, keeps the session,
+// whose deletion would take that app's row untold. The bind commits before the end's transaction
+// opens, which is the window the end's read leaves, so this runs on every engine.
+func TestLogoutRecipients_AHintedSignOutByTheLastAppKeepsASessionAnAppJoinedBeforeTheSessionLock(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	user, hinted, joined := createTestUser(t), createTestClient(t), createTestClient(t)
+	session := createTestUserSessionWithClient(t, user.Id, hinted.Id)
+	db := &joinBeforeTheTransactionDatabase{Database: database, join: func() error {
+		_, err := usersession.NewManager(database).BumpUserSession(ctx, session.SessionIdentifier, joined.Id, "", "", "")
+		return err
+	}}
+
+	end, err := revocation.EndClientPartTx(ctx, db, session.SessionIdentifier, hinted.ClientIdentifier)
+
+	require.NoError(t, err)
+	require.Nil(t, db.join, "the join ran as the end opened its transaction")
+	require.NotNil(t, end.Ended, "the hinted app's part ended")
+	require.Equal(t, hinted.Id, end.Ended.ClientId)
+	require.False(t, end.SessionDeleted, "the app that joined keeps the session")
+
+	kept, err := database.GetUserSessionBySessionIdentifier(ctx, nil, session.SessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, kept, "the session stays")
+	apps, err := database.GetUserSessionClientsByUserSessionId(ctx, nil, session.Id)
+	require.NoError(t, err)
+	require.Len(t, apps, 1)
+	require.Equal(t, joined.Id, apps[0].ClientId, "with the app that joined, and without the hinted one")
+}

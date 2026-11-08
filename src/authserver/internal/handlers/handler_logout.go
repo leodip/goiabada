@@ -43,8 +43,6 @@ type logoutDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
-	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
 }
 
 // logoutTokenSender tells the apps whose part of a session ended, with the logout tokens the end
@@ -578,7 +576,9 @@ func classifyIdTokenHint(
 //
 // The client whose part ended is told with a logout token naming the user and the session, after the
 // audit events, when the session was still valid under settings; the other apps on the session are
-// told nothing, since their part did not end (#784 decisions 1 and 2).
+// told nothing, since their part did not end (#784 decisions 1 and 2). Whether it was the session's
+// last app is read under the session's row (revocation.EndClientPartTx), so an app a sign-in adds to
+// the session at the same moment keeps the session rather than being deleted with it untold.
 func handleExistingSessionOnLogout(
 	r *http.Request,
 	settings *record.Settings,
@@ -587,73 +587,46 @@ func handleExistingSessionOnLogout(
 	auditLogger AuditLogger,
 	logoutTokens logoutTokenSender,
 ) error {
-	sessionIdentifier, client := hint.sessionIdentifier, hint.client
-	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
+	end, err := revocation.EndClientPartTx(r.Context(), database, hint.sessionIdentifier, hint.client.ClientIdentifier)
 	if err != nil {
 		return err
 	}
-	if userSession == nil {
+	if end.Ended == nil {
 		return nil
 	}
+	userSession, sessionClient := end.Session, end.Ended
 
-	err = database.UserSessionLoadClients(r.Context(), nil, userSession)
-	if err != nil {
-		return err
+	// "" rather than a subject, and the key stays: /auth/logout carries no bearer token --
+	// authHeaderToContext is mounted on /userinfo and the /api/ groups and nowhere else -- so there
+	// is no caller identity to read here, and "" is what this row has always carried. The actor is
+	// this event's own user_id, which is where an auditor reads it (#385).
+	auditLogger.Log(r.Context(), audit.EventDeletedUserSessionClient, map[string]interface{}{
+		"user_id":         userSession.UserId,
+		"user_session_id": userSession.Id,
+		"client_id":       sessionClient.Client.Id,
+		"logged_in_user":  "",
+	})
+
+	if end.SessionDeleted {
+		// "" for the reason given above: no bearer token reaches /auth/logout, and the actor is this
+		// event's own user_id. The session went, so it is recorded as every other deletion of one is,
+		// with the reason the sign-out without a hint gives (#564).
+		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
+			"user_session_id": userSession.Id,
+			"user_id":         userSession.UserId,
+			"logged_in_user":  "",
+			"reason":          audit.DeletedUserSessionSignedOut,
+		})
+		auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
+			"user_id":            userSession.UserId,
+			"session_identifier": hint.sessionIdentifier,
+			"logged_in_user":     "",
+		})
 	}
 
-	err = database.UserSessionClientsLoadClients(r.Context(), nil, userSession.Clients)
-	if err != nil {
-		return err
-	}
-
-	for idx, sessionClient := range userSession.Clients {
-		if sessionClient.Client.ClientIdentifier == client.ClientIdentifier {
-			err = database.DeleteUserSessionClient(r.Context(), nil, userSession.Clients[idx].Id)
-			if err != nil {
-				return err
-			}
-
-			// "" rather than a subject, and the key stays: /auth/logout carries no bearer
-			// token -- authHeaderToContext is mounted on /userinfo and the /api/ groups and
-			// nowhere else -- so there is no caller identity to read here, and "" is what
-			// this row has always carried. The actor is this event's own user_id, which is
-			// where an auditor reads it (#385).
-			auditLogger.Log(r.Context(), audit.EventDeletedUserSessionClient, map[string]interface{}{
-				"user_id":         userSession.UserId,
-				"user_session_id": userSession.Id,
-				"client_id":       sessionClient.Client.Id,
-				"logged_in_user":  "",
-			})
-
-			if len(userSession.Clients) == 1 {
-				err = database.DeleteUserSession(r.Context(), nil, userSession.Id)
-				if err != nil {
-					return err
-				}
-
-				// "" for the reason given above: no bearer token reaches /auth/logout, and
-				// the actor is this event's own user_id. The session went, so it is recorded
-				// as every other deletion of one is, with the reason the sign-out without a
-				// hint gives (#564).
-				auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-					"user_session_id": userSession.Id,
-					"user_id":         userSession.UserId,
-					"logged_in_user":  "",
-					"reason":          audit.DeletedUserSessionSignedOut,
-				})
-				auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
-					"user_id":            userSession.UserId,
-					"session_identifier": sessionIdentifier,
-					"logged_in_user":     "",
-				})
-			}
-
-			if sessionLive(settings, userSession) {
-				if delivery, tells := backchannel.SessionClientDelivery(&sessionClient.Client, userSession, hint.subject); tells {
-					logoutTokens.Send(r.Context(), settings.Issuer, []backchannel.Delivery{delivery})
-				}
-			}
-			break
+	if sessionLive(settings, userSession) {
+		if delivery, tells := backchannel.SessionClientDelivery(&sessionClient.Client, userSession, hint.subject); tells {
+			logoutTokens.Send(r.Context(), settings.Issuer, []backchannel.Delivery{delivery})
 		}
 	}
 

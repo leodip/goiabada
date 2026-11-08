@@ -315,14 +315,15 @@ client's back-channel logout URI (#784).
   (`AcquireUserSessionRow`), before the deletion cascades the session's apps away. The apps and their
   clients are read with `GetCommittedUserSessionClients`, a locking read on MySQL, so a sign-in that
   added an app after the transaction's first read is still told; an ordinary read there answers
-  InnoDB's snapshot. A row already gone names nobody. A termination, the hintless sign-out and a reused
+  InnoDB's snapshot. A row already gone names nobody. A termination, both sign-outs and a reused
   code take that session's row first and hold no users row: the subject is read before the
   transaction. A sign-in takes each session it removes after its own writes, and after the user's
   row when it rechecks an OTP claim. A user-wide end and a credential change take the
   user's row first (the generation increment, or `AcquireUserRow` for a deletion), then each of the
   user's sessions in id order, as the [data guide](data.md#transactions) sets out. The hinted
-  sign-out runs no transaction: it reads the session and deletes the hinting app's row, and the
-  session when that was its last app, each autocommitted, and tells that app after the delete. Each caller hands its deliveries to
+  sign-out (`revocation.EndClientPartTx`) deletes the hinting app's row, and the session when that
+  app is its last as read under the row, so an app a sign-in added after the sign-out first read the
+  session keeps it; it tells the hinting app after the commit. Each caller hands its deliveries to
   `backchannel.Sender.Send` after the commit, beside its audit events
 - The token: `typ: logout+jwt`, RS256 under the current signing key's `kid`; `iss`, `aud` (the
   client identifier), `iat`, `exp` 120 seconds on, `jti`, the back-channel logout event with `{}`,

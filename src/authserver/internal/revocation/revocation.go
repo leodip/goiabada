@@ -740,6 +740,91 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 	return result, nil
 }
 
+// ClientPartDatabase is what EndClientPartTx reads and writes.
+type ClientPartDatabase interface {
+	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
+	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
+	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+}
+
+// ClientPartEnd reports what EndClientPartTx did.
+type ClientPartEnd struct {
+	// Session is the session sessionIdentifier named, as read before the transaction; nil when there
+	// was none, which is nothing to end.
+	Session *record.UserSession
+	// Ended is the app's row on the session, with its client, read under the session's row and
+	// deleted; nil when the app had no part in the session, or the session was ended meanwhile.
+	Ended *record.UserSessionClient
+	// SessionDeleted is true when that app was the session's last, so the session went with it.
+	SessionDeleted bool
+}
+
+// EndClientPartTx ends one app's part of a session, the teardown a confirmed id_token_hint earns at
+// /auth/logout: the app's row on the session, and the session itself when that app was its last.
+// Per-app rather than whole-session, because logging one app out must not stop the session-bound
+// tokens of the other apps sharing the session (#129).
+//
+// Whether the app was the last is read under the session's row, with GetCommittedUserSessionClients,
+// as every other end reads a session's apps. Issuance takes that row before it adds an app to the
+// session, so an app a sign-in binds after the session was read, and before this takes its row, is
+// seen here and keeps the session: its part did not end, and deleting the session would take its row
+// with it untold. A session ended meanwhile is held by nothing: that end told its apps.
+//
+// The audit events and the app's logout token are the caller's, after the commit.
+func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifier string,
+	clientIdentifier string) (ClientPartEnd, error) {
+
+	session, err := db.GetUserSessionBySessionIdentifier(ctx, nil, sessionIdentifier)
+	if err != nil {
+		return ClientPartEnd{}, err
+	}
+	if session == nil {
+		return ClientPartEnd{}, nil
+	}
+
+	var ended *record.UserSessionClient
+	sessionDeleted := false
+	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		ended, sessionDeleted = nil, false
+		held, acquireErr := db.AcquireUserSessionRow(ctx, tx, sessionIdentifier)
+		if acquireErr != nil {
+			return acquireErr
+		}
+		if !held {
+			return nil
+		}
+		sessionClients, readErr := db.GetCommittedUserSessionClients(ctx, tx, session.Id)
+		if readErr != nil {
+			return readErr
+		}
+		for i := range sessionClients {
+			if sessionClients[i].Client.ClientIdentifier != clientIdentifier {
+				continue
+			}
+			if deleteErr := db.DeleteUserSessionClient(ctx, tx, sessionClients[i].Id); deleteErr != nil {
+				return deleteErr
+			}
+			if len(sessionClients) == 1 {
+				if deleteErr := db.DeleteUserSession(ctx, tx, session.Id); deleteErr != nil {
+					return deleteErr
+				}
+				sessionDeleted = true
+			}
+			found := sessionClients[i]
+			ended = &found
+			return nil
+		}
+		return nil
+	})
+	if err != nil {
+		return ClientPartEnd{}, err
+	}
+	return ClientPartEnd{Session: session, Ended: ended, SessionDeleted: sessionDeleted}, nil
+}
+
 // AuthCodeReuseResult reports what the response to a reused authorization code actually did. It
 // carries what the auth_code_reuse_detected payload needs beyond the code the caller already holds.
 type AuthCodeReuseResult struct {
