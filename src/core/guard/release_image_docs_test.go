@@ -193,16 +193,13 @@ const siteDocs = "site/src/content/docs"
 var busyboxImage = regexp.MustCompile("(?:^|[\\s=\"'])(?:docker\\.io/)?(?:library/)?busybox(?::([^\\s`\"']+))?(?:$|[\\s`\"'])")
 
 // lineCode is the code on one line of a Markdown page: the whole line inside a fenced block, and
-// otherwise its inline code spans.
+// otherwise its inline code spans with their backticks, so a span holding only a name, such as
+// `busybox` in a sentence, starts at no boundary busyboxImage reads as an image's.
 func lineCode(line string, fenced bool) []string {
 	if fenced {
 		return []string{line}
 	}
-	var spans []string
-	for _, m := range inlineCode.FindAllStringSubmatch(line, -1) {
-		spans = append(spans, m[1])
-	}
-	return spans
+	return inlineCode.FindAllString(line, -1)
 }
 
 // busyboxRunFindings walks the Markdown pages under docs, relative to root, and returns a finding
@@ -299,10 +296,11 @@ func TestBusyboxRunFindings(t *testing.T) {
 			"docs/f.mdx:2 runs busybox with no version, not busybox:1.37")
 	})
 
-	t.Run("prose naming the tool and a program run after -- are not images, so the pages run none", func(t *testing.T) {
+	t.Run("prose naming the tool, formatted or not, and a program run after -- are not images, so the pages run none", func(t *testing.T) {
 		root := writeTree(t, map[string]string{
 			"docs/a.mdx": "The BusyBox image runs as root.\n",
 			"docs/b.mdx": "The busybox image provides the diagnostic tools.\n",
+			"docs/d.mdx": "The `busybox` image provides the diagnostic tools.\n",
 			"docs/c.mdx": "```bash\nkubectl exec tool-pod -- busybox nslookup example.com\n```\n\nRun `kubectl exec tool-pod -- busybox ps` to list them.\n",
 		})
 		findings, pages, err := busyboxRunFindings(root, "docs", "1.37")
