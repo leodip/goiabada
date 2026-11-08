@@ -83,8 +83,6 @@ A self-registered client's redirect URIs follow the [rules for every client](/co
 
 A `backchannel_logout_uri` follows the [rules for every client](/concepts/clients/#back-channel-logout), and must use `https`, whether the client is public or confidential: `http` is refused, on `127.0.0.1` and `localhost` too. The registration must also ask for the `authorization_code` grant type, since a client that signs no users in has no session to end. The auth server sends logout tokens only to a [public address](/concepts/clients/#self-registered-clients) for a self-registered client.
 
-A URI that breaks these rules refuses the registration with `invalid_client_metadata`. It isn't dropped, as a `policy_uri` is. `backchannel_logout_session_required` sent without a URI is stored as `false`.
-
 ## Privacy policy and terms of service
 
 The consent screen links a client's `policy_uri` and `tos_uri`, so users can read them before they allow the app in. Anyone can register a client, so the auth server keeps a URL only when it's on the app's own site. It keeps each one when it:

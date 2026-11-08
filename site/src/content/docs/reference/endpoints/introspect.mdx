@@ -111,7 +111,7 @@ The members are read from the token, and they're the same for every client that 
 
 ## The request
 
-`/auth/introspect` takes a POST, with the parameters in an `application/x-www-form-urlencoded` body. Each parameter goes in once. A GET is refused with `405 Method Not Allowed`, so a token never ends up in a URL.
+`/auth/introspect` takes a POST, with the parameters in an `application/x-www-form-urlencoded` body. Each parameter goes in once.
 
 | Parameter | Required | What it does |
 |---|---|---|
@@ -137,7 +137,7 @@ The auth server's log has a `client authentication refused at the introspection 
 
 Every answer carries `Cache-Control: no-store`. If your API caches answers itself, keep each one no longer than you can accept a revoked token being honored, and never past the token's `exp`.
 
-An error is a JSON body with `error` and `error_description`, as on the [token endpoint](/reference/endpoints/token/#errors). Browsers can't call the endpoint, since only a confidential client may: it sends no CORS headers.
+An error is a JSON body with `error` and `error_description`, as on the [token endpoint](/reference/endpoints/token/#errors).
 
 ## Next steps
 

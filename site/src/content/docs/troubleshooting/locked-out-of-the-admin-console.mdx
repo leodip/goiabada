@@ -134,8 +134,6 @@ An authenticator that refuses every code, the right one included, was disabled a
 
 When none of these is left, the auth server's `recover` subcommand restores sign-in for one named user. It needs the auth server's database credentials, so you run it where the auth server runs: on its host, in its Compose service or in its pod. It does only what its flags ask. Whatever they ask, it ends all of the user's sessions and revokes their refresh tokens, and the [audit log](/concepts/audit-log/) records the recovery with the command as the actor.
 
-Then it tells each of the user's apps that has a [back-channel logout URI](/concepts/clients/#back-channel-logout) that the user was signed out, as [Telling the apps that knew the user](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user) describes, and prints each app's outcome as it comes. An app that doesn't answer is tried again, so this can take up to about a minute. The recovery is already done by then, so an app that wasn't told doesn't change the command's exit status. The audit log records each app's outcome as `sent_logout_token`.
-
 | Flag | What it does |
 |---|---|
 | `--email <address>` | Names the user to recover, by their stored address. Required. |
@@ -207,7 +205,7 @@ The admin console signs in through the same form, so nobody can turn the challen
   </TabItem>
 </Tabs>
 
-The forms stop asking for the challenge at the next request, on every replica. The [audit log](/concepts/audit-log/) records `updated_turnstile_settings` with the command as the actor. Sign in, fix the widget in the Cloudflare dashboard or the site key under **Admin**, **Turnstile**, and turn the challenge on again. Before you sign out, check that a private window can sign in.
+The forms stop asking for the challenge at the next request, on every replica. Sign in, fix the widget in the Cloudflare dashboard or the site key under **Admin**, **Turnstile**, and turn the challenge on again. Before you sign out, check that a private window can sign in.
 
 ## Next steps
 

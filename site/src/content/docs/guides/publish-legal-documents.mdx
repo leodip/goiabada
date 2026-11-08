@@ -40,8 +40,6 @@ A document's kind is fixed when you create it, so a version always means the sam
 
 A document is written in Markdown ([CommonMark](https://commonmark.org/)) with tables: headings, paragraphs, lists, links, emphasis, quotations, code and tables. Its title holds at most 200 characters, and its text at most 100,000.
 
-The page shows the document's title as its main heading, so the text's headings go under it: the highest level the text uses, `#` or lower, is shown one level below the title, and the others keep their places under it.
-
 What the text can't do, so it never runs code or calls another site from a reader's browser:
 
 - HTML in the text isn't shown.
@@ -50,15 +48,9 @@ What the text can't do, so it never runs code or calls another site from a reade
 
 A document has one text, in whatever language you write it. If you serve people in several languages, put each language's text in the same document.
 
-## Drafts
-
-A document has at most one draft. **Save draft** replaces it, as often as you like: nobody but administrators sees a draft.
-
-**Publish** publishes the draft as last saved. Changes you haven't saved yet aren't part of it. Once published, the draft is gone, and the editor opens on the current version's text: saving it starts the next draft.
-
 ## Versions
 
-A published version never changes. The **Versions** tab lists every version, first to last, with the date it was published, and marks the one in effect, the latest. Click a version to read its text as it was published, and the Markdown it was written in.
+A published version never changes.
 
 <Aside type="caution">
 Every version of a **Users must accept** document is a new set of terms, and users are asked to accept it again. Fix typos in the draft before you publish: there's no way to publish a correction without asking everyone again.
@@ -93,14 +85,11 @@ Besides its public page, a document in effect shows to users here, and nowhere u
 | The acceptance page, at sign-in | The **Users must accept** documents the user hasn't accepted. See [Accepting documents at sign-in](#accepting-documents-at-sign-in). |
 | My Account, under **Legal documents** | The versions the user accepted. See [What users accepted](#what-users-accepted). |
 
-To keep a document within your users' reach at other times, such as a privacy notice, link its [public page](#the-public-page) from your apps and your website.
-
 ## Accepting documents at sign-in
 
 When a user signs in to a client, after their password and any second factor, and before the consent screen, the auth server checks the **Users must accept** documents in effect for that client. If the user hasn't accepted the current version of one, they see a page listing each such document by its title, linked to its public page, with a box to tick.
 
 - **Accept** with every box ticked records, for each document, the user, the version shown and the time. The sign-in then goes on to the consent screen or back to the client.
-- **Accept** with a box left unticked shows the page again and records nothing.
 - **Decline** sends the client the error `access_denied`. Nothing is recorded, and the user stays signed in, so the next sign-in asks again.
 
 A user is asked at every sign-in, single sign-on included, until they accept. A document accepted once counts on every client it applies to. Each new version is asked again, at the user's next sign-in to a client it covers.
@@ -120,7 +109,7 @@ The admin console's own sign-in never asks, so users can always reach My Account
 
 Each user sees the documents they accepted under **Account**, **Legal documents**: each document's title, the version they accepted and when, linked to that version's public page. A retired document shows **No longer in effect** instead of a link.
 
-On a user's page in the admin console, the **Legal documents** tab lists the same. Click **View text** to read the exact version the user accepted, a retired document's included. Acceptances can't be edited or removed by hand; they're deleted with the user.
+On a user's page in the admin console, the **Legal documents** tab lists the same. Click **View text** to read the exact version the user accepted, a retired document's included.
 
 ## Which clients a document applies to
 
@@ -133,21 +122,11 @@ A document applies to every client until you choose otherwise. On its **Applies 
 
 Click **Save** to keep your choice. It takes effect at once and publishes no new version, so users who accepted the current version aren't asked again. A user who never accepted it is asked at their next sign-in to a client it now covers.
 
-The admin console's own client isn't in the list. Users are never asked to accept a document when they sign in to the admin console, so they can always reach their account.
-
-A client's own **Legal documents** tab lists the documents that apply to it, published or not. It's read only: choose a document's clients on the document itself.
-
-### When a client is deleted
-
-Deleting a client takes it off every document that listed it, and leaves those documents on their other clients. A document set to **Selected apps** whose last client is deleted applies to nobody. It never switches to all apps by itself. The **Legal documents** list flags it with **No apps** until you tick a client or choose **All apps**.
-
 ## Retiring a document
 
 A published document can't be deleted, since that would destroy the record of which version users accepted. Retire it instead: on its page, click **Retire** and confirm.
 
-A retired document is no longer in effect, whichever clients it lists. Its versions stay, and the admin console still shows each one's text. It can't be edited, published, or given other clients while it's retired.
-
-To bring it back, click **Restore**. It's in effect again as it was, at the same version, so users who had accepted that version aren't asked again.
+To bring it back, click **Restore**.
 
 ## Deleting a document
 

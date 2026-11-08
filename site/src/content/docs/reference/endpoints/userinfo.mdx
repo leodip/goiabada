@@ -53,8 +53,6 @@ Send the access token one way:
 
 A token in the query string isn't read, since it would end up in logs and the browser's history. Sending the token twice, in two headers, two parameters or both ways, is refused with `invalid_request`.
 
-A token bound to a key must be sent with `DPoP`, and a token bound to none with `Bearer` or in the body.
-
 The token must be an access token the auth server issued for a user, with `openid` in its scope. A client credentials token never has `openid`, and an ID token or a refresh token isn't accepted.
 
 ## The answer
@@ -114,7 +112,7 @@ This makes `/userinfo` stricter than the token's own `exp`: an access token stop
 
 ## Calling it from a browser
 
-JavaScript in a browser can call `/userinfo` when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. It can send a `DPoP` header and read `WWW-Authenticate`, both challenges included. Without one, the browser blocks the call.
+JavaScript in a browser can call `/userinfo` when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client. Without one, the browser blocks the call.
 
 ## Next steps
 

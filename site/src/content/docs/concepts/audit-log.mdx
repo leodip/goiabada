@@ -226,7 +226,7 @@ Every `deleted_user_session` entry names the session's user by `user_id`, and ha
 
 ## The Admin API
 
-- [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (1 to 200; anything else gets the default, 20), and three filters. `auditEvent` and `requestId` are each an exact match. `userId`, a user's row id, lists the events about that user and the ones they made: those whose `user_id` or `logged_in_user_id` column holds it, each once. It finds a deleted user's events too. The filters you set combine, so `userId=42&auditEvent=deleted_user_session` lists the session deletions about user 42 and the ones user 42 made, such as an administrator ending another user's session. Each entry carries the two columns as `userId` and `loggedInUserId`, `null` when the event names no such user.
+- [`GET /api/v1/admin/audit-logs`](/reference/api/admin/operations/getauditlogs/) lists stored events, newest first, a page at a time: `page`, `size` (1 to 200; anything else gets the default, 20), and three filters, which combine. `auditEvent` and `requestId` are each an exact match. `userId`, a user's row id, lists the events about that user and the ones they made: those whose `user_id` or `logged_in_user_id` column holds it, each once. Each entry carries the two columns as `userId` and `loggedInUserId`, `null` when the event names no such user.
 - [`GET /api/v1/admin/audit-logs/event-types`](/reference/api/admin/operations/getauditeventtypes/) returns every event name the server can write. The viewer's event list comes from here, so it includes events that haven't happened yet.
 - [`GET /api/v1/admin/settings/audit-logs`](/reference/api/admin/operations/getsettingsauditlogs/) and [`PUT`](/reference/api/admin/operations/updatesettingsauditlogs/) read and change the two switches and the retention.
 
@@ -325,7 +325,7 @@ These come from the Account API, which users reach through the admin console's a
 | `recovery_codes_created` | A user got a new set of recovery codes: with the authenticator they set up on their account page or when a sign-in required it, or on their own, from their account page, replacing the set they had. The codes aren't recorded. |
 | `deleted_own_user_consent` | A user withdrew the consent they had given a client. |
 | `deleted_own_account` | A user deleted their own account from their account pages. An administrator deleting a user writes `deleted_user` instead, so watch both to see every deletion. |
-| `exported_own_user_data` | A user downloaded their own data, with **Download my data** under **Your data** in their account pages or through `GET /api/v1/account/export`. `user_id` and `logged_in_user` are both that user. It's written once the file has been sent, and a refused download writes nothing. An administrator downloading a user's data writes `exported_user_data` instead, so watch both to see every download. |
+| `exported_own_user_data` | A user downloaded their own data, with **Download my data** under **Your data** in their account pages or through `GET /api/v1/account/export`. `user_id` and `logged_in_user` are both that user. An administrator downloading a user's data writes `exported_user_data` instead, so watch both to see every download. |
 
 ### Users
 
@@ -348,7 +348,7 @@ These come from the Account API, which users reach through the admin console's a
 | `deleted_user_permission` | An administrator revoked a permission from a user. One entry per permission. |
 | `deleted_user_consent` | An administrator deleted a consent a user had given a client. |
 | `deleted_user` | An administrator deleted a user. A user deleting their own account writes `deleted_own_account` instead. |
-| `exported_user_data` | An administrator downloaded a user's data, with **Download data** on the user's page or through `GET /api/v1/admin/users/{id}/export`. `user_id` is the user exported and `logged_in_user` who exported them, so the `userId` filter lists the entry under both. It's written once the file has been sent, and a refused export writes nothing. A user downloading their own data writes `exported_own_user_data` instead, so watch both to see every download. |
+| `exported_user_data` | An administrator downloaded a user's data, with **Download data** on the user's page or through `GET /api/v1/admin/users/{id}/export`. `user_id` is the user exported and `logged_in_user` who exported them, so the `userId` filter lists the entry under both. A user downloading their own data writes `exported_own_user_data` instead, so watch both to see every download. |
 
 ### Groups
 

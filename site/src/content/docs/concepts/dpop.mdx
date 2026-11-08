@@ -81,7 +81,7 @@ DPoP is opt-in per request: send a proof with a token request, on any grant, and
 
 The nonce is how the auth server knows a proof was made just now, not stored up in advance. Every answer to a token request with a `DPoP` header carries a fresh one in `DPoP-Nonce`, success or error. Use the latest you've seen in your next token request.
 
-A nonce is good for 10 minutes. After that, the auth server answers `use_dpop_nonce` again, with a new nonce, and so it does once after an operator rotates its session authentication key. Your app must always handle `use_dpop_nonce` by retrying once with the new nonce, as DPoP libraries do. It never counts as a failed sign-in or a failed client authentication.
+A nonce is good for 10 minutes. After that, the auth server answers `use_dpop_nonce` again, with a new nonce. Your app must always handle `use_dpop_nonce` by retrying once with the new nonce, as DPoP libraries do.
 
 At the token endpoint, the nonce is what makes a proof fresh. Your proof still needs an `iat`, but your app's clock doesn't have to be right.
 
@@ -91,7 +91,7 @@ A public client's refresh token is bound to its key too. Once your app has a ref
 
 **Keep the key as long as you keep the refresh token.** An app that loses its key, or makes a new one, has to sign the user in again.
 
-A public client's refresh token issued without a proof is bound by its first refresh with one, and stays bound from then on. A bound refresh token stays bound even if an administrator makes the client confidential.
+A public client's refresh token issued without a proof is bound by its first refresh with one, and stays bound from then on.
 
 A confidential client's refresh token isn't bound: its client authentication already ties the token to it, so it can change keys at any refresh. Each of its access tokens is still bound to the key of the request that got it.
 
@@ -123,12 +123,7 @@ The proof's `htm` and `htu` name this request, `GET` and `https://auth.example.c
 
 **Your app's clock must be within a minute of the auth server's.** Without a nonce, the proof's `iat` is what makes it fresh, and a proof made more than 60 seconds before or after the auth server's time is refused.
 
-A bound token sent as `Bearer`, in the header or a POST body, is refused, and so is a token bound to no key sent with `DPoP`. A refused call is answered `401` with two challenges in `WWW-Authenticate`, `Bearer` first, the error in the one your request used:
-
-```http
-HTTP/1.1 401 Unauthorized
-WWW-Authenticate: Bearer realm="goiabada", DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA", error="invalid_dpop_proof", error_description="The DPoP proof is invalid."
-```
+A bound token sent as `Bearer`, in the header or a POST body, is refused, and so is a token bound to no key sent with `DPoP`. [UserInfo](/reference/endpoints/userinfo/#errors) lists each refusal and its `WWW-Authenticate` challenges.
 
 ## What a proof must say
 
@@ -148,13 +143,9 @@ Send one `DPoP` header, of at most 8 KiB. A request whose proof fails any of the
 
 ## What a bound token carries
 
-A bound access token's `cnf.jkt` claim is the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) thumbprint of your key: its required members, hashed with SHA-256 and base64url-encoded without padding. That claim is what says a token is bound. Its `typ` claim is still `Bearer`, the label every access token carries. See [The access token](/concepts/tokens/#the-access-token).
+A bound access token's `cnf.jkt` claim is the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) thumbprint of your key: its required members, hashed with SHA-256 and base64url-encoded without padding. That claim is what says a token is bound. See [The access token](/concepts/tokens/#the-access-token).
 
 Keep a DPoP client's access tokens short-lived. APIs don't hand out nonces, so a proof made in advance for a token, by malware running in your app for example, can work there until the token expires.
-
-## When a client requires DPoP
-
-An administrator can turn on [**Require DPoP for token requests**](/concepts/clients/#require-dpop-for-token-requests) for a client. Then every token request for it needs a proof, and it can't get access tokens through the [implicit flow](/legacy-flows/implicit/), which has no token request to carry one. Turn it on for a client that always uses DPoP, so none of its tokens can be had without a proof.
 
 ## Next steps
 

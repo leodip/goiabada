@@ -75,8 +75,6 @@ When the browser has no session with the auth server, the level and the user's t
 | `urn:goiabada:level2_mandatory` | No | A password, then sets up two-factor authentication and enters a code | `urn:goiabada:level2_mandatory` | `["pwd", "otp"]` |
 | `urn:goiabada:level2_mandatory` | Yes | A password and a code | `urn:goiabada:level2_mandatory` | `["pwd", "otp"]` |
 
-A user who enters a recovery code instead of a code reaches the same `acr`, with `["pwd", "recovery_code"]`.
-
 `urn:goiabada:level2_optional` with only `pwd` is the level working as intended: the user hasn't set up two-factor authentication. If your app wants to nudge them to, that's the case to look for.
 
 ## A session that's already there
@@ -96,7 +94,7 @@ Removing the authenticator also lowers each of the user's sessions to what a pas
 
 ## Setting up two-factor authentication during a sign-in
 
-At `urn:goiabada:level2_mandatory`, a user with no authenticator sets one up before they enter a code. Once the code is accepted, one more page shows the new authenticator's ten [recovery codes](/guides/require-two-factor-authentication/#recovery-codes), once, and its **Continue** goes on to your app. The new authenticator is stored only while the account still has none. If it gains one meanwhile, because the same user finished setting one up in another tab or on their account page, nothing is stored, and the sign-in ends on a page saying "Your two-factor authentication settings changed". That sign-in can't go on: the user goes back to the app and signs in again, which starts from the account's current settings.
+At `urn:goiabada:level2_mandatory`, a user with no authenticator sets one up before they enter a code. The new authenticator is stored only while the account still has none. If it gains one meanwhile, because the same user finished setting one up in another tab or on their account page, nothing is stored, and the sign-in ends on a page saying "Your two-factor authentication settings changed". That sign-in can't go on: the user goes back to the app and signs in again, which starts from the account's current settings.
 
 ## Next steps
 

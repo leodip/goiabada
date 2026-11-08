@@ -61,8 +61,6 @@ Once a family is revoked, the user has to sign in to your app again. Their sessi
 
 **After a replay, only that one grant is revoked.** The user's session with the auth server, their sign-ins to other clients and their other grants keep working.
 
-**Access tokens already issued stay valid at an API that checks only their signature**, until they expire. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/), its Admin and Account APIs, and an API that [introspects](/reference/endpoints/introspect/) them refuse them at once. Keep access token lifetimes short.
-
 **The replay check comes last.** A refresh that fails for another reason first, such as a user who was disabled or whose password changed, gets that reason, and nothing is revoked.
 
 The `refresh_token_replay_detected` event is written when the auth server revokes something, not on every repeat, and its `first_refresh_token_jti` identifies the grant. It doesn't prove an attack: an app that refreshes in parallel triggers it too.

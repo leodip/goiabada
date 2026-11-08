@@ -84,7 +84,7 @@ A certificate the auth server doesn't trust ends the delivery at once, since a r
 
 ## Where the auth server connects
 
-A client an administrator created is reached at any address, plain `http` included for a confidential client, through the proxy in `HTTPS_PROXY` or `HTTP_PROXY` when one is set. A [self-registered client](/concepts/clients/#self-registered-clients) is reached only over `https` and at a public address, checked on the address the auth server connects to, and never through a proxy.
+A client an administrator created is reached at any address, plain `http` included for a confidential client, through the proxy in `HTTPS_PROXY` or `HTTP_PROXY` when one is set. A [self-registered client](/concepts/clients/#self-registered-clients) is reached only over `https`, never through a proxy, and only at a public address. The auth server checks the address it connects to, after looking the name up, and sends nothing to a loopback, private, link-local, shared (`100.64.0.0/10`), multicast, broadcast, documentation or 6to4 (`2002::/16`) address, or any other that IANA lists as not globally reachable. A NAT64 address (`64:ff9b::/96`) counts as the IPv4 address it carries. A delivery refused this way isn't tried again, and its `outcome` is `blocked`.
 
 Where a firewall or an egress policy limits what the auth server reaches, allow your apps' back-channel logout URIs.
 

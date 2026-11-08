@@ -19,7 +19,7 @@ This guide puts a Cloudflare Turnstile challenge on the auth server's sign-in, f
 
 3. Choose the **Managed** mode, where most visitors never have to click anything. **Non-interactive** and **Invisible** work too. Don't opt for pre-clearance: it's only for sites served through Cloudflare's proxy. Create the widget.
 
-4. In the admin console, open **Admin**, **Turnstile**. Paste the widget's site key into **Site key** and its secret key into **Secret key**, turn on **Require the challenge**, click **Save**, and confirm. The auth server checks the secret key with Cloudflare before it saves it, so a mistyped one is refused there. The secret key is never shown again.
+4. In the admin console, open **Admin**, **Turnstile**. Paste the widget's site key into **Site key** and its secret key into **Secret key**, turn on **Require the challenge**, click **Save**, and confirm.
 
 5. Open the auth server's sign-in page in a private window. Cloudflare's widget sits above **Sign in**, and once it shows a tick, the form signs you in.
 
@@ -39,7 +39,7 @@ The challenge is on three forms, each with its own widget:
 - `POST /forgot-password`, which sends a [password reset](/concepts/password-recovery/) link;
 - `POST /account/register`, [self-registration](/concepts/self-registration/).
 
-A submission is accepted only with a token Cloudflare verified for the auth server's host and for that form, so a token solved on one form doesn't pass on another. A submission without one is refused before any [rate limit](/reference/environment-variables/#rate-limits) counts it and before any password is checked, so it spends no budget. The form comes back with a message and the email address as typed.
+A submission is accepted only with a token Cloudflare verified for the auth server's host and for that form, so a token solved on one form doesn't pass on another. A submission without one is refused before any [rate limit](/reference/environment-variables/#rate-limits) counts it and before any password is checked, so it spends no budget.
 
 The other steps of a sign-in, the one-time code, recovery codes and consent, and the pages a reset or activation link opens, carry no challenge.
 

@@ -98,8 +98,6 @@ Every redirect URI must:
 - **have well-formed percent-escapes.** `https://example.com/a%zz` is refused.
 - **fit the limits:** at most 2048 bytes each, at most 60 per client, and no duplicates.
 
-The scheme, host, `http` and fragment rules are checked again on every authorization request, so a stored redirect URI that breaks them gets an error page instead of a redirect, and nothing is sent to it. A save checks every URI in the list, stored ones included, so the list can't be saved while it holds one that breaks a rule. The refusal names it: remove it in the same save.
-
 **A query is allowed and comes back as you registered it.** The auth server adds its response to it rather than rewriting it. The one exception is a parameter the response owns: `code`, `state`, `error`, `error_description` and `iss` are removed from the registered query in the default `query` response mode, even when the response doesn't set them. So a `state` in the callback is always the one your app sent, and no `state` comes back if your app sent none. With `response_mode=fragment` or `form_post`, the response doesn't travel in the query, and the registered query is left exactly as it is.
 
 The authorization code is bound to the redirect URI it was issued for. Your app must send that same `redirect_uri` when it exchanges the code at `/auth/token`.
@@ -126,8 +124,6 @@ The [redirect URI rules](#redirect-uris) apply to each one, with these differenc
 - **The port of a loopback address counts.** Register the exact port your app listens on: `http://127.0.0.1/signed-out` doesn't match `http://127.0.0.1:54321/signed-out`. An app that picks its port at startup needs a fixed port to be sent back.
 - **A custom scheme and a query are allowed,** such as `com.example.app:/signed-out` or `https://app.example.com/bye?state=fixed`.
 
-[OpenID Connect RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html#ClientMetadata) allows plain `http` only for a confidential client. Goiabada also accepts a loopback `http` address from a public client, as it does for redirect URIs.
-
 Through the Admin API, replace the list whole with [`PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris`](/reference/api/admin/operations/updateclientpostlogoutredirecturis/), sending the list as you read it in `expectedPostLogoutRedirectURIs`. Each save leaves an `updated_post_logout_redirect_uris` entry in the [audit log](/concepts/audit-log/).
 
 ## Back-channel logout
@@ -139,7 +135,7 @@ A back-channel logout URI is an address on your app's server where the auth serv
 - **The client needs a flow that signs users in,** the authorization code flow or the implicit flow. A client with neither has no session to end.
 - **A self-registered client's URI reaches only public addresses.** See [Self-registered clients](#self-registered-clients).
 
-A client can also require the session identifier, `sid`, in every logout token it's sent. Turn that on when your app finds its sessions by `sid` alone. Without it, disabling or deleting the user, a password reset or an administrator setting the password sends your app one token naming only the user, which asks it to end every session it has for them. With it, your app is sent one token for each of the user's sessions it was on instead. See [Credential changes](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user).
+A client can also require the session identifier, `sid`, in every logout token it's sent. Turn that on when your app finds its sessions by `sid` alone. [Telling the apps that knew the user](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user) says which tokens it's sent then.
 
 In the admin console, open the client's **Back-channel logout** tab, enter the URI, such as `https://app.example.com/backchannel-logout`, tick **Require the session identifier** if your app needs `sid`, then click **Save**. Empty the field and save to send nothing.
 
@@ -181,7 +177,7 @@ Whether a sign-in shows the consent screen depends on the two settings, the requ
 | Either | Either | Yes | Either | Either | Either | Shown |
 | Either | Either | Either | Yes | Either | Either | Shown |
 
-`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Ask users for consent** off and **Remember consent** on, the stored consent needs to cover only that scope, not the client's other requested scopes.
+`authserver:manage-account` counts here only when a client other than the admin console's asks for it.
 
 The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept: while it covers every scope and the client has **Remember consent** on, a later sign-in skips the screen unless it asks for `offline_access` or sends `prompt=consent`, and a user can withdraw it under **Account**, **Consents**, which also revokes the refresh tokens they hold with that client. A user who unticks `authserver:manage-account` is asked for it again at the client's next sign-in that asks for it.
 
@@ -249,7 +245,7 @@ A value of 0 uses the global setting. See [Tokens](/concepts/tokens/).
 
 Turn this on when every token a client gets must be bound to its key with [DPoP](/concepts/dpop/), so none can be had without a proof. It's a switch on the client's **Tokens** tab, saved with the tab.
 
-- **Every token request needs a `DPoP` proof,** on every grant. One without is refused with `400` `invalid_dpop_proof`, "This client requires a DPoP proof with every token request." A wrong client secret is still refused with `invalid_client`, so a stranger can't learn the setting.
+- **Every token request needs a `DPoP` proof,** on every grant. One without is refused with `400` `invalid_dpop_proof`, "This client requires a DPoP proof with every token request."
 - **The client can't get access tokens through the [implicit flow](/legacy-flows/implicit/).** They'd travel in the redirect, with no proof. `response_type=token` and `id_token token` are refused with `unauthorized_client`, even for a sign-in already under way when you turn it on. `id_token` alone, and the authorization code flow, work as before.
 - **It's off until you turn it on.** A client that sends a proof gets bound tokens either way: this setting stops it getting tokens without one.
 - **The admin console's client can't have it,** since the console calls the auth server with Bearer tokens. Its **Tokens** tab doesn't show the switch.
@@ -297,18 +293,7 @@ curl -X POST https://auth.example.com/connect/register \
   }'
 ```
 
-The auth server reads ten fields and ignores the rest:
-
-- `redirect_uris`, required when the client uses the authorization code flow.
-- `post_logout_redirect_uris`, the client's [sign-out redirect URIs](#sign-out-redirect-uris), optional.
-- `token_endpoint_auth_method`: `none` for a public client, or `client_secret_basic` (the default) or `client_secret_post` for a confidential one.
-- `grant_types`: `authorization_code` (the default), `refresh_token` and `client_credentials`. A public client can't ask for `client_credentials`, and the legacy flows can't be asked for at all: both are off on the client, whatever the global settings, until an administrator turns one on for it.
-- `client_name`: the name the consent screen shows, up to 100 characters, which becomes the client's **Description**.
-- `policy_uri` and `tos_uri`: the client's **Privacy policy URL** and **Terms of service URL**. Each is kept only when it has the scheme and host of one of the client's redirect URIs, and dropped otherwise, without refusing the registration. See [Privacy policy and terms of service](/reference/endpoints/dynamic-client-registration/#privacy-policy-and-terms-of-service).
-- `backchannel_logout_uri` and `backchannel_logout_session_required`: the client's [back-channel logout](#back-channel-logout) settings, optional. The URI must use `https`. See [Back-channel logout](/reference/endpoints/dynamic-client-registration/#back-channel-logout).
-- `dpop_bound_access_tokens`: `true` to [require DPoP for token requests](#require-dpop-for-token-requests), `false` when left out.
-
-It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Metadata it refuses gets a 400 with `invalid_client_metadata`, or `invalid_redirect_uri` for a redirect URI. A refused sign-out redirect URI or back-channel logout setting gets `invalid_client_metadata`. Every field, answer and error is on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
+It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Every field it reads, its answer and its errors are on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
 
 Because nobody has reviewed them, self-registered clients are treated more carefully:
 
@@ -316,7 +301,7 @@ Because nobody has reviewed them, self-registered clients are treated more caref
 - **Their identifier can't be changed.** It's generated, `dcr_` followed by a UUID.
 - **They start with consent on.** The consent screen shows the name the client gave itself, with a note that it registered itself and hasn't been verified. Give it a display name and turn on **Display name** under **Sign-in and consent pages** to replace both. A public one also starts with [**Remember consent**](#consent-required) off, so its users see the screen on every sign-in.
 - **They're never sent an error.** An error response is a redirect to the client, and anyone can point a self-registered client anywhere. So when the user declines or the auth server refuses the request, the user sees a page naming the app and the address it asked for, and the request stops there. `prompt=none` included.
-- **Their back-channel logout URI reaches only public addresses.** Otherwise anyone could register a client that has the auth server send requests into your network, to a cloud metadata service for one. The auth server checks the address it connects to, after looking the name up, and sends nothing to a loopback, private, link-local, shared (`100.64.0.0/10`), multicast, broadcast, documentation or 6to4 (`2002::/16`) address, or any other address IANA lists as not globally reachable, IPv4 or IPv6. A NAT64 address (`64:ff9b::/96`) counts as the IPv4 address it carries. It never uses a proxy for them. This holds whoever set the URI, and after you've reviewed the client too. A refused delivery isn't tried again, and is recorded as `blocked`. For an app on your own network, create the client in the admin console instead.
+- **Their back-channel logout URI reaches only public addresses.** Otherwise anyone could register a client that has the auth server send requests into your network, to a cloud metadata service for one. This holds whoever set the URI, and after you've reviewed the client too. For an app on your own network, create the client in the admin console instead. See [Where the auth server connects](/reference/endpoints/backchannel-logout/#where-the-auth-server-connects).
 - **A sign-out without a hint doesn't send the user back to them.** Their sign-out redirect URIs prove nothing about where the user should go, so a [sign-out](/reference/endpoints/logout/#where-the-user-lands) with no `id_token_hint` ends on the auth server's "Signed out" page. One with a hint the auth server confirms still goes back to one of the client's sign-out redirect URIs.
 
 Once you've reviewed a self-registered client, you can change its settings like any other, **Ask users for consent** included.
