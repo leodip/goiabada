@@ -1336,6 +1336,36 @@ hold_young_go_modules() {
     [ ${#held[@]} -eq 0 ] || go get "${held[@]}"
 }
 
+# modernc.org/sqlite is SQLite transpiled to Go, running on modernc.org/libc, and asks to be built
+# with exactly the libc version its own go.mod names ("Fragile modernc.org/libc dependency" in its
+# package documentation, https://gitlab.com/cznic/sqlite/-/issues/177). go get -u takes the newest
+# libc whatever sqlite asks for, and hold_young_go_modules can keep sqlite on an older release than
+# the libc it would pair with, so deps sets libc back to the selected sqlite's own after both.
+
+# sqlite_libc_version reads `go mod graph` on stdin and prints the modernc.org/libc version that
+# modernc.org/sqlite at VERSION requires, or nothing when the graph holds no such requirement.
+# Usage: sqlite_libc_version VERSION < graph
+sqlite_libc_version() {
+    awk -v from="modernc.org/sqlite@$1" '
+        $1 == from && index($2, "modernc.org/libc@") == 1 { print substr($2, length("modernc.org/libc@") + 1); exit }'
+}
+
+# pin_sqlite_libc runs in a Go module's directory after go get -u and hold_young_go_modules. In a
+# module that requires modernc.org/sqlite, it sets modernc.org/libc to exactly the version the
+# selected sqlite requires; in any other it does nothing. Fails when that version cannot be read
+# from the module graph, or go get cannot set it.
+# Usage: pin_sqlite_libc
+pin_sqlite_libc() {
+    local sqlite libc want
+    sqlite=$(go list -m -f '{{.Version}}' modernc.org/sqlite 2>/dev/null) && [ -n "$sqlite" ] || return 0
+    want=$(go mod graph | sqlite_libc_version "$sqlite")
+    [ -n "$want" ] || return 1
+    libc=$(go list -m -f '{{.Version}}' modernc.org/libc 2>/dev/null)
+    [ "$libc" = "$want" ] && return 0
+    print_info "Pinned: modernc.org/libc ${libc:-(none)} is not the $want modernc.org/sqlite $sqlite requires; $want instead"
+    go get "modernc.org/libc@$want"
+}
+
 # =============================================================================
 # Command: deps
 # =============================================================================
@@ -1347,6 +1377,9 @@ hold_young_go_modules() {
 # RELEASE_MIN_AGE_DAYS; npm then resolves the lock file, and with npm update the
 # transitive dependencies, under the same cutoff. A new major version stays a
 # change of its own, which check lists.
+#
+# A Go module's modernc.org/libc follows its modernc.org/sqlite, to the exact
+# version sqlite requires (pin_sqlite_libc).
 
 cmd_deps() {
     take_now_flag "$@" || return 1
@@ -1385,11 +1418,12 @@ cmd_deps() {
                 # This is needed because go get -u tries to fetch from remote
                 go mod edit -require=github.com/leodip/goiabada/core@v0.0.0 2>/dev/null || true
                 print_success "go get -u ./..."
-                if hold_young_go_modules "$before" "$cutoff"; then
-                    go mod edit -require=github.com/leodip/goiabada/core@v0.0.0 2>/dev/null || true
-                else
+                if ! hold_young_go_modules "$before" "$cutoff"; then
                     print_error "go get of the held-back versions failed"
+                elif ! pin_sqlite_libc; then
+                    print_error "pinning modernc.org/libc to modernc.org/sqlite's version failed"
                 fi
+                go mod edit -require=github.com/leodip/goiabada/core@v0.0.0 2>/dev/null || true
             else
                 print_error "go get -u ./... failed"
             fi
@@ -1413,7 +1447,11 @@ cmd_deps() {
             go list -m -f '{{.Path}} {{.Version}}' all > "$before" 2>/dev/null
             if go get -u ./... 2>&1; then
                 print_success "go get -u ./..."
-                hold_young_go_modules "$before" "$cutoff" || print_error "go get of the held-back versions failed"
+                if ! hold_young_go_modules "$before" "$cutoff"; then
+                    print_error "go get of the held-back versions failed"
+                elif ! pin_sqlite_libc; then
+                    print_error "pinning modernc.org/libc to modernc.org/sqlite's version failed"
+                fi
             else
                 print_error "go get -u ./... failed"
             fi
