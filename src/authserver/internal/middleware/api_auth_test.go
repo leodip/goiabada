@@ -28,7 +28,7 @@ import (
 // apiBearerForTest is the API surface's guard set. These tests drive the scope, user-bound and
 // session guards with a token already in the context, so the parser is never reached; the whole
 // chain from the header to the refusal, on both surfaces, is bearer_guard_chain_test.go's.
-var apiBearerForTest = NewBearerTokenForAPI(nil)
+var apiBearerForTest = NewBearerTokenForAPI(nil, ResourceProofs{})
 
 func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("passes when token has required scope", func(t *testing.T) {
@@ -1474,7 +1474,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 				// Both surfaces, because the refusal writer writes the description twice
 				// and a specialised message could be introduced in either one alone.
 				assert.Equal(t,
-					`Bearer realm="goiabada", error="invalid_token", error_description="`+tc.wantDescription+`"`,
+					`Bearer realm="goiabada", error="invalid_token", error_description="`+tc.wantDescription+`"`+`, DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`,
 					rr.Header().Get("WWW-Authenticate"), "challenge")
 
 				var body api.ErrorResponse
@@ -1608,8 +1608,9 @@ func TestRequireUserBoundToken(t *testing.T) {
 		assert.False(t, nextCalled)
 		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 		assert.Equal(t, "ACCESS_TOKEN_REQUIRED", decodeErrorCode(t, rr))
-		// RFC 6750 section 3.1: a request with no credential is told the realm and no error.
-		assert.Equal(t, `Bearer realm="goiabada"`, rr.Header().Get("WWW-Authenticate"))
+		// RFC 6750 section 3.1: a request with no credential is told the realm and no error, in both
+		// schemes (RFC 9449 section 7.2).
+		assert.Equal(t, `Bearer realm="goiabada"`+`, DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`, rr.Header().Get("WWW-Authenticate"))
 	})
 
 	t.Run("a zero auth_time is present and therefore accepted", func(t *testing.T) {

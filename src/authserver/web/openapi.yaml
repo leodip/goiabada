@@ -11,6 +11,12 @@ info:
     ```
     Authorization: Bearer <access_token>
     ```
+    An access token bound to a DPoP key (RFC 9449), one whose `cnf.jkt` claim is set, is sent
+    with the `DPoP` scheme instead, beside a `DPoP` header carrying a proof for the request:
+    ```
+    Authorization: DPoP <access_token>
+    DPoP: <proof>
+    ```
     `getClientLogoImage`, at `/client/logo/{clientIdentifier}`, and `getPublicSettings`, at
     `/api/public/settings`, are outside `/api/v1`: they are public and marked `security: []`.
 
@@ -105,6 +111,7 @@ tags:
 
 security:
   - BearerAuth: []
+  - DPoPAuth: []
 
 paths:
   # =============================================================================
@@ -4587,8 +4594,9 @@ paths:
         older or weaker sign-in is refused with 401 (`INSUFFICIENT_USER_AUTHENTICATION`) and RFC
         9470's step-up challenge, `WWW-Authenticate: Bearer realm="goiabada",
         error="insufficient_user_authentication", error_description="...",
-        acr_values="urn:goiabada:level2_optional", max_age="300"`. Sign the user in again, with
-        `prompt=login` and those `acr_values`, and retry with the new token.
+        acr_values="urn:goiabada:level2_optional", max_age="300", DPoP realm="goiabada",
+        algs="ES256 ..."`. Sign the user in again, with `prompt=login` and those `acr_values`, and
+        retry with the new token.
 
         Each download counts against the `account_export` rate limit, 5 per hour for each user; a
         request refused by the client or the sign-in check spends nothing. Every download leaves an
@@ -4624,16 +4632,17 @@ paths:
                 $ref: '#/components/schemas/UserExportResponse'
         '401':
           description: |
-            Missing or invalid bearer token (`ACCESS_TOKEN_REQUIRED`, `INVALID_TOKEN`), or a
-            sign-in older than 300 seconds or below `urn:goiabada:level2_optional`
-            (`INSUFFICIENT_USER_AUTHENTICATION`), whose challenge names the `acr_values` and
-            `max_age` a new sign-in must meet.
+            Missing or invalid access token (`ACCESS_TOKEN_REQUIRED`, `INVALID_TOKEN`), a refused
+            DPoP proof (`INVALID_DPOP_PROOF`), or a sign-in older than 300 seconds or below
+            `urn:goiabada:level2_optional` (`INSUFFICIENT_USER_AUTHENTICATION`), whose challenge
+            names the `acr_values` and `max_age` a new sign-in must meet.
           headers:
             WWW-Authenticate:
               description: |
-                The bearer challenge. For `INSUFFICIENT_USER_AUTHENTICATION` it is
-                `error="insufficient_user_authentication"` with
-                `acr_values="urn:goiabada:level2_optional"` and `max_age="300"`.
+                A Bearer challenge, then a DPoP challenge naming the accepted proof algorithms, the
+                error in the challenge of the scheme the token was sent with. For
+                `INSUFFICIENT_USER_AUTHENTICATION` it is `error="insufficient_user_authentication"`
+                with `acr_values="urn:goiabada:level2_optional"` and `max_age="300"`.
               schema:
                 type: string
           content:
@@ -5131,6 +5140,26 @@ components:
         deliberately not one of the manage-* scopes, so holding the admin console's client secret
         is not a way to drive the admin API with no user present.
 
+        A token bound to a DPoP key is refused here with 401 INVALID_TOKEN: send it with the
+        DPoP scheme.
+    DPoPAuth:
+      type: http
+      scheme: dpop
+      bearerFormat: JWT
+      description: |
+        JWT access token bound to a DPoP key (RFC 9449), sent as `Authorization: DPoP
+        <access_token>` beside a `DPoP` header holding one proof for the request. It takes the
+        same scopes as BearerAuth.
+
+        The proof's `htm` is the request's method, its `htu` the auth server's public base URL
+        followed by the operation's path, its `ath` the base64url SHA-256 hash of the access
+        token, and its `iat` within 60 seconds of the auth server's clock. It is signed by the key
+        whose thumbprint is the token's `cnf.jkt`. Each proof is accepted once. No nonce is
+        needed.
+
+        A missing, repeated, invalid or replayed proof is refused with 401 INVALID_DPOP_PROOF. A
+        proof by another key, or a token bound to no key, is refused with 401 INVALID_TOKEN.
+
   parameters:
     UserIdParam:
       name: id
@@ -5200,10 +5229,17 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     Unauthorized:
-      description: Missing or invalid bearer token
+      description: |
+        Missing or invalid access token (ACCESS_TOKEN_REQUIRED, INVALID_TOKEN), or a refused DPoP
+        proof (INVALID_DPOP_PROOF)
       headers:
         WWW-Authenticate:
-          description: Bearer challenge on token refusals. An operation may also return a handler-level 401 without this header.
+          description: |
+            A Bearer challenge, then a DPoP challenge naming the accepted proof algorithms, on
+            token refusals, the error in the challenge of the scheme the token was sent with:
+            `Bearer realm="goiabada", error="invalid_token", error_description="...", DPoP
+            realm="goiabada", algs="ES256 ..."`. An operation may also return a handler-level
+            401 without this header.
           schema:
             type: string
       content:

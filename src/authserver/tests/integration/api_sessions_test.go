@@ -333,7 +333,7 @@ func assertSessionsRefuseToken(t *testing.T, accessToken string) {
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	require.Equal(t, http.StatusUnauthorized, resp.StatusCode, string(body))
-	assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`,
+	assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`+", "+dpopChallengeBare,
 		resp.Header.Get("WWW-Authenticate"))
 	var errResp api.ErrorResponse
 	require.NoError(t, json.Unmarshal(body, &errResp))

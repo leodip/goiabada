@@ -163,7 +163,7 @@ func TestBearerToken_NonAccessTokensAreRefusedAtEveryGroup(t *testing.T) {
 	for _, route := range bearerKindRoutes() {
 		unparseable := sendBearer(t, route, "not-a-jwt")
 		require.Equal(t, http.StatusUnauthorized, unparseable.status, "%s: the baseline is a 401", route.name)
-		require.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`,
+		require.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`+", "+dpopChallengeBare,
 			unparseable.wwwAuthenticate)
 		// A presented token that is refused is invalid_token, never read as a missing one, in each
 		// surface's own body (#435).

@@ -81,3 +81,24 @@ func TestNonces_ExpiresAtOnlyForTheServersNonces(t *testing.T) {
 		})
 	}
 }
+
+// At a resource a proof is accepted while its iat lies within the minute either side of the
+// server's clock, so its replay record is kept until iat plus 60 seconds, the last moment Check
+// takes it (#42 decision 8), rounded up to the whole second so no store's precision can end the
+// record before that moment.
+func TestProof_IssuedAtWindowEndsSixtySecondsAfterIat(t *testing.T) {
+	tests := []struct {
+		name     string
+		issuedAt time.Time
+		want     time.Time
+	}{
+		{"a whole second", time.Unix(1_800_000_000, 0), time.Unix(1_800_000_060, 0)},
+		{"a fraction of a second, rounded up", time.Unix(1_800_000_000, 250_000_000), time.Unix(1_800_000_061, 0)},
+		{"a nanosecond past the second", time.Unix(1_800_000_000, 1), time.Unix(1_800_000_061, 0)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, dpop.Proof{IssuedAt: tc.issuedAt}.IssuedAtWindowEnds())
+		})
+	}
+}

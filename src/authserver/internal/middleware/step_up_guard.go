@@ -50,7 +50,8 @@ func (m *BearerToken) RequireRecentAuthentication(maxAge time.Duration, minimum 
 				slog.WarnContext(r.Context(), "rejecting bearer token: its sign-in is too old or too weak for the route",
 					"auth_time_readable", readable, "recent", recent, "acr", jwtToken.StringClaim("acr"))
 				m.refusals.insufficientUserAuthentication(w, r,
-					"This endpoint requires a more recent sign-in, or a stronger one.", minimum.String(), maxAge)
+					"This endpoint requires a more recent sign-in, or a stronger one.", minimum.String(), maxAge,
+					schemesOf(r.Context()))
 				return
 			}
 

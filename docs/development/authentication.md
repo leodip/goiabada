@@ -110,6 +110,31 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   browser app can send a proof and read the nonce (section 8, #42 decision 15). Which origins are
   granted, and where, is unchanged.
 
+### DPoP at the auth server's own resources (RFC 9449 section 7)
+- `/userinfo` and every `/api/v1/*` route take an access token with the `DPoP` scheme as well as
+  Bearer (#42 decision 10). `JwtAuthorizationHeaderToContext` reads the scheme: Bearer in the
+  header or the form body, DPoP in the header only. A token carrying `cnf.jkt` sent by a Bearer
+  method, and a token without it sent with DPoP, are 401 `invalid_token`; a stray `DPoP` header
+  beside an unbound Bearer token is ignored.
+- With the DPoP scheme the guard checks the proof through `middleware.ResourceProofs`, the token
+  endpoint's `dpop.Checker` and replay store with no nonce judge, so `iat` must lie within 60
+  seconds of the server's clock (decision 8). `ath` is the presented token's. A proof problem is
+  401 `invalid_dpop_proof` (`INVALID_DPOP_PROOF` in the API envelope) with the Warn record `dpop
+  proof refused at a resource`; a valid proof by another key than `cnf.jkt` is 401
+  `invalid_token` (figure 16). An accepted proof goes on the context with
+  `reqctx.WithDPoPProof`, which is what makes the guards behind challenge in the DPoP scheme.
+- `RecordDPoPProof` is the last bearer guard on every route, so only a request every other guard
+  admitted spends its proof, into `dpop_proofs` until `dpop.Proof.IssuedAtWindowEnds` (`iat`
+  plus 60 seconds, rounded up to the second). A replay is `invalid_dpop_proof`, a store failure a
+  500. The admin group mounts it in each route's `With`, after the route's scope guard;
+  `TestInitRoutes_EveryBearerRouteRecordsTheDPoPProofAfterItsGuards` holds every route to it.
+- Every 401 carries one `WWW-Authenticate` field line with `Bearer realm="goiabada"` first and
+  `DPoP realm="goiabada", algs="…"` second (`dpop.SigningAlgorithms`), the error in the challenge
+  of the scheme used; a request with no credential gets both with no error. A 400 or 403 carries
+  the challenge of each scheme used, Bearer alone when none was, so every Bearer 400 and 403 is
+  unchanged. Handlers behind the guards build theirs with `middleware.UnauthorizedChallenge` and
+  `InsufficientScopeChallenge`, which read the scheme off the context.
+
 ### Access token liveness
 One check decides whether an access token is one under RFC 9068 and still stands for live state.
 - `liveness.AccessToken` checks the token first: its header `typ` is `at+jwt` (or
@@ -801,13 +826,13 @@ names (section 2.2.2).
     the authenticator generation the code was accepted for; a recovery code is claimed in the
     deletion's transaction (#783).
   - `GET /api/v1/account/export` mounts `RequireAdminConsoleClient`, then
-    `RequireRecentAuthentication(300s, urn:goiabada:level2_optional)`, then the `account_export`
-    tier (5 an hour per token user, every request counted), so a request either guard refuses
-    spends nothing. The step-up guard is RFC 9470 section 3: it refuses a token whose `auth_time`
+    `RequireRecentAuthentication(300s, urn:goiabada:level2_optional)`, then `RecordDPoPProof`,
+    then the `account_export` tier (5 an hour per token user, every request counted), so a request
+    either guard refuses spends neither its proof nor the tier. The step-up guard is RFC 9470 section 3: it refuses a token whose `auth_time`
     is older than the maximum age or whose `acr` ranks below the minimum, and fails closed on a
     missing or non-integer `auth_time` or an unknown `acr`, answering 401
     `INSUFFICIENT_USER_AUTHENTICATION` with `error="insufficient_user_authentication"`,
-    `acr_values` and `max_age` on every refusal. It takes the age, the level and a clock, so it is
+    `acr_values` and `max_age` on every refusal, in the challenge of the scheme used. It takes the age, the level and a clock, so it is
     the guard to reuse in front of another operation. A refresh keeps `auth_time`, so a refreshed
     token is as old as its sign-in. The answer is the admin export's builder and writer, and
     `exported_own_user_data` is written after it (#782). In the console, `render.IsStepUpRequired`

@@ -287,3 +287,15 @@ func (p Proof) ReplayKey() string {
 	sum := sha256.Sum256([]byte(p.HTU + " " + p.JTI))
 	return hex.EncodeToString(sum[:])
 }
+
+// IssuedAtWindowEnds is the last moment Check accepts the proof by its iat, when its freshness comes
+// from iat rather than from a nonce, as at the resources: iat plus IssuedAtWindow (#42 decision 8),
+// rounded up to the whole second, so a store keeping it at any precision never ends its replay
+// record before that moment. It is how long the resources' replay store keeps the proof.
+func (p Proof) IssuedAtWindowEnds() time.Time {
+	end := p.IssuedAt.Add(IssuedAtWindow)
+	if whole := end.Truncate(time.Second); !whole.Equal(end) {
+		return whole.Add(time.Second)
+	}
+	return end
+}

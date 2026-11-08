@@ -24,11 +24,27 @@ export function dpopKey(): DPoPKey {
 
 const b64 = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
 
+// Section 4.2: the ath of an access token, the base64url SHA-256 of its ASCII characters.
+export function ath(accessToken: string): string {
+  return createHash("sha256").update(accessToken, "ascii").digest("base64url");
+}
+
 // A proof by key for a request with method htm to htu: a dpop+jwt header naming ES256 and the key,
-// and a fresh jti, iat now, and the nonce when there is one.
-export function dpopProof(key: DPoPKey, { htu = tokenEndpoint, htm = "POST", nonce }: { htu?: string; htm?: string; nonce?: string } = {}): string {
+// and a fresh jti, iat now or iatOffsetSeconds from it, the nonce when there is one, and the ath of
+// accessToken when there is one, as a proof to a resource carries (section 7).
+export function dpopProof(
+  key: DPoPKey,
+  { htu = tokenEndpoint, htm = "POST", nonce, accessToken, iatOffsetSeconds = 0 }: { htu?: string; htm?: string; nonce?: string; accessToken?: string; iatOffsetSeconds?: number } = {},
+): string {
   const header = b64({ typ: "dpop+jwt", alg: "ES256", jwk: key.jwk });
-  const claims = b64({ jti: randomUUID(), htm, htu, iat: Math.floor(Date.now() / 1000), ...(nonce ? { nonce } : {}) });
+  const claims = b64({
+    jti: randomUUID(),
+    htm,
+    htu,
+    iat: Math.floor(Date.now() / 1000) + iatOffsetSeconds,
+    ...(nonce ? { nonce } : {}),
+    ...(accessToken ? { ath: ath(accessToken) } : {}),
+  });
   const signature = sign("sha256", Buffer.from(`${header}.${claims}`), { key: key.privateKey, dsaEncoding: "ieee-p1363" });
   return `${header}.${claims}.${signature.toString("base64url")}`;
 }

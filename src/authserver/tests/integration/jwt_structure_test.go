@@ -20,7 +20,7 @@ import (
 // header and claim cases (crit, cty, invalid UTF-8) need a token signed with altered content, which
 // only the unit tier can sign; the alphabet cases are the ones a client can send.
 
-const malformedAccessTokenChallenge = `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`
+const malformedAccessTokenChallenge = `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."` + ", " + dpopChallengeBare
 
 // = padding is outside the compact serialization's unpadded alphabet (RFC 7515 section 2). Sent in
 // the Authorization header, the padded token is refused at userinfo and the admin API as a token that

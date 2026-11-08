@@ -148,9 +148,9 @@ func TestCacheDirectives_EveryUserinfoAnswerIsNotStorable(t *testing.T) {
 		wantChallenge string
 	}{
 		{"the claims", openidToken, http.StatusOK, ""},
-		{"no token", "", http.StatusUnauthorized, `Bearer realm="goiabada"`},
+		{"no token", "", http.StatusUnauthorized, `Bearer realm="goiabada", ` + dpopChallengeBare},
 		{"a token that is not one", "not-a-token", http.StatusUnauthorized,
-			`Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`},
+			`Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."` + ", " + dpopChallengeBare},
 		{"a token without openid", noOpenidToken, http.StatusForbidden,
 			`Bearer realm="goiabada", error="insufficient_scope", error_description="Insufficient scope."`},
 	} {

@@ -48,7 +48,7 @@ func serveAdminConsoleClientGuard(t *testing.T, token *oauth.JwtToken) *httptest
 		req = req.WithContext(reqctx.WithBearerToken(req.Context(), *token))
 	}
 	rr := httptest.NewRecorder()
-	NewBearerTokenForAPI(nil).RequireAdminConsoleClient()(http.HandlerFunc(
+	NewBearerTokenForAPI(nil, ResourceProofs{}).RequireAdminConsoleClient()(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) })).ServeHTTP(rr, req)
 	return rr
 }
@@ -91,7 +91,7 @@ func TestRequireAdminConsoleClient_NoTokenIsTheMissingCredential(t *testing.T) {
 // client credentials token is still USER_CONTEXT_REQUIRED, and a user's token from another client
 // reaches this guard and is refused here.
 func TestRequireAdminConsoleClient_InTheAccountAPIsChain(t *testing.T) {
-	guards := NewBearerTokenForAPI(chainParser{})
+	guards := NewBearerTokenForAPI(chainParser{}, ResourceProofs{})
 	chain := guards.JwtAuthorizationHeaderToContext()(
 		guards.RequireBearerTokenScope("openid")(guards.RequireUserBoundToken()(guards.RequireAdminConsoleClient()(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) })))))

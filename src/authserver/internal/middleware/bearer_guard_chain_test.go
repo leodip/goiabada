@@ -64,10 +64,10 @@ type chainSurface struct {
 
 func chainSurfaces() []chainSurface {
 	return []chainSurface{
-		{name: "api", build: func() *BearerToken { return NewBearerTokenForAPI(chainParser{}) }},
+		{name: "api", build: func() *BearerToken { return NewBearerTokenForAPI(chainParser{}, ResourceProofs{}) }},
 		{name: "userinfo", build: func() *BearerToken {
 			// The real writer, so the /userinfo body is the bytes on the wire and not a recorded call.
-			return NewBearerTokenForUserInfo(chainParser{}, render.New(nil, nil))
+			return NewBearerTokenForUserInfo(chainParser{}, render.New(nil, nil), ResourceProofs{})
 		}},
 	}
 }
@@ -80,8 +80,8 @@ type chainAnswer struct {
 }
 
 const (
-	challengeMissing        = `Bearer realm="goiabada"`
-	challengeInvalidToken   = `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`
+	challengeMissing        = `Bearer realm="goiabada", ` + dpopChallengeBare
+	challengeInvalidToken   = `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid.", ` + dpopChallengeBare
 	challengeInvalidRequest = `Bearer realm="goiabada", error="invalid_request", error_description="The access token must be sent by one method only."`
 	challengeRepeated       = `Bearer realm="goiabada", error="invalid_request", error_description="The access_token parameter must be sent once."`
 	challengeUnparseable    = `Bearer realm="goiabada", error="invalid_request", error_description="The request body could not be parsed."`
@@ -314,10 +314,10 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 	t.Run("a terminated session is 401 invalid_token", func(t *testing.T) {
 		want := map[string]chainAnswer{
 			"api": {http.StatusUnauthorized,
-				`Bearer realm="goiabada", error="invalid_token", error_description="Session has been terminated"`,
+				`Bearer realm="goiabada", error="invalid_token", error_description="Session has been terminated", ` + dpopChallengeBare,
 				`{"error_code":"INVALID_TOKEN","error_description":"Session has been terminated"}`},
 			"userinfo": {http.StatusUnauthorized,
-				`Bearer realm="goiabada", error="invalid_token", error_description="Session has been terminated"`,
+				`Bearer realm="goiabada", error="invalid_token", error_description="Session has been terminated", ` + dpopChallengeBare,
 				`{"error":"invalid_token","error_description":"Session has been terminated"}`},
 		}
 		for _, surface := range chainSurfaces() {

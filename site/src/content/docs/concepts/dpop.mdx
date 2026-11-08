@@ -85,6 +85,28 @@ A nonce is good for 10 minutes. After that, the auth server answers `use_dpop_no
 
 At the token endpoint, the nonce is what makes a proof fresh. Your proof still needs an `iat`, but your app's clock doesn't have to be right.
 
+## Call userinfo and the API with a bound token
+
+Goiabada's own resources, [UserInfo](/reference/endpoints/userinfo/) and the [Admin and Account APIs](/reference/api/authentication/), take a bound token with the `DPoP` scheme, beside a new proof for each call:
+
+```http
+GET /userinfo HTTP/1.1
+Host: auth.example.com
+Authorization: DPoP eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...
+DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7...
+```
+
+The proof's `htm` and `htu` name this request, `GET` and `https://auth.example.com/userinfo`, and its `ath` claim is the hash of the access token. It carries no nonce: these endpoints don't hand them out.
+
+**Your app's clock must be within a minute of the auth server's.** Without a nonce, the proof's `iat` is what makes it fresh, and a proof made more than 60 seconds before or after the auth server's time is refused.
+
+A bound token sent as `Bearer`, in the header or a POST body, is refused, and so is a token bound to no key sent with `DPoP`. A refused call is answered `401` with two challenges in `WWW-Authenticate`, `Bearer` first, the error in the one your request used:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer realm="goiabada", DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA", error="invalid_dpop_proof", error_description="The DPoP proof is invalid."
+```
+
 ## What a proof must say
 
 | Part | Rule |
@@ -94,11 +116,12 @@ At the token endpoint, the nonce is what makes a proof fresh. Your proof still n
 | `jwk` | Your public key, of the type the algorithm takes: an EC key on the curve it names, an RSA key of 2048 to 8192 bits, or an Ed25519 key for `Ed25519` and `EdDSA`. A key with any private part is refused |
 | `jti` | A new identifier for each proof. A proof is accepted once: sent again, it's refused |
 | `htm` | The request's method, exactly: `POST` at the token endpoint |
+| `ath` | At userinfo and the API, the hash of the access token sent beside it: its SHA-256, base64url-encoded without padding |
 | `htu` | The URL of the request: the auth server's base URL, `GOIABADA_AUTHSERVER_BASEURL`, followed by the endpoint's path, such as `https://auth.example.com/auth/token`. The query and fragment are ignored. A proof naming the internal base URL is refused |
-| `iat` | When your app made the proof, in seconds since 1970 |
-| `nonce` | At the token endpoint, the latest `DPoP-Nonce` |
+| `iat` | When your app made the proof, in seconds since 1970. At userinfo and the API, within 60 seconds of the auth server's clock |
+| `nonce` | At the token endpoint, the latest `DPoP-Nonce`. Userinfo and the API don't read it |
 
-Send one `DPoP` header, of at most 8 KiB. A request whose proof fails any of these is refused with `400 Bad Request`, `invalid_dpop_proof`, "The DPoP proof is invalid." The auth server's log has a `dpop proof refused at the token endpoint` warning saying which check failed. See [Logs](/deploy/logs/#records-worth-knowing).
+Send one `DPoP` header, of at most 8 KiB. A request whose proof fails any of these is refused with `invalid_dpop_proof`, "The DPoP proof is invalid.": `400 Bad Request` at the token endpoint, `401 Unauthorized` at userinfo and the API. At userinfo and the API, a proof that passes but is signed by another key than the token's is refused with `invalid_token`. The auth server's log has a `dpop proof refused at the token endpoint` or `dpop proof refused at a resource` warning saying which check failed. See [Logs](/deploy/logs/#records-worth-knowing).
 
 ## What a bound token carries
 
@@ -110,6 +133,7 @@ Keep a DPoP client's access tokens short-lived. APIs don't hand out nonces, so a
 
 <CardGrid>
   <LinkCard title="Token" description="Every grant, and every refusal, at the token endpoint." href="/reference/endpoints/token/" />
+  <LinkCard title="UserInfo" description="Read the signed-in user's claims with a bound token." href="/reference/endpoints/userinfo/" />
   <LinkCard title="Tokens" description="What each token carries, and how to check one." href="/concepts/tokens/" />
   <LinkCard title="Discovery and JWKS" description="The algorithms a proof may use, from the discovery document." href="/reference/endpoints/discovery-and-jwks/" />
 </CardGrid>

@@ -49,7 +49,7 @@ func serveParseGuard(parser tokenParser, req *http.Request) parseGuardResult {
 		result.token, result.present = reqctx.BearerTokenFrom(r.Context())
 	})
 	result.rr = httptest.NewRecorder()
-	NewBearerTokenForAPI(parser).JwtAuthorizationHeaderToContext()(next).ServeHTTP(result.rr, req)
+	NewBearerTokenForAPI(parser, ResourceProofs{}).JwtAuthorizationHeaderToContext()(next).ServeHTTP(result.rr, req)
 	return result
 }
 

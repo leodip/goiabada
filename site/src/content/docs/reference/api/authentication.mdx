@@ -115,6 +115,16 @@ Every operation under `/api/v1/` takes an access token in the `Authorization` he
 
 The token must be an access token the auth server issued for the `authserver` resource, which is what asking for an `authserver:` scope gets you. An ID token or a refresh token is refused.
 
+An access token bound to a key with [DPoP](/concepts/dpop/) goes with the `DPoP` scheme instead, beside a `DPoP` header carrying a new proof for the call:
+
+```bash
+curl https://auth.example.com/api/v1/account/profile \
+  -H "Authorization: DPoP USER_ACCESS_TOKEN" \
+  -H "DPoP: YOUR_PROOF"
+```
+
+The proof's `htu` is the operation's URL, such as `https://auth.example.com/api/v1/account/profile`, and its `iat` must be within a minute of the auth server's clock. [Call userinfo and the API with a bound token](/concepts/dpop/#call-userinfo-and-the-api-with-a-bound-token) has the rest. A bound token sent as `Bearer`, or a token bound to no key sent with `DPoP`, is refused with `INVALID_TOKEN`.
+
 ## Which tokens each API accepts
 
 The Admin API accepts a client's token from the client credentials flow, and a user's token from the authorization code flow when the client may [request the administrative scopes on a user's behalf](/reference/api/scopes/#administrative-scopes-on-a-users-behalf).
@@ -132,7 +142,8 @@ A token whose sign-in is older, or at `urn:goiabada:level1`, is answered `401` w
 ```
 WWW-Authenticate: Bearer realm="goiabada", error="insufficient_user_authentication",
   error_description="This endpoint requires a more recent sign-in, or a stronger one.",
-  acr_values="urn:goiabada:level2_optional", max_age="300"
+  acr_values="urn:goiabada:level2_optional", max_age="300",
+  DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"
 ```
 
 The admin console answers it by sending the user through the sign-in page again with `prompt=login` and that `acr_values`, and the token it gets back downloads.
@@ -146,10 +157,11 @@ The other refusals:
 | Answer | Error code | Why |
 |---|---|---|
 | `401` | `ACCESS_TOKEN_REQUIRED` | No token was sent. |
-| `401` | `INVALID_TOKEN` | The token is malformed, expired, revoked, not an access token for `authserver`, from another issuer, its grant was revoked, or its client, user or session is gone or disabled. |
+| `401` | `INVALID_TOKEN` | The token is malformed, expired, revoked, not an access token for `authserver`, from another issuer, its grant was revoked, or its client, user or session is gone or disabled. Or it was sent with the wrong scheme for its DPoP binding, or its proof is signed by another key. |
+| `401` | `INVALID_DPOP_PROOF` | The token was sent with `DPoP`, and its proof is missing, sent twice, fails a check or was already used. |
 | `403` | `INSUFFICIENT_SCOPE` | The token carries none of the scopes the operation accepts. |
 
-The [errors](/reference/api/errors/) page has the format of every error answer.
+Every `401` carries a `WWW-Authenticate` header with a `Bearer` challenge, then a `DPoP` challenge listing the proof algorithms, the error in the challenge of the scheme your call used. A `403` carries only that scheme's challenge. The [errors](/reference/api/errors/) page has the format of every error answer.
 
 ## The OpenAPI document
 

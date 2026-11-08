@@ -277,7 +277,7 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   refusal stay in `internal/handlers`. It also declares `ChallengeRealm`, the realm the Basic and
   Bearer challenges share, as the lowest package that writes a challenge (#676)
 - `internal/dpop/` - The DPoP proof checker (RFC 9449), the one function the token endpoint and the
-  auth server's own resources will call. `Checker.Check` takes plain values: the request's `DPoP`
+  auth server's own resources call. `Checker.Check` takes plain values: the request's `DPoP`
   header values, method and escaped path, the access token presented beside the proof when there
   is one, the clock, and a nonce judge when freshness comes from a server nonce. It refuses a
   missing or doubled header and one over 8 KiB, runs `oauth.CheckJWTStructure`, and checks `typ`
@@ -331,9 +331,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `RunInTransaction` reruns the one the engine rolls back (#301), and the audit events after the
   commit naming the command under `command`. The command in `cmd/goiabada-authserver` parses,
   refuses a schema other than its head, and prints; the data tier runs `Run` on every engine (#498)
-- `internal/reqctx/` - The seven request-scoped values (settings, session identifier and that
-  session's user, bearer token, validated token, the credential reservation a failures-only rate-limit tier holds, and the
-  acting user the session guard found live, which the audit logger records), each
+- `internal/reqctx/` - The eight request-scoped values (settings, session identifier and that
+  session's user, bearer token, validated token, the credential reservation a failures-only rate-limit tier holds, the
+  acting user the session guard found live, which the audit logger records, and the DPoP proof
+  the bearer guard accepted beside a token sent with the DPoP scheme), each
   written by one middleware and read through a typed accessor; services take theirs as parameters,
   and the context-value guard holds every module file to them with no exemption (#433, #439)
 - `internal/otpcredential/` - The stored TOTP credential: establish, remove, verify a stored or a

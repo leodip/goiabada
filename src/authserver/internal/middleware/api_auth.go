@@ -43,7 +43,7 @@ func (m *BearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func
 			}
 
 			if !hasRequiredScope {
-				m.refusals.forbidden(w, r, "INSUFFICIENT_SCOPE", "Insufficient scope.")
+				m.refusals.forbidden(w, r, "INSUFFICIENT_SCOPE", "Insufficient scope.", schemesOf(r.Context()))
 				return
 			}
 
@@ -106,7 +106,7 @@ func (m *BearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 				// WWW-Authenticate header conformant; on the API the JSON ErrorCode carries the
 				// precise reason, which is how every other guard in this file distinguishes its cases.
 				m.refusals.forbidden(w, r, "USER_CONTEXT_REQUIRED",
-					"This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted.")
+					"This endpoint requires an access token issued for a user. Tokens obtained through the client credentials grant are not accepted.", schemesOf(r.Context()))
 				return
 			}
 
@@ -177,36 +177,36 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 			case liveness.NotAnAccessTokenHeader:
 				slog.WarnContext(r.Context(), "rejecting bearer token: the header's typ is not at+jwt",
 					"typ", jwtToken.Header["typ"])
-				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				m.refusals.invalidToken(w, r, invalidTokenDescription, schemesOf(r.Context()))
 				return
 			case liveness.ForeignIssuer:
 				slog.WarnContext(r.Context(), "rejecting bearer token: iss is not the configured issuer",
 					"iss", jwtToken.StringClaim("iss"))
-				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				m.refusals.invalidToken(w, r, invalidTokenDescription, schemesOf(r.Context()))
 				return
 			case liveness.ClientNotFound:
 				slog.WarnContext(r.Context(), "rejecting bearer token: client_id does not resolve to a client",
 					"client_id", jwtToken.StringClaim("client_id"))
-				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				m.refusals.invalidToken(w, r, invalidTokenDescription, schemesOf(r.Context()))
 				return
 			case liveness.ClientDisabled:
 				slog.WarnContext(r.Context(), "rejecting bearer token: client is disabled",
 					"client_id", verdict.Client.ClientIdentifier)
-				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				m.refusals.invalidToken(w, r, invalidTokenDescription, schemesOf(r.Context()))
 				return
 			case liveness.GrantRevoked:
 				slog.WarnContext(r.Context(), "rejecting bearer token: its grant has been revoked",
 					"grant_id", jwtToken.StringClaim("grant_id"))
-				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				m.refusals.invalidToken(w, r, invalidTokenDescription, schemesOf(r.Context()))
 				return
 			case liveness.AccessTokenRevoked:
 				slog.WarnContext(r.Context(), "rejecting bearer token: it has been revoked",
 					"jti", jwtToken.StringClaim("jti"))
-				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				m.refusals.invalidToken(w, r, invalidTokenDescription, schemesOf(r.Context()))
 				return
 			case liveness.BlankSubject:
 				slog.WarnContext(r.Context(), "rejecting bearer token: user token has no sub claim")
-				m.refusals.invalidToken(w, r, "Invalid token subject")
+				m.refusals.invalidToken(w, r, "Invalid token subject", schemesOf(r.Context()))
 				return
 			case liveness.UserNotFound:
 				slog.WarnContext(r.Context(), "rejecting bearer token: subject does not resolve to a user")
@@ -225,7 +225,7 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 			case liveness.SessionExpired:
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has expired",
 					"session_identifier", sid, "session_id", verdict.Session.Id)
-				m.refusals.invalidToken(w, r, "Session has expired")
+				m.refusals.invalidToken(w, r, "Session has expired", schemesOf(r.Context()))
 				return
 			case liveness.SessionGenerationSuperseded:
 				slog.WarnContext(r.Context(), "rejecting bearer token: session is on a superseded authentication generation",
@@ -233,7 +233,7 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 			default:
 				slog.WarnContext(r.Context(), "rejecting bearer token: liveness check refused it", "refusal", int(verdict.Refusal))
 			}
-			m.refusals.invalidToken(w, r, "Session has been terminated")
+			m.refusals.invalidToken(w, r, "Session has been terminated", schemesOf(r.Context()))
 		})
 	}
 }
@@ -277,7 +277,7 @@ func (m *BearerToken) RequireAdminConsoleClient() func(http.Handler) http.Handle
 				slog.WarnContext(r.Context(), "rejecting bearer token: issued to a client other than the admin console's",
 					"client_id", jwtToken.StringClaim("client_id"))
 				m.refusals.forbidden(w, r, "CLIENT_NOT_ALLOWED",
-					"This endpoint accepts only access tokens issued to the admin console's own client.")
+					"This endpoint accepts only access tokens issued to the admin console's own client.", schemesOf(r.Context()))
 				return
 			}
 
@@ -317,7 +317,7 @@ func (m *BearerToken) RequireBearerTokenScopeSetAnyOf(requiredScopeSets [][]stri
 			}
 
 			if !holdsEveryScopeOfASet(jwtToken, requiredScopeSets) {
-				m.refusals.forbidden(w, r, "INSUFFICIENT_SCOPE", "Insufficient scope.")
+				m.refusals.forbidden(w, r, "INSUFFICIENT_SCOPE", "Insufficient scope.", schemesOf(r.Context()))
 				return
 			}
 

@@ -40,3 +40,24 @@ func TestProof_IsAcceptedByTheChecker(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, key.Thumbprint, proof.Thumbprint)
 }
+
+// ATH is RFC 9449 section 7.1's example: the access token of figure 13 and the ath its proof
+// carries.
+func TestATH_IsRFC9449sExample(t *testing.T) {
+	assert.Equal(t, "fUHyO2r2Z3DZ53EsNrWBb0xWXoaNy59IiKCAqksmQEo", dpoptest.ATH("Kz~8mXK1EalYznwH-LC-1fBAo.4Ljp~zsPE_NeO.gxU"))
+}
+
+// A resource proof is one the checker accepts for the access token it names, with no nonce.
+func TestResourceProof_IsAcceptedForItsAccessToken(t *testing.T) {
+	checker, err := dpop.NewChecker("https://auth.example.com")
+	require.NoError(t, err)
+	now := time.Unix(1_800_000_000, 0)
+	key := dpoptest.RFC7517Key(t)
+
+	proof, err := checker.Check(dpop.Request{
+		Proofs: []string{key.ResourceProof(t, "GET", "https://auth.example.com/userinfo", now, "an-access-token")},
+		Method: "GET", Path: "/userinfo", AccessToken: "an-access-token", Now: now,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, key.Thumbprint, proof.Thumbprint)
+}

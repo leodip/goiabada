@@ -77,6 +77,21 @@ func (k Key) Proof(t testing.TB, htm, htu string, iat time.Time, nonce string) s
 	return k.Sign(t, map[string]any{"typ": "dpop+jwt", "alg": "ES256", "jwk": k.JWK}, claims)
 }
 
+// ResourceProof signs a proof for a request with method htm to htu at a resource, issued at iat,
+// with a fresh jti and the ath of accessToken (RFC 9449 section 7.1), and no nonce.
+func (k Key) ResourceProof(t testing.TB, htm, htu string, iat time.Time, accessToken string) string {
+	t.Helper()
+	return k.Sign(t, map[string]any{"typ": "dpop+jwt", "alg": "ES256", "jwk": k.JWK},
+		map[string]any{"jti": NewJTI(t), "htm": htm, "htu": htu, "iat": iat.Unix(), "ath": ATH(accessToken)})
+}
+
+// ATH is the ath of accessToken as RFC 9449 section 4.2 defines it: the base64url encoding, without
+// padding, of the SHA-256 hash of the token's ASCII characters.
+func ATH(accessToken string) string {
+	sum := sha256.Sum256([]byte(accessToken))
+	return b64(sum[:])
+}
+
 // Sign signs header and claims exactly as given, ES256 with k, for a proof Proof does not build.
 func (k Key) Sign(t testing.TB, header, claims map[string]any) string {
 	t.Helper()

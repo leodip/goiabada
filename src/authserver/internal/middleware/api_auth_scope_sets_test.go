@@ -77,7 +77,7 @@ func TestRequireBearerTokenScopeSetAnyOf_NoTokenIsTheBareChallenge(t *testing.T)
 
 	assert.False(t, nextCalled)
 	assert.Equal(t, http.StatusUnauthorized, rr.Code)
-	assert.Equal(t, BearerChallenge("", ""), rr.Header().Get("WWW-Authenticate"))
+	assert.Equal(t, `Bearer realm="goiabada"`+`, DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`, rr.Header().Get("WWW-Authenticate"))
 	var body map[string]string
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
 	assert.Equal(t, "ACCESS_TOKEN_REQUIRED", body["error_code"])

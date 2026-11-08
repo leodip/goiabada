@@ -61,6 +61,12 @@ var bearerEnglishRefusals = map[string]bool{
 	"Invalid token subject":        true,
 	"Session has been terminated":  true,
 	"Session has expired":          true,
+	"The access token is bound to a DPoP key and must be sent with the DPoP scheme.":       true,
+	"The access token is not bound to a DPoP key and must be sent with the Bearer scheme.": true,
+	"The DPoP proof is not signed with the key the access token is bound to.":              true,
+
+	// invalidDPoPProof: a DPoP request whose proof is refused, 401.
+	"The DPoP proof is invalid.": true,
 
 	// forbidden: a valid token that does not reach the route, 403.
 	"Insufficient scope.": true,
@@ -91,9 +97,11 @@ var bearerRefusalDescriptionArg = map[string]int{
 
 // bearerAPIWriterArgs maps what apiBearerRefusals writes through to the index of the text it writes.
 var bearerAPIWriterArgs = map[string]int{
-	"WriteError":      1,
-	"BearerChallenge": 1,
-	"StepUpChallenge": 0,
+	"WriteError":             1,
+	"BearerChallenge":        1,
+	"unauthorizedChallenges": 2,
+	"usedChallenges":         2,
+	"stepUpChallenges":       1,
 }
 
 // bearerAPIWriterType is the receiver whose methods write the admin and account API's envelope.
@@ -277,7 +285,7 @@ func collectBearerRefusals(fset *token.FileSet, f *ast.File, rel string, consts 
 			case !ok:
 				problem(text, bearerAPIWriterType+"."+fn.Name.Name+" writes "+name+" something other "+
 					"than its description parameter")
-			case sentence == "" && name == "BearerChallenge":
+			case sentence == "" && name != "WriteError":
 				// A challenge naming the realm alone, which is what RFC 6750 section 3.1 asks of a
 				// request carrying no credential.
 			default:

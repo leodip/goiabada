@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 
+	"github.com/leodip/goiabada/authserver/internal/dpop"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
@@ -511,7 +512,7 @@ func isUserInfoInvalidToken(err error, description string) bool {
 		detail.Description() == description &&
 		detail.HTTPStatus() == http.StatusUnauthorized &&
 		detail.WWWAuthenticate() ==
-			`Bearer realm="goiabada", error="invalid_token", error_description="`+description+`"`
+			`Bearer realm="goiabada", error="invalid_token", error_description="`+description+`"`+`, DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`
 }
 
 // The two cases above assert on the value handed to a mocked writer, which cannot say what a
@@ -539,42 +540,62 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			database := datamocks.NewDatabase(t)
-			auditLogger := handlersmocks.NewAuditLogger(t)
+	// The challenges name both schemes, Bearer first, with the error in the scheme the token was
+	// presented with (RFC 9449 section 7.2, #42 decision 10).
+	const dpopChallenge = `DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`
+	schemes := []struct {
+		name      string
+		viaDPoP   bool
+		challenge func(description string) string
+	}{
+		{"bearer", false, func(description string) string {
+			return `Bearer realm="goiabada", error="invalid_token", error_description="` + description + `", ` + dpopChallenge
+		}},
+		{"dpop", true, func(description string) string {
+			return `Bearer realm="goiabada", ` + dpopChallenge + `, error="invalid_token", error_description="` + description + `"`
+		}},
+	}
 
-			// templateFS is nil because JSONError renders no template; a 500 through the
-			// page writer would panic here, which is the fail-loud direction.
-			handler := HandleUserInfoGetPost(render.New(nil, nil), database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+	for _, scheme := range schemes {
+		for _, test := range tests {
+			t.Run(scheme.name+"/"+test.name, func(t *testing.T) {
+				database := datamocks.NewDatabase(t)
+				auditLogger := handlersmocks.NewAuditLogger(t)
 
-			req, _ := http.NewRequest("GET", "/userinfo", nil)
-			jwtToken := oauth.JwtToken{
-				Claims: map[string]interface{}{
-					"sub":   "user123",
-					"scope": "openid",
-				},
-			}
-			req = req.WithContext(reqctx.WithValidatedToken(req.Context(), jwtToken))
-			rr := httptest.NewRecorder()
+				// templateFS is nil because JSONError renders no template; a 500 through the
+				// page writer would panic here, which is the fail-loud direction.
+				handler := HandleUserInfoGetPost(render.New(nil, nil), database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
-			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").Return(test.user, nil)
-			if test.user != nil {
-				auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
-					"user_id": test.user.Id,
-				}).Return()
-			}
+				req, _ := http.NewRequest("GET", "/userinfo", nil)
+				jwtToken := oauth.JwtToken{
+					Claims: map[string]interface{}{
+						"sub":   "user123",
+						"scope": "openid",
+					},
+				}
+				req = req.WithContext(reqctx.WithValidatedToken(req.Context(), jwtToken))
+				if scheme.viaDPoP {
+					req = req.WithContext(reqctx.WithDPoPProof(req.Context(), &dpop.Proof{Thumbprint: "jkt"}))
+				}
+				rr := httptest.NewRecorder()
 
-			handler.ServeHTTP(rr, req)
+				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").Return(test.user, nil)
+				if test.user != nil {
+					auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
+						"user_id": test.user.Id,
+					}).Return()
+				}
 
-			assert.Equal(t, http.StatusUnauthorized, rr.Code)
-			assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="`+test.description+`"`,
-				rr.Header().Get("WWW-Authenticate"))
+				handler.ServeHTTP(rr, req)
 
-			var body map[string]interface{}
-			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
-			assert.Equal(t, "invalid_token", body["error"])
-			assert.Equal(t, test.description, body["error_description"])
-		})
+				assert.Equal(t, http.StatusUnauthorized, rr.Code)
+				assert.Equal(t, scheme.challenge(test.description), rr.Header().Get("WWW-Authenticate"))
+
+				var body map[string]interface{}
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+				assert.Equal(t, "invalid_token", body["error"])
+				assert.Equal(t, test.description, body["error_description"])
+			})
+		}
 	}
 }

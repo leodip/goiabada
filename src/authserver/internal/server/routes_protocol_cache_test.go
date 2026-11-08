@@ -132,7 +132,7 @@ func TestInitRoutes_UserinfoRefusesToBeStored(t *testing.T) {
 			defer func() { _ = result.Body.Close() }()
 
 			assert.Equal(t, http.StatusUnauthorized, result.StatusCode)
-			assert.Equal(t, `Bearer realm="goiabada"`, result.Header.Get("WWW-Authenticate"))
+			assert.Equal(t, `Bearer realm="goiabada"`+`, DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"`, result.Header.Get("WWW-Authenticate"))
 			assert.Equal(t, "no-store", result.Header.Get("Cache-Control"))
 			assert.Equal(t, "no-cache", result.Header.Get("Pragma"))
 		})

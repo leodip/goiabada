@@ -1,7 +1,8 @@
-// Package reqctx holds the auth server's seven request-scoped values: the settings, the browser's
+// Package reqctx holds the auth server's eight request-scoped values: the settings, the browser's
 // session identifier and that session's user, the bearer token read off the request, the token a
 // scope guard validated, the credential reservation a failures-only rate-limit tier holds
-// (#439), and the user whose token the session guard found live (#780). Each is written by
+// (#439), the user whose token the session guard found live (#780), and the DPoP proof the token
+// was presented with (#42). Each is written by
 // one middleware and read back through a typed accessor, over an unexported key, so nothing
 // outside this package can write one or read it under the wrong type (#433).
 package reqctx
@@ -11,6 +12,7 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"github.com/leodip/goiabada/authserver/internal/dpop"
 	"github.com/leodip/goiabada/authserver/internal/liveness"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
@@ -26,6 +28,7 @@ const (
 	validatedTokenKey
 	credentialReservationKey
 	actingUserIdKey
+	dpopProofKey
 )
 
 // ErrNoSettings is what a reader answers its request with when the settings middleware did
@@ -149,4 +152,18 @@ func WithActingUserId(ctx context.Context, userId int64) context.Context {
 func ActingUserIdFrom(ctx context.Context) (int64, bool) {
 	userId, ok := ctx.Value(actingUserIdKey).(int64)
 	return userId, ok
+}
+
+// WithDPoPProof records the DPoP proof the bearer guard accepted beside the request's access token,
+// which says the token was presented with the DPoP scheme (RFC 9449 section 7.1): the guards behind
+// it challenge in that scheme, and the replay guard records the proof (#42 decision 10).
+func WithDPoPProof(ctx context.Context, proof *dpop.Proof) context.Context {
+	return context.WithValue(ctx, dpopProofKey, proof)
+}
+
+// DPoPProofFrom answers false when the request's token was not presented with the DPoP scheme, or
+// no bearer guard read it.
+func DPoPProofFrom(ctx context.Context) (*dpop.Proof, bool) {
+	proof, ok := ctx.Value(dpopProofKey).(*dpop.Proof)
+	return proof, ok && proof != nil
 }

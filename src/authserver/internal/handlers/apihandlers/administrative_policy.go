@@ -156,7 +156,7 @@ func refuseAdministratorChange(w http.ResponseWriter, r *http.Request, auditLogg
 	}
 	auditLogger.Log(r.Context(), audit.EventAdministratorChangeRefused, details)
 
-	w.Header().Set("WWW-Authenticate", middleware.InsufficientScopeChallenge(manageScopeRequiredDescription, manageScope))
+	w.Header().Set("WWW-Authenticate", middleware.InsufficientScopeChallenge(r.Context(), manageScopeRequiredDescription, manageScope))
 	writeJSONError(w, manageScopeRequiredDescription, "MANAGE_SCOPE_REQUIRED", http.StatusForbidden)
 }
 
