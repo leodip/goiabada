@@ -188,8 +188,9 @@ func TestKubernetesOverview_DebuggingWithoutAShell(t *testing.T) {
 const siteDocs = "site/src/content/docs"
 
 // busyboxImage is a BusyBox image a command on a page runs, as an argument to --image= or a word
-// of its own, with the tag it names, if any. A path such as /bin/busybox is not one.
-var busyboxImage = regexp.MustCompile("(?:^|[\\s=])busybox(?::([^\\s`]+))?(?:$|[\\s`])")
+// of its own, quoted or not, by its short name or as docker.io/library/busybox, with the tag it
+// names, if any. A path such as /bin/busybox is not one.
+var busyboxImage = regexp.MustCompile("(?:^|[\\s=\"'])(?:docker\\.io/)?(?:library/)?busybox(?::([^\\s`\"']+))?(?:$|[\\s`\"'])")
 
 // busyboxRunFindings walks the Markdown pages under docs, relative to root, and returns a finding
 // for each BusyBox a page runs that isn't busybox:version, and the pages that run one at all.
@@ -253,18 +254,26 @@ func TestBusyboxRunFindings(t *testing.T) {
 		assert.Equal(t, map[string]bool{"docs/a.mdx": true, "docs/sub/b.mdx": true}, pages)
 	})
 
-	t.Run("a page running busybox with no version or another one fails, naming its line", func(t *testing.T) {
+	t.Run("a page running busybox with no version or another one fails, naming its line, quoted or qualified", func(t *testing.T) {
 		root := writeTree(t, map[string]string{
 			"docs/a.mdx": "intro\n   kubectl run x --rm -i --image=busybox -- nslookup example.com\n",
 			"docs/b.md":  "`docker run --rm busybox:1.38 nc -zv db 5432`\n",
 			"docs/c.txt": "kubectl run x --image=busybox\n",
+			"docs/d.mdx": "```bash\nkubectl run x --image=\"busybox\" -- nslookup example.com\ndocker run --rm 'busybox:1.38' nslookup example.com\n```\n",
+			"docs/e.mdx": "```bash\nkubectl run x --image=docker.io/library/busybox -- nslookup example.com\ndocker run --rm docker.io/busybox:1.38 sh\ndocker run --rm library/busybox:1.37 sh\n```\n",
+			"docs/f.mdx": "```yaml\nimage: \"busybox\"\n```\n",
 		})
 		findings, _, err := busyboxRunFindings(root, "docs", "1.37")
 		require.NoError(t, err)
 		sort.Strings(findings)
 		assertFindings(t, findings,
 			"docs/a.mdx:2 runs busybox with no version, not busybox:1.37",
-			"docs/b.md:1 runs busybox:1.38, not busybox:1.37")
+			"docs/b.md:1 runs busybox:1.38, not busybox:1.37",
+			"docs/d.mdx:2 runs busybox with no version, not busybox:1.37",
+			"docs/d.mdx:3 runs busybox:1.38, not busybox:1.37",
+			"docs/e.mdx:2 runs busybox with no version, not busybox:1.37",
+			"docs/e.mdx:3 runs busybox:1.38, not busybox:1.37",
+			"docs/f.mdx:2 runs busybox with no version, not busybox:1.37")
 	})
 
 	t.Run("pages that run no BusyBox are reported as none", func(t *testing.T) {
