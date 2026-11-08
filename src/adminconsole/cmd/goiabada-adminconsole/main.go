@@ -3,10 +3,11 @@
 //
 //	goiabada-adminconsole [flags]           start the admin console
 //	goiabada-adminconsole healthcheck       check the running console's /health (#808)
+//	goiabada-adminconsole check-authserver  make the console's settings call to the auth server once
 //
-// The flags take no command after them, and `healthcheck` takes no flags or arguments, reading its
-// listener from the environment; any other word on the command line is refused with exit 2 before
-// the console does anything else (#808 decision 5).
+// The flags take no command after them. `healthcheck` and `check-authserver` take no flags or
+// arguments, reading what they need from the environment; any other word on the command line is
+// refused with exit 2 before the console does anything else (#808 decisions 5 and 6).
 //
 // It is configured by GOIABADA_ environment variables, most with a flag over them. It keeps no
 // database: everything it reads and writes goes through the auth server's admin and account APIs,
@@ -66,6 +67,12 @@ func run() int {
 	// check every 10 seconds writes no startup records (#808 decisions 2 and 3).
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		return healthcheck.Run(healthcheckListeners, os.Args[2:], os.Stderr)
+	}
+	// So is the check of the auth server, which reads only the auth server's two URLs and the
+	// internal CA file, so an operator can run it beside a console that cannot start (#808
+	// decision 6).
+	if len(os.Args) > 1 && os.Args[1] == "check-authserver" {
+		return checkAuthServer(os.Args[2:], os.Stdout, os.Stderr)
 	}
 
 	// TZ is resolved again before anything else, so the first record is already in the zone the
@@ -311,18 +318,23 @@ var healthcheckListeners = healthcheck.Listeners{
 
 // dispatch refuses the positional arguments the flag parse left, since the console's flags take no
 // command: none serves, and any word is refused, naming it and the commands there are, as the auth
-// server refuses one since #424. `healthcheck` runs before the parse when it is the first argument,
-// so it arrives here only behind a flag or `--`, and is refused for taking none (#808 decision 5).
+// server refuses one since #424. `healthcheck` and `check-authserver` run before the parse when
+// they are the first argument, so they arrive here only behind a flag or `--`, and are refused for
+// taking none (#808 decisions 5 and 6).
 func dispatch(args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
-	if args[0] == "healthcheck" {
+	switch args[0] {
+	case "healthcheck":
 		return healthcheck.ArgumentsRefused("goiabada-adminconsole")
+	case "check-authserver":
+		return checkAuthServerRefused()
 	}
 	return errs.Errorf("unknown command %q: run goiabada-adminconsole [flags], with no command, to "+
-		"start the admin console, or goiabada-adminconsole healthcheck, alone, to check the running "+
-		"console's health", args[0])
+		"start the admin console, goiabada-adminconsole healthcheck, alone, to check the running "+
+		"console's health, or goiabada-adminconsole check-authserver, alone, to check that the console "+
+		"reaches the auth server", args[0])
 }
 
 // newTokenClient builds the console's one token client, which makes all three of its grants. The

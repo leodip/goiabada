@@ -171,10 +171,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 			InternalCAFile:                   getEnv("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", ""),
 		},
-		AuthServer: AuthServerConfig{
-			BaseURL:         getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
-			InternalBaseURL: getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
-		},
+		AuthServer: authServerFromEnv(),
 	}
 
 	// Admin console
@@ -241,6 +238,30 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+// authServerFromEnv reads the auth server's two URLs from the environment, for Load and for
+// LoadAuthServerCheck alike.
+func authServerFromEnv() AuthServerConfig {
+	return AuthServerConfig{
+		BaseURL:         getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
+		InternalBaseURL: getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
+	}
+}
+
+// LoadAuthServerCheck reads what the check-authserver command needs, from the environment alone
+// and by Load's own rules: the auth server's two URLs, and the internal CA file read into the pool
+// the console's calls verify the auth server against, nil while the file is unset. Nothing else is
+// read, so a setting the check does not use cannot fail it, and it needs no session key or client
+// secret. A CA file it cannot build a pool from is refused with Load's own line (#808 decision 6).
+func LoadAuthServerCheck() (AuthServerConfig, *x509.CertPool, error) {
+	var malformed malformedValues
+	console := AdminConsoleConfig{InternalCAFile: getEnv("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", "")}
+	readInternalRoots(&console, &malformed)
+	if err := malformed.err(); err != nil {
+		return AuthServerConfig{}, nil, err
+	}
+	return authServerFromEnv(), console.InternalRoots, nil
 }
 
 func getEnv(key string, defaultVal string) string {

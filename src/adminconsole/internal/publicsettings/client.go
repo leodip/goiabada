@@ -65,6 +65,11 @@ func NewClient(authServerBaseURL string, rootCAs *x509.CertPool, upstream *upstr
 	}
 }
 
+// URL is the address GetPublicSettings asks.
+func (c *Client) URL() string {
+	return fmt.Sprintf("%s/api/public/settings", c.authServerBaseURL)
+}
+
 // GetPublicSettings fetches public settings from the unauthenticated /api/public/settings endpoint.
 // No access token is required for this call.
 // Returns only safe-to-share settings: appName, uiTheme, smtpEnabled, issuer. The issuer is
@@ -77,7 +82,7 @@ func NewClient(authServerBaseURL string, rootCAs *x509.CertPool, upstream *upstr
 // json.Decoder, which stops at the first complete value and would therefore accept a truncated
 // prefix with keys missing and say nothing, and the failure arm discarded its read error.
 func (c *Client) GetPublicSettings(ctx context.Context) (*api.PublicSettingsResponse, error) {
-	url := fmt.Sprintf("%s/api/public/settings", c.authServerBaseURL)
+	url := c.URL()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

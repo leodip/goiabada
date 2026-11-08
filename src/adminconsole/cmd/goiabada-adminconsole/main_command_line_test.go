@@ -27,8 +27,9 @@ const healthcheckRefusal = "healthcheck takes no arguments: it reads the listene
 // unknownCommand is the refusal of a word that names no command, for word.
 func unknownCommand(word string) string {
 	return `unknown command "` + word + `": run goiabada-adminconsole [flags], with no command, to start ` +
-		`the admin console, or goiabada-adminconsole healthcheck, alone, to check the running console's ` +
-		"health\n"
+		`the admin console, goiabada-adminconsole healthcheck, alone, to check the running console's ` +
+		"health, or goiabada-adminconsole check-authserver, alone, to check that the console reaches the " +
+		"auth server\n"
 }
 
 // commandLineBound is how long a child of these cases may run. Each expects an exit well inside a
@@ -279,6 +280,7 @@ func TestMain_RefusesAWordThatNamesNoCommand(t *testing.T) {
 		{"a word after the flags", []string{"--adminconsole-log-level=debug", "serve"}, "serve"},
 		{"a flag after the word, refused with it", []string{"serve", "--adminconsole-log-level=debug"}, "serve"},
 		{"a mistyped command", []string{"healthchek"}, "healthchek"},
+		{"a word that only begins with a command", []string{"check-authserver-now"}, "check-authserver-now"},
 		{"behind --", []string{"--", "-x"}, "-x"},
 	}
 	for _, tc := range cases {
