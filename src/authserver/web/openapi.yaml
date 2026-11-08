@@ -28,7 +28,9 @@ info:
       domain scope (`authserver:manage-users`, `authserver:manage-clients` or
       `authserver:manage-settings`). `authserver:manage` is accepted everywhere.
       `getClientSecret` is the one read `authserver:admin-read` does not reach: it answers a
-      credential, so it accepts `authserver:manage-clients` or `authserver:manage`.
+      credential, so it accepts `authserver:manage-clients` or `authserver:manage`. `exportUser`
+      holds the user's audit events, so it takes `authserver:manage-users` only together with
+      `authserver:manage-settings`.
       A token from the client credentials flow is accepted here.
     - **Account API** (`/api/v1/account/*`): Self-service account management. Requires
       `authserver:manage-account` scope, **and** a token issued for a user: these operations
@@ -1131,8 +1133,8 @@ paths:
       description: |
         Every version of a legal document the user accepted at sign-in, the latest acceptance
         first, retired documents included. `url` is the version's public page, null for a retired
-        document, whose pages all answer not found; the version's text is read with the legal
-        document routes. `acceptances` is `[]` when the user accepted nothing, never null.
+        document. Read the version's text with `getLegalDocumentVersion`. `acceptances` is `[]` when
+        the user accepted nothing, never null.
         Acceptances are never edited or removed by hand; they are deleted with the user.
 
         The route admits `authserver:admin-read`, `authserver:manage-users` and
@@ -1164,8 +1166,9 @@ paths:
       summary: Export a user's data
       description: |
         One JSON document holding what the auth server holds about the user, to answer their
-        request for a copy of their data: the identifiers to search older audit rows and the logs
-        with, the profile, and the user's other data as the matching Admin API reads answer it.
+        request for a copy of their data: the identifiers to search the logs with, and the audit
+        entries that name the user only by subject, email address or its digest; the profile; and
+        the user's other data as the matching Admin API reads answer it.
         Nothing secret is in it: no password hash, two-factor secret, recovery code, pending code
         or token. It leaves out every attribute, the user's own or a group's, whose
         `includeInIdToken` and `includeInAccessToken` are both false, since no app receives it;
@@ -1177,9 +1180,6 @@ paths:
         the date being `exportedAt`'s in UTC. It is gzip-compressed (`Content-Encoding: gzip`)
         when the request's `Accept-Encoding` accepts gzip, and plain JSON otherwise; error answers
         are never compressed. Like every Admin API answer it is never cached.
-
-        Every export leaves an `exported_user_data` audit event naming the user in `user_id` and
-        who exported them in `logged_in_user`, once the answer has been sent.
 
         The audit events in the document don't name the other people who acted on the user: an
         event an administrator made about the user says an administrator made it, without saying
@@ -1998,8 +1998,7 @@ paths:
 
         The short name is the document's public address, `/legal/<short-name>`: lowercase
         letters, digits and hyphens, starting and ending with a letter or a digit, at most 64
-        characters, and unique among documents. A refused value answers 400 with its
-        handler.legal_document.* key.
+        characters, and unique among documents.
       operationId: createLegalDocument
       requestBody:
         required: true
@@ -2084,9 +2083,7 @@ paths:
       tags: [Legal Documents]
       summary: Delete legal document
       description: |
-        Delete a legal document that was never published. A published one is refused with 400
-        and handler.legal_document.published_not_deleted, so the record of what users accepted
-        is kept: retire it instead.
+        Delete a legal document that was never published. Retire a published one instead.
       operationId: deleteLegalDocument
       parameters:
         - $ref: '#/components/parameters/LegalDocumentIdParam'
@@ -2114,12 +2111,7 @@ paths:
       summary: Save legal document draft
       description: |
         Replace the document's draft, or start one, with as many saves as you like before
-        publishing. A retired document is refused with 400 and handler.legal_document.retired:
-        restore it first.
-
-        An empty `shortName` keeps the document's. Another one is taken only until the first
-        publish; after that it is refused with 400 and handler.legal_document.short_name_fixed,
-        so links to the document keep working.
+        publishing.
       operationId: saveLegalDocumentDraft
       parameters:
         - $ref: '#/components/parameters/LegalDocumentIdParam'
@@ -2156,9 +2148,6 @@ paths:
         The draft is cleared, and a published version is never changed. Each version of a
         document users must accept is asked of them again.
 
-        Refused with 400 when the document has no draft (handler.legal_document.no_draft), its
-        draft has no text (handler.legal_document.draft_empty), or it is retired
-        (handler.legal_document.retired).
       operationId: publishLegalDocument
       parameters:
         - $ref: '#/components/parameters/LegalDocumentIdParam'
@@ -2195,9 +2184,7 @@ paths:
       summary: Retire legal document
       description: |
         Retire a published document: it applies to no one from then on, and its versions are
-        kept. Refused with 400 for a document that was never published
-        (handler.legal_document.not_published), which is deleted instead, and for one already
-        retired (handler.legal_document.already_retired).
+        kept. A document that was never published is deleted instead.
       operationId: retireLegalDocument
       parameters:
         - $ref: '#/components/parameters/LegalDocumentIdParam'
@@ -2224,8 +2211,7 @@ paths:
       tags: [Legal Documents]
       summary: Restore legal document
       description: |
-        Restore a retired document as it was, with its current version. Refused with 400 for a
-        document that is not retired (handler.legal_document.not_retired).
+        Restore a retired document as it was, with its current version.
       operationId: restoreLegalDocument
       parameters:
         - $ref: '#/components/parameters/LegalDocumentIdParam'
@@ -2252,22 +2238,15 @@ paths:
       tags: [Legal Documents]
       summary: Set the apps a legal document applies to
       description: |
-        Set the document's Applies to: `all_apps`, the default a document is created with, or
-        `selected_apps` with the client ids it applies to. The whole list is replaced; a repeated
-        id is listed once. `expectedClientIds` is the list as you last read it, `[]` when it was
-        empty; absent or null is refused with `VALIDATION_ERROR`. Changing a document's apps needs
-        no new version.
+        Set which apps the document applies to: `all_apps`, the default a document is created
+        with, or `selected_apps` with the client ids it applies to. The whole list is replaced; a
+        repeated id is listed once. `expectedClientIds` is the list as you last read it, `[]` when
+        it was empty. Changing a document's apps needs no new version.
 
         `selected_apps` with an empty list is saved, and the document then applies to nobody;
         deleting a document's last app leaves it the same way. It never becomes `all_apps` by
-        itself. `all_apps` with any client id is refused with
-        handler.legal_document.apps_with_all_apps, and an `appliesTo` that is neither with
-        handler.legal_document.applies_to_invalid. The admin console's own client is never asked
-        to accept a document, so it is refused with handler.legal_document.admin_console_client.
-        A retired document is refused with handler.legal_document.retired. An unknown client id is
-        answered 404 and saves nothing. Every save leaves an `updated_legal_document_apps` audit
-        record naming the document, its Applies to, the client ids added and removed, and the
-        caller.
+        itself. The admin console's own client can't be listed, since users are never asked to
+        accept a document when they sign in to it.
       operationId: updateLegalDocumentApps
       parameters:
         - $ref: '#/components/parameters/LegalDocumentIdParam'
@@ -2534,7 +2513,7 @@ paths:
         `authserver:manage` writes to an administrator client, or sets the secret of a client
         listed for the `authserver` resource among its introspection resources: whoever holds that
         secret can introspect access tokens from every app. `authserver:manage-clients` is refused
-        with `MANAGE_SCOPE_REQUIRED` and an `administrator_change_refused` audit record. It can
+        with `MANAGE_SCOPE_REQUIRED`. It can
         still make such a client public, which empties its introspection resources, and it sets
         the secret of a client listed only for other resources.
       operationId: updateClientAuthentication
@@ -2648,8 +2627,8 @@ paths:
         Each entry follows the redirect URI rules: an absolute URI with no fragment, at most 2048
         bytes, listed once, and plain `http` only on 127.0.0.1, [::1] or localhost. A custom
         scheme and a query, `state` included, are accepted. The client needs the authorization
-        code flow or the implicit flow. On a client that may act as an administrator, only
-        `authserver:manage` may save it.
+        code flow or the implicit flow. On an administrator client, only `authserver:manage` may
+        save it.
       operationId: updateClientPostLogoutRedirectURIs
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2703,12 +2682,9 @@ paths:
         code flow or the implicit flow.
 
         Setting the URI, or changing the stored one, needs `authserver:manage`: another token is
-        refused 403 `MANAGE_SCOPE_REQUIRED`, and the refusal is recorded as
-        `administrator_change_refused`. The URI sent is compared with the one stored when the save
-        is made, so sending back a URI another save has since changed is refused the same way. `authserver:manage-clients` can clear the URI and change
-        `backchannelLogoutSessionRequired` alone. On a client that may act as an administrator,
-        only `authserver:manage` may save at all. Each save is recorded as
-        `updated_client_backchannel_logout`.
+        refused 403 `MANAGE_SCOPE_REQUIRED`. `authserver:manage-clients` can clear the URI and
+        change `backchannelLogoutSessionRequired` alone. On an administrator client, only
+        `authserver:manage` may save at all.
       operationId: updateClientBackchannelLogout
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2915,20 +2891,15 @@ paths:
       description: |
         Replace the whole list of resources whose tokens the client may introspect. A repeated id
         is listed once. `expectedResourceIds` is the list as you last read it, `[]` when it was
-        empty; absent or null is refused with `VALIDATION_ERROR`.
+        empty.
 
         The route admits `authserver:manage-clients` and `authserver:manage`. Adding the
         `authserver` resource is reserved to `authserver:manage`, because a client listed for it
         can introspect the tokens of every sign-in: `authserver:manage-clients` is refused with
-        `MANAGE_SCOPE_REQUIRED` and an `administrator_change_refused` audit record naming the
-        resource under `resource_ids`. Keeping it listed, or removing it, is not reserved. A write
+        `MANAGE_SCOPE_REQUIRED`. Keeping it listed, or removing it, is not reserved. A write
         to an administrator client is reserved to `authserver:manage` too.
 
-        A public client cannot authenticate, so it never introspects: a non-empty list for one is
-        refused with `handler.client_introspection_resources.public_client`, while its empty list is
-        saved. Making a client public empties its list. An unknown resource id is answered 404 and
-        saves nothing. Every save leaves an `updated_client_introspection_resources` audit record
-        naming the client, the resources added and removed, and the caller.
+        A public client can't introspect, so it lists none. Making a client public empties its list.
       operationId: updateClientIntrospectionResources
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2972,8 +2943,7 @@ paths:
         The legal documents that apply to the client: every document that is not retired and
         applies to all apps or lists the client, published or not, in the order they were
         created. A document never published has `currentVersion` 0. `legalDocuments` is `[]` when
-        none applies, never null. The documents are chosen with the legal document routes, in the
-        settings domain; this read is part of the client.
+        none applies, never null. Choose them with `updateLegalDocumentApps`.
 
         The route admits `authserver:admin-read`, `authserver:manage-clients` and
         `authserver:manage`.
@@ -3065,16 +3035,11 @@ paths:
         types that return an access token, `token` and `id_token token`, with
         `unauthorized_client`. A client starts with it off.
 
-        `dpopBoundAccessTokens` is required: a body without it, or with null, is
-        refused with `handler.client_dpop.dpop_bound_access_tokens_required` rather
-        than read as false. Switching the admin console's own client on is refused
-        with `handler.client_dpop.admin_console_not_allowed`, since the console calls
-        the auth server with Bearer tokens, and an id that is not a number with
-        `VALIDATION_ERROR`. The route takes the scopes of the client's other settings;
-        an administrator client takes `authserver:manage`. Every save, one to the value
-        already stored included, leaves an `updated_client_dpop` audit record naming
-        the client, the new value and the caller. The answer is the client as it now
-        is. No other operation sets or clears `dpopBoundAccessTokens`.
+        The admin console's own client can't turn it on, since it calls the auth server
+        with Bearer tokens. The route admits `authserver:manage-clients` and
+        `authserver:manage`; on an administrator client, only `authserver:manage`. The
+        answer is the client as it now is. No other operation sets or clears
+        `dpopBoundAccessTokens`.
       operationId: updateClientDPoP
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -3323,8 +3288,7 @@ paths:
       tags: [Settings]
       summary: Update general settings
       description: |
-        Update general system settings. `accountDeletionEnabled` is required: a request without
-        it, or with it `null`, is refused with `400`.
+        Update general system settings.
       operationId: updateSettingsGeneral
       requestBody:
         required: true
@@ -3411,14 +3375,7 @@ paths:
         an IPv6 literal, and without regard to case. A change of port, username, encryption or
         sender keeps the stored password.
 
-        A null character in `smtpUsername` is refused with 400
-        `handler.settings_email.smtp_username_invalid_character`, and one in a new `smtpPassword`
-        with 400 `handler.settings_email.smtp_password_invalid_character`; nothing is written.
-        PLAIN sign-in can't carry that character (RFC 4616). An empty password with a username is
-        accepted.
-
-        `smtpFromEmail` is stored with the part before the @ as sent and the domain lowercased, so
-        `Notify@Example.COM` is stored and answered as `Notify@example.com`.
+        An empty password with a username is accepted.
 
         Once every other check has passed, a save with `smtpEnabled: true` opens a TCP
         connection to `smtpHost` on `smtpPort`, with a 3-second timeout. It only checks that
@@ -3484,22 +3441,15 @@ paths:
         the credentials and the sender. Answers 200 once the SMTP server has accepted the
         message, with `encrypted` saying whether it went over TLS.
 
-        With `smtpEncryption` set to `none`, STARTTLS if available, the message is encrypted
-        only when the SMTP server offers STARTTLS with a certificate the auth server trusts for
-        `smtpHost`, and is sent unencrypted otherwise. A server that refuses the STARTTLS
-        command gets the message unencrypted over the same connection. A STARTTLS command left
-        without a valid reply, because the connection broke or timed out or the reply was
-        malformed, or a failed TLS handshake or certificate check, closes the connection, and the
-        message goes unencrypted over a second one, within the same time limits. Each unencrypted
-        send writes an Info record to the auth server's log, "sending the email unencrypted",
-        whose `reason` is `starttls_not_offered`, `starttls_refused`, `starttls_failed` or
-        `tls_failed`.
+        With `smtpEncryption` set to `none`, STARTTLS if available, a message the SMTP server
+        can't take over TLS, with a certificate the auth server trusts for `smtpHost`, is sent
+        unencrypted, and `encrypted` is `false`. Each such send writes an Info record to the auth
+        server's log, "sending the email unencrypted", whose `reason` is `starttls_not_offered`,
+        `starttls_refused`, `starttls_failed` or `tls_failed`.
 
         The send waits up to 10 seconds to connect, including the TLS handshake for SSL/TLS.
         After that, each step of the SMTP conversation fails if the SMTP server sends or takes
         nothing for 20 seconds, and the whole send ends 40 seconds after it started connecting.
-        These limits are much shorter than the 2 to 10 minutes per command that RFC 5321 section
-        4.5.3.2 recommends, because the request waits for the send.
       operationId: sendTestEmail
       requestBody:
         required: true
@@ -3616,28 +3566,10 @@ paths:
         `turnstileSecretKey` keeps it, a non-empty one replaces it, and
         `clearTurnstileSecretKey: true` removes it. Space around either key is trimmed.
 
-        A save is refused with 400, and writes nothing, when it:
-
-        - turns the challenge on without a site key
-          (`handler.settings_turnstile.site_key_required`), or without a secret key stored or sent
-          (`handler.settings_turnstile.secret_key_required`);
-        - removes the secret key while the challenge is on, or while turning it on
-          (`handler.settings_turnstile.secret_key_clear_while_enabled`);
-        - changes the site key while a secret key is stored, carrying neither a new
-          `turnstileSecretKey` nor `clearTurnstileSecretKey: true`
-          (`handler.settings_turnstile.site_key_changed`). The two keys come from one widget;
-        - sends a new secret key together with `clearTurnstileSecretKey: true`
-          (`handler.settings_turnstile.secret_key_and_clear`);
-        - sends a site key or a secret key longer than 128 characters
-          (`handler.settings_turnstile.site_key_too_long`,
-          `handler.settings_turnstile.secret_key_too_long`).
-
         A save that stores a new secret key, or turns the challenge on, first checks the secret key
-        with Cloudflare's siteverify. It is refused with 400, and writes nothing, when Cloudflare
-        does not accept the secret key (`handler.settings_turnstile.secret_key_rejected`), or
-        when the key could not be checked with it: Cloudflare could not be reached, or gave no
-        usable answer (`handler.settings_turnstile.secret_key_unchecked`). Turning
-        the challenge off and removing the secret key never call Cloudflare.
+        with Cloudflare's siteverify, and is refused with 400 when Cloudflare doesn't accept it or
+        can't be reached. Turning the challenge off and removing the secret key never call
+        Cloudflare.
       operationId: updateSettingsTurnstile
       requestBody:
         required: true
@@ -3688,8 +3620,7 @@ paths:
       description: |
         Replace the session settings. All four fields are required. A request without
         `maxUserSessionsPerUser`, or with it `null`, is refused with `400`, and so is a value outside
-        0 to 1000. A request without `keepSignedIn`, or with a value other than `always`, `ask` or
-        `never`, is refused with `400` too.
+        0 to 1000.
 
         Lowering `maxUserSessionsPerUser` ends no session at once: each user's sessions over the new
         value end at that user's next sign-in, their expired sessions first and then the least
@@ -4143,7 +4074,8 @@ paths:
         Update the authenticated user's email (marks as unverified). Requires the current
         password, checked before the address: a blank one is a 400 with error_code
         VALIDATION_ERROR, a wrong one a 400 with error_code AUTHENTICATION_FAILED that counts
-        against the failure limit shared with the password and OTP changes. Submitting the
+        against the `account_password` failure limit, shared with the password, two-factor and
+        recovery-code changes and the account's deletion. Submitting the
         address the account already has changes nothing, keeps it verified, and answers 200
         with the user as stored. The operation is also limited to 5 requests per hour per
         account, answered 429, whatever the address and whether or not the password was right,
@@ -4340,8 +4272,9 @@ paths:
       summary: Change own password
       description: |
         Change the password. Requires the current password: a wrong one is a 400 with error_code
-        AUTHENTICATION_FAILED that counts against the failure limit shared with the email and OTP
-        changes. The new password must meet the configured password policy. The operation is also
+        AUTHENTICATION_FAILED that counts against the `account_password` failure limit, shared with
+        the email, two-factor and recovery-code changes and the account's deletion. The new password
+        must meet the configured password policy. The operation is also
         limited to 10 requests per hour per account, together with the OTP change and new sets of
         recovery codes, answered 429, whether or not the password was right, and whether or not
         the rate limiter (GOIABADA_AUTHSERVER_RATELIMITER_ENABLED) is on.
@@ -4557,8 +4490,8 @@ paths:
 
         The deletion removes the user's profile, password, authenticator, recovery codes, picture,
         groups, permissions, attributes and consents, and every session they have, so their refresh
-        tokens are revoked and their access tokens are refused from then on. The audit log records
-        it as `deleted_own_account`. The user is emailed that their account was deleted, when SMTP
+        tokens are revoked and their access tokens are refused from then on. The user is emailed
+        that their account was deleted, when SMTP
         is configured and their address is verified.
 
         Only a token issued to the admin console's own client may call this. Any other client's
@@ -4567,9 +4500,8 @@ paths:
         turned off **Let users delete their own account**, the request is refused with 403
         (`ACCOUNT_DELETION_DISABLED`).
 
-        The last enabled user holding `authserver:manage` can't delete their account: the request
-        is refused with 409 (`LAST_ADMINISTRATOR`) before the password or a code is checked, so
-        nothing is spent.
+        The last enabled user holding `authserver:manage` can't delete their account: the request is
+        refused with 409 (`LAST_ADMINISTRATOR`).
 
         A wrong or blank password is refused with 400 (`AUTHENTICATION_FAILED`). With two-factor
         authentication on, no code is refused with 400 (`OTP_CODE_REQUIRED`), a wrong or already
@@ -4623,15 +4555,7 @@ paths:
       description: |
         The authenticated user's own data, as one JSON document: the same document, headers and
         file name as an administrator's export of that user,
-        `GET /api/v1/admin/users/{id}/export`, but for the instant it was made. It leaves out
-        every attribute, the user's own or a group's, whose `includeInIdToken` and
-        `includeInAccessToken` are both false, since no app receives it. An audit event an
-        administrator made about the user says an administrator made it, without saying who.
-
-        The answer is a file to save, named `user-<id>-<date>.json` in `Content-Disposition`, the
-        date being `exportedAt`'s in UTC. It is gzip-compressed (`Content-Encoding: gzip`) when the
-        request's `Accept-Encoding` accepts gzip, and plain JSON otherwise; error answers are never
-        compressed. It is never cached.
+        `GET /api/v1/admin/users/{id}/export`.
 
         Only a token issued to the admin console's own client may call this. Any other client's
         token is refused with 403 (`CLIENT_NOT_ALLOWED`), whatever its scopes and however recent
@@ -4648,9 +4572,7 @@ paths:
         retry with the new token.
 
         Each download counts against the `account_export` rate limit, 5 per hour for each user; a
-        request refused by the client or the sign-in check spends nothing. Every download leaves an
-        `exported_own_user_data` audit event naming the user in `user_id` and `logged_in_user`,
-        once the answer has been sent.
+        request refused by the client or the sign-in check spends nothing.
       operationId: exportAccount
       parameters:
         - name: Accept-Encoding
@@ -4860,10 +4782,6 @@ paths:
         Validate the sign-out target, mint a short-lived id_token_hint and return the prepared
         sign-out operation, as either a self-submitting form's parameters or a URL to follow.
 
-        postLogoutRedirectUri must be an absolute URI, with a scheme, no fragment and, for http
-        or https, a host, and it must not use plain http on a host other than 127.0.0.1, [::1]
-        or localhost. A target that breaks either rule is refused with 400 VALIDATION_ERROR,
-        since /auth/logout wouldn't redirect to it.
       operationId: requestAccountLogout
       requestBody:
         required: true
@@ -5162,6 +5080,8 @@ components:
         (`authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings`)
         or `authserver:manage`. A client credentials token is accepted. Reads accept
         `authserver:admin-read`, except `getClientSecret`; writes need the domain scope.
+        `exportUser` takes `authserver:manage-users` only together with
+        `authserver:manage-settings`.
 
         The granular scopes stop short of administrators. An administrator is a user, group or
         client holding any of the six administrative permissions on the `authserver` resource
@@ -5175,8 +5095,8 @@ components:
         deleting such a group), writes to an administrator, switches whether a client may
         request the administrative scopes, reads an administrator client's secret, adds the
         `authserver` resource to a client's introspection resources, reads or sets the secret of
-        a client listed for it, changes the email or
-        audit-log settings, or changes an administrative permission's description. It keeps
+        a client listed for it, sets or changes a client's back-channel logout URI, changes the
+        email or audit-log settings, or changes an administrative permission's description. It keeps
         full control of everyone else, and still reads administrators. `authserver:manage`
         alone meets 409 LAST_ADMINISTRATOR, on the operations that could leave no enabled user
         holding it.
@@ -5314,8 +5234,8 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
       description: |
-        The token is valid but does not authorise this request. Four checks
-        answer here, and a caller distinguishes them by error_code.
+        The token is valid but does not authorise this request. A caller
+        tells the refusals apart by error_code.
 
         INSUFFICIENT_SCOPE comes from the route's authorisation middleware,
         before the handler runs: an Admin operation needs one of the scopes
@@ -5330,6 +5250,12 @@ components:
         FORBIDDEN comes from the handler, on the account endpoints that
         resolve a resource by id and then check it belongs to the caller, so
         a valid token for the wrong user reaches this rather than a 404.
+
+        CLIENT_NOT_ALLOWED comes from the route on the two Account
+        operations only the admin console's own client may call,
+        `deleteAccount` and `exportAccount`. ACCOUNT_DELETION_DISABLED comes
+        from `deleteAccount` while an administrator has turned off **Let
+        users delete their own account**.
 
         MANAGE_SCOPE_REQUIRED comes from the handler, on the Admin operations
         the administrative policy guards. Only `authserver:manage` creates an
@@ -5350,8 +5276,8 @@ components:
             sessions, consents, attributes, memberships, permissions,
             deletion), an administrative group (settings, attributes,
             members, permissions, deletion), or an administrator client
-            (settings, authentication, flows, redirect URIs, web origins,
-            token settings, permissions, introspection resources, logo,
+            (settings, authentication, flows, redirect URIs, sign-out redirect URIs, back-channel
+            logout, DPoP, web origins, token settings, permissions, introspection resources, logo,
             deletion);
           - switches whether a client may request the administrative scopes,
             on or off, on any client;
@@ -5360,20 +5286,19 @@ components:
           - reads an administrator client's secret, or reads or sets the
             secret of a client listed for the `authserver` resource among its
             introspection resources;
+          - sets or changes a client's back-channel logout URI;
           - changes the email or the audit-log settings;
           - changes an administrative permission's description.
         Granular scopes still read administrators. The refusal is answered
-        after the request's 400 and 404, writes nothing, carries
-        `WWW-Authenticate: Bearer realm="goiabada", error="insufficient_scope",
+        after the request's 400 and 404, writes nothing, carries the insufficient_scope challenge of
+        the scheme the token was sent with, such as `WWW-Authenticate: Bearer realm="goiabada",
+        error="insufficient_scope",
         error_description="...", scope="authserver:manage"`, and leaves an
         `administrator_change_refused` audit record.
 
-        Every operation this document secures declares a 403. The public
-        client logo endpoint, which carries `security: []` and authorises
-        nothing, is the one that does not.
       headers:
         WWW-Authenticate:
-          description: Bearer challenge on scope and administrative-policy refusals; other forbidden responses omit it.
+          description: An insufficient_scope challenge in the scheme the token was sent with, Bearer or DPoP, on every refusal but FORBIDDEN and ACCOUNT_DELETION_DISABLED, which omit it.
           schema:
             type: string
       content:
@@ -5587,7 +5512,7 @@ components:
             The language the user chose for Goiabada's own pages and emails: the tag of one of
             the auth server's language catalogs, such as `pt-BR`, or empty for Automatic, where
             pages follow the language the application or the browser asks for and emails follow
-            `locale`. A tag whose catalog an operator has since removed counts as Automatic.
+            `locale`.
         birthDate:
           type: string
           format: date-time
@@ -6572,7 +6497,7 @@ components:
         - data
 
     UserExportIdentifiersResponse:
-      description: What the user is known by, to search older audit rows and the logs with.
+      description: What the user is known by, to search the logs, and the audit entries that name the user only by subject, email address or its digest.
       type: object
       properties:
         id:
@@ -7028,7 +6953,7 @@ components:
           description: The unpublished draft, or null when the document has none.
         versions:
           type: array
-          description: The published versions, the first first.
+          description: The published versions, oldest first.
           items:
             $ref: '#/components/schemas/LegalDocumentVersionSummaryResponse'
 
@@ -7779,8 +7704,8 @@ components:
           description: >-
             The complete set of redirect URIs the client has after the call. More than 60, one
             longer than 2048 bytes, one listed twice, or a plain http one on a host other than
-            127.0.0.1, [::1] or localhost, is refused with 400 and nothing is written, even when
-            it is already stored. error_code is the refusal's catalog key, such as
+            127.0.0.1, [::1] or localhost, is refused with 400 and nothing is written. error_code
+            is the refusal's catalog key, such as
             handler.client_redirect_uris.too_many.
           items:
             type: string
@@ -7817,8 +7742,7 @@ components:
             The complete set of sign-out redirect URIs the client has after the call. More than
             60, one longer than 2048 bytes, one listed twice, one that isn't an absolute URI, or a
             plain http one on a host other than 127.0.0.1, [::1] or localhost, is refused with 400
-            and nothing is written, even when it is already stored. error_code is the refusal's
-            catalog key, such as
+            and nothing is written. error_code is the refusal's catalog key, such as
             handler.client_post_logout_redirect_uris.too_many.
           items:
             type: string
@@ -8214,13 +8138,15 @@ components:
             A new SMTP password, at most 256 bytes, without a null character. The stored password
             is never returned, only `hasSmtpPassword`, so an absent or empty value keeps the stored
             password; a non-empty value replaces it. Sending one together with
-            `clearSmtpPassword: true` is refused with 400 `VALIDATION_ERROR` and nothing is written.
+            `clearSmtpPassword: true` is refused with 400
+            `handler.settings_email.smtp_password_and_clear` and nothing is written.
         clearSmtpPassword:
           type: boolean
           default: false
           description: |
             `true` removes the stored SMTP password. Removing it when none is stored is an ordinary
-            save. Refused with 400 `VALIDATION_ERROR` together with a non-empty `smtpPassword`.
+            save. Refused with 400 `handler.settings_email.smtp_password_and_clear` together with a
+            non-empty `smtpPassword`.
             Ignored when `smtpEnabled` is false, which clears every SMTP field, the password included.
         smtpEncryption:
           type: string
