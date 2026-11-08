@@ -5,13 +5,16 @@ package guard
 // Dockerfile declares, the user it runs as, the check the setup wizard writes, and the manifest's
 // container names a debug container targets. Each is read from that one source, so an image that
 // gains a file, a timing that changes or a container renamed fails here rather than leaving a page
-// that tells an operator to look for something the image no longer holds.
+// that tells an operator to look for something the image no longer holds. Every BusyBox a page of
+// the site runs is held to the version the Compose page's debugging section pins.
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -179,6 +182,103 @@ func TestKubernetesOverview_DebuggingWithoutAShell(t *testing.T) {
 	for _, target := range targets {
 		assert.Containsf(t, string(manifest), "\n      - name: "+target[1]+"\n", "%s: %s targets %q, a container the wizard's manifest declares", imagesKubernetesPage, imagesDebuggingHeading, target[1])
 	}
+}
+
+// siteDocs is the documentation site's pages, relative to the repository root.
+const siteDocs = "site/src/content/docs"
+
+// busyboxImage is a BusyBox image a command on a page runs, as an argument to --image= or a word
+// of its own, with the tag it names, if any. A path such as /bin/busybox is not one.
+var busyboxImage = regexp.MustCompile("(?:^|[\\s=])busybox(?::([^\\s`]+))?(?:$|[\\s`])")
+
+// busyboxRunFindings walks the Markdown pages under docs, relative to root, and returns a finding
+// for each BusyBox a page runs that isn't busybox:version, and the pages that run one at all.
+func busyboxRunFindings(root, docs, version string) (findings []string, pages map[string]bool, err error) {
+	pages = map[string]bool{}
+	err = filepath.WalkDir(filepath.Join(root, filepath.FromSlash(docs)), func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || (filepath.Ext(path) != ".md" && filepath.Ext(path) != ".mdx") {
+			return err
+		}
+		text, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		page := filepath.ToSlash(rel)
+		for n, line := range strings.Split(string(text), "\n") {
+			for _, match := range busyboxImage.FindAllStringSubmatch(line, -1) {
+				pages[page] = true
+				at := fmt.Sprintf("%s:%d", page, n+1)
+				switch match[1] {
+				case version:
+				case "":
+					findings = append(findings, at+" runs busybox with no version, not busybox:"+version)
+				default:
+					findings = append(findings, at+" runs busybox:"+match[1]+", not busybox:"+version)
+				}
+			}
+		}
+		return nil
+	})
+	return findings, pages, err
+}
+
+// TestSitePages_RunTheDebuggingSectionsBusyBox: every BusyBox image a page of the documentation
+// site runs names the version the Compose page's debugging section pins, so no recipe runs
+// whatever latest is that day.
+func TestSitePages_RunTheDebuggingSectionsBusyBox(t *testing.T) {
+	pinned := busyboxImage.FindStringSubmatch(busyboxPin.FindString(imagesSection(t, imagesComposePage, imagesDebuggingHeading)))
+	require.NotNilf(t, pinned, "%s: %s runs a BusyBox of a named version", imagesComposePage, imagesDebuggingHeading)
+
+	findings, pages, err := busyboxRunFindings(filepath.Dir(SourceRoot(t)), siteDocs, pinned[1])
+	require.NoError(t, err)
+	for _, page := range []string{imagesComposePage, imagesKubernetesPage} {
+		require.Truef(t, pages[strings.TrimPrefix(page, "../")], "the walk of %s finds the BusyBox %s runs", siteDocs, page)
+	}
+	assert.Emptyf(t, findings, "every BusyBox a page runs is busybox:%s, the version %s's %s runs", pinned[1], imagesComposePage, imagesDebuggingHeading)
+}
+
+func TestBusyboxRunFindings(t *testing.T) {
+	t.Run("pages that run the pinned version pass, and a path to busybox is not an image", func(t *testing.T) {
+		root := writeTree(t, map[string]string{
+			"docs/a.mdx":     "```bash\nkubectl run x --image=busybox:1.37 -- nslookup example.com\n```\n",
+			"docs/sub/b.mdx": "docker run --rm -it busybox:1.37\n\nCOPY --from=build /bin/busybox /bin/sh\n",
+		})
+		findings, pages, err := busyboxRunFindings(root, "docs", "1.37")
+		require.NoError(t, err)
+		assert.Empty(t, findings)
+		assert.Equal(t, map[string]bool{"docs/a.mdx": true, "docs/sub/b.mdx": true}, pages)
+	})
+
+	t.Run("a page running busybox with no version or another one fails, naming its line", func(t *testing.T) {
+		root := writeTree(t, map[string]string{
+			"docs/a.mdx": "intro\n   kubectl run x --rm -i --image=busybox -- nslookup example.com\n",
+			"docs/b.md":  "`docker run --rm busybox:1.38 nc -zv db 5432`\n",
+			"docs/c.txt": "kubectl run x --image=busybox\n",
+		})
+		findings, _, err := busyboxRunFindings(root, "docs", "1.37")
+		require.NoError(t, err)
+		sort.Strings(findings)
+		assertFindings(t, findings,
+			"docs/a.mdx:2 runs busybox with no version, not busybox:1.37",
+			"docs/b.md:1 runs busybox:1.38, not busybox:1.37")
+	})
+
+	t.Run("pages that run no BusyBox are reported as none", func(t *testing.T) {
+		root := writeTree(t, map[string]string{"docs/a.mdx": "The BusyBox image runs as root.\n"})
+		findings, pages, err := busyboxRunFindings(root, "docs", "1.37")
+		require.NoError(t, err)
+		assert.Empty(t, findings)
+		assert.Empty(t, pages)
+	})
+
+	t.Run("a docs directory that is missing fails the walk", func(t *testing.T) {
+		_, _, err := busyboxRunFindings(t.TempDir(), "docs", "1.37")
+		assert.Error(t, err)
+	})
 }
 
 // TestUpgradePage_TheImagesGiveDockerTheStartPeriod: the list of how long each platform gives a
