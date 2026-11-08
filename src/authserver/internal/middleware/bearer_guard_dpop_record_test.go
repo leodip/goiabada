@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -290,33 +291,75 @@ func TestBearerGuardDPoP_ASuccessOrAServerErrorKeepsItsProofSpent(t *testing.T) 
 	}
 }
 
-// A release the store cannot make leaves the proof spent and the handler's refusal as it was, with
-// an Error record: the fault refuses only the proof's reuse, which a fresh proof is admitted for.
-func TestBearerGuardDPoP_AReleaseTheStoreCannotMakeKeepsTheRefusal(t *testing.T) {
-	logs := logtest.CaptureSlog(t)
+// A release the store cannot make is a store that cannot answer (#42 decision 9): the proof stays
+// spent, and the request is the surface's 500 in place of the handler's refusal, which would tell
+// the client its proof is unspent. The 500 is one coherent answer: the handler's status, body and
+// headers, its challenge included, are dropped, while what the middlewares ahead of the guards set
+// is kept. The one record is the 500's, at Error.
+func TestBearerGuardDPoP_AReleaseTheStoreCannotMakeIsAServerError(t *testing.T) {
 	key := dpoptest.RFC7517Key(t)
-	store := newReplayStore()
-	store.releaseFault = errors.New("connection reset")
-	proof := key.ResourceProof(t, "GET", dpopUserinfoURL, dpopNow, tokenBound)
-	chain := handlerInstance(t, store, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"error_code":"REFUSED"}`))
-	})
+	for _, tc := range []struct {
+		surface string
+		body    func(t *testing.T, body map[string]any)
+	}{
+		{"api", func(t *testing.T, body map[string]any) {
+			assert.Equal(t, "INTERNAL_SERVER_ERROR", body["error_code"])
+		}},
+		{"userinfo", func(t *testing.T, body map[string]any) {
+			assert.Equal(t, "server_error", body["error"])
+		}},
+	} {
+		t.Run(tc.surface, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+			store := newReplayStore()
+			store.releaseFault = errors.New("connection reset")
+			guards := dpopGuards(t, tc.surface, dpopResourceBaseURL, store)
+			chain := guards.JwtAuthorizationHeaderToContext()(guards.RequireBearerTokenScope("openid")(
+				guards.RecordDPoPProof()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Content-Type", "text/plain")
+					w.Header().Set("WWW-Authenticate", `Bearer realm="goiabada", error="invalid_token"`)
+					w.Header().Set("X-Handler", "refusal")
+					w.WriteHeader(http.StatusUnauthorized)
+					_, _ = w.Write([]byte("REFUSED"))
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte("MORE"))
+				}))))
+			// A header set ahead of the guards, as the no-store and CORS middlewares set theirs.
+			outer := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("X-Outer", "kept")
+				chain.ServeHTTP(w, r)
+			})
+			proof := key.ResourceProof(t, http.MethodGet, dpopUserinfoURL, dpopNow, tokenBound)
 
-	rr := serveSeen(chain, store, proof)
+			rr := serveSeen(outer, store, proof)
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	assert.Equal(t, `{"error_code":"REFUSED"}`, rr.Body.String())
-	assert.Equal(t, 1, store.count(), "the proof stays spent")
-	var released []logtest.CapturedRecord
-	for _, record := range logs.Records() {
-		if record.Message == "unable to release the dpop proof of a refused request" {
-			released = append(released, record)
-		}
+			require.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+			var body map[string]any
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body), "the body is the 500's alone: %q", rr.Body.String())
+			tc.body(t, body)
+			assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+			assert.Empty(t, rr.Header().Values("WWW-Authenticate"), "the handler's challenge is dropped")
+			assert.Empty(t, rr.Header().Get("X-Handler"), "and so is every other header of its refusal")
+			assert.Equal(t, "kept", rr.Header().Get("X-Outer"))
+			assert.Equal(t, 1, rr.records, "the proof was still recorded when the 500 was written")
+			assert.Equal(t, 1, store.count(), "the proof stays spent")
+			assert.Equal(t, 1, store.releaseCalls())
+
+			var errorRecords []logtest.CapturedRecord
+			for _, record := range logs.Records() {
+				if record.Level == slog.LevelError {
+					errorRecords = append(errorRecords, record)
+				}
+			}
+			require.Len(t, errorRecords, 1)
+			assert.Contains(t, fmt.Sprint(errorRecords[0].Attrs["error"]), "connection reset")
+			assert.Contains(t, fmt.Sprint(errorRecords[0].Attrs["error"]), "unable to release the DPoP proof")
+
+			replay := serveSeen(outer, store, proof)
+			assert.Equal(t, http.StatusUnauthorized, replay.Code, "the spent proof is refused as a replay")
+			assert.Contains(t, replay.Header().Get("WWW-Authenticate"), `error="invalid_dpop_proof"`)
+		})
 	}
-	require.Len(t, released, 1)
-	assert.Equal(t, slog.LevelError, released[0].Level)
-	assert.Contains(t, fmt.Sprint(released[0].Attrs["error"]), "connection reset")
 }
 
 // Single-use holds while a refused request is in flight: a second use of its proof meanwhile is

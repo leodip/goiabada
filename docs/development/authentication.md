@@ -167,8 +167,10 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   written: a refused request leaves its proof unspent, and the client may resend it corrected. A
   success or a 5xx keeps the record. Recording before the handler, not at each handler's last
   check, keeps the proof single-use whatever the handler does: a concurrent use is a replay
-  while the first request is in flight. A failed release is an Error record and leaves the proof
-  spent.
+  while the first request is in flight. A failed release is a store failure: the proof stays
+  spent and the request is the surface's 500 in place of the handler's refusal, with the headers
+  put back as they were before the handler ran (its challenge dropped) and its later writes
+  discarded.
 - `htu` is compared with the path the client sent, `dpop.RequestPath` over `RequestURI`, at the
   token endpoint and the resources alike: `httpmw.StripTrailingSlash` rewrites `r.URL` before
   routing.

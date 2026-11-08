@@ -295,8 +295,10 @@ func (m *BearerToken) dpopProof(w http.ResponseWriter, r *http.Request, token *o
 // own last check, so that it is single-use whatever the handler does: two requests sending it at
 // once never both reach a handler, and the second, refused as a replay, released nothing. A 5xx,
 // and a success, keep the record, since what the handler did before them may have taken effect. A
-// release that fails is an Error record, and the proof stays spent, which refuses nothing a fresh
-// proof would not be admitted for.
+// release that fails is a store that cannot answer, so it is the surface's 500 in place of the
+// handler's refusal, which would tell the client its proof is unspent: the proof stays spent, the
+// response's headers are put back as they were when the handler was called, dropping the
+// refusal's challenge and the rest, and whatever the handler writes after is discarded.
 func (m *BearerToken) RecordDPoPProof() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -330,36 +332,62 @@ func (m *BearerToken) RecordDPoPProof() func(http.Handler) http.Handler {
 				m.refusals.invalidDPoPProof(w, r)
 				return
 			}
-			next.ServeHTTP(&dpopRefusalReleaser{ResponseWriter: w, release: func() {
-				if err := m.proofs.Replays.ReleaseDPoPProof(r.Context(), nil, proof.ReplayKey()); err != nil {
-					slog.ErrorContext(r.Context(), "unable to release the dpop proof of a refused request", "error", err)
-				}
-			}}, r)
+			next.ServeHTTP(&dpopRefusalReleaser{
+				ResponseWriter: w,
+				headerAtStart:  w.Header().Clone(),
+				release: func() error {
+					return m.proofs.Replays.ReleaseDPoPProof(r.Context(), nil, proof.ReplayKey())
+				},
+				releaseFailed: func(w http.ResponseWriter, err error) {
+					m.refusals.internalError(w, r, errs.Wrap(err, "unable to release the DPoP proof of a refused request"), "")
+				},
+			}, r)
 		})
 	}
 }
 
 // dpopRefusalReleaser is the writer RecordDPoPProof hands the handler: the first final status it
 // writes, explicitly or by a first Write, decides once whether the proof's record is released, and a
-// 4xx releases it before the status is passed on.
+// 4xx releases it before the status is passed on. When the release fails, the headers go back to
+// headerAtStart, releaseFailed answers the surface's 500 in place of the 4xx, and every later write
+// by the handler is discarded, so the response is that 500 alone.
 type dpopRefusalReleaser struct {
 	http.ResponseWriter
-	release func()
-	decided bool
+	headerAtStart http.Header
+	release       func() error
+	releaseFailed func(w http.ResponseWriter, err error)
+	decided       bool
+	answered      bool
 }
 
 func (w *dpopRefusalReleaser) WriteHeader(code int) {
+	if w.answered {
+		return
+	}
 	// A 1xx is informational, sent ahead of the final status, which can still be anything.
 	if !w.decided && code >= http.StatusOK {
 		w.decided = true
 		if code >= http.StatusBadRequest && code < http.StatusInternalServerError {
-			w.release()
+			if err := w.release(); err != nil {
+				w.answered = true
+				header := w.Header()
+				clear(header)
+				for name, values := range w.headerAtStart {
+					header[name] = values
+				}
+				w.releaseFailed(w.ResponseWriter, err)
+				return
+			}
 		}
 	}
 	w.ResponseWriter.WriteHeader(code)
 }
 
 func (w *dpopRefusalReleaser) Write(b []byte) (int, error) {
+	if w.answered {
+		// The handler's body belongs to the refusal the 500 replaced.
+		return len(b), nil
+	}
 	// A Write before any WriteHeader writes 200.
 	w.decided = true
 	return w.ResponseWriter.Write(b)
