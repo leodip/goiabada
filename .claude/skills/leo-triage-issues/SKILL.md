@@ -1,5 +1,5 @@
 ---
-name: triage-issues
+name: leo-triage-issues
 description: Re-triage the GitHub issues of leodip/goiabada against the latest main, the open ones and those closed as completed since the latest release. For an open issue it checks whether it still applies, what changed, its priority and type labels, and which other issues it touches; for a closed one, whether its "Done when" is really met. Then closes resolved issues, reopens closed ones that were only partly done, and updates the triage comments, after one confirmation.
 argument-hint: "[issue numbers...] [--dry-run]"
 disable-model-invocation: true
