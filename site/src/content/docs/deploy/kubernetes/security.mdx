@@ -96,7 +96,13 @@ Before you answer yes, check two things:
 
   A workload that calls the auth server's public URL goes through the routing layer and needs nothing.
 
-The policies state no egress rules, so they restrict nothing the servers connect to. An egress rule would have to name every destination, and three can't be named: the SMTP host and port are settings in the database, changed in the admin console; the auth server sends [logout tokens](/reference/endpoints/backchannel-logout/) to the back-channel logout URI registered on each client, wherever your apps listen; and the database host is often a DNS name, while a NetworkPolicy selects only pods, namespaces and IP blocks. A rule written for today's addresses would cut email, the logout tokens or the database when one moved.
+The policies state no egress rules, so they restrict nothing the servers connect to. An egress rule would have to name every destination, and three can't be named ahead of time:
+
+- the SMTP host and port, which are settings you change in the admin console;
+- each client's back-channel logout URI, where the auth server sends [logout tokens](/reference/endpoints/back-channel-logout/);
+- the database host, often a DNS name, which a NetworkPolicy can't select: it selects only pods, namespaces and IP blocks.
+
+ A rule written for today's addresses would cut email, the logout tokens or the database when one moved.
 
 To see what the policies admit:
 

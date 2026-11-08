@@ -7,13 +7,13 @@ import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
 This page helps your API ask the auth server whether an access token is still active, with the introspection endpoint, `/auth/introspect`.
 
-It's the [RFC 7662](https://www.rfc-editor.org/rfc/rfc7662) token introspection endpoint, the `introspection_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). A signature check tells your API a token was issued and hasn't expired. Introspection also tells it whether the token was cut off since: its session ended, its grant was revoked, its user or its client was disabled.
+It's the [RFC 7662](https://www.rfc-editor.org/rfc/rfc7662) token introspection endpoint, the `introspection_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). A signature check tells your API a token was issued and hasn't expired. Introspection also tells it whether the token was cut off since: its session ended, its [grant](/concepts/glossary/#grant) was revoked, its user or its client was disabled.
 
 ## Introspect a token
 
 <Steps>
 
-1. Give your API a confidential client listed for its resource, as [Protect an API](/guides/protect-an-api/#ask-the-auth-server-about-a-token) shows. See [Introspection resources](/concepts/clients/#introspection-resources).
+1. Give your API a [confidential client](/concepts/clients/#public-and-confidential-clients), one with a client secret, listed for its resource, as [Protect an API](/guides/protect-an-api/#ask-the-auth-server-about-a-token) shows. See [Introspection resources](/concepts/clients/#introspection-resources).
 
 2. From your API, send the access token it received, with the client's credentials:
 
@@ -79,7 +79,7 @@ An access token bound to a key with [DPoP](/concepts/dpop/) is answered with `to
 }
 ```
 
-Introspection doesn't check the proof: your API does. Accept such a token only in a request with the `DPoP` scheme and a `DPoP` proof signed by the key whose thumbprint is `cnf.jkt`, and refuse it sent as a bearer token. Don't send the proof to `/auth/introspect`: the endpoint ignores a `DPoP` header.
+Introspection doesn't check the proof: your API does, as [Accept DPoP-bound tokens](/guides/protect-an-api/#accept-dpop-bound-tokens) describes. Send no proof to `/auth/introspect`: the endpoint ignores a `DPoP` header.
 
 ## When a token is active
 

@@ -17,7 +17,7 @@ This page helps you write your privacy notice and answer people's requests about
 
 3. **Set how long audit events are kept,** under **Admin**, **Audit logging**, and decide where the servers' logs go and how long you keep them there. See [How long each record is kept](#how-long-each-record-is-kept).
 
-4. **Decide whether users may delete their own account,** with **Let users delete their own account** under **Admin**, **Settings**, **General**, **Account deletion**. It's on by default.
+4. **Decide whether users may delete their own account,** with **Let users delete their own account** under **Admin**, **General**, **Account deletion**. It's on by default.
 
 5. **Name everyone who receives data** in your notice: the apps you register as clients, your mail server, Cloudflare while Turnstile is on, and wherever your logs and backups go. See [What apps receive](#what-apps-receive) and [Who else receives data](#who-else-receives-data).
 
@@ -85,8 +85,8 @@ About each user:
 About their sign-ins:
 
 - each session's IP address, the browser's user agent as it was sent, the device name, type and operating system read from it, when it started and was last used, its [ACR level](/concepts/acr-and-amr/), the clients it served, and a digest of the browser's [device identifier](/concepts/sessions/#how-the-auth-server-recognizes-a-browser);
-- each authorization code's IP address and user agent, from the sign-in it was issued in;
-- each refresh token's client, scope, type and times.
+- each [authorization code](/concepts/glossary/#authorization-code)'s IP address and user agent, from the sign-in it was issued in;
+- each [refresh token](/concepts/refresh-tokens/)'s client, scope, type and times.
 
 Behind each cookie that names a session is a **browser-session row**, encrypted and with no user column. It holds a sign-in in progress, or a signed-in session. The admin console's rows hold the user's tokens, an ID token with their name and email address among them.
 
@@ -102,7 +102,7 @@ Behind each cookie that names a session is a **browser-session row**, encrypted 
 - **The same subject for every client.** `sub` is the user's [subject](/concepts/glossary/#subject), the same in every client's tokens.
 - **Profile pictures,** which anyone who knows the user's subject can load. See [The profile picture](/reference/endpoints/logo-and-picture/#the-profile-picture).
 - **ID tokens,** which apps keep and may send back as `id_token_hint` when they sign a user out. Sent in a query string, the hint lands in the browser's history and in proxies' access logs: [Hiding the hint](/guides/sign-users-out/#hiding-the-hint) shows how to keep it out.
-- **Logout tokens,** naming the user's `sub` and, for one session, its `sid`, sent to each client with a back-channel logout URI. See [The logout token](/reference/endpoints/backchannel-logout/#the-logout-token).
+- **Logout tokens,** naming the user's `sub` and, for one session, its `sid`, sent to each client with a back-channel logout URI. See [The logout token](/reference/endpoints/back-channel-logout/#the-logout-token).
 
 ## Who else receives data
 

@@ -21,7 +21,7 @@ It's [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-co
 
 </Steps>
 
-A session that expires is never sent, and neither is an app without a URI. Disabling or deleting a user, a password reset, an administrator setting the password and the `recover` command send one token to each app that knew the user, naming the user and no session: see [Telling the apps that knew the user](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user).
+No token is sent for a session that has expired, or to an app without a URI. Disabling or deleting a user, a password reset, an administrator setting the password and the `recover` command send one token to each app that knew the user, naming the user and no session: see [Telling the apps that knew the user](/concepts/ending-sessions/#telling-the-apps-that-knew-the-user).
 
 ## The request
 
@@ -93,7 +93,7 @@ Where a firewall or an egress policy limits what the auth server reaches, allow 
 A delivery that gets no answer after its last attempt is given up. So is one still running when the auth server stops, and one dropped because too many were already running: deliveries are kept in memory only. Nothing sends it later, so your app has to find out on its own, and that isn't always possible:
 
 - **Ending a session, a different user signing in on the browser, a reused authorization code, a credential change, and disabling or deleting the user** revoke the session's refresh tokens. Your app learns at its next refresh, which fails.
-- **A sign-out and a sign-in ending an older session** revoke nothing. A normal refresh token stops working with the session, but an offline refresh token keeps working, so an app holding one stays signed in.
+- **A sign-out and a sign-in ending an older session** revoke nothing. An offline refresh token from that session keeps working, so an app holding one stays signed in.
 
 <Aside type="caution">
 An app that must stop when the user's session does shouldn't ask for `offline_access`. A normal refresh token stops working with the session, however the session ends, whether or not the logout token arrived.

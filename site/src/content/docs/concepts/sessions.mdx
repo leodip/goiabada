@@ -61,7 +61,7 @@ A session can be used only while all of these hold:
 
 Each bound includes its last second: a session idle for exactly the idle timeout still counts, and so does a sign-in exactly `max_age` seconds ago, as [OpenID Connect Core 1.0 section 3.1.2.1](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest) describes. The idle timeout can't be longer than the maximum lifetime.
 
-A session that fails one of them isn't used, and the user signs in again. It isn't ended either: a session that has merely expired revokes nothing, its offline refresh tokens keep working, and no app is sent a [logout token](/reference/endpoints/backchannel-logout/) for it. A background job removes idle and expired sessions every 12 hours.
+A session that fails one of them isn't used, and the user signs in again. It isn't ended either: a session that has merely expired revokes nothing, its offline refresh tokens keep working, and no app is sent a [logout token](/reference/endpoints/back-channel-logout/) for it. A background job removes idle and expired sessions every 12 hours.
 
 ## What keeps a session alive
 

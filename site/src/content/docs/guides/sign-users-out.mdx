@@ -56,7 +56,7 @@ With the ID token as its hint, a sign-out ends your app's part of the user's ses
 
 A sign-out with no hint, or with one the auth server can't confirm, asks the user "Do you want to sign out?" first, and when they click **Sign out**, it ends the whole session, every client's part of it. RP-Initiated Logout, the OpenID Connect standard the endpoint follows, asks for that, since anyone can send a browser to `/auth/logout`. [Ending sessions](/concepts/ending-sessions/#signing-out) has the precise rules.
 
-When your client has a [back-channel logout URI](#get-told-when-a-session-ends), a sign-out with the hint sends your app a logout token for its part of the session too, after it has already ended its own. Answer it with `200` like any other. A sign-out with no hint sends one to every app on the session.
+When your client has a [back-channel logout URI](#get-told-when-a-session-ends), a sign-out with the hint sends your app a [logout token](/reference/endpoints/back-channel-logout/#the-logout-token), a signed message saying the session ended, for its part of the session too, after it has already ended its own. Answer it with `200` like any other. A sign-out with no hint sends one to every app on the session.
 
 An ID token that has expired still works as a hint while the session it came from is there, so a user who leaves your app open all day can still sign out without the question.
 
@@ -124,7 +124,7 @@ Your app's own session can outlive the user's session on the auth server: when t
    - it has a `sub`, a `sid` or both;
    - it has no `nonce`.
 
-   Most JWT libraries check the signature, `alg`, `typ`, `iss`, `aud` and `exp` when you tell them what to expect. The `typ`, `events` and `nonce` checks are what tell a logout token from an ID token, which is signed with the same key and names the same user. [The logout token](/reference/endpoints/backchannel-logout/#the-logout-token) lists every claim.
+   Most JWT libraries check the signature, `alg`, `typ`, `iss`, `aud` and `exp` when you tell them what to expect. The `typ`, `events` and `nonce` checks are what tell a logout token from an ID token, which is signed with the same key and names the same user. [The logout token](/reference/endpoints/back-channel-logout/#the-logout-token) lists every claim.
 
 4. End your app's sessions the token names. With a `sid`, that's each session whose ID token has that `sid` and the same `sub`. Without one, it's every session your app has for that `sub`, on every device. Delete the tokens your app kept for them.
 
@@ -140,9 +140,9 @@ Your app's own session can outlive the user's session on the auth server: when t
 
 </Steps>
 
-When your app doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429, the auth server sends the same token again, `jti` included, so a token can arrive more than once: answer `200` again. See [Retries](/reference/endpoints/backchannel-logout/#retries).
+When your app doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429, the auth server sends the same token again, `jti` included, so a token can arrive more than once: answer `200` again. See [Retries](/reference/endpoints/back-channel-logout/#retries).
 
-A token that never gets through isn't sent later. See [When a delivery is lost](/reference/endpoints/backchannel-logout/#when-a-delivery-is-lost) for what your app can still rely on.
+A token that never gets through isn't sent later. See [When a delivery is lost](/reference/endpoints/back-channel-logout/#when-a-delivery-is-lost) for what your app can still rely on.
 
 ## Next steps
 
@@ -151,5 +151,5 @@ A token that never gets through isn't sent later. See [When a delivery is lost](
   <LinkCard title="Revoke" description="End a grant with its refresh or access token." href="/reference/endpoints/revoke/" />
   <LinkCard title="Ending sessions" description="What a sign-out ends, and what it leaves alone." href="/concepts/ending-sessions/" />
   <LinkCard title="Sessions" description="How long a session lasts, and single sign-on." href="/concepts/sessions/" />
-  <LinkCard title="Back-channel logout" description="The logout token, its retries, and what your app answers." href="/reference/endpoints/backchannel-logout/" />
+  <LinkCard title="Back-channel logout" description="The logout token, its retries, and what your app answers." href="/reference/endpoints/back-channel-logout/" />
 </CardGrid>

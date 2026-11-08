@@ -110,7 +110,7 @@ Every key is snake_case, and a key means the same thing in every event that carr
 
 Events are about people and clients, so details carry ids, not secrets. A refresh token appears only as its `jti`, and an authenticator code only as its time step.
 
-No entry records an email address. An entry about one records `email_digest`, the SHA-256 hex digest of the address in lowercase. That covers a failed sign-in, a refused password grant, a registration, a forgot-password request, a rate limit on any of them, an account created or activated, an email verification code, and the recipient of a test email. Each address is also trimmed of surrounding spaces, the form every account's address is stored in, except on a forgot-password request, whose digest is of the address as that form looks it up. To find the entries about an address you know, compute its digest with `printf '%s' 'ana@example.com' | sha256sum`, the address in lowercase. Anyone holding a candidate address can do the same, so treat the digest as a pseudonym, not a secret. An entry about an account also names it by `user_id`.
+No entry records an email address. An entry about one records `email_digest` instead, the SHA-256 hex digest of the address in lowercase, and an entry about an account also names it by `user_id`. To find the entries about an address you know, compute its digest with `printf '%s' 'ana@example.com' | sha256sum`. Anyone holding a candidate address can do the same, so treat the digest as a pseudonym, not a secret.
 
 | Key | Meaning |
 |---|---|

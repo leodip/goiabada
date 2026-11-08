@@ -61,7 +61,7 @@ The auth server asks Cloudflare about at most 64 submissions at a time, and the 
 
 ## What it can't protect
 
-The [password grant](/legacy-flows/ropc/) takes a password straight from a client, with no page to show a challenge on, and it shares each account's budget of wrong passwords with the sign-in form. A public client with the password grant enabled lets anyone send it passwords, so through it a script can still spend an account's budget and block its sign-in on the form. A confidential client has to prove its secret first. So the challenge stops that only while no public client has the password grant enabled. It's off by default.
+The [password grant](/legacy-flows/ropc/) takes a password straight from a client, with no page to show a challenge on, and it shares each account's budget of wrong passwords with the sign-in form. A [public client](/concepts/clients/#public-and-confidential-clients) with the password grant enabled lets anyone send it passwords, so through it a script can still spend an account's budget and block its sign-in on the form. A confidential client has to prove its secret first. So the challenge stops that only while no public client has the password grant enabled. It's off by default.
 
 ## Turn the challenge off
 

@@ -130,7 +130,7 @@ sudo chmod 600 /etc/goiabada/*-key.pem
 
 Renewing a certificate takes a restart, since each server reads its files when it starts.
 
-With `https://` URLs, each HTTP listener only redirects to HTTPS, before the certificate and after it. If you forward port 80 to it, you can keep it on instead, to send visitors who type `http://` to HTTPS. See [listen addresses](/reference/environment-variables/#listen-addresses).
+If you forward port 80 to the HTTP listeners, you can keep them on instead: with `https://` URLs they only redirect, so visitors who type `http://` reach HTTPS. See [listen addresses](/reference/environment-variables/#listen-addresses).
 
 <Aside type="note" title="macOS and Windows">
 The releases include macOS and Windows binaries, which read the same variables. Load `goiabada.env` into their environment and run them under the service manager you use there.

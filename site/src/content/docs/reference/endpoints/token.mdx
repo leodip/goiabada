@@ -169,7 +169,7 @@ See [ROPC](/legacy-flows/ropc/#who-cant-use-it) for who can use it and every ref
 
 ## DPoP
 
-A request with a `DPoP` header gets an access token bound to the proof's key, on every grant, with `token_type` `DPoP` and the key's thumbprint as `cnf.jkt`. The proof must carry a nonce from the auth server: a request whose proof has none, or one that's expired, is refused with `use_dpop_nonce` and a new nonce in a `DPoP-Nonce` header, and your app retries once with it. Every answer to a request with a `DPoP` header carries a fresh `DPoP-Nonce`. [DPoP](/concepts/dpop/) has the whole round trip and every rule a proof must follow.
+A request with a `DPoP` header gets an access token bound to the proof's key, on every grant, with `token_type` `DPoP` and the key's thumbprint as `cnf.jkt`. Every answer to it carries a fresh nonce in a `DPoP-Nonce` header, which the next proof must carry. [DPoP](/concepts/dpop/) has the whole round trip and every rule a proof must follow.
 
 | `error` | `error_description` | Why |
 |---|---|---|

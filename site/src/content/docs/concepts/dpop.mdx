@@ -87,7 +87,7 @@ At the token endpoint, the nonce is what makes a proof fresh. Your proof still n
 
 ## Refresh tokens bound to your key
 
-A public client's refresh token is bound to its key too. Once your app has a refresh token from a request with a proof, every refresh of it needs a proof by that same key, and so does every refresh token after it. A refresh without a proof, or with a proof by another key, is refused with `invalid_grant`, and spends nothing: the refresh token still works with the right key.
+A [public client's](/concepts/clients/#public-and-confidential-clients) [refresh token](/concepts/refresh-tokens/) is bound to its key too. Once your app has a refresh token from a request with a proof, every refresh of it needs a proof by that same key, and so does every refresh token after it. A refresh without a proof, or with a proof by another key, is refused with `invalid_grant`, and spends nothing: the refresh token still works with the right key.
 
 **Keep the key as long as you keep the refresh token.** An app that loses its key, or makes a new one, has to sign the user in again.
 
@@ -123,7 +123,9 @@ The proof's `htm` and `htu` name this request, `GET` and `https://auth.example.c
 
 **Your app's clock must be within a minute of the auth server's.** Without a nonce, the proof's `iat` is what makes it fresh, and a proof made more than 60 seconds before or after the auth server's time is refused.
 
-A bound token sent as `Bearer`, in the header or a POST body, is refused, and so is a token bound to no key sent with `DPoP`. [UserInfo](/reference/endpoints/userinfo/#errors) lists each refusal and its `WWW-Authenticate` challenges.
+A bound token sent as `Bearer`, in the header or a POST body, is refused, and so is a token bound to no key sent with `DPoP`.
+
+Keep a DPoP client's access tokens short-lived. Userinfo and the API don't hand out nonces, so a proof made in advance for a token, by malware running in your app for example, can work there until the token expires. [UserInfo](/reference/endpoints/userinfo/#errors) lists each refusal and its `WWW-Authenticate` challenges.
 
 ## What a proof must say
 
@@ -144,8 +146,6 @@ Send one `DPoP` header, of at most 8 KiB. A request whose proof fails any of the
 ## What a bound token carries
 
 A bound access token's `cnf.jkt` claim is the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) thumbprint of your key: its required members, hashed with SHA-256 and base64url-encoded without padding. That claim is what says a token is bound. See [The access token](/concepts/tokens/#the-access-token).
-
-Keep a DPoP client's access tokens short-lived. APIs don't hand out nonces, so a proof made in advance for a token, by malware running in your app for example, can work there until the token expires.
 
 ## Next steps
 

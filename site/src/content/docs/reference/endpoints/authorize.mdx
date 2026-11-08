@@ -57,7 +57,7 @@ The link works once, for five minutes, and only on its own: a `request_handle` s
 | `max_age` | No | A number of seconds. A user who signed in longer ago than that signs in again. |
 | `acr_values` | No | The level of authentication to ask for. See [ACR and AMR](/concepts/acr-and-amr/#which-level-a-request-asks-for). |
 | `id_token_hint` | No | An ID token naming the user your app expects. See [id_token_hint](/concepts/id-token-hint/). |
-| `ui_locales` | No | The languages for the sign-in pages, as space-separated language tags in order of preference, such as `pt-BR en`. A user's [page language](/guides/customize-and-translate-the-pages/#how-the-language-is-chosen) wins over it on every page drawn for them once they've entered their password or while their browser is signed in. |
+| `ui_locales` | No | The languages for the sign-in pages, as space-separated language tags in order of preference, such as `pt-BR en`. A user's [page language](/guides/customize-and-translate-the-pages/#how-the-language-is-chosen) wins over it. |
 
 PKCE is required for every [public client](/concepts/clients/#public-and-confidential-clients), and for a confidential one unless an administrator made it optional.
 

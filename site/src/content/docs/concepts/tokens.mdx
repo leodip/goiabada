@@ -80,7 +80,7 @@ These settings are under **Admin**, **Tokens** in the admin console, and apply t
 
 The first sets how long both the access token and the ID token last. The other two decide whether user claims such as `email` or `name` go in each token, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. A client can override all three on its own **Tokens** tab: a lifetime of 0 there uses this setting, and each claims switch can be on, off, or left to this setting. See [Clients](/concepts/clients/#tokens).
 
-Keep the lifetime short. An API that checks an access token by its signature alone accepts it until `exp`, whatever happens to the session or the grant meanwhile, unless it [introspects](/reference/endpoints/introspect/) the token. The lifetime is the longest that can last. See [Access tokens already issued](/concepts/ending-sessions/#access-tokens-already-issued).
+Keep the lifetime short. An API that checks an access token by its signature alone accepts it until `exp`, whatever happens to the session or the grant meanwhile. The lifetime is the longest that can last. See [Access tokens already issued](/concepts/ending-sessions/#access-tokens-already-issued).
 
 An authorization code works once, for 60 seconds. [Refresh tokens](/concepts/refresh-tokens/#how-long-a-refresh-token-lasts) have lifetimes of their own.
 
@@ -115,7 +115,7 @@ User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes
 
 Access tokens follow [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068), the JWT profile for access tokens, in everything it requires. Two of its recommendations are left aside:
 
-- **One token for several APIs.** When the scopes your app asks for belong to more than one resource, it gets one token naming them all in `aud`. RFC 9068 recommends refusing that request with `invalid_scope`, which only makes sense with the `resource` parameter of [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707), and Goiabada doesn't support that. Each permission scope belongs to one resource in `aud`, so your API checks the scope it needs as usual.
+- **One token for several APIs.** When the scopes your app asks for belong to more than one resource, it gets one token naming them all in `aud`. RFC 9068 recommends refusing that request with `invalid_scope`. Goiabada doesn't support the `resource` parameter of [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707). Each permission scope belongs to one resource in `aud`, so your API checks the scope it needs as usual.
 - **`groups` holds group identifiers,** an array of strings, rather than the objects RFC 9068 borrows from SCIM.
 
 ## The ID token

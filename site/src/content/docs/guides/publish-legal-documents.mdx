@@ -83,16 +83,16 @@ Besides its public page, a document in effect shows to users here, and nowhere u
 |---|---|
 | The registration form, beside the fields it asks for | Those for all apps, plus the client's own when the user came from that client's sign-in page. |
 | The acceptance page, at sign-in | The **Users must accept** documents the user hasn't accepted. See [Accepting documents at sign-in](#accepting-documents-at-sign-in). |
-| My Account, under **Legal documents** | The versions the user accepted. See [What users accepted](#what-users-accepted). |
+| **Account**, **Legal documents**, in the admin console | The versions the user accepted. See [What users accepted](#what-users-accepted). |
 
 ## Accepting documents at sign-in
 
-When a user signs in to a client, after their password and any second factor, and before the consent screen, the auth server checks the **Users must accept** documents in effect for that client. If the user hasn't accepted the current version of one, they see a page listing each such document by its title, linked to its public page, with a box to tick.
+When a user signs in to a client, after their password and any second factor, and before the [consent](/concepts/glossary/#consent) screen, the auth server checks the **Users must accept** documents in effect for that client. If the user hasn't accepted the current version of one, they see a page listing each such document by its title, linked to its public page, with a box to tick.
 
 - **Accept** with every box ticked records, for each document, the user, the version shown and the time. The sign-in then goes on to the consent screen or back to the client.
 - **Decline** sends the client the error `access_denied`. Nothing is stored, and the user stays signed in, so the next sign-in asks again.
 
-A user is asked at every sign-in, single sign-on included, until they accept. A document accepted once counts on every client it applies to. Each new version is asked again, at the user's next sign-in to a client it covers.
+A user is asked at every sign-in, [single sign-on](/guides/single-sign-on-across-clients/) included, until they accept. A document accepted once counts on every client it applies to. Each new version is asked again, at the user's next sign-in to a client it covers.
 
 Where the page can't be shown:
 
@@ -100,10 +100,10 @@ Where the page can't be shown:
 |---|---|
 | A sign-in with [`prompt=none`](/concepts/prompt/#the-silent-checks) | Answered `interaction_required`. |
 | The [password grant](/legacy-flows/ropc/#who-cant-use-it) | Refused with `invalid_grant`, until the user accepts in the browser. |
-| A refresh token | Keeps working. An offline refresh token keeps refreshing for up to its lifetime without the new version accepted. |
-| The client credentials grant | Unaffected: there's no user. |
+| A [refresh token](/concepts/refresh-tokens/) | Keeps working. An offline refresh token keeps refreshing for up to its lifetime without the new version accepted. |
+| The [client credentials](/guides/protect-an-api/#let-a-service-call-your-api) grant | Unaffected: there's no user. |
 
-The admin console's own sign-in never asks, so users can always reach My Account. The [audit log](/concepts/audit-log/) records each acceptance as `accepted_legal_document`, and each decline as `declined_legal_documents`.
+The admin console's own sign-in never asks, so users can always reach their **Account** pages. The [audit log](/concepts/audit-log/) records each acceptance as `accepted_legal_document`, and each decline as `declined_legal_documents`.
 
 ## What users accepted
 

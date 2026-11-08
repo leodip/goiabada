@@ -123,7 +123,7 @@ curl https://auth.example.com/api/v1/account/profile \
   -H "DPoP: YOUR_PROOF"
 ```
 
-The proof's `htu` is the operation's URL, such as `https://auth.example.com/api/v1/account/profile`, and its `iat` must be within a minute of the auth server's clock. [Call userinfo and the API with a bound token](/concepts/dpop/#call-userinfo-and-the-api-with-a-bound-token) has the rest. A bound token sent as `Bearer`, or a token bound to no key sent with `DPoP`, is refused with `INVALID_TOKEN`.
+The proof's `htu` is the operation's URL, such as `https://auth.example.com/api/v1/account/profile`,. [Call userinfo and the API with a bound token](/concepts/dpop/#call-userinfo-and-the-api-with-a-bound-token) has the rest.
 
 ## Which tokens each API accepts
 

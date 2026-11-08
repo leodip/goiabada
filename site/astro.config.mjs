@@ -168,7 +168,7 @@ export default defineConfig({
 								{ label: 'Revoke', slug: 'reference/endpoints/revoke' },
 								{ label: 'Introspect', slug: 'reference/endpoints/introspect' },
 								{ label: 'Logout', slug: 'reference/endpoints/logout' },
-								{ label: 'Back-channel logout', slug: 'reference/endpoints/backchannel-logout' },
+								{ label: 'Back-channel logout', slug: 'reference/endpoints/back-channel-logout' },
 								{ label: 'UserInfo', slug: 'reference/endpoints/userinfo' },
 								{ label: 'Dynamic client registration', slug: 'reference/endpoints/dynamic-client-registration' },
 								{ label: 'Discovery and JWKS', slug: 'reference/endpoints/discovery-and-jwks' },

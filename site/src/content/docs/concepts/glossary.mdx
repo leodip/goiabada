@@ -111,7 +111,7 @@ A privacy notice or terms of use you write in the admin console, under **Legal d
 
 ### Logout token
 
-A signed JWT the auth server sends to a client's back-channel logout URI when a session the client was on ends. It names the user (`sub`) and, unless it's about every session of the user, the session (`sid`), so the app can end its own session for them. Its header says `typ` `logout+jwt`, which tells it apart from an ID token. See [Back-channel logout](/reference/endpoints/backchannel-logout/).
+A signed JWT the auth server sends to a client's back-channel logout URI when a session the client was on ends. It names the user (`sub`) and, unless it's about every session of the user, the session (`sid`), so the app can end its own session for them. Its header says `typ` `logout+jwt`, which tells it apart from an ID token. See [Back-channel logout](/reference/endpoints/back-channel-logout/).
 
 ### Permission
 

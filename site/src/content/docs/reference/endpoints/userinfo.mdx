@@ -76,7 +76,7 @@ Every answer, the claims and each error alike, carries `Cache-Control: no-store`
 
 ## Errors
 
-An error is answered with a `WWW-Authenticate` header naming the `error` and its `error_description`, and the same two in a JSON body, as [RFC 6750 section 3](https://www.rfc-editor.org/rfc/rfc6750#section-3) defines. A `401` names both schemes the endpoint accepts, a `Bearer` challenge first and a `DPoP` challenge listing the proof algorithms second, with the error in the challenge of the scheme your request used:
+An error is answered with a `WWW-Authenticate` header naming the `error` and its `error_description`, and the same two in a JSON body, as [RFC 6750 section 3](https://www.rfc-editor.org/rfc/rfc6750#section-3) defines. A `401` carries two challenges: `Bearer` first, then `DPoP` with the proof algorithms. The error goes in the challenge of the scheme your request used:
 
 ```http
 HTTP/1.1 401 Unauthorized
