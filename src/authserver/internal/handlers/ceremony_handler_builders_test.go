@@ -307,6 +307,16 @@ func (noLegalDocumentsOwed) Owed(context.Context, *record.Client, int64) ([]lega
 	return nil, nil
 }
 
+// owedRead answers the read of what a user owes with owed and err: nothing owed while both are nil.
+type owedRead struct {
+	owed []legaldocuments.InEffect
+	err  error
+}
+
+func (o *owedRead) Owed(context.Context, *record.Client, int64) ([]legaldocuments.InEffect, error) {
+	return o.owed, o.err
+}
+
 func legalDocumentsOrNone(legalDocuments legalDocumentsPort) legalDocumentsPort {
 	if legalDocuments == nil {
 		return noLegalDocumentsOwed{}

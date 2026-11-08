@@ -94,6 +94,37 @@ func TestValidateTokenRequest_ROPC_ALegalDocumentOwedIsRefused(t *testing.T) {
 	assert.ErrorAs(t, err, &owed, "typed, so the token handler leaves it off the wrong-password budget")
 }
 
+// What the user owes can't be read: the grant answers the fault, never reads it as nothing owed,
+// which would issue tokens to a user who owes the acceptance step a document (#622 decision 7).
+func TestValidateTokenRequest_ROPC_AFailedReadOfTheDocumentsOwedIsAnError(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
+		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+
+	passwordHash, _ := passwordhash.Hash("correctpassword")
+	user := &record.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
+	ropcEnabled := true
+	client := &record.Client{Id: 7, ClientIdentifier: "ropc-client", Enabled: true, IsPublic: true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled}
+	failure := errors.New("database down")
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, int64(7)).
+		Return([]record.LegalDocumentClient{}, nil).Once()
+	mockDB.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return(nil, failure).Once()
+
+	result, err := validator.ValidateTokenRequest(context.Background(),
+		&record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}, &ValidateTokenRequestInput{
+			GrantType: "password", ClientId: "ropc-client", Username: "user@example.com",
+			Password: "correctpassword", Scope: "openid",
+		})
+
+	assert.Nil(t, result)
+	require.ErrorIs(t, err, failure)
+	mockDB.AssertNotCalled(t, "UserLoadPermissions", mock.Anything, mock.Anything, mock.Anything)
+}
+
 func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)

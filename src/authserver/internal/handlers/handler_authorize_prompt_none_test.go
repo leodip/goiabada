@@ -153,6 +153,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 		{"the session lookup", "GetUserSessionBySessionIdentifier"},
 		{"the session's user", "UserSessionLoadUser"},
 		{"the effective scope", "FilterOutScopesWhereUserIsNotAuthorized"},
+		{"the legal documents owed", "Owed"},
 		{"the consent", "GetConsentByUserIdAndClientId"},
 		{"the session bump", "BumpUserSession"},
 		{"the save", "AddAuthContext"},
@@ -169,6 +170,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
+			legalDocuments := &owedRead{}
 			handler := buildAuthorizeGet(authorizeGetDeps{
 				pageRenderer:       pageRenderer,
 				ceremonyStore:      ceremonyStore,
@@ -178,6 +180,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 				auditLogger:        auditLogger,
 				permissionChecker:  permissionChecker,
 				tokenParser:        tokenParser,
+				legalDocuments:     legalDocuments,
 			})
 
 			req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none", nil)
@@ -233,6 +236,11 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 						return
 					}
 					permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", &userSession.User).Return("openid", nil)
+				}},
+				{"Owed", func(fail bool) {
+					if fail {
+						legalDocuments.err = fault
+					}
 				}},
 				{"GetConsentByUserIdAndClientId", func(fail bool) {
 					if fail {

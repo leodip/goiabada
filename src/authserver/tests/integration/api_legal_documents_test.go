@@ -300,10 +300,15 @@ func TestAPILegalDocuments_NotFoundAndBadIds(t *testing.T) {
 func TestAPILegalDocuments_TheSettingsDomainsScopes(t *testing.T) {
 	manageToken, _ := createAdminClientWithToken(t)
 	id := createLegalDocumentOverAPI(t, manageToken, "for_information", legalShortName("scopes"), "Privacy", "Text")
+	// Published, so its first version can be read under each permission. A notice for information is
+	// never asked at sign-in, and the settings permission below publishes it again anyway.
+	status, body, _ := legalCall(t, manageToken, http.MethodPost, legalPath(id, "/publish"), nil)
+	require.Equal(t, http.StatusOK, status, "publish: %v", body)
 
 	reads := []struct{ method, path string }{
 		{http.MethodGet, legalDocumentsPath},
 		{http.MethodGet, legalPath(id, "")},
+		{http.MethodGet, legalPath(id, "/versions/1")},
 	}
 	writes := []struct {
 		method, path string

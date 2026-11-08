@@ -151,4 +151,17 @@ func TestOwed_AFailedReadIsAnError(t *testing.T) {
 	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, (*sql.Tx)(nil), int64(42)).Return(nil, failure)
 	_, err = NewReader(database).Owed(context.Background(), shop, 42)
 	require.ErrorIs(t, err, failure, "never read as nothing accepted, nor as everything")
+
+	// A document whose versions can't be read is never skipped: skipping it would leave a must-accept
+	// document unowed, and its users signing in without it.
+	database = datamocks.NewDatabase(t)
+	database.EXPECT().GetLegalDocumentClientsByClientId(mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return([]record.LegalDocumentClient{}, nil)
+	database.EXPECT().GetAllLegalDocuments(mock.Anything, (*sql.Tx)(nil)).Return([]record.LegalDocument{
+		{Id: 1, ShortName: "terms", Kind: mustAccept, AppliesToAllApps: true},
+	}, nil)
+	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentId(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, failure)
+	owed, err := NewReader(database).Owed(context.Background(), shop, 42)
+	require.ErrorIs(t, err, failure, "a document whose versions can't be read is not skipped")
+	assert.Nil(t, owed)
 }

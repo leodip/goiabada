@@ -298,6 +298,44 @@ func TestLegalDocumentDraft_ARetiredDocumentIsReadOnly(t *testing.T) {
 	database.AssertNotCalled(t, "UpdateLegalDocument", mock.Anything, mock.Anything, mock.Anything)
 }
 
+// A draft save holds its title and text to what a create does, and a rename to the short-name rules,
+// since the short name is the document's /legal/<short-name> path from its first publish on.
+func TestLegalDocumentDraft_Refusals(t *testing.T) {
+	cases := []struct {
+		name string
+		body map[string]any
+		code string
+	}{
+		{"an uppercase short name", map[string]any{"shortName": "Terms", "title": "Terms", "markdown": "x"},
+			"handler.legal_document.short_name_invalid"},
+		{"a short name with a slash", map[string]any{"shortName": "terms/v2", "title": "Terms", "markdown": "x"},
+			"handler.legal_document.short_name_invalid"},
+		{"a 65-character short name", map[string]any{"shortName": strings.Repeat("a", 65), "title": "Terms", "markdown": "x"},
+			"handler.legal_document.short_name_too_long"},
+		{"no title", map[string]any{"title": " \t", "markdown": "x"}, "handler.legal_document.title_required"},
+		{"a 201-character title", map[string]any{"title": strings.Repeat("é", 201), "markdown": "x"},
+			"handler.legal_document.title_too_long"},
+		{"100,001 characters of text", map[string]any{"title": "Terms", "markdown": strings.Repeat("ü", 100_001)},
+			"handler.legal_document.markdown_too_long"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			noApps(database)
+			underItsRow(database, draftDocument(5))
+			database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(nil, nil).Maybe()
+			database.On("GetLegalDocumentByShortName", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+
+			status, body := serveLegal(HandleLegalDocumentDraftPut(database, handlersmocks.NewAuditLogger(t)),
+				legalRequest(t, http.MethodPut, c.body, "id", "5"))
+
+			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, c.code, errorCode(body))
+			database.AssertNotCalled(t, "UpdateLegalDocument", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
 func TestLegalDocumentDraft_AnUnknownDocumentIs404(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	noApps(database)

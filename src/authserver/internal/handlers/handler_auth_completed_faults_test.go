@@ -43,6 +43,12 @@ const completedSessionIdentifier = "test-session"
 const consentManageAccountScope = builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 
 func newCompletedFixture(t *testing.T, authContext *ceremony.AuthContext) *completedFixture {
+	return newCompletedFixtureWith(t, authContext, nil)
+}
+
+// newCompletedFixtureWith is newCompletedFixture asking legalDocuments what the user owes; nil owes
+// nothing.
+func newCompletedFixtureWith(t *testing.T, authContext *ceremony.AuthContext, legalDocuments legalDocumentsPort) *completedFixture {
 	f := &completedFixture{
 		pageRenderer:       handlersmocks.NewPageRenderer(t),
 		ceremonyStore:      handlersmocks.NewCeremonyStore(t),
@@ -60,6 +66,7 @@ func newCompletedFixture(t *testing.T, authContext *ceremony.AuthContext) *compl
 		templateFS:         fstest.MapFS{},
 		auditLogger:        f.auditLogger,
 		permissionChecker:  f.permissionChecker,
+		legalDocuments:     legalDocuments,
 	})
 	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
 	req = withSessionSettings(req)
@@ -258,6 +265,22 @@ func TestHandleAuthCompletedGet_AFailureAfterTheBindAnswers500(t *testing.T) {
 			Return(scope, nil).Once()
 		f.database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
 			Return(nil, failure).Once()
+		f.expect500(failure)
+
+		f.handler.ServeHTTP(f.rr, f.req)
+
+		f.pageRenderer.AssertExpectations(t)
+		f.assertNothingSaved(t)
+	})
+
+	// What the user owes can't be read: refused, never read as nothing owed, which would issue to a
+	// user who owes the acceptance step a must-accept document (#622).
+	t.Run("the legal documents owed", func(t *testing.T) {
+		f := newCompletedFixtureWith(t, ssoCeremony("openid"), &owedRead{err: failure})
+		userSession := f.expectReusableSession("test-client")
+		user := f.expectBoundSSO(userSession)
+		f.permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", user).
+			Return("openid", nil).Once()
 		f.expect500(failure)
 
 		f.handler.ServeHTTP(f.rr, f.req)
