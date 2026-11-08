@@ -26,10 +26,11 @@
 # mockery:        Mock generator version (devcontainer)
 # staticcheck:    Static analyzer (devcontainer, make check)
 # unparam:        Unused-parameter analyzer (devcontainer, make check)
-# govulncheck:    Vulnerability scanner (devcontainer)
-# trivy:          Image scanner, built from source in CI's Build validation, which
-#                 fails on a fixable HIGH or CRITICAL finding in the images' Alpine
-#                 packages, and in the weekly Image scan of the published images
+# govulncheck:    Vulnerability scanner (devcontainer, CI's Vulnerabilities job over the
+#                 source, Build validation's scan of the release images' binaries, and
+#                 the weekly Image scan of the published images)
+# trivy:          Image scanner, built from source in the weekly Image scan of the
+#                 published images
 # grype:          Image scanner, built from source in the weekly Image scan of the
 #                 published images, beside Trivy
 # npm-check-updates: Upgrades the npm projects' dependencies (version-manager.sh
@@ -55,9 +56,11 @@
 # release only once GitHub has recorded it public for 3 days; the malicious
 # v0.69.4 was public for about 12 hours (#520).
 #
-# grype is pinned, built and suggested the same way. It runs only in the weekly
-# Image scan, so a second vulnerability database catches an advisory Trivy's is
-# late on; the build-time gate stays Trivy's alone (#520).
+# grype is pinned, built and suggested the same way. It runs in the weekly Image
+# scan beside Trivy, so a second vulnerability database catches an advisory
+# Trivy's is late on (#520). Neither gates a build: the images hold no operating
+# system package, and Build validation gates on govulncheck's scan of their
+# binaries (#808).
 #
 # npm-check-updates, cropperjs and acorn are suggested under the same 3 days,
 # counted from when the npm registry records the release published, and deps
