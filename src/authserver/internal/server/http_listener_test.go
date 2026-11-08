@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"reflect"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -42,6 +43,15 @@ const (
 // registered as Start registers them, before Start builds its listeners.
 func newHTTPListenerTestServer(t *testing.T, configure func(*config.AuthServerConfig)) *Server {
 	t.Helper()
+	s := newStartableTestServer(t, configure)
+	s.registerRoutes()
+	return s
+}
+
+// newStartableTestServer is the server main builds for a configuration, as Start receives it: its
+// routes not yet registered, since Start registers them.
+func newStartableTestServer(t *testing.T, configure func(*config.AuthServerConfig)) *Server {
+	t.Helper()
 
 	database := newRoutingDatabase(t)
 	database.On("PoolStats").Return(testPoolStats).Maybe()
@@ -53,9 +63,7 @@ func newHTTPListenerTestServer(t *testing.T, configure func(*config.AuthServerCo
 	cfg.AuthServer.ListenPortHttp = 9090
 	configure(&cfg.AuthServer)
 
-	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg, testTokenProofs(t))
-	s.registerRoutes()
-	return s
+	return NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg, testTokenProofs(t))
 }
 
 // redirectingServer is an https deployment reached directly: its HTTP listener only redirects.
@@ -411,6 +419,53 @@ func TestStart_TheHTTPListenerAndItsRecords(t *testing.T) {
 				assert.Empty(t, health.Header.Values("Strict-Transport-Security"))
 			}
 		})
+	}
+}
+
+// Start serves the HTTP listener newHTTPListenerServer builds. The tests above build that listener
+// themselves, so they can't see Start handing the listener the router again, as it did before #715,
+// which would serve every page over plain HTTP beside an https base URL reached directly. The worker
+// Start launches first touches the database after its startup delay, long after this has stopped.
+func TestStart_AnHTTPSBaseURLsHTTPListenerOnlyRedirects(t *testing.T) {
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := probe.Addr().(*net.TCPAddr).Port
+	require.NoError(t, probe.Close())
+
+	s := newStartableTestServer(t, func(c *config.AuthServerConfig) {
+		c.BaseURL = "https://auth.example.com"
+		c.ListenPortHttp = port
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	returned := make(chan error, 1)
+	go func() {
+		_, err := s.Start(ctx)
+		returned <- err
+	}()
+
+	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+	require.Eventually(t, func() bool {
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			return false
+		}
+		_ = conn.Close()
+		return true
+	}, 10*time.Second, 20*time.Millisecond, "Start's HTTP listener answers")
+
+	page, _ := sendToHTTPListener(t, addr, http.MethodGet, "GET /no-such-path HTTP/1.1\r\nHost: auth.example.com\r\nConnection: close\r\n\r\n")
+	assert.Equal(t, http.StatusMovedPermanently, page.StatusCode, "the listener only redirects")
+	assert.Equal(t, "https://auth.example.com/no-such-path", page.Header.Get("Location"))
+	assert.Empty(t, page.Header.Values("Strict-Transport-Security"), "no HSTS over plain HTTP")
+
+	cancel()
+	select {
+	case err := <-returned:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("Start did not return once its context was cancelled")
 	}
 }
 

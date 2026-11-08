@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -47,6 +48,15 @@ const (
 // them, before Start builds its listeners.
 func newHTTPListenerTestServer(t *testing.T, configure func(*config.AdminConsoleConfig)) *Server {
 	t.Helper()
+	s := newStartableTestServer(t, configure)
+	s.registerRoutes()
+	return s
+}
+
+// newStartableTestServer is the server main builds for a configuration, as Start receives it: its
+// routes not yet registered, since Start registers them.
+func newStartableTestServer(t *testing.T, configure func(*config.AdminConsoleConfig)) *Server {
+	t.Helper()
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/public/settings" {
@@ -71,9 +81,7 @@ func newHTTPListenerTestServer(t *testing.T, configure func(*config.AdminConsole
 	upstream := upstreammetrics.Register(registry)
 	cache := publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil, upstream), publicsettings.DefaultTTL, registry)
 
-	s := NewServer(routing.New(), newTestSessionStore(), cache, nil, cfg, nil, nil, nil, registry, upstream)
-	s.registerRoutes()
-	return s
+	return NewServer(routing.New(), newTestSessionStore(), cache, nil, cfg, nil, nil, nil, registry, upstream)
 }
 
 // redirectingServer is an https deployment reached directly: its HTTP listener only redirects.
@@ -428,6 +436,49 @@ func TestStart_TheHTTPListenerAndItsRecords(t *testing.T) {
 				assert.Empty(t, health.Header.Values("Strict-Transport-Security"))
 			}
 		})
+	}
+}
+
+// Start serves the HTTP listener newHTTPListenerServer builds. The tests above build that listener
+// themselves, so they can't see Start handing the listener the router again, as it did before #715,
+// which would serve every page over plain HTTP beside an https base URL reached directly.
+func TestStart_AnHTTPSBaseURLsHTTPListenerOnlyRedirects(t *testing.T) {
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := probe.Addr().(*net.TCPAddr).Port
+	require.NoError(t, probe.Close())
+
+	s := newStartableTestServer(t, func(c *config.AdminConsoleConfig) {
+		c.BaseURL = "https://console.example.com"
+		c.ListenPortHttp = port
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	returned := make(chan error, 1)
+	go func() { returned <- s.Start(ctx) }()
+
+	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+	require.Eventually(t, func() bool {
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			return false
+		}
+		_ = conn.Close()
+		return true
+	}, 10*time.Second, 20*time.Millisecond, "Start's HTTP listener answers")
+
+	page, _ := sendToHTTPListener(t, addr, http.MethodGet, "GET /no-such-path HTTP/1.1\r\nHost: console.example.com\r\nConnection: close\r\n\r\n")
+	assert.Equal(t, http.StatusMovedPermanently, page.StatusCode, "the listener only redirects")
+	assert.Equal(t, "https://console.example.com/no-such-path", page.Header.Get("Location"))
+	assert.Empty(t, page.Header.Values("Strict-Transport-Security"), "no HSTS over plain HTTP")
+
+	cancel()
+	select {
+	case err := <-returned:
+		require.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("Start did not return once its context was cancelled")
 	}
 }
 
