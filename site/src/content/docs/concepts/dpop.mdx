@@ -135,7 +135,7 @@ WWW-Authenticate: Bearer realm="goiabada", DPoP realm="goiabada", algs="ES256 ES
 | Part | Rule |
 |---|---|
 | `typ` | `dpop+jwt` |
-| `alg` | One of `ES256`, `ES384`, `ES512`, `PS256`, `PS384`, `PS512`, `RS256`, `RS384`, `RS512`, `Ed25519` and `EdDSA`, as discovery's `dpop_signing_alg_values_supported` lists them. `none` and symmetric algorithms are never accepted |
+| `alg` | One of `ES256`, `ES384`, `ES512`, `PS256`, `PS384`, `PS512`, `RS256`, `RS384`, `RS512`, `Ed25519` and `EdDSA`, as [discovery's](/reference/endpoints/discovery-and-jwks/) `dpop_signing_alg_values_supported` lists them. `none` and symmetric algorithms are never accepted |
 | `jwk` | Your public key, of the type the algorithm takes: an EC key on the curve it names, an RSA key of 2048 to 8192 bits, or an Ed25519 key for `Ed25519` and `EdDSA`. A key with any private part is refused |
 | `jti` | A new identifier for each proof. A proof is accepted once: sent again, it's refused |
 | `htm` | The request's method, exactly: `POST` at the token endpoint |
@@ -152,11 +152,15 @@ A bound access token's `cnf.jkt` claim is the [RFC 7638](https://www.rfc-editor.
 
 Keep a DPoP client's access tokens short-lived. APIs don't hand out nonces, so a proof made in advance for a token, by malware running in your app for example, can work there until the token expires.
 
+## When a client requires DPoP
+
+An administrator can turn on [**Require DPoP for token requests**](/concepts/clients/#require-dpop-for-token-requests) for a client. Then every token request for it needs a proof, and it can't get access tokens through the [implicit flow](/legacy-flows/implicit/), which has no token request to carry one. Turn it on for a client that always uses DPoP, so none of its tokens can be had without a proof.
+
 ## Next steps
 
 <CardGrid>
+  <LinkCard title="Add sign-in to a SPA or mobile app" description="Bind a browser or mobile app's tokens to its key, step by step." href="/guides/add-sign-in-to-a-spa-or-mobile-app/#bind-the-tokens-to-a-key-with-dpop" />
+  <LinkCard title="Protect an API" description="Accept DPoP-bound tokens at your own API, and refuse copied ones." href="/guides/protect-an-api/#accept-dpop-bound-tokens" />
   <LinkCard title="Token" description="Every grant, and every refusal, at the token endpoint." href="/reference/endpoints/token/" />
   <LinkCard title="UserInfo" description="Read the signed-in user's claims with a bound token." href="/reference/endpoints/userinfo/" />
-  <LinkCard title="Tokens" description="What each token carries, and how to check one." href="/concepts/tokens/" />
-  <LinkCard title="Discovery and JWKS" description="The algorithms a proof may use, from the discovery document." href="/reference/endpoints/discovery-and-jwks/" />
 </CardGrid>

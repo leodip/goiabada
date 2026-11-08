@@ -814,9 +814,21 @@ Goiabada implements published standards. When a change touches behavior one of t
 the relevant section of the official text (rfc-editor.org, openid.net) rather than relying on
 memory, and follow its MUST and SHOULD requirements. The main ones: OAuth 2.0 (RFC 6749) and bearer
 tokens (RFC 6750), PKCE (RFC 7636), revocation (RFC 7009), introspection (RFC 7662), dynamic client
-registration (RFC 7591), authorization server metadata (RFC 8414), JWT (RFC 7519) and JWK (RFC
-7517), JWT access tokens (RFC 9068), the OAuth 2.0 Security Best Current Practice (RFC 9700), and
-OpenID Connect Core 1.0, Discovery 1.0 and Back-Channel Logout 1.0.
+registration (RFC 7591), authorization server metadata (RFC 8414), JWT (RFC 7519), JWS (RFC
+7515), JWA (RFC 7518), JWK (RFC 7517) and JWK thumbprints (RFC 7638), JWT access tokens (RFC 9068),
+DPoP (RFC 9449), the OAuth 2.0 Security Best Current Practice (RFC 9700), and OpenID Connect Core
+1.0, Discovery 1.0 and Back-Channel Logout 1.0.
+
+Every JWT the auth server or the admin console reads, its own tokens, the console's ID tokens and
+DPoP proofs, first passes `oauth.CheckJWTStructure` in core, before its signature is checked (#709):
+three segments of the unpadded base64url alphabet only, so `=`, CR, LF and whitespace are refused
+(RFC 7515 sections 2 and 5.2); a header and payload of valid UTF-8 (RFC 7519 section 7.2); no
+`crit` header, whatever its value, since Goiabada understands no extension (RFC 7515 section
+4.1.11); and no `cty` of `JWT` or `application/jwt`, since it supports no nested JWT. Each reader
+answers a refusal as it answers a malformed token. The console's ID-token reader also requires a
+string `sub` of 1 to 255 characters and a numeric `iat` (OpenID Connect Core 1.0 section 2), refuses
+an RSA key under 2048 bits or with an even, small or overlong exponent (RFC 7518 section 3.3), and
+skips a key whose `use` is not `sig` or whose `alg` is not `RS256` (Core section 10.1).
 
 Goiabada departs from three of RFC 9068's SHOULDs and MAYs, and the tokens page documents each:
 a request whose scopes name several resources gets one token naming them all in `aud` (section 3,

@@ -10,8 +10,13 @@ claims and answers.
 | `/web2` | `testapp-web2`, confidential | Single sign-on across clients |
 | `/web3` | `testapp-web3`, confidential, no back-channel logout URI | Sign users out: what the auth server does with the tokens of an app that isn't told a session ended |
 | `/spa` | `testapp-spa`, public | Add sign-in to a SPA or mobile app |
+| `/spa-dpop` | `testapp-spa-dpop`, public, requires DPoP for token requests | Add sign-in to a SPA or mobile app: "Bind the tokens to a key with DPoP" |
 | `/service` | `testapp-service`, client credentials | Protect an API |
-| `/api/products` | `testapp-api`, confidential, introspects | Protect an API: checks and introspects the token, answers 401 or 403 |
+| `/api/products` | `testapp-api`, confidential, introspects | Protect an API: checks and introspects the token, accepts a DPoP-bound one only with a proof by its key, answers 401 or 403 |
+
+The API checks each token on its own and by introspection. Add `?check=local` or
+`?check=introspection` to have it check one way alone, each as "Accept DPoP-bound tokens" describes
+it; a DPoP proof for the API names its URL without the query.
 
 The e2e environment (see [../README.md](../README.md)) deploys it on its two test app hosts:
 `e2e/infra/testapp.sh` sets up the clients below through the admin console, the way these steps say,
@@ -45,10 +50,13 @@ which `e2e/infra/prepare.sh` wrote, and add the `http://localhost:3000/...` addr
    `https://e2e-webtest1.goiabada.dev/spa` as both its redirect URI and its sign-out redirect URI,
    and the web origin
    `https://e2e-webtest1.goiabada.dev`.
-6. **`testapp-service`** (Protect an API, "Let a service call your API", steps 1 and 2). Create
+6. **`testapp-spa-dpop`** (the same guide's "Bind the tokens to a key with DPoP", step 1): the same
+   as `testapp-spa`, with `https://e2e-webtest1.goiabada.dev/spa-dpop` as its redirect URI and its
+   sign-out redirect URI, and **Require DPoP for token requests** on, on its **Tokens** tab.
+7. **`testapp-service`** (Protect an API, "Let a service call your API", steps 1 and 2). Create
    it with **Client credentials flow** on and **Authorization code flow with PKCE** off, grant it `product-api` `read` on **Permissions**, and
    copy its secret to `SERVICE_CLIENT_SECRET`.
-7. **`testapp-api`** (Protect an API, "Ask the auth server about a token", steps 1 and 2). Create
+8. **`testapp-api`** (Protect an API, "Ask the auth server about a token", steps 1 and 2). Create
    it with **Authorization code flow with PKCE** on, choose `product-api` on its **Introspection**
    tab, click **Add resource** and **Save**, and copy its secret to `API_CLIENT_SECRET`.
 
@@ -61,5 +69,5 @@ an auth server on the same machine, outside a container.
 ```bash
 cp .env.example .env.local   # then fill in the secrets
 npm run dev                  # http://localhost:3000
-npm test                     # the back-channel logout route's checks of a logout token
+npm test                     # the back-channel logout route's checks of a logout token, and the API's DPoP checks
 ```

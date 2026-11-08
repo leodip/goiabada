@@ -134,6 +134,51 @@ When an operation must stop the moment a token is cut off, have your API also [i
 
 Each check is a call to the auth server, so keep it for the operations that need it. See [Introspect](/reference/endpoints/introspect/) for the answer's members and errors.
 
+## Accept DPoP-bound tokens
+
+An app using [DPoP](/concepts/dpop/) gets access tokens bound to a key it holds, so a token copied away from it is useless without that key. It calls your API with the `DPoP` scheme, and a proof, a short JWT signed by the key, in a `DPoP` header:
+
+```http
+GET /products HTTP/1.1
+Host: api.example.com
+Authorization: DPoP eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...
+DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7...
+```
+
+A bound token carries the key's thumbprint in `cnf.jkt`. That claim is what says it's bound: its `typ` claim is `Bearer` whether it's bound or not.
+
+<Steps>
+
+1. Read the `Authorization` header's scheme. With `Bearer`, check the token as step 6 above does, and refuse it with `401` `invalid_token` if it carries `cnf.jkt`: a bound token sent as a bearer token is how a copied one would arrive.
+
+2. With `DPoP`, take the request's one `DPoP` header, and refuse the request with `401` `invalid_dpop_proof` if there's none, or more than one, or its proof fails any of these checks:
+
+   | Part | Check |
+   |---|---|
+   | Header `typ` | `dpop+jwt` |
+   | Header `alg` | One of the asymmetric algorithms you accept, such as `ES256`. Never `none` or a symmetric one such as `HS256` |
+   | Header `jwk` | A public key, with no private part. The signature verifies with it |
+   | `htm` | Your request's method, exactly, such as `GET` |
+   | `htu` | Your API's own public URL for the request, such as `https://api.example.com/products`, without query or fragment. Compare it with the URL your callers use, configured in your API, never one rebuilt from the `Host` header |
+   | `iat` | Within a minute of your API's clock, either side |
+   | `ath` | The access token's SHA-256 hash, base64url-encoded without padding |
+   | `jti` | Not seen before on this URL: keep each one until its `iat` falls out of your window, and refuse it a second time |
+
+3. Check the token as step 6 above does, and refuse it with `401` `invalid_token` if it has no `cnf.jkt`, or if its `cnf.jkt` isn't the proof key's thumbprint: the key's [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) thumbprint, with SHA-256, base64url-encoded without padding. Most JWT libraries compute it.
+
+4. When your API [introspects](#ask-the-auth-server-about-a-token) the token, the answer says the same: `token_type` `DPoP` and the thumbprint in `cnf.jkt` for a bound token, `token_type` `Bearer` and no `cnf` for an unbound one. Apply steps 1 and 3 to that answer.
+
+</Steps>
+
+Every `401` your API answers names both schemes in `WWW-Authenticate`, `Bearer` first, with the error in the challenge of the scheme the request used, and the algorithms it accepts in `algs`:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer realm="product-api", DPoP realm="product-api", algs="ES256 PS256", error="invalid_dpop_proof", error_description="The DPoP proof is invalid."
+```
+
+A `403` for a missing permission carries `insufficient_scope` in the challenge of the scheme used, just the same.
+
 ## When something goes wrong
 
 - The app gets `error=invalid_scope`, or a token without the permission: see [invalid_scope](/troubleshooting/invalid-scope/).
@@ -147,4 +192,5 @@ Each check is a call to the auth server, so keep it for the operations that need
   <LinkCard title="Tokens" description="Every claim an access token carries, and how long it lasts." href="/concepts/tokens/" />
   <LinkCard title="Token" description="The token endpoint's grants, answers and errors." href="/reference/endpoints/token/" />
   <LinkCard title="Introspect" description="Ask the auth server whether a token is still active." href="/reference/endpoints/introspect/" />
+  <LinkCard title="DPoP" description="How apps bind their tokens to a key, and what a proof says." href="/concepts/dpop/" />
 </CardGrid>

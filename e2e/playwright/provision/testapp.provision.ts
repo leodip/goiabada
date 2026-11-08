@@ -20,6 +20,7 @@ import {
   readClientSecret,
   resourceUrl,
   rowWithCell,
+  saveAndExpectSaved,
   saveResourcePermissions,
   setBackchannelLogoutUri,
   signInAsAdmin,
@@ -43,7 +44,7 @@ async function createClient(page: Page, client: NewClient): Promise<number> {
 test("set up the test app's clients and API", async ({ page }) => {
   await signInAsAdmin(page);
 
-  const clientIds = [testapp.web, testapp.web2, testapp.web3, testapp.spa, testapp.service, testapp.api].map((c) => c.clientId);
+  const clientIds = [testapp.web, testapp.web2, testapp.web3, testapp.spa, testapp.spaDpop, testapp.service, testapp.api].map((c) => c.clientId);
   await page.goto(clientsList);
   for (const identifier of clientIds) {
     if ((await clientRow(page, identifier).count()) > 0) {
@@ -79,21 +80,31 @@ test("set up the test app's clients and API", async ({ page }) => {
   }
 
   // Add sign-in to a SPA or mobile app, steps 1 to 4: a public client, the page as its redirect URI
-  // and, since it signs out back to itself, as its sign-out redirect URI, and its origin.
-  const spaId = await createClient(page, { identifier: testapp.spa.clientId });
-  await page.goto(clientUrl(spaId, "authentication"));
-  await page.getByRole("radio", { name: "Public", exact: true }).check();
-  await page.locator("#btnSave").click();
-  await confirmDialog(page, "You're making the client public");
-  await expect(page.getByText("Authentication saved.")).toBeVisible();
-  await addRedirectUri(page, spaId, testapp.spa.url);
-  await addSignOutRedirectUri(page, spaId, testapp.spa.url);
-  await page.goto(clientUrl(spaId, "web-origins"));
-  await page.locator("#webOrigin").fill(testapp.spa.origin);
-  await page.locator("#addOriginBtn").click();
-  await page.locator("#btnSave").click();
-  await expect(page.getByText("Web origins saved.")).toBeVisible();
+  // and, since it signs out back to itself, as its sign-out redirect URI, and its origin. The SPA with
+  // DPoP is the same on its own page, and "Bind the tokens to a key with DPoP", step 1, turns on
+  // Require DPoP for token requests on its Tokens tab.
+  for (const spa of [testapp.spa, testapp.spaDpop]) {
+    const spaId = await createClient(page, { identifier: spa.clientId });
+    await page.goto(clientUrl(spaId, "authentication"));
+    await page.getByRole("radio", { name: "Public", exact: true }).check();
+    await page.locator("#btnSave").click();
+    await confirmDialog(page, "You're making the client public");
+    await expect(page.getByText("Authentication saved.")).toBeVisible();
+    await addRedirectUri(page, spaId, spa.url);
+    await addSignOutRedirectUri(page, spaId, spa.url);
+    await page.goto(clientUrl(spaId, "web-origins"));
+    await page.locator("#webOrigin").fill(spa.origin);
+    await page.locator("#addOriginBtn").click();
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Web origins saved.")).toBeVisible();
+    if (spa === testapp.spaDpop) {
+      await page.goto(clientUrl(spaId, "tokens"));
+      await page.getByRole("checkbox", { name: "Require DPoP for token requests" }).check();
+      await saveAndExpectSaved(page, "Token settings saved.");
+    }
+  }
   secrets.SPA_CLIENT_ID = testapp.spa.clientId;
+  secrets.SPA_DPOP_CLIENT_ID = testapp.spaDpop.clientId;
 
   // Protect an API, "Let a service call your API", steps 1 and 2: the client credentials flow alone,
   // and the API's read permission.

@@ -13,7 +13,7 @@ two Playwright suites against them:
 |---|---|
 | `e2e-auth.goiabada.dev` | Auth server |
 | `e2e-admin.goiabada.dev` | Admin console |
-| `e2e-webtest1.goiabada.dev` | The test app (`testapp/`): the web app, the SPA, the service and the API |
+| `e2e-webtest1.goiabada.dev` | The test app (`testapp/`): the web app, the SPAs, the service and the API |
 | `e2e-webtest2.goiabada.dev` | The test app again, for its second web app: single sign-on across two sites |
 
 The deployment is the docs' [Reverse proxy](https://goiabada.dev/deploy/reverse-proxy/) method, as a
