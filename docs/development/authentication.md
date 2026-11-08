@@ -161,7 +161,14 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   judges the nonce. A replay is `invalid_dpop_proof`, a store failure a 500. The admin group mounts
   it in each route's `With`, after the route's scope guard, and the account group after each
   route's limiters; `TestInitRoutes_EveryBearerRouteRecordsTheDPoPProofAfterItsGuards` holds every
-  route to it.
+  route to it. The handler's own checks (body, session, current password, OTP code, existence)
+  run after the record, so the writer it hands the handler releases the record
+  (`ReleaseDPoPProof`) when the handler's first final status is a 4xx, before that status is
+  written: a refused request leaves its proof unspent, and the client may resend it corrected. A
+  success or a 5xx keeps the record. Recording before the handler, not at each handler's last
+  check, keeps the proof single-use whatever the handler does: a concurrent use is a replay
+  while the first request is in flight. A failed release is an Error record and leaves the proof
+  spent.
 - `htu` is compared with the path the client sent, `dpop.RequestPath` over `RequestURI`, at the
   token endpoint and the resources alike: `httpmw.StripTrailingSlash` rewrites `r.URL` before
   routing.

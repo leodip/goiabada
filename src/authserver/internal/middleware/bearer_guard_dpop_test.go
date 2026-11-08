@@ -79,6 +79,10 @@ type replayStore struct {
 	mu      sync.Mutex
 	records map[string]time.Time
 	fault   error
+	// releaseFault is what ReleaseDPoPProof answers, when set, deleting nothing; releases counts its
+	// calls.
+	releaseFault error
+	releases     int
 }
 
 func newReplayStore() *replayStore { return &replayStore{records: map[string]time.Time{}} }
@@ -94,6 +98,23 @@ func (s *replayStore) RecordDPoPProof(_ context.Context, _ *sql.Tx, proofHash st
 	}
 	s.records[proofHash] = expiresAt
 	return true, nil
+}
+
+func (s *replayStore) ReleaseDPoPProof(_ context.Context, _ *sql.Tx, proofHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.releases++
+	if s.releaseFault != nil {
+		return s.releaseFault
+	}
+	delete(s.records, proofHash)
+	return nil
+}
+
+func (s *replayStore) releaseCalls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.releases
 }
 
 func (s *replayStore) count() int {

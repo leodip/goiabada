@@ -50,9 +50,11 @@ type ResourceProofs struct {
 }
 
 // dpopProofRecorder is the replay store: it records a proof's replay key until expiresAt, and
-// reports false when the key was recorded before, by this instance or another sharing the database.
+// reports false when the key was recorded before, by this instance or another sharing the database;
+// and it releases a record, which unspends its proof.
 type dpopProofRecorder interface {
 	RecordDPoPProof(ctx context.Context, tx *sql.Tx, proofHash string, expiresAt time.Time) (bool, error)
+	ReleaseDPoPProof(ctx context.Context, tx *sql.Tx, proofHash string) error
 }
 
 // NewBearerTokenForAPI builds the guard set for /api/v1/*, whose refusals answer the
@@ -283,6 +285,18 @@ func (m *BearerToken) dpopProof(w http.ResponseWriter, r *http.Request, token *o
 // by this instance or another sharing the database, is a replay, answered 401 invalid_dpop_proof
 // with a Warn record. A store that cannot answer is the surface's 500: the request never goes
 // ahead unchecked. A request whose token was not presented with the DPoP scheme passes through.
+//
+// The handler still has checks of its own: the request body, the session's and the credentials'
+// (a current password, an OTP code), whether what it names exists. A request one of them refuses
+// has not succeeded, so it leaves its proof unspent too (decision 9): when the handler answers a
+// 4xx, the record this call stored is released before that status is written, so the client can
+// never see the refusal while its proof is still recorded, and can send the proof again with the
+// request corrected. The proof is recorded before the handler runs rather than at each handler's
+// own last check, so that it is single-use whatever the handler does: two requests sending it at
+// once never both reach a handler, and the second, refused as a replay, released nothing. A 5xx,
+// and a success, keep the record, since what the handler did before them may have taken effect. A
+// release that fails is an Error record, and the proof stays spent, which refuses nothing a fresh
+// proof would not be admitted for.
 func (m *BearerToken) RecordDPoPProof() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -316,9 +330,44 @@ func (m *BearerToken) RecordDPoPProof() func(http.Handler) http.Handler {
 				m.refusals.invalidDPoPProof(w, r)
 				return
 			}
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(&dpopRefusalReleaser{ResponseWriter: w, release: func() {
+				if err := m.proofs.Replays.ReleaseDPoPProof(r.Context(), nil, proof.ReplayKey()); err != nil {
+					slog.ErrorContext(r.Context(), "unable to release the dpop proof of a refused request", "error", err)
+				}
+			}}, r)
 		})
 	}
+}
+
+// dpopRefusalReleaser is the writer RecordDPoPProof hands the handler: the first final status it
+// writes, explicitly or by a first Write, decides once whether the proof's record is released, and a
+// 4xx releases it before the status is passed on.
+type dpopRefusalReleaser struct {
+	http.ResponseWriter
+	release func()
+	decided bool
+}
+
+func (w *dpopRefusalReleaser) WriteHeader(code int) {
+	// A 1xx is informational, sent ahead of the final status, which can still be anything.
+	if !w.decided && code >= http.StatusOK {
+		w.decided = true
+		if code >= http.StatusBadRequest && code < http.StatusInternalServerError {
+			w.release()
+		}
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *dpopRefusalReleaser) Write(b []byte) (int, error) {
+	// A Write before any WriteHeader writes 200.
+	w.decided = true
+	return w.ResponseWriter.Write(b)
+}
+
+// Unwrap answers the writer beneath, for http.ResponseController.
+func (w *dpopRefusalReleaser) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 func (p ResourceProofs) now() time.Time {

@@ -263,8 +263,8 @@ func serverRecordStatements() []narrowWrite {
 			},
 		},
 
-		// The DPoP replay store (#42 decision 9): one insert, which the primary key makes atomic, and
-		// the sweep.
+		// The DPoP replay store (#42 decision 9): one insert, which the primary key makes atomic, the
+		// release of a refused request's record, and the sweep.
 		{
 			name: "RecordDPoPProof",
 			run: func(ctx context.Context, d *Database) (any, error) {
@@ -274,6 +274,13 @@ func serverRecordStatements() []narrowWrite {
 			statements: []string{
 				"INSERT INTO dpop_proofs (proof_hash, expires_at) VALUES ('" + dpopProofHash + "', 2003-03-03T00:00:00Z)",
 			},
+		},
+		{
+			name: "ReleaseDPoPProof",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return nil, d.ReleaseDPoPProof(ctx, nil, dpopProofHash)
+			},
+			statements: []string{"DELETE FROM dpop_proofs WHERE proof_hash = '" + dpopProofHash + "'"},
 		},
 		{
 			name: "DeleteExpiredDPoPProofs",

@@ -875,6 +875,10 @@ type Database interface {
 	// a replay, the key already stored by an earlier use of the proof, here or at another instance
 	// (#42 decision 9). A key that is not a lower-case SHA-256 hex digest is an error.
 	RecordDPoPProof(ctx context.Context, tx *sql.Tx, proofHash string, expiresAt time.Time) (bool, error)
+	// ReleaseDPoPProof deletes one proof's record, so the proof is unspent: the resources release
+	// the record of a proof whose request they refused after recording it (#42 decision 9). A key
+	// with no record is no error; one that is not a lower-case SHA-256 hex digest is.
+	ReleaseDPoPProof(ctx context.Context, tx *sql.Tx, proofHash string) error
 	// DeleteExpiredDPoPProofs reaps on expires_at alone: past it the proof could no longer be
 	// accepted, so its record has nothing left to refuse.
 	DeleteExpiredDPoPProofs(ctx context.Context, tx *sql.Tx, now time.Time) error

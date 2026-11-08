@@ -104,6 +104,39 @@ func TestRecordDPoPProof_RefusesAKeyThatIsNoDigest(t *testing.T) {
 	}
 }
 
+// Releasing a proof deletes its record and no other, so the proof is unspent and records again as
+// new: the resources release the record of a request they refused after recording its proof (#42
+// decision 9). Releasing a key with no record is no error, and a key that is no digest is refused
+// before anything is deleted, as at the record.
+func TestReleaseDPoPProof_UnspendsOneProofAndNoOther(t *testing.T) {
+	expiresAt := time.Now().UTC().Add(10 * time.Minute)
+	released, kept := newProofHash(t), newProofHash(t)
+	require.True(t, recordDPoPProof(t, released, expiresAt))
+	require.True(t, recordDPoPProof(t, kept, expiresAt))
+
+	require.NoError(t, database.ReleaseDPoPProof(context.Background(), nil, released))
+
+	_, count := storedDPoPProof(t, released)
+	assert.Equal(t, 0, count, "the released proof's record is gone")
+	_, count = storedDPoPProof(t, kept)
+	assert.Equal(t, 1, count, "the other proof's record stays")
+	assert.True(t, recordDPoPProof(t, released, expiresAt), "the released proof records again as new")
+	assert.False(t, recordDPoPProof(t, kept, expiresAt), "the other is still a replay")
+
+	require.NoError(t, database.ReleaseDPoPProof(context.Background(), nil, newProofHash(t)), "a key with no record")
+	for name, key := range map[string]string{
+		"empty":          "",
+		"upper case":     strings.ToUpper(kept),
+		"trailing space": kept[:63] + " ",
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Error(t, database.ReleaseDPoPProof(context.Background(), nil, key))
+			_, count := storedDPoPProof(t, kept)
+			assert.Equal(t, 1, count, "nothing deleted")
+		})
+	}
+}
+
 // Simultaneous uses of one proof, through the pool from many callers at once, as many requests or
 // many instances sharing the database would make them: exactly one is recorded, and every other is
 // a replay, with no error (#42 decision 9). On SQLite the pool has one connection, so the callers
