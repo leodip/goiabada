@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/dpop"
@@ -37,9 +36,10 @@ import (
 //
 // proofs checks a DPoP proof (RFC 9449). A request carrying a DPoP header is a DPoP request, and
 // every answer to it carries exactly one DPoP-Nonce header with a fresh nonce, whatever the answer
-// (sections 8 and 8.2). Its proof is checked once the request is parsed, before the client is
-// authenticated and the grant looked at, so the nonce round trip never counts as a failed client
-// authentication or a failed password (#42 decision 7). Once the grant has validated, the proof is
+// (sections 8 and 8.2): TokenDPoPNonce, mounted ahead of this handler and of the ROPC limiter,
+// sets it. Its proof is checked once the form is parsed, before the client's credentials are read
+// and the grant looked at, so the nonce round trip never counts as a failed client authentication
+// or a failed password (#42 decision 7). Once the grant has validated, the proof is
 // recorded in the replay store, just before anything is minted: a proof used before is refused,
 // and a store that cannot answer is a 500 (decision 9). A valid proof binds the access token of
 // every grant to its key (decision 2), and a public client's refresh token too; a refresh token
@@ -59,11 +59,24 @@ func HandleTokenPost(
 	responder := tokenResponder{jsonWriter: jsonWriter, issuer: tokenIssuer, auditLogger: auditLogger, metrics: tokenMetrics}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		proofValues := r.Header.Values("DPoP")
-		var now time.Time
-		if len(proofValues) > 0 {
-			now = proofs.now()
-			w.Header().Set("DPoP-Nonce", proofs.Nonces.Mint(now))
+		var proof *dpop.Proof
+		if proofValues := r.Header.Values("DPoP"); len(proofValues) > 0 {
+			// The proof first, once the form is read, and before the client's credentials are: a
+			// nonce round trip, or a proof refused, is never answered as a client authentication
+			// refusal, however the credentials read (#42 decision 7).
+			if err := r.ParseForm(); err != nil {
+				responder.refuse(w, r, requestedGrantType(r), protocolvalidation.UnparseableRequest())
+				return
+			}
+			// The client the request names, for the record of a refused proof alone: credentials that
+			// cannot be read name none here, and are refused below as they are without a proof.
+			namedClient, _, _ := extractClientCredentials(r)
+			var err error
+			proof, err = proofs.checkTokenProof(r, proofValues, namedClient)
+			if err != nil {
+				responder.refuse(w, r, requestedGrantType(r), err)
+				return
+			}
 		}
 
 		input, err := parseTokenRequest(r)
@@ -78,13 +91,7 @@ func HandleTokenPost(
 			return
 		}
 
-		var proof *dpop.Proof
-		if len(proofValues) > 0 {
-			proof, err = proofs.checkTokenProof(r, proofValues, now, input.ClientId)
-			if err != nil {
-				responder.refuse(w, r, input.GrantType, err)
-				return
-			}
+		if proof != nil {
 			// The proof key, for the refresh grant to hold a bound refresh token to and the code grant a
 			// bound code (#42 decisions 11 and 14).
 			input.DPoPThumbprint = proof.Thumbprint

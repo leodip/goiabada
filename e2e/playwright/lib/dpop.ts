@@ -10,6 +10,12 @@ import type { TestClient } from "./fixtures";
 import { clientCredentialsToken } from "./oauth";
 import { expectNoStore, postToken, tokenEndpoint, type RawAnswer } from "./rfc6749";
 
+// The DPoP challenge the auth server's userinfo and API send after the Bearer challenge on every
+// 401, with no error: the realm and the algorithms a proof may be signed with, in discovery's order
+// (#42 decisions 4 and 10). A 401's error follows it in the challenge of the scheme the request used.
+export const authServerDPoPChallenge =
+  'DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"';
+
 export interface DPoPKey {
   privateKey: KeyObject;
   // The public key as a proof's jwk header member carries it.

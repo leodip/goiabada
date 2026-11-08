@@ -7,7 +7,8 @@
 import { createHash } from "node:crypto";
 import type { Response } from "@playwright/test";
 import { grantUserPermission } from "../../lib/admin-console";
-import { submitPassword } from "../../lib/browser-sign-in";
+import { openSignIn, submitPassword } from "../../lib/browser-sign-in";
+import { dpopKey, expectBoundTokenResponse, postTokenWithDPoP } from "../../lib/dpop";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { postToken } from "../../lib/rfc6749";
@@ -112,17 +113,37 @@ test("the SPA with DPoP signs in with dpop_jkt, gets bound tokens, refreshes, ca
   await context.close();
 });
 
-// The client requires DPoP, so the token endpoint refuses any of its token requests without a proof,
-// before it looks at the grant.
-test("the SPA with DPoP's client gets nothing from the token endpoint without a proof", async ({ request }) => {
-  const refused = await postToken(request, {
+// The client requires DPoP, so the token endpoint refuses a token request of its own without a
+// proof, a real code from its own sign-in included, and redeems the same code with one: the refusal
+// spends nothing. The landing at the SPA is held, so the page's script never redeems the code itself.
+test("the SPA with DPoP's client gets nothing from the token endpoint without a proof", async ({ browser, users, request }) => {
+  const user = await users.create();
+  const { context, page, codeVerifier } = await openSignIn(browser, {
+    clientId: testapp.spaDpop.clientId,
+    scope: "openid",
+    params: { redirect_uri: testapp.spaDpop.url },
+  });
+  await context.route((url) => url.href.startsWith(testapp.spaDpop.url), (route) =>
+    route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>held</title>" }),
+  );
+  await submitPassword(page, user.email, user.password);
+  await page.waitForURL((url) => url.href.startsWith(testapp.spaDpop.url));
+  const code = new URL(page.url()).searchParams.get("code");
+  expect(code).toBeTruthy();
+  await context.close();
+  const redeem = {
     grant_type: "authorization_code",
     client_id: testapp.spaDpop.clientId,
-    code: "SplxlOBeZQQYbYS6WxSbIA",
+    code: code as string,
     redirect_uri: testapp.spaDpop.url,
-    code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
-  });
+    code_verifier: codeVerifier,
+  };
+
+  const refused = await postToken(request, redeem);
   expect(refused.status, refused.text).toBe(400);
   expect(refused.body.error).toBe("invalid_dpop_proof");
   expect(refused.body.error_description).toBe("This client requires a DPoP proof with every token request.");
+
+  const key = dpopKey();
+  expectBoundTokenResponse(await postTokenWithDPoP(request, redeem, key), key);
 });

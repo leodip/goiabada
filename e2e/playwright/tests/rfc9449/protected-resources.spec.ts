@@ -5,7 +5,7 @@
 // and a proof for another token. Every 401 names both schemes, Bearer first, the error in the
 // challenge of the scheme used (section 7.2). The full matrix is in the Go tiers.
 import type { APIRequestContext } from "@playwright/test";
-import { dpopKey, dpopProof, expectBoundTokenResponse, postTokenWithDPoP, type DPoPKey } from "../../lib/dpop";
+import { authServerDPoPChallenge as dpopChallenge, dpopKey, dpopProof, expectBoundTokenResponse, postTokenWithDPoP, type DPoPKey } from "../../lib/dpop";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { basicAuth, expectTokenResponse, postToken } from "../../lib/rfc6749";
@@ -13,7 +13,6 @@ import { passwordGrantClient } from "../../lib/test-clients";
 
 const userinfoUrl = `${env.authUrl}/userinfo`;
 const profileUrl = `${env.authUrl}/api/v1/account/profile`;
-const dpopChallenge = 'DPoP realm="goiabada", algs="ES256 ES384 ES512 PS256 PS384 PS512 RS256 RS384 RS512 Ed25519 EdDSA"';
 const scope = "openid authserver:manage-account";
 
 // GETs url with the Authorization header given and, when there is one, the proof as a DPoP header.

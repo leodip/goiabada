@@ -650,7 +650,7 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("matching kid returns the key", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)}}
+		tp.cachedJwks = cachedKeys(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
 
 		pub := tp.getPublicKeyFromCache("key-1")
 
@@ -660,14 +660,14 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("non-matching kid returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)}}
+		tp.cachedJwks = cachedKeys(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
 
 		assert.Nil(t, tp.getPublicKeyFromCache("key-2"))
 	})
 
 	t.Run("empty kid with a single key returns that key", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)}}
+		tp.cachedJwks = cachedKeys(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
 
 		pub := tp.getPublicKeyFromCache("")
 
@@ -677,42 +677,60 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("empty kid with several keys returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{
+		tp.cachedJwks = cachedKeys(t,
 			oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey),
 			oauthclienttest.JwkFromPublicKey("key-2", &attacker.PublicKey),
-		}}
+		)
 
 		assert.Nil(t, tp.getPublicKeyFromCache(""))
 	})
 
 	t.Run("empty kid with a single undecodable key returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{{Kty: "EC", Kid: "key-1"}}}
+		tp.cachedJwks = cachedKeys(t, oauth.Jwk{Kty: "EC", Kid: "key-1"})
 
 		assert.Nil(t, tp.getPublicKeyFromCache(""))
 	})
 
 	// #709 finding 7, OIDC Core 1.0 section 10.1: a key whose use is present and not sig, or whose
 	// alg is present and not RS256, is not used, whether a kid names it or it is the only key.
+	// Present is present with any value: an empty string, a JSON null or a number is no absent
+	// member. Member names are case-sensitive, so a USE member is not use.
 	for _, tc := range []struct {
 		name   string
-		change func(*oauth.Jwk)
+		change func(map[string]any)
 		usable bool
 	}{
-		{"use sig and alg RS256", func(*oauth.Jwk) {}, true},
-		{"use and alg absent", func(j *oauth.Jwk) { j.Use, j.Alg = "", "" }, true},
-		{"use enc", func(j *oauth.Jwk) { j.Use = "enc" }, false},
-		{"use enc and alg absent", func(j *oauth.Jwk) { j.Use, j.Alg = "enc", "" }, false},
-		{"alg RS512", func(j *oauth.Jwk) { j.Alg = "RS512" }, false},
-		{"alg RS512 and use absent", func(j *oauth.Jwk) { j.Use, j.Alg = "", "RS512" }, false},
-		{"alg none", func(j *oauth.Jwk) { j.Alg = "none" }, false},
+		{"use sig and alg RS256", func(map[string]any) {}, true},
+		{"use and alg absent", func(m map[string]any) { delete(m, "use"); delete(m, "alg") }, true},
+		{"use enc", func(m map[string]any) { m["use"] = "enc" }, false},
+		{"use enc and alg absent", func(m map[string]any) { m["use"] = "enc"; delete(m, "alg") }, false},
+		{"alg RS512", func(m map[string]any) { m["alg"] = "RS512" }, false},
+		{"alg RS512 and use absent", func(m map[string]any) { delete(m, "use"); m["alg"] = "RS512" }, false},
+		{"alg none", func(m map[string]any) { m["alg"] = "none" }, false},
+		{"use an empty string", func(m map[string]any) { m["use"] = "" }, false},
+		{"use null", func(m map[string]any) { m["use"] = nil }, false},
+		{"use a number", func(m map[string]any) { m["use"] = 1 }, false},
+		{"use an array holding sig", func(m map[string]any) { m["use"] = []string{"sig"} }, false},
+		{"alg an empty string", func(m map[string]any) { m["alg"] = "" }, false},
+		{"alg null", func(m map[string]any) { m["alg"] = nil }, false},
+		{"alg a boolean", func(m map[string]any) { m["alg"] = true }, false},
+		{"use SIG", func(m map[string]any) { m["use"] = "SIG" }, false},
+		{"use absent beside a USE member", func(m map[string]any) { delete(m, "use"); m["USE"] = "enc" }, true},
 	} {
-		jwk := oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)
-		tc.change(&jwk)
+		encoded, err := json.Marshal(oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+		require.NoError(t, err)
+		var members map[string]any
+		require.NoError(t, json.Unmarshal(encoded, &members))
+		tc.change(members)
+		document, err := json.Marshal(map[string]any{"keys": []any{members}})
+		require.NoError(t, err)
 		for _, kid := range []string{"key-1", ""} {
 			t.Run(tc.name+" under kid "+fmt.Sprintf("%q", kid), func(t *testing.T) {
 				tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-				tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{jwk}}
+				keys, err := decodeJWKS(document)
+				require.NoError(t, err)
+				tp.cachedJwks = keys
 
 				pub := tp.getPublicKeyFromCache(kid)
 
@@ -728,7 +746,7 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("matching kid on an undecodable key returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{{Kty: "EC", Kid: "key-1"}}}
+		tp.cachedJwks = cachedKeys(t, oauth.Jwk{Kty: "EC", Kid: "key-1"})
 
 		assert.Nil(t, tp.getPublicKeyFromCache("key-1"))
 	})
@@ -824,4 +842,39 @@ func TestRefreshJwks_AcceptsADocumentUnderTheCap(t *testing.T) {
 	require.NoError(t, tp.refreshJwks(context.Background()))
 	require.Len(t, tp.cachedJwks.Keys, 1)
 	assert.Equal(t, "key-1", tp.cachedJwks.Keys[0].Kid)
+}
+
+// cachedKeys is keys as refreshJwks caches them: encoded as the auth server publishes them and read
+// back through decodeJWKS.
+func cachedKeys(t *testing.T, keys ...oauth.Jwk) publishedKeys {
+	t.Helper()
+	encoded, err := json.Marshal(oauth.Jwks{Keys: keys})
+	require.NoError(t, err)
+	decoded, err := decodeJWKS(encoded)
+	require.NoError(t, err)
+	return decoded
+}
+
+// A key whose use or alg is no string is kept under its kid and never used, and the other keys of
+// the document are read as before; a key that is no JSON object refuses the document.
+func TestDecodeJWKS_AKeyOfTheWrongShapeIsNeverUsed(t *testing.T) {
+	key, other := oauthclienttest.Keys(t)
+	good, err := json.Marshal(oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+	require.NoError(t, err)
+	odd, err := json.Marshal(oauthclienttest.JwkFromPublicKey("key-2", &other.PublicKey))
+	require.NoError(t, err)
+	odd = bytes.Replace(odd, []byte(`"use":"sig"`), []byte(`"use":["sig"]`), 1)
+
+	keys, err := decodeJWKS([]byte(`{"keys":[` + string(good) + `,` + string(odd) + `]}`))
+	require.NoError(t, err)
+	tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+	tp.cachedJwks = keys
+
+	require.Len(t, keys.Keys, 2)
+	assert.Equal(t, "key-2", keys.Keys[1].Kid)
+	assert.NotNil(t, tp.getPublicKeyFromCache("key-1"))
+	assert.Nil(t, tp.getPublicKeyFromCache("key-2"))
+
+	_, err = decodeJWKS([]byte(`{"keys":[` + string(good) + `,"a string"]}`))
+	assert.Error(t, err)
 }

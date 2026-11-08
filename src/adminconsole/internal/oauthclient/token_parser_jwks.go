@@ -61,7 +61,7 @@ type JWKSTokenParser struct {
 	fetchMu sync.Mutex
 
 	mu         sync.RWMutex
-	cachedJwks oauth.Jwks
+	cachedJwks publishedKeys
 	fetchedAt  time.Time
 	// generation counts the fetches that replaced cachedJwks; it is how a request that waited
 	// on fetchMu tells that the fetch it was waiting for has already happened.
@@ -430,33 +430,80 @@ func (tp *JWKSTokenParser) getPublicKeyFromCache(kid string) *rsa.PublicKey {
 	return nil
 }
 
-// verificationKey is j as an RSA public key when j may verify an ID token's RS256 signature, and
+// publishedKeys is the auth server's JWKS as the console reads it: each key with what its use and
+// alg members, as the document carries them, say about verifying an ID token.
+type publishedKeys struct {
+	Keys []publishedKey
+}
+
+// publishedKey is one key of the JWKS: its members, and whether its use and alg allow it to
+// verify an ID token (usableSigningKey), judged from the document's own members, since oauth.Jwk
+// holds each as a string and so reads an empty or null member as an absent one.
+type publishedKey struct {
+	oauth.Jwk
+	signing bool
+}
+
+// decodeJWKS reads a JWKS document into its keys. A document that is not a JSON object with a keys
+// array, or a key that is not a JSON object, is an error. A key whose members are not the strings
+// oauth.Jwk holds is kept, under the kid it names, and never used.
+func decodeJWKS(document []byte) (publishedKeys, error) {
+	var raw struct {
+		Keys []json.RawMessage `json:"keys"`
+	}
+	if err := json.Unmarshal(document, &raw); err != nil {
+		return publishedKeys{}, err
+	}
+	keys := make([]publishedKey, 0, len(raw.Keys))
+	for _, member := range raw.Keys {
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal(member, &members); err != nil {
+			return publishedKeys{}, err
+		}
+		var jwk oauth.Jwk
+		// A member of another type fails the decode after every other member is read.
+		fits := json.Unmarshal(member, &jwk) == nil
+		keys = append(keys, publishedKey{Jwk: jwk, signing: fits && usableSigningKey(members)})
+	}
+	return publishedKeys{Keys: keys}, nil
+}
+
+// verificationKey is k as an RSA public key when k may verify an ID token's RS256 signature, and
 // nil otherwise.
-func verificationKey(j oauth.Jwk) *rsa.PublicKey {
-	if !usableSigningKey(j) {
+func verificationKey(k publishedKey) *rsa.PublicKey {
+	if !k.signing {
 		return nil
 	}
-	pub, err := jwkToRSAPublicKey(j)
+	pub, err := jwkToRSAPublicKey(k.Jwk)
 	if err != nil {
 		return nil
 	}
 	return pub
 }
 
-// usableSigningKey reports whether a JWK's use and alg allow it to verify an ID token: a use
-// present and not sig, or an alg present and not RS256, the one algorithm the console accepts,
-// rules the key out (OIDC Core 1.0 section 10.1: "The key usage of the respective keys MUST support
-// signing"; RFC 7517 sections 4.2 and 4.4). Both values compare case-sensitively, as RFC 7517 has
-// them. oauth.Jwk holds each member as a string, so an empty value reads as an absent one (#709
-// finding 7).
-func usableSigningKey(j oauth.Jwk) bool {
-	if j.Use != "" && j.Use != "sig" {
+// usableSigningKey reports whether a JWK's members, read by their exact names, allow it to verify
+// an ID token: a use present and not the string sig, or an alg present and not the string RS256,
+// the one algorithm the console accepts, rules the key out (OIDC Core 1.0 section 10.1: "The key
+// usage of the respective keys MUST support signing"; RFC 7517 sections 4.2 and 4.4). Present means
+// present with any value: an empty string, a JSON null or any other JSON value is not sig or RS256,
+// and is not an absent member either (#709 finding 7). Both values compare case-sensitively, as RFC
+// 7517 has them, and so do the member names, so a USE member is another member and not use.
+func usableSigningKey(members map[string]json.RawMessage) bool {
+	return memberAbsentOr(members, "use", "sig") && memberAbsentOr(members, "alg", jwt.SigningMethodRS256.Alg())
+}
+
+// memberAbsentOr reports whether the named member is absent, or present as exactly the JSON string
+// want.
+func memberAbsentOr(members map[string]json.RawMessage, name, want string) bool {
+	raw, present := members[name]
+	if !present {
+		return true
+	}
+	var value string
+	if len(raw) == 0 || raw[0] != '"' || json.Unmarshal(raw, &value) != nil {
 		return false
 	}
-	if j.Alg != "" && j.Alg != jwt.SigningMethodRS256.Alg() {
-		return false
-	}
-	return true
+	return value == want
 }
 
 func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
@@ -487,8 +534,8 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var jwks oauth.Jwks
-	if err := json.Unmarshal(body, &jwks); err != nil {
+	jwks, err := decodeJWKS(body)
+	if err != nil {
 		return err
 	}
 	tp.mu.Lock()

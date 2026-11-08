@@ -64,9 +64,9 @@ func newDPoPTokenInstance(t *testing.T, replays *sqlitedb.Database) *dpopTokenEn
 		registry:    metrics.NewRegistry(),
 		now:         dpopNow,
 	}
-	e.handler = HandleTokenPost(render.New(nil, nil), e.database, e.issuer, e.validator, e.auditLogger,
-		&countingCredentialFailures{}, tokenmetrics.Register(e.registry), &recordingLogoutTokens{},
-		TokenProofs{Checker: checker, Nonces: dpop.NewNonces(dpopSessionKey), Replays: replays, Now: func() time.Time { return e.now }})
+	proofs := TokenProofs{Checker: checker, Nonces: dpop.NewNonces(dpopSessionKey), Replays: replays, Now: func() time.Time { return e.now }}
+	e.handler = TokenDPoPNonce(proofs)(HandleTokenPost(render.New(nil, nil), e.database, e.issuer, e.validator, e.auditLogger,
+		&countingCredentialFailures{}, tokenmetrics.Register(e.registry), &recordingLogoutTokens{}, proofs)).ServeHTTP
 	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 		Return(&protocolvalidation.ClientCredentialsGrant{Client: &record.Client{Id: 1}, Scope: "r:p"}, nil)
 	e.auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
@@ -143,8 +143,8 @@ func TestTokenDPoP_AProofAcceptedAtOneInstanceIsAReplayAtAnother(t *testing.T) {
 
 // The record outlives the last moment its proof could be accepted, and the sweep never deletes it
 // before then: a sweep at the nonce's expiry keeps the record, so a replay at that moment is still
-// refused as one, and once a sweep has deleted it the proof is refused for its expired nonce, never
-// accepted.
+// refused as one, and once a sweep has deleted it, past the grace, the proof is refused for its
+// expired nonce, never accepted.
 func TestTokenDPoP_TheSweepNeverLetsAProofBeAcceptedTwice(t *testing.T) {
 	key := dpoptest.RFC7517Key(t)
 	db := newReplaySQLiteDB(t)
@@ -153,6 +153,7 @@ func TestTokenDPoP_TheSweepNeverLetsAProofBeAcceptedTwice(t *testing.T) {
 	e.issues(key, 1)
 	proof := key.Proof(t, "POST", dpopTokenHTU, e.now, nonce)
 	expiresAt := dpopNow.Add(10 * time.Minute)
+	recordExpiresAt := expiresAt.Add(dpop.ReplayRecordGrace)
 
 	require.Equal(t, http.StatusOK, e.post(t, "/auth/token", clientCredentialsForm, proof).Code)
 
@@ -160,7 +161,63 @@ func TestTokenDPoP_TheSweepNeverLetsAProofBeAcceptedTwice(t *testing.T) {
 	e.now = expiresAt
 	assertTokenError(t, e.post(t, "/auth/token", clientCredentialsForm, proof), "invalid_dpop_proof", "The DPoP proof is invalid.")
 
-	require.NoError(t, db.DeleteExpiredDPoPProofs(context.Background(), nil, expiresAt.Add(time.Microsecond).UTC()))
-	e.now = expiresAt.Add(time.Microsecond)
+	require.NoError(t, db.DeleteExpiredDPoPProofs(context.Background(), nil, recordExpiresAt.UTC()))
+	assertTokenError(t, e.post(t, "/auth/token", clientCredentialsForm, proof), "invalid_dpop_proof", "The DPoP proof is invalid.")
+
+	require.NoError(t, db.DeleteExpiredDPoPProofs(context.Background(), nil, recordExpiresAt.Add(time.Microsecond).UTC()))
+	e.now = recordExpiresAt.Add(time.Microsecond)
 	assertTokenError(t, e.post(t, "/auth/token", clientCredentialsForm, proof), "use_dpop_nonce", "Authorization server requires nonce in DPoP proof.")
+}
+
+// A proof accepted late in its nonce's life stays refused at an instance whose clock runs 30
+// seconds behind, after another instance swept the table the moment the nonce expired by its own
+// clock: the record is kept past the nonce's expiry by the grace (RFC 9449 section 11.1).
+func TestTokenDPoP_ASweepByAnotherClockNeverLetsAProofBeAcceptedTwice(t *testing.T) {
+	key := dpoptest.RFC7517Key(t)
+	db := newReplaySQLiteDB(t)
+	first := newDPoPTokenInstance(t, db)
+	behind := newDPoPTokenInstance(t, db)
+	nonce := first.freshNonce(t) // minted at dpopNow
+	proof := key.Proof(t, "POST", dpopTokenHTU, dpopNow, nonce)
+	first.issues(key, 1)
+
+	first.now = dpopNow.Add(9*time.Minute + 45*time.Second)
+	require.Equal(t, http.StatusOK, first.post(t, "/auth/token", clientCredentialsForm, proof).Code)
+
+	sweeperNow := dpopNow.Add(10*time.Minute + time.Second)
+	require.NoError(t, db.DeleteExpiredDPoPProofs(context.Background(), nil, sweeperNow.UTC()))
+	behind.now = sweeperNow.Add(-30 * time.Second)
+	behind.auditLogger.ExpectedCalls[0].Maybe() // it mints nothing, so audits nothing
+
+	assertTokenError(t, behind.post(t, "/auth/token", clientCredentialsForm, proof), "invalid_dpop_proof", "The DPoP proof is invalid.")
+}
+
+// A request validated across its nonce's expiry, while another instance sweeps the table, cannot
+// record the proof another request already spent as new: it is judged again at the record point and
+// refused, and the record is still there.
+func TestTokenDPoP_AnInFlightRequestAcrossTheExpiryCannotSpendAProofAgain(t *testing.T) {
+	key := dpoptest.RFC7517Key(t)
+	db := newReplaySQLiteDB(t)
+	first := newDPoPTokenInstance(t, db)
+	nonce := first.freshNonce(t) // minted at dpopNow
+	proof := usedOnceProof(t, key, dpopNow, nonce)
+	first.issues(key, 1)
+
+	first.now = dpopNow.Add(599 * time.Second)
+	require.Equal(t, http.StatusOK, first.post(t, "/auth/token", clientCredentialsForm, proof).Code)
+
+	second := newDPoPTokenInstance(t, db)
+	second.now = first.now
+	second.auditLogger.ExpectedCalls[0].Maybe() // it mints nothing, so audits nothing
+	second.validator.ExpectedCalls[0].Run(func(mock.Arguments) {
+		second.now = dpopNow.Add(601 * time.Second)
+		require.NoError(t, db.DeleteExpiredDPoPProofs(context.Background(), nil, second.now.UTC()))
+	})
+
+	rr := second.post(t, "/auth/token", clientCredentialsForm, proof)
+
+	assertTokenError(t, rr, "use_dpop_nonce", "Authorization server requires nonce in DPoP proof.")
+	recorded, err := db.RecordDPoPProof(context.Background(), nil, usedOnceReplayKey, dpopNow)
+	require.NoError(t, err)
+	assert.False(t, recorded, "the first request's record outlived the sweep")
 }

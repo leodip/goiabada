@@ -23,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
@@ -87,9 +88,9 @@ func newDPoPTokenEndpoint(t *testing.T, publicBaseURL string, sessionKey []byte)
 		registry:           metrics.NewRegistry(),
 		now:                dpopNow,
 	}
-	e.handler = HandleTokenPost(render.New(nil, nil), e.database, e.issuer, e.validator, e.auditLogger,
-		e.credentialFailures, tokenmetrics.Register(e.registry), &recordingLogoutTokens{},
-		TokenProofs{Checker: checker, Nonces: dpop.NewNonces(sessionKey), Replays: e.database, Now: func() time.Time { return e.now }})
+	proofs := TokenProofs{Checker: checker, Nonces: dpop.NewNonces(sessionKey), Replays: e.database, Now: func() time.Time { return e.now }}
+	e.handler = TokenDPoPNonce(proofs)(HandleTokenPost(render.New(nil, nil), e.database, e.issuer, e.validator, e.auditLogger,
+		e.credentialFailures, tokenmetrics.Register(e.registry), &recordingLogoutTokens{}, proofs)).ServeHTTP
 	return e
 }
 
@@ -414,4 +415,92 @@ func TestTokenDPoP_ABaseURLWithAPath(t *testing.T) {
 			assertTokenError(t, rr, "invalid_dpop_proof", "The DPoP proof is invalid.")
 		})
 	}
+}
+
+// The nonce is judged before anything reads the client's credentials: a proof with no nonce, or an
+// expired one, is answered use_dpop_nonce however the credentials read, Basic credentials that do not
+// decode, two authentication methods at once and a wrong secret included. The validator, which
+// authenticates the client, is never called, nothing is logged as a refused client authentication,
+// and no failed sign-in is charged.
+func TestTokenDPoP_TheNonceComesBeforeTheClientsCredentials(t *testing.T) {
+	key := dpoptest.RFC7517Key(t)
+	expiredNonce := dpop.NewNonces(dpopSessionKey).Mint(dpopNow.Add(-11 * time.Minute))
+	for _, tc := range []struct {
+		name, authorization, form string
+	}{
+		{"Basic credentials that do not decode", "Basic !!!", "grant_type=client_credentials&scope=r:p"},
+		{"Basic credentials naming no client", "Basic Ono=", "grant_type=client_credentials&scope=r:p"},
+		{"two authentication methods", "Basic dGVzdF9jbGllbnQ6cw==", clientCredentialsForm},
+		{"a wrong secret", "", "grant_type=client_credentials&client_id=test_client&client_secret=wrong&scope=r:p"},
+		{"a wrong password", "", "grant_type=password&client_id=test_client&username=u&password=wrong&scope=openid"},
+	} {
+		for nonceName, nonce := range map[string]string{"no nonce": "", "an expired nonce": expiredNonce} {
+			t.Run(tc.name+"/"+nonceName, func(t *testing.T) {
+				e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
+				logged := logtest.CaptureSlog(t)
+				req := httptest.NewRequest(http.MethodPost, "/auth/token", strings.NewReader(tc.form))
+				req = withSettings(req, &record.Settings{})
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				if tc.authorization != "" {
+					req.Header.Set("Authorization", tc.authorization)
+				}
+				req.Header.Set("DPoP", key.Proof(t, "POST", dpopTokenHTU, dpopNow, nonce))
+
+				rr := httptest.NewRecorder()
+				e.handler.ServeHTTP(rr, req)
+
+				assertTokenError(t, rr, "use_dpop_nonce", "Authorization server requires nonce in DPoP proof.")
+				assertFreshNonce(t, rr, dpopSessionKey, dpopNow)
+				assert.Equal(t, 0, e.credentialFailures.count, "no failed sign-in is charged")
+				for _, record := range logged.Records() {
+					assert.Less(t, record.Level, slog.LevelWarn, "nothing is logged as a refusal: %s", record.Message)
+				}
+			})
+		}
+	}
+}
+
+// htu names the path the client sent, not the one routing rewrote: behind the trailing-slash strip
+// that heads the router, a proof for /auth/token/ sent to /auth/token/ is judged on its nonce, and one
+// for /auth/token sent there is refused invalid_dpop_proof (#42 decision 6). The path without the
+// slash takes its own proof, as before.
+func TestTokenDPoP_HTUNamesThePathTheClientSent(t *testing.T) {
+	key := dpoptest.RFC7517Key(t)
+	for _, tc := range []struct {
+		name, path, htu, code string
+	}{
+		{"a trailing slash, named", "/auth/token/", dpopTokenHTU + "/", "use_dpop_nonce"},
+		{"a trailing slash, not named", "/auth/token/", dpopTokenHTU, "invalid_dpop_proof"},
+		{"no trailing slash", "/auth/token", dpopTokenHTU, "use_dpop_nonce"},
+		{"no trailing slash, one named", "/auth/token", dpopTokenHTU + "/", "invalid_dpop_proof"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
+			e.handler = httpmw.StripTrailingSlash(e.handler).ServeHTTP
+
+			rr := e.post(t, tc.path, clientCredentialsForm, key.Proof(t, "POST", tc.htu, e.now, ""))
+
+			description := map[string]string{
+				"use_dpop_nonce":     "Authorization server requires nonce in DPoP proof.",
+				"invalid_dpop_proof": "The DPoP proof is invalid.",
+			}[tc.code]
+			assertTokenError(t, rr, tc.code, description)
+		})
+	}
+
+	t.Run("an accepted proof for a trailing slash binds the token", func(t *testing.T) {
+		e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
+		e.handler = httpmw.StripTrailingSlash(e.handler).ServeHTTP
+		nonce := e.post(t, "/auth/token/", clientCredentialsForm, key.Proof(t, "POST", dpopTokenHTU+"/", e.now, "")).
+			Header().Get("DPoP-Nonce")
+		client := &record.Client{Id: 1}
+		e.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"})
+		e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", key.Thumbprint).
+			Return(&oauth.TokenResponse{AccessToken: "a", TokenType: "DPoP"}, nil).Once()
+		e.auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
+
+		rr := e.post(t, "/auth/token/", clientCredentialsForm, key.Proof(t, "POST", dpopTokenHTU+"/", e.now, nonce))
+
+		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	})
 }

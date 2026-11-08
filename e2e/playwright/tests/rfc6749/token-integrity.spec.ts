@@ -11,6 +11,7 @@ import type { APIRequestContext } from "@playwright/test";
 import { createSign, generateKeyPairSync } from "node:crypto";
 import { addIntrospectionResource, clientUrl, readClientSecret } from "../../lib/admin-console";
 import { signInThroughClient } from "../../lib/browser-sign-in";
+import { authServerDPoPChallenge } from "../../lib/dpop";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { refreshToken, userinfo, userTokens } from "../../lib/oauth";
@@ -76,7 +77,7 @@ test("/userinfo and the account API refuse a real access token with = padding ad
       expect((await bearerAnswer(request, "GET", path, { token })).status, "the unaltered token is accepted").toBe(200);
       const malformed = await bearerAnswer(request, "GET", path, { token: "not-a-token" });
       expect(malformed.status).toBe(401);
-      expect(malformed.challenge).toBe('Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."');
+      expect(malformed.challenge).toBe(`Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid.", ${authServerDPoPChallenge}`);
       for (const padded of [`${token}=`, `${token}==`, `${header}.${payload}=.${signature}`]) {
         expect(await bearerAnswer(request, "GET", path, { token: padded }), padded.slice(-8)).toEqual(malformed);
       }
@@ -110,7 +111,7 @@ test("a real token with a line break added, sent in a form body, is refused at /
   await test.step("/userinfo", async () => {
     const malformed = await bearerAnswer(request, "POST", "/userinfo", { form: "not-a-token" });
     expect(malformed.status).toBe(401);
-    expect(malformed.challenge).toBe('Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."');
+    expect(malformed.challenge).toBe(`Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid.", ${authServerDPoPChallenge}`);
     for (const token of broken(accessToken)) expect(await bearerAnswer(request, "POST", "/userinfo", { form: token })).toEqual(malformed);
     expect((await bearerAnswer(request, "POST", "/userinfo", { form: accessToken })).status, "the unaltered token is accepted").toBe(200);
   });

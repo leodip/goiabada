@@ -353,9 +353,10 @@ func TestBearerGuardDPoP_NoCredentialsIsBothChallengesWithNoError(t *testing.T) 
 }
 
 // The proof is recorded under the hash of its normalized htu and its jti, the replay key, until
-// its iat plus 60 seconds, the last moment the resources accept it (#42 decisions 8 and 9). The
-// hash is sha256sum's over "https://auth.example.com/userinfo resource-proof-1".
-func TestBearerGuardDPoP_TheProofIsRecordedUntilItsIatPlusAMinute(t *testing.T) {
+// its iat plus 60 seconds, the last moment the resources accept it (#42 decisions 8 and 9), and five
+// minutes beyond, for instances whose clocks run behind the sweeper's. The hash is sha256sum's over
+// "https://auth.example.com/userinfo resource-proof-1".
+func TestBearerGuardDPoP_TheProofIsRecordedUntilItsIatPlusAMinuteAndTheGrace(t *testing.T) {
 	key := dpoptest.RFC7517Key(t)
 	store := newReplayStore()
 	iat := dpopNow.Add(-20 * time.Second)
@@ -368,7 +369,7 @@ func TestBearerGuardDPoP_TheProofIsRecordedUntilItsIatPlusAMinute(t *testing.T) 
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, map[string]time.Time{
-		"77ffe8c1cfe479f05df5c306f7fc455992001b22d080377cee01b12f23969717": time.Unix(1_800_000_040, 0),
+		"77ffe8c1cfe479f05df5c306f7fc455992001b22d080377cee01b12f23969717": time.Unix(1_800_000_040+300, 0),
 	}, store.records)
 }
 

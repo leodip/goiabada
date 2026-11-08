@@ -87,7 +87,7 @@ At the token endpoint, the nonce is what makes a proof fresh. Your proof still n
 
 ## Refresh tokens bound to your key
 
-A public client's refresh token is bound to its key too. Once your app has a refresh token from a request with a proof, every refresh of it needs a proof by that same key, and so does every refresh token after it. A refresh without a proof, or with a proof by another key, is refused with `invalid_grant`, "The refresh token is bound to a DPoP key, and the request carries no proof by that key." It spends nothing: the refresh token still works with the right key.
+A public client's refresh token is bound to its key too. Once your app has a refresh token from a request with a proof, every refresh of it needs a proof by that same key, and so does every refresh token after it. A refresh without a proof, or with a proof by another key, is refused with `invalid_grant`, and spends nothing: the refresh token still works with the right key.
 
 **Keep the key as long as you keep the refresh token.** An app that loses its key, or makes a new one, has to sign the user in again.
 
@@ -104,7 +104,7 @@ GET /auth/authorize?client_id=my-app&response_type=code&...&code_challenge=E9Mel
 Host: auth.example.com
 ```
 
-A bound code is redeemed only with a proof by that key. Redeeming it without a proof, or with a proof by another key, is refused with `invalid_grant`, "The authorization code is bound to a DPoP key, and the request carries no proof by that key." It spends nothing: the code can still be redeemed with the right key, within its 60 seconds.
+A bound code is redeemed only with a proof by that key. Redeeming it without a proof, or with a proof by another key, is refused with `invalid_grant`, and spends nothing: the code can still be redeemed with the right key, within its 60 seconds.
 
 It's optional, even when your client requires DPoP, and only `response_type=code` takes it. Send it beside [PKCE](/concepts/pkce/), not in place of it.
 
@@ -144,7 +144,7 @@ WWW-Authenticate: Bearer realm="goiabada", DPoP realm="goiabada", algs="ES256 ES
 | `iat` | When your app made the proof, in seconds since 1970. At userinfo and the API, within 60 seconds of the auth server's clock |
 | `nonce` | At the token endpoint, the latest `DPoP-Nonce`. Userinfo and the API don't read it |
 
-Send one `DPoP` header, of at most 8 KiB. A request whose proof fails any of these is refused with `invalid_dpop_proof`, "The DPoP proof is invalid.": `400 Bad Request` at the token endpoint, `401 Unauthorized` at userinfo and the API. At userinfo and the API, a proof that passes but is signed by another key than the token's is refused with `invalid_token`. The auth server's log has a `dpop proof refused at the token endpoint` or `dpop proof refused at a resource` warning saying which check failed. See [Logs](/deploy/logs/#records-worth-knowing).
+Send one `DPoP` header, of at most 8 KiB. A request whose proof fails any of these is refused with `invalid_dpop_proof`: `400 Bad Request` at the token endpoint, `401 Unauthorized` at userinfo and the API. At userinfo and the API, a proof that passes but is signed by another key than the token's is refused with `invalid_token`. To find which check failed, see [Logs](/deploy/logs/#records-worth-knowing).
 
 ## What a bound token carries
 

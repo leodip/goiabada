@@ -248,7 +248,7 @@ func (m *BearerToken) dpopProof(w http.ResponseWriter, r *http.Request, token *o
 	proof, err := m.proofs.Checker.Check(dpop.Request{
 		Proofs:      r.Header.Values("DPoP"),
 		Method:      r.Method,
-		Path:        r.URL.EscapedPath(),
+		Path:        dpop.RequestPath(r.RequestURI, r.URL.EscapedPath()),
 		AccessToken: tokenStr,
 		Now:         m.proofs.now(),
 	})
@@ -274,8 +274,12 @@ func (m *BearerToken) dpopProof(w http.ResponseWriter, r *http.Request, token *o
 
 // RecordDPoPProof spends the DPoP proof the parse guard accepted, recording it in the replay store
 // until its iat plus a minute, the last moment the resources could accept it again (#42 decisions 8
-// and 9, RFC 9449 section 11.1). It is the last bearer guard on every route, so only a request every
-// other guard admitted spends its proof, just before its handler serves it. A proof recorded before,
+// and 9, RFC 9449 section 11.1), and dpop.ReplayRecordGrace beyond, for the instances whose clocks
+// run behind the one that sweeps. It is the last guard on every route, behind the bearer guards and
+// the route's rate limiters, so only a request every other guard admitted spends its proof, just
+// before its handler serves it. The iat is judged again first, at the clock of this moment: a proof
+// whose window ended while the guards ahead ran is refused as an invalid proof, as it would be were
+// it sent now, and so can never be recorded as new after a sweep removed its record. A proof recorded before,
 // by this instance or another sharing the database, is a replay, answered 401 invalid_dpop_proof
 // with a Warn record. A store that cannot answer is the surface's 500: the request never goes
 // ahead unchecked. A request whose token was not presented with the DPoP scheme passes through.
@@ -291,7 +295,15 @@ func (m *BearerToken) RecordDPoPProof() func(http.Handler) http.Handler {
 				m.refusals.internalError(w, r, errs.New("no DPoP replay store is configured for this surface"), "")
 				return
 			}
-			recorded, err := m.proofs.Replays.RecordDPoPProof(r.Context(), nil, proof.ReplayKey(), proof.IssuedAtWindowEnds())
+			if m.proofs.now().After(proof.IssuedAtWindowEnds()) {
+				jwtToken, _ := reqctx.BearerTokenFrom(r.Context())
+				slog.WarnContext(r.Context(), "dpop proof refused at a resource",
+					"reason", dpop.ErrInvalidProof.Error()+": its iat window ended before it was recorded",
+					"client_id", jwtToken.StringClaim("client_id"))
+				m.refusals.invalidDPoPProof(w, r)
+				return
+			}
+			recorded, err := m.proofs.Replays.RecordDPoPProof(r.Context(), nil, proof.ReplayKey(), proof.IssuedAtWindowEnds().Add(dpop.ReplayRecordGrace))
 			if err != nil {
 				m.refusals.internalError(w, r, errs.Wrap(err, "unable to record the DPoP proof in the replay store"), "")
 				return

@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -286,6 +287,36 @@ func isDPoPMediaType(typ string) bool {
 func (p Proof) ReplayKey() string {
 	sum := sha256.Sum256([]byte(p.HTU + " " + p.JTI))
 	return hex.EncodeToString(sum[:])
+}
+
+// ReplayRecordGrace is how long the replay store keeps a proof's record past the last moment the
+// instance accepting it could accept it again. The sweep judges that moment by its own instance's
+// clock, and another instance's clock may run behind it, still within a nonce's or an iat's window:
+// a record swept the moment the proof expired by one clock could let an instance whose clock reads
+// earlier accept the proof again (RFC 9449 section 11.1). The grace keeps the record while any
+// instance whose clock is within it of the sweeper's could still accept the proof. It is five times
+// the skew the windows themselves allow an instance's clock, and the record point checks freshness
+// again at its own clock, so a request that was still being validated when its proof expired
+// cannot record it as new after the sweep. It is fixed, not a setting.
+const ReplayRecordGrace = 5 * time.Minute
+
+// RequestPath is the escaped path of the request as its client sent it, the path htu must name
+// (#42 decision 6): read from requestURI, the request-target as it arrived (http.Request.RequestURI),
+// since routing may since have rewritten the request's URL, as stripping a trailing slash does.
+// routedPath, the request URL's escaped path, is the answer when requestURI is empty, as for a
+// request a test builds by hand, or names no path.
+func RequestPath(requestURI, routedPath string) string {
+	if requestURI == "" {
+		return routedPath
+	}
+	target, err := url.ParseRequestURI(requestURI)
+	if err != nil || target.Opaque != "" {
+		return routedPath
+	}
+	if path := target.EscapedPath(); path != "" {
+		return path
+	}
+	return routedPath
 }
 
 // IssuedAtWindowEnds is the last moment Check accepts the proof by its iat, when its freshness comes

@@ -23,7 +23,9 @@ import (
 // proof passed every check and whose grant validated records the proof just before its tokens are
 // minted: a proof recorded before is a replay, refused invalid_dpop_proof, and a store that cannot
 // answer fails the request with a 500, never letting it go on unchecked. The record is kept until
-// the proof's nonce expires, the last moment it could still be accepted (decision 8). Over the real
+// the proof's nonce expires, the last moment it could still be accepted (decision 8), and a grace
+// beyond for instances whose clocks run behind the sweeper's; the nonce is judged again at the
+// record point. Over the real
 // engine the same store holds across instances and simultaneous requests:
 // handler_token_dpop_replay_sqlite_test.go.
 
@@ -37,16 +39,17 @@ func usedOnceProof(t *testing.T, key dpoptest.Key, iat time.Time, nonce string) 
 		map[string]any{"jti": "a-proof-used-once", "htm": "POST", "htu": dpopTokenHTU, "iat": iat.Unix(), "nonce": nonce})
 }
 
-// The proof is recorded by its replay key, outside any transaction, until its nonce expires: ten
-// minutes after the nonce was minted, whenever the proof is sent within them.
-func TestTokenDPoP_TheProofIsRecordedUntilItsNonceExpires(t *testing.T) {
+// The proof is recorded by its replay key, outside any transaction, until its nonce expires, ten
+// minutes after the nonce was minted, whenever the proof is sent within them, and five minutes
+// beyond, for instances whose clocks run behind the sweeper's.
+func TestTokenDPoP_TheProofIsRecordedUntilItsNonceExpiresAndTheGrace(t *testing.T) {
 	key := dpoptest.RFC7517Key(t)
 	e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
 	nonce := e.freshNonce(t) // minted at dpopNow
 	client := &record.Client{Id: 1}
 	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 		Return(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"}, nil).Once()
-	e.database.On("RecordDPoPProof", mock.Anything, (*sql.Tx)(nil), usedOnceReplayKey, dpopNow.Add(10*time.Minute)).
+	e.database.On("RecordDPoPProof", mock.Anything, (*sql.Tx)(nil), usedOnceReplayKey, dpopNow.Add(15*time.Minute)).
 		Return(true, nil).Once()
 	e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", key.Thumbprint).
 		Return(&oauth.TokenResponse{AccessToken: "a", TokenType: "DPoP"}, nil).Once()
@@ -134,4 +137,48 @@ func TestTokenDPoP_ARefusedRequestRecordsNoProof(t *testing.T) {
 
 		assertTokenError(t, rr, "invalid_dpop_proof", "The DPoP proof is invalid.")
 	})
+}
+
+// The nonce is judged again where the proof is recorded: a request whose nonce expired while its
+// grant was validated is refused use_dpop_nonce, as it would be were it sent now, with a fresh nonce
+// to retry with, and records nothing, while one still inside the nonce's life at that moment, its
+// last second included, records its proof. The issuer, a strict double, mints only for the second.
+func TestTokenDPoP_TheNonceIsJudgedAgainAtTheRecordPoint(t *testing.T) {
+	key := dpoptest.RFC7517Key(t)
+	for _, tc := range []struct {
+		name     string
+		recordAt time.Time
+		accepted bool
+	}{
+		{"its nonce expired while the grant was validated", dpopNow.Add(10*time.Minute + time.Second), false},
+		{"its nonce still good at the record point", dpopNow.Add(10 * time.Minute), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
+			nonce := e.freshNonce(t) // minted at dpopNow
+			client := &record.Client{Id: 1}
+			e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
+				Run(func(mock.Arguments) { e.now = tc.recordAt }). // the clock moves on during validation
+				Return(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"}, nil).Once()
+			if tc.accepted {
+				e.database.On("RecordDPoPProof", mock.Anything, (*sql.Tx)(nil), usedOnceReplayKey, dpopNow.Add(15*time.Minute)).
+					Return(true, nil).Once()
+				e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", key.Thumbprint).
+					Return(&oauth.TokenResponse{AccessToken: "a", TokenType: "DPoP"}, nil).Once()
+				e.auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
+			}
+
+			e.now = dpopNow.Add(10*time.Minute - time.Second)
+			rr := e.post(t, "/auth/token", clientCredentialsForm, usedOnceProof(t, key, e.now, nonce))
+
+			if tc.accepted {
+				require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+				return
+			}
+			assertTokenError(t, rr, "use_dpop_nonce", "Authorization server requires nonce in DPoP proof.")
+			// The second use_dpop_nonce counted; the first is freshNonce's.
+			assert.Equal(t, []string{`goiabada_token_requests_refused_total{grant_type="client_credentials",error="use_dpop_nonce"} 2`},
+				tokenSamples(t, e.registry))
+		})
+	}
 }

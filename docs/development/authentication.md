@@ -81,13 +81,15 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   plain names (section 2.2.2 MAY) (#676)
 
 ### DPoP at the token endpoint (RFC 9449)
-- A request carrying a `DPoP` header is a DPoP request, on any of the four grants. The handler sets
-  one `DPoP-Nonce` header with a fresh nonce before anything else, so every answer to it carries
-  one, 400s and 500s included (sections 8 and 8.2). The rate limiter's 429 is written before the
-  handler and carries none.
-- The proof is checked once the request is parsed, before `ValidateTokenRequest` authenticates the
-  client, so the nonce round trip is never a client-authentication refusal or a charged password
-  guess (#42 decision 7). `handlers.TokenProofs` holds the `dpop.Checker` for the public base URL,
+- A request carrying a `DPoP` header is a DPoP request, on any of the four grants.
+  `handlers.TokenDPoPNonce` heads the token route, ahead of the ROPC limiter, and sets one
+  `DPoP-Nonce` header with a fresh nonce and `no-store`, so every answer to it carries one, the
+  limiter's 400 and 429 and the handler's 400s and 500s included (sections 8 and 8.2). It is the
+  only place the endpoint mints a nonce.
+- The proof is checked once the form is parsed, before the client's credentials are read and
+  `ValidateTokenRequest` authenticates the client, so the nonce round trip is never a
+  client-authentication refusal or a charged password guess, however the credentials read (#42
+  decision 7). `handlers.TokenProofs` holds the `dpop.Checker` for the public base URL,
   never the internal one, and the `dpop.Nonces`; `main` builds both, from
   `GOIABADA_AUTHSERVER_BASEURL` and the current session authentication key.
 - Freshness comes from the nonce alone (decision 8). A nonce is a Unix-seconds timestamp and its
@@ -101,9 +103,13 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
 - Each proof is accepted once (section 11.1, #42 decision 9). Once `ValidateTokenRequest` has
   accepted the grant, just before the issuer mints, `TokenProofs.Replays` inserts the proof's
   `dpop.Proof.ReplayKey`, the SHA-256 hex of its normalized `htu`, a space and its `jti`, into
-  `dpop_proofs` with its nonce's expiry (`dpop.Nonces.ExpiresAt`). The primary key makes the
-  insert atomic across requests and instances: a taken key is a replay, `invalid_dpop_proof` with
-  the same Warn record. A request refused earlier records nothing, so its proof stays unspent. A
+  `dpop_proofs` with its nonce's expiry (`dpop.Nonces.ExpiresAt`) plus `dpop.ReplayRecordGrace`,
+  five minutes, so a sweep by one instance's clock never removes a record while an instance whose
+  clock runs behind could still accept the proof. The nonce is judged again at that moment, by the
+  clock then: one that expired while the grant was validated is `use_dpop_nonce`, so a request in
+  flight across a sweep cannot record a spent proof as new. The primary key makes the insert atomic
+  across requests and instances: a taken key is a replay, `invalid_dpop_proof` with the same Warn
+  record. A request refused earlier records nothing, so its proof stays unspent. A
   store failure is a 500, and nothing is minted. The cleanup worker deletes expired rows on every
   poll, outside the claim.
 - A public client's refresh-token family is bound to a proof key (section 5, #42 decision 11):
@@ -148,11 +154,17 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   proof refused at a resource`; a valid proof by another key than `cnf.jkt` is 401
   `invalid_token` (figure 16). An accepted proof goes on the context with
   `reqctx.WithDPoPProof`, which is what makes the guards behind challenge in the DPoP scheme.
-- `RecordDPoPProof` is the last bearer guard on every route, so only a request every other guard
-  admitted spends its proof, into `dpop_proofs` until `dpop.Proof.IssuedAtWindowEnds` (`iat`
-  plus 60 seconds, rounded up to the second). A replay is `invalid_dpop_proof`, a store failure a
-  500. The admin group mounts it in each route's `With`, after the route's scope guard;
-  `TestInitRoutes_EveryBearerRouteRecordsTheDPoPProofAfterItsGuards` holds every route to it.
+- `RecordDPoPProof` is the last middleware on every bearer route, behind every guard and rate
+  limiter, so only a request all of them admitted spends its proof, into `dpop_proofs` until
+  `dpop.Proof.IssuedAtWindowEnds` (`iat` plus 60 seconds, rounded up to the second) plus
+  `dpop.ReplayRecordGrace`. It judges `iat` again first, by the clock then, as the token endpoint
+  judges the nonce. A replay is `invalid_dpop_proof`, a store failure a 500. The admin group mounts
+  it in each route's `With`, after the route's scope guard, and the account group after each
+  route's limiters; `TestInitRoutes_EveryBearerRouteRecordsTheDPoPProofAfterItsGuards` holds every
+  route to it.
+- `htu` is compared with the path the client sent, `dpop.RequestPath` over `RequestURI`, at the
+  token endpoint and the resources alike: `httpmw.StripTrailingSlash` rewrites `r.URL` before
+  routing.
 - Every 401 carries one `WWW-Authenticate` field line with `Bearer realm="goiabada"` first and
   `DPoP realm="goiabada", algs="…"` second (`dpop.SigningAlgorithms`), the error in the challenge
   of the scheme used; a request with no credential gets both with no error. A 400 or 403 carries
@@ -863,15 +875,15 @@ names (section 2.2.2).
     the authenticator generation the code was accepted for; a recovery code is claimed in the
     deletion's transaction (#783).
   - `GET /api/v1/account/export` mounts `RequireAdminConsoleClient`, then
-    `RequireRecentAuthentication(300s, urn:goiabada:level2_optional)`, then `RecordDPoPProof`,
-    then the `account_export` tier (5 an hour per token user, every request counted), so a request
-    either guard refuses spends neither its proof nor the tier. The step-up guard is RFC 9470 section 3: it refuses a token whose `auth_time`
-    is older than the maximum age or whose `acr` ranks below the minimum, and fails closed on a
-    missing or non-integer `auth_time` or an unknown `acr`, answering 401
+    `RequireRecentAuthentication(300s, urn:goiabada:level2_optional)`, then the `account_export`
+    tier (5 an hour per token user, every request counted), so a request either guard refuses
+    spends nothing, then `RecordDPoPProof`. The step-up guard is RFC 9470 section 3: it refuses a
+    token whose `auth_time` is older than the maximum age or whose `acr` ranks below the minimum,
+    and fails closed on a missing or non-integer `auth_time` or an unknown `acr`, answering 401
     `INSUFFICIENT_USER_AUTHENTICATION` with `error="insufficient_user_authentication"`,
-    `acr_values` and `max_age` on every refusal, in the challenge of the scheme used. It takes the age, the level and a clock, so it is
-    the guard to reuse in front of another operation. A refresh keeps `auth_time`, so a refreshed
-    token is as old as its sign-in. The answer is the admin export's builder and writer, and
+    `acr_values` and `max_age` on every refusal, in the challenge of the scheme used. It takes the
+    age, the level and a clock, so it is the guard to reuse in front of another operation. A
+    refresh keeps `auth_time`, so a refreshed token is as old as its sign-in. The answer is the admin export's builder and writer, and
     `exported_own_user_data` is written after it (#782). In the console, `render.IsStepUpRequired`
     recognises that 401 by its code and `render.IsSessionEnded` leaves it out, since the token and
     its session are still good. A page in front of the guard checks `IsStepUpRequired` before the

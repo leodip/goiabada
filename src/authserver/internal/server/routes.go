@@ -207,8 +207,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	// token branch, the protocol branch counting its faults as refusals. The router answers POST
 	// /auth/token from this route, behind the token branch alone; any other method falls to the
 	// group its path is under, whose chain runs before the 405, as it did when the route was its
-	// own (#435).
-	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics, logoutTokens, s.tokenProofs))
+	// own (#435). TokenDPoPNonce heads the route, so an answer the limiter writes to a DPoP request
+	// carries its nonce too (#42 decision 7).
+	token.With(handlers.TokenDPoPNonce(s.tokenProofs), rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics, logoutTokens, s.tokenProofs))
 	// Token revocation (RFC 7009, #676), outside the /auth group for the reason the token endpoint
 	// is, on a branch of its own that answers a fault 503. No rate limit: the client authenticates
 	// before anything else, as at the token endpoint's grants that have none (decision 10).
@@ -488,78 +489,79 @@ func (s *Server) initRoutes(branches appBranches) {
 		// client identifier on a client_credentials token, so the token type must be gated.
 		r.Use(apiBearer.RequireUserBoundToken())
 		r.Use(apiBearer.RequireValidSession(s.database))
-		// The DPoP proof is spent after every guard on a route has passed, just before its handler
-		// (#42 decision 9): here for every route but the deletion and the download, which spend it
-		// after their own guards.
+		// The DPoP proof is spent after every guard on a route has passed, its rate limiters
+		// included, just before its handler (#42 decision 9): a request a limiter refuses leaves its
+		// proof unspent. Routes with no guard of their own take it through recorded; each route with
+		// a limiter or a guard of its own mounts it last, behind them.
 		unrecorded := r
-		r = r.With(apiBearer.RecordDPoPProof())
+		recorded := r.With(apiBearer.RecordDPoPProof())
 
-		r.Get("/profile", apihandlers.HandleAccountProfileGet(s.database))
-		r.Put("/profile", apihandlers.HandleAccountProfilePut(s.database, profileValidator, auditLogger))
+		recorded.Get("/profile", apihandlers.HandleAccountProfileGet(s.database))
+		recorded.Put("/profile", apihandlers.HandleAccountProfilePut(s.database, profileValidator, auditLogger))
 		// The email change verifies the account password too, so it spends the same bucket as
 		// the password and OTP changes below (#404). Past the password it says whether the address
 		// is taken, so every change counts on the account first, and a request that tier refuses
 		// never reaches the password check.
-		r.With(rateLimiter.LimitAccountEmailChange, rateLimiter.LimitAccountPassword).Put("/email",
+		unrecorded.With(rateLimiter.LimitAccountEmailChange, rateLimiter.LimitAccountPassword, apiBearer.RecordDPoPProof()).Put("/email",
 			apihandlers.HandleAccountEmailPut(s.database, emailValidator, auditLogger, rateLimiter, notifier))
 		// The send counts every request on the account, beside its own five minute resend cooldown:
 		// the account chooses the address it mails, so each send is a mail to any address (#404).
-		r.With(rateLimiter.LimitEmailVerificationSend).Post("/email/verification/send",
+		unrecorded.With(rateLimiter.LimitEmailVerificationSend, apiBearer.RecordDPoPProof()).Post("/email/verification/send",
 			apihandlers.HandleAccountEmailVerificationSendPost(httpHelper, s.database, emailSender, auditLogger, s.dataCipher, adminConsoleBaseURL))
 		// The verification check counts failures only, in a bucket of its own.
-		r.With(rateLimiter.LimitEmailVerification).Post("/email/verification",
+		unrecorded.With(rateLimiter.LimitEmailVerification, apiBearer.RecordDPoPProof()).Post("/email/verification",
 			apihandlers.HandleAccountEmailVerificationPost(s.database, auditLogger, rateLimiter, s.dataCipher))
-		r.Put("/phone", apihandlers.HandleAccountPhonePut(s.database, phoneValidator, auditLogger))
-		r.Put("/address", apihandlers.HandleAccountAddressPut(s.database, addressValidator, auditLogger))
+		recorded.Put("/phone", apihandlers.HandleAccountPhonePut(s.database, phoneValidator, auditLogger))
+		recorded.Put("/address", apihandlers.HandleAccountAddressPut(s.database, addressValidator, auditLogger))
 		// One limiter over these PUTs and the email change above, which is what makes the
 		// failure budget shared: they verify the same password, so separate buckets would hand
 		// an attacker more guesses by alternating. The enrollment GET between them checks no
 		// credential. Ahead of it, one more over these PUTs and the new set of recovery codes
 		// below counts every change, since each sends the user a notice: a request it refuses
 		// never reaches the password check, and one that check refuses is counted (#724).
-		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Put("/password",
+		unrecorded.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword, apiBearer.RecordDPoPProof()).Put("/password",
 			apihandlers.HandleAccountPasswordPut(s.database, passwordValidator, auditLogger, rateLimiter, notifier, logoutTokens))
-		r.Get("/otp/enrollment", apihandlers.HandleAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
-		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Put("/otp",
+		recorded.Get("/otp/enrollment", apihandlers.HandleAccountOTPEnrollmentGet(s.database, otpSecretGenerator, s.dataCipher))
+		unrecorded.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword, apiBearer.RecordDPoPProof()).Put("/otp",
 			apihandlers.HandleAccountOTPPut(s.database, auditLogger, rateLimiter, s.dataCipher, notifier))
 		// The count of unused recovery codes checks no credential; a new set takes the password,
 		// so it spends the same bucket as the changes above (#257 decision 8).
-		r.Get("/otp/recovery-codes", apihandlers.HandleAccountRecoveryCodesGet(s.database))
-		r.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword).Post("/otp/recovery-codes",
+		recorded.Get("/otp/recovery-codes", apihandlers.HandleAccountRecoveryCodesGet(s.database))
+		unrecorded.With(rateLimiter.LimitAccountCredentialChange, rateLimiter.LimitAccountPassword, apiBearer.RecordDPoPProof()).Post("/otp/recovery-codes",
 			apihandlers.HandleAccountRecoveryCodesPost(s.database, auditLogger, rateLimiter, notifier))
 		// Deleting the account answers only the admin console's own client, so an application the
 		// user granted manage-account cannot delete it (#783 decision 3). The client guard comes
 		// first, so another client's token spends nothing. The deletion checks the password and a
 		// code, so it spends the bucket the changes above share; it sends one notice, and only when
 		// it succeeds, so it takes no account_credential_change (decision 4).
-		unrecorded.With(apiBearer.RequireAdminConsoleClient(), apiBearer.RecordDPoPProof(), rateLimiter.LimitAccountPassword).Post("/deletion",
+		unrecorded.With(apiBearer.RequireAdminConsoleClient(), rateLimiter.LimitAccountPassword, apiBearer.RecordDPoPProof()).Post("/deletion",
 			apihandlers.HandleAccountDeletionPost(s.database, auditLogger, rateLimiter, s.dataCipher, notifier, logoutTokens))
 		// The download of the account's own data answers only the admin console's own client, then
 		// only a sign-in within the last five minutes at urn:goiabada:level2_optional or above, with
 		// RFC 9470's step-up challenge (#782 decisions 1 and 3). The client guard comes first, so
-		// another app is told what is true for it and never asked to sign the user in again. The
-		// DPoP proof is spent after both, and the account_export tier comes last, so a request
-		// either guard refuses spends nothing (decision 5).
+		// another app is told what is true for it and never asked to sign the user in again; the
+		// account_export tier comes after both, so a request either guard refuses spends nothing
+		// (decision 5), and the DPoP proof is spent last.
 		unrecorded.With(apiBearer.RequireAdminConsoleClient(),
 			apiBearer.RequireRecentAuthentication(accountExportMaxAge, record.AcrLevel2Optional, time.Now),
-			apiBearer.RecordDPoPProof(), rateLimiter.LimitAccountExport).Get("/export",
+			rateLimiter.LimitAccountExport, apiBearer.RecordDPoPProof()).Get("/export",
 			apihandlers.HandleAccountExportGet(s.database, auditLogger, baseURL))
-		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
-		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
+		recorded.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
+		recorded.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
 		// The legal document versions the caller accepted (#622 decision 10).
-		r.Get("/legal-document-acceptances", apihandlers.HandleAccountLegalDocumentAcceptancesGet(s.database, baseURL))
+		recorded.Get("/legal-document-acceptances", apihandlers.HandleAccountLegalDocumentAcceptancesGet(s.database, baseURL))
 
 		// Sessions (self-service)
-		r.Get("/sessions", apihandlers.HandleAccountSessionsGet(s.database))
-		r.Delete("/sessions/{id}", apihandlers.HandleAccountSessionDelete(s.database, auditLogger, logoutTokens))
+		recorded.Get("/sessions", apihandlers.HandleAccountSessionsGet(s.database))
+		recorded.Delete("/sessions/{id}", apihandlers.HandleAccountSessionDelete(s.database, auditLogger, logoutTokens))
 
 		// Logout request (self-service)
-		r.Post("/logout-request", apihandlers.HandleAccountLogoutRequestPost(s.database, s.dataCipher, baseURL))
+		recorded.Post("/logout-request", apihandlers.HandleAccountLogoutRequestPost(s.database, s.dataCipher, baseURL))
 
 		// Profile picture (self-service)
-		r.Get("/profile-picture", apihandlers.HandleAccountProfilePictureGet(s.database, baseURL))
-		r.Post("/profile-picture", apihandlers.HandleAccountProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
-		r.Delete("/profile-picture", apihandlers.HandleAccountProfilePictureDelete(s.database, auditLogger))
+		recorded.Get("/profile-picture", apihandlers.HandleAccountProfilePictureGet(s.database, baseURL))
+		recorded.Post("/profile-picture", apihandlers.HandleAccountProfilePicturePost(s.database, auditLogger, baseURL, maxUploadBytes))
+		recorded.Delete("/profile-picture", apihandlers.HandleAccountProfilePictureDelete(s.database, auditLogger))
 	})
 
 	// Browser session store, for the admin console (#266).

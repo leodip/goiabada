@@ -249,6 +249,7 @@ func newRoutesTestServerRendering(t *testing.T, configure func(*config.Config), 
 		revocationMetrics:    revocationmetrics.Register(registry),
 		introspectionMetrics: introspectionmetrics.Register(registry),
 		challengeVerifier:    verifier,
+		tokenProofs:          testTokenProofs(t),
 	}
 	// What a forgot-password request hands off runs against this test's mocks, so it is waited
 	// for before they are torn down, as the server waits for it on shutdown.
