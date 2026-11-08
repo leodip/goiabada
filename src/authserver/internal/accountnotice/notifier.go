@@ -83,7 +83,7 @@ const (
 	// authentication off.
 	OTPDisabledByAdministrator Notice = "otp_disabled_by_administrator"
 	// OTPLockout tells a user their authenticator was disabled after record.OtpConsecutiveFailureLimit
-	// wrong codes in a row at sign-in, which only someone holding the password reaches (#489, #724
+	// wrong codes in a row, at sign-in or confirming the account's deletion, which only someone holding the password reaches (#489, #724
 	// decision 7). The refusal that disabled it sends it, so it goes once per lockout.
 	OTPLockout Notice = "otp_lockout"
 	// RecoveryCodeUsed tells a user a recovery code signed in, with how many unused codes are left

@@ -990,7 +990,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "If this client runs in a browser and calls /auth/token, /auth/revoke or /userinfo, register its origin here: a scheme, a host and an optional port, with nothing after them, such as https://www.example.com or https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "If this client runs in a browser and calls /auth/token, /auth/revoke, /auth/logout or /userinfo, register its origin here: a scheme, a host and an optional port, with nothing after them, such as https://www.example.com or https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Web origin"
 "adminconsole.admin_clients.web_origins.add_button" = "Add"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Web origins"

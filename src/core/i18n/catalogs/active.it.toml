@@ -997,7 +997,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "Se questo client viene eseguito in un browser e chiama /auth/token, /auth/revoke o /userinfo, registra qui la sua origine: schema, host e porta facoltativa, senza nulla dopo, come https://www.example.com o https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "Se questo client viene eseguito in un browser e chiama /auth/token, /auth/revoke, /auth/logout o /userinfo, registra qui la sua origine: schema, host e porta facoltativa, senza nulla dopo, come https://www.example.com o https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Origine web"
 "adminconsole.admin_clients.web_origins.add_button" = "Aggiungi"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Origini web"

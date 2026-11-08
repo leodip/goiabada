@@ -76,9 +76,9 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   `grant_id`
 - `offline_access` names `authserver` in `aud`, as the claim scopes do (RFC 9068 section 2.2.3)
 - Departures from its SHOULDs, documented on the tokens page: a request naming several resources
-  gets one token for all of them rather than `invalid_scope` (section 3; no RFC 8707), `groups` is
-  an array of identifiers rather than SCIM objects (section 2.2.3.1), and the private claims have
-  plain names (section 2.2.2 MAY) (#676)
+  gets one token for all of them rather than `invalid_scope` (section 3; no RFC 8707), and `groups`
+  is an array of identifiers rather than SCIM objects (section 2.2.3.1). The private claims have
+  plain names, which section 2.2.2 allows (#676)
 
 ### DPoP at the token endpoint (RFC 9449)
 - A request carrying a `DPoP` header is a DPoP request, on any of the four grants.
@@ -843,12 +843,12 @@ string `sub` of 1 to 255 characters and a numeric `iat` (OpenID Connect Core 1.0
 an RSA key under 2048 bits or with an even, small or overlong exponent (RFC 7518 section 3.3), and
 skips a key whose `use` is not `sig` or whose `alg` is not `RS256` (Core section 10.1).
 
-Goiabada departs from three of RFC 9068's SHOULDs and MAYs, and the tokens page documents each:
-a request whose scopes name several resources gets one token naming them all in `aud` (section 3,
-since there is no RFC 8707 `resource` parameter; each scope still belongs to one resource in `aud`),
-`groups` is an array of group identifiers rather than SCIM objects (section 2.2.3.1), and the
-private claims `attributes`, `auth_state_generation`, `grant_id` and the `typ` claim have plain
-names (section 2.2.2).
+Goiabada departs from two of RFC 9068's SHOULDs, and the tokens page documents each: a request
+whose scopes name several resources gets one token naming them all in `aud` (section 3, since there
+is no RFC 8707 `resource` parameter; each scope still belongs to one resource in `aud`), and
+`groups` is an array of group identifiers rather than SCIM objects (section 2.2.3.1). The private
+claims `attributes`, `auth_state_generation`, `grant_id` and the `typ` claim have plain names,
+which section 2.2.2 allows.
 
 ## API Routes
 

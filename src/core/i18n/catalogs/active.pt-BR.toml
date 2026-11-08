@@ -940,7 +940,7 @@
 "adminconsole.admin_clients.backchannel_logout.saved_successfully" = "Configurações de logout back-channel salvas."
 "adminconsole.admin_clients.backchannel_logout.manage_required" = "Somente um administrador com authserver:manage pode definir ou alterar a URI de logout back-channel. Você ainda pode limpá-la, ou alterar se o identificador de sessão é exigido."
 
-"adminconsole.admin_clients.web_origins.lead" = "Se este cliente roda em um navegador e chama /auth/token, /auth/revoke ou /userinfo, registre aqui a origem dele: um esquema, um host e uma porta opcional, sem nada depois, como https://www.example.com ou https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "Se este cliente roda em um navegador e chama /auth/token, /auth/revoke, /auth/logout ou /userinfo, registre aqui a origem dele: um esquema, um host e uma porta opcional, sem nada depois, como https://www.example.com ou https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Origem web"
 "adminconsole.admin_clients.web_origins.add_button" = "Adicionar"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Origens web"

@@ -547,9 +547,10 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// two, and a new set of codes in one sitting, and it holds one account to 240 notices a
 		// day on each replica.
 		accountCredentialChange: request("account_credential_change", countedByTokenUser, "", 10, 60*time.Minute),
-		// per-subject account password failures, one bucket for the three routes that check
-		// that password: PUT /api/v1/account/password, PUT /api/v1/account/otp and
-		// PUT /api/v1/account/email (#404). All three verify the same secret, so separate
+		// per-subject account password failures, one bucket for the five routes that check
+		// that password: PUT /api/v1/account/password, PUT /api/v1/account/otp,
+		// PUT /api/v1/account/email, POST /api/v1/account/otp/recovery-codes and
+		// POST /api/v1/account/deletion (#404). All five verify the same secret, so separate
 		// buckets would hand an attacker more guesses by alternating between them.
 		//
 		// Five rather than the ten the sign-in gate allows because the consequences are
