@@ -192,8 +192,23 @@ const siteDocs = "site/src/content/docs"
 // names, if any. A path such as /bin/busybox is not one.
 var busyboxImage = regexp.MustCompile("(?:^|[\\s=\"'])(?:docker\\.io/)?(?:library/)?busybox(?::([^\\s`\"']+))?(?:$|[\\s`\"'])")
 
+// lineCode is the code on one line of a Markdown page: the whole line inside a fenced block, and
+// otherwise its inline code spans.
+func lineCode(line string, fenced bool) []string {
+	if fenced {
+		return []string{line}
+	}
+	var spans []string
+	for _, m := range inlineCode.FindAllStringSubmatch(line, -1) {
+		spans = append(spans, m[1])
+	}
+	return spans
+}
+
 // busyboxRunFindings walks the Markdown pages under docs, relative to root, and returns a finding
-// for each BusyBox a page runs that isn't busybox:version, and the pages that run one at all.
+// for each BusyBox a page's code runs that isn't busybox:version, and the pages that run one at
+// all. Prose naming the tool is not an image, and neither is what follows a command's -- separator,
+// the program it runs inside the container.
 func busyboxRunFindings(root, docs, version string) (findings []string, pages map[string]bool, err error) {
 	pages = map[string]bool{}
 	err = filepath.WalkDir(filepath.Join(root, filepath.FromSlash(docs)), func(path string, entry fs.DirEntry, err error) error {
@@ -209,16 +224,24 @@ func busyboxRunFindings(root, docs, version string) (findings []string, pages ma
 			return err
 		}
 		page := filepath.ToSlash(rel)
+		fenced := false
 		for n, line := range strings.Split(string(text), "\n") {
-			for _, match := range busyboxImage.FindAllStringSubmatch(line, -1) {
-				pages[page] = true
-				at := fmt.Sprintf("%s:%d", page, n+1)
-				switch match[1] {
-				case version:
-				case "":
-					findings = append(findings, at+" runs busybox with no version, not busybox:"+version)
-				default:
-					findings = append(findings, at+" runs busybox:"+match[1]+", not busybox:"+version)
+			if strings.HasPrefix(strings.TrimSpace(line), "```") {
+				fenced = !fenced
+				continue
+			}
+			for _, code := range lineCode(line, fenced) {
+				code, _, _ = strings.Cut(code, " -- ")
+				for _, match := range busyboxImage.FindAllStringSubmatch(code, -1) {
+					pages[page] = true
+					at := fmt.Sprintf("%s:%d", page, n+1)
+					switch match[1] {
+					case version:
+					case "":
+						findings = append(findings, at+" runs busybox with no version, not busybox:"+version)
+					default:
+						findings = append(findings, at+" runs busybox:"+match[1]+", not busybox:"+version)
+					}
 				}
 			}
 		}
@@ -246,7 +269,7 @@ func TestBusyboxRunFindings(t *testing.T) {
 	t.Run("pages that run the pinned version pass, and a path to busybox is not an image", func(t *testing.T) {
 		root := writeTree(t, map[string]string{
 			"docs/a.mdx":     "```bash\nkubectl run x --image=busybox:1.37 -- nslookup example.com\n```\n",
-			"docs/sub/b.mdx": "docker run --rm -it busybox:1.37\n\nCOPY --from=build /bin/busybox /bin/sh\n",
+			"docs/sub/b.mdx": "```bash\ndocker run --rm -it busybox:1.37\n```\n\n```dockerfile\nCOPY --from=build /bin/busybox /bin/sh\n```\n",
 		})
 		findings, pages, err := busyboxRunFindings(root, "docs", "1.37")
 		require.NoError(t, err)
@@ -256,7 +279,7 @@ func TestBusyboxRunFindings(t *testing.T) {
 
 	t.Run("a page running busybox with no version or another one fails, naming its line, quoted or qualified", func(t *testing.T) {
 		root := writeTree(t, map[string]string{
-			"docs/a.mdx": "intro\n   kubectl run x --rm -i --image=busybox -- nslookup example.com\n",
+			"docs/a.mdx": "1. intro\n\n   ```bash\n   kubectl run x --rm -i --image=busybox -- nslookup example.com\n   ```\n",
 			"docs/b.md":  "`docker run --rm busybox:1.38 nc -zv db 5432`\n",
 			"docs/c.txt": "kubectl run x --image=busybox\n",
 			"docs/d.mdx": "```bash\nkubectl run x --image=\"busybox\" -- nslookup example.com\ndocker run --rm 'busybox:1.38' nslookup example.com\n```\n",
@@ -267,7 +290,7 @@ func TestBusyboxRunFindings(t *testing.T) {
 		require.NoError(t, err)
 		sort.Strings(findings)
 		assertFindings(t, findings,
-			"docs/a.mdx:2 runs busybox with no version, not busybox:1.37",
+			"docs/a.mdx:4 runs busybox with no version, not busybox:1.37",
 			"docs/b.md:1 runs busybox:1.38, not busybox:1.37",
 			"docs/d.mdx:2 runs busybox with no version, not busybox:1.37",
 			"docs/d.mdx:3 runs busybox:1.38, not busybox:1.37",
@@ -276,8 +299,12 @@ func TestBusyboxRunFindings(t *testing.T) {
 			"docs/f.mdx:2 runs busybox with no version, not busybox:1.37")
 	})
 
-	t.Run("pages that run no BusyBox are reported as none", func(t *testing.T) {
-		root := writeTree(t, map[string]string{"docs/a.mdx": "The BusyBox image runs as root.\n"})
+	t.Run("prose naming the tool and a program run after -- are not images, so the pages run none", func(t *testing.T) {
+		root := writeTree(t, map[string]string{
+			"docs/a.mdx": "The BusyBox image runs as root.\n",
+			"docs/b.mdx": "The busybox image provides the diagnostic tools.\n",
+			"docs/c.mdx": "```bash\nkubectl exec tool-pod -- busybox nslookup example.com\n```\n\nRun `kubectl exec tool-pod -- busybox ps` to list them.\n",
+		})
 		findings, pages, err := busyboxRunFindings(root, "docs", "1.37")
 		require.NoError(t, err)
 		assert.Empty(t, findings)
