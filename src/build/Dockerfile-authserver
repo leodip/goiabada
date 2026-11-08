@@ -1,4 +1,9 @@
-FROM golang:1.27.3-alpine AS build
+# The build stage runs on the builder's platform and cross-compiles for the image's, which
+# BuildKit passes as TARGETOS and TARGETARCH: a release builds linux/amd64 and linux/arm64
+# from this file, and compiling the arm64 binary under emulation takes minutes longer for a
+# byte-identical one (#808). TestReleaseBuilds_CrossCompile, in
+# src/core/guard/release_build_rules_test.go, holds the build to this form.
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS build
 
 ARG version
 ARG buildDate
@@ -30,6 +35,9 @@ COPY ./core ./core
 RUN mkdir -p /app/bin
 
 WORKDIR /app/src/authserver
+# Declared here, after the module downloads, so those layers are the same for every platform.
+ARG TARGETOS
+ARG TARGETARCH
 # -w drops the DWARF debug data, which nothing in a deployment reads and which
 # is about a third of this image compressed (#331). It is -w and not -s: -s
 # would drop the symbol table too, which is what `govulncheck -mode=binary`
@@ -39,11 +47,11 @@ WORKDIR /app/src/authserver
 # from the runtime's own tables, which -w leaves alone.
 #
 # No debuggable copy of a release is kept. To get one, build the release's tag
-# with this file and the release's build arguments, after removing -w: the same
-# commit, Go image and source path (/app/src, fixed above) give byte-identical
-# code at identical addresses, so the rebuild's DWARF describes the shipped
-# binary.
-RUN go build -buildvcs=false -tags=production -ldflags="-w -X 'github.com/leodip/goiabada/core/buildinfo.Version=${version}' -X 'github.com/leodip/goiabada/core/buildinfo.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/core/buildinfo.GitCommit=${gitCommit}'" -o ../../bin/goiabada-authserver ./cmd/goiabada-authserver
+# with this file, the release's build arguments and the image's platform, after
+# removing -w: the same commit, Go image, platform and source path (/app/src,
+# fixed above) give byte-identical code at identical addresses, so the rebuild's
+# DWARF describes the shipped binary.
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -buildvcs=false -tags=production -ldflags="-w -X 'github.com/leodip/goiabada/core/buildinfo.Version=${version}' -X 'github.com/leodip/goiabada/core/buildinfo.BuildDate=${buildDate}' -X 'github.com/leodip/goiabada/core/buildinfo.GitCommit=${gitCommit}'" -o ../../bin/goiabada-authserver ./cmd/goiabada-authserver
 
 # ------------------------------------------------------------------------------
 

@@ -52,9 +52,11 @@ var packageSetCheck = `RUN [ -r /lib/apk/db/installed ] || { echo "unable to rea
 	`[ -f /etc/ssl/certs/ca-certificates.crt ] || { echo "the final stage has no /etc/ssl/certs/ca-certificates.crt" >&2; exit 1; }`
 
 // dockerInstruction is one instruction of a Dockerfile as Docker reads it: the text with its
-// continuation lines joined and the comment lines inside a continuation dropped.
+// continuation lines joined and the comment lines inside a continuation dropped, and the line it
+// begins on.
 type dockerInstruction struct {
 	text string
+	line int
 }
 
 var (
@@ -74,7 +76,7 @@ var (
 func dockerInstructions(src string) ([]dockerInstruction, string) {
 	var out []dockerInstruction
 	continuing := false
-	for _, raw := range strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n") {
+	for n, raw := range strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n") {
 		trimmed := strings.TrimSpace(raw)
 		if strings.HasPrefix(trimmed, "#") && escapeDirective.MatchString(trimmed) {
 			return nil, "sets the escape directive"
@@ -89,7 +91,7 @@ func dockerInstructions(src string) ([]dockerInstruction, string) {
 		case trimmed == "" || strings.HasPrefix(trimmed, "#"):
 			continue
 		default:
-			out = append(out, dockerInstruction{text: strings.TrimSpace(strings.TrimSuffix(trimmed, "\\"))})
+			out = append(out, dockerInstruction{text: strings.TrimSpace(strings.TrimSuffix(trimmed, "\\")), line: n + 1})
 		}
 		continuing = strings.HasSuffix(trimmed, "\\")
 		// Any "<<" is refused, a heredoc of whatever delimiter BuildKit accepts, digits included,
