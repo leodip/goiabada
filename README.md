@@ -62,7 +62,7 @@ An auth server holds the keys to everything else, so security comes first in eve
 - **Minimal container images**, with no package manager, running as a non-root user, and rescanned for vulnerabilities every week.
 - **Every change checked** by static analysis (`gosec`, `govulncheck`), the race detector, and tests on all four databases.
 
-See [Security](https://goiabada.dev/reference/security/) for the full list. Found a vulnerability? Email [contact@leodip.com](mailto:contact@leodip.com), and keep it private until a fix is released.
+See [Security](https://goiabada.dev/reference/security/) for the full list. Found a vulnerability? Email [leo@goiabada.dev](mailto:leo@goiabada.dev), and keep it private until a fix is released.
 
 ## Get started
 
