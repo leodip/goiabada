@@ -185,7 +185,7 @@ With the [Turnstile challenge](/guides/require-a-turnstile-challenge/) on, the s
 - **The widget doesn't list the auth server's host**, the host of `GOIABADA_AUTHSERVER_BASEURL`. The widget then shows an error.
 - **The widget lists another host**, and the token is solved there. The auth server logs `refused a turnstile token solved on another hostname` with the `hostname` the token names and the `expected_hostname`.
 
-The admin console signs in through the same form, so nobody can turn the challenge off there. Turn it off with the auth server's `recover` command, where the auth server runs. `--disable-turnstile` names no user, so it needs no `--email`, touches no user and ends no sessions. It keeps the site key and the secret key:
+The admin console signs in through the same form, so once you're signed out, you can't turn the challenge off there. Turn it off with the auth server's `recover` command, where the auth server runs:
 
 <Tabs>
   <TabItem label="Docker Compose">

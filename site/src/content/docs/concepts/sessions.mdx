@@ -24,7 +24,7 @@ A session can be hours old. When an operation needs the user to have signed in r
    Host: auth.example.com
    ```
 
-   A user who signed in longer ago than that enters their password again. One who signed in within it goes straight through.
+   A user who signed in longer ago than that enters their password again, and gets a new session in place of the old one: the user's other apps on it stop refreshing, and are [told it ended](/concepts/ending-sessions/#telling-your-apps). One who signed in within it goes straight through. `prompt=login` asks for the password too, but keeps the session.
 
 2. Check `auth_time` in the ID token before you allow the operation. It's when the user last entered a credential, so it's no older than `max_age` allows:
 
@@ -88,7 +88,7 @@ Once the user has signed in, the auth server checks them again before it records
 Then it records the sign-in in a session:
 
 - **The browser's session is valid and the user's own.** It's reused: its last activity moves forward, and its ACR level goes up when this sign-in reached a higher one. Reusing it never lowers its level. When the user entered a credential in this sign-in, its `auth_time` is updated to then. A sign-in that asked for the password again, such as one with `prompt=login`, replaces the session's level and methods with its own, as described in [A session that's already there](/concepts/acr-and-amr/#a-session-thats-already-there).
-- **Otherwise, a new session starts.** It replaces the user's own session the browser had, if it had one that's no longer valid, and the user's other sessions from the same browser, recognized by its [device cookie](#how-the-auth-server-recognizes-a-browser). Their sessions in other browsers stay, unless the user would then hold more than [the cap](#how-many-sessions-a-user-can-hold). Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them, and the apps on each one that was still valid are [told it ended](/concepts/ending-sessions/#telling-your-apps). A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
+- **Otherwise, a new session starts.** It replaces the user's own session the browser had, if that one had expired or was older than the request's `max_age`, and the user's other sessions from the same browser, recognized by its [device cookie](#how-the-auth-server-recognizes-a-browser). Their sessions in other browsers stay, unless the user would then hold more than [the cap](#how-many-sessions-a-user-can-hold). Nothing those sessions handed out is revoked, though their normal refresh tokens stop working with them, and the apps on each one still within its idle timeout and maximum lifetime are [told it ended](/concepts/ending-sessions/#telling-your-apps). A session the browser had for **another** user is ended, as [Ending sessions](/concepts/ending-sessions/#a-different-user-signs-in-on-the-same-browser) describes.
 
 A new session needs a password entered in this sign-in. A sign-in that was relying on a session that ended partway through goes back to the password step rather than starting one from nothing.
 

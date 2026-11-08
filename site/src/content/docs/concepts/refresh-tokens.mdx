@@ -92,7 +92,7 @@ A refresh is refused with `invalid_grant` when the token can't be used any more:
 
 ## Revoking a grant
 
-When your app is done with a grant, typically when the user signs out, it sends the refresh token, or any access token of the grant, to the [revocation endpoint](/reference/endpoints/revoke/), `/auth/revoke`. That ends the whole grant and leaves the user's session and your app's other grants alone. See [What revoking ends](/reference/endpoints/revoke/#what-revoking-ends).
+When your app is done with a grant, typically when the user signs out, it sends the refresh token, or an access token of the grant that hasn't expired, to the [revocation endpoint](/reference/endpoints/revoke/), `/auth/revoke`. That ends the whole grant and leaves the user's session and your app's other grants alone. See [What revoking ends](/reference/endpoints/revoke/#what-revoking-ends).
 
 ## Checking a refresh token
 

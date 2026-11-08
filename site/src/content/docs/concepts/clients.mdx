@@ -61,7 +61,7 @@ A client you create in the admin console starts:
 - with the default ACR level `urn:goiabada:level2_optional`;
 - not allowed to request the administrative scopes.
 
-The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Sign-out redirect URIs**, **Back-channel logout**, **Web origins**, **Sessions**, **Permissions** and, for a confidential client, **Introspection**.
+The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Sign-out redirect URIs**, **Back-channel logout**, **Web origins**, **Sessions**, **Permissions**, **Introspection** for a confidential client, and **Legal documents**.
 
 ## Public and confidential clients
 
@@ -122,7 +122,6 @@ The [redirect URI rules](#redirect-uris) apply to each one, with these differenc
 
 - **The list is its own.** A client can have up to 60 sign-out redirect URIs, besides its redirect URIs.
 - **The port of a loopback address counts.** Register the exact port your app listens on: `http://127.0.0.1/signed-out` doesn't match `http://127.0.0.1:54321/signed-out`. An app that picks its port at startup needs a fixed port to be sent back.
-- **A custom scheme and a query are allowed,** such as `com.example.app:/signed-out` or `https://app.example.com/bye?state=fixed`.
 
 Through the Admin API, replace the list whole with [`PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris`](/reference/api/admin/operations/updateclientpostlogoutredirecturis/), sending the list as you read it in `expectedPostLogoutRedirectURIs`. Each save leaves an `updated_post_logout_redirect_uris` entry in the [audit log](/concepts/audit-log/).
 

@@ -67,7 +67,7 @@ Signing out at `/auth/logout` revokes no token. That's why step 3 revokes them:
 - **A refresh token** keeps working while the session it's tied to does, which, when other apps share that session, is after your app has signed out. An offline refresh token, from the `offline_access` scope, isn't tied to a session at all.
 - **An access token** works at `/userinfo` and the auth server's APIs until it expires or is revoked. An API that checks only its signature accepts it until it expires, revoked or not.
 
-Revoking either token ends the whole grant, so one call is enough. See [What revoking ends](/reference/endpoints/revoke/#what-revoking-ends).
+Revoking the refresh token, or an access token that hasn't expired, ends the whole grant, so one call is enough. See [What revoking ends](/reference/endpoints/revoke/#what-revoking-ends).
 
 To cut off everything a session handed out, to every app, end the session instead. A user can, under **Account**, **Sessions** in the admin console, and an administrator can, on the user's **Sessions** tab. See [Ending sessions](/concepts/ending-sessions/#end-a-session).
 
@@ -140,9 +140,9 @@ Your app's own session can outlive the user's session on the auth server: when t
 
 </Steps>
 
-When your app doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429, the auth server sends the same token again, `jti` included, for about a minute. So a token can arrive twice: answer `200` again. [Retries](/reference/endpoints/backchannel-logout/#retries) gives the schedule.
+When your app doesn't answer within 5 seconds, or answers with a 5xx, 408 or 429, the auth server sends the same token again, `jti` included, so a token can arrive more than once: answer `200` again. See [Retries](/reference/endpoints/backchannel-logout/#retries).
 
-A token that never gets through isn't sent later. After a sign-out, or a sign-in that ends an older session, nothing else tells an app holding an offline refresh token from that session, so it stays signed in. See [When a delivery is lost](/reference/endpoints/backchannel-logout/#when-a-delivery-is-lost).
+A token that never gets through isn't sent later. See [When a delivery is lost](/reference/endpoints/backchannel-logout/#when-a-delivery-is-lost) for what your app can still rely on.
 
 ## Next steps
 

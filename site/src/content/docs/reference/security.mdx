@@ -37,7 +37,7 @@ This page helps you report a security issue in Goiabada, and shows what it does 
 
 ## Emails about account changes
 
-Goiabada emails a user when their sign-in details change, so someone who stole a password can't change them unnoticed:
+Goiabada emails a user when their sign-in details change or their account is deleted, so someone who stole a password can't act on the account unnoticed:
 
 | What changed | Who's told |
 |---|---|
@@ -48,7 +48,7 @@ Goiabada emails a user when their sign-in details change, so someone who stole a
 | Two-factor authentication set up, on the Account pages or during a sign-in | The account's address |
 | Two-factor authentication turned off on the Account pages | The account's address |
 | Two-factor authentication turned off by an administrator | The account's address |
-| Their authenticator, disabled after 100 wrong codes in a row at sign-in | The account's address |
+| Their authenticator, disabled after 100 wrong codes in a row | The account's address |
 | A recovery code, used to sign in. The email says how many unused codes are left | The account's address |
 | A new set of recovery codes, made on the Account pages | The account's address |
 | Their account, deleted on the Account pages | The address the account had |
@@ -74,7 +74,7 @@ Each notice says what changed and what to do if the user didn't change it, in th
 - **The cookie is `HttpOnly`,** so no script can read it, **`SameSite=Lax`,** so the browser leaves it off another site's form posts, and **`Secure`** when the server's base URL is `https`, so it never travels over plain HTTP. On `https` its name carries the `__Host-` prefix, so a sibling subdomain can't set one.
 - **Another cookie names the browser, not a session.** It holds a random identifier, with the same attributes, for the session maximum lifetime, up to 400 days, and is used only to end the user's own earlier sessions from that browser when they sign in again. A session stores only its SHA-256. See [Sessions](/concepts/sessions/#how-the-auth-server-recognizes-a-browser).
 - **Sessions expire:** after 2 hours idle or 24 hours in all, by default. See [Sessions](/concepts/sessions/#how-long-a-session-lasts).
-- **The auth server's cookie outlives the browser only when the user asks.** Under **Keep users signed in after the browser closes**, the default **Let each user choose** shows an unticked **Keep me signed in** box on the password page. Ticked, the cookie lasts as long as its session, up to 400 days; unticked, the browser drops it when it closes. **Always** and **Never** decide for everyone. See [Closing the browser](/concepts/sessions/#closing-the-browser).
+- **By default, the auth server's cookie outlives the browser only when the user asks.** Under **Keep users signed in after the browser closes**, the default **Let each user choose** shows an unticked **Keep me signed in** box on the password page. Ticked, the cookie lasts as long as its session, up to 400 days; unticked, the browser drops it when it closes. **Always** and **Never** decide for everyone. See [Closing the browser](/concepts/sessions/#closing-the-browser).
 - **The admin console's cookie has no expiry,** so the browser drops it when it closes. A browser that restores its last session can bring it back. The console signs in through the auth server, so an administrator whose auth server cookie outlived the browser is signed back in without a password: administrators should leave **Keep me signed in** unticked. See [Administrators](/concepts/sessions/#administrators).
 
 ## Cross-site request forgery
@@ -89,7 +89,7 @@ The protocol endpoints are called from other sites by design, so the auth server
 |---|---|
 | `/auth/authorize` | OpenID Connect requires it to take a POST as well as a GET, and a POST only starts a sign-in, as a link would. Every step after it is checked. |
 | `/auth/token` | A confidential client presents its secret. A public client presents a one-time code, bound to its redirect URI and to a PKCE verifier only it holds. |
-| `/auth/revoke` | A client presents its secret, or a public client its `client_id`, with a token it already holds. It reads no cookie, and it ends only that token's grant. |
+| `/auth/revoke` | A client presents its secret, or a public client its `client_id`, with a token it already holds. It reads no cookie, and it ends only that token and the grant it belongs to. |
 | `/auth/introspect` | A confidential client presents its secret, which a cross-site page doesn't have. It reads no cookie and changes nothing. |
 | `/userinfo` | It takes an access token, never a cookie. |
 | `/connect/register` | It creates a client and acts on no signed-in user. It's off by default. |

@@ -13,9 +13,9 @@ It's [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-co
 
 <Steps>
 
-1. A user's session ends while it's still valid: someone ends it, the user signs out, a different user signs in on the browser, and the other ends [Telling your apps](/concepts/ending-sessions/#telling-your-apps) lists.
+1. A user's session, or your app's part of it, ends while the session is still valid: someone ends it, the user signs out, a different user signs in on the browser, and the other ends [Telling your apps](/concepts/ending-sessions/#telling-your-apps) lists.
 
-2. Once the end is saved, the auth server signs one logout token for each app the session was on that has a [back-channel logout URI](/concepts/clients/#back-channel-logout), and POSTs it there. The request that ended the session doesn't wait for it.
+2. Once the end is saved, the auth server signs one logout token for each app whose part ended that has a [back-channel logout URI](/concepts/clients/#back-channel-logout), and POSTs it there. The request that ended the session doesn't wait for it.
 
 3. Your app checks the token, ends its own sessions for that user, and answers `200 OK`.
 

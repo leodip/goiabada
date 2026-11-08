@@ -99,13 +99,13 @@ Until a user has approved it, your app can't get the scope without them:
 - a `prompt=none` request asking for it is answered `consent_required`;
 - a refresh renewing it is refused with `invalid_grant`, and the refresh token isn't spent, so a refresh whose `scope` leaves `authserver:manage-account` out still works.
 
-A session or a live refresh token from an earlier authorization-code sign-in can encounter these checks until the user approves the scope. Send the user through an ordinary sign-in: they approve once, and the refreshes and silent requests after it work. Refresh tokens from the [password grant](/legacy-flows/ropc/) don't need this consent.
+A session or a live refresh token from an earlier authorization-code sign-in can encounter these checks until the user approves the scope. Send the user through an ordinary sign-in: they approve once, and the refreshes after it work. So do silent requests, unless your client is public with [**Remember consent**](/concepts/clients/#consent-required) off. Refresh tokens from the [password grant](/legacy-flows/ropc/) don't need this consent.
 
 ## Change a user's account from your app
 
 There are three ways, and which one fits depends on who's making the change:
 
-- **The Account API, with the user's token.** For an app that changes the signed-in user's own account on their behalf. It asks for `authserver:manage-account` as [above](#call-the-account-api), and each user approves that once on the consent screen. The token reaches that user's account and nothing else.
+- **The Account API, with the user's token.** For an app that changes the signed-in user's own account on their behalf. It asks for `authserver:manage-account` as [above](#call-the-account-api), and each user approves that on the consent screen: once, or at every sign-in for a public client with [**Remember consent**](/concepts/clients/#consent-required) off. The token reaches that user's account and nothing else.
 - **The Admin API, with your client's own token.** For a service that changes users' accounts with no user present, such as provisioning from an HR system. It gets its token through the client credentials flow, as in [Call the Admin API](#call-the-admin-api), holding `authserver:manage-users`, which only an administrator with `authserver:manage` can grant it. That makes the client an [administrator](/reference/api/administrators/), and it still can't change an administrator.
 - **A link to the admin console's Account pages.** For a change the user makes themselves. Link to `/account/profile` on the admin console, such as `https://admin.example.com/account/profile`. The user signs in there if they need to and edits their profile, email, phone, address, picture, password, two-factor authentication, sessions and consents. Your app needs no scope at all.
 

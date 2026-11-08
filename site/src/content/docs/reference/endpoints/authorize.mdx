@@ -88,6 +88,7 @@ Every other check is answered with an error response to your redirect URI, carry
 | There's no `request` or `request_uri`: request objects aren't supported | `request_not_supported`, `request_uri_not_supported` |
 | `response_type` is there, separated by single spaces, and one the auth server supports | `invalid_request`, `unsupported_response_type` |
 | The implicit flow is on for the client, when `response_type` asks for it | `unauthorized_client` |
+| The client doesn't [require DPoP](/concepts/clients/#require-dpop-for-token-requests), when `response_type` asks for an access token through the implicit flow | `unauthorized_client` |
 | The authorization code flow is on for the client, when `response_type` asks for it | `unauthorized_client` |
 | `scope` has `openid`, when `response_type` asks for an ID token | `invalid_request` |
 | `nonce` is there, when the implicit flow asks for an ID token | `invalid_request` |

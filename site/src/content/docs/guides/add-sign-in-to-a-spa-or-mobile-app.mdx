@@ -80,11 +80,9 @@ Anyone who copies a token out of your app, or out of a log, can use it until it 
 
 <Steps>
 
-1. In the admin console, on your client's **Tokens** tab, turn on **Require DPoP for token requests** and click **Save**. Every token request for your client then needs a proof, so nobody gets a token for it without one. See [Require DPoP for token requests](/concepts/clients/#require-dpop-for-token-requests).
+1. When a user signs in, make an ES256 key pair. In a browser, make it with the Web Crypto API with its private key non-extractable, so no script can read it, and keep it in IndexedDB, which stores the key itself. On a phone, keep it in the platform's keystore. Keep the key as long as the refresh token: every refresh needs a proof by the same key.
 
-2. When a user signs in, make an ES256 key pair. In a browser, make it with the Web Crypto API with its private key non-extractable, so no script can read it, and keep it in IndexedDB, which stores the key itself. On a phone, keep it in the platform's keystore. Keep the key as long as the refresh token: every refresh needs a proof by the same key.
-
-3. Send the key's thumbprint as `dpop_jkt` with the authorization request, beside the PKCE challenge, so the code is bound to your key from the start:
+2. Send the key's thumbprint as `dpop_jkt` with the authorization request, beside the PKCE challenge, so the code is bound to your key from the start:
 
    ```http
    GET /auth/authorize?client_id=my-spa&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&response_type=code&scope=openid%20email&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&dpop_jkt=NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs&state=af0ifjsldkj&nonce=n-0S6_WzA2Mj HTTP/1.1
@@ -93,7 +91,7 @@ Anyone who copies a token out of your app, or out of a log, can use it until it 
 
    The thumbprint is the one [a bound token carries](/concepts/dpop/#what-a-bound-token-carries) in `cnf.jkt`.
 
-4. Redeem the code as in step 6 above, with a proof by the key in a `DPoP` header, `htm` `POST` and `htu` the token endpoint's URL:
+3. Redeem the code as in step 6 above, with a proof by the key in a `DPoP` header, `htm` `POST` and `htu` the token endpoint's URL:
 
    ```bash
    curl -X POST https://auth.example.com/auth/token \
@@ -107,9 +105,9 @@ Anyone who copies a token out of your app, or out of a log, can use it until it 
 
    The first answer is `400` `use_dpop_nonce`, with a nonce in its `DPoP-Nonce` header. Make a new proof carrying that nonce and send the request again: the answer's `token_type` is `DPoP`. [Get a bound access token](/concepts/dpop/#get-a-bound-access-token) shows each proof, and [The nonce](/concepts/dpop/#the-nonce) when to retry.
 
-5. Refresh the same way, with a new proof by the same key, carrying the latest nonce you got.
+4. Refresh the same way, with a new proof by the same key, carrying the latest nonce you got.
 
-6. Call `/userinfo`, and your APIs, with the `DPoP` scheme and a new proof for each call, its `htm` and `htu` naming that call and its `ath` the hash of the access token:
+5. Call `/userinfo`, and your APIs, with the `DPoP` scheme and a new proof for each call, its `htm` and `htu` naming that call and its `ath` the hash of the access token:
 
    ```http
    GET /userinfo HTTP/1.1
@@ -117,6 +115,8 @@ Anyone who copies a token out of your app, or out of a log, can use it until it 
    Authorization: DPoP eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...
    DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7...
    ```
+
+6. Once your app sends a proof with every token request, turn on **Require DPoP for token requests** on your client's **Tokens** tab in the admin console, and click **Save**. From then on, nobody gets a token for your client without a proof. See [Require DPoP for token requests](/concepts/clients/#require-dpop-for-token-requests).
 
 </Steps>
 

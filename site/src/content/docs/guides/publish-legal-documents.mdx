@@ -43,7 +43,7 @@ A document is written in Markdown ([CommonMark](https://commonmark.org/)) with t
 What the text can't do, so it never runs code or calls another site from a reader's browser:
 
 - HTML in the text isn't shown.
-- A link to a `javascript:`, `vbscript:` or `file:` address, or to a `data:` address that isn't an image, is left out.
+- A link to a `javascript:`, `vbscript:` or `file:` address, or to a `data:` address that isn't an image, keeps its text and loses its address.
 - An image is never loaded. It's shown as a link to the image, named by its alternative text.
 
 A document has one text, in whatever language you write it. If you serve people in several languages, put each language's text in the same document.
@@ -90,7 +90,7 @@ Besides its public page, a document in effect shows to users here, and nowhere u
 When a user signs in to a client, after their password and any second factor, and before the consent screen, the auth server checks the **Users must accept** documents in effect for that client. If the user hasn't accepted the current version of one, they see a page listing each such document by its title, linked to its public page, with a box to tick.
 
 - **Accept** with every box ticked records, for each document, the user, the version shown and the time. The sign-in then goes on to the consent screen or back to the client.
-- **Decline** sends the client the error `access_denied`. Nothing is recorded, and the user stays signed in, so the next sign-in asks again.
+- **Decline** sends the client the error `access_denied`. Nothing is stored, and the user stays signed in, so the next sign-in asks again.
 
 A user is asked at every sign-in, single sign-on included, until they accept. A document accepted once counts on every client it applies to. Each new version is asked again, at the user's next sign-in to a client it covers.
 

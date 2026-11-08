@@ -116,7 +116,7 @@ When an operation must stop the moment a token is cut off, have your API also [i
 
 <Steps>
 
-1. Give your API a confidential client of its own: open **Admin**, **Clients**, click **New client**, enter a **Client identifier**, such as `product-api-introspector`, and click **Create client**. On **Authentication**, click **Show** and copy the **Client secret** to your API's configuration.
+1. Give your API a confidential client of its own: open **Admin**, **Clients**, click **New client**, enter a **Client identifier**, such as `product-api-introspector`, turn off **Authorization code with PKCE**, and click **Create client**. On **Authentication**, click **Show** and copy the **Client secret** to your API's configuration.
 
 2. On the client's **Introspection** tab, choose `product-api`, click **Add resource**, and click **Save**. The client can now introspect the tokens whose `aud` names `product-api`, and no others.
 

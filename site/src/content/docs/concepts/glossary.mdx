@@ -75,7 +75,7 @@ An application that asks the auth server for tokens: your app, an API calling an
 
 ### Consent
 
-A user's approval for a client to receive what it asked for. The auth server asks for it when the client has "Ask users for consent" turned on, when the client asks for `offline_access`, or when the request says `prompt=consent`. It also asks when a client other than the admin console's asks for `authserver:manage-account` and the user hasn't approved that scope for it yet. An earlier approval skips the screen on later sign-ins, except those asking for `offline_access` or saying `prompt=consent`, and except for a public client with "Remember consent" off, whose users are asked every time. See [Consent required](/concepts/clients/#consent-required) for the full rule. Users can revoke a consent under "Consents" in their account.
+A user's approval for a client to receive what it asked for. The auth server asks for it when the client has "Ask users for consent" turned on, when the client asks for `offline_access`, or when the request says `prompt=consent`. It also asks when a client other than the admin console's asks for `authserver:manage-account` and the user hasn't approved that scope for it yet. An earlier approval can skip the screen on later sign-ins, as [Consent required](/concepts/clients/#consent-required) describes. Users can revoke a consent under "Consents" in their account.
 
 ### DPoP
 
@@ -87,7 +87,7 @@ A way for a client to register itself, by calling `/connect/register`, instead o
 
 ### Grant
 
-What one sign-in gives a client: its refresh token, every refresh token that one is rotated into, and every access token issued with them, which carry its identifier as `grant_id`. A password grant makes one too. Tokens from the client credentials flow and the implicit flow belong to no grant. Your app ends a grant by sending one of its tokens to [`/auth/revoke`](/reference/endpoints/revoke/). See [Refresh tokens](/concepts/refresh-tokens/#revoking-a-grant).
+What one sign-in gives a client: its refresh token, every refresh token that one is rotated into, and every access token issued with them, which carry its identifier as `grant_id`. A password grant makes one too. Tokens from the client credentials flow and the implicit flow belong to no grant. Your app ends a grant by sending its refresh token, or an access token of it that hasn't expired, to [`/auth/revoke`](/reference/endpoints/revoke/). See [Refresh tokens](/concepts/refresh-tokens/#revoking-a-grant).
 
 ### Group
 

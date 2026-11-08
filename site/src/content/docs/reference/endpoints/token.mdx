@@ -249,7 +249,7 @@ Pragma: no-cache
 | `unauthorized_client` | 400 | The grant is off for this client, or this client can't use it |
 | `unsupported_grant_type` | 400 | `grant_type` isn't one of the four: "Unsupported grant_type." |
 | `invalid_scope` | 400 | A scope is malformed, unknown, or more than the client or user may have |
-| `invalid_dpop_proof` | 400 | The [DPoP](#dpop) proof is missing a part, or fails a check |
+| `invalid_dpop_proof` | 400 | The [DPoP](#dpop) proof fails a check or was already used, or the client requires DPoP and the request sent no proof |
 | `use_dpop_nonce` | 400 | The [DPoP](#dpop) proof needs the nonce this answer's `DPoP-Nonce` header carries |
 | `server_error` | 500 | Something failed on the server. The description ends with a request id to find it in the logs |
 

@@ -9,7 +9,7 @@ This page helps you understand the tokens your app gets, and check one before yo
 
 Your app gets up to three tokens from the [token endpoint](/reference/endpoints/token/):
 
-- **An access token**, which your app sends to an API in an `Authorization: Bearer` header. It says what your app may do there. One your app got with [DPoP](/concepts/dpop/) is bound to a key your app holds.
+- **An access token**, which your app sends to an API in an `Authorization: Bearer` header. It says what your app may do there. One your app got with [DPoP](/concepts/dpop/) is bound to a key your app holds, and goes in an `Authorization: DPoP` header instead, beside a proof.
 - **An ID token**, which tells your app who signed in and how. Your app gets one only when it asks for the `openid` scope.
 - **A refresh token**, which your app trades for new tokens without asking the user to sign in again. See [Refresh tokens](/concepts/refresh-tokens/).
 

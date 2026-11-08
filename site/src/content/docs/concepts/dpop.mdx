@@ -132,14 +132,14 @@ A bound token sent as `Bearer`, in the header or a POST body, is refused, and so
 | `typ` | `dpop+jwt` |
 | `alg` | One of `ES256`, `ES384`, `ES512`, `PS256`, `PS384`, `PS512`, `RS256`, `RS384`, `RS512`, `Ed25519` and `EdDSA`, as [discovery's](/reference/endpoints/discovery-and-jwks/) `dpop_signing_alg_values_supported` lists them. `none` and symmetric algorithms are never accepted |
 | `jwk` | Your public key, of the type the algorithm takes: an EC key on the curve it names, an RSA key of 2048 to 8192 bits, or an Ed25519 key for `Ed25519` and `EdDSA`. A key with any private part is refused |
-| `jti` | A new identifier for each proof. A proof is accepted once: sent again, it's refused |
+| `jti` | A new identifier for each proof, a retry included. A proof is accepted once: sent again, it's refused. At userinfo and the API, a proof is spent even when the call is refused |
 | `htm` | The request's method, exactly: `POST` at the token endpoint |
 | `ath` | At userinfo and the API, the hash of the access token sent beside it: its SHA-256, base64url-encoded without padding |
 | `htu` | The URL of the request: the auth server's base URL, `GOIABADA_AUTHSERVER_BASEURL`, followed by the endpoint's path, such as `https://auth.example.com/auth/token`. The query and fragment are ignored. A proof naming the internal base URL is refused |
 | `iat` | When your app made the proof, in seconds since 1970. At userinfo and the API, within 60 seconds of the auth server's clock |
 | `nonce` | At the token endpoint, the latest `DPoP-Nonce`. Userinfo and the API don't read it |
 
-Send one `DPoP` header, of at most 8 KiB. A request whose proof fails any of these is refused with `invalid_dpop_proof`: `400 Bad Request` at the token endpoint, `401 Unauthorized` at userinfo and the API. At userinfo and the API, a proof that passes but is signed by another key than the token's is refused with `invalid_token`. To find which check failed, see [Logs](/deploy/logs/#records-worth-knowing).
+Send one `DPoP` header, of at most 8 KiB. A request whose proof fails any of these checks but the nonce is refused with `invalid_dpop_proof`: `400 Bad Request` at the token endpoint, `401 Unauthorized` at userinfo and the API. At userinfo and the API, a proof that passes but is signed by another key than the token's is refused with `invalid_token`. To find which check failed, see [Logs](/deploy/logs/#records-worth-knowing).
 
 ## What a bound token carries
 

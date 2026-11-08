@@ -87,7 +87,7 @@ It leaves:
 - the encrypted browser-session rows behind the cookies of the user's sign-ins, which can remain until they expire;
 - what clients already received about the user, such as their name and email address. The apps that are told learn that the user's sessions ended, not that the user is gone.
 
-Whoever deletes the account, the user is emailed that it's gone: see [emails about account changes](/reference/security/#emails-about-account-changes).
+Whoever deletes the account, the user is emailed that it's gone, while **Send email** is on and their address is verified: see [emails about account changes](/reference/security/#emails-about-account-changes).
 
 ## A request for a person's data
 
@@ -108,7 +108,7 @@ It holds:
 
 Nothing secret is in it: no password, authenticator secret, recovery code, emailed code or token.
 
-An entry an administrator made about the person says an administrator did it, with `actedByAdministrator`, but not who. An entry about a sign-in that replaced another user's session on a shared browser doesn't name that other user. So you can send the file as it is. The audit log itself still shows who acted.
+An entry an administrator made about the person says an administrator did it, with `actedByAdministrator`, but not who. An entry about a sign-in that replaced another user's session on a shared browser doesn't name that other user. The audit log itself still shows who acted. An entry the person made keeps whom they acted on, so an administrator's file names the users they changed: review it before you send it.
 
 Each download is recorded in the audit log as `exported_user_data`, under the user and under you.
 
@@ -127,7 +127,7 @@ Scripts get the same file from `GET /api/v1/admin/users/{id}/export`, with a tok
 
 Every password set here, by you or by the user, must meet the [password policy](/concepts/password-policy/), which the page shows under the field.
 
-**New password** on the **Authentication** tab gives the user a new password. It signs them out of every session and revokes their refresh tokens. A password the user changes themselves does the same, except for the session they change it from. See [credential changes](/concepts/ending-sessions/#credential-changes). Either way, the user is emailed about the change: see [emails about account changes](/reference/security/#emails-about-account-changes).
+**New password** on the **Authentication** tab gives the user a new password. It signs them out of every session and revokes their refresh tokens. A password the user changes themselves does the same, except for the session they change it from. See [credential changes](/concepts/ending-sessions/#credential-changes). Either way, the user is emailed about the change, while **Send email** is on and their address is verified: see [emails about account changes](/reference/security/#emails-about-account-changes).
 
 A user who forgot their password can ask for a reset link from the sign-in page: see [Password recovery](/concepts/password-recovery/). The link you email a new user to set up their password is the same kind of link.
 

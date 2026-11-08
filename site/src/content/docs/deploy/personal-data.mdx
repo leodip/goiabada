@@ -11,7 +11,7 @@ This page helps you write your privacy notice and answer people's requests about
 
 <Steps>
 
-1. **Publish your privacy notice** as a legal document, so people can read it from the sign-in pages. See [Publish legal documents](/guides/publish-legal-documents/). The sections below list what Goiabada stores and shares, for your notice to cover.
+1. **Publish your privacy notice** as a legal document, and link its public page from your apps and your website. See [Publish legal documents](/guides/publish-legal-documents/). The sections below list what Goiabada stores and shares, for your notice to cover.
 
 2. **Choose how users stay signed in,** with **Keep users signed in after the browser closes** under **Admin**, **Sessions**. **Always** keeps a cookie past the browser's close without asking, which is yours to decide on: see [What's yours to decide](#whats-yours-to-decide).
 
@@ -74,7 +74,7 @@ Everything is in the auth server's database, plus the servers' logs. The admin c
 
 About each user:
 
-- their profile: names, nickname, website, gender, birthdate, time zone and locale;
+- their profile: names, username, nickname, website, gender, birthdate, time zone, locale and page language;
 - their email address and phone number, each with whether it's verified, and their address;
 - their password, as a hash, their recovery codes, as digests, and their authenticator's secret, encrypted;
 - their picture;
@@ -94,7 +94,7 @@ Behind each cookie that names a session is a **browser-session row**, encrypted 
 
 **Audit events** name the user by their id, hold digests of email addresses, and on some events an IP address. See [the audit log's details](/concepts/audit-log/#details). By default each event is also written to the server's output, so it lands in your logs too.
 
-**The logs** hold more. The HTTP request log records each request's client IP address. It's off unless you turn it on, but every configuration the [setup wizard](/deploy/setup-wizard/) writes turns it on, and the [production checklist](/deploy/production-checklist/#monitoring-and-logs) asks for it. A logout token that couldn't be delivered writes a warning naming the client and the user. See [Logs](/deploy/logs/).
+**The logs** hold more. The HTTP request log records each request's client IP address. It's off unless you turn it on, but every configuration the [setup wizard](/deploy/setup-wizard/) writes turns it on, and the [production checklist](/deploy/production-checklist/#monitoring-and-logs) asks for it. Some warning and error records name a user by their id, such as a logout token that couldn't be delivered. [Verbose API logging](/deploy/logs/#verbose-api-logging), meant for development, also writes every Admin and Account API body, names and email addresses included. See [Logs](/deploy/logs/).
 
 ## What apps receive
 
@@ -130,7 +130,7 @@ Behind each cookie that names a session is a **browser-session row**, encrypted 
 - **Erasure.** Delete the user from **Users**, or let them delete their own account. [Deleting users](/concepts/users-and-groups/#deleting-users) lists what a deletion leaves behind.
 - **Restriction.** Disable the user. That ends their sessions, revokes their refresh tokens and sends logout tokens. See [Enabled and disabled](/concepts/users-and-groups/#enabled-and-disabled).
 - **Withdrawn consent.** Withdrawing a user's consent to a client, on their **Consents** tab or by the user under **Account**, **Consents**, revokes that client's refresh tokens and unredeemed authorization codes for the user. The app keeps what it already received.
-- **Telling apps (GDPR Article 19).** That's a step you take yourself. A logout token ends sessions; it doesn't ask an app to erase anything. Each `sent_logout_token` entry in the audit log records which app was sent one, and the audit log's **User id** filter finds a person's events by their id. See [See what happened](/concepts/audit-log/#see-what-happened).
+- **Telling apps (GDPR Article 19).** That's a step you take yourself. A logout token ends sessions; it doesn't ask an app to erase anything. To find the apps that got the person's data, filter the audit log by their **User id**: each `created_auth_code` entry names an app they signed in to. See [See what happened](/concepts/audit-log/#see-what-happened).
 
 ## Next steps
 
