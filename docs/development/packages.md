@@ -42,9 +42,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   invent a justification rather than fill the one cell a human owes (#385). Beside it,
   `imagescanreport`, which the weekly Image scan workflow runs over Trivy's, Grype's and
   govulncheck's JSON for each published image to write the one `security` issue: a finding with a
-  fixed version, or a Go finding govulncheck reports reachable, merged across scanners and
-  identifiers into one entry per advisory, the rest to the run's log, and the same bytes for the
-  same scans, since the workflow compares the report with the issue's body (#520)
+  fixed version, or a Go finding whose vulnerable symbol govulncheck detects in the binary, which
+  does not prove the code reaches it, merged across scanners and identifiers into one entry per
+  advisory, the rest to the run's log, and the same bytes for the same scans, since the workflow
+  compares the report with the issue's body (#520)
 - `countries/` - Self-maintained ISO 3166-1 reference data: names, alpha-2 and alpha-3 codes, flag
   emoji and ITU-T E.164 calling codes, generated into `data_generated.go` from the datahub dataset.
   It replaced `github.com/biter777/countries` and deliberately depends on nothing (#272)

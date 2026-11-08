@@ -9,11 +9,12 @@
 // `govulncheck -mode=binary -format json` over the image's binary.
 //
 // A finding is listed when a scanner names a fixed version for it, or when it is in Go code and
-// govulncheck finds the vulnerable symbol called. One advisory is one entry however many identifiers
-// the scanners give it (a CVE in one, a GO- or GHSA- identifier in another), naming every image and
-// package it is in and the scanners that saw it. The report goes to standard output, and is empty
-// when nothing is listed, which is what tells the workflow to close the issue. Every finding left out
-// is written to standard error, which is the run's log.
+// govulncheck detects its vulnerable symbol in the binary, which does not prove the code reaches it.
+// One advisory is one entry however many identifiers the scanners give it (a CVE in one, a GO- or
+// GHSA- identifier in another), naming every image and package it is in and the scanners that saw it.
+// The report goes to standard output, and is empty when nothing is listed, which is what tells the
+// workflow to close the issue. Every finding left out is written to standard error, which is the
+// run's log.
 //
 // The same scans always give the same bytes, in whatever order the directories are named, because
 // the workflow decides whether anything changed by comparing the report with the issue's body. A scan

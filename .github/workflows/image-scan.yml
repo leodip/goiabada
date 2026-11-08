@@ -6,10 +6,11 @@
 # registries' tags to one manifest, so each image's digest is normally scanned once; two digests for
 # one tag are each scanned, under the registry's name. Every platform of each image is pulled and
 # scanned with Trivy and Grype, two vulnerability databases, so one catches an advisory the other is
-# late on, and the image's binary with govulncheck -mode=binary, which says whether the code reaches a
-# Go advisory. core/cmd/imagescanreport turns the scans into one issue, labelled security, listing
-# what someone can act on: each finding with a fixed version, and each Go finding govulncheck reports
-# reachable. Everything else is printed in this run's log.
+# late on, and the image's binary with govulncheck -mode=binary, which detects a Go advisory's
+# vulnerable symbol present in the binary; that does not prove the code reaches it. The
+# core/cmd/imagescanreport command turns the scans into one issue, labelled security, listing what
+# someone can act on: each finding with a fixed version, and each Go finding whose vulnerable symbol
+# govulncheck detects in the binary. Everything else is printed in this run's log.
 #
 # One issue, found by its title: opened when the list first has an entry, its body rewritten and a
 # comment added only when the list changes, so a week with nothing new sends nothing, and closed with
