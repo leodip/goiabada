@@ -106,6 +106,9 @@ type resetNoticeTest struct {
 	auditLogger  *handlersmocks.AuditLogger
 	emailSender  *accounthandlersmocks.EmailSender
 	jobs         *resetHeldJobs
+	// renderErr is what drawing the success page answers: nil, or the error a client that dropped
+	// the connection makes RenderTemplate return.
+	renderErr error
 }
 
 func newResetNoticeTest(t *testing.T) *resetNoticeTest {
@@ -154,7 +157,10 @@ func (rt *resetNoticeTest) stubReset(before *record.User, replaced *record.User)
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			done, ok := data["passwordReset"].(bool)
 			return ok && done
-		})).Return(nil).Once()
+		})).Return(rt.renderErr).Once()
+	if rt.renderErr != nil {
+		rt.pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, rt.renderErr).Return().Once()
+	}
 }
 
 func TestHandleResetPasswordPost_TellsTheUserTheirPasswordWasReset(t *testing.T) {
@@ -164,6 +170,7 @@ func TestHandleResetPasswordPost_TellsTheUserTheirPasswordWasReset(t *testing.T)
 		replaced      func() *record.User
 		renderLocale  string
 		expectSubject string
+		renderErr     error
 	}{
 		{
 			name:          "an English user",
@@ -202,9 +209,21 @@ func TestHandleResetPasswordPost_TellsTheUserTheirPasswordWasReset(t *testing.T)
 			renderLocale:  "en",
 			expectSubject: "Your password was reset",
 		},
+		{
+			// The reset committed, so the user is told even when its page can't be drawn, as a
+			// client that dropped the connection makes it: the 500 answers the browser, and the
+			// notice still goes.
+			name:          "the success page can't be drawn",
+			before:        resetNoticeRow("the-old-hash", true),
+			replaced:      func() *record.User { return resetNoticeRow("the-old-hash", true) },
+			renderLocale:  "en",
+			expectSubject: "Your password was reset",
+			renderErr:     errors.New("the client went away"),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rt := newResetNoticeTest(t)
+			rt.renderErr = tc.renderErr
 			rt.stubReset(tc.before, tc.replaced())
 
 			rt.serve(t, resetNoticeSettings())
