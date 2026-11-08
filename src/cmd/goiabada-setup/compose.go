@@ -127,7 +127,7 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString("    networks:\n")
 	sb.WriteString("      - goiabada-network\n")
 	sb.WriteString("    healthcheck:\n")
-	sb.WriteString("      test: [\"CMD\", \"wget\", \"--spider\", \"http://localhost:9090/health\"]\n")
+	sb.WriteString("      test: [\"CMD\", \"/app/goiabada-authserver\", \"healthcheck\"]\n")
 	sb.WriteString("      interval: 10s\n")
 	sb.WriteString("      timeout: 5s\n")
 	sb.WriteString("      retries: 3\n")

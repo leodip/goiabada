@@ -77,6 +77,36 @@ func TestComposeFile_GivesTheAuthServerTimeToStart(t *testing.T) {
 	}
 }
 
+// Every generated Compose file checks the auth server's health with its own healthcheck command,
+// which the images carry, never with wget, which an image built FROM scratch has none of, keeping
+// the check's timings. The admin console's service sets no check of its own, and so takes the
+// image's (#808).
+func TestComposeFile_ChecksTheAuthServerWithItsOwnHealthcheck(t *testing.T) {
+	for _, testCase := range composeCases(t) {
+		t.Run(testCase.name, func(t *testing.T) {
+			content := descriptionOf(testCase.config())
+			doc := only[map[string]any](t, toAny(yamlDocuments(t, content)), "the Compose file's documents")
+			healthcheck := at[map[string]any](t, doc, "services", "goiabada-authserver", "healthcheck")
+			test := at[[]any](t, healthcheck, "test")
+			if !slices.Equal(test, []any{"CMD", "/app/goiabada-authserver", "healthcheck"}) {
+				t.Errorf("the auth server's healthcheck test is %q, want [CMD /app/goiabada-authserver healthcheck]", test)
+			}
+			for key, want := range map[string]string{"interval": "10s", "timeout": "5s", "start_period": "300s"} {
+				if got := at[string](t, healthcheck, key); got != want {
+					t.Errorf("the auth server's healthcheck has %s %q, want %s", key, got, want)
+				}
+			}
+			if got := at[int](t, healthcheck, "retries"); got != 3 {
+				t.Errorf("the auth server's healthcheck has retries %d, want 3", got)
+			}
+			adminConsole := at[map[string]any](t, doc, "services", "goiabada-adminconsole")
+			if _, ok := adminConsole["healthcheck"]; ok {
+				t.Errorf("the admin console's service sets a healthcheck of its own, where it takes the image's")
+			}
+		})
+	}
+}
+
 // composeCases are the golden cases whose output is a Compose file, failing the test when there
 // are none, so a renamed deployment type cannot leave a Compose property checking nothing.
 func composeCases(t *testing.T) []goldenCase {
