@@ -17,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -41,12 +42,47 @@ type shellSource struct {
 	text   string
 }
 
-// workflowRunScripts returns every run: script of a GitHub workflow, each a block scalar (run: |)
-// or one line. A block runs while its lines are indented deeper than the run key, blank lines
-// included, and is dedented by its first line's indentation, as YAML reads it.
+// workflowRunScripts returns every run: script of a GitHub workflow.
 func workflowRunScripts(text string) []shellSource {
-	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 	var out []shellSource
+	for _, run := range workflowRuns(workflowLines(text)) {
+		out = append(out, run.script)
+	}
+	return out
+}
+
+// workflowLines splits a workflow into its lines.
+func workflowLines(text string) []string {
+	return strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+}
+
+// yamlLineScalar is the string a one-line YAML scalar holds: a single-quoted one without its quotes
+// and with each doubled quote read as one, a double-quoted one unescaped, and a plain one as
+// written.
+func yamlLineScalar(value string) string {
+	switch {
+	case len(value) >= 2 && value[0] == '\'' && value[len(value)-1] == '\'':
+		return strings.ReplaceAll(value[1:len(value)-1], "''", "'")
+	case len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"':
+		if unquoted, err := strconv.Unquote(value); err == nil {
+			return unquoted
+		}
+	}
+	return value
+}
+
+// workflowRun is one run: key of a workflow: the line it is on, counted from 0, the column its name
+// begins at, and its script.
+type workflowRun struct {
+	line, column int
+	script       shellSource
+}
+
+// workflowRuns returns every run: key of a GitHub workflow and its script, each a block scalar
+// (run: |) or one line. A block runs while its lines are indented deeper than the run key, blank
+// lines included, and is dedented by its first line's indentation, as YAML reads it.
+func workflowRuns(lines []string) []workflowRun {
+	var out []workflowRun
 	for i := 0; i < len(lines); i++ {
 		trimmed := strings.TrimLeft(lines[i], " ")
 		key := len(lines[i]) - len(trimmed)
@@ -59,7 +95,7 @@ func workflowRunScripts(text string) []shellSource {
 		}
 		value = strings.TrimSpace(value)
 		if value != "" && !strings.HasPrefix(value, "|") && !strings.HasPrefix(value, ">") {
-			out = append(out, shellSource{offset: i, text: value})
+			out = append(out, workflowRun{line: i, column: key, script: shellSource{offset: i, text: yamlLineScalar(value)}})
 			continue
 		}
 		var block []string
@@ -80,7 +116,7 @@ func workflowRunScripts(text string) []shellSource {
 				block = append(block, "")
 			}
 		}
-		out = append(out, shellSource{offset: i + 1, text: strings.Join(block, "\n")})
+		out = append(out, workflowRun{line: i, column: key, script: shellSource{offset: i + 1, text: strings.Join(block, "\n")}})
 		i = j - 1
 	}
 	return out
