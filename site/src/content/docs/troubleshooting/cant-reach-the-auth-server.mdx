@@ -43,7 +43,7 @@ The usual causes:
 
 1. Find the URL the admin console calls: its `GOIABADA_AUTHSERVER_INTERNALBASEURL`, or its `GOIABADA_AUTHSERVER_BASEURL` when that's empty.
 
-2. Run the admin console's `check-authserver` command where the admin console runs, [with Docker Compose](#run-the-check-with-docker-compose) or [on Kubernetes](#run-the-check-on-kubernetes). It asks that URL for the settings once, as the admin console does: it trusts the same certificate authorities and follows no redirect, for an `http` or an `https` URL alike. It needs no session keys or client secret.
+2. Run the admin console's `check-authserver` command where the admin console runs: [with Docker Compose](#run-the-check-with-docker-compose), [on Kubernetes](#run-the-check-on-kubernetes) or [with native binaries](#run-the-check-with-native-binaries). It asks that URL for the settings once, as the admin console does: it trusts the same certificate authorities and follows no redirect, for an `http` or an `https` URL alike. It needs no session keys or client secret.
 
    When the auth server answers with its settings, the check prints the URL and exits `0`:
 
@@ -102,6 +102,14 @@ The logs name what stopped it, such as a malformed setting, missing session keys
 - **The auth server refused or redirected it.** The previous log ends in `the auth server does not accept the admin console's client secret, …`, `the auth server refused the admin console's token request, …` or `the auth server redirected the admin console's token request, …`, and the exit code is `1`. Waiting doesn't help. A refused secret is covered in [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-admin-consoles-client-secret-changed), and a redirect is the redirect cause above.
 
 Don't run the check from a pod of your own. Where the cluster's network plugin enforces NetworkPolicies, the wizard's admits to the auth server's port only pods labelled `app: goiabada-adminconsole`. A pod carrying that label joins the admin console's Service, which then sends administrators to it.
+
+## Run the check with native binaries
+
+Run it as the admin console's service user, with the service's environment file, here as [Native binaries](/deploy/native-binaries/#set-it-up) sets them up:
+
+```bash
+sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-adminconsole check-authserver'
+```
 
 ## When only signing in fails
 

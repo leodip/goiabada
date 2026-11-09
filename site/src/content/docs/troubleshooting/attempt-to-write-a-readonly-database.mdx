@@ -47,14 +47,14 @@ Give the database's directory, and every file in it, to the user the auth server
    docker compose stop goiabada-authserver
    ```
 
-2. Change the owner, once, in a throwaway container of the auth server's service:
+2. Change the owner, once, from a throwaway BusyBox container that mounts the auth server's volumes where its service does:
 
    ```bash
-   docker compose run --rm --no-deps --user 0:0 --cap-add CHOWN --entrypoint chown \
-     goiabada-authserver -R 10001:10001 /data
+   docker run --rm --volumes-from "$(docker compose ps -aq goiabada-authserver)" busybox:1.37 \
+     chown -R 10001:10001 /data
    ```
 
-   This runs `chown` as root, so it reaches the volume wherever the service mounts it. `--cap-add CHOWN` is what lets root change the owner in a service that drops every capability. Use the path your file mounts the volume at, `/data` in the file the setup wizard writes.
+   The image holds no `chown`, so this runs BusyBox's, as root. Use the path your file mounts the volume at, `/data` in the file the setup wizard writes.
 
 3. Start everything again:
 

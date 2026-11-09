@@ -227,12 +227,12 @@ docker compose cp goiabada-authserver:/data ./goiabada-backup
 docker compose start goiabada-authserver
 ```
 
-To restore it, stop the auth server again, then copy the backup in as the image's own user, which keeps the files its own, removing any WAL files the current database left first:
+To restore it, stop the auth server again, then copy the backup in as the image's own user, which keeps the files its own, removing any WAL files the current database left first. The image has no shell, so a BusyBox container does the copy, with the auth server's volumes mounted where its service mounts them:
 
 ```bash
 docker compose stop goiabada-authserver
-docker compose run --rm --no-deps -v "$PWD/goiabada-backup:/backup:ro" --entrypoint sh \
-  goiabada-authserver -c 'rm -f /data/goiabada.db-wal /data/goiabada.db-shm && cp /backup/* /data/'
+docker run --rm --volumes-from "$(docker compose ps -aq goiabada-authserver)" -v "$PWD/goiabada-backup:/backup:ro" \
+  --user 10001:10001 busybox:1.37 sh -c 'rm -f /data/goiabada.db-wal /data/goiabada.db-shm && cp /backup/* /data/'
 docker compose start goiabada-authserver
 ```
 

@@ -137,7 +137,7 @@ An image of your own built `FROM leodip/goiabada:…` can `COPY` files in, but c
 
 ## Health checks
 
-Both binaries check their own server with the `healthcheck` command: one `GET` of `/health` on the server's own listener, which answers whenever the process is up, without asking the database. It prints nothing when the server is healthy, and otherwise one line saying what it met, and exits with:
+Both binaries check their own server with the `healthcheck` command: one `GET` of `/health` on the server's own listener, which answers whenever the server is up and listening, without asking the database. It prints nothing when the server is healthy, and otherwise one line saying what it met, and exits with:
 
 - `0`: healthy, `/health` answered `200`.
 - `1`: unhealthy: a refused connection, no answer within 3 seconds, or any status but `200`, a redirect included.
