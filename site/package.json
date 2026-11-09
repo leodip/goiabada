@@ -11,9 +11,9 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/markdown-satteri": "^0.4.6",
+    "@astrojs/markdown-satteri": "^0.4.7",
     "@astrojs/starlight": "^0.42.9",
-    "astro": "^7.4.5",
+    "astro": "^7.4.7",
     "hast-util-from-html": "^2.0.3",
     "hast-util-select": "^6.0.4",
     "hast-util-to-mdast": "^10.1.2",
@@ -35,6 +35,6 @@
     "postcss-nested": "7.0.2"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.1"
+    "@playwright/test": "1.65.0"
   }
 }
