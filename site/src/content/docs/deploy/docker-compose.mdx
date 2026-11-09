@@ -143,7 +143,7 @@ Both binaries check their own server with the `healthcheck` command: one `GET` o
 - `1`: unhealthy: a refused connection, no answer within 3 seconds, or any status but `200`, a redirect included.
 - `2`: a listener variable that doesn't parse, or an argument given. The command takes none.
 
-Each image declares the command as its own health check, every 10 seconds, with a 5-second timeout and 3 retries, and 5 minutes for a first start's seed or an upgrade's migrations before its failures count. The image's check applies wherever nothing sets one of its own: a plain `docker run`, a Docker Swarm service, and the admin console under the wizard's files. The wizard's file gives the auth server the same check, with the same timings, in a `healthcheck` of its own, and starts the admin console once it passes.
+Each image declares the command as its own health check, every 10 seconds, with a 5-second timeout and 3 retries, and 5 minutes for a first start's seed or an upgrade's migrations before its failures count. The image's check applies wherever nothing sets one of its own: a plain `docker run`, a Docker Swarm service, and the admin console under the wizard's files.
 
 To check a container in a Compose file or an orchestrator of your own, use the exec form, with the image's timings:
 
