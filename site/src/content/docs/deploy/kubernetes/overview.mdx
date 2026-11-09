@@ -120,7 +120,7 @@ kubectl label secret goiabada-secrets goiabada-encryption-key -n goiabada team=i
 
 ## Debugging without a shell
 
-The images hold no shell, so `kubectl exec` has nothing to run but the server: see [What the images contain](/deploy/docker-compose/#what-the-images-contain). Attach a debug container to a pod instead, which shares the server's processes and network. Write the user it runs as to a file, the images' uid and gid:
+The images hold no shell, so `kubectl exec` has nothing to run but the server: see [What the images contain](/deploy/docker-compose/#what-the-images-contain). Attach a debug container to a pod instead, which shares the server's processes and network. Write the user it runs as, the images' uid and gid, to a file:
 
 ```yaml
 # debug-user.yaml
@@ -140,7 +140,7 @@ For the admin console, name one of its pods and `--target=adminconsole`.
 In the debug container, `ps` lists the server as PID 1, the server answers on `127.0.0.1:9090`, or `9091` for the admin console, and `/proc/1/root/` holds the server's files.
 
 - **`--profile=restricted`** gives the debug container what the restricted Pod Security Standard requires. The wizard's namespace warns about and audits any pod that breaks it, and a namespace that enforces it refuses the debug container of kubectl's default profile.
-- **The custom file's user** is needed twice over: the restricted profile sets `runAsNonRoot`, so a BusyBox image, which runs as root unless told otherwise, doesn't start without one, and only the server's own uid and gid can read its files under `/proc/1/root/`.
+- **The custom file's user** is needed twice over. The restricted profile sets `runAsNonRoot`, and BusyBox runs as root unless told otherwise, so the debug container doesn't start without it. It also needs the server's own uid and gid to read the server's files under `/proc/1/root/`.
 - **On OpenShift,** the restricted-v2 SCC runs the pod as a uid from the namespace's range instead, in group 0. Read the uid with `kubectl get pod <pod> -n goiabada -o jsonpath='{.spec.containers[0].securityContext.runAsUser}'`, and set it as `runAsUser`, with `runAsGroup: 0`.
 
 ## Recover a locked-out administrator

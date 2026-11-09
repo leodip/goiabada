@@ -43,7 +43,7 @@ The usual causes:
 
 1. Find the URL the admin console calls: its `GOIABADA_AUTHSERVER_INTERNALBASEURL`, or its `GOIABADA_AUTHSERVER_BASEURL` when that's empty.
 
-2. Run the admin console's `check-authserver` command where the admin console runs: [with Docker Compose](#run-the-check-with-docker-compose), [on Kubernetes](#run-the-check-on-kubernetes) or [with native binaries](#run-the-check-with-native-binaries). It asks that URL for the settings once, as the admin console does: it trusts the same certificate authorities and follows no redirect, for an `http` or an `https` URL alike. It needs no session keys or client secret.
+2. Run the admin console's `check-authserver` command where the admin console runs: [with Docker Compose](#run-the-check-with-docker-compose), [on Kubernetes](#run-the-check-on-kubernetes) or [with native binaries](#run-the-check-with-native-binaries). It asks that URL for the settings once, as the admin console does: it trusts the same certificate authorities and follows no redirect. It needs no session keys or client secret.
 
    When the auth server answers with its settings, the check prints the URL and exits `0`:
 
