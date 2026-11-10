@@ -42,7 +42,7 @@ func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 	assert.Equal(t, audit.EventTypes(), body.AuditEventTypes)
 	assert.NotContains(t, body.AuditEventTypes, "updated_ui_theme_settings",
 		"the theme setting's event is retired with the setting (#810)")
-	assert.Len(t, body.AuditEventTypes, 137,
+	assert.Len(t, body.AuditEventTypes, 138,
 		"the catalog is the 104 declared names less the four #351 decision 11 deleted, "+
 			"plus failed_account_activation_code (#435), requested_password_reset (#404), "+
 			"administrator_change_refused, administrative_permission_changed and "+
@@ -60,8 +60,8 @@ func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 			"deleted_own_account (#783), and exported_user_data (#781), and "+
 			"updated_client_backchannel_logout and sent_logout_token (#784), and exported_own_user_data (#782), and "+
 			"updated_client_dpop (#42), and the four brand events created_brand, updated_brand, "+
-			"deleted_brand and updated_default_brand (#810), less updated_ui_theme_settings, which "+
-			"#810 retires")
+			"deleted_brand and updated_default_brand (#810), and updated_client_brand (#812), less "+
+			"updated_ui_theme_settings, which #810 retires")
 
 	// The wire end of the chain openapi.yaml declares. The unit tier's
 	// TestOpenAPI_SchemaPropertiesMatchTheAPIStructs holds GetAuditEventTypesResponse's schema

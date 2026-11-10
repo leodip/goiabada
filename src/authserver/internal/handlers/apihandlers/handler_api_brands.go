@@ -23,11 +23,13 @@ import (
 )
 
 // The admin API's brands (#810), in the settings domain: a brand is a name, an appearance and one
-// of the built-in themes, and the one the settings row points at is the default, which every page
-// is drawn in (decisions 1 and 5). The last write of a brand wins, as for resources and groups.
+// of the built-in themes, and the one the settings row points at is the default, which a client
+// with no brand of its own is drawn in (decisions 1 and 5; #812 decision 1). Every brand answer
+// says how many clients are drawn in it (#812 decision 3). The last write of a brand wins, as for
+// resources and groups.
 
-// brandsDatabase is what the brand endpoints need: the brands, the default pointer, and the
-// transaction the pointer's writes take the settings row's lock in.
+// brandsDatabase is what the brand endpoints need: the brands, the default pointer, the count of
+// clients drawn in each, and the transaction the pointer's writes take the settings row's lock in.
 type brandsDatabase interface {
 	CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
 	UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
@@ -36,6 +38,7 @@ type brandsDatabase interface {
 	GetDefaultBrand(ctx context.Context, tx *sql.Tx) (*record.Brand, error)
 	MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int64) (int64, error)
 	DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (int, error)
+	CountClientsPerBrand(ctx context.Context, tx *sql.Tx) (map[int64]int, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -121,6 +124,18 @@ func defaultBrandId(w http.ResponseWriter, r *http.Request, database brandsDatab
 	return brand.Id, true
 }
 
+// brandClientCounts reads how many clients each brand draws, by brand id, answering the request
+// when it cannot: a count that cannot be read fails the answer (#812 decision 3). A brand no client
+// is drawn in is absent, and reads as 0.
+func brandClientCounts(w http.ResponseWriter, r *http.Request, database brandsDatabase) (map[int64]int, bool) {
+	counts, err := database.CountClientsPerBrand(r.Context(), nil)
+	if err != nil {
+		writeInternalServerError(w, r, errs.Wrap(err, "database error counting the clients of each brand"))
+		return nil, false
+	}
+	return counts, true
+}
+
 // HandleBrandsGet - GET /api/v1/admin/brands
 func HandleBrandsGet(database brandsDatabase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -133,12 +148,16 @@ func HandleBrandsGet(database brandsDatabase) http.HandlerFunc {
 		if !ok {
 			return
 		}
+		counts, ok := brandClientCounts(w, r, database)
+		if !ok {
+			return
+		}
 
 		slices.SortFunc(brands, func(a, b record.Brand) int { return strings.Compare(a.Name, b.Name) })
 
 		response := api.GetBrandsResponse{Brands: make([]api.BrandResponse, 0, len(brands))}
 		for i := range brands {
-			response.Brands = append(response.Brands, apimapping.ToBrandResponse(&brands[i], brands[i].Id == defaultId))
+			response.Brands = append(response.Brands, apimapping.ToBrandResponse(&brands[i], brands[i].Id == defaultId, counts[brands[i].Id]))
 		}
 		writeJSON(w, r, http.StatusOK, response)
 	}
@@ -171,8 +190,9 @@ func HandleBrandCreatePost(database brandsDatabase, auditLogger AuditLogger) htt
 			"logged_in_user": callerSubject(r),
 		})
 
-		// A brand just created is never the default: the pointer names a brand that existed.
-		writeJSON(w, r, http.StatusCreated, api.CreateBrandResponse{Brand: apimapping.ToBrandResponse(&brand, false)})
+		// A brand just created is never the default, the pointer names a brand that existed, and no
+		// client can have been given it yet: it draws no client.
+		writeJSON(w, r, http.StatusCreated, api.CreateBrandResponse{Brand: apimapping.ToBrandResponse(&brand, false, 0)})
 	}
 }
 
@@ -187,7 +207,11 @@ func HandleBrandGet(database brandsDatabase) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.GetBrandResponse{Brand: apimapping.ToBrandResponse(brand, brand.Id == defaultId)})
+		counts, ok := brandClientCounts(w, r, database)
+		if !ok {
+			return
+		}
+		writeJSON(w, r, http.StatusOK, api.GetBrandResponse{Brand: apimapping.ToBrandResponse(brand, brand.Id == defaultId, counts[brand.Id])})
 	}
 }
 
@@ -232,15 +256,21 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger) http
 		if !ok {
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.UpdateBrandResponse{Brand: apimapping.ToBrandResponse(brand, brand.Id == defaultId)})
+		counts, ok := brandClientCounts(w, r, database)
+		if !ok {
+			return
+		}
+		writeJSON(w, r, http.StatusOK, api.UpdateBrandResponse{Brand: apimapping.ToBrandResponse(brand, brand.Id == defaultId, counts[brand.Id])})
 	}
 }
 
 // HandleBrandDelete - DELETE /api/v1/admin/brands/{id}
 //
 // The deletion runs in a transaction because DeleteBrand reads the default pointer under the
-// settings row's lock: the default is refused there, before the foreign key is reached, and a
-// change of default committed meanwhile is the one it reads (decision 1).
+// settings row's lock: the default is refused there, before any client is touched, and a change of
+// default committed meanwhile is the one it reads (decision 1). Under that lock it moves the
+// brand's clients to the default and answers how many, which deleted_brand records as client_count
+// (#812 decisions 1 and 3).
 func HandleBrandDelete(database brandsDatabase, auditLogger AuditLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		brand, ok := loadBrand(w, r, database)
@@ -248,8 +278,10 @@ func HandleBrandDelete(database brandsDatabase, auditLogger AuditLogger) http.Ha
 			return
 		}
 
+		var moved int
 		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			_, deleteErr := database.DeleteBrand(r.Context(), tx, brand.Id)
+			var deleteErr error
+			moved, deleteErr = database.DeleteBrand(r.Context(), tx, brand.Id)
 			return deleteErr
 		})
 		switch {
@@ -267,6 +299,7 @@ func HandleBrandDelete(database brandsDatabase, auditLogger AuditLogger) http.Ha
 		auditLogger.Log(r.Context(), audit.EventDeletedBrand, map[string]interface{}{
 			"brand_id":       brand.Id,
 			"brand_name":     brand.Name,
+			"client_count":   moved,
 			"logged_in_user": callerSubject(r),
 		})
 
@@ -277,9 +310,9 @@ func HandleBrandDelete(database brandsDatabase, auditLogger AuditLogger) http.Ha
 // HandleBrandMakeDefaultPost - POST /api/v1/admin/brands/{id}/make-default
 //
 // MakeBrandDefault moves the pointer under the settings row's lock and reads the brand under it,
-// so a brand deleted meanwhile is not found rather than made the default (decision 1). The brand
-// and the one it replaces are read in the same transaction, after the move, for the answer and
-// the audit event. A brand that already is the default is answered as it is, and nothing is
+// so a brand deleted meanwhile is not found rather than made the default (decision 1). The brand,
+// the one it replaces and the count of clients each brand draws are read in the same transaction,
+// after the move, for the answer and the audit event. A brand that already is the default is answered as it is, and nothing is
 // recorded.
 func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -290,8 +323,9 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 
 		var brand, previous *record.Brand
 		var previousId int64
+		var counts map[int64]int
 		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			brand, previous = nil, nil
+			brand, previous, counts = nil, nil, nil
 			var err error
 			previousId, err = database.MakeBrandDefault(r.Context(), tx, id)
 			if err != nil {
@@ -309,6 +343,10 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 				if err != nil {
 					return errs.Wrap(err, "database error getting the previous default brand")
 				}
+			}
+			counts, err = database.CountClientsPerBrand(r.Context(), tx)
+			if err != nil {
+				return errs.Wrap(err, "database error counting the clients of each brand")
 			}
 			return nil
 		})
@@ -336,7 +374,7 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 			})
 		}
 
-		writeJSON(w, r, http.StatusOK, api.MakeBrandDefaultResponse{Brand: apimapping.ToBrandResponse(brand, true)})
+		writeJSON(w, r, http.StatusOK, api.MakeBrandDefaultResponse{Brand: apimapping.ToBrandResponse(brand, true, counts[brand.Id])})
 	}
 }
 

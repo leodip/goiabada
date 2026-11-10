@@ -271,6 +271,10 @@ const (
 	ErrCodeClientDPoPBoundAccessTokensRequired = "handler.client_dpop.dpop_bound_access_tokens_required"
 	ErrCodeClientDPoPAdminConsoleNotAllowed    = "handler.client_dpop.admin_console_not_allowed"
 
+	// A client's brand, PUT /clients/{id}/brand (#812 decision 2).
+	ErrCodeClientBrandIdRequired = "handler.client_brand.brand_id_required"
+	ErrCodeClientBrandNotFound   = "handler.client_brand.brand_not_found"
+
 	ErrCodeClientWebOriginEmpty            = "handler.client_web_origins.empty"
 	ErrCodeClientWebOriginInvalid          = "handler.client_web_origins.invalid"  // Args: {"origin": string}
 	ErrCodeClientWebOriginTooLong          = "handler.client_web_origins.too_long" // Args: {"length": int, "max": int, "origin": string}

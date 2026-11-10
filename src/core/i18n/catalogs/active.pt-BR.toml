@@ -1993,6 +1993,8 @@
 "handler.client_backchannel_logout.uri_http_self_registered" = "A URI de logout back-channel precisa usar https em um cliente que se registrou sozinho, seja qual for o tipo. http simples só é permitido em um cliente confidencial criado por um administrador: {{.uri}}"
 "handler.client_dpop.dpop_bound_access_tokens_required" = "dpopBoundAccessTokens é obrigatório: envie true ou false."
 "handler.client_dpop.admin_console_not_allowed" = "O cliente do console de administração não pode exigir DPoP nas solicitações de token."
+"handler.client_brand.brand_id_required" = "brandId é obrigatório: envie o id de uma marca, ou null para a marca padrão."
+"handler.client_brand.brand_not_found" = "A marca não existe."
 "handler.client_web_origins.empty" = "A origem web não pode ficar vazia"
 "handler.client_web_origins.invalid" = "Origem web inválida: {{.origin}}. Uma origem web é um esquema, um host e uma porta opcional, sem nada depois do host: por exemplo https://www.example.com ou https://myapp:8080. O esquema precisa ser http ou https; o host precisa ser ASCII, não pode conter informações de usuário e não pode ser um literal IPv6 nem um endereço IPv4 abreviado; e a porta, se houver, precisa ser decimal simples abaixo de 65536, sem zero à esquerda."
 "handler.client_web_origins.too_long" = "A origem web é longa demais ({{.length}} caracteres, o máximo é {{.max}}): {{.origin}}"

@@ -262,6 +262,17 @@ var clientTargetWrites = []clientTargetWrite{
 		refusedEarlierForTheConsoleClient: true,
 	},
 	{
+		name: "PUT /clients/{id}/brand",
+		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string, client *record.Client) *httptest.ResponseRecorder {
+			r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/brand", `{"brandId":7}`, scope)
+			rr := httptest.NewRecorder()
+			HandleClientBrandPut(database, auditLogger).ServeHTTP(rr, r)
+			return rr
+		},
+		writes:           []string{"RunInTransaction", "SetClientBrand"},
+		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
+	},
+	{
 		name: "PUT /clients/{id}/permissions",
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string, client *record.Client) *httptest.ResponseRecorder {
 			r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/permissions", `{"permissionIds":[],"expectedPermissionIds":[]}`, scope)
@@ -615,6 +626,20 @@ func TestClientTargetCeiling_TheRoutesAnswerTheirOwnFourHundredsFirst(t *testing
 		r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/authentication", `{"isPublic":false,"clientSecret":"short"}`, granularScopeOfClients)
 		rr := httptest.NewRecorder()
 		HandleClientAuthenticationPut(database, auditLogger, testDataCipher).ServeHTTP(rr, r)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		assertNoClientPolicyRead(t, database)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("a brand assignment without brandId", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		expectTheTargetClient(targetClient(t, clientHoldingManage))(database)
+
+		r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/brand", `{}`, granularScopeOfClients)
+		rr := httptest.NewRecorder()
+		HandleClientBrandPut(database, auditLogger).ServeHTTP(rr, r)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		assertNoClientPolicyRead(t, database)

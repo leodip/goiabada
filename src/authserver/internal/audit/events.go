@@ -224,7 +224,8 @@ const (
 	// row with brand_id, brand_name and logged_in_user. updated_brand adds the appearance and the
 	// theme it saved. updated_default_brand names the new default as brand_id and brand_name and
 	// the one it replaced as old_brand_id and old_brand_name; a make-default that changes nothing
-	// writes none.
+	// writes none. deleted_brand adds client_count, how many clients the deletion moved to the
+	// default brand (#812 decision 3); no event is written for each client it moved.
 	EventCreatedBrand                 = "created_brand"
 	EventUpdatedBrand                 = "updated_brand"
 	EventDeletedBrand                 = "deleted_brand"
@@ -653,6 +654,13 @@ const (
 	// Payload: client_id, client_identifier, dpop_bound_access_tokens (the value saved) and
 	// logged_in_user.
 	EventUpdatedClientDPoP = "updated_client_dpop"
+	// EventUpdatedClientBrand records an administrator's change of a client's brand through PUT
+	// /api/v1/admin/clients/{id}/brand, written once the change has committed; an assignment that
+	// changes nothing writes none (#812 decision 2).
+	//
+	// Payload: client_id, client_identifier, brand_id and brand_name (the brand given; both left
+	// out when the client goes back to the default brand) and logged_in_user.
+	EventUpdatedClientBrand = "updated_client_brand"
 	// EventSentLogoutToken records one delivery of a logout token to an app's back-channel logout
 	// URI, written when the delivery finishes, after the end of the session it tells of has
 	// committed (#784 decision 8). It is the record that an app was told that this user's session
@@ -810,6 +818,7 @@ var auditEventTypes = []string{
 	EventUpdatedClientAdministrativeScopes,
 	EventUpdatedClientAuthentication,
 	EventUpdatedClientBackchannelLogout,
+	EventUpdatedClientBrand,
 	EventUpdatedClientDPoP,
 	EventUpdatedClientIntrospectionResources,
 	EventUpdatedClientLogo,

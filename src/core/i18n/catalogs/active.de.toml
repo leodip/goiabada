@@ -2087,6 +2087,8 @@
 "handler.client_backchannel_logout.uri_http_self_registered" = "Die Back-Channel-Logout-URI muss bei einem Client, der sich selbst registriert hat, unabhängig von seinem Typ https verwenden. Einfaches http ist nur bei einem vertraulichen Client erlaubt, den ein Administrator angelegt hat: {{.uri}}"
 "handler.client_dpop.dpop_bound_access_tokens_required" = "dpopBoundAccessTokens muss angegeben werden: Senden Sie true oder false."
 "handler.client_dpop.admin_console_not_allowed" = "Der Client der Verwaltungskonsole kann DPoP für Token-Anfragen nicht verlangen."
+"handler.client_brand.brand_id_required" = "brandId muss angegeben werden: Senden Sie die ID einer Marke oder null für die Standardmarke."
+"handler.client_brand.brand_not_found" = "Die Marke existiert nicht."
 "handler.client_web_origins.empty" = "Die Web-Origin darf nicht leer sein."
 "handler.client_web_origins.invalid" = "Ungültige Web-Origin: {{.origin}}. Eine Web-Origin besteht aus Schema, Host und optionalem Port, ohne weitere Bestandteile. Beispiele: https://www.example.com oder https://myapp:8080. Das Schema muss http oder https sein. Der Host muss in ASCII angegeben sein, darf keine Benutzerinformationen enthalten und weder ein IPv6-Literal noch eine verkürzte IPv4-Adresse sein. Ein Port muss als Dezimalzahl unter 65536 ohne führende Null angegeben sein."
 "handler.client_web_origins.too_long" = "Die Web-Origin ist zu lang ({{.length}} Zeichen, höchstens {{.max}}): {{.origin}}"
