@@ -399,7 +399,7 @@ func TestBrandDelete_TheDefaultIsRefused(t *testing.T) {
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 	datamocks.ExpectRunInTransaction(database, brandTx)
 	database.On("DeleteBrand", mock.Anything, brandTx, int64(1)).
-		Return(errs.WithStack(data.ErrDefaultBrandNotDeletable)).Once()
+		Return(0, errs.WithStack(data.ErrDefaultBrandNotDeletable)).Once()
 
 	status, answer := serveBrand(HandleBrandDelete(database, handlersmocks.NewAuditLogger(t)),
 		brandRequest(t, http.MethodDelete, nil, "id", "1"))
@@ -425,7 +425,7 @@ func TestBrandDelete_AnUnknownBrandIsNotFound(t *testing.T) {
 		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		datamocks.ExpectRunInTransaction(database, brandTx)
-		database.On("DeleteBrand", mock.Anything, brandTx, int64(3)).Return(errs.WithStack(data.ErrBrandNotFound)).Once()
+		database.On("DeleteBrand", mock.Anything, brandTx, int64(3)).Return(0, errs.WithStack(data.ErrBrandNotFound)).Once()
 
 		status, body := serveBrand(HandleBrandDelete(database, handlersmocks.NewAuditLogger(t)),
 			brandRequest(t, http.MethodDelete, nil, "id", "3"))
@@ -440,7 +440,7 @@ func TestBrandDelete_DeletesUnderTheTransactionAndAudits(t *testing.T) {
 	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
 		Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 	datamocks.ExpectRunInTransaction(database, brandTx)
-	database.On("DeleteBrand", mock.Anything, brandTx, int64(3)).Return(nil).Once()
+	database.On("DeleteBrand", mock.Anything, brandTx, int64(3)).Return(0, nil).Once()
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedBrand, map[string]interface{}{
 		"brand_id": int64(3), "brand_name": "Acme", "logged_in_user": brandCaller,

@@ -210,37 +210,48 @@ func (d *Database) MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int
 
 // DeleteBrand deletes a brand that is not the default, reading the pointer under the settings
 // row's lock, for the reason MakeBrandDefault gives (#810 decision 1).
-func (d *Database) DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) error {
+//
+// Under that same lock it first puts every client given the brand back on the default, and answers
+// how many it moved (#812 decision 1). SetClientBrand takes the lock too, so an assignment of the
+// brand either committed before and is moved and counted here, or comes after and finds the brand
+// gone. The default brand is refused before any client is touched. A brand that is not there moves
+// no client, since the foreign key lets none name it.
+func (d *Database) DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (int, error) {
 
 	if tx == nil {
-		return errs.New("deleting a brand requires a transaction: the settings row's lock lasts as long as it does")
+		return 0, errs.New("deleting a brand requires a transaction: the settings row's lock lasts as long as it does")
 	}
 
 	if err := d.AcquireSettingsRow(ctx, tx, initialSettingsId); err != nil {
-		return err
+		return 0, err
 	}
 
 	current, err := d.readDefaultBrandId(ctx, tx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if current.Valid && current.Int64 == brandId {
-		return errs.WithStack(data.ErrDefaultBrandNotDeletable)
+		return 0, errs.WithStack(data.ErrDefaultBrandNotDeletable)
+	}
+
+	moved, err := d.clearBrandFromClients(ctx, tx, brandId)
+	if err != nil {
+		return 0, err
 	}
 
 	result, err := d.ExecSQL(ctx, tx, deleteBrand.text(d.Dialect), brandId)
 	if err != nil {
-		return errs.Wrap(err, "unable to delete brand")
+		return 0, errs.Wrap(err, "unable to delete brand")
 	}
 	deleted, err := result.RowsAffected()
 	if err != nil {
-		return errs.Wrap(err, "unable to get rows affected when deleting a brand")
+		return 0, errs.Wrap(err, "unable to get rows affected when deleting a brand")
 	}
 	if deleted == 0 {
-		return errs.WithStack(data.ErrBrandNotFound)
+		return 0, errs.WithStack(data.ErrBrandNotFound)
 	}
 
-	return nil
+	return moved, nil
 }
 
 // readDefaultBrandId reads the settings row's pointer. A missing row reads as an empty pointer:

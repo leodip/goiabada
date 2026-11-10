@@ -35,7 +35,7 @@ type brandsDatabase interface {
 	GetAllBrands(ctx context.Context, tx *sql.Tx) ([]record.Brand, error)
 	GetDefaultBrand(ctx context.Context, tx *sql.Tx) (*record.Brand, error)
 	MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int64) (int64, error)
-	DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) error
+	DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (int, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -249,7 +249,8 @@ func HandleBrandDelete(database brandsDatabase, auditLogger AuditLogger) http.Ha
 		}
 
 		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			return database.DeleteBrand(r.Context(), tx, brand.Id)
+			_, deleteErr := database.DeleteBrand(r.Context(), tx, brand.Id)
+			return deleteErr
 		})
 		switch {
 		case errors.Is(err, data.ErrDefaultBrandNotDeletable):

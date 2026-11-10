@@ -21,7 +21,7 @@ var clientColumns = columnList{
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
-		"include_open_id_connect_claims_in_id_token, default_acr_level",
+		"include_open_id_connect_claims_in_id_token, default_acr_level, brand_id",
 	mysql: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
 		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
@@ -32,7 +32,7 @@ var clientColumns = columnList{
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
-		"include_open_id_connect_claims_in_id_token, default_acr_level",
+		"include_open_id_connect_claims_in_id_token, default_acr_level, brand_id",
 	postgres: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
 		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
@@ -43,7 +43,7 @@ var clientColumns = columnList{
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
-		"include_open_id_connect_claims_in_id_token, default_acr_level",
+		"include_open_id_connect_claims_in_id_token, default_acr_level, brand_id",
 	mssql: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
 		"website_url, privacy_policy_url, terms_of_service_url, display_name, enabled, " +
 		"consent_required, remember_consent, backchannel_logout_uri, " +
@@ -54,7 +54,7 @@ var clientColumns = columnList{
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
-		"include_open_id_connect_claims_in_id_token, default_acr_level",
+		"include_open_id_connect_claims_in_id_token, default_acr_level, brand_id",
 }
 
 // scanClient reads one row selected with clientColumns.
@@ -94,6 +94,7 @@ func scanClient(row rowScanner, client *record.Client) error {
 		&client.IncludeOpenIDConnectClaimsInAccessToken,
 		&client.IncludeOpenIDConnectClaimsInIdToken,
 		&client.DefaultAcrLevel,
+		&client.BrandId,
 	)
 }
 
@@ -110,8 +111,8 @@ var insertClient = statement{
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
-		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES (?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"include_open_id_connect_claims_in_id_token, default_acr_level, brand_id) VALUES (?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
 		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
 		"terms_of_service_url, display_name, enabled, " +
@@ -124,8 +125,8 @@ var insertClient = statement{
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
-		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES (?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"include_open_id_connect_claims_in_id_token, default_acr_level, brand_id) VALUES (?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
 		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
 		"terms_of_service_url, display_name, enabled, " +
@@ -138,9 +139,9 @@ var insertClient = statement{
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
-		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES ($1, $2, $3, $4, " +
+		"include_open_id_connect_claims_in_id_token, default_acr_level, brand_id) VALUES ($1, $2, $3, $4, " +
 		"$5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, " +
-		"$23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33) RETURNING id",
+		"$23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34) RETURNING id",
 	mssql: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
 		"client_secret_encrypted, description, website_url, privacy_policy_url, " +
 		"terms_of_service_url, display_name, enabled, " +
@@ -154,18 +155,19 @@ var insertClient = statement{
 		"refresh_token_offline_max_lifetime_in_seconds, " +
 		"include_open_id_connect_claims_in_access_token, " +
 		"include_open_id_connect_claims_in_id_token, " +
-		"default_acr_level) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, " +
+		"default_acr_level, brand_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, " +
 		"@p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, " +
-		"@p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, @p33)",
+		"@p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, @p33, @p34)",
 }
 
 // updateClient writes the whole row but created_at, administrative_scopes_allowed,
-// remember_consent, the two back-channel logout columns and dpop_bound_access_tokens, which are
-// dont-update: the allowance has one writer, SetClientAdministrativeScopesAllowed, Remember consent
-// is written only by CreateClient, SetClientRememberConsent and SetClientPublic's transition, the
-// back-channel logout columns only by CreateClient and SetClientBackchannelLogout, and "Require DPoP
-// for token requests" only by CreateClient and SetClientDPoPBoundAccessTokens (#499, #711, #784,
-// #42).
+// remember_consent, the two back-channel logout columns, dpop_bound_access_tokens and brand_id,
+// which are dont-update: the allowance has one writer, SetClientAdministrativeScopesAllowed,
+// Remember consent is written only by CreateClient, SetClientRememberConsent and SetClientPublic's
+// transition, the back-channel logout columns only by CreateClient and SetClientBackchannelLogout,
+// "Require DPoP for token requests" only by CreateClient and SetClientDPoPBoundAccessTokens, and a
+// client's brand only by CreateClient, SetClientBrand and a brand's deletion (#499, #711, #784,
+// #42, #812).
 var updateClient = statement{
 	sqlite: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
 		"description = ?, website_url = ?, privacy_policy_url = ?, terms_of_service_url = ?, " +
@@ -321,7 +323,7 @@ func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *record.
 		client.ResourceOwnerPasswordCredentialsEnabled, client.TokenExpirationInSeconds,
 		client.RefreshTokenOfflineIdleTimeoutInSeconds, client.RefreshTokenOfflineMaxLifetimeInSeconds,
 		client.IncludeOpenIDConnectClaimsInAccessToken, client.IncludeOpenIDConnectClaimsInIdToken,
-		client.DefaultAcrLevel)
+		client.DefaultAcrLevel, client.BrandId)
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt

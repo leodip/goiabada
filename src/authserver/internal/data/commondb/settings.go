@@ -478,9 +478,11 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 // re-read does not hold, for the reason AcquireClientRow gives: under MVCC it returns the last
 // committed version without waiting for a writer in flight.
 //
-// The transaction holding it touches no table but settings, so it holds one row and cannot be part
-// of a deadlock cycle. TryClaimCleanupRun writes the same row, autocommitted, and waits at most for
-// one save.
+// Every transaction holding it takes it before any other row: the section saves touch no table but
+// settings, and the brand writes (MakeBrandDefault, DeleteBrand and SetClientBrand, #810 and #812)
+// take it first and then the brands and clients they write. No transaction waits for it while
+// holding another row, so it cannot close a deadlock cycle. TryClaimCleanupRun writes the same row,
+// autocommitted, and waits at most for one save.
 //
 // A row that is not there affects no rows and is not reported here, as AcquireClientRow does not
 // report a missing client: the read that follows decides whether it exists.

@@ -41,7 +41,8 @@ func makeDefaultBrand(t *testing.T, appearance record.BrandAppearance, theme str
 			if _, err := database.MakeBrandDefault(ctx, tx, previous); err != nil {
 				return err
 			}
-			return database.DeleteBrand(ctx, tx, brand.Id)
+			_, err := database.DeleteBrand(ctx, tx, brand.Id)
+			return err
 		}), "unable to put the default brand back")
 	})
 	return brand

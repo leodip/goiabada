@@ -60,7 +60,7 @@ func keepDefaultBrand(t *testing.T) (defaultId int64, created *[]int64) {
 				return err
 			}
 			for _, id := range *ids {
-				if err := database.DeleteBrand(ctx, tx, id); err != nil && !errors.Is(err, data.ErrBrandNotFound) {
+				if _, err := database.DeleteBrand(ctx, tx, id); err != nil && !errors.Is(err, data.ErrBrandNotFound) {
 					return err
 				}
 			}

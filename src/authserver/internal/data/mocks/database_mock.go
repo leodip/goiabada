@@ -1255,6 +1255,74 @@ func (_c *Database_CommitTransaction_Call) RunAndReturn(run func(ctx context.Con
 	return _c
 }
 
+// CountClientsPerBrand provides a mock function for the type Database
+func (_mock *Database) CountClientsPerBrand(ctx context.Context, tx *sql.Tx) (map[int64]int, error) {
+	ret := _mock.Called(ctx, tx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountClientsPerBrand")
+	}
+
+	var r0 map[int64]int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx) (map[int64]int, error)); ok {
+		return returnFunc(ctx, tx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx) map[int64]int); ok {
+		r0 = returnFunc(ctx, tx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[int64]int)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx) error); ok {
+		r1 = returnFunc(ctx, tx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_CountClientsPerBrand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountClientsPerBrand'
+type Database_CountClientsPerBrand_Call struct {
+	*mock.Call
+}
+
+// CountClientsPerBrand is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+func (_e *Database_Expecter) CountClientsPerBrand(ctx any, tx any) *Database_CountClientsPerBrand_Call {
+	return &Database_CountClientsPerBrand_Call{Call: _e.mock.On("CountClientsPerBrand", ctx, tx)}
+}
+
+func (_c *Database_CountClientsPerBrand_Call) Run(run func(ctx context.Context, tx *sql.Tx)) *Database_CountClientsPerBrand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CountClientsPerBrand_Call) Return(int64ToInt map[int64]int, err error) *Database_CountClientsPerBrand_Call {
+	_c.Call.Return(int64ToInt, err)
+	return _c
+}
+
+func (_c *Database_CountClientsPerBrand_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx) (map[int64]int, error)) *Database_CountClientsPerBrand_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CountEnabledUsersHoldingPermission provides a mock function for the type Database
 func (_mock *Database) CountEnabledUsersHoldingPermission(ctx context.Context, tx *sql.Tx, permissionId int64) (int, error) {
 	ret := _mock.Called(ctx, tx, permissionId)
@@ -3671,20 +3739,29 @@ func (_c *Database_DeleteAllUserConsent_Call) RunAndReturn(run func(ctx context.
 }
 
 // DeleteBrand provides a mock function for the type Database
-func (_mock *Database) DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) error {
+func (_mock *Database) DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (int, error) {
 	ret := _mock.Called(ctx, tx, brandId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteBrand")
 	}
 
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (int, error)); ok {
+		return returnFunc(ctx, tx, brandId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) int); ok {
 		r0 = returnFunc(ctx, tx, brandId)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(int)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, brandId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // Database_DeleteBrand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteBrand'
@@ -3723,12 +3800,12 @@ func (_c *Database_DeleteBrand_Call) Run(run func(ctx context.Context, tx *sql.T
 	return _c
 }
 
-func (_c *Database_DeleteBrand_Call) Return(err error) *Database_DeleteBrand_Call {
-	_c.Call.Return(err)
+func (_c *Database_DeleteBrand_Call) Return(movedClients int, err error) *Database_DeleteBrand_Call {
+	_c.Call.Return(movedClients, err)
 	return _c
 }
 
-func (_c *Database_DeleteBrand_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, brandId int64) error) *Database_DeleteBrand_Call {
+func (_c *Database_DeleteBrand_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, brandId int64) (int, error)) *Database_DeleteBrand_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -7753,6 +7830,80 @@ func (_c *Database_GetClientLogoByClientId_Call) Return(clientLogo *record.Clien
 }
 
 func (_c *Database_GetClientLogoByClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error)) *Database_GetClientLogoByClientId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetClientPageBrand provides a mock function for the type Database
+func (_mock *Database) GetClientPageBrand(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Brand, error) {
+	ret := _mock.Called(ctx, tx, clientIdentifier)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClientPageBrand")
+	}
+
+	var r0 *record.Brand
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (*record.Brand, error)); ok {
+		return returnFunc(ctx, tx, clientIdentifier)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) *record.Brand); ok {
+		r0 = returnFunc(ctx, tx, clientIdentifier)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*record.Brand)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, clientIdentifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetClientPageBrand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClientPageBrand'
+type Database_GetClientPageBrand_Call struct {
+	*mock.Call
+}
+
+// GetClientPageBrand is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientIdentifier string
+func (_e *Database_Expecter) GetClientPageBrand(ctx any, tx any, clientIdentifier any) *Database_GetClientPageBrand_Call {
+	return &Database_GetClientPageBrand_Call{Call: _e.mock.On("GetClientPageBrand", ctx, tx, clientIdentifier)}
+}
+
+func (_c *Database_GetClientPageBrand_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientIdentifier string)) *Database_GetClientPageBrand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetClientPageBrand_Call) Return(brand *record.Brand, err error) *Database_GetClientPageBrand_Call {
+	_c.Call.Return(brand, err)
+	return _c
+}
+
+func (_c *Database_GetClientPageBrand_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Brand, error)) *Database_GetClientPageBrand_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -16992,6 +17143,84 @@ func (_c *Database_SetClientBackchannelLogout_Call) Return(err error) *Database_
 }
 
 func (_c *Database_SetClientBackchannelLogout_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error) *Database_SetClientBackchannelLogout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetClientBrand provides a mock function for the type Database
+func (_mock *Database) SetClientBrand(ctx context.Context, tx *sql.Tx, clientId int64, brandId sql.NullInt64) (bool, error) {
+	ret := _mock.Called(ctx, tx, clientId, brandId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetClientBrand")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, sql.NullInt64) (bool, error)); ok {
+		return returnFunc(ctx, tx, clientId, brandId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, sql.NullInt64) bool); ok {
+		r0 = returnFunc(ctx, tx, clientId, brandId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, sql.NullInt64) error); ok {
+		r1 = returnFunc(ctx, tx, clientId, brandId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_SetClientBrand_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetClientBrand'
+type Database_SetClientBrand_Call struct {
+	*mock.Call
+}
+
+// SetClientBrand is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientId int64
+//   - brandId sql.NullInt64
+func (_e *Database_Expecter) SetClientBrand(ctx any, tx any, clientId any, brandId any) *Database_SetClientBrand_Call {
+	return &Database_SetClientBrand_Call{Call: _e.mock.On("SetClientBrand", ctx, tx, clientId, brandId)}
+}
+
+func (_c *Database_SetClientBrand_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64, brandId sql.NullInt64)) *Database_SetClientBrand_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 sql.NullInt64
+		if args[3] != nil {
+			arg3 = args[3].(sql.NullInt64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetClientBrand_Call) Return(changed bool, err error) *Database_SetClientBrand_Call {
+	_c.Call.Return(changed, err)
+	return _c
+}
+
+func (_c *Database_SetClientBrand_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64, brandId sql.NullInt64) (bool, error)) *Database_SetClientBrand_Call {
 	_c.Call.Return(run)
 	return _c
 }

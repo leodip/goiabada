@@ -107,7 +107,12 @@ read the settings row's `default_brand_id` under it: `MakeBrandDefault` then rea
 writes the pointer, and `DeleteBrand` refuses the brand the pointer names, so a deletion racing a
 change of default never leaves the pointer on a deleted brand, and the data tier's `brand_test.go`
 shows each order on every engine; `UpdateSettings`, which the section saves write through, leaves
-the pointer alone (`dont-update`), and #622's legal document lifecycle writes
+the pointer alone (`dont-update`), #812's client brand (`AcquireSettingsRow`): `SetClientBrand`
+reads the brand under it and writes `clients.brand_id`, and `DeleteBrand` puts the brand's clients
+back on the default under it before deleting, answering how many it moved, so an assignment racing
+a deletion is either moved and counted or refused as a brand that does not exist, which
+`client_brand_test.go` shows in each order on every engine; `UpdateClient` leaves the column alone
+(`dont-update`), and #622's legal document lifecycle writes
 (`AcquireLegalDocumentRow`): a draft
 save, publish, retire, restore, delete and a change of apps each read the document again under its
 row and decide on that, so a publish clears only the draft it froze, a save cannot rename a document

@@ -94,6 +94,17 @@ type Database interface {
 	// and nothing else but updated_at. UpdateClient never writes the column: only this and
 	// CreateClient do (#42 decision 12).
 	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error
+	// SetClientBrand gives a client a brand of its own, or with an empty brandId puts it back on the
+	// default, and nothing else but updated_at. It takes the settings row's lock first, as the
+	// brand deletion that clears the column does, and answers ErrBrandNotFound, writing nothing, for
+	// a brand that is not there. It answers whether it wrote: false for a client that already has
+	// that brand, or is not there. UpdateClient never writes the column (#812 decision 1). A
+	// transaction is required, as for AcquireSettingsRow.
+	SetClientBrand(ctx context.Context, tx *sql.Tx, clientId int64, brandId sql.NullInt64) (changed bool, err error)
+	// GetClientPageBrand answers the brand the pages of the client with this identifier are drawn
+	// in: its own brand, or the default brand when it has none. It answers nil when there is no
+	// such client, or when it has no brand of its own and there is no default (#812 decision 1).
+	GetClientPageBrand(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Brand, error)
 	// AcquireClientRow takes the client's row inside the caller's transaction and holds it
 	// until that transaction ends, so a read taken afterwards cannot be invalidated by
 	// another writer before the caller writes it back (see #245).
@@ -528,8 +539,15 @@ type Database interface {
 	MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int64) (previousDefaultBrandId int64, err error)
 	// DeleteBrand deletes a brand, reading the default under the settings row's lock: it answers
 	// ErrDefaultBrandNotDeletable for the default brand and ErrBrandNotFound for a brand that is not
-	// there, deleting nothing. A transaction is required, as for AcquireSettingsRow.
-	DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) error
+	// there, deleting nothing. Under that lock it first puts every client given the brand back on
+	// the default, and answers how many it moved (#812 decision 1). A transaction is required, as
+	// for AcquireSettingsRow.
+	DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (movedClients int, err error)
+	// CountClientsPerBrand answers, by brand id, how many clients are drawn in each brand: those
+	// given it and, for the default brand, those with no brand of their own, so the counts add up
+	// to every client while there is a default. A brand no client is drawn in is absent (#812
+	// decision 3).
+	CountClientsPerBrand(ctx context.Context, tx *sql.Tx) (map[int64]int, error)
 
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
