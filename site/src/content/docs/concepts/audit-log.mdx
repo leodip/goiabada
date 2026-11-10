@@ -117,12 +117,15 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `added_client_ids` | The row ids of the clients a save of a legal document's apps added. |
 | `added_resource_ids` | The row ids of the resources a save of a client's introspection resources added. |
 | `allowed` | Whether the client may now ask for the administrative scopes. |
+| `appearance` | A brand's appearance after the save: `auto`, `light` or `dark`. |
 | `applies_to` | A legal document's Applies to after the save: `all_apps`, or `selected_apps` for the apps it lists. |
 | `attempts` | How many times the auth server sent a logout token before its delivery finished, 0 when it sent none. |
 | `audit_log_retention_days` | The new audit log retention, in days. |
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
 | `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
 | `auth_state` | The step of the sign-in the browser most recently moved, when a page of a sign-in it no longer holds, or of none, was refused. |
+| `brand_id` | The brand's row id. On `updated_default_brand`, the brand that is now the default. |
+| `brand_name` | The brand's name. On `updated_default_brand`, the brand that is now the default. |
 | `ceiling` | Which rule refused an administrator change: `grant`, `target`, `settings` or `backchannel_logout_uri`. |
 | `change` | `granted` or `revoked`. |
 | `checkpoint` | Where an administrative scope was refused: `authorize`, `issue`, or the token endpoint's `authorization_code`, `refresh_token` or `password` grant. |
@@ -163,6 +166,8 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `new_generation` | The user's authentication generation after their sessions and tokens were revoked. |
 | `new_ui_theme` | The UI theme after the change. |
 | `old` | The default token settings, the session settings, or the Turnstile settings, before the change, keyed as below. |
+| `old_brand_id` | The row id of the brand that was the default before `updated_default_brand`. |
+| `old_brand_name` | The name of the brand that was the default before `updated_default_brand`. |
 | `old_generation` | The user's authentication generation before their sessions and tokens were revoked. |
 | `old_ui_theme` | The UI theme before the change. |
 | `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. For a logout token, how its delivery ended: see `goiabada_backchannel_logout_deliveries_total` on [Monitoring](/deploy/monitoring/#metrics-catalog). |
@@ -198,6 +203,7 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `target_id` | The row id of the user, group, client or resource a request acted on. |
 | `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
 | `terminated_session_identifiers` | The identifier of each session ended. |
+| `theme` | The key of a brand's theme after the save, such as `blueberry`. |
 | `token_client_id` | The row id of the client a token sent to the revocation endpoint was issued to. |
 | `token_expiration_in_seconds` | Under `old` and `new`: the default access token lifetime, in seconds. |
 | `token_type` | The type of token a client sent to the revocation endpoint: `access_token` or `refresh_token`. |
@@ -416,6 +422,15 @@ These come from the Account API, which users reach through the admin console's a
 | `retired_legal_document` | An administrator retired a legal document. |
 | `restored_legal_document` | An administrator restored a retired legal document. |
 | `deleted_legal_document` | An administrator deleted a legal document that was never published. |
+
+### Brands
+
+| Event | Meaning |
+|---|---|
+| `created_brand` | An administrator created a brand. |
+| `updated_brand` | An administrator changed a brand's name, appearance or theme. |
+| `deleted_brand` | An administrator deleted a brand. |
+| `updated_default_brand` | An administrator made another brand the default. The entry names the new and the old default. |
 
 ### Settings and keys
 

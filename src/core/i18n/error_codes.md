@@ -302,6 +302,13 @@ cause, each a whole sentence.
 | `handler.legal_document.not_retired` | (none) | The document is not retired. |
 | `handler.legal_document.published_not_deleted` | (none) | A published document cannot be deleted, so the record of what users accepted is kept. Retire it instead. |
 | `handler.legal_document.published_concurrently` | (none) | Another version of the document was published at the same moment, so nothing was published. Load the document again and retry. |
+| `handler.brand.name_required` | (none) | Name is required. |
+| `handler.brand.name_too_long` | `max` (int) | The name cannot exceed a maximum length of {{.max}} characters. |
+| `handler.brand.name_angle_brackets` | (none) | The name cannot contain the characters < or >. |
+| `handler.brand.name_in_use` | (none) | Another brand already uses this name. |
+| `handler.brand.appearance_invalid` | (none) | Choose automatic, light or dark. |
+| `handler.brand.theme_invalid` | (none) | Choose one of the built-in themes. |
+| `handler.brand.default_delete_not_allowed` | (none) | The default brand cannot be deleted. Make another brand the default first. |
 | `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
 | `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
 | `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |

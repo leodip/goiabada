@@ -196,6 +196,14 @@ var adminRouteClassification = map[string]adminRouteClass{
 		"lacks (#402 decision 7)"),
 	"PUT /api/v1/admin/settings/ui-theme": outsideCeilings("changes how pages look and gives the caller no " +
 		"authority it lacks (#402 decision 7)"),
+	"POST /api/v1/admin/brands": outsideCeilings("creates a brand, which changes how pages look and gives the " +
+		"caller no authority it lacks (#402 decision 7)"),
+	"PUT /api/v1/admin/brands/{id}": outsideCeilings("changes how pages look and gives the caller no authority " +
+		"it lacks (#402 decision 7)"),
+	"DELETE /api/v1/admin/brands/{id}": outsideCeilings("deletes a brand that is not the default, which changes " +
+		"how no page looks and gives the caller no authority it lacks (#402 decision 7)"),
+	"POST /api/v1/admin/brands/{id}/make-default": outsideCeilings("changes how pages look and gives the caller " +
+		"no authority it lacks (#402 decision 7)"),
 	"PUT /api/v1/admin/settings/tokens": outsideCeilings("changes posture and gives the caller no authority it " +
 		"lacks (#402 decision 7)"),
 	"PUT /api/v1/admin/settings/turnstile": outsideCeilings("changes posture, which a wrong site key can turn " +

@@ -193,34 +193,43 @@ const (
 	// the draft writes updated_legal_document_draft; publishing writes no draft event.
 	// updated_legal_document_apps records a change of the apps a document applies to, with
 	// applies_to (all_apps or selected_apps), added_client_ids and removed_client_ids.
-	EventCreatedLegalDocument         = "created_legal_document"
-	EventUpdatedLegalDocumentApps     = "updated_legal_document_apps"
-	EventUpdatedLegalDocumentDraft    = "updated_legal_document_draft"
-	EventPublishedLegalDocument       = "published_legal_document"
-	EventRetiredLegalDocument         = "retired_legal_document"
-	EventRestoredLegalDocument        = "restored_legal_document"
-	EventDeletedLegalDocument         = "deleted_legal_document"
-	EventUserRemovedFromGroup         = "user_removed_from_group"
-	EventCreatedGroup                 = "created_group"
-	EventUpdatedGroup                 = "updated_group"
-	EventDeletedGroup                 = "deleted_group"
-	EventDeleteGroupAttribute         = "deleted_group_attribute"
-	EventAddedGroupAttribute          = "added_group_attribute"
-	EventUpdatedGroupAttribute        = "updated_group_attribute"
-	EventAddedGroupPermission         = "added_group_permission"
-	EventDeletedGroupPermission       = "deleted_group_permission"
-	EventAddedUserPermission          = "added_user_permission"
-	EventDeletedUserPermission        = "deleted_user_permission"
-	EventDeleteUserAttribute          = "deleted_user_attribute"
-	EventAddedUserAttribute           = "added_user_attribute"
-	EventUpdatedUserAttribute         = "updated_user_attribute"
-	EventDeletedUser                  = "deleted_user"
-	EventUpdatedSMTPSettings          = "updated_smtp_settings"
-	EventUpdatedGeneralSettings       = "updated_general_settings"
-	EventUpdatedSessionsSettings      = "updated_sessions_settings"
-	EventUpdatedTokensSettings        = "updated_tokens_settings"
-	EventUpdatedTurnstileSettings     = "updated_turnstile_settings"
-	EventUpdatedUIThemeSettings       = "updated_ui_theme_settings"
+	EventCreatedLegalDocument      = "created_legal_document"
+	EventUpdatedLegalDocumentApps  = "updated_legal_document_apps"
+	EventUpdatedLegalDocumentDraft = "updated_legal_document_draft"
+	EventPublishedLegalDocument    = "published_legal_document"
+	EventRetiredLegalDocument      = "retired_legal_document"
+	EventRestoredLegalDocument     = "restored_legal_document"
+	EventDeletedLegalDocument      = "deleted_legal_document"
+	EventUserRemovedFromGroup      = "user_removed_from_group"
+	EventCreatedGroup              = "created_group"
+	EventUpdatedGroup              = "updated_group"
+	EventDeletedGroup              = "deleted_group"
+	EventDeleteGroupAttribute      = "deleted_group_attribute"
+	EventAddedGroupAttribute       = "added_group_attribute"
+	EventUpdatedGroupAttribute     = "updated_group_attribute"
+	EventAddedGroupPermission      = "added_group_permission"
+	EventDeletedGroupPermission    = "deleted_group_permission"
+	EventAddedUserPermission       = "added_user_permission"
+	EventDeletedUserPermission     = "deleted_user_permission"
+	EventDeleteUserAttribute       = "deleted_user_attribute"
+	EventAddedUserAttribute        = "added_user_attribute"
+	EventUpdatedUserAttribute      = "updated_user_attribute"
+	EventDeletedUser               = "deleted_user"
+	EventUpdatedSMTPSettings       = "updated_smtp_settings"
+	EventUpdatedGeneralSettings    = "updated_general_settings"
+	EventUpdatedSessionsSettings   = "updated_sessions_settings"
+	EventUpdatedTokensSettings     = "updated_tokens_settings"
+	EventUpdatedTurnstileSettings  = "updated_turnstile_settings"
+	EventUpdatedUIThemeSettings    = "updated_ui_theme_settings"
+	// The brands (#810 decision 5), written by the admin API after each committed change, every
+	// row with brand_id, brand_name and logged_in_user. updated_brand adds the appearance and the
+	// theme it saved. updated_default_brand names the new default as brand_id and brand_name and
+	// the one it replaced as old_brand_id and old_brand_name; a make-default that changes nothing
+	// writes none.
+	EventCreatedBrand                 = "created_brand"
+	EventUpdatedBrand                 = "updated_brand"
+	EventDeletedBrand                 = "deleted_brand"
+	EventUpdatedDefaultBrand          = "updated_default_brand"
 	EventUpdatedAuditLogsSettings     = "updated_audit_logs_settings"
 	EventUpdatedWebOrigins            = "updated_web_origins"
 	EventUpdatedClientSettings        = "updated_client_settings"
@@ -725,6 +734,7 @@ var auditEventTypes = []string{
 	EventBumpedUserSession,
 	EventChangedPassword,
 	EventCreatedAuthCode,
+	EventCreatedBrand,
 	EventCreatedClient,
 	EventCreatedGroup,
 	EventCreatedLegalDocument,
@@ -732,6 +742,7 @@ var auditEventTypes = []string{
 	EventCreatedUser,
 	EventCrossUserSessionReplaced,
 	EventDeclinedLegalDocuments,
+	EventDeletedBrand,
 	EventDeletedClient,
 	EventDeletedClientLogo,
 	EventDeletedGroup,
@@ -796,6 +807,7 @@ var auditEventTypes = []string{
 	EventTokenRevocationRefused,
 	EventTokenScopeDenied,
 	EventUpdatedAuditLogsSettings,
+	EventUpdatedBrand,
 	EventUpdatedClientAdministrativeScopes,
 	EventUpdatedClientAuthentication,
 	EventUpdatedClientBackchannelLogout,
@@ -806,6 +818,7 @@ var auditEventTypes = []string{
 	EventUpdatedClientPermissions,
 	EventUpdatedClientSettings,
 	EventUpdatedClientTokens,
+	EventUpdatedDefaultBrand,
 	EventUpdatedGeneralSettings,
 	EventUpdatedGroup,
 	EventUpdatedGroupAttribute,

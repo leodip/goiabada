@@ -446,6 +446,17 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/sessions", apihandlers.HandleSettingsSessionsGet())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/sessions", apihandlers.HandleSettingsSessionsPut(s.database, auditLogger))
 
+		// Brands (#810, settings domain): the looks the pages are drawn in, the default among them.
+		// Reading also accepts admin-read; every change needs manage-settings or manage.
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/brands", apihandlers.HandleBrandsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/brands", apihandlers.HandleBrandCreatePost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/brands/{id}", apihandlers.HandleBrandGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/brands/{id}", apihandlers.HandleBrandUpdatePut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/brands/{id}", apihandlers.HandleBrandDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/brands/{id}/make-default", apihandlers.HandleBrandMakeDefaultPost(s.database, auditLogger))
+		// The built-in themes a brand can take, reference data behind the same read scopes.
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/brand-themes", apihandlers.HandleBrandThemesGet())
+
 		// Settings - UI Theme
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/ui-theme", apihandlers.HandleSettingsUIThemeGet())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/ui-theme", apihandlers.HandleSettingsUIThemePut(s.database, auditLogger))

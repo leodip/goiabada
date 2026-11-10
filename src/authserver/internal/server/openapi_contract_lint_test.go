@@ -936,6 +936,22 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 				case "writeLegalDocumentNotFound":
 					out[404] = true
 				}
+				// The brand handlers' readers answer their own refusals (#810): brandId 400 for a
+				// path id that is not one, loadBrand that 400, 404 for no such brand and 500 for a
+				// failed read, defaultBrandId 500 for a failed read, and brandNameTaken 400 for a
+				// name the engine refused as another brand's. writeBrandNotFound is the 404.
+				switch f.Name {
+				case "brandId", "brandNameTaken":
+					out[400] = true
+				case "loadBrand":
+					out[400] = true
+					out[404] = true
+					out[500] = true
+				case "defaultBrandId":
+					out[500] = true
+				case "writeBrandNotFound":
+					out[404] = true
+				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {
 				case "InternalServerError", "JSONError":
@@ -2008,6 +2024,12 @@ func TestOpenAPI_APIFiveHundredsAreTheJSONEnvelope(t *testing.T) {
 // the line. A gap left recorded is a burn-down item; an enforced site left recorded is what stops
 // the next person having to re-derive that it is enforced.
 var publishedRequestEnums = map[string]string{
+	"CreateBrandRequest.appearance": "enforced: handler_api_brands.go refuses any appearance but " +
+		"[auto, light, dark], an absent one included, with 400 before writing. Covered by " +
+		"TestBrandCreate_Refusals' appearance cases. Published in #810",
+	"UpdateBrandRequest.appearance": "enforced: handler_api_brands.go refuses any appearance but " +
+		"[auto, light, dark], an absent one included, with 400 before writing. Covered by " +
+		"TestBrandUpdate_Refusals' appearance cases. Published in #810",
 	"CreateLegalDocumentRequest.kind": "enforced: handler_api_legal_documents.go refuses any kind but " +
 		"[must_accept, for_information], an absent one included, with 400 before writing. Covered by " +
 		"TestLegalDocumentCreate_Refusals' unknown and missing kind cases. Published in #622",

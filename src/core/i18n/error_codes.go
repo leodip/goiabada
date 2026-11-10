@@ -166,6 +166,15 @@ const (
 	ErrCodeLegalDocumentAppsWithAllApps       = "handler.legal_document.apps_with_all_apps"
 	ErrCodeLegalDocumentAdminConsoleClient    = "handler.legal_document.admin_console_client"
 
+	// Brands (#810 decision 5).
+	ErrCodeBrandNameRequired            = "handler.brand.name_required"
+	ErrCodeBrandNameTooLong             = "handler.brand.name_too_long" // Args: {"max": int}
+	ErrCodeBrandNameAngleBrackets       = "handler.brand.name_angle_brackets"
+	ErrCodeBrandNameInUse               = "handler.brand.name_in_use"
+	ErrCodeBrandAppearanceInvalid       = "handler.brand.appearance_invalid"
+	ErrCodeBrandThemeInvalid            = "handler.brand.theme_invalid"
+	ErrCodeBrandDefaultDeleteNotAllowed = "handler.brand.default_delete_not_allowed"
+
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"

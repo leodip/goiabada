@@ -94,6 +94,8 @@ tags:
     description: Permission management (Admin API)
   - name: Legal Documents
     description: Privacy notices and terms of use (Admin API, settings domain)
+  - name: Brands
+    description: The looks the pages are drawn in (Admin API, settings domain)
   - name: Clients
     description: OAuth client management (Admin API)
   - name: Audit Logs
@@ -2312,6 +2314,213 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # =============================================================================
+  # ADMIN API - BRANDS
+  # =============================================================================
+  /api/v1/admin/brands:
+    get:
+      tags: [Brands]
+      summary: List brands
+      description: |
+        Every brand, sorted by name. The default brand, the one every page is drawn in, has
+        `isDefault` true.
+      operationId: getBrands
+      responses:
+        '200':
+          description: Brands list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetBrandsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Brands]
+      summary: Create brand
+      description: |
+        Create a brand. It is not the default until it is made the default.
+      operationId: createBrand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBrandRequest'
+      responses:
+        '201':
+          description: Brand created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBrandResponse'
+        '400':
+          description: |
+            error_code is INVALID_REQUEST_BODY for a body that is not JSON, or one of
+            handler.brand.name_required, handler.brand.name_too_long,
+            handler.brand.name_angle_brackets, handler.brand.name_in_use,
+            handler.brand.appearance_invalid and handler.brand.theme_invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brands/{id}:
+    get:
+      tags: [Brands]
+      summary: Get brand
+      description: Get a brand by its ID.
+      operationId: getBrand
+      parameters:
+        - $ref: '#/components/parameters/BrandIdParam'
+      responses:
+        '200':
+          description: Brand details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetBrandResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags: [Brands]
+      summary: Update brand
+      description: |
+        Replace a brand's name, appearance and theme. A change to the default brand restyles
+        every page at once.
+      operationId: updateBrand
+      parameters:
+        - $ref: '#/components/parameters/BrandIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBrandRequest'
+      responses:
+        '200':
+          description: Brand updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateBrandResponse'
+        '400':
+          description: |
+            error_code is VALIDATION_ERROR for a malformed ID, INVALID_REQUEST_BODY for a body
+            that is not JSON, or one of the refusals createBrand lists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Brands]
+      summary: Delete brand
+      description: |
+        Delete a brand. The default brand cannot be deleted: make another brand the default
+        first.
+      operationId: deleteBrand
+      parameters:
+        - $ref: '#/components/parameters/BrandIdParam'
+      responses:
+        '200':
+          description: Brand deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: |
+            error_code is VALIDATION_ERROR for a malformed ID, or
+            handler.brand.default_delete_not_allowed for the default brand.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brands/{id}/make-default:
+    post:
+      tags: [Brands]
+      summary: Make brand the default
+      description: |
+        Make a brand the default, which restyles every page at once. A brand that already is
+        the default is answered unchanged.
+      operationId: makeBrandDefault
+      parameters:
+        - $ref: '#/components/parameters/BrandIdParam'
+      responses:
+        '200':
+          description: The brand, now the default
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MakeBrandDefaultResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-themes:
+    get:
+      tags: [Brands]
+      summary: List brand themes
+      description: |
+        The built-in themes a brand can take, in display order. Each has its `key`, which is
+        what a brand's `theme` takes, and its light and dark palettes: a `#rrggbb` value for
+        each of the 23 color tokens, by the token's name.
+      operationId: getBrandThemes
+      responses:
+        '200':
+          description: Brand themes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetBrandThemesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -5151,6 +5360,14 @@ components:
       in: path
       required: true
       description: Legal document ID
+      schema:
+        type: integer
+        format: int64
+    BrandIdParam:
+      name: id
+      in: path
+      required: true
+      description: Brand ID
       schema:
         type: integer
         format: int64
@@ -8300,6 +8517,156 @@ components:
         - userSessionMaxLifetimeInSeconds
         - maxUserSessionsPerUser
         - keepSignedIn
+
+    BrandResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        appearance:
+          type: string
+          enum: [auto, light, dark]
+          description: Light or dark, or auto to follow each visitor's device.
+        theme:
+          type: string
+          description: The key of one of the built-in themes getBrandThemes lists.
+        isDefault:
+          type: boolean
+          description: True for the default brand, the one every page is drawn in.
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - name
+        - appearance
+        - theme
+        - isDefault
+        - createdAt
+        - updatedAt
+
+    GetBrandsResponse:
+      type: object
+      properties:
+        brands:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrandResponse'
+      required:
+        - brands
+
+    CreateBrandRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 60
+          description: |
+            Unique among brands, at most 60 characters, without `<` or `>`. Surrounding spaces
+            are ignored.
+        appearance:
+          type: string
+          enum: [auto, light, dark]
+        theme:
+          type: string
+          description: The key of one of the built-in themes getBrandThemes lists.
+      required:
+        - name
+        - appearance
+        - theme
+
+    CreateBrandResponse:
+      type: object
+      properties:
+        brand:
+          $ref: '#/components/schemas/BrandResponse'
+      required:
+        - brand
+
+    GetBrandResponse:
+      type: object
+      properties:
+        brand:
+          $ref: '#/components/schemas/BrandResponse'
+      required:
+        - brand
+
+    UpdateBrandRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 60
+          description: |
+            Unique among brands, at most 60 characters, without `<` or `>`. Surrounding spaces
+            are ignored.
+        appearance:
+          type: string
+          enum: [auto, light, dark]
+        theme:
+          type: string
+          description: The key of one of the built-in themes getBrandThemes lists.
+      required:
+        - name
+        - appearance
+        - theme
+
+    UpdateBrandResponse:
+      type: object
+      properties:
+        brand:
+          $ref: '#/components/schemas/BrandResponse'
+      required:
+        - brand
+
+    MakeBrandDefaultResponse:
+      type: object
+      properties:
+        brand:
+          $ref: '#/components/schemas/BrandResponse'
+      required:
+        - brand
+
+    BrandThemeResponse:
+      type: object
+      properties:
+        key:
+          type: string
+          enum: [blueberry, blackberry, avocado, plum, tangerine, guava, coconut, high-contrast]
+        light:
+          type: object
+          description: The light palette, a `#rrggbb` value for each color token by its name.
+          additionalProperties:
+            type: string
+            pattern: '^#[0-9a-f]{6}$'
+        dark:
+          type: object
+          description: The dark palette, keyed as `light` is.
+          additionalProperties:
+            type: string
+            pattern: '^#[0-9a-f]{6}$'
+      required:
+        - key
+        - light
+        - dark
+
+    GetBrandThemesResponse:
+      type: object
+      properties:
+        brandThemes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrandThemeResponse'
+      required:
+        - brandThemes
 
     SettingsUIThemeResponse:
       type: object
