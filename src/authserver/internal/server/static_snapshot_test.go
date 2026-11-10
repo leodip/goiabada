@@ -194,9 +194,10 @@ func TestServeStaticFiles_ConcurrentRequestsForAFileEachEarnTheYear(t *testing.T
 
 // Spellings that reach one file are kept apart, here through directory symlinks as on a
 // case-insensitive file system, so requests could multiply one file's snapshot. The snapshots
-// together never pass the budget however many spellings are asked for.
+// together, each buffer counted whole, never pass the budget however many spellings are asked for.
+// The file's size is one io.ReadAll leaves more room to spare after than the overhead allows for.
 func TestStaticSnapshots_ManySpellingsOfOneFileNeverPassTheBudget(t *testing.T) {
-	content := bytes.Repeat([]byte("a"), staticSnapshotLimit)
+	content := bytes.Repeat([]byte("a"), 837000)
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "probe.css"), content, 0o600))
 	require.NoError(t, os.Symlink(".", filepath.Join(dir, "a")))
@@ -214,7 +215,7 @@ func TestStaticSnapshots_ManySpellingsOfOneFileNeverPassTheBudget(t *testing.T) 
 
 		kept := 0
 		for keptName, keptSnapshot := range snapshots.files {
-			kept += len(keptName) + len(keptSnapshot.content)
+			kept += len(keptName) + cap(keptSnapshot.content)
 		}
 		require.LessOrEqual(t, kept, staticSnapshotsBudget, "the snapshots kept after %d spellings", spelling+1)
 	}

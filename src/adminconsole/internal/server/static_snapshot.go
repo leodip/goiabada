@@ -34,8 +34,8 @@ const staticSnapshotReads = 3
 // anyone make the server hold the whole file in memory with a one-byte range request.
 const staticSnapshotLimit = 1 << 20
 
-// staticSnapshotsBudget is the most the kept snapshots hold together, each costing its bytes, its
-// name and staticSnapshotOverhead. Keeping one that would pass it empties the snapshots first: the
+// staticSnapshotsBudget is the most the kept snapshots hold together, each costing the buffer its
+// bytes are in, its name and staticSnapshotOverhead. Keeping one that would pass it empties the snapshots first: the
 // names are the requests' spellings, and on a case-insensitive file system or through a directory
 // symlink many spellings reach one file, each kept apart. They can make the server read the file
 // again, but never hold more than the budget.
@@ -125,8 +125,10 @@ func (s *staticSnapshots) forgetLocked(name string) {
 	}
 }
 
+// staticSnapshotCost is what the snapshot kept under name costs the budget: the whole buffer its
+// bytes are in, which io.ReadAll can leave with room to spare, its name and the overhead.
 func staticSnapshotCost(name string, snapshot staticSnapshot) int64 {
-	return int64(len(name)+len(snapshot.content)) + staticSnapshotOverhead
+	return int64(len(name)+cap(snapshot.content)) + staticSnapshotOverhead
 }
 
 // readStaticFileOnce reads the file once and reports whether it stayed unchanged while read: the
