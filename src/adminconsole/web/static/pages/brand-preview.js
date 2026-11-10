@@ -7,10 +7,19 @@
 // lacks, as a refused form drawn again can, is previewed in the first listed theme, as its
 // Appearance cards are drawn.
 //
-// The Light/Dark switch shows one sample at a time; it sits outside the form, so it is never
-// submitted. The samples are drawn hidden, so neither shows in the console's own colors before
-// this script has styled it. A browser restoring the form, as on Back, fires no input, so the
-// preview is drawn again on every pageshow.
+// The appearance decides which sample shows: Light and Dark their one sample, with the Light/Dark
+// switch hidden, and Automatic, or a form holding no appearance it knows, the sample the switch
+// names. One sentence beside the preview says which applies. The switch sits outside the form, so
+// it is never submitted. The samples are drawn hidden, so neither shows in the console's own
+// colors before this script has styled it.
+//
+// The three Appearance cards' swatches are redrawn in the chosen theme too, from the same
+// palettes: each names the modes it shows, one SVG per mode in order, and each shape the token its
+// fill or border is drawn from. The colors are set as attributes, as the server draws them. The
+// theme cards' swatches each show their own theme and are left alone.
+//
+// A browser restoring the form, as on Back, fires no input, so all of it is drawn again on every
+// pageshow.
 
 const brandPalettes = JSON.parse(document.getElementById("brand-palettes").textContent);
 
@@ -27,10 +36,43 @@ function chosenTheme() {
   return brandPalettes.find(function (theme) { return theme.key === key; }) || brandPalettes[0];
 }
 
+// chosenAppearance answers the appearance the form holds, auto when it holds none: a refused
+// form drawn again with an appearance it does not offer checks no card.
+function chosenAppearance() {
+  const checked = document.querySelector('input[name="appearance"]:checked');
+  return checked ? checked.value : "auto";
+}
+
 // previewMode answers the mode the switch is on, light unless it is on dark.
 function previewMode() {
   const checked = document.querySelector('input[name="brandPreviewMode"]:checked');
   return checked && checked.value === "dark" ? "dark" : "light";
+}
+
+// drawSwatch gives each shape of one swatch SVG its token's color in palette.
+function drawSwatch(svg, palette) {
+  for (const shape of svg.querySelectorAll("[data-fill]")) {
+    const fill = palette[shape.dataset.fill];
+    if (fill !== undefined) {
+      shape.setAttribute("fill", fill);
+    }
+  }
+  for (const shape of svg.querySelectorAll("[data-stroke]")) {
+    const stroke = palette[shape.dataset.stroke];
+    if (stroke !== undefined) {
+      shape.setAttribute("stroke", stroke);
+    }
+  }
+}
+
+function drawAppearanceSwatches(theme) {
+  for (const swatch of document.querySelectorAll("[data-appearance-swatch]")) {
+    const modes = swatch.dataset.appearanceSwatch.split(" ");
+    const svgs = swatch.querySelectorAll("svg");
+    for (let i = 0; i < svgs.length && i < modes.length; i++) {
+      drawSwatch(svgs[i], theme[modes[i] === "dark" ? "dark" : "light"] || {});
+    }
+  }
 }
 
 function drawPreview() {
@@ -38,7 +80,8 @@ function drawPreview() {
   if (!theme) {
     return;
   }
-  const mode = previewMode();
+  const appearance = chosenAppearance();
+  const mode = appearance === "auto" ? previewMode() : appearance;
   for (const sample of document.querySelectorAll("[data-brand-sample]")) {
     const sampleMode = sample.dataset.brandSample === "dark" ? "dark" : "light";
     const palette = theme[sampleMode] || {};
@@ -49,6 +92,14 @@ function drawPreview() {
     sample.style.setProperty("color-scheme", sampleMode);
     sample.hidden = sampleMode !== mode;
   }
+  const modeSwitch = document.querySelector(".brand-preview-switch");
+  if (modeSwitch) {
+    modeSwitch.hidden = appearance !== "auto";
+  }
+  for (const note of document.querySelectorAll("[data-brand-preview-note]")) {
+    note.hidden = note.dataset.brandPreviewNote !== appearance;
+  }
+  drawAppearanceSwatches(theme);
 }
 
 drawPreview();

@@ -17,18 +17,25 @@ import (
 
 // brandPreviewRun is the program the TestBrandPreviewJS tests run under Node (#811). It draws the
 // brand editor in a small DOM of its own, as admin_settings_branding_brand.html and the
-// brand_sample partial draw it: the form's theme cards, the preview's Light/Dark switch outside
-// the form, the two samples, light and dark, hidden until styled, and the palettes data block. It
+// brand_sample partial draw it: the form's Appearance and theme cards, each with its swatch, the
+// preview's sentences on the appearance and its Light/Dark switch outside the form, drawn for the
+// appearance the form was drawn with, the two samples, light and dark, hidden until styled, and the
+// palettes data block. The swatches start in a color no theme has, so a swatch the script does not
+// draw keeps it. It
 // loads the served brand-preview.js into it, then acts as a person and a browser do: picking a
 // theme or a mode (a radio checked, then its input and change events, which bubble), a browser
 // restoring the form with no event, and pageshow. At each "look" it writes down what each sample
-// shows and every style property any element carries.
+// shows, every style property any element carries, which of the switch and the sentences show,
+// and the colors each card's swatch is drawn in, token by token.
 //
 // The DOM is the browser's, a boundary this module does not own, so it is stood in for: only what
 // a page script reads, with radios unchecking the rest of their group, as a browser's do. A
 // selector it cannot read fails the run rather than matching nothing.
 const brandPreviewRun = `"use strict";
 const vm = require("vm");
+
+// The color the page's swatches start in, which no palette holds.
+const staleColor = "#5e7a1e";
 
 function dataAttr(prop) { return "data-" + prop.replace(/[A-Z]/g, function (c) { return "-" + c.toLowerCase(); }); }
 
@@ -221,6 +228,41 @@ function build(request) {
       ])]),
     ]);
   };
+  // A swatch as the brand_swatch partial draws it, one SVG per mode, in the stale color: each
+  // shape names the token its fill, or its border, is drawn from.
+  const swatch = function (attrs, modes) {
+    return el("span", Object.assign({ class: "theme-swatch", "aria-hidden": "true" }, attrs), modes.map(function () {
+      return el("svg", { viewBox: "0 0 120 64" }, [
+        el("rect", { fill: staleColor, "data-fill": "canvas" }),
+        el("rect", { fill: staleColor, stroke: staleColor, "data-fill": "surface", "data-stroke": "line" }),
+        el("rect", { fill: staleColor, "data-fill": "ink" }),
+        el("rect", { fill: staleColor, "data-fill": "ink-muted" }),
+        el("rect", { fill: staleColor, "data-fill": "brand" }),
+      ]);
+    }));
+  };
+  const appearanceCard = function (value, modes) {
+    return el("label", { class: "option-card" }, [
+      radio("appearance", value, request.appearance === value),
+      el("span", {}, [swatch({ "data-appearance-swatch": modes.join(" ") }, modes)]),
+    ]);
+  };
+  const themeCard = function (key) {
+    return el("label", { class: "option-card" }, [
+      radio("theme", key, key === request.theme),
+      el("span", {}, [swatch({}, ["light", "dark"])]),
+    ]);
+  };
+  // The appearance the page was drawn with, as the template reads it: Light or Dark, else
+  // Automatic.
+  const drawnAppearance = request.appearance === "light" || request.appearance === "dark" ? request.appearance : "auto";
+  const note = function (appearance) {
+    const attrs = { class: "field-hint", "data-brand-preview-note": appearance };
+    if (appearance !== drawnAppearance) { attrs.hidden = ""; }
+    return el("p", attrs);
+  };
+  const switchAttrs = { class: "brand-preview-switch" };
+  if (drawnAppearance !== "auto") { switchAttrs.hidden = ""; }
   const palettes = el("script", { type: "application/json", id: "brand-palettes" });
   palettes.textContent = JSON.stringify(request.palettes);
   const html = el("html", { lang: "en" }, [
@@ -229,12 +271,19 @@ function build(request) {
       el("div", { class: "brand-editor" }, [
         el("form", { class: "panel", method: "post" }, [
           el("input", { class: "control", id: "name", type: "text", name: "name", value: "Autumn" }),
-          radio("appearance", "auto", request.appearance === "auto"),
-          radio("appearance", "light", request.appearance === "light"),
-          radio("appearance", "dark", request.appearance === "dark"),
-        ].concat(request.themeCards.map(function (key) { return radio("theme", key, key === request.theme); }))),
+          el("fieldset", {}, [
+            appearanceCard("auto", ["light", "dark"]),
+            appearanceCard("light", ["light"]),
+            appearanceCard("dark", ["dark"]),
+          ]),
+          el("fieldset", {}, request.themeCards.map(themeCard)),
+        ]),
         el("section", { class: "brand-preview" }, [
-          el("fieldset", { class: "brand-preview-switch" }, [
+          el("p", { class: "field-hint" }),
+          note("auto"),
+          note("light"),
+          note("dark"),
+          el("fieldset", switchAttrs, [
             radio("brandPreviewMode", "light", true),
             radio("brandPreviewMode", "dark", false),
           ]),
@@ -250,7 +299,28 @@ function build(request) {
   return { doc: doc, win: win };
 }
 
+// swatchColors answers, for each SVG of a swatch, the color each token is drawn in.
+function swatchColors(span) {
+  return span.querySelectorAll("svg").map(function (svg) {
+    const colors = {};
+    for (const shape of svg.querySelectorAll("rect")) {
+      if (shape.hasAttribute("data-fill")) { colors[shape.getAttribute("data-fill")] = shape.getAttribute("fill"); }
+      if (shape.hasAttribute("data-stroke")) { colors[shape.getAttribute("data-stroke")] = shape.getAttribute("stroke"); }
+    }
+    return colors;
+  });
+}
+
 function look(doc) {
+  const swatches = { appearance: {}, theme: {} };
+  for (const card of doc.querySelectorAll("label.option-card")) {
+    const choice = card.querySelector("input");
+    swatches[choice.name][choice.value] = swatchColors(card.querySelector(".theme-swatch"));
+  }
+  const notes = {};
+  for (const n of doc.querySelectorAll("[data-brand-preview-note]")) {
+    notes[n.getAttribute("data-brand-preview-note")] = n.hidden;
+  }
   const samples = {};
   for (const s of doc.querySelectorAll("[data-brand-sample]")) {
     samples[s.getAttribute("data-brand-sample")] = { hidden: s.hidden, style: Object.assign({}, s.styleProps) };
@@ -261,7 +331,13 @@ function look(doc) {
       styledElsewhere.push(n.describe + " " + JSON.stringify(n.styleProps));
     }
   }
-  return { samples: samples, styledElsewhere: styledElsewhere };
+  return {
+    samples: samples,
+    styledElsewhere: styledElsewhere,
+    switchHidden: doc.querySelector(".brand-preview-switch").hidden,
+    notesHidden: notes,
+    swatches: swatches,
+  };
 }
 
 let input = "";
@@ -349,9 +425,17 @@ type previewSample struct {
 	Style  map[string]string `json:"style"`
 }
 
+// previewSwatch is the color each token of one SVG of a swatch is drawn in.
+type previewSwatch map[string]string
+
 type previewLook struct {
 	Samples         map[string]previewSample `json:"samples"`
 	StyledElsewhere []string                 `json:"styledElsewhere"`
+	SwitchHidden    bool                     `json:"switchHidden"`
+	NotesHidden     map[string]bool          `json:"notesHidden"`
+	// Swatches holds, for the appearance cards and the theme cards, each card's swatch by the
+	// card's value: one previewSwatch per mode it shows.
+	Swatches map[string]map[string][]previewSwatch `json:"swatches"`
 }
 
 // previewPage is the editor the stand-in document draws: the theme cards, which are the listed
@@ -535,4 +619,163 @@ func TestBrandPreviewJS_ShadowsAreUICSSs(t *testing.T) {
 	css := string(source)
 	assert.Contains(t, css, "  --shadow-panel: "+lightPanelShadow+";\n", "the light panel shadow")
 	assert.Contains(t, css, "      --shadow-panel: "+darkPanelShadow+";\n", "the dark panel shadow, under the dark variant")
+}
+
+// shownMode is the sample a look shows: "light", "dark", "none" or "both".
+func shownMode(look previewLook) string {
+	light, dark := !look.Samples["light"].Hidden, !look.Samples["dark"].Hidden
+	switch {
+	case light && dark:
+		return "both"
+	case light:
+		return "light"
+	case dark:
+		return "dark"
+	}
+	return "none"
+}
+
+// shownNotes are the sentences on the appearance a look shows.
+func shownNotes(look previewLook) []string {
+	shown := []string{}
+	for _, appearance := range []string{"auto", "light", "dark"} {
+		if hidden, ok := look.NotesHidden[appearance]; ok && !hidden {
+			shown = append(shown, appearance)
+		}
+	}
+	return shown
+}
+
+// The appearance decides the modes the preview shows (#811 decision 2): Automatic the switch,
+// starting on Light, and the sample it names; Light and Dark their one sample and no switch. The
+// sentence beside the preview says which applies. A form drawn with no appearance it knows, as a
+// refused one can be, is previewed as Automatic, the appearance a new brand starts with.
+func TestBrandPreviewJS_TheAppearanceDecidesTheModesShown(t *testing.T) {
+	for _, tc := range []struct {
+		appearance   string
+		wantMode     string
+		switchHidden bool
+		wantNotes    []string
+	}{
+		{appearance: "auto", wantMode: "light", switchHidden: false, wantNotes: []string{"auto"}},
+		{appearance: "light", wantMode: "light", switchHidden: true, wantNotes: []string{"light"}},
+		{appearance: "dark", wantMode: "dark", switchHidden: true, wantNotes: []string{"dark"}},
+		{appearance: "", wantMode: "light", switchHidden: false, wantNotes: []string{"auto"}},
+	} {
+		t.Run("drawn as "+tc.appearance, func(t *testing.T) {
+			looks := runBrandPreview(t, previewPage{themeCards: bothCards, theme: "plum", appearance: tc.appearance},
+				load(), lookAt())
+			assert.Equal(t, tc.wantMode, shownMode(looks[0]))
+			assert.Equal(t, tc.switchHidden, looks[0].SwitchHidden)
+			assert.Equal(t, tc.wantNotes, shownNotes(looks[0]))
+			assertSampleDrawn(t, looks[0].Samples["light"], previewPlum.Light, "light")
+			assertSampleDrawn(t, looks[0].Samples["dark"], previewPlum.Dark, "dark")
+		})
+	}
+}
+
+// Changing the appearance changes the preview at once. Light and Dark show their one sample
+// whatever the switch is on; back on Automatic the switch shows again, where it was left.
+func TestBrandPreviewJS_PickingAnAppearanceChangesThePreview(t *testing.T) {
+	looks := runBrandPreview(t, previewPage{themeCards: bothCards, theme: "blueberry", appearance: "auto"},
+		load(), pick("appearance", "dark"), lookAt(), pick("appearance", "light"), lookAt(),
+		pick("appearance", "auto"), lookAt(), pick("brandPreviewMode", "dark"), lookAt(),
+		pick("appearance", "light"), lookAt(), pick("appearance", "auto"), lookAt())
+
+	want := []struct {
+		mode         string
+		switchHidden bool
+		note         string
+	}{
+		{"dark", true, "dark"},
+		{"light", true, "light"},
+		{"light", false, "auto"},
+		{"dark", false, "auto"},
+		{"light", true, "light"},
+		{"dark", false, "auto"},
+	}
+	require.Len(t, looks, len(want))
+	for i, w := range want {
+		assert.Equal(t, w.mode, shownMode(looks[i]), "look %d: the sample shown", i)
+		assert.Equal(t, w.switchHidden, looks[i].SwitchHidden, "look %d: the switch hidden", i)
+		assert.Equal(t, []string{w.note}, shownNotes(looks[i]), "look %d: the sentence shown", i)
+		assertSampleDrawn(t, looks[i].Samples[w.mode], map[string]map[string]string{
+			"light": previewBlueberry.Light, "dark": previewBlueberry.Dark}[w.mode], w.mode)
+		assert.Empty(t, looks[i].StyledElsewhere, "look %d: only the samples are styled", i)
+	}
+}
+
+// swatchIn is the swatch of a palette as the brand_swatch partial draws it: its canvas, a card on
+// it with its line, two lines of text and a button.
+func swatchIn(palette map[string]string) previewSwatch {
+	swatch := previewSwatch{}
+	for _, token := range []string{"canvas", "surface", "line", "ink", "ink-muted", "brand"} {
+		swatch[token] = palette[token]
+	}
+	return swatch
+}
+
+// assertAppearanceSwatches holds the three Appearance cards to the theme's palettes: Automatic its
+// light and its dark one, Light its light one, Dark its dark one.
+func assertAppearanceSwatches(t *testing.T, look previewLook, theme previewTheme, msg string) {
+	t.Helper()
+	assert.Equal(t, map[string][]previewSwatch{
+		"auto":  {swatchIn(theme.Light), swatchIn(theme.Dark)},
+		"light": {swatchIn(theme.Light)},
+		"dark":  {swatchIn(theme.Dark)},
+	}, look.Swatches["appearance"], msg)
+}
+
+// The three Appearance cards' swatches are drawn in the theme the form holds, on load and on every
+// theme picked, and in the first listed theme for a theme the list lacks (#811 decision 4). Each
+// theme card's own swatch shows its fixed theme, as the server drew it.
+func TestBrandPreviewJS_TheAppearanceSwatchesFollowTheTheme(t *testing.T) {
+	looks := runBrandPreview(t, previewPage{themeCards: []string{"blueberry", "plum", "dragonfruit"}, theme: "plum", appearance: "dark"},
+		lookAt(), load(), lookAt(), pick("theme", "blueberry"), lookAt(), pick("theme", "plum"), lookAt(),
+		pick("theme", "dragonfruit"), lookAt())
+
+	stale := previewSwatch{"canvas": "#5e7a1e", "surface": "#5e7a1e", "line": "#5e7a1e", "ink": "#5e7a1e",
+		"ink-muted": "#5e7a1e", "brand": "#5e7a1e"}
+	assert.Equal(t, []previewSwatch{stale, stale}, looks[0].Swatches["appearance"]["auto"], "the page as the server drew it")
+
+	assert.Equal(t, "#c2b000", looks[1].Swatches["appearance"]["light"][0]["canvas"], "Plum's light canvas")
+	assert.Equal(t, "#c2d003", looks[1].Swatches["appearance"]["dark"][0]["line"], "Plum's dark line, the card's border")
+	assertAppearanceSwatches(t, looks[1], previewPlum, "on load, the theme the form holds")
+	assertAppearanceSwatches(t, looks[2], previewBlueberry, "Blueberry picked")
+	assertAppearanceSwatches(t, looks[3], previewPlum, "Plum picked again")
+	assertAppearanceSwatches(t, looks[4], previewBlueberry, "a theme the list lacks, in the first listed")
+
+	for i, look := range looks {
+		for _, key := range []string{"blueberry", "plum", "dragonfruit"} {
+			assert.Equal(t, []previewSwatch{stale, stale}, look.Swatches["theme"][key], "look %d: %s's card keeps its own swatch", i, key)
+		}
+		assert.Empty(t, look.StyledElsewhere, "look %d: the swatches' colors are attributes, never styles", i)
+	}
+}
+
+// A browser restoring the form, as on Back, fires no input: the appearance and theme it restores
+// decide the sample, the switch, the sentence and the Appearance swatches on pageshow.
+func TestBrandPreviewJS_PageshowDrawsTheRestoredAppearance(t *testing.T) {
+	for _, persisted := range []bool{true, false} {
+		t.Run(fmt.Sprintf("persisted=%v", persisted), func(t *testing.T) {
+			looks := runBrandPreview(t, previewPage{themeCards: bothCards, theme: "blueberry", appearance: "light"},
+				load(), restore("appearance", "auto"), restore("theme", "plum"), restore("brandPreviewMode", "dark"), lookAt(),
+				previewStep{Do: "pageshow", Persisted: persisted}, lookAt(),
+				restore("appearance", "light"), previewStep{Do: "pageshow", Persisted: persisted}, lookAt())
+
+			assert.Equal(t, "light", shownMode(looks[0]), "nothing is drawn before pageshow")
+			assert.True(t, looks[0].SwitchHidden)
+			assertAppearanceSwatches(t, looks[0], previewBlueberry, "nothing is drawn before pageshow")
+
+			assert.Equal(t, "dark", shownMode(looks[1]))
+			assert.False(t, looks[1].SwitchHidden)
+			assert.Equal(t, []string{"auto"}, shownNotes(looks[1]))
+			assertAppearanceSwatches(t, looks[1], previewPlum, "the restored theme")
+
+			assert.Equal(t, "light", shownMode(looks[2]))
+			assert.True(t, looks[2].SwitchHidden)
+			assert.Equal(t, []string{"light"}, shownNotes(looks[2]))
+			assertSampleDrawn(t, looks[2].Samples["light"], previewPlum.Light, "light")
+		})
+	}
 }

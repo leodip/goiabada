@@ -33,8 +33,14 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   drawn `hidden`. `static/pages/brand-preview.js` reads every theme's palettes from the
   `brand-palettes` data block, sets the chosen theme's 23 tokens, the mode's `--shadow-panel` and
   `color-scheme` on each sample alone through the CSSOM (never a `style` attribute or the page's
-  root), then shows the sample the Light/Dark switch names, on every input and `pageshow`. A form
-  holding a theme the list lacks is previewed in the first listed one. The script keeps its own copy
+  root), on every input and `pageshow`. The appearance decides what shows: Light or Dark its one
+  sample with the Light/Dark switch hidden, Automatic (or no appearance it knows) the switch and
+  the sample it names, and one `data-brand-preview-note` sentence saying which applies; the
+  template draws the switch and sentences for the form's appearance. The script also redraws the
+  three Appearance cards' swatches in the chosen theme: each `data-appearance-swatch` names its
+  modes, one SVG each in order, and `brand_swatch`'s shapes name their tokens in `data-fill` and
+  `data-stroke`; the theme cards' swatches keep their own theme. A form holding a theme the list
+  lacks is previewed in the first listed one. The script keeps its own copy
   of `ui.css`'s two panel shadows, which `TestBrandPreviewJS_ShadowsAreUICSSs` holds equal, and
   `brand_preview_script_test.go` runs it under Node against a stand-in of the editor. The samples'
   colors are the theme's, under a forced palette too; the editor's own controls are held to the

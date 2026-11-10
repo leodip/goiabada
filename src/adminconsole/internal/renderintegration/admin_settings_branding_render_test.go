@@ -271,11 +271,12 @@ func TestRender_AdminSettingsBrandingFormDrawsThePreview(t *testing.T) {
 			assert.Contains(t, editor, `<h2 class="brand-preview-title" id="brand-preview-title">Pré-visualização</h2>`)
 			assert.Contains(t, editor, "Uma amostra de uma página de entrada nesta marca, como o formulário está agora. A marca só muda quando você salva.")
 
-			// The switch, named, its two choices the appearances' names, on Light.
-			assert.Regexp(t, `<fieldset class="brand-preview-switch">\s*<legend class="field-label">Visualizar em</legend>`, editor)
+			// The switch, named, its two choices the appearances' names, on Light; a Dark brand
+			// draws it hidden, and says it is always dark.
+			assert.Regexp(t, `<fieldset class="brand-preview-switch" hidden>\s*<legend class="field-label">Visualizar em</legend>`, editor)
 			assert.Regexp(t, `<input type="radio" id="brand-preview-mode-light" name="brandPreviewMode" value="light" checked>\s*<span>Claro</span>`, editor)
 			assert.Regexp(t, `<input type="radio" id="brand-preview-mode-dark" name="brandPreviewMode" value="dark">\s*<span>Escuro</span>`, editor)
-			assert.NotRegexp(t, `brand-preview-switch"[^>]*hidden`, editor, "the switch shows")
+			assert.Contains(t, editor, `<p class="field-hint" data-brand-preview-note="dark">Esta marca é sempre escura.</p>`)
 
 			for _, mode := range []string{"light", "dark"} {
 				sample := sampleOf(t, editor, mode)
@@ -309,5 +310,89 @@ func TestRender_AdminSettingsBrandingFormDrawsThePreview(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The preview is drawn for the form's appearance (#811 decision 2): the sentence saying which
+// modes apply shown and the other two drawn hidden, for the script to show as the appearance
+// changes, and the switch shown only under Automatic, the appearance a form holding none it knows
+// is previewed as.
+func TestRender_AdminSettingsBrandingFormDrawsThePreviewForTheAppearance(t *testing.T) {
+	notes := map[string]string{
+		"auto":  `<p class="field-hint" data-brand-preview-note="auto">Os visitantes a veem clara ou escura, conforme o dispositivo deles.</p>`,
+		"light": `<p class="field-hint" data-brand-preview-note="light">Esta marca é sempre clara.</p>`,
+		"dark":  `<p class="field-hint" data-brand-preview-note="dark">Esta marca é sempre escura.</p>`,
+	}
+	for _, tc := range []struct {
+		appearance   string
+		shownNote    string
+		switchHidden bool
+	}{
+		{"auto", "auto", false},
+		{"light", "light", true},
+		{"dark", "dark", true},
+		{"sepia", "auto", false},
+	} {
+		t.Run(tc.appearance, func(t *testing.T) {
+			out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
+				"isNew":           true,
+				"brand":           adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: tc.appearance, Theme: "plum"},
+				"brandThemes":     renderThemes,
+				"appearanceTheme": renderThemes[1],
+			})
+			start := strings.Index(out, `<section class="brand-preview"`)
+			require.Positive(t, start)
+			preview := out[start:]
+
+			for appearance, note := range notes {
+				if appearance == tc.shownNote {
+					assert.Contains(t, preview, note, "the sentence for %s shows", appearance)
+				} else {
+					assert.Contains(t, preview, strings.Replace(note, `">`, `" hidden>`, 1), "the sentence for %s is hidden", appearance)
+				}
+			}
+			switchTag := regexp.MustCompile(`<fieldset class="brand-preview-switch"[^>]*>`).FindString(preview)
+			if tc.switchHidden {
+				assert.Equal(t, `<fieldset class="brand-preview-switch" hidden>`, switchTag)
+			} else {
+				assert.Equal(t, `<fieldset class="brand-preview-switch">`, switchTag)
+			}
+		})
+	}
+}
+
+// The three Appearance cards' swatches are marked for the preview's script, which redraws them in
+// the theme the form holds (#811 decision 4): each names the modes it shows, in order, and each
+// shape names the token its color is drawn from. The theme cards' swatches are not marked.
+func TestRender_AdminSettingsBrandingFormMarksTheAppearanceSwatches(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
+		"isNew":           true,
+		"brand":           adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: "auto", Theme: "plum"},
+		"brandThemes":     renderThemes,
+		"appearanceTheme": renderThemes[1],
+	})
+
+	swatches := regexp.MustCompile(`<span class="theme-swatch" aria-hidden="true"[^>]*>`).FindAllString(out, -1)
+	require.Len(t, swatches, 3+len(renderThemes))
+	assert.Equal(t, []string{
+		`<span class="theme-swatch" aria-hidden="true" data-appearance-swatch="light dark">`,
+		`<span class="theme-swatch" aria-hidden="true" data-appearance-swatch="light">`,
+		`<span class="theme-swatch" aria-hidden="true" data-appearance-swatch="dark">`,
+	}, swatches[:3], "the Automatic, Light and Dark cards, in order")
+	for _, swatch := range swatches[3:] {
+		assert.Equal(t, `<span class="theme-swatch" aria-hidden="true">`, swatch, "a theme card's swatch keeps its theme")
+	}
+
+	// Plum's light palette, on the Light card, each shape naming its token.
+	light := regexp.MustCompile(`(?s)data-appearance-swatch="light">(.*?)</span>`).FindStringSubmatch(out)
+	require.Len(t, light, 2)
+	for _, shape := range []string{
+		`<rect width="120" height="64" fill="#ba0001" data-fill="canvas"/>`,
+		`fill="#ba0002" stroke="#ba0003" vector-effect="non-scaling-stroke" data-fill="surface" data-stroke="line"/>`,
+		`fill="#ba0004" data-fill="ink"/>`,
+		`fill="#ba0005" data-fill="ink-muted"/>`,
+		`fill="#ba0006" data-fill="brand"/>`,
+	} {
+		assert.Contains(t, light[1], shape)
 	}
 }
