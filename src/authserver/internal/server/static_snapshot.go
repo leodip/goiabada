@@ -109,7 +109,8 @@ func (s *staticSnapshots) keep(name string, snapshot staticSnapshot) {
 	s.forgetLocked(name)
 	cost := staticSnapshotCost(name, snapshot)
 	if s.cost+cost > staticSnapshotsBudget {
-		clear(s.files)
+		// A new map, not clear: a cleared map keeps the storage its entries took, outside the budget.
+		s.files = map[string]staticSnapshot{}
 		s.cost = 0
 	}
 	s.files[name] = snapshot
