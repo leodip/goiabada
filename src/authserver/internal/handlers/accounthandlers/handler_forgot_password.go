@@ -279,9 +279,12 @@ func finishForgotPassword(
 	}
 	auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeCodeIssued)
 
+	// The link names the sign-in this page's URL named, when the id is well formed, so a reset in
+	// the browser holding it carries it on (#812 decision 9). The id is echoed, never looked up: the
+	// answer to the request was the same whatever it named, and so is what is decided here.
 	bind := map[string]interface{}{
 		"name": user.FullName(),
-		"link": emaillinks.ResetPasswordLink(baseURL, verificationCode),
+		"link": emaillinks.ResetPasswordLink(baseURL, verificationCode, registrationCeremonyId(r)),
 	}
 	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, user.PageLanguage, user.Locale))
 	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)

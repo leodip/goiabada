@@ -279,6 +279,7 @@
 "reset_password.code_invalid_link" = "Richiedi un nuovo link"
 "reset_password.modal_title" = "Password impostata"
 "reset_password.modal_body" = "La password è stata impostata. Ora puoi accedere con:"
+"reset_password.return_to_app_body" = "La password è stata impostata. Torna all'applicazione a cui stavi accedendo e accedi con la tua nuova password e questo indirizzo email:"
 
 # --- Generic error and not-found pages --------------------------------------
 

@@ -553,7 +553,7 @@ func HandleUserCreatePost(
 
 			bind := map[string]interface{}{
 				"name": name,
-				"link": emaillinks.ResetPasswordLink(baseURL, verificationCode),
+				"link": emaillinks.ResetPasswordLink(baseURL, verificationCode, ""),
 			}
 
 			// The email is the new user's, in their language by the rule every email to a user

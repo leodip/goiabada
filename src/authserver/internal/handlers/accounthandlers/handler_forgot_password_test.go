@@ -306,7 +306,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// shape and the absence of an address in it belong to emaillinks.ResetPasswordLink's own tests
 		// (#112 decision 5). Asserting the exact string here would pin the shape in a
 		// second place and let the two disagree.
-		assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode), emailedLink,
+		assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode, ""), emailedLink,
 			"the emailed link must be the shared builder's output for the code that was issued")
 
 		pageRenderer.AssertExpectations(t)
@@ -827,4 +827,63 @@ func TestForgotPasswordRequiresEmail(t *testing.T) {
 
 		assert.Equal(t, 1, calls)
 	})
+}
+
+// A request made on a forgot-password page whose URL names a sign-in mails a link naming it beside
+// the code; one naming an id of the wrong shape, or none, mails the code alone. The id is echoed
+// without being looked up, so the answer is the same page whatever it names (#812 decision 9).
+func TestHandleForgotPasswordPost_TheLinkNamesTheSignInThePageNamed(t *testing.T) {
+	const ceremonyId = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+	for _, tc := range []struct {
+		name      string
+		query     string
+		wantQuery []string
+		wantId    string
+	}{
+		{name: "a sign-in named", query: "?ceremony=" + ceremonyId, wantQuery: []string{"ceremony", "code"}, wantId: ceremonyId},
+		{name: "an id of the wrong shape", query: "?ceremony=" + ceremonyId + "x", wantQuery: []string{"code"}},
+		{name: "none", query: "", wantQuery: []string{"code"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			jobs := &heldJobs{}
+
+			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+			req := forgotPasswordRequest("existing@example.com")
+			req.URL.RawQuery = strings.TrimPrefix(tc.query, "?")
+			rr := httptest.NewRecorder()
+
+			user := &record.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true}
+			database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(user, nil)
+			expectLinkSentPage(pageRenderer, rr, req)
+			handler.ServeHTTP(rr, req)
+			require.Equal(t, http.StatusOK, rr.Code)
+
+			database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(1), "existing@example.com",
+				mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
+			var emailedLink string
+			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).
+				Run(func(args mock.Arguments) {
+					emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
+				}).Return(&bytes.Buffer{}, nil)
+			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil)
+			auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.Anything).Return().Once()
+
+			jobs.runAll(t, afterresponse.ClassRecovery)
+
+			link, err := url.Parse(emailedLink)
+			require.NoError(t, err)
+			assert.Equal(t, testBaseURL+"/reset-password", link.Scheme+"://"+link.Host+link.Path)
+			keys := []string{}
+			for key := range link.Query() {
+				keys = append(keys, key)
+			}
+			assert.ElementsMatch(t, tc.wantQuery, keys)
+			assert.Equal(t, tc.wantId, link.Query().Get("ceremony"))
+			assert.NotEmpty(t, link.Query().Get("code"))
+		})
+	}
 }

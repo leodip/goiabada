@@ -276,6 +276,7 @@
 "reset_password.code_invalid_link" = "Neuen Link anfordern"
 "reset_password.modal_title" = "Passwort festgelegt"
 "reset_password.modal_body" = "Ihr Passwort ist festgelegt. Sie können sich jetzt mit dieser E-Mail-Adresse anmelden:"
+"reset_password.return_to_app_body" = "Ihr Passwort ist festgelegt. Kehren Sie zu der Anwendung zurück, bei der Sie sich anmelden wollten, und melden Sie sich mit Ihrem neuen Passwort und dieser E-Mail-Adresse an:"
 
 # --- Generic error and not-found pages --------------------------------------
 

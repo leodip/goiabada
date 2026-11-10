@@ -259,6 +259,7 @@
 "reset_password.code_invalid_link" = "Solicitar um novo link"
 "reset_password.modal_title" = "Senha definida"
 "reset_password.modal_body" = "Sua senha foi definida. Agora você pode entrar com:"
+"reset_password.return_to_app_body" = "Sua senha foi definida. Volte ao aplicativo em que você estava entrando e entre com sua nova senha e este endereço de e-mail:"
 
 # --- Páginas genéricas de erro e não encontrada ------------------------------
 

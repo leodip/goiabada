@@ -60,8 +60,9 @@ type linkedSignInCeremonies interface {
 // formed and the browser holds that sign-in, as the client the request's pages are drawn for: the
 // page itself, a refusal beside its form, the pages answering it, and a guard's or a rate limiter's
 // refusal ahead of it (#812 decision 4). It is for the pages a sign-in links to, registration, forgot
-// password and activation, which carry the sign-in's id in their URL on a GET and on the POST of
-// their form alike, so it reads the URL's parameter whatever the method, and never a form body.
+// password, activation and password reset, which carry the sign-in's id in their URL on a GET and on
+// the POST of their form alike, so it reads the URL's parameter whatever the method, and never a form
+// body.
 //
 // A URL naming a sign-in the browser does not hold (another browser, or a sign-in that ended), a
 // malformed id, or none names no client, and the page is drawn in the default brand: on these pages

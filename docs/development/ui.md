@@ -21,9 +21,10 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `middleware.PageClient` puts an empty one on every page request, `middleware.SignInPageClient`
   names the client of the sign-in a step's request names on the step routes, ahead of their guards
   and limiters, and `/auth/authorize` names its client once the request reaches the client check.
-  `middleware.LinkedSignInPageClient` does the same on forgot password, registration and
-  activation, from the well-formed `ceremony` parameter of their URL on a GET and a POST alike,
-  while the browser holds that sign-in; the password page's links to the first two carry it.
+  `middleware.LinkedSignInPageClient` does the same on forgot password, registration, activation
+  and password reset, from the well-formed `ceremony` parameter of their URL on a GET and a POST
+  alike, while the browser holds that sign-in; the password page's links to the first two carry it,
+  and the activation and reset links mailed from them carry it through their first hop.
   `/auth/logout` names the client of a confirmed hint or, with no hint, `client_id`, and none for a
   rejected hint; its declining link carries that `client_id` to `/auth/logout/declined`, which
   names it for the look alone. The no-longer-active page forgets it. `render.RequestPageBrand` reads it for both layouts and the

@@ -120,9 +120,10 @@ func (s *Server) initRoutes(branches appBranches) {
 	legalDocumentPage := handlers.HandleLegalDocumentGet(httpHelper, s.database)
 	pages.Get("/legal/{shortName}", legalDocumentPage)
 	pages.Get("/legal/{shortName}/versions/{version}", legalDocumentPage)
-	// The pages a sign-in links to, forgot password, registration and activation, are drawn in the
-	// brand of the client of the sign-in their URL names, while the browser holds it, from ahead of
-	// every guard and limiter on them, so a refusal those write is drawn in it too (#812 decision 4).
+	// The pages a sign-in links to, forgot password, registration, activation and password reset, are
+	// drawn in the brand of the client of the sign-in their URL names, while the browser holds it, from
+	// ahead of every guard and limiter on them, so a refusal those write is drawn in it too (#812
+	// decisions 4 and 9).
 	linkedSignInPageClient := middleware.LinkedSignInPageClient(ceremonyStore)
 	// The email check runs ahead of the limiter, so a request refused for email being off spends
 	// no budget and is never answered 429 (#542).
@@ -132,8 +133,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	pages.With(linkedSignInPageClient, accounthandlers.ForgotPasswordRequiresEmail(httpHelper), accounthandlers.RequireForgotPasswordChallenge(httpHelper, s.challengeVerifier), rateLimiter.LimitForgotPwd).Post(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL))
 	// The two endpoints an emailed link points at register from the constants the links are
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
-	pages.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
-	pages.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL, notifier, logoutTokens))
+	pages.With(linkedSignInPageClient, rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
+	pages.With(linkedSignInPageClient, rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, ceremonyStore, s.database, passwordValidator, auditLogger, baseURL, adminConsoleBaseURL, notifier, logoutTokens))
 	// One discovery document at both well-known addresses, OIDC Discovery 1.0's and RFC 8414's, so
 	// the two cannot disagree: RFC 8414 section 3 allows more than one address and section 3.2 fields
 	// beyond its own. RFC 8414 section 3.1's path-suffixed form has no route; a reverse proxy serving

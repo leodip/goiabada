@@ -277,6 +277,7 @@
 "reset_password.code_invalid_link" = "Solicitar otro enlace"
 "reset_password.modal_title" = "Contraseña establecida"
 "reset_password.modal_body" = "Tu contraseña está lista. Ya puedes iniciar sesión con:"
+"reset_password.return_to_app_body" = "Tu contraseña está lista. Vuelve a la aplicación en la que estabas iniciando sesión e inicia sesión con tu nueva contraseña y este correo electrónico:"
 
 # --- Generic error and not-found pages --------------------------------------
 

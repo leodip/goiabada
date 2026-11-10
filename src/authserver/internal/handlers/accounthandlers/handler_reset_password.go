@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -296,10 +297,11 @@ func withResetUsersPageLanguage(r *http.Request, user *record.User) *http.Reques
 // HandleResetPasswordGet serves both halves of the reset link's journey.
 //
 // A request carrying ?code= is the emailed link being followed: it validates the code, marks
-// the session and answers 303 to the same path with no query, so the credential does not
+// the session and answers 303 to the same path without the code, so the credential does not
 // remain in the address bar, in browser history, or in the Referer of anything the page then
-// loads (#201, absorbed by #112 decision 1). A request with no query is that redirect
-// landing, and renders the form from the marker alone.
+// loads (#201, absorbed by #112 decision 1). A request with no code is that redirect landing,
+// and renders the form from the marker alone; the only query it keeps is the sign-in a reset
+// requested from an app's sign-in came from, which the form posts back (#812 decision 9).
 //
 // The link deliberately does NOT carry the address any more, which is what removes #112's
 // defect class: a '+' or a '%xx' in an address was mangled by form-urlencoded query parsing
@@ -418,20 +420,38 @@ func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession link
 	}
 
 	// 303 rather than 302, so the browser is required to follow with a GET regardless of
-	// what this request was, and the code is gone from the request target from here on.
-	http.Redirect(w, r, emaillinks.ResetPasswordPath, http.StatusSeeOther)
+	// what this request was, and the code is gone from the request target from here on. The
+	// sign-in the link names, when it names one of the right shape, stays on it, where the form
+	// posts it back (#812 decision 9): it is not a credential, and the password page's own URL
+	// carries it.
+	//nolint:gosec // G710: a fixed path, and an id whose shape is checked, encoded as its query
+	http.Redirect(w, r, emaillinks.ResetPasswordContinuation(registrationCeremonyId(r)), http.StatusSeeOther)
 }
 
+// HandleResetPasswordPost is the reset form's submission: it sets the password the link authorizes,
+// signs the user out everywhere, consumes the code and mails the account its notice.
+//
+// A reset requested from an app's sign-in carries that sign-in on (#812 decision 10): the link names
+// it, and the first hop keeps it in the URL this form posts to. When the browser holds it at the
+// password step, the password just set is recorded as proven on it (carryOnSignIn), through the one
+// operation the password page, registration and activation use, and the browser goes on into the app.
+// The reset itself is the same either way. Everywhere else it ends on its page as it always has, and
+// when the link named a sign-in, the page tells the person to go back to the application they were
+// signing in to and sign in with the new password, with My Account as a secondary link.
 func HandleResetPasswordPost(
 	pageRenderer PageRenderer,
 	httpSession linkMarkerSessionStore,
+	ceremonies signInCeremonies,
 	database resetPasswordDatabase,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
+	baseURL string,
 	adminConsoleBaseURL string,
 	notifier AccountNotifier,
 	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
+
+	proof := authflow.NewPasswordProof(auditLogger)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -622,19 +642,26 @@ func HandleResetPasswordPost(
 				"user_id", user.Id, "error", clearLinkMarkerErr)
 		}
 
-		bind := map[string]interface{}{
-			"passwordReset":       true,
-			"email":               user.Email,
-			"adminConsoleBaseUrl": adminConsoleBaseURL,
+		ceremonyId := registrationCeremonyId(r)
+		if !carryOnReset(w, r, ceremonies, proof, baseURL, ceremonyId, replaced, result.NewGeneration, passwordHash) {
+			bind := map[string]interface{}{
+				"passwordReset":       true,
+				"email":               user.Email,
+				"adminConsoleBaseUrl": adminConsoleBaseURL,
+				// The reset came from an app's sign-in this browser does not hold at its password
+				// step: opened in another browser, after that sign-in ended or went on, or lost
+				// before the save landed. The person goes back to the app.
+				"returnToApp": ceremonyId != "",
+			}
+
+			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
+			if err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+			}
 		}
 
-		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-		}
-
-		// The account's address is told its password was reset, after the commit and the page
-		// (#724), so a user whose mailbox someone else reads learns of it. The setup link an
+		// The account's address is told its password was reset, after the commit and the page, or
+		// the redirect into the app (#724), so a user whose mailbox someone else reads learns of it. The setup link an
 		// administrator emails a new user sets the account's first password, which replaces
 		// nothing and tells nobody (decision 6). The claim marked the address verified, so the
 		// notice goes to it as the verified address it now is. The notifier sends only with SMTP
@@ -645,4 +672,25 @@ func HandleResetPasswordPost(
 			notifier.Send(r, accountnotice.PasswordReset, to)
 		}
 	}
+}
+
+// carryOnReset carries on the sign-in a reset's link named (#812 decision 10), as carryOnSignIn
+// carries on registration's and activation's, and reports whether it answered. replaced is the
+// account as the reset read it under its own lock, before the claim, so whether it is enabled is
+// what the reset decided on, never a read made after it; a row the reset found gone or disabled
+// carries nothing on. The proof is recorded for the account as the reset left it: with the password
+// just set, passwordHash, and newGeneration, the authentication generation the reset advanced to
+// when it signed the user out everywhere, so the sign-in it carries on is not itself refused for the
+// generation it replaced.
+func carryOnReset(w http.ResponseWriter, r *http.Request, ceremonies signInCeremonies,
+	proof *authflow.PasswordProof, baseURL string, ceremonyId string, replaced *record.User,
+	newGeneration int64, passwordHash string) bool {
+
+	if replaced == nil || !replaced.Enabled {
+		return false
+	}
+	proven := *replaced
+	proven.PasswordHash = passwordHash
+	proven.AuthStateGeneration = newGeneration
+	return carryOnSignIn(w, r, ceremonies, proof, baseURL, ceremonyId, &proven)
 }

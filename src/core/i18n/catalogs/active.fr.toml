@@ -275,6 +275,7 @@
 "reset_password.code_invalid_link" = "Demander un nouveau lien"
 "reset_password.modal_title" = "Mot de passe défini"
 "reset_password.modal_body" = "Votre mot de passe est défini. Vous pouvez maintenant vous connecter avec :"
+"reset_password.return_to_app_body" = "Votre mot de passe est défini. Revenez à l’application à laquelle vous vous connectiez, et connectez-vous avec votre nouveau mot de passe et cette adresse e-mail :"
 
 # --- Generic error and not-found pages --------------------------------------
 

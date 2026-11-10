@@ -272,6 +272,7 @@
 "reset_password.code_invalid_link" = "Request a new link"
 "reset_password.modal_title" = "Password set"
 "reset_password.modal_body" = "Your password is set. You can now sign in with:"
+"reset_password.return_to_app_body" = "Your password is set. Go back to the application you were signing in to, and sign in with your new password and this email address:"
 
 # --- Generic error and not-found pages --------------------------------------
 

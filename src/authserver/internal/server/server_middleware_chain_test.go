@@ -229,16 +229,17 @@ func TestInitRoutes_TheSignInStepsNameTheirClientAheadOfTheirGuards(t *testing.T
 	}
 }
 
-// The pages a sign-in links to, forgot password, registration and activation, name the client of the
-// sign-in their URL names ahead of every guard and limiter they carry, so the refusals those write are
-// drawn in that client's brand; no other page route names one that way (#812 decision 4).
+// The pages a sign-in links to, forgot password, registration, activation and password reset, name the
+// client of the sign-in their URL names ahead of every guard and limiter they carry, so the refusals
+// those write are drawn in that client's brand; no other page route names one that way (#812
+// decisions 4 and 9).
 func TestInitRoutes_ThePagesASignInLinksToNameItsClientAheadOfTheirGuards(t *testing.T) {
 	s := newFaultsTestServer(datamocks.NewDatabase(t))
 	// By prefix: the compiler may name the closure LinkedSignInPageClient.func1 or, inlined, .1.
 	const namer = "github.com/leodip/goiabada/authserver/internal/middleware.LinkedSignInPageClient."
 	linked := []string{
 		"GET /forgot-password", "POST /forgot-password", "GET /account/register", "POST /account/register",
-		"GET /account/activate", "POST /account/activate",
+		"GET /account/activate", "POST /account/activate", "GET /reset-password", "POST /reset-password",
 	}
 
 	seen := map[string]bool{}

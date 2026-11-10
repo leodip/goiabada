@@ -475,7 +475,7 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	// This site's only job is to hand the issued code to the shared builder; the link's shape
 	// and the absence of an address in it belong to ResetPasswordLink's own tests (#112
 	// decision 5).
-	assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode), emailedLink,
+	assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode, ""), emailedLink,
 		"the emailed link must be the shared builder's output for the code that was issued")
 	require.NotNil(t, sent)
 	assert.Equal(t, "TestApp - create a password for your new account", sent.Subject)

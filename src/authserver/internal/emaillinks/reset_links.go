@@ -24,15 +24,29 @@ const ForgotPasswordPath = "/forgot-password"
 // ResetPasswordLink builds the password reset link emailed to a user, under the auth
 // server's public base URL, which the caller is handed at construction (#434).
 //
-// The link carries the verification code and nothing else. It used to carry the
+// The link carries the verification code, and no address. It used to carry the
 // address too, as ?email=<address>&code=<code>, which broke every address holding a
 // '+' or a '%' followed by two hex digits: Go parses a query with
 // form-urlencoded rules (WHATWG URL Standard section 5.1), where '+' decodes to a
 // space, so the address came back mangled and the lookup failed. Carrying only the
 // code removes the defect class rather than escaping around it, because the code's
 // alphabet is entirely RFC 3986 unreserved (#112).
-func ResetPasswordLink(baseURL, code string) string {
-	return baseURL + ResetPasswordPath + "?" + codeQuery(code)
+//
+// ceremonyId is the sign-in the forgot-password page's URL named, through the password
+// page's Forgot password? link, so that resetting in the browser that holds it carries
+// that sign-in on into the app, as an activation does (#812 decisions 9 and 10). Empty
+// for a request made on a page naming none, and for the setup link an administrator
+// sends a new user, whose links carry the code alone. The id's alphabet is RFC 3986
+// unreserved too.
+func ResetPasswordLink(baseURL, code, ceremonyId string) string {
+	return baseURL + linkWithSignIn(ResetPasswordPath, code, ceremonyId)
+}
+
+// ResetPasswordContinuation is where the reset link's first hop sends the browser:
+// ResetPasswordPath with the code gone and the sign-in the link carried kept, or with no
+// query when it carried none.
+func ResetPasswordContinuation(ceremonyId string) string {
+	return continuationWithSignIn(ResetPasswordPath, ceremonyId)
 }
 
 // AccountActivateLink builds the account activation link emailed to someone who has
@@ -43,21 +57,33 @@ func ResetPasswordLink(baseURL, code string) string {
 // anywhere else, whose link carries the code alone. The id's alphabet is RFC 3986
 // unreserved too.
 func AccountActivateLink(baseURL, code, ceremonyId string) string {
-	if ceremonyId == "" {
-		return baseURL + AccountActivatePath + "?" + codeQuery(code)
-	}
-	return baseURL + AccountActivatePath + "?" +
-		url.Values{"code": {code}, ceremony.QueryParameter: {ceremonyId}}.Encode()
+	return baseURL + linkWithSignIn(AccountActivatePath, code, ceremonyId)
 }
 
 // AccountActivateContinuation is where the activation link's first hop sends the
 // browser: AccountActivatePath with the code gone and the sign-in the link carried
 // kept, or with no query when it carried none.
 func AccountActivateContinuation(ceremonyId string) string {
+	return continuationWithSignIn(AccountActivatePath, ceremonyId)
+}
+
+// linkWithSignIn is path with the code, and the sign-in when ceremonyId is not empty, as
+// its query: the shape both emailed links share.
+func linkWithSignIn(path, code, ceremonyId string) string {
 	if ceremonyId == "" {
-		return AccountActivatePath
+		return path + "?" + codeQuery(code)
 	}
-	return AccountActivatePath + "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	return path + "?" + url.Values{"code": {code}, ceremony.QueryParameter: {ceremonyId}}.Encode()
+}
+
+// continuationWithSignIn is path with the sign-in alone as its query, or bare when
+// ceremonyId is empty: where both links' first hops send the browser once the code is
+// dropped.
+func continuationWithSignIn(path, ceremonyId string) string {
+	if ceremonyId == "" {
+		return path
+	}
+	return path + "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
 }
 
 // codeQuery encodes the one query parameter both links carry.
