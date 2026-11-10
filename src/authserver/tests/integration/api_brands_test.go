@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
@@ -80,6 +81,31 @@ func createBrandOverAPI(t *testing.T, accessToken string, created *[]int64, name
 	return id
 }
 
+// assertBrandReadsAsCreated checks that a read answers what the create did. The create answers the
+// timestamps it stamped; MySQL, PostgreSQL and SQL Server store them rounded to the microsecond, so
+// a read answers them within a microsecond of the create's.
+func assertBrandReadsAsCreated(t *testing.T, created, read map[string]any) {
+	t.Helper()
+	for _, field := range []string{"createdAt", "updatedAt"} {
+		createdAt, err := time.Parse(time.RFC3339Nano, created[field].(string))
+		require.NoError(t, err, "the create's %s", field)
+		readAt, err := time.Parse(time.RFC3339Nano, read[field].(string))
+		require.NoError(t, err, "the read's %s", field)
+		assert.WithinDuration(t, createdAt, readAt, time.Microsecond,
+			"a read answers the create's %s to the microsecond", field)
+	}
+	without := func(brand map[string]any) map[string]any {
+		rest := map[string]any{}
+		for key, value := range brand {
+			if key != "createdAt" && key != "updatedAt" {
+				rest[key] = value
+			}
+		}
+		return rest
+	}
+	assert.Equal(t, without(created), without(read), "a read answers what the create did")
+}
+
 func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	_, created := keepDefaultBrand(t)
@@ -108,7 +134,7 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 
 	status, body, _ = brandCall(t, accessToken, http.MethodGet, brandPath(id, ""), nil)
 	require.Equal(t, http.StatusOK, status)
-	assert.Equal(t, brand, body["brand"], "a read answers what the create did")
+	assertBrandReadsAsCreated(t, brand, body["brand"].(map[string]any))
 
 	renamed := brandName("Zest")
 	status, body, _ = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
