@@ -1722,6 +1722,13 @@
 "adminconsole.admin_branding.delete.confirm_field_label" = "Geben Sie zur Bestätigung den Namen der Marke ein"
 "adminconsole.admin_branding.delete.delete_button" = "Marke löschen"
 "adminconsole.admin_branding.delete.back_button" = "Zurück zu den Marken"
+"adminconsole.admin_branding.preview.title" = "Vorschau"
+"adminconsole.admin_branding.preview.description" = "Ein Beispiel einer Anmeldeseite in dieser Marke, so wie das Formular gerade steht. Die Marke ändert sich erst, wenn Sie speichern."
+"adminconsole.admin_branding.preview.auto_note" = "Besucher sehen sie hell oder dunkel, je nach ihrem Gerät."
+"adminconsole.admin_branding.preview.light_note" = "Diese Marke ist immer hell."
+"adminconsole.admin_branding.preview.dark_note" = "Diese Marke ist immer dunkel."
+"adminconsole.admin_branding.preview.mode_legend" = "Vorschau in"
+"adminconsole.admin_branding.preview.sample_lead" = "Geben Sie Ihre E-Mail-Adresse und Ihr Passwort ein, um fortzufahren."
 
 "adminconsole.admin_settings.tokens.page_title" = "Token-Einstellungen"
 "adminconsole.admin_settings.tokens.subtitle" = "Tokens"

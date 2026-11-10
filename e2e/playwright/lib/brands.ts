@@ -2,12 +2,13 @@
 // page of the auth server and the console is drawn in. Changing the default, or the default brand,
 // changes what the whole instance looks like, so the tests doing it are *.system.ts files, and put back
 // the default brand they found (withDefaultBrandRestored).
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { confirmDialog } from "./admin-console";
 import { env } from "./environment";
 
 export const brandingPath = "/admin/settings/branding";
 export const brandingUrl = `${env.adminUrl}${brandingPath}`;
+export const newBrandUrl = `${brandingUrl}/new`;
 
 export type Appearance = "auto" | "light" | "dark";
 
@@ -69,9 +70,84 @@ export async function fillBrandForm(page: Page, values: Partial<BrandValues>) {
   if (values.theme) await page.locator(`#theme-${values.theme}`).check();
 }
 
+// The brand editor's preview (#811): a sample of a sign-in page in each mode, drawn in the theme the
+// form holds, one shown at a time; the Light/Dark switch named "Preview in", shown under Automatic;
+// and the sentences saying what it shows.
+export type PreviewMode = "light" | "dark";
+
+export function brandPreview(page: Page): Locator {
+  return page.locator("section.brand-preview");
+}
+
+export function previewSample(page: Page, mode: PreviewMode): Locator {
+  return page.locator(`[data-brand-sample="${mode}"]`);
+}
+
+export function previewSwitch(page: Page): Locator {
+  return brandPreview(page).getByRole("group", { name: "Preview in", exact: true });
+}
+
+// Puts the switch on a mode, as a click on its choice does.
+export async function switchPreviewTo(page: Page, mode: PreviewMode) {
+  await page.locator(`#brand-preview-mode-${mode}`).check();
+}
+
+// Waits for the preview to be drawn: the script has styled the samples and shown one of them.
+export async function expectPreviewDrawn(page: Page) {
+  await expect(page.locator("[data-brand-sample]:visible")).toHaveCount(1);
+}
+
+// The colors a sample is drawn in, as the browser computes them: its canvas, the card's surface, the
+// primary button's brand and the text on it, the invalid Password field's danger border, the danger
+// notice's soft background and its ink, and the color-scheme the sample asks for.
+export interface SampleColors {
+  canvas: string;
+  surface: string;
+  brand: string;
+  onBrand: string;
+  danger: string;
+  dangerSoft: string;
+  dangerInk: string;
+  colorScheme: string;
+}
+
+export function sampleColors(sample: Locator): Promise<SampleColors> {
+  return sample.evaluate((sample) => {
+    const style = (selector: string) => getComputedStyle(sample.querySelector(selector)!);
+    const button = style(".button-primary");
+    const notice = style(".notice-danger");
+    return {
+      canvas: getComputedStyle(sample).backgroundColor,
+      surface: style(".auth-card").backgroundColor,
+      brand: button.backgroundColor,
+      onBrand: button.color,
+      danger: style('.control[aria-invalid="true"]').borderTopColor,
+      dangerSoft: notice.backgroundColor,
+      dangerInk: notice.color,
+      colorScheme: getComputedStyle(sample).colorScheme,
+    };
+  });
+}
+
+// What each Appearance card's swatch is drawn in, one entry per mode it shows, in order: the canvas
+// and the brand, as the attributes the shapes carry.
+export function appearanceSwatchFills(page: Page): Promise<Record<string, { canvas: string; brand: string }[]>> {
+  return page.evaluate(() => {
+    const fills: Record<string, { canvas: string; brand: string }[]> = {};
+    for (const card of Array.from(document.querySelectorAll<HTMLInputElement>('input[name="appearance"]'))) {
+      const swatch = card.closest("label")!.querySelector("[data-appearance-swatch]")!;
+      fills[card.value] = Array.from(swatch.querySelectorAll("svg"), (svg) => ({
+        canvas: svg.querySelector('[data-fill="canvas"]')!.getAttribute("fill")!,
+        brand: svg.querySelector('[data-fill="brand"]')!.getAttribute("fill")!,
+      }));
+    }
+    return fills;
+  });
+}
+
 // Fills and submits the new brand form, leaving the page wherever the console answers.
 export async function submitNewBrand(page: Page, values: BrandValues) {
-  await page.goto(`${brandingUrl}/new`);
+  await page.goto(newBrandUrl);
   await fillBrandForm(page, values);
   await page.locator("#btnCreate").click();
 }

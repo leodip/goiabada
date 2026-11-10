@@ -233,9 +233,10 @@ func TestSendEmail_ACancelledCallerEndsTheSend(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	// The clock starts before the timer, so the cancellation lands at least cancelAfter after it.
+	started := time.Now()
 	time.AfterFunc(cancelAfter, cancel)
 
-	started := time.Now()
 	_, err := sender.SendEmail(ctx, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",

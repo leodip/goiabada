@@ -132,7 +132,7 @@ below is about the e2e suite.
 
 Tests sit under `playwright/tests/`, one folder per area: the admin console (`admin-console/sign-in`,
 `admin-console/shell`, `admin-console/clients/`, `resources/`, `groups/`, `users/`, `legal-documents/`,
-`account/` and `settings/`), the test app (`testapp/`: a user signing in to its web apps, its SPA and its API, single
+`account/`, `settings/` and `branding/`), the test app (`testapp/`: a user signing in to its web apps, its SPA and its API, single
 sign-on across its two sites, signing out, being told when a session ends, the authorization parameters, and the auth server's own
 pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), DPoP through the
 real proxy (`rfc9449/`, proofs signed by `lib/dpop.ts` with Node's built-in crypto), the protocol
@@ -140,9 +140,10 @@ itself where no page reaches it (`oauth/`), the Turnstile challenge on the auth 
 Cloudflare's test keys (`turnstile/`), and accessibility (`accessibility/`: axe over every page and
 state of both applications in the light and the dark scheme, the layout at phone and tablet widths,
 the main journeys by keyboard, and the focused field kept clear of the console's header). Every spec
-runs in Chromium; `tests/accessibility/focus-not-obscured.spec.ts` runs in Firefox and WebKit too, as
-the `firefox` and `webkit` projects, since how a browser scrolls a focused field into view is its
-engine's own code. They run eight at a time against an
+runs in Chromium; `tests/accessibility/focus-not-obscured.spec.ts` and
+`tests/admin-console/branding/preview.spec.ts` run in Firefox and WebKit too, as the `firefox` and
+`webkit` projects, since how a browser scrolls a focused field into view, and how it restores a form
+after Back, is its engine's own code. They run eight at a time against an
 environment that stays up between runs, so every test keeps to these rules, which is what lets the
 suite run again and again without a reset:
 
@@ -171,7 +172,7 @@ suite run again and again without a reset:
   worker's session. A run signs the administrator in about sixteen times, and the rate-limits suite
   once, under the seeded cap of 20 sessions per user, and the sessions the cap ends are the least
   recently used, those earlier runs left. The Firefox and WebKit projects add a worker each, since
-  their one spec runs its tests in order on one worker.
+  each runs its two specs on one worker (`playwright.config.ts`).
 - **It imports `test` from `lib/fixtures.ts`**, whose watcher fails a test in which a page of the auth
   server or the admin console reported a Content-Security-Policy violation, such as an inline script
   or an `eval` the servers' `script-src 'self'` refused, in any browser context the test or a helper

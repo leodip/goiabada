@@ -1721,6 +1721,13 @@
 "adminconsole.admin_branding.delete.confirm_field_label" = "Pour confirmer, saisissez le nom de la marque"
 "adminconsole.admin_branding.delete.delete_button" = "Supprimer la marque"
 "adminconsole.admin_branding.delete.back_button" = "Retour aux marques"
+"adminconsole.admin_branding.preview.title" = "Aperçu"
+"adminconsole.admin_branding.preview.description" = "Un exemple de page de connexion dans cette marque, selon le formulaire tel qu’il est. La marque ne change que lorsque vous enregistrez."
+"adminconsole.admin_branding.preview.auto_note" = "Les visiteurs la voient claire ou sombre, selon leur appareil."
+"adminconsole.admin_branding.preview.light_note" = "Cette marque est toujours claire."
+"adminconsole.admin_branding.preview.dark_note" = "Cette marque est toujours sombre."
+"adminconsole.admin_branding.preview.mode_legend" = "Aperçu en"
+"adminconsole.admin_branding.preview.sample_lead" = "Saisissez votre adresse e-mail et votre mot de passe pour continuer."
 
 "adminconsole.admin_settings.tokens.page_title" = "Paramètres des jetons"
 "adminconsole.admin_settings.tokens.subtitle" = "Jetons"

@@ -1,6 +1,6 @@
 {{define "title"}}{{ if .isNew }}{{ T $.ctx "adminconsole.admin_branding.new.page_title" }}{{ else }}{{ T $.ctx "adminconsole.admin_branding.brand.page_title_prefix" }} – {{ .storedBrand.Name }}{{ end }} – {{ .appName }}{{end}}
 {{define "menu"}}{{ template "admin_menu" . }}{{end}}
-{{define "head"}}{{end}}
+{{define "head"}}<script src="{{ asset "/static/pages/brand-preview.js" }}" defer></script>{{end}}
 
 {{define "page"}}
 <div class="page-header">
@@ -26,11 +26,15 @@
   {{ end }}{{ end }}
 </div>
 
+{{/* The editor is two panes (#811): the form, and beside it the preview, outside the form, so
+     nothing in it is submitted. In a window too narrow for both, the preview follows the form. */}}
+<div class="brand-editor">
 {{/* errorField names the field a refusal is about: the name input, or the appearance or theme
      cards, which are marked invalid, described by the notice, and focused, the first card of a
      group. A refusal naming no field leaves the focus on the name. The swatches are drawn from
      the palettes the auth server lists: each theme card shows its light and its dark palette,
-     and the appearance cards show the form's theme in the light, the dark or both. */}}
+     and the appearance cards show the form's theme in the light, the dark or both, each marked
+     with the modes it shows, in order, so brand-preview.js redraws them as the theme changes. */}}
 <form class="panel" method="post" novalidate>
   <div class="panel-body stacked">
     {{ if .error }}
@@ -63,12 +67,12 @@
 
     <fieldset{{ if .error }}{{ if eq .errorField "appearance" }} aria-describedby="brand-error"{{ end }}{{ end }}>
       <legend class="field-label mb-3">{{ T $.ctx "adminconsole.admin_branding.brand.field.appearance" }}</legend>
-      <div class="grid gap-3 md:grid-cols-3">
+      <div class="option-grid">
         <label class="option-card">
           <input type="radio" id="appearance-auto" name="appearance" value="auto"{{ if eq .brand.Appearance "auto" }} checked{{ end }} aria-labelledby="appearance-name-auto" aria-describedby="appearance-hint-auto"
             {{- if .error }}{{ if eq .errorField "appearance" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
           <span class="grid min-w-0 flex-1 gap-1">
-            <span class="theme-swatch" aria-hidden="true">{{ template "brand_swatch" .appearanceTheme.Light }}{{ template "brand_swatch" .appearanceTheme.Dark }}</span>
+            <span class="theme-swatch" aria-hidden="true" data-appearance-swatch="light dark">{{ template "brand_swatch" .appearanceTheme.Light }}{{ template "brand_swatch" .appearanceTheme.Dark }}</span>
             <span class="choice-label" id="appearance-name-auto">{{ T $.ctx "adminconsole.admin_branding.appearance.auto" }}</span>
             <span class="field-hint" id="appearance-hint-auto">{{ T $.ctx "adminconsole.admin_branding.appearance.auto_hint" }}</span>
           </span>
@@ -77,7 +81,7 @@
           <input type="radio" id="appearance-light" name="appearance" value="light"{{ if eq .brand.Appearance "light" }} checked{{ end }} aria-labelledby="appearance-name-light" aria-describedby="appearance-hint-light"
             {{- if .error }}{{ if eq .errorField "appearance" }} aria-invalid="true"{{ end }}{{ end }}>
           <span class="grid min-w-0 flex-1 gap-1">
-            <span class="theme-swatch" aria-hidden="true">{{ template "brand_swatch" .appearanceTheme.Light }}</span>
+            <span class="theme-swatch" aria-hidden="true" data-appearance-swatch="light">{{ template "brand_swatch" .appearanceTheme.Light }}</span>
             <span class="choice-label" id="appearance-name-light">{{ T $.ctx "adminconsole.admin_branding.appearance.light" }}</span>
             <span class="field-hint" id="appearance-hint-light">{{ T $.ctx "adminconsole.admin_branding.appearance.light_hint" }}</span>
           </span>
@@ -86,7 +90,7 @@
           <input type="radio" id="appearance-dark" name="appearance" value="dark"{{ if eq .brand.Appearance "dark" }} checked{{ end }} aria-labelledby="appearance-name-dark" aria-describedby="appearance-hint-dark"
             {{- if .error }}{{ if eq .errorField "appearance" }} aria-invalid="true"{{ end }}{{ end }}>
           <span class="grid min-w-0 flex-1 gap-1">
-            <span class="theme-swatch" aria-hidden="true">{{ template "brand_swatch" .appearanceTheme.Dark }}</span>
+            <span class="theme-swatch" aria-hidden="true" data-appearance-swatch="dark">{{ template "brand_swatch" .appearanceTheme.Dark }}</span>
             <span class="choice-label" id="appearance-name-dark">{{ T $.ctx "adminconsole.admin_branding.appearance.dark" }}</span>
             <span class="field-hint" id="appearance-hint-dark">{{ T $.ctx "adminconsole.admin_branding.appearance.dark_hint" }}</span>
           </span>
@@ -96,7 +100,7 @@
 
     <fieldset{{ if .error }}{{ if eq .errorField "theme" }} aria-describedby="brand-error"{{ end }}{{ end }}>
       <legend class="field-label mb-3">{{ T $.ctx "adminconsole.admin_branding.brand.field.theme" }}</legend>
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="option-grid">
         {{ range $i, $theme := .brandThemes }}
         <label class="option-card">
           <input type="radio" id="theme-{{ $theme.Key }}" name="theme" value="{{ $theme.Key }}"{{ if eq $theme.Key $.brand.Theme }} checked{{ end }} aria-labelledby="theme-name-{{ $theme.Key }}"
@@ -119,6 +123,36 @@
     {{ end }}
   </div>
 </form>
+
+{{/* The preview: the Light/Dark switch, what it shows said in text, and a sample of a sign-in page
+     in each mode, which brand-preview.js draws in the theme the form holds, from the palettes the
+     brand-palettes data block hands it, and shows one at a time. The appearance decides which:
+     Light and Dark their one sample, with no switch, and Automatic the sample the switch names.
+     One sentence says which applies. The switch on the heading's line, and the sentence in the
+     paragraph saying what the preview shows, keep the whole preview on a 1280×800 screen beside
+     the form. The page is drawn for the form's appearance, a form holding none it knows as
+     Automatic, and the script follows the appearance as it changes. */}}
+{{ $previewAppearance := "auto" }}{{ if eq .brand.Appearance "light" "dark" }}{{ $previewAppearance = .brand.Appearance }}{{ end }}
+<section class="brand-preview" aria-labelledby="brand-preview-title">
+  <div class="brand-preview-header">
+    <h2 class="brand-preview-title" id="brand-preview-title">{{ T $.ctx "adminconsole.admin_branding.preview.title" }}</h2>
+    <fieldset class="brand-preview-switch"{{ if ne $previewAppearance "auto" }} hidden{{ end }}>
+      <legend class="field-label">{{ T $.ctx "adminconsole.admin_branding.preview.mode_legend" }}</legend>
+      <label class="choice"><input type="radio" id="brand-preview-mode-light" name="brandPreviewMode" value="light" checked>
+        <span>{{ T $.ctx "adminconsole.admin_branding.appearance.light" }}</span></label>
+      <label class="choice"><input type="radio" id="brand-preview-mode-dark" name="brandPreviewMode" value="dark">
+        <span>{{ T $.ctx "adminconsole.admin_branding.appearance.dark" }}</span></label>
+    </fieldset>
+  </div>
+  <p class="field-hint"><span>{{ T $.ctx "adminconsole.admin_branding.preview.description" }}</span>
+    <span data-brand-preview-note="auto"{{ if ne $previewAppearance "auto" }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_branding.preview.auto_note" }}</span>
+    <span data-brand-preview-note="light"{{ if ne $previewAppearance "light" }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_branding.preview.light_note" }}</span>
+    <span data-brand-preview-note="dark"{{ if ne $previewAppearance "dark" }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_branding.preview.dark_note" }}</span></p>
+  {{ template "brand_sample" (args "light" $.ctx $.appName) }}
+  {{ template "brand_sample" (args "dark" $.ctx $.appName) }}
+</section>
+</div>
+<script type="application/json" id="brand-palettes">{{ .brandThemes }}</script>
 {{ if not .isNew }}{{ if not .storedBrand.IsDefault }}
 {{ template "modal_dialog" (args "makeDefault" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_branding.brand.make_default_button") (T $.ctx "adminconsole.admin_branding.brand.make_default_title")) }}
 {{ end }}{{ end }}

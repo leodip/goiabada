@@ -1718,6 +1718,13 @@
 "adminconsole.admin_branding.delete.confirm_field_label" = "To confirm, type the brand's name"
 "adminconsole.admin_branding.delete.delete_button" = "Delete brand"
 "adminconsole.admin_branding.delete.back_button" = "Back to the brands"
+"adminconsole.admin_branding.preview.title" = "Preview"
+"adminconsole.admin_branding.preview.description" = "A sample of a sign-in page in this brand, as the form stands now. The brand changes only when you save."
+"adminconsole.admin_branding.preview.auto_note" = "Visitors see it light or dark, following their device."
+"adminconsole.admin_branding.preview.light_note" = "This brand is always light."
+"adminconsole.admin_branding.preview.dark_note" = "This brand is always dark."
+"adminconsole.admin_branding.preview.mode_legend" = "Preview in"
+"adminconsole.admin_branding.preview.sample_lead" = "Enter your email and password to continue."
 
 "adminconsole.admin_settings.tokens.page_title" = "Token settings"
 "adminconsole.admin_settings.tokens.subtitle" = "Tokens"

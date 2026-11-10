@@ -2,6 +2,7 @@ package adminsettingshandlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -412,6 +413,47 @@ func TestHandleBrandDeletePost_Refusals(t *testing.T) {
 			assert.Equal(t, tc.message, bind["error"])
 			assert.Equal(t, tc.deleted, apiClient.deletedId)
 			assert.Equal(t, 0, cache.invalidations)
+		})
+	}
+}
+
+// The brand editor hands its preview script every listed theme's light and dark palette, in the
+// auth server's order, as the page's palettes data block encodes them: the new form, a stored
+// brand's page and a refused form alike, whatever theme the form holds.
+func TestBrandEditor_HandsThePreviewEveryThemesPalettes(t *testing.T) {
+	const want = `[{"key":"blueberry","light":{"canvas":"#000001","surface":"#000002"},"dark":{"canvas":"#000003","surface":"#000004"}},` +
+		`{"key":"plum","light":{"canvas":"#000011","surface":"#000012"},"dark":{"canvas":"#000013","surface":"#000014"}}]`
+
+	draw := map[string]func(httpHelper *handlersmocks.HttpHelper){
+		"new form": func(httpHelper *handlersmocks.HttpHelper) {
+			HandleBrandNewGet(httpHelper, newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
+				handlertest.Request(http.MethodGet, "/admin/settings/branding/new", handlertest.WithAccessToken()))
+		},
+		"stored brand": func(httpHelper *handlersmocks.HttpHelper) {
+			HandleBrandGet(httpHelper, newSettingsTestStore(), newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
+				handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
+					handlertest.WithPathValue("brandId", "4")))
+		},
+		"refused form": func(httpHelper *handlersmocks.HttpHelper) {
+			apiClient := newBrandingAPI()
+			apiClient.writeErr = refusal("handler.brand.theme_invalid", "Not that.")
+			HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
+				httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit",
+					handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", "4"),
+					handlertest.WithForm(url.Values{"name": {"Autumn"}, "appearance": {"auto"}, "theme": {"guava"}})))
+		},
+	}
+	for name, drawPage := range draw {
+		t.Run(name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
+
+			drawPage(httpHelper)
+
+			encoded, err := json.Marshal(handlertest.Bind(t, httpHelper)["brandThemes"])
+			require.NoError(t, err)
+			assert.JSONEq(t, want, string(encoded))
 		})
 	}
 }

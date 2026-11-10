@@ -25,12 +25,37 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `border-line`, never a raw value, and every pair a component draws text or a boundary on is in
   `TestThemeContrast_EveryPairMeetsWCAGAA`, at WCAG AA in both modes of every preset and 7:1 for
   High contrast's text.
+- **Brand preview**: the brand editor (`admin_settings_branding_brand.html`) is two panes (#811),
+  `brand-editor`: the form, and outside it the `brand-preview`, held in view beside the form from
+  75rem and below it in a narrower window. The `brand_sample` partial draws a refused sign-in, once
+  per mode, with the auth server's card components and, wherever the sign-in page has one, its own
+  message; its fields, buttons and link are spans, and each sample is `inert`, `aria-hidden` and
+  drawn `hidden`. `static/pages/brand-preview.js` reads every theme's palettes from the
+  `brand-palettes` data block, sets the chosen theme's 23 tokens, the mode's `--shadow-panel` and
+  `color-scheme` on each sample alone through the CSSOM (never a `style` attribute or the page's
+  root), on every input and `pageshow`. The appearance decides what shows: Light or Dark its one
+  sample with the Light/Dark switch hidden, Automatic (or no appearance it knows) the switch and
+  the sample it names, and one `data-brand-preview-note` sentence saying which applies; the
+  template draws the switch and sentences for the form's appearance. The switch on the heading's
+  line, the sentences sharing one paragraph, the column's width and close spacing keep the whole
+  preview on a 1280×800 screen beneath the header in every built-in language;
+  `preview.spec.ts` measures it at 1280×800 and 1440×900, so check it there after adding to the
+  preview. The script also redraws the
+  three Appearance cards' swatches in the chosen theme: each `data-appearance-swatch` names its
+  modes, one SVG each in order, and `brand_swatch`'s shapes name their tokens in `data-fill` and
+  `data-stroke`; the theme cards' swatches keep their own theme. A form holding a theme the list
+  lacks is previewed in the first listed one. The script keeps its own copy
+  of `ui.css`'s two panel shadows, which `TestBrandPreviewJS_ShadowsAreUICSSs` holds equal, and
+  `brand_preview_script_test.go` runs it under Node against a stand-in of the editor. The samples'
+  colors are the theme's, under a forced palette too; the editor's own controls are held to the
+  page's contrast requirement.
 - **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
   `panel`, `panel-body` (several, each under a `panel-title`, for a panel in sections),
   `panel-footer`; `button`, with `-primary` for a form's one main action, `-danger`, `-quiet`,
   `-sm`, `-icon` and `-block`; `field`, holding `field-label`, a `control`, `field-hint` and
   `field-error`; `input-row` for a control and the button acting on it; `choice`, `switch`,
-  `option-card`, `check-list` of `check-row`; `detail-list`, a `dl` of a record's facts; `notice`
+  `option-card`, in an `option-grid` where cards reflow to their column's width, `check-list` of
+  `check-row`; `detail-list`, a `dl` of a record's facts; `notice`
   with `-danger`, `-positive`, `-caution` or `-note`; `tag`; `table-scroll` around a `data-table`;
   `tab-bar` and `tab-item`, one underlined row while the tabs fit and rows of pills where they do
   not, which `shell.js` decides, so a bar never scrolls sideways; `pager`; `dialog`; `empty-state`;

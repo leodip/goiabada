@@ -41,12 +41,14 @@ type BrandForm struct {
 }
 
 // BrandThemeOption is one theme card: the key the form sends, the theme's name in words, and the
-// light and dark palettes its swatch is drawn in, as the auth server answered them.
+// light and dark palettes its swatch is drawn in, as the auth server answered them. The editor
+// hands the list to its preview script in a JSON data block (#811), each theme as its key and its
+// two palettes; the name is the card's alone.
 type BrandThemeOption struct {
-	Key   string
-	Name  string
-	Light map[string]string
-	Dark  map[string]string
+	Key   string            `json:"key"`
+	Name  string            `json:"-"`
+	Light map[string]string `json:"light"`
+	Dark  map[string]string `json:"dark"`
 }
 
 // brandErrorFields maps the refusals a brand's save can meet to the field each is about: the four
