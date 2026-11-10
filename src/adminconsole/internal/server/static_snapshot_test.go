@@ -116,19 +116,27 @@ func TestServeStaticFiles_AFileOverTheSnapshotLimitIsStreamedAndKeptFiveMinutes(
 	assert.Equal(t, staticLongCache, rr.Header().Get("Cache-Control"))
 }
 
-// A file that grows past the snapshot limit while it is read is not read further: it is streamed
-// as an oversized file is, kept five minutes even by the fingerprint of what it grew to.
+// A file that grows past the snapshot limit while it is read is not read further: the snapshot's
+// read stops a byte past the limit, and the file is streamed as an oversized file is, kept five
+// minutes even by the fingerprint of what it grew to.
 func TestServeStaticFiles_AFileGrowingPastTheSnapshotLimitWhileReadIsStreamed(t *testing.T) {
 	originalAt := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	grown := bytes.Repeat([]byte("a"), staticSnapshotLimit+1)
-	s := newStaticSnapshotTestServer(t, newEditedInPlaceFS(t, []byte("body { color: blue; }"), originalAt,
-		[][]byte{grown}, originalAt.Add(24*time.Hour)))
+	grown := bytes.Repeat([]byte("a"), 4*staticSnapshotLimit)
+	fsys := &countingFS{FS: newEditedInPlaceFS(t, []byte("body { color: blue; }"), originalAt,
+		[][]byte{grown}, originalAt.Add(24*time.Hour))}
+	s := newStaticSnapshotTestServer(t, fsys)
+	target := "/static/probe.css?v=" + staticFingerprint(grown)
 
-	rr := serveStaticRequest(s, "/static/probe.css?v="+staticFingerprint(grown), nil)
+	ranged := serveStaticRequest(s, target, http.Header{"Range": {"bytes=0-0"}})
+	require.Equal(t, http.StatusPartialContent, ranged.Code)
+	assert.Equal(t, "a", ranged.Body.String())
+	assert.Equal(t, staticShortCache, ranged.Header().Get("Cache-Control"))
+	assert.Less(t, fsys.read.Load(), int64(2*staticSnapshotLimit), "the snapshot's read stops past the limit")
 
-	require.Equal(t, http.StatusOK, rr.Code)
-	assert.True(t, bytes.Equal(grown, rr.Body.Bytes()), "the grown file is streamed whole")
-	assert.Equal(t, staticShortCache, rr.Header().Get("Cache-Control"))
+	whole := serveStaticRequest(s, target, nil)
+	require.Equal(t, http.StatusOK, whole.Code)
+	assert.True(t, bytes.Equal(grown, whole.Body.Bytes()), "the grown file is streamed whole")
+	assert.Equal(t, staticShortCache, whole.Header().Get("Cache-Control"))
 }
 
 // A file is read once for every request naming it while its size and modification date stay the
