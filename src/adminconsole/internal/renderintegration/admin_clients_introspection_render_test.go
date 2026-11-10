@@ -142,7 +142,7 @@ func serveClientTab(t *testing.T, handler http.HandlerFunc, tab, locale string) 
 	t.Helper()
 	req := handlertest.Request(http.MethodGet, "/admin/clients/7/"+tab,
 		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
-		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"}))
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test"}))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, locale))
 	rec := httptest.NewRecorder()
 

@@ -55,7 +55,6 @@ func (settingsCarrierApiClient) VerifyAccountEmail(context.Context, string, *api
 func publicSettings(smtpEnabled bool) *api.PublicSettingsResponse {
 	return &api.PublicSettingsResponse{
 		AppName:     "Goiabada",
-		UITheme:     "dark",
 		SMTPEnabled: smtpEnabled,
 		Issuer:      "https://issuer.example",
 	}

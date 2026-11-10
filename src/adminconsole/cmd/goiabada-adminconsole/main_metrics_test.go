@@ -225,7 +225,7 @@ func stubAuthServer(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/api/public/settings":
-			_, _ = w.Write([]byte(`{"appName":"Goiabada","issuer":"https://auth.example.test","uiTheme":"light","smtpEnabled":false}`))
+			_, _ = w.Write([]byte(`{"appName":"Goiabada","issuer":"https://auth.example.test","smtpEnabled":false}`))
 		case "/auth/token":
 			_, _ = w.Write([]byte(`{"access_token":"a-session-token","token_type":"Bearer","expires_in":300}`))
 		default:

@@ -160,7 +160,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
-	api.Get("/api/public/settings", handlers.HandlePublicSettingsGet(s.database))
+	api.Get("/api/public/settings", handlers.HandlePublicSettingsGet(s.database, baseURL))
 
 	// One route boundary and one client-error responder, shared by every ceremony route: the
 	// ceremony load, its id check, the state gate, the step redirects and the error responses to a

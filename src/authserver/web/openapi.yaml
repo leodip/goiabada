@@ -3526,9 +3526,9 @@ paths:
       tags: [Settings]
       summary: Get public settings
       description: |
-        The settings the admin console reads before anyone holds a token: the app name, the UI
-        theme, whether SMTP is configured, the issuer, the password rules, and whether users can
-        delete their own account. This is a public endpoint that does not require
+        The settings the admin console reads before anyone holds a token: the app name, whether
+        SMTP is configured, the issuer, the default brand, the password rules, and whether users
+        can delete their own account. This is a public endpoint that does not require
         authentication.
       operationId: getPublicSettings
       security: []
@@ -8147,9 +8147,6 @@ components:
       properties:
         appName:
           type: string
-        uiTheme:
-          type: string
-          description: The name of the UI theme the pages use.
         smtpEnabled:
           type: boolean
           description: When true, SMTP is configured, so the auth server can send email.
@@ -8161,15 +8158,37 @@ components:
           description: >-
             When true, users can delete their own account from their account pages in the admin
             console. The same setting as accountDeletionEnabled in the general settings.
+        brand:
+          $ref: '#/components/schemas/PublicBrandResponse'
         passwordRules:
           $ref: '#/components/schemas/PasswordRulesResponse'
       required:
         - appName
-        - uiTheme
         - smtpEnabled
         - issuer
         - accountDeletionEnabled
         - passwordRules
+
+    PublicBrandResponse:
+      type: object
+      description: >-
+        The default brand, which every page of the auth server and the admin console is drawn in.
+        Absent from the public settings when the auth server cannot read the default brand; pages
+        are then drawn automatic, in the built-in colors.
+      properties:
+        appearance:
+          type: string
+          enum: [auto, light, dark]
+          description: Light or dark, or auto to follow each visitor's device.
+        stylesheetUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's stylesheet, which a page links after main.css. The URL
+            changes whenever the stylesheet does.
+      required:
+        - appearance
+        - stylesheetUrl
 
     PasswordRulesResponse:
       type: object

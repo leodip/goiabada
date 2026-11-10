@@ -30,7 +30,6 @@ func TestHandleNewGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, "/admin/users/new",
 				handlertest.WithSettings(&api.PublicSettingsResponse{
 					AppName:     "Goiabada",
-					UITheme:     "dark",
 					SMTPEnabled: smtpEnabled,
 					Issuer:      "https://issuer.example",
 				}))

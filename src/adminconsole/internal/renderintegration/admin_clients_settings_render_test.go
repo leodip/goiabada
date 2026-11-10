@@ -245,7 +245,7 @@ func postClientSettings(t *testing.T, apiClient *settingsTabAPI, form url.Values
 	t.Helper()
 	req := handlertest.Request(http.MethodPost, "/admin/clients/7/settings",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
-		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"}),
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test"}),
 		handlertest.WithForm(form))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 	rec := httptest.NewRecorder()

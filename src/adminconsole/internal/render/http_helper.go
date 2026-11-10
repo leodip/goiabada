@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
@@ -170,7 +171,13 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 		data = map[string]interface{}{}
 	}
 	data["appName"] = settings.AppName
-	data["uiTheme"] = settings.UITheme
+	// A page is drawn in the default brand the auth server publishes: the layouts write
+	// brandDataTheme on the html element and link brandStylesheet after main.css, as the auth
+	// server's own layouts do (#810 decision 3). The stylesheet URL is the auth server's, linked as
+	// given. Given no brand, as by an auth server older than brands, a page is drawn automatic in
+	// main.css's colors. uiTheme is no longer bound, so a layout copied from an older release draws
+	// every page automatic.
+	data["brandDataTheme"], data["brandStylesheet"] = pageBrand(settings.Brand)
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled
 	// The account menu lists Delete account only while users may delete their own account (#783
@@ -325,4 +332,17 @@ func (h *Renderer) EncodeJSON(w http.ResponseWriter, r *http.Request, data inter
 	if err != nil {
 		h.JSONError(w, r, err)
 	}
+}
+
+// pageBrand is what a page takes from the published brand: the data-theme its html element carries,
+// light or dark, or empty for automatic and for an appearance the console does not know, and the
+// URL it links the brand's stylesheet by, or empty for none.
+func pageBrand(brand *api.PublicBrandResponse) (dataTheme string, stylesheet string) {
+	if brand == nil {
+		return "", ""
+	}
+	if brand.Appearance == "light" || brand.Appearance == "dark" {
+		dataTheme = brand.Appearance
+	}
+	return dataTheme, brand.StylesheetURL
 }

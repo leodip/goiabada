@@ -302,20 +302,25 @@ func TestRenderTemplate_Binds(t *testing.T) {
 	t.Run("Layout settings reach the template", func(t *testing.T) {
 		layoutFS := fstest.MapFS{
 			"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
-			"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}")},
+			"page.html": {Data: []byte("{{define \"content\"}}{{.appName}}|{{.brandDataTheme}}|{{.brandStylesheet}}|" +
+				"{{.smtpEnabled}}|{{.uiTheme}}{{end}}")},
 		}
 		layoutHelper := New(layoutFS, nil)
 		req := httptest.NewRequest("GET", "/", nil)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &api.PublicSettingsResponse{
-			AppName:     "sentinel app",
-			UITheme:     "sentinel theme",
+			AppName: "sentinel app",
+			Brand: &api.PublicBrandResponse{
+				Appearance:    "dark",
+				StylesheetURL: "https://auth.example.test/brand/7/stylesheet.css?v=0123456789ab",
+			},
 			SMTPEnabled: true,
 		}))
 
 		body, err := renderPage(layoutHelper, req, "layouts/layout.html", "page.html", map[string]interface{}{})
 
 		require.NoError(t, err)
-		assert.Equal(t, "<html>sentinel app|sentinel theme|true</html>", body)
+		// uiTheme is no longer bound: a layout copied from an older release draws automatic.
+		assert.Equal(t, "<html>sentinel app|dark|https://auth.example.test/brand/7/stylesheet.css?v=0123456789ab|true|</html>", body)
 	})
 
 	// Every application route runs under middleware.SettingsCache, so a render without settings is

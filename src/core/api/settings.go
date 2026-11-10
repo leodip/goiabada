@@ -27,9 +27,14 @@ import (
 // what ends that.
 type PublicSettingsResponse struct {
 	AppName     string `json:"appName"`
-	UITheme     string `json:"uiTheme"`
 	SMTPEnabled bool   `json:"smtpEnabled"`
 	Issuer      string `json:"issuer"`
+
+	// Brand is the default brand, which the admin console draws every page in, as the auth server
+	// draws its own (#810 decision 3). It is absent when the auth server cannot read the default
+	// brand, and from an auth server older than brands; the console then draws its pages automatic,
+	// in the built-in colors.
+	Brand *PublicBrandResponse `json:"brand,omitempty"`
 
 	// AccountDeletionEnabled is whether users may delete their own account, which the admin
 	// console's account menu and page read, as SMTPEnabled gates Email verification. It is a
@@ -38,6 +43,15 @@ type PublicSettingsResponse struct {
 	AccountDeletionEnabled bool `json:"accountDeletionEnabled"`
 
 	PasswordRules PasswordRulesResponse `json:"passwordRules"`
+}
+
+// PublicBrandResponse is what a page drawn in the default brand takes from it: its appearance, auto,
+// light or dark, and the absolute URL of its stylesheet, which a page links after main.css. The URL
+// is opaque to the admin console, which links it as given and never builds one (#810 decision 3).
+// The same stylesheet is served to anyone, so neither value discloses anything a page does not.
+type PublicBrandResponse struct {
+	Appearance    string `json:"appearance"`
+	StylesheetURL string `json:"stylesheetUrl"`
 }
 
 // PasswordRulesResponse is what the stored password policy asks of a new password, as data: the

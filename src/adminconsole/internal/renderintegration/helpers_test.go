@@ -73,7 +73,7 @@ func renderPageAt(t *testing.T, path, layout, page string, bind map[string]inter
 	idTokenClaims jwt.MapClaims, locale string, smtpEnabled bool) string {
 
 	t.Helper()
-	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: smtpEnabled}
+	settings := &api.PublicSettingsResponse{AppName: "Test", SMTPEnabled: smtpEnabled}
 	return renderPageWith(t, path, layout, page, bind, idTokenClaims, locale, settings)
 }
 

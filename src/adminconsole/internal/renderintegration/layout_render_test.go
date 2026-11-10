@@ -27,7 +27,7 @@ import (
 // mentions the console's base URL as a string to assert against (#279).
 func TestRender_NotFoundPage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin/clients/not-a-number/settings", nil)
-	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
+	settings := &api.PublicSettingsResponse{AppName: "Test", SMTPEnabled: true}
 	req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 

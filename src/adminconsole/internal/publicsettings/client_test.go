@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/stretchr/testify/assert"
@@ -94,7 +95,8 @@ func TestClient_ReadsTheSettingsItIsGiven(t *testing.T) {
 		assert.Equal(t, "/api/public/settings", r.URL.Path)
 		assert.Equal(t, http.MethodGet, r.Method)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"appName":"Goiabada","issuer":"https://auth.example.com","uiTheme":"dark"}`))
+		_, _ = w.Write([]byte(`{"appName":"Goiabada","issuer":"https://auth.example.com",` +
+			`"brand":{"appearance":"dark","stylesheetUrl":"https://auth.example.com/brand/7/stylesheet.css?v=0123456789ab"}}`))
 	}))
 	t.Cleanup(server.Close)
 
@@ -103,7 +105,26 @@ func TestClient_ReadsTheSettingsItIsGiven(t *testing.T) {
 
 	assert.Equal(t, "Goiabada", settings.AppName)
 	assert.Equal(t, "https://auth.example.com", settings.Issuer)
-	assert.Equal(t, "dark", settings.UITheme)
+	require.NotNil(t, settings.Brand)
+	assert.Equal(t, api.PublicBrandResponse{
+		Appearance:    "dark",
+		StylesheetURL: "https://auth.example.com/brand/7/stylesheet.css?v=0123456789ab",
+	}, *settings.Brand)
+}
+
+// An auth server that publishes no brand, as one older than brands does during a rollout, gives
+// the console none, which draws its pages automatic in the built-in colors (#810 decision 3).
+func TestClient_ReadsNoBrandWhenNoneIsPublished(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"appName":"Goiabada","uiTheme":"dark","issuer":"https://auth.example.com"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	settings, err := NewClient(server.URL, nil, nil).GetPublicSettings(context.Background())
+	require.NoError(t, err)
+
+	assert.Nil(t, settings.Brand)
 }
 
 // The failure arm keeps the status and whatever the auth server said, which is what the middleware

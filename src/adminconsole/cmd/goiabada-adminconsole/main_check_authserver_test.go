@@ -21,7 +21,7 @@ const checkAuthServerRefusal = "check-authserver takes no arguments: it reads th
 	"internal CA file from the environment, so run goiabada-adminconsole check-authserver alone\n"
 
 // publicSettingsBody is the auth server's answer at /api/public/settings, as it writes it.
-const publicSettingsBody = `{"appName":"Goiabada","uiTheme":"light","smtpEnabled":false,"issuer":"https://auth.example.test"}`
+const publicSettingsBody = `{"appName":"Goiabada","smtpEnabled":false,"issuer":"https://auth.example.test"}`
 
 // uncheckableEnvironment is an environment the console refuses at start and check-authserver
 // reads none of: a TZ naming no zone, a malformed number and a malformed boolean, no session keys

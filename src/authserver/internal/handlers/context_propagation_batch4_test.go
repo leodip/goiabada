@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,15 +38,17 @@ func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 	jsonWriter.AssertExpectations(t)
 }
 
-// The accept arm for the settings read.
+// The accept arm for the settings read, and the default brand's.
 func TestPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	database.On("GetSettingsById", theRequestsContext(), mock.Anything, int64(1)).
 		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
+	database.On("GetDefaultBrand", theRequestsContext(), (*sql.Tx)(nil)).
+		Return(&record.Brand{Id: 1, Appearance: record.BrandAppearanceAuto, Theme: "blueberry"}, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandlePublicSettingsGet(database).ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/api/v1/public/settings"))
+	HandlePublicSettingsGet(database, "https://auth.example.test").ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/api/v1/public/settings"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)

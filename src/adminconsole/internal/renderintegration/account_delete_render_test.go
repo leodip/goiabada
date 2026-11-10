@@ -32,7 +32,7 @@ const (
 )
 
 func deletionOn(on bool) *api.PublicSettingsResponse {
-	return &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true, AccountDeletionEnabled: on}
+	return &api.PublicSettingsResponse{AppName: "Test", SMTPEnabled: true, AccountDeletionEnabled: on}
 }
 
 // renderDeletePage draws /account/delete in English with deletion on.

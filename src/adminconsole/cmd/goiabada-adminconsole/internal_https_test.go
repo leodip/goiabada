@@ -149,7 +149,7 @@ func newRecordingTLSAuthServer(t *testing.T, leaf tls.Certificate, record func(p
 		case "/auth/token":
 			_, _ = w.Write([]byte(`{"access_token":"at","token_type":"Bearer","expires_in":3600}`))
 		case "/api/public/settings":
-			_, _ = w.Write([]byte(`{"appName":"Goiabada","uiTheme":"","smtpEnabled":false,"issuer":"https://auth.example.test"}`))
+			_, _ = w.Write([]byte(`{"appName":"Goiabada","smtpEnabled":false,"issuer":"https://auth.example.test"}`))
 		case "/api/v1/admin/settings/general":
 			_, _ = w.Write([]byte(`{"appName":"Goiabada","issuer":"https://auth.example.test"}`))
 		case "/api/v1/sessions/create":

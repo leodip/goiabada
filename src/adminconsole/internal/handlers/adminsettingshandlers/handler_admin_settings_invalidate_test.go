@@ -50,7 +50,7 @@ func (a settingsSaveAPI) UpdateSettingsEmail(context.Context, string, *api.Updat
 }
 
 func (a settingsSaveAPI) GetSettingsUITheme(context.Context, string) (*api.SettingsUIThemeResponse, error) {
-	return &api.SettingsUIThemeResponse{UITheme: "light", AvailableThemes: []string{"light", "dark"}}, nil
+	return &api.SettingsUIThemeResponse{AvailableThemes: []string{"light", "dark"}}, nil
 }
 
 func (a settingsSaveAPI) UpdateSettingsUITheme(context.Context, string, *api.UpdateSettingsUIThemeRequest) (*api.SettingsUIThemeResponse, error) {

@@ -42,7 +42,7 @@ func TestGerman_AdminPageUsesQueryOrAustrianHeader(t *testing.T) {
 func TestGerman_ConsoleRefusalIsRenderedOnItsForm(t *testing.T) {
 	req := handlertest.Request(http.MethodPost, "/admin/resources/7/delete",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "7"),
-		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"}),
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test"}),
 		handlertest.WithLocale("de-AT"),
 		handlertest.WithForm(url.Values{"resourceIdentifier": {"shipping"}}))
 	w := httptest.NewRecorder()

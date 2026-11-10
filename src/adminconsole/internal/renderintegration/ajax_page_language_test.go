@@ -65,7 +65,7 @@ func TestRender_LayoutsPublishTheCatalogLanguage(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req.Header.Set("Accept-Language", acceptLanguage)
 				req = req.WithContext(reqctx.WithSettings(req.Context(),
-					&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"}))
+					&api.PublicSettingsResponse{AppName: "Test"}))
 				w := httptest.NewRecorder()
 				var renderErr error
 				i18n.Locale(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
