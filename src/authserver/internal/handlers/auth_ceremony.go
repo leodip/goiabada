@@ -127,7 +127,11 @@ func (b *CeremonyBoundary) rejectCeremonyMismatch(w http.ResponseWriter, r *http
 // (rejectCeremonyMismatch), a step whose save found another ceremony in the session
 // (answerCeremonyReplaced), and /auth/completed's bind that found a newer sign-in already on the
 // session (#538).
+//
+// It is drawn in the default brand, also when the request named a sign-in the browser held when it
+// arrived: the page acts on no sign-in, so it takes no client's brand (#812).
 func (b *CeremonyBoundary) renderCeremonyNoLongerActive(w http.ResponseWriter, r *http.Request) {
+	reqctx.ForgetPageClient(r.Context())
 	bind := map[string]interface{}{
 		"title":       i18n.T(r.Context(), "auth_error.ceremony_mismatch.title"),
 		"error":       i18n.T(r.Context(), "auth_error.ceremony_mismatch.message"),

@@ -124,7 +124,7 @@ func TestPublicSettings_AnswersNoBrandWhenTheDefaultCannotBeRead(t *testing.T) {
 		{name: "a failed read", err: errors.New("the database went away"), wantLog: "unable to read the default brand"},
 		{name: "a theme none of the built-in ones",
 			brand:   &record.Brand{Id: 3, Name: "Odd", Appearance: record.BrandAppearanceDark, Theme: "mango"},
-			wantLog: "unable to link the default brand's stylesheet"},
+			wantLog: "unable to link the brand's stylesheet"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)

@@ -146,6 +146,11 @@ type AuthorizePageRefusal struct {
 	// ImplicitFlow is whether the request asks for tokens rather than a code, for
 	// AuthorizePageRefusalFormPostUnreachable, so the page names the modes that request may use.
 	ImplicitFlow bool
+	// ClientId is the client_id of a request refused once its client is known: at or after the
+	// check of its client_id and redirect_uri. The page is drawn in that client's brand when it names
+	// one, enabled or not. It is empty for a refusal made before, whose page is drawn in the default
+	// brand (#812).
+	ClientId string
 }
 
 // AuthorizePageRefusalReason is why a request is answered on the refusal page.
@@ -540,17 +545,19 @@ func refuseUnaddressableAuthorizeRequest(ctx context.Context, validator authoriz
 	}
 
 	// RFC 6749 section 4.1.2.1 forbids sending a bad client_id or redirect_uri anywhere, so the page
-	// is the whole answer.
+	// is the whole answer. From here on the client is known, and every refusal names it.
+	clientId := params.Get("client_id")
 	err := validator.ValidateClientAndRedirectURI(ctx, &protocolvalidation.ValidateClientAndRedirectURIInput{
 		RequestId:    requestId,
-		ClientId:     params.Get("client_id"),
+		ClientId:     clientId,
 		RedirectURI:  params.Get("redirect_uri"),
 		ResponseType: params.Get("response_type"),
 	})
 	if err != nil {
 		var localizedErr *i18n.LocalizedError
 		if errors.As(err, &localizedErr) {
-			return &AuthorizePageRefusal{Reason: AuthorizePageRefusalClientOrRedirectURI, ClientRefusal: localizedErr}, nil
+			return &AuthorizePageRefusal{Reason: AuthorizePageRefusalClientOrRedirectURI, ClientRefusal: localizedErr,
+				ClientId: clientId}, nil
 		}
 		return nil, err
 	}
@@ -564,7 +571,7 @@ func refuseUnaddressableAuthorizeRequest(ctx context.Context, validator authoriz
 	// the query names a mode this server understands and may not use for tokens, which ValidateRequest
 	// refuses by redirect, in the fragment (#231).
 	if !protocolvalidation.IsSupportedResponseMode(params.Get("response_mode")) {
-		return &AuthorizePageRefusal{Reason: AuthorizePageRefusalUnsupportedResponseMode}, nil
+		return &AuthorizePageRefusal{Reason: AuthorizePageRefusalUnsupportedResponseMode, ClientId: clientId}, nil
 	}
 
 	// response_mode=form_post answers through an HTML form whose action is the redirect URI, and
@@ -580,7 +587,8 @@ func refuseUnaddressableAuthorizeRequest(ctx context.Context, validator authoriz
 		redirectURI, err := url.Parse(params.Get("redirect_uri"))
 		if err != nil || (redirectURI.Scheme != "http" && redirectURI.Scheme != "https") {
 			return &AuthorizePageRefusal{Reason: AuthorizePageRefusalFormPostUnreachable,
-				ImplicitFlow: protocolvalidation.ParseResponseType(params.Get("response_type")).IsImplicitFlow()}, nil
+				ImplicitFlow: protocolvalidation.ParseResponseType(params.Get("response_type")).IsImplicitFlow(),
+				ClientId:     clientId}, nil
 		}
 	}
 

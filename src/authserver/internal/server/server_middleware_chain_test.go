@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -79,7 +80,8 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/i18n.Locale.func1",
 	)
 
-	// The page branch alone refreshes the browser session, ahead of the first read of it, so the
+	// The page branch alone carries the client a page is drawn for, which starts as none (#812). It
+	// alone refreshes the browser session, ahead of the first read of it, so the
 	// touch can send the session cookie again (#743 decisions 8 and 9), behind NoStore, so every
 	// answer that can carry that cookie is no-store, the router's 405 included. It then applies a
 	// known user's page language, over what the locale middleware resolved; the protocol endpoints
@@ -87,6 +89,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	// faults as the page branch does, and draws no page.
 	wantPages := append(append(append([]string{}, wantRoot...),
 		"github.com/leodip/goiabada/authserver/internal/middleware.NoStore.func1",
+		"github.com/leodip/goiabada/authserver/internal/middleware.PageClient.func1",
 		"github.com/leodip/goiabada/core/sessionstore.Refreshing"),
 		wantApp[len(wantRoot):]...)
 	wantPages = append(wantPages,
@@ -178,4 +181,50 @@ func TestInitRoutes_OnlyPagesRefreshTheBrowserSession(t *testing.T) {
 	require.NoError(t, err)
 	assert.Positive(t, pages, "page routes are registered")
 	assert.Positive(t, others, "other routes are registered")
+}
+
+// The sign-in's step routes name the client of the sign-in a request names ahead of every guard and
+// limiter they carry, so the refusals those write, the rate limiter's above all, are drawn in that
+// client's brand. The authorization and sign-out routes do not: /auth/authorize names its client
+// once the request reaches the client check, and a sign-out names no sign-in (#812).
+func TestInitRoutes_TheSignInStepsNameTheirClientAheadOfTheirGuards(t *testing.T) {
+	s := newFaultsTestServer(datamocks.NewDatabase(t))
+	// By prefix: the compiler may name the closure SignInPageClient.func1 or, inlined, .1.
+	const namer = "github.com/leodip/goiabada/authserver/internal/middleware.SignInPageClient."
+	steps := []string{
+		"GET /auth/level1", "GET /auth/level1completed", "GET /auth/level2", "GET /auth/completed",
+		"GET /auth/issue", "GET /auth/pwd", "POST /auth/pwd", "GET /auth/otp", "POST /auth/otp",
+		"GET /auth/recovery-codes", "POST /auth/recovery-codes", "GET /auth/legal-acceptance",
+		"POST /auth/legal-acceptance", "GET /auth/consent", "POST /auth/consent",
+	}
+
+	seen := map[string]bool{}
+	err := s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		key := method + " " + route
+		if !strings.HasPrefix(route, "/auth/") {
+			return nil
+		}
+		names := make([]string, len(middlewares))
+		for i, mounted := range middlewares {
+			names[i] = runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name()
+		}
+		at := slices.IndexFunc(names, func(name string) bool { return strings.HasPrefix(name, namer) })
+		if !slices.Contains(steps, key) {
+			assert.Equal(t, -1, at, "%s names no sign-in's client", key)
+			return nil
+		}
+		seen[key] = true
+		if assert.NotEqual(t, -1, at, "%s names the client of its sign-in: %v", key, names) {
+			assert.Equal(t, 1, strings.Count(strings.Join(names, " "), namer), key)
+			for _, guard := range names[:at] {
+				assert.NotContains(t, guard, "RateLimiter", "%s limits ahead of naming its client", key)
+				assert.NotContains(t, guard, "Challenge", "%s challenges ahead of naming its client", key)
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	for _, step := range steps {
+		assert.True(t, seen[step], "the route table has %s", step)
+	}
 }

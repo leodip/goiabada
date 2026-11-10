@@ -75,6 +75,12 @@ func HandleAuthorizeGet(
 			return
 		}
 
+		// Past a page refusal the request's client is known, and the error response, a form_post
+		// above all, and the 500 of a save that failed are drawn in its brand (#812).
+		if result.PageRefusal == nil && result.AuthContext != nil {
+			reqctx.NamePageClient(r.Context(), result.AuthContext.ClientId)
+		}
+
 		switch {
 		case result.PageRefusal != nil:
 			answerAuthorizePageRefusal(pageRenderer, w, r, result.PageRefusal)
@@ -139,6 +145,10 @@ func renderAuthorizeRefusal(pageRenderer PageRenderer, w http.ResponseWriter, r 
 // is the whole answer to such a request.
 func answerAuthorizePageRefusal(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
 	refusal *authflow.AuthorizePageRefusal) {
+
+	// A refusal made once the request's client is known is drawn in that client's brand, and one
+	// made before in the default (#812).
+	reqctx.NamePageClient(r.Context(), refusal.ClientId)
 
 	switch refusal.Reason {
 	case authflow.AuthorizePageRefusalUnusableHandle:

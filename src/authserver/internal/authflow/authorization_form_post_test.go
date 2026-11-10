@@ -59,7 +59,8 @@ func TestAuthorization_FormPostToAPrivateUseSchemeIsRefusedOnThePage(t *testing.
 	}
 
 	for _, tc := range testCases {
-		want := &AuthorizePageRefusal{Reason: AuthorizePageRefusalFormPostUnreachable, ImplicitFlow: tc.wantImplicit}
+		want := &AuthorizePageRefusal{Reason: AuthorizePageRefusalFormPostUnreachable, ImplicitFlow: tc.wantImplicit,
+			ClientId: "test-client"}
 		params := formPostParams(tc.responseType, "form_post", tc.redirectURI)
 
 		t.Run("GET "+tc.responseType+" "+tc.redirectURI, func(t *testing.T) {

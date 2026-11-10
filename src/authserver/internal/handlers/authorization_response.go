@@ -303,15 +303,15 @@ func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI stri
 	return nil
 }
 
-// formPostTemplate is the form_post page: the template set form_post.html is read from, and the
-// default brand it is drawn in, which a nil brands leaves automatic in the built-in colors.
+// formPostTemplate is the form_post page: the template set form_post.html is read from, and where it
+// reads the brand it is drawn in, which a nil brands leaves automatic in the built-in colors.
 type formPostTemplate struct {
 	fs     fs.FS
-	brands render.DefaultBrandReader
+	brands render.PageBrandReader
 }
 
-// formPostPage is what the form_post page shows around the response it carries: its language, the
-// default brand's data-theme and stylesheet, the text in the reader's language, and the stylesheet
+// formPostPage is what the form_post page shows around the response it carries: its language, its
+// brand's data-theme and stylesheet, the text in the reader's language, and the stylesheet
 // and script by their fingerprints. The page is parsed alone, with no layout and none of the
 // renderer's template functions, so every value it shows arrives here (#617).
 type formPostPage struct {
@@ -331,10 +331,11 @@ type formPostPage struct {
 var formPostAssetURL = render.NewAssetURLs(web.StaticFS())
 
 // newFormPostPage is the form_post page's presentation for a request in ctx under settings, drawn in
-// the default brand brands reads as the layouts are drawn: data-theme for a light or dark brand and
-// none for an automatic one, and the brand's stylesheet after main.css. A brand that cannot be read
-// leaves the page automatic in main.css's colors, and the response is still delivered.
-func newFormPostPage(ctx context.Context, settings *record.Settings, brands render.DefaultBrandReader) (formPostPage, error) {
+// the brand brands reads as the layouts are drawn (render.RequestPageBrand): the brand of the client
+// the response goes to, which ctx names, or the default. Its data-theme for a light or dark brand
+// and none for an automatic one, and the brand's stylesheet after main.css. A brand that cannot be
+// read leaves the page automatic in main.css's colors, and the response is still delivered.
+func newFormPostPage(ctx context.Context, settings *record.Settings, brands render.PageBrandReader) (formPostPage, error) {
 	stylesheet, err := formPostAssetURL("/static/main.css")
 	if err != nil {
 		return formPostPage{}, err
@@ -343,7 +344,7 @@ func newFormPostPage(ctx context.Context, settings *record.Settings, brands rend
 	if err != nil {
 		return formPostPage{}, err
 	}
-	brand := render.DefaultPageBrand(ctx, brands)
+	brand := render.RequestPageBrand(ctx, brands)
 	return formPostPage{
 		Lang:            i18n.CatalogTag(ctx),
 		Theme:           brand.DataTheme,

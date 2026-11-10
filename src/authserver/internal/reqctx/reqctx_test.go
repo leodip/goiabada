@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// present reports which of the eight values ctx carries, so a test can say which it expects.
+// present reports which of the nine values ctx carries, so a test can say which it expects.
 func present(ctx context.Context) map[string]bool {
 	_, settings := SettingsFrom(ctx)
 	_, sessionIdentifier := SessionIdentifierFrom(ctx)
@@ -24,6 +24,7 @@ func present(ctx context.Context) map[string]bool {
 	_, reservation := CredentialReservationFrom(ctx)
 	_, actingUserId := ActingUserIdFrom(ctx)
 	_, dpopProof := DPoPProofFrom(ctx)
+	_, pageClient := PageClientFrom(ctx)
 	return map[string]bool{
 		"settings":          settings,
 		"sessionIdentifier": sessionIdentifier,
@@ -33,6 +34,7 @@ func present(ctx context.Context) map[string]bool {
 		"reservation":       reservation,
 		"actingUserId":      actingUserId,
 		"dpopProof":         dpopProof,
+		"pageClient":        pageClient,
 	}
 }
 
@@ -156,6 +158,7 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 		"reservation":       WithCredentialReservation(ctx, &CredentialReservation{}),
 		"actingUserId":      WithActingUserId(ctx, 7),
 		"dpopProof":         WithDPoPProof(ctx, &dpop.Proof{}),
+		"pageClient":        WithPageClient(ctx, &PageClient{}),
 	}
 
 	for written, writtenCtx := range cases {
@@ -207,4 +210,28 @@ func TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent(t *testing.T) {
 		_, ok := ValidatedSubject(ctx)
 		assert.False(t, ok, "a bearer token alone is not a validated one")
 	})
+}
+
+// The page client is named and forgotten through the pointer the middleware wrote, so a name given
+// by a handler is seen by the renderer drawing the page; a context without one names no client and
+// ignores a name.
+func TestReqctx_PageClientIsNamedInPlace(t *testing.T) {
+	holder := &PageClient{}
+	ctx := WithPageClient(context.Background(), holder)
+	assert.Empty(t, PageClientIdentifier(ctx))
+
+	NamePageClient(ctx, "app-1")
+	assert.Equal(t, "app-1", holder.ClientIdentifier())
+	assert.Equal(t, "app-1", PageClientIdentifier(ctx))
+
+	ForgetPageClient(ctx)
+	assert.Empty(t, PageClientIdentifier(ctx))
+
+	bare := context.Background()
+	NamePageClient(bare, "app-1")
+	assert.Empty(t, PageClientIdentifier(bare))
+
+	got, ok := PageClientFrom(WithPageClient(context.Background(), nil))
+	assert.False(t, ok)
+	assert.Nil(t, got)
 }

@@ -26,14 +26,15 @@ import (
 type Renderer struct {
 	templateFS fs.FS
 	assets     *assetFingerprints
-	brands     DefaultBrandReader
+	brands     PageBrandReader
 }
 
 // New returns a Renderer over templateFS, which holds the layouts and pages, and staticFS, the
 // static files the server serves under /static/, which the pages name through the asset template
-// function. Every page is drawn in the default brand brands reads, as DefaultPageBrand answers it;
-// a nil brands reads none, and draws every page automatic in the built-in colors.
-func New(templateFS fs.FS, staticFS fs.FS, brands DefaultBrandReader) *Renderer {
+// function. A page is drawn in the brand brands reads for its request, as RequestPageBrand answers
+// it: the brand of the client the request names, or the default; a nil brands reads none, and draws
+// every page automatic in the built-in colors.
+func New(templateFS fs.FS, staticFS fs.FS, brands PageBrandReader) *Renderer {
 	return &Renderer{templateFS: templateFS, assets: newAssetFingerprints(staticFS), brands: brands}
 }
 
@@ -198,11 +199,11 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		}
 		data["emailLang"] = emailCopyLang(requested, templateName)
 	} else {
-		// A page is drawn in the default brand: the layouts write brandDataTheme on the html element
+		// A page is drawn in its brand: the layouts write brandDataTheme on the html element
 		// and link brandStylesheet after main.css. An email links no stylesheet, so it reads no
 		// brand. ui_theme is no longer bound, so a layout copied from an older release, which reads
 		// it, draws every page automatic in the built-in colors.
-		brand := DefaultPageBrand(r.Context(), h.brands)
+		brand := RequestPageBrand(r.Context(), h.brands)
 		data["brandDataTheme"] = brand.DataTheme
 		data["brandStylesheet"] = brand.Stylesheet
 	}

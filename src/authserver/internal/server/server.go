@@ -758,9 +758,9 @@ func (s *Server) applicationChain(faults middleware.ServerFaults) []func(http.Ha
 	}
 }
 
-// pageChain is the page branch's middleware: the refresh of the browser session, the application
-// chain, then the page language of the user a page is drawn for, over what the locale middleware
-// resolved (#631 decision 5). The other branches answer protocol clients and the APIs, whose
+// pageChain is the page branch's middleware: the client a page is drawn for, which starts as none
+// (#812), the refresh of the browser session, the application chain, then the page language of the
+// user a page is drawn for, over what the locale middleware resolved (#631 decision 5). The other branches answer protocol clients and the APIs, whose
 // refusals keep the language the request asks for.
 //
 // Only a page request refreshes the browser session, and the refresh sends the session cookie
@@ -772,7 +772,7 @@ func (s *Server) applicationChain(faults middleware.ServerFaults) []func(http.Ha
 // the router's 405 for a path under a page group, which no renderer draws and RFC 9110 section
 // 15.5.6 makes heuristically cacheable.
 func (s *Server) pageChain() []func(http.Handler) http.Handler {
-	return append(append([]func(http.Handler) http.Handler{middleware.NoStore(), sessionstore.Refreshing},
+	return append(append([]func(http.Handler) http.Handler{middleware.NoStore(), middleware.PageClient(), sessionstore.Refreshing},
 		s.applicationChain(middleware.PageFaults())...),
 		middleware.PageLanguage(ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName), s.database))
 }
