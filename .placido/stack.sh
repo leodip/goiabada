@@ -144,7 +144,7 @@ host_port() {  # host_port CONTAINER_PORT: the loopback port the host reaches it
 serve_env() {  # serve_env AUTH_PORT CONSOLE_PORT: what differs from devcontainer.json, as -e arguments
     local setting
     for setting in GOIABADA_DB_TYPE=sqlite "GOIABADA_DB_DSN=$SERVE_DIR/goiabada.db" \
-        GOIABADA_DB_USERNAME= GOIABADA_DB_PASSWORD= GOIABADA_DB_HOST= GOIABADA_DB_PORT= GOIABADA_DB_NAME= \
+        GOIABADA_DB_USERNAME='' GOIABADA_DB_PASSWORD='' GOIABADA_DB_HOST='' GOIABADA_DB_PORT='' GOIABADA_DB_NAME='' \
         "GOIABADA_AUTHSERVER_BASEURL=http://localhost:$1" GOIABADA_AUTHSERVER_INTERNALBASEURL=http://localhost:19290 \
         GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=19290 GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=19292 \
         GOIABADA_AUTHSERVER_METRICS_ENABLED=false \
