@@ -261,6 +261,7 @@
 "forgot_password.modal_title" = "Consultez vos e-mails"
 "forgot_password.modal_body" = "Si un compte utilise cette adresse, nous y avons envoyé un lien pour réinitialiser votre mot de passe :"
 "forgot_password.modal_detail" = "Le lien expire après 5 minutes. Vérifiez votre dossier de courriers indésirables si vous ne le trouvez pas."
+"forgot_password.back_to_sign_in" = "Retour à la connexion"
 
 # --- Reset password (reset-password) ----------------------------------------
 

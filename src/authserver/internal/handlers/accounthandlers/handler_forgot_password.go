@@ -75,6 +75,7 @@ func renderForgotPasswordForm(w http.ResponseWriter, r *http.Request, pageRender
 		"email":      email,
 		"error":      refusal,
 		"errorField": field,
+		"ceremonyId": registrationCeremonyId(r),
 	}
 	err := turnstile.WithWidget(pageRenderer, settings).RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
 	if err != nil {
@@ -309,8 +310,9 @@ func finishForgotPassword(
 // the address as it was typed, which tells the person nothing they did not say.
 func renderForgotPasswordLinkSent(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, email string) {
 	bind := map[string]interface{}{
-		"linkSent": true,
-		"email":    email,
+		"linkSent":   true,
+		"email":      email,
+		"ceremonyId": registrationCeremonyId(r),
 	}
 
 	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind); err != nil {

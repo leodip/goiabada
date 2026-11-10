@@ -258,6 +258,7 @@
 "forgot_password.modal_title" = "Check your email"
 "forgot_password.modal_body" = "If an account uses this address, we've sent it a link to reset your password:"
 "forgot_password.modal_detail" = "The link expires after 5 minutes. Check your spam folder if you don't see it."
+"forgot_password.back_to_sign_in" = "Back to sign in"
 
 # --- Reset password (reset-password) ----------------------------------------
 

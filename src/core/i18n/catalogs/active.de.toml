@@ -262,6 +262,7 @@
 "forgot_password.modal_title" = "E-Mails prüfen"
 "forgot_password.modal_body" = "Falls es ein Konto mit dieser Adresse gibt, wurde ein Link zum Zurücksetzen des Passworts dorthin gesendet:"
 "forgot_password.modal_detail" = "Der Link läuft nach 5 Minuten ab. Prüfen Sie auch Ihren Spamordner, falls Sie keine Nachricht finden."
+"forgot_password.back_to_sign_in" = "Zurück zur Anmeldung"
 
 # --- Reset password (reset-password) ----------------------------------------
 

@@ -49,3 +49,35 @@ func SignInPageClient(ceremonies signInCeremonies) func(next http.Handler) http.
 		})
 	}
 }
+
+// linkedSignInCeremonies is what LinkedSignInPageClient reads: the sign-in a page's URL names,
+// whatever the request's method.
+type linkedSignInCeremonies interface {
+	HeldAuthContext(r *http.Request, ceremonyId string) (*ceremony.AuthContext, error)
+}
+
+// LinkedSignInPageClient names the client of the sign-in a page's URL names, when the id is well
+// formed and the browser holds that sign-in, as the client the request's pages are drawn for: the
+// page itself, a refusal beside its form, the pages answering it, and a guard's or a rate limiter's
+// refusal ahead of it (#812 decision 4). It is for the pages a sign-in links to, registration, forgot
+// password and activation, which carry the sign-in's id in their URL on a GET and on the POST of
+// their form alike, so it reads the URL's parameter whatever the method, and never a form body.
+//
+// A URL naming a sign-in the browser does not hold (another browser, or a sign-in that ended), a
+// malformed id, or none names no client, and the page is drawn in the default brand: on these pages
+// that is never an error. It writes nothing and refuses nothing.
+//
+// It is mounted on those routes ahead of every guard and limiter there, beneath PageClient.
+func LinkedSignInPageClient(ceremonies linkedSignInCeremonies) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ceremonyId := r.URL.Query().Get(ceremony.QueryParameter)
+			if ceremony.IsWellFormedId(ceremonyId) {
+				if authContext, err := ceremonies.HeldAuthContext(r, ceremonyId); err == nil && authContext != nil {
+					reqctx.NamePageClient(r.Context(), authContext.ClientId)
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}

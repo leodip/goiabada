@@ -263,6 +263,7 @@
 "forgot_password.modal_title" = "Revisa tu correo"
 "forgot_password.modal_body" = "Si hay una cuenta con esta dirección, le hemos enviado un enlace para restablecer su contraseña:"
 "forgot_password.modal_detail" = "El enlace caduca a los 5 minutos. Si no lo encuentras, revisa la carpeta de spam."
+"forgot_password.back_to_sign_in" = "Volver a iniciar sesión"
 
 # --- Reset password (reset-password) ----------------------------------------
 

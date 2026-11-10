@@ -265,6 +265,7 @@
 "forgot_password.modal_title" = "Controlla la tua email"
 "forgot_password.modal_body" = "Se esiste un account con questo indirizzo, abbiamo inviato un link per reimpostare la password a:"
 "forgot_password.modal_detail" = "Il link scade dopo 5 minuti. Se non trovi il messaggio, controlla la cartella spam."
+"forgot_password.back_to_sign_in" = "Torna all'accesso"
 
 # --- Reset password (reset-password) ----------------------------------------
 

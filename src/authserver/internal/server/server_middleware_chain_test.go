@@ -228,3 +228,44 @@ func TestInitRoutes_TheSignInStepsNameTheirClientAheadOfTheirGuards(t *testing.T
 		assert.True(t, seen[step], "the route table has %s", step)
 	}
 }
+
+// The pages a sign-in links to, forgot password, registration and activation, name the client of the
+// sign-in their URL names ahead of every guard and limiter they carry, so the refusals those write are
+// drawn in that client's brand; no other page route names one that way (#812 decision 4).
+func TestInitRoutes_ThePagesASignInLinksToNameItsClientAheadOfTheirGuards(t *testing.T) {
+	s := newFaultsTestServer(datamocks.NewDatabase(t))
+	// By prefix: the compiler may name the closure LinkedSignInPageClient.func1 or, inlined, .1.
+	const namer = "github.com/leodip/goiabada/authserver/internal/middleware.LinkedSignInPageClient."
+	linked := []string{
+		"GET /forgot-password", "POST /forgot-password", "GET /account/register", "POST /account/register",
+		"GET /account/activate", "POST /account/activate",
+	}
+
+	seen := map[string]bool{}
+	err := s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		key := method + " " + route
+		names := make([]string, len(middlewares))
+		for i, mounted := range middlewares {
+			names[i] = runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name()
+		}
+		at := slices.IndexFunc(names, func(name string) bool { return strings.HasPrefix(name, namer) })
+		if !slices.Contains(linked, key) {
+			assert.Equal(t, -1, at, "%s names no linked sign-in's client", key)
+			return nil
+		}
+		seen[key] = true
+		if assert.NotEqual(t, -1, at, "%s names the client of the sign-in its URL names: %v", key, names) {
+			assert.Equal(t, 1, strings.Count(strings.Join(names, " "), namer), key)
+			for _, guard := range names[:at] {
+				assert.NotContains(t, guard, "accounthandlers", "%s guards ahead of naming its client", key)
+				assert.NotContains(t, guard, "RateLimiter", "%s limits ahead of naming its client", key)
+				assert.NotContains(t, guard, "Challenge", "%s challenges ahead of naming its client", key)
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	for _, page := range linked {
+		assert.True(t, seen[page], "the route table has %s", page)
+	}
+}

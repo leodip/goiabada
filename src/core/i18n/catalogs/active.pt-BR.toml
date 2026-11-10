@@ -245,6 +245,7 @@
 "forgot_password.modal_title" = "Verifique seu e-mail"
 "forgot_password.modal_body" = "Se houver uma conta com este endereço, enviamos para ele um link para redefinir sua senha:"
 "forgot_password.modal_detail" = "O link expira em 5 minutos. Verifique a pasta de spam se não encontrá-lo."
+"forgot_password.back_to_sign_in" = "Voltar para o login"
 
 # --- Redefinir senha (reset-password) ----------------------------------------
 

@@ -80,7 +80,8 @@ func RefuseUnavailableRegistration(pageRenderer PageRenderer) func(http.Handler)
 // "Register" link said so: the id that link carried, if it has the shape of one. The page puts it back
 // into its own "Sign in" link, so a visitor who registers nothing and goes back lands on the same
 // sign-in's password form, where without it the link would load a step that names no ceremony and get
-// the "no longer active" page (#246 decision 22).
+// the "no longer active" page (#246 decision 22). The forgot-password page reads it the same way, from
+// the password page's "Forgot password?" link, for its own "Back to sign in" link (#812 decision 8).
 //
 // It is only ever echoed into a link, and never checked against a stored ceremony here, so a value
 // that is not an id is dropped and not repeated into the page, whatever the visitor put in the query:
