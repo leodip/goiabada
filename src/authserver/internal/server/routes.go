@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
+	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
@@ -151,6 +152,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	files.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(files, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(files, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
+	getAndHead(files, brandthemes.StylesheetRoute, handlers.HandleBrandStylesheetGet(httpHelper, s.database))
 
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)
