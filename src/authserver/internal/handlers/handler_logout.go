@@ -125,7 +125,7 @@ func renderLogoutConsent(w http.ResponseWriter, r *http.Request, pageRenderer Pa
 
 	bind := map[string]interface{}{
 		"formAction":            logoutFormPath,
-		"declineHref":           logoutDeclineHref(r),
+		"declineHref":           logoutDeclineHref(r, clientId),
 		"postLogoutRedirectUri": render.QueryOrFormValue(r, "post_logout_redirect_uri"),
 		"clientId":              clientId,
 		"state":                 state,
@@ -140,23 +140,35 @@ func renderLogoutConsent(w http.ResponseWriter, r *http.Request, pageRenderer Pa
 }
 
 // logoutDeclineHref is the declining control's destination: the declined page, carrying the
-// End-User's language and nothing else. A decline is not a logout, so it hands the RP nothing:
-// no post_logout_redirect_uri, client_id or state, and never the id_token_hint (RP-Initiated
-// Logout 1.0 sections 2 and 3, #152).
-func logoutDeclineHref(r *http.Request) string {
+// End-User's language, and clientId, the client_id the consent page carries, so the declined page
+// is drawn in that client's brand (#812 decision 5). clientId is empty when a hint was rejected, so
+// that page stays in the default brand as the others do. A decline is not a logout, so it hands the
+// RP nothing: no post_logout_redirect_uri or state, and never the id_token_hint (RP-Initiated
+// Logout 1.0 sections 2 and 3, #152); the declined page reads client_id for its look alone.
+func logoutDeclineHref(r *http.Request, clientId string) string {
+	query := url.Values{}
 	if uiLocales := render.QueryOrFormValue(r, "ui_locales"); len(uiLocales) > 0 {
-		return logoutDeclinedPath + "?" + url.Values{"ui_locales": {uiLocales}}.Encode()
+		query.Set("ui_locales", uiLocales)
+	}
+	if len(clientId) > 0 {
+		query.Set("client_id", clientId)
+	}
+	if len(query) > 0 {
+		return logoutDeclinedPath + "?" + query.Encode()
 	}
 	return logoutDeclinedPath
 }
 
 // HandleLogoutDeclinedGet renders the page an End-User lands on after declining to sign out with
 // no history to go back to, or with no script to go back with: they are still signed in and can
-// close the page. It reads no session and writes nothing, and the only parameter it honours is
-// ui_locales, so the page is in the language the RP asked for (#152).
+// close the page. It reads no session and writes nothing. It honours two parameters: ui_locales, so
+// the page is in the language the RP asked for (#152), and client_id, so it is drawn in that
+// client's brand, which is all client_id is read for here (#812 decision 5). A client_id that names
+// no client draws the page in the default brand.
 func HandleLogoutDeclinedGet(pageRenderer PageRenderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r = refineLogoutLocale(r)
+		reqctx.NamePageClient(r.Context(), render.QueryOrFormValue(r, "client_id"))
 		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/logout_declined.html", map[string]interface{}{})
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
@@ -694,6 +706,18 @@ func doLogout(
 		// because a hint the OP cannot confirm is a reason to ask rather than an error to report.
 		pageRenderer.InternalServerError(w, r, err)
 		return
+	}
+
+	// The sign-out's pages are drawn in the brand of the client the request names: the one a
+	// confirmed hint was issued to, or with no hint the one client_id names, which is trusted for the
+	// look alone, as an authorization request's is. A rejected hint names none, so every page of it
+	// is drawn in the default brand, as the consent page it renders drops client_id (#812 decision 5).
+	// A client_id that names no client draws the pages in the default brand too.
+	switch hint.state {
+	case hintConfirmed:
+		reqctx.NamePageClient(r.Context(), hint.client.ClientIdentifier)
+	case hintAbsent:
+		reqctx.NamePageClient(r.Context(), render.QueryOrFormValue(r, "client_id"))
 	}
 
 	// 2. Decide whether to ask. RP-Initiated Logout 1.0 section 2: "the OP MUST ask the End-User this

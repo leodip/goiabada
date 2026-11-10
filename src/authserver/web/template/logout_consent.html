@@ -30,8 +30,8 @@
        could stop it submitting: with JavaScript unavailable, clicking No answered Yes and tore
        the session down (#152). A link cannot submit the form, and its href is a destination that
        needs no script: the declined page, which says the End-User is still signed in and can
-       close it, carrying ui_locales and nothing else, since a decline is not a logout and hands
-       the RP nothing. With script, utils.js sends the link back through the browser's history
+       close it, carrying ui_locales, and the client_id above for that page's brand alone (#812),
+       and nothing else, since a decline is not a logout and hands the RP nothing. With script, utils.js sends the link back through the browser's history
        when there is any (data-history-back), and leaves the href in charge when there is none. -->
   <div class="auth-actions">
     <a class="button" href="{{ .declineHref }}" data-history-back>{{ T $.ctx "logout_consent.button.stay" }}</a>

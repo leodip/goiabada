@@ -21,7 +21,9 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `middleware.PageClient` puts an empty one on every page request, `middleware.SignInPageClient`
   names the client of the sign-in a step's request names on the step routes, ahead of their guards
   and limiters, and `/auth/authorize` names its client once the request reaches the client check.
-  The no-longer-active page forgets it. `render.RequestPageBrand` reads it for both layouts and the
+  `/auth/logout` names the client of a confirmed hint or, with no hint, `client_id`, and none for a
+  rejected hint; its declining link carries that `client_id` to `/auth/logout/declined`, which
+  names it for the look alone. The no-longer-active page forgets it. `render.RequestPageBrand` reads it for both layouts and the
   form_post page. A page with no readable brand links none and is drawn automatic in the built-in
   colors. The stylesheet sets the 23 `--color-*` tokens, the dark ones under the two
   selectors `ui.css`'s dark variant uses, so a change to that variant changes `stylesheetCSS` too.
