@@ -2181,7 +2181,6 @@
 "handler.settings_keys.key_not_found" = "Key not found"
 "handler.settings_keys.only_previous_revocable" = "Only a previous key can be revoked"
 
-"handler.settings_ui_theme.theme_invalid" = "Invalid theme."
 "handler.settings_audit_logs.retention_days_negative" = "The retention can't be negative. Use 0 to keep stored events forever."
 "handler.settings_audit_logs.retention_days_too_large" = "The retention can't be more than 3650 days (10 years)."
 

@@ -164,12 +164,10 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `method` | The HTTP method of a refused Admin API request. |
 | `new` | The default token settings, the session settings, or the Turnstile settings, after the change, keyed as below. |
 | `new_generation` | The user's authentication generation after their sessions and tokens were revoked. |
-| `new_ui_theme` | The UI theme after the change. |
 | `old` | The default token settings, the session settings, or the Turnstile settings, before the change, keyed as below. |
 | `old_brand_id` | The row id of the brand that was the default before `updated_default_brand`. |
 | `old_brand_name` | The name of the brand that was the default before `updated_default_brand`. |
 | `old_generation` | The user's authentication generation before their sessions and tokens were revoked. |
-| `old_ui_theme` | The UI theme before the change. |
 | `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. For a logout token, how its delivery ended: see `goiabada_backchannel_logout_deliveries_total` on [Monitoring](/deploy/monitoring/#metrics-catalog). |
 | `permission_id` | The row id of a permission. |
 | `permission_identifiers` | The administrative permissions changed, such as `authserver:manage`. |
@@ -437,7 +435,6 @@ These come from the Account API, which users reach through the admin console's a
 | Event | Meaning |
 |---|---|
 | `updated_general_settings` | An administrator saved the **General** settings. |
-| `updated_ui_theme_settings` | An administrator changed the **Theme** settings. The entry names the old and the new theme. |
 | `updated_sessions_settings` | An administrator changed the session settings: the idle timeout, the maximum lifetime, the most sessions one user can hold, or whether users stay signed in after the browser closes. The entry holds the old and the new values. |
 | `updated_tokens_settings` | An administrator changed the default token settings. The entry holds the old and the new values. |
 | `updated_smtp_settings` | An administrator changed the **Email** settings, including turning email on or off. |

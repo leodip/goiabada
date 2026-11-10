@@ -2186,7 +2186,6 @@
 "handler.settings_keys.key_not_found" = "No se encontró la clave"
 "handler.settings_keys.only_previous_revocable" = "Solo se puede revocar una clave anterior"
 
-"handler.settings_ui_theme.theme_invalid" = "El tema no es válido."
 "handler.settings_audit_logs.retention_days_negative" = "El período de conservación no puede ser negativo. Usa 0 para conservar los eventos almacenados para siempre."
 "handler.settings_audit_logs.retention_days_too_large" = "El período de conservación no puede superar los 3650 días (10 años)."
 

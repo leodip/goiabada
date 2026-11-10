@@ -2059,10 +2059,6 @@ var publishedRequestEnums = map[string]string{
 		"any value but [always, ask, never], an absent or empty one included, with 400 before saving. " +
 		"Covered by TestSettingsSessionsPut_RefusesAMissingOrUnknownKeepSignedIn and " +
 		"TestAPISettingsSessionsPut_KeepSignedInIsRequiredAndOneOfThreeModes. Published in #743",
-	"UpdateSettingsUIThemeRequest.uiTheme": "enforced: handler_api_settings_ui_theme.go trims the " +
-		"value and refuses anything but the empty value and uithemes.Get() with 400 before saving. " +
-		"Covered by TestAPISettingsUIThemePut_ValidationErrors. Published in #617, when the themes " +
-		"became three",
 }
 
 // A closed enum on a request property is a promise that the server refuses everything outside it,

@@ -313,17 +313,6 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 			english:    "The retention can't be more than 3650 days (10 years).",
 			portuguese: "A retenção não pode passar de 3650 dias (10 anos).",
 		},
-		{
-			name: "an unknown UI theme",
-			serve: settingsRefusal(http.MethodPut, "/api/v1/admin/settings/ui-theme", map[string]any{"uiTheme": "no-such-theme"}, &record.Settings{}, nil,
-				func(t *testing.T, database *datamocks.Database) http.Handler {
-					return HandleSettingsUIThemePut(database, handlersmocks.NewAuditLogger(t))
-				}),
-			status:     http.StatusBadRequest,
-			code:       "handler.settings_ui_theme.theme_invalid",
-			english:    "Invalid theme.",
-			portuguese: "Tema inválido.",
-		},
 	})
 }
 

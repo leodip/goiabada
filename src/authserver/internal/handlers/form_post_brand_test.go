@@ -105,7 +105,7 @@ func TestFormPost_ThePageIsDrawnInTheDefaultBrand(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			r := withSettings(httptest.NewRequest(http.MethodGet, "/auth/issue", nil),
-				&record.Settings{Issuer: testResponseIssuer, UITheme: "dark"})
+				&record.Settings{Issuer: testResponseIssuer})
 			responder := NewClientErrorResponder(formPostBrandDatabase(t, callback, tc.brand, nil), nil)
 
 			require.NoError(t, tc.write(responder, w, r))
@@ -141,7 +141,7 @@ func TestFormPost_APageWithNoReadableBrandStillCarriesTheResponse(t *testing.T) 
 		t.Run(tc.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			r := withSettings(httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
-				&record.Settings{Issuer: testResponseIssuer, UITheme: "dark"})
+				&record.Settings{Issuer: testResponseIssuer})
 			responder := NewClientErrorResponder(formPostBrandDatabase(t, callback, tc.brand, tc.err), nil)
 
 			require.NoError(t, responder.redirToClientWithError(w, r,

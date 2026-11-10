@@ -457,10 +457,6 @@ func (s *Server) initRoutes(branches appBranches) {
 		// The built-in themes a brand can take, reference data behind the same read scopes.
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/brand-themes", apihandlers.HandleBrandThemesGet())
 
-		// Settings - UI Theme
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/ui-theme", apihandlers.HandleSettingsUIThemeGet())
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/ui-theme", apihandlers.HandleSettingsUIThemePut(s.database, auditLogger))
-
 		// Settings - Tokens
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/tokens", apihandlers.HandleSettingsTokensGet())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/tokens", apihandlers.HandleSettingsTokensPut(s.database, auditLogger))

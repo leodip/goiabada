@@ -2185,7 +2185,6 @@
 "handler.settings_keys.key_not_found" = "Schlüssel nicht gefunden."
 "handler.settings_keys.only_previous_revocable" = "Nur ein vorheriger Schlüssel kann widerrufen werden."
 
-"handler.settings_ui_theme.theme_invalid" = "Ungültiges Farbschema."
 "handler.settings_audit_logs.retention_days_negative" = "Die Aufbewahrungsdauer darf nicht negativ sein. Verwenden Sie 0, um gespeicherte Ereignisse unbegrenzt aufzubewahren."
 "handler.settings_audit_logs.retention_days_too_large" = "Die Aufbewahrungsdauer darf höchstens 3650 Tage (10 Jahre) betragen."
 

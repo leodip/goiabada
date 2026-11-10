@@ -220,7 +220,6 @@ const (
 	EventUpdatedSessionsSettings   = "updated_sessions_settings"
 	EventUpdatedTokensSettings     = "updated_tokens_settings"
 	EventUpdatedTurnstileSettings  = "updated_turnstile_settings"
-	EventUpdatedUIThemeSettings    = "updated_ui_theme_settings"
 	// The brands (#810 decision 5), written by the admin API after each committed change, every
 	// row with brand_id, brand_name and logged_in_user. updated_brand adds the appearance and the
 	// theme it saved. updated_default_brand names the new default as brand_id and brand_name and
@@ -837,7 +836,6 @@ var auditEventTypes = []string{
 	EventUpdatedSMTPSettings,
 	EventUpdatedTokensSettings,
 	EventUpdatedTurnstileSettings,
-	EventUpdatedUIThemeSettings,
 	EventUpdatedUserAddress,
 	EventUpdatedUserAttribute,
 	EventUpdatedUserAuthentication,

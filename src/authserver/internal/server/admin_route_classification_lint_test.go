@@ -194,8 +194,6 @@ var adminRouteClassification = map[string]adminRouteClass{
 		"lacks (#402 decision 7)"),
 	"PUT /api/v1/admin/settings/sessions": outsideCeilings("changes posture and gives the caller no authority it " +
 		"lacks (#402 decision 7)"),
-	"PUT /api/v1/admin/settings/ui-theme": outsideCeilings("changes how pages look and gives the caller no " +
-		"authority it lacks (#402 decision 7)"),
 	"POST /api/v1/admin/brands": outsideCeilings("creates a brand, which changes how pages look and gives the " +
 		"caller no authority it lacks (#402 decision 7)"),
 	"PUT /api/v1/admin/brands/{id}": outsideCeilings("changes how pages look and gives the caller no authority " +

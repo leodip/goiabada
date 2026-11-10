@@ -397,7 +397,6 @@ const (
 	ErrCodeSettingsKeysKeyNotFound           = "handler.settings_keys.key_not_found"
 	ErrCodeSettingsKeysOnlyPreviousRevocable = "handler.settings_keys.only_previous_revocable"
 
-	ErrCodeSettingsUIThemeInvalid                 = "handler.settings_ui_theme.theme_invalid"
 	ErrCodeSettingsAuditLogsRetentionDaysNegative = "handler.settings_audit_logs.retention_days_negative"
 	ErrCodeSettingsAuditLogsRetentionDaysTooLarge = "handler.settings_audit_logs.retention_days_too_large"
 

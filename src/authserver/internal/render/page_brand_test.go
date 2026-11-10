@@ -69,9 +69,7 @@ func brandStylesheetHref(t *testing.T, brandId string, theme string) string {
 
 // Both layouts are drawn in the default brand: the html element carries data-theme for a light or
 // dark brand and none for an automatic one, the color-scheme meta follows, and the brand's
-// stylesheet is linked after main.css, so its tokens win over main.css's (#810 decision 3). The
-// settings row's ui_theme no longer draws anything: a row still holding dark beside an automatic
-// brand gives an automatic page.
+// stylesheet is linked after main.css, so its tokens win over main.css's (#810 decision 3).
 func TestRender_LayoutsAreDrawnInTheDefaultBrand(t *testing.T) {
 	for _, layout := range []struct{ layout, page string }{
 		{"/layouts/auth_layout.html", "/logged_out.html"},
@@ -80,7 +78,6 @@ func TestRender_LayoutsAreDrawnInTheDefaultBrand(t *testing.T) {
 		for _, tc := range []struct {
 			name            string
 			brand           *record.Brand
-			uiTheme         string
 			wantDataTheme   string
 			wantColorScheme string
 			wantBrandHref   func(t *testing.T) string
@@ -100,16 +97,15 @@ func TestRender_LayoutsAreDrawnInTheDefaultBrand(t *testing.T) {
 				wantBrandHref:   func(t *testing.T) string { return brandStylesheetHref(t, "12", "avocado") },
 			},
 			{
-				name:            "an automatic brand on Blueberry, beside a ui_theme of dark",
+				name:            "an automatic brand on Blueberry",
 				brand:           &record.Brand{Id: 1, Name: "Default", Appearance: record.BrandAppearanceAuto, Theme: "blueberry"},
-				uiTheme:         "dark",
 				wantColorScheme: "light dark",
 				wantBrandHref:   func(t *testing.T) string { return brandStylesheetHref(t, "1", "blueberry") },
 			},
 		} {
 			t.Run(layout.layout+" "+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
-				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test", UITheme: tc.uiTheme}))
+				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 				brands := &defaultBrandStub{brand: tc.brand}
 
 				buf, err := New(web.TemplateFS(), web.StaticFS(), brands).RenderTemplateToBuffer(req, layout.layout, layout.page,
@@ -154,7 +150,7 @@ func TestRender_APageWithNoReadableBrandIsStillDrawn(t *testing.T) {
 			t.Run(layout.layout+" "+tc.name, func(t *testing.T) {
 				logs := logtest.CaptureSlog(t)
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
-				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test", UITheme: "dark"}))
+				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 
 				buf, err := New(web.TemplateFS(), web.StaticFS(), tc.brands).RenderTemplateToBuffer(req, layout.layout, layout.page,
 					map[string]interface{}{})

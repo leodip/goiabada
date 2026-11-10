@@ -11,7 +11,7 @@ import (
 
 // settingsColumns is the settings table as scanSettings reads it.
 var settingsColumns = columnList{
-	sqlite: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+	sqlite: "id, created_at, updated_at, app_name, issuer, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
@@ -23,7 +23,7 @@ var settingsColumns = columnList{
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at, " +
 		"account_deletion_enabled, default_brand_id",
-	mysql: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+	mysql: "id, created_at, updated_at, app_name, issuer, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
@@ -35,7 +35,7 @@ var settingsColumns = columnList{
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at, " +
 		"account_deletion_enabled, default_brand_id",
-	postgres: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+	postgres: "id, created_at, updated_at, app_name, issuer, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
@@ -47,7 +47,7 @@ var settingsColumns = columnList{
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at, " +
 		"account_deletion_enabled, default_brand_id",
-	mssql: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+	mssql: "id, created_at, updated_at, app_name, issuer, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
 		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
@@ -69,7 +69,6 @@ func scanSettings(row rowScanner, settings *record.Settings) error {
 		&settings.UpdatedAt,
 		&settings.AppName,
 		&settings.Issuer,
-		&settings.UITheme,
 		&settings.PasswordPolicy,
 		&settings.SelfRegistrationEnabled,
 		&settings.SelfRegistrationRequiresEmailVerification,
@@ -107,6 +106,11 @@ func scanSettings(row rowScanner, settings *record.Settings) error {
 	)
 }
 
+// insertSettings and insertInitialSettings are the only statements naming ui_theme. The column
+// stays for one release, for the previous one, which reads it, and #823 drops it (#810 decision
+// 2). No field carries it, so a read leaves it out and a save leaves it as stored; it is NOT NULL
+// with no default, so an insert writes it as the empty value, a literal rather than a bound
+// argument.
 var insertSettings = statement{
 	sqlite: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
@@ -119,8 +123,9 @@ var insertSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -132,8 +137,9 @@ var insertSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -145,9 +151,9 @@ var insertSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
-		"$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, " +
-		"$33, $34, $35, $36, $37, $38, $39) RETURNING id",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES ($1, $2, $3, $4, '', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, " +
+		"$16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, " +
+		"$32, $33, $34, $35, $36, $37, $38) RETURNING id",
 	mssql: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -159,9 +165,9 @@ var insertSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled, default_brand_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, " +
-		"@p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, " +
-		"@p27, @p28, @p29, @p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37, @p38, @p39)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, '', @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, " +
+		"@p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, " +
+		"@p32, @p33, @p34, @p35, @p36, @p37, @p38)",
 }
 
 // insertInitialSettings is the settings row with its id named, written once, by
@@ -178,8 +184,9 @@ var insertInitialSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -191,8 +198,9 @@ var insertInitialSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -204,9 +212,9 @@ var insertInitialSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
-		"$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, " +
-		"$35, $36, $37, $38, $39, $40)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES ($1, $2, $3, $4, $5, '', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, " +
+		"$16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, " +
+		"$32, $33, $34, $35, $36, $37, $38, $39)",
 	mssql: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -218,15 +226,15 @@ var insertInitialSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, " +
-		"@p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, " +
-		"@p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37, @p38, @p39, @p40)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (@p1, @p2, @p3, @p4, @p5, '', @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, " +
+		"@p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, " +
+		"@p32, @p33, @p34, @p35, @p36, @p37, @p38, @p39)",
 }
 
 // updateSettings writes the whole row but created_at, aes_encryption_key, last_cleanup_at and
 // default_brand_id, which are dont-update: see the record for why each is left alone.
 var updateSettings = statement{
-	sqlite: "UPDATE settings SET updated_at = ?, app_name = ?, issuer = ?, ui_theme = ?, " +
+	sqlite: "UPDATE settings SET updated_at = ?, app_name = ?, issuer = ?, " +
 		"password_policy = ?, self_registration_enabled = ?, " +
 		"self_registration_requires_email_verification = ?, token_expiration_in_seconds = ?, " +
 		"refresh_token_offline_idle_timeout_in_seconds = ?, " +
@@ -240,7 +248,7 @@ var updateSettings = statement{
 		"dynamic_client_registration_enabled = ?, pkce_required = ?, implicit_flow_enabled = ?, " +
 		"resource_owner_password_credentials_enabled = ?, audit_logs_in_console_enabled = ?, " +
 		"audit_logs_in_database_enabled = ?, audit_log_retention_days = ?, account_deletion_enabled = ? WHERE id = ?",
-	mysql: "UPDATE settings SET updated_at = ?, app_name = ?, issuer = ?, ui_theme = ?, " +
+	mysql: "UPDATE settings SET updated_at = ?, app_name = ?, issuer = ?, " +
 		"password_policy = ?, self_registration_enabled = ?, " +
 		"self_registration_requires_email_verification = ?, token_expiration_in_seconds = ?, " +
 		"refresh_token_offline_idle_timeout_in_seconds = ?, " +
@@ -254,38 +262,38 @@ var updateSettings = statement{
 		"dynamic_client_registration_enabled = ?, pkce_required = ?, implicit_flow_enabled = ?, " +
 		"resource_owner_password_credentials_enabled = ?, audit_logs_in_console_enabled = ?, " +
 		"audit_logs_in_database_enabled = ?, audit_log_retention_days = ?, account_deletion_enabled = ? WHERE id = ?",
-	postgres: "UPDATE settings SET updated_at = $1, app_name = $2, issuer = $3, ui_theme = $4, " +
-		"password_policy = $5, self_registration_enabled = $6, " +
-		"self_registration_requires_email_verification = $7, token_expiration_in_seconds = $8, " +
-		"refresh_token_offline_idle_timeout_in_seconds = $9, " +
-		"refresh_token_offline_max_lifetime_in_seconds = $10, " +
-		"user_session_idle_timeout_in_seconds = $11, user_session_max_lifetime_in_seconds = $12, " +
-		"include_open_id_connect_claims_in_access_token = $13, " +
-		"include_open_id_connect_claims_in_id_token = $14, max_user_sessions_per_user = $15, " +
-		"keep_signed_in = $16, " +
-		"smtp_host = $17, smtp_port = $18, smtp_username = $19, smtp_password_encrypted = $20, " +
-		"smtp_from_name = $21, smtp_from_email = $22, smtp_encryption = $23, smtp_enabled = $24, " +
-		"turnstile_enabled = $25, turnstile_site_key = $26, turnstile_secret_key_encrypted = $27, " +
-		"dynamic_client_registration_enabled = $28, pkce_required = $29, implicit_flow_enabled = $30, " +
-		"resource_owner_password_credentials_enabled = $31, audit_logs_in_console_enabled = $32, " +
-		"audit_logs_in_database_enabled = $33, audit_log_retention_days = $34, account_deletion_enabled = $35 " +
-		"WHERE id = $36",
-	mssql: "UPDATE settings SET updated_at = @p1, app_name = @p2, issuer = @p3, ui_theme = @p4, " +
-		"password_policy = @p5, self_registration_enabled = @p6, " +
-		"self_registration_requires_email_verification = @p7, token_expiration_in_seconds = @p8, " +
-		"refresh_token_offline_idle_timeout_in_seconds = @p9, " +
-		"refresh_token_offline_max_lifetime_in_seconds = @p10, " +
-		"user_session_idle_timeout_in_seconds = @p11, user_session_max_lifetime_in_seconds = @p12, " +
-		"include_open_id_connect_claims_in_access_token = @p13, " +
-		"include_open_id_connect_claims_in_id_token = @p14, max_user_sessions_per_user = @p15, " +
-		"keep_signed_in = @p16, " +
-		"smtp_host = @p17, smtp_port = @p18, smtp_username = @p19, smtp_password_encrypted = @p20, " +
-		"smtp_from_name = @p21, smtp_from_email = @p22, smtp_encryption = @p23, smtp_enabled = @p24, " +
-		"turnstile_enabled = @p25, turnstile_site_key = @p26, turnstile_secret_key_encrypted = @p27, " +
-		"dynamic_client_registration_enabled = @p28, pkce_required = @p29, implicit_flow_enabled = @p30, " +
-		"resource_owner_password_credentials_enabled = @p31, audit_logs_in_console_enabled = @p32, " +
-		"audit_logs_in_database_enabled = @p33, audit_log_retention_days = @p34, account_deletion_enabled = @p35 " +
-		"WHERE id = @p36",
+	postgres: "UPDATE settings SET updated_at = $1, app_name = $2, issuer = $3, " +
+		"password_policy = $4, self_registration_enabled = $5, " +
+		"self_registration_requires_email_verification = $6, token_expiration_in_seconds = $7, " +
+		"refresh_token_offline_idle_timeout_in_seconds = $8, " +
+		"refresh_token_offline_max_lifetime_in_seconds = $9, " +
+		"user_session_idle_timeout_in_seconds = $10, user_session_max_lifetime_in_seconds = $11, " +
+		"include_open_id_connect_claims_in_access_token = $12, " +
+		"include_open_id_connect_claims_in_id_token = $13, max_user_sessions_per_user = $14, " +
+		"keep_signed_in = $15, " +
+		"smtp_host = $16, smtp_port = $17, smtp_username = $18, smtp_password_encrypted = $19, " +
+		"smtp_from_name = $20, smtp_from_email = $21, smtp_encryption = $22, smtp_enabled = $23, " +
+		"turnstile_enabled = $24, turnstile_site_key = $25, turnstile_secret_key_encrypted = $26, " +
+		"dynamic_client_registration_enabled = $27, pkce_required = $28, implicit_flow_enabled = $29, " +
+		"resource_owner_password_credentials_enabled = $30, audit_logs_in_console_enabled = $31, " +
+		"audit_logs_in_database_enabled = $32, audit_log_retention_days = $33, account_deletion_enabled = $34 " +
+		"WHERE id = $35",
+	mssql: "UPDATE settings SET updated_at = @p1, app_name = @p2, issuer = @p3, " +
+		"password_policy = @p4, self_registration_enabled = @p5, " +
+		"self_registration_requires_email_verification = @p6, token_expiration_in_seconds = @p7, " +
+		"refresh_token_offline_idle_timeout_in_seconds = @p8, " +
+		"refresh_token_offline_max_lifetime_in_seconds = @p9, " +
+		"user_session_idle_timeout_in_seconds = @p10, user_session_max_lifetime_in_seconds = @p11, " +
+		"include_open_id_connect_claims_in_access_token = @p12, " +
+		"include_open_id_connect_claims_in_id_token = @p13, max_user_sessions_per_user = @p14, " +
+		"keep_signed_in = @p15, " +
+		"smtp_host = @p16, smtp_port = @p17, smtp_username = @p18, smtp_password_encrypted = @p19, " +
+		"smtp_from_name = @p20, smtp_from_email = @p21, smtp_encryption = @p22, smtp_enabled = @p23, " +
+		"turnstile_enabled = @p24, turnstile_site_key = @p25, turnstile_secret_key_encrypted = @p26, " +
+		"dynamic_client_registration_enabled = @p27, pkce_required = @p28, implicit_flow_enabled = @p29, " +
+		"resource_owner_password_credentials_enabled = @p30, audit_logs_in_console_enabled = @p31, " +
+		"audit_logs_in_database_enabled = @p32, audit_log_retention_days = @p33, account_deletion_enabled = @p34 " +
+		"WHERE id = @p35",
 }
 
 var selectSettingsById = statement{
@@ -325,7 +333,7 @@ func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 	settings.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertSettings, "settings",
-		settings.CreatedAt, settings.UpdatedAt, settings.AppName, settings.Issuer, settings.UITheme,
+		settings.CreatedAt, settings.UpdatedAt, settings.AppName, settings.Issuer,
 		settings.PasswordPolicy, settings.SelfRegistrationEnabled,
 		settings.SelfRegistrationRequiresEmailVerification, settings.TokenExpirationInSeconds,
 		settings.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineMaxLifetimeInSeconds,
@@ -396,7 +404,7 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 
 	if _, err := d.ExecSQL(ctx, tx, insertInitialSettings.text(d.Dialect),
 		settings.Id, settings.CreatedAt, settings.UpdatedAt, settings.AppName, settings.Issuer,
-		settings.UITheme, settings.PasswordPolicy, settings.SelfRegistrationEnabled,
+		settings.PasswordPolicy, settings.SelfRegistrationEnabled,
 		settings.SelfRegistrationRequiresEmailVerification, settings.TokenExpirationInSeconds,
 		settings.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineMaxLifetimeInSeconds,
 		settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
@@ -433,7 +441,7 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 	settings.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateSettings.text(d.Dialect),
-		settings.UpdatedAt, settings.AppName, settings.Issuer, settings.UITheme, settings.PasswordPolicy,
+		settings.UpdatedAt, settings.AppName, settings.Issuer, settings.PasswordPolicy,
 		settings.SelfRegistrationEnabled, settings.SelfRegistrationRequiresEmailVerification,
 		settings.TokenExpirationInSeconds, settings.RefreshTokenOfflineIdleTimeoutInSeconds,
 		settings.RefreshTokenOfflineMaxLifetimeInSeconds, settings.UserSessionIdleTimeoutInSeconds,

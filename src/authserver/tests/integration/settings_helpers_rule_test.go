@@ -32,7 +32,6 @@ func populatedSettings() record.Settings {
 		UpdatedAt:                               stamp,
 		AppName:                                 "Goiabada",
 		Issuer:                                  "https://auth.example.org",
-		UITheme:                                 "dark",
 		PasswordPolicy:                          record.PasswordPolicyMedium,
 		SelfRegistrationEnabled:                 true,
 		TokenExpirationInSeconds:                300,

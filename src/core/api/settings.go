@@ -212,18 +212,6 @@ type UpdateSettingsTokensRequest struct {
 	IncludeOpenIDConnectClaimsInIdToken     bool `json:"includeOpenIDConnectClaimsInIdToken"`
 }
 
-// SettingsUIThemeResponse represents the UI theme settings returned by the API
-type SettingsUIThemeResponse struct {
-	UITheme         string   `json:"uiTheme"`
-	AvailableThemes []string `json:"availableThemes"`
-}
-
-// UpdateSettingsUIThemeRequest contains the UI theme setting field for update
-// Empty string means default theme.
-type UpdateSettingsUIThemeRequest struct {
-	UITheme string `json:"uiTheme"`
-}
-
 // SettingsAuditLogsResponse represents the audit log settings returned by the API
 type SettingsAuditLogsResponse struct {
 	AuditLogsInConsoleEnabled  bool `json:"auditLogsInConsoleEnabled"`

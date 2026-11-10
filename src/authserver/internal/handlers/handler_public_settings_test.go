@@ -71,8 +71,7 @@ func TestPublicSettings_Success(t *testing.T) {
 // The default brand rides with the public settings as brand: its appearance, and the absolute URL
 // of its stylesheet, built from the auth server's base URL as a client logo's URL is, so the admin
 // console links it after main.css and draws every page as the auth server draws its own (#810
-// decision 3). uiTheme is no longer answered, whatever the settings row still holds: a stored dark
-// beside an automatic brand answers automatic.
+// decision 3). uiTheme is no longer answered.
 func TestPublicSettings_CarriesTheDefaultBrand(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
@@ -90,7 +89,7 @@ func TestPublicSettings_CarriesTheDefaultBrand(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
-				Id: 1, AppName: "Goiabada", UITheme: "dark",
+				Id: 1, AppName: "Goiabada",
 			}, nil).Once()
 			database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(tc.brand, nil).Once()
 

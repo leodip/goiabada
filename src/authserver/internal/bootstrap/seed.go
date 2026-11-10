@@ -358,7 +358,6 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	return r.db.CreateInitialSettings(ctx, tx, &record.Settings{
 		AppName: values.appName,
 		Issuer:  r.cfg.AuthServerBaseURL,
-		UITheme: "",
 		// Nobody registers until an administrator opens it, and then through the verified flow
 		// unless they turn verification off on purpose (#526).
 		SelfRegistrationEnabled:                   false,

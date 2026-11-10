@@ -4,6 +4,9 @@ import (
 	"database/sql"
 )
 
+// Settings is the one settings row. No field carries its ui_theme column: a brand is the look
+// now, and the column stays unread for the previous release until #823 drops it. Only the inserts
+// name it, with the empty value (#810 decision 2).
 type Settings struct {
 	Id int64 `db:"id" fieldtag:"pk"`
 	// CreatedAt is when the row was inserted. It is tagged dont-update so UpdateSettings never
@@ -13,7 +16,6 @@ type Settings struct {
 	UpdatedAt                                 sql.NullTime   `db:"updated_at"`
 	AppName                                   string         `db:"app_name"`
 	Issuer                                    string         `db:"issuer"`
-	UITheme                                   string         `db:"ui_theme"`
 	PasswordPolicy                            PasswordPolicy `db:"password_policy"`
 	SelfRegistrationEnabled                   bool           `db:"self_registration_enabled"`
 	SelfRegistrationRequiresEmailVerification bool           `db:"self_registration_requires_email_verification"`

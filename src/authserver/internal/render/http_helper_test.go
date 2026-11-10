@@ -245,7 +245,6 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
 			AppName:     "sentinel app",
-			UITheme:     "sentinel theme",
 			SMTPEnabled: true,
 		}))
 

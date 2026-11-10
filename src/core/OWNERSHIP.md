@@ -216,7 +216,6 @@ command itself and fails on a tree it changed.
 | `core/api` | `SettingsSigningKeyResponse` | both-apps | — |
 | `core/api` | `SettingsTokensResponse` | both-apps | — |
 | `core/api` | `SettingsTurnstileResponse` | both-apps | — |
-| `core/api` | `SettingsUIThemeResponse` | contract | Admin API DTO of `/api/v1/admin/settings/ui-theme`, which is what `core/api` is for. The auth server still serves the operation, and no admin console file reads it since the Theme page gave way to Branding (#810), which retires the operation and this type with it; #385 exempts this package by name. |
 | `core/api` | `SuccessResponse` | both-apps | — |
 | `core/api` | `UpdateAccountEmailRequest` | both-apps | — |
 | `core/api` | `UpdateAccountOTPRequest` | both-apps | — |
@@ -253,7 +252,6 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateSettingsSessionsRequest` | both-apps | — |
 | `core/api` | `UpdateSettingsTokensRequest` | both-apps | — |
 | `core/api` | `UpdateSettingsTurnstileRequest` | both-apps | — |
-| `core/api` | `UpdateSettingsUIThemeRequest` | contract | Admin API DTO of `/api/v1/admin/settings/ui-theme`, which is what `core/api` is for. The auth server still serves the operation, and no admin console file reads it since the Theme page gave way to Branding (#810), which retires the operation and this type with it; #385 exempts this package by name. |
 | `core/api` | `UpdateUserAddressRequest` | both-apps | — |
 | `core/api` | `UpdateUserAttributeRequest` | both-apps | — |
 | `core/api` | `UpdateUserAttributeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
@@ -674,7 +672,6 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeSettingsTurnstileSiteKeyChanged` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeSettingsTurnstileSiteKeyRequired` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeSettingsTurnstileSiteKeyTooLong` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeSettingsUIThemeInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeUserEmailRequired` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeUserEmailTooLong` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeUserGroupsNotFound` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |

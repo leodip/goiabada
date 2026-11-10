@@ -381,7 +381,6 @@ cause, each a whole sentence.
 | `handler.settings_email.connect_failed` | (none) | Unable to connect to the SMTP server. |
 | `handler.settings_keys.key_not_found` | (none) | Key not found |
 | `handler.settings_keys.only_previous_revocable` | (none) | Only a previous key can be revoked |
-| `handler.settings_ui_theme.theme_invalid` | (none) | Invalid theme. |
 | `handler.settings_audit_logs.retention_days_negative` | (none) | The retention can't be negative. Use 0 to keep stored events forever. |
 | `handler.settings_audit_logs.retention_days_too_large` | (none) | The retention can't be more than 3650 days (10 years). |
 
