@@ -755,14 +755,6 @@
     white-space: nowrap;
   }
 
-  .data-table .text-link {
-    text-decoration: none;
-  }
-
-  .data-table .text-link:hover {
-    text-decoration: underline;
-  }
-
   .cell-wrap {
     overflow-wrap: anywhere;
   }
