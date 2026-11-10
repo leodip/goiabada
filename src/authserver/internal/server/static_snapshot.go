@@ -6,7 +6,10 @@ import (
 	"io/fs"
 	"path"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/leodip/goiabada/authserver/internal/render"
 )
 
 // staticSnapshot is a static file read once, over the static files it was read from: the bytes
@@ -16,42 +19,82 @@ import (
 // decision 7). Every other name is opened from the static files as before.
 type staticSnapshot struct {
 	fs.FS
-	name    string
-	info    fs.FileInfo
-	content []byte
+	name        string
+	info        fs.FileInfo
+	content     []byte
+	fingerprint string
 }
 
 // staticSnapshotReads is how many times a file found changing while it is read is read again
 // before its bytes are served without a modification date.
 const staticSnapshotReads = 3
 
-// readStaticSnapshot reads the file urlPath names under /static, as http.FileServer names it, and
-// reports false for a directory or a file that cannot be read, which the file server then answers
-// as it always has.
+// staticSnapshotLimit is the largest file read whole for a snapshot. A larger one is streamed
+// from the static files as any other request is, kept five minutes: reading it whole would let
+// anyone make the server hold the whole file in memory with a one-byte range request.
+const staticSnapshotLimit = 1 << 20
+
+// staticSnapshots are the snapshots of the static files, each kept while its file's size and
+// modification date stay the same, so a request for an unchanged file costs a stat and no read.
+// They hold only files of the static directory up to staticSnapshotLimit each, which requests
+// cannot add to.
+type staticSnapshots struct {
+	fsys  fs.FS
+	mu    sync.Mutex
+	files map[string]staticSnapshot
+}
+
+func newStaticSnapshots(fsys fs.FS) *staticSnapshots {
+	return &staticSnapshots{fsys: fsys, files: map[string]staticSnapshot{}}
+}
+
+// read returns the snapshot of the file urlPath names under /static, as http.FileServer names it,
+// and reports false for a directory, a file over staticSnapshotLimit or a file that cannot be
+// read, which the file server then answers as it always has.
 //
 // The file server sizes and dates the answer from the snapshot's metadata, so the metadata has to
 // describe the bytes read: the size is always theirs, and the modification date is the file's only
 // when the file did not change while it was read. A file edited in place mid-read is read again;
 // one still changing after staticSnapshotReads reads is served with no modification date, so no
-// conditional request is answered 304 on a date that does not describe the bytes.
-func readStaticSnapshot(fsys fs.FS, urlPath string) (staticSnapshot, bool) {
+// conditional request is answered 304 on a date that does not describe the bytes, and is not kept.
+func (s *staticSnapshots) read(urlPath string) (staticSnapshot, bool) {
 	name := strings.TrimPrefix(path.Clean("/"+strings.TrimPrefix(urlPath, staticPrefix)), "/")
 	if !fs.ValidPath(name) || name == "." {
 		return staticSnapshot{}, false
 	}
+	info, err := fs.Stat(s.fsys, name)
+	if err != nil || info.IsDir() || info.Size() > staticSnapshotLimit {
+		s.mu.Lock()
+		delete(s.files, name)
+		s.mu.Unlock()
+		return staticSnapshot{}, false
+	}
+	s.mu.Lock()
+	kept, ok := s.files[name]
+	s.mu.Unlock()
+	if ok && kept.info.Size() == info.Size() && kept.info.ModTime().Equal(info.ModTime()) {
+		return kept, true
+	}
 	for read := 1; ; read++ {
-		snapshot, unchanged, ok := readStaticFileOnce(fsys, name)
+		snapshot, unchanged, ok := readStaticFileOnce(s.fsys, name)
 		if !ok {
 			return staticSnapshot{}, false
 		}
-		if unchanged || read == staticSnapshotReads {
+		if unchanged {
+			s.mu.Lock()
+			s.files[name] = snapshot
+			s.mu.Unlock()
+			return snapshot, true
+		}
+		if read == staticSnapshotReads {
 			return snapshot, true
 		}
 	}
 }
 
 // readStaticFileOnce reads the file once and reports whether it stayed unchanged while read: the
-// same size and modification date before and after, the size being the bytes read.
+// same size and modification date before and after, the size being the bytes read. A file that
+// grows past staticSnapshotLimit while it is read is not read further, and reports false.
 func readStaticFileOnce(fsys fs.FS, name string) (snapshot staticSnapshot, unchanged, ok bool) {
 	file, err := fsys.Open(name)
 	if err != nil {
@@ -62,8 +105,8 @@ func readStaticFileOnce(fsys fs.FS, name string) (snapshot staticSnapshot, uncha
 	if err != nil || before.IsDir() {
 		return staticSnapshot{}, false, false
 	}
-	content, err := io.ReadAll(file)
-	if err != nil {
+	content, err := io.ReadAll(io.LimitReader(file, staticSnapshotLimit+1))
+	if err != nil || len(content) > staticSnapshotLimit {
 		return staticSnapshot{}, false, false
 	}
 	after, err := file.Stat()
@@ -76,7 +119,9 @@ func readStaticFileOnce(fsys fs.FS, name string) (snapshot staticSnapshot, uncha
 	if unchanged {
 		info.modTime = after.ModTime()
 	}
-	return staticSnapshot{FS: fsys, name: name, info: info, content: content}, unchanged, true
+	return staticSnapshot{
+		FS: fsys, name: name, info: info, content: content, fingerprint: render.AssetFingerprint(content),
+	}, unchanged, true
 }
 
 // snapshotInfo is the file's metadata as the snapshot's bytes have it: their size, and the file's
