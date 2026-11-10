@@ -36,7 +36,11 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   root), on every input and `pageshow`. The appearance decides what shows: Light or Dark its one
   sample with the Light/Dark switch hidden, Automatic (or no appearance it knows) the switch and
   the sample it names, and one `data-brand-preview-note` sentence saying which applies; the
-  template draws the switch and sentences for the form's appearance. The script also redraws the
+  template draws the switch and sentences for the form's appearance. The switch on the heading's
+  line, the sentences sharing one paragraph, the column's width and close spacing keep the whole
+  preview on a 1280×800 screen beneath the header in every built-in language;
+  `preview.spec.ts` measures it at 1280×800 and 1440×900, so check it there after adding to the
+  preview. The script also redraws the
   three Appearance cards' swatches in the chosen theme: each `data-appearance-swatch` names its
   modes, one SVG each in order, and `brand_swatch`'s shapes name their tokens in `data-fill` and
   `data-stroke`; the theme cards' swatches keep their own theme. A form holding a theme the list

@@ -2,7 +2,8 @@
 // appearance the form holds, before anything is saved. The appearance decides what it shows: Light and
 // Dark their one sample with no switch, Automatic the sample the Light/Dark switch names, starting on
 // Light. The Appearance cards' swatches follow the chosen theme too. The sample is an illustration: it
-// cannot be focused, assistive technology skips it, and the page says in text what it shows.
+// cannot be focused, assistive technology skips it, and the page says in text what it shows. Beside
+// the form, the whole preview stays on screen as the page scrolls, at 1440×900 and 1280×800.
 //
 // Everything here is on the New brand page and nothing is saved, so this is an ordinary parallel spec.
 // A browser restores the form after Back without firing a change, each engine in its own way, so this
@@ -12,6 +13,7 @@ import {
   appearanceSwatchFills,
   brandPreview,
   brandingUrl,
+  expectPreviewDrawn,
   fillBrandForm,
   newBrandUrl,
   previewSample,
@@ -269,3 +271,34 @@ test("the sample cannot be reached by Tab, is hidden from assistive technology, 
     ).toBeNull();
   }
 });
+
+// Beside the form, the whole preview is on screen at the two desktop sizes the editor is laid out for
+// (#811 decision 1), beneath the console's header, once the page is scrolled and down to its end, in
+// every built-in language: Automatic's, whose sentence and switch make it the tallest, in English and
+// in the languages whose words run longer.
+const locales = ["en", "pt-BR", "de", "es", "fr", "it"];
+for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }]) {
+  test(`at ${viewport.width}×${viewport.height} the whole preview stays on screen beside the form as the page scrolls, in every language`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const preview = brandPreview(page);
+    for (const locale of locales) {
+      await page.goto(`${newBrandUrl}?${new URLSearchParams({ ui_locales: locale })}`);
+      await expect(page.locator("html")).toHaveAttribute("lang", locale);
+      await expect(page.locator("#appearance-auto")).toBeChecked();
+      await expectPreviewDrawn(page);
+      await expect(preview.locator(".brand-preview-switch")).toBeVisible();
+      for (const scroll of ["scrolled", "at the end"] as const) {
+        await page.evaluate((toEnd) => window.scrollTo(0, toEnd ? document.documentElement.scrollHeight : 400), scroll === "at the end");
+        const where = `${locale}, ${scroll}`;
+        const header = await page.locator(".app-header").boundingBox();
+        const form = await page.locator(".brand-editor > form").boundingBox();
+        const box = await preview.boundingBox();
+        if (!header || !form || !box) throw new Error(`the header, the form or the preview is not drawn (${where})`);
+        expect(box.x, `the preview beside the form (${where})`).toBeGreaterThanOrEqual(form.x + form.width);
+        expect(box.y, `the preview's top beneath the header (${where})`).toBeGreaterThanOrEqual(header.y + header.height);
+        expect(box.y + box.height, `the preview's bottom on screen (${where})`).toBeLessThanOrEqual(viewport.height);
+      }
+    }
+  });
+}

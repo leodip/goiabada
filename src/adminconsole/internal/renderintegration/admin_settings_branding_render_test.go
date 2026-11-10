@@ -269,14 +269,16 @@ func TestRender_AdminSettingsBrandingFormDrawsThePreview(t *testing.T) {
 
 			// The page says in text what the preview shows.
 			assert.Contains(t, editor, `<h2 class="brand-preview-title" id="brand-preview-title">Pré-visualização</h2>`)
-			assert.Contains(t, editor, "Uma amostra de uma página de entrada nesta marca, como o formulário está agora. A marca só muda quando você salva.")
+			// One paragraph holds what it shows and the sentence saying which modes apply, so the
+			// preview fits a 1280×800 screen beside the form in every language.
+			assert.Regexp(t, `<p class="field-hint"><span>Uma amostra de uma página de entrada nesta marca, como o formulário está agora\. A marca só muda quando você salva\.</span>\s*<span data-brand-preview-note="auto" hidden>`, editor)
 
 			// The switch, named, its two choices the appearances' names, on Light; a Dark brand
 			// draws it hidden, and says it is always dark.
 			assert.Regexp(t, `<fieldset class="brand-preview-switch" hidden>\s*<legend class="field-label">Visualizar em</legend>`, editor)
 			assert.Regexp(t, `<input type="radio" id="brand-preview-mode-light" name="brandPreviewMode" value="light" checked>\s*<span>Claro</span>`, editor)
 			assert.Regexp(t, `<input type="radio" id="brand-preview-mode-dark" name="brandPreviewMode" value="dark">\s*<span>Escuro</span>`, editor)
-			assert.Contains(t, editor, `<p class="field-hint" data-brand-preview-note="dark">Esta marca é sempre escura.</p>`)
+			assert.Regexp(t, `<span data-brand-preview-note="dark">Esta marca é sempre escura\.</span></p>`, editor)
 
 			for _, mode := range []string{"light", "dark"} {
 				sample := sampleOf(t, editor, mode)
@@ -319,9 +321,9 @@ func TestRender_AdminSettingsBrandingFormDrawsThePreview(t *testing.T) {
 // is previewed as.
 func TestRender_AdminSettingsBrandingFormDrawsThePreviewForTheAppearance(t *testing.T) {
 	notes := map[string]string{
-		"auto":  `<p class="field-hint" data-brand-preview-note="auto">Os visitantes a veem clara ou escura, conforme o dispositivo deles.</p>`,
-		"light": `<p class="field-hint" data-brand-preview-note="light">Esta marca é sempre clara.</p>`,
-		"dark":  `<p class="field-hint" data-brand-preview-note="dark">Esta marca é sempre escura.</p>`,
+		"auto":  `<span data-brand-preview-note="auto">Os visitantes a veem clara ou escura, conforme o dispositivo deles.</span>`,
+		"light": `<span data-brand-preview-note="light">Esta marca é sempre clara.</span>`,
+		"dark":  `<span data-brand-preview-note="dark">Esta marca é sempre escura.</span>`,
 	}
 	for _, tc := range []struct {
 		appearance   string

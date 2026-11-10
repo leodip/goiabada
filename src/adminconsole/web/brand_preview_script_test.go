@@ -257,9 +257,9 @@ function build(request) {
   // Automatic.
   const drawnAppearance = request.appearance === "light" || request.appearance === "dark" ? request.appearance : "auto";
   const note = function (appearance) {
-    const attrs = { class: "field-hint", "data-brand-preview-note": appearance };
+    const attrs = { "data-brand-preview-note": appearance };
     if (appearance !== drawnAppearance) { attrs.hidden = ""; }
-    return el("p", attrs);
+    return el("span", attrs);
   };
   const switchAttrs = { class: "brand-preview-switch" };
   if (drawnAppearance !== "auto") { switchAttrs.hidden = ""; }
@@ -279,13 +279,18 @@ function build(request) {
           el("fieldset", {}, request.themeCards.map(themeCard)),
         ]),
         el("section", { class: "brand-preview" }, [
-          el("p", { class: "field-hint" }),
-          note("auto"),
-          note("light"),
-          note("dark"),
-          el("fieldset", switchAttrs, [
-            radio("brandPreviewMode", "light", true),
-            radio("brandPreviewMode", "dark", false),
+          el("div", { class: "brand-preview-header" }, [
+            el("h2", { class: "brand-preview-title" }),
+            el("fieldset", switchAttrs, [
+              radio("brandPreviewMode", "light", true),
+              radio("brandPreviewMode", "dark", false),
+            ]),
+          ]),
+          el("p", { class: "field-hint" }, [
+            el("span"),
+            note("auto"),
+            note("light"),
+            note("dark"),
           ]),
           sample("light"),
           sample("dark"),
