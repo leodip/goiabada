@@ -72,7 +72,7 @@ func (c *Client) URL() string {
 
 // GetPublicSettings fetches public settings from the unauthenticated /api/public/settings endpoint.
 // No access token is required for this call.
-// Returns only safe-to-share settings: appName, smtpEnabled, issuer, the default brand. The issuer is
+// Returns only safe-to-share settings: appName, smtpEnabled, issuer, the console's brand. The issuer is
 // already served anonymously at /.well-known/openid-configuration, which OIDC Discovery
 // section 3 requires, so carrying it here discloses nothing new (#285).
 //

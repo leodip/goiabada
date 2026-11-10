@@ -1,6 +1,8 @@
 package integration
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -75,4 +78,62 @@ func TestPublicSettings_CarriesAnAutomaticDefaultBrandAsAuto(t *testing.T) {
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&published))
 	assert.Equal(t, "auto", published.Brand.Appearance)
+}
+
+// publicBrand reads the brand /api/public/settings answers: its appearance and stylesheet URL.
+func publicBrand(t *testing.T) (appearance, stylesheetURL string) {
+	t.Helper()
+	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var published struct {
+		Brand struct {
+			Appearance    string `json:"appearance"`
+			StylesheetURL string `json:"stylesheetUrl"`
+		} `json:"brand"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&published))
+	return published.Brand.Appearance, published.Brand.StylesheetURL
+}
+
+// brandStylesheetURL is the pattern of the absolute URL of brand's stylesheet.
+func brandStylesheetURL(brand *record.Brand) string {
+	return `^` + regexp.QuoteMeta(appConfig.AuthServer.BaseURL) + `/brand/` + strconv.FormatInt(brand.Id, 10) +
+		`/stylesheet\.css\?v=[0-9a-f]{12}$`
+}
+
+// /api/public/settings answers as brand the brand of the admin console's own client, which the
+// console draws every page in, and the default brand while that client has none of its own (#812
+// decision 7). Another client's brand is never answered.
+func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
+	ctx := context.Background()
+	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
+	console, err := database.GetClientByClientIdentifier(ctx, nil, builtin.AdminConsoleClientIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, console)
+	require.False(t, console.BrandId.Valid, "the console's client starts on the default brand")
+
+	// Another client given a brand leaves the answer on the default.
+	other, _ := brandSignInClient(t, record.AcrLevel1)
+	giveClientBrand(t, other, record.BrandAppearanceLight, "guava")
+	appearance, stylesheetURL := publicBrand(t)
+	assert.Equal(t, "dark", appearance)
+	assert.Regexp(t, brandStylesheetURL(defaultBrand), stylesheetURL)
+
+	// The console's client given a light Avocado brand: the answer is that brand.
+	consoleBrand := giveClientBrand(t, console, record.BrandAppearanceLight, "avocado")
+	appearance, stylesheetURL = publicBrand(t)
+	assert.Equal(t, "light", appearance)
+	assert.Regexp(t, brandStylesheetURL(consoleBrand), stylesheetURL)
+
+	// Put back on the default, the answer is the default again.
+	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		_, err := database.SetClientBrand(ctx, tx, console.Id, sql.NullInt64{})
+		return err
+	}))
+	appearance, stylesheetURL = publicBrand(t)
+	assert.Equal(t, "dark", appearance)
+	assert.Regexp(t, brandStylesheetURL(defaultBrand), stylesheetURL)
 }

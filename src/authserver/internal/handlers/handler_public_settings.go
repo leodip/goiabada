@@ -10,27 +10,30 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// publicSettingsDatabase is what the public settings endpoint needs: the settings row, and the
-// default brand it points at.
+// publicSettingsDatabase is what the public settings endpoint needs: the settings row, and the brand
+// the admin console's own client is drawn in, its own or the default the row points at.
 type publicSettingsDatabase interface {
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
-	render.DefaultBrandReader
+	render.PageBrandReader
 }
 
 // HandlePublicSettingsGet answers GET /api/public/settings, which needs no authentication: the
 // settings the admin console needs before anyone holds a token, the application name, whether SMTP
-// is configured, the issuer, the default brand, the stored password policy's rules and whether users
-// may delete their own account, as JSON, or the API's JSON 500 when the settings row cannot be read
-// (#279 decision 17). openapi.yaml describes it as getPublicSettings (#783).
+// is configured, the issuer, the brand the console draws its pages in, the stored password policy's
+// rules and whether users may delete their own account, as JSON, or the API's JSON 500 when the
+// settings row cannot be read (#279 decision 17). openapi.yaml describes it as getPublicSettings
+// (#783).
 //
-// The default brand is the one the auth server's own pages are drawn in, read through the same
-// render.DefaultPageBrand, with its stylesheet's URL made absolute on baseURL, as a client logo's is,
-// so the console links it and draws its pages alike (#810 decision 3). A default brand that cannot be
-// read leaves brand out rather than failing the answer: the console then draws automatic in the
-// built-in colors, as the auth server's own pages are drawn then.
+// The brand is the admin console's own client's, or the default brand when that client has none of
+// its own (#812 decision 7): the one the auth server draws that client's sign-in pages in, read
+// through the same render.ClientPageBrand, with its stylesheet's URL made absolute on baseURL, as a
+// client logo's is, so the console links it and draws its pages alike (#810 decision 3). A brand that
+// cannot be read leaves brand out rather than failing the answer: the console then draws automatic
+// in the built-in colors, as the auth server's own pages are drawn then.
 //
 // The route is registered for GET only, so the router answers any other method itself, 405 with
 // an Allow header and no body, as it does for every API route (#522 decision 5).
@@ -51,7 +54,7 @@ func HandlePublicSettingsGet(database publicSettingsDatabase, baseURL string) ht
 
 		// Map to public response DTO. Only the fields below may ever appear here:
 		// this endpoint needs no authentication, so the DTO is the whole boundary
-		// between an anonymous caller and the 32 fields of record.Settings, which
+		// between an anonymous caller and every field of record.Settings, which
 		// include the legacy AES encryption key and the encrypted SMTP password.
 		// handler_public_settings_test.go fails if that boundary widens.
 		//
@@ -71,9 +74,9 @@ func HandlePublicSettingsGet(database publicSettingsDatabase, baseURL string) ht
 		// as SMTPEnabled gates Email verification (#783 decision 6). It is a policy, not data about
 		// anyone.
 		//
-		// Brand is here because the admin console draws its pages in the default brand (#810
-		// decision 3). It is its appearance and stylesheet URL alone, which every page the auth server
-		// serves to anyone already carries.
+		// Brand is here because the admin console draws its pages in its own client's brand (#810
+		// decision 3, #812 decision 7). It is its appearance and stylesheet URL alone, which that
+		// client's sign-in pages already carry to anyone.
 		response := api.PublicSettingsResponse{
 			AppName:       settings.AppName,
 			SMTPEnabled:   settings.SMTPEnabled,
@@ -89,11 +92,11 @@ func HandlePublicSettingsGet(database publicSettingsDatabase, baseURL string) ht
 	}
 }
 
-// publicBrand is the default brand as the public settings carry it, or nil when it cannot be read,
-// which render.DefaultPageBrand says by naming no stylesheet. Its data-theme is empty for automatic
-// alone, so an empty one is published as auto.
-func publicBrand(ctx context.Context, brands render.DefaultBrandReader, baseURL string) *api.PublicBrandResponse {
-	brand := render.DefaultPageBrand(ctx, brands)
+// publicBrand is the admin console's own client's brand as the public settings carry it, or nil when
+// it cannot be read, which render.ClientPageBrand says by naming no stylesheet. Its data-theme is
+// empty for automatic alone, so an empty one is published as auto.
+func publicBrand(ctx context.Context, brands render.PageBrandReader, baseURL string) *api.PublicBrandResponse {
+	brand := render.ClientPageBrand(ctx, brands, builtin.AdminConsoleClientIdentifier)
 	if brand.Stylesheet == "" {
 		return nil
 	}

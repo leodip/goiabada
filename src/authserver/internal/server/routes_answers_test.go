@@ -61,8 +61,10 @@ func newRoutingDatabase(t *testing.T) *datamocks.Database {
 	t.Helper()
 
 	database := datamocks.NewDatabase(t)
-	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	// A page reads the default brand, and the public settings the console's client's; none leaves
+	// it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+	database.On("GetClientPageBrand", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Maybe()
 	return database

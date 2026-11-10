@@ -1,5 +1,5 @@
 // Package publicsettings is how the admin console learns the auth server's public settings: the
-// application name, the default brand's appearance and stylesheet, whether SMTP is configured, and
+// application name, the console's brand's appearance and stylesheet, whether SMTP is configured, and
 // the issuer the console checks its own tokens' iss claim against. Client reads them from the auth
 // server's unauthenticated /api/public/settings, and Cache keeps them for a TTL so that every page,
 // which needs them before it renders, does not ask the auth server again. Every request arriving

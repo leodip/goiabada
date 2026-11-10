@@ -5,8 +5,8 @@ import (
 )
 
 // PublicSettingsResponse is what /api/public/settings answers. That endpoint needs no
-// authentication, so this type is the entire boundary between an anonymous caller and the 37
-// fields of record.Settings, among them the legacy AES encryption key and the encrypted SMTP
+// authentication, so this type is the entire boundary between an anonymous caller and every field
+// of record.Settings, among them the legacy AES encryption key and the encrypted SMTP
 // password. The auth server's handler_public_settings_test.go holds that boundary in two
 // directions: an allowlist of the fields below, and a case filling the model with recognizable
 // secrets and asserting none of them reach the body.
@@ -30,10 +30,11 @@ type PublicSettingsResponse struct {
 	SMTPEnabled bool   `json:"smtpEnabled"`
 	Issuer      string `json:"issuer"`
 
-	// Brand is the default brand, which the admin console draws every page in, as the auth server
-	// draws its own (#810 decision 3). It is absent when the auth server cannot read the default
-	// brand, and from an auth server older than brands; the console then draws its pages automatic,
-	// in the built-in colors.
+	// Brand is the brand of the admin console's own client, or the default brand when that client
+	// has none of its own, which the console draws every page in, as the auth server draws that
+	// client's sign-in pages (#810 decision 3, #812 decision 7). It is absent when the auth server
+	// cannot read the brand, and from an auth server older than brands; the console then draws its
+	// pages automatic, in the built-in colors.
 	Brand *PublicBrandResponse `json:"brand,omitempty"`
 
 	// AccountDeletionEnabled is whether users may delete their own account, which the admin
@@ -45,7 +46,7 @@ type PublicSettingsResponse struct {
 	PasswordRules PasswordRulesResponse `json:"passwordRules"`
 }
 
-// PublicBrandResponse is what a page drawn in the default brand takes from it: its appearance, auto,
+// PublicBrandResponse is what a page drawn in a brand takes from it: its appearance, auto,
 // light or dark, and the absolute URL of its stylesheet, which a page links after main.css. The URL
 // is opaque to the admin console, which links it as given and never builds one (#810 decision 3).
 // The same stylesheet is served to anyone, so neither value discloses anything a page does not.
