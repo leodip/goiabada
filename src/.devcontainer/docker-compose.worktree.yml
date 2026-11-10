@@ -12,9 +12,18 @@
 # `!reset` needs Compose 2.24 or later. Never apply this file to the human
 # container: VS Code reads docker-compose.yml alone, and keeps its ports.
 #
+# The one port it adds is a pair on the devcontainer, for the auth server and
+# admin console that `.placido/stack.sh serve` starts so an agent can look at
+# the pages in a browser. No host port is named, so Docker picks a free one for
+# each stack and two stacks never collide, and only on the loopback address.
+#
 # See README.md in this directory for how to start, wait for, use and tear
 # down such a stack.
 services:
+  devcontainer:
+    ports:
+      - "127.0.0.1::19290"
+      - "127.0.0.1::19291"
   mysql-server:
     ports: !reset []
   postgres-server:

@@ -25,6 +25,19 @@
   `site/STYLE.md` and its linked glossary. The docs describe the latest version;
   breaking changes and migration steps belong in release notes. For docs or
   OpenAPI changes, build the site on the host as `site/README.md` describes.
+- **Look at the pages the change touches.** Reading the CSS does not show how a page
+  looks. When the change alters a page of the auth server or the admin console, run
+  `.placido/stack.sh serve`, which starts both from this worktree and prints their
+  addresses and the admin's sign-in, and open the pages with the Playwright MCP
+  tools: the ones the agreement names first, in light and dark
+  (`browser_emulate_media`), at a phone width (`browser_resize` to 375 pixels wide),
+  and in each theme or state the change adds. Text hard to read, overlaps, overflow
+  or a control out of place is a finding like any other; say which page, scheme and
+  width show it. After switching the color scheme or the theme, wait a second before
+  the screenshot: a screenshot taken mid-fade shows faded text that is not there.
+  Measure contrast from the computed colors (`browser_evaluate`), not from the
+  picture. Run `serve` again after each fix round, since it runs the code it started
+  with.
 - **Browser tests:** the Playwright suite under `e2e/` runs against one shared
   environment on a VPS, and placido runs it whole as the last gate, after the
   review. Do not run `e2e` or the scripts under `e2e/` yourself, and do not count a

@@ -18,6 +18,10 @@
   the updates in a slice. API operation descriptions live in
   `src/authserver/web/openapi.yaml`. Use `site/STYLE.md` and its linked glossary
   for wording; breaking changes and migration steps belong in release notes.
+- **Pages to look at:** when the change alters how a page of the auth server or the
+  admin console looks, name in the agreement the pages and states to look at, such as
+  the brand editor in light and dark and at a phone width. The implementer and the
+  reviewer open them in a browser, through `.placido/stack.sh serve`.
 - **Browser tests:** `e2e/` holds a Playwright suite that runs against a real
   deployment on a VPS (see `e2e/README.md`). Placido runs it whole as the last gate,
   after the review; no agent runs it. In every interview, look at

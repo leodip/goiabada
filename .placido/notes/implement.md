@@ -31,6 +31,18 @@
   the latest version in the present tense; put breaking changes and migration
   steps in release notes. For docs or OpenAPI changes, build the site from `site/`
   on the host as `site/README.md` describes; the devcontainer has no Node.js.
+- **Look at the pages you change.** When the slice changes how a page of the auth
+  server or the admin console looks, regenerate the CSS, then run
+  `.placido/stack.sh serve`: it starts both from this worktree, with an empty
+  database, and prints their addresses and the admin's sign-in. Open the pages with
+  the Playwright MCP tools, starting with the ones the agreement names, in light and
+  dark (`browser_emulate_media`) and at a phone width (`browser_resize` to 375
+  pixels wide), and look at each screenshot: text hard to read, overlaps, overflow, a
+  control out of place. After switching the color scheme or the theme, wait a second
+  before the screenshot: the page fades between colors, and a screenshot taken
+  mid-fade shows faded text that is not there. Measure a doubtful contrast from the
+  computed colors (`browser_evaluate`), not from the picture. `serve` runs what the
+  worktree held when it started, so run it again after a change; `serve stop` ends it.
 - **Browser tests:** the Playwright suite under `e2e/` runs against one shared
   environment on a VPS, and placido runs it whole as the last gate, after the
   review. Do not run `e2e` or the scripts under `e2e/` yourself. Look at

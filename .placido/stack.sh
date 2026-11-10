@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The Docker stack of one placido issue: a compose project named after the issue
 # ($PLACIDO_NAME, such as goiabada-439) from src/.devcontainer, with every database,
-# and no published ports (docker-compose.worktree.yml), so issues never collide with
-# each other or with the human stack, `goiabada`. Tests run inside its devcontainer
+# and no fixed published ports (docker-compose.worktree.yml), so issues never collide
+# with each other or with the human stack, `goiabada`. Tests run inside its devcontainer
 # with the environment devcontainer.json declares, which `docker exec` does not apply
 # by itself (see src/.devcontainer/README.md).
 #
@@ -11,6 +11,8 @@
 #   stack.sh run ARGS    src/authserver/run-tests.sh ARGS, in the devcontainer
 #   stack.sh vet         go vet in every module, in the devcontainer
 #   stack.sh exec CMD    any shell command, from src/authserver, in the devcontainer
+#   stack.sh serve       start the auth server and admin console from this worktree, for a browser
+#   stack.sh serve stop  stop them
 #   stack.sh ps          the stack's containers
 set -euo pipefail
 
@@ -123,6 +125,46 @@ wait_for_databases() {
     done
 }
 
+# `serve`: the auth server and the admin console built from this worktree, for an agent
+# to look at in a browser. They listen on 19290 and 19291 with a SQLite database of their
+# own, apart from everything a test run uses: run-tests.sh kills whatever listens on
+# 19090, 19091 and 19190 and removes /tmp/goiabada*.db*. The host reaches them on the
+# loopback ports Docker picked for this stack (docker-compose.worktree.yml), and each
+# base URL names that address, since the pages redirect to it and the cookies are set
+# for it; the admin console reaches the auth server inside the container. The database
+# starts empty each time, because the seed writes the admin console's sign-in address
+# from its base URL, which changes when the stack is created again. The servers embed
+# the stylesheets the worktree holds; serve does not regenerate them.
+SERVE_DIR=/tmp/placido-serve
+
+host_port() {  # host_port CONTAINER_PORT: the loopback port the host reaches it on
+    compose port devcontainer "$1" 2>/dev/null | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -1
+}
+
+serve_env() {  # serve_env AUTH_PORT CONSOLE_PORT: what differs from devcontainer.json, as -e arguments
+    local setting
+    for setting in GOIABADA_DB_TYPE=sqlite "GOIABADA_DB_DSN=$SERVE_DIR/goiabada.db" \
+        GOIABADA_DB_USERNAME= GOIABADA_DB_PASSWORD= GOIABADA_DB_HOST= GOIABADA_DB_PORT= GOIABADA_DB_NAME= \
+        "GOIABADA_AUTHSERVER_BASEURL=http://localhost:$1" GOIABADA_AUTHSERVER_INTERNALBASEURL=http://localhost:19290 \
+        GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=19290 GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=19292 \
+        GOIABADA_AUTHSERVER_METRICS_ENABLED=false \
+        "GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:$2" \
+        GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=19291 GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=19293; do
+        printf -- '-e\0%s\0' "$setting"
+    done
+}
+
+wait_for_page() {  # wait_for_page NAME URL: until it answers, or die with its log
+    local deadline=$(( $(date +%s) + 60 ))
+    until curl -s -o /dev/null -m 3 "$2"; do
+        if [[ $(date +%s) -ge $deadline ]] || ! docker exec "$CONTAINER" pgrep -f "^$SERVE_DIR/goiabada-$1" >/dev/null; then
+            docker exec "$CONTAINER" tail -n 20 "$SERVE_DIR/$1.log" 2>&1 | sed 's/^/  /' >&2
+            die "the $1 did not answer at $2; its last lines are above"
+        fi
+        sleep 1
+    done
+}
+
 case "${1:-}" in
     up)
         # Compose files that read the data key and database passwords from a generated
@@ -181,11 +223,36 @@ case "${1:-}" in
         shift
         in_container "$REPO_IN_CONTAINER/src/authserver" bash -lc "$*"
         ;;
+    serve)
+        # The servers an earlier serve started stop, and their database goes with them.
+        in_container / bash -c "pkill -f '^$SERVE_DIR/' || true; rm -rf '$SERVE_DIR' && mkdir -p '$SERVE_DIR'"
+        if [[ "${2:-}" == stop ]]; then echo "the auth server and admin console are stopped"; exit 0; fi
+        auth=$(host_port 19290); console=$(host_port 19291)
+        [[ -n "$auth" && -n "$console" ]] \
+            || die "$CONTAINER publishes no ports for serve, so it predates them; start the stack again with: $0 up"
+        in_container "$REPO_IN_CONTAINER/src/authserver" \
+            go build -buildvcs=false -o "$SERVE_DIR/goiabada-authserver" ./cmd/goiabada-authserver
+        in_container "$REPO_IN_CONTAINER/src/adminconsole" \
+            go build -buildvcs=false -o "$SERVE_DIR/goiabada-adminconsole" ./cmd/goiabada-adminconsole
+        env=()
+        while IFS= read -r -d '' item; do env+=("$item"); done < <(env_args; serve_env "$auth" "$console")
+        for server in authserver adminconsole; do  # the console asks the auth server as it starts
+            docker exec -d -u vscode -w "$SERVE_DIR" "${env[@]}" "$CONTAINER" \
+                bash -c "exec $SERVE_DIR/goiabada-$server >$SERVE_DIR/$server.log 2>&1"
+            if [[ $server == authserver ]]; then url="http://localhost:$auth/health"; else url="http://localhost:$console/"; fi
+            wait_for_page "$server" "$url"
+        done
+        login=$(printf '%s\n' "${env[@]}" | sed -n 's/^GOIABADA_ADMIN_\(EMAIL\|PASSWORD\)=//p' | paste -sd ' ')
+        echo "auth server    http://localhost:$auth"
+        echo "admin console  http://localhost:$console  (sign in as ${login/ / with password })"
+        echo "Built from this worktree's code, with an empty database seeded by the auth server."
+        echo "Logs: $0 exec 'tail $SERVE_DIR/*.log'. Run serve again after a change; serve stop ends them."
+        ;;
     ps)
         compose ps
         ;;
     *)
-        sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
         exit 2
         ;;
 esac

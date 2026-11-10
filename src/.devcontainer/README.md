@@ -53,12 +53,16 @@ to recreate its databases with it.
 `docker-compose.worktree.yml` is an override for **automated** stacks: independent copies of the
 same five services, one per git worktree, so a test run in one worktree cannot touch another's
 files or databases, and a rebuild or reopen of the human container in VS Code cannot kill a run
-in flight. Its whole content is `ports: !reset []` on the four services that publish a port. That
-is the only thing that stops a plain `docker compose up` with a new project name from starting
-next to the live stack: the tests reach the databases by service name on the project's own
-network with fixed internal ports, and Compose prefixes the network, the volumes and the built
-image with the project name. Everything else is inherited, so `run-tests.sh` runs inside the
-second stack unchanged.
+in flight. It sets `ports: !reset []` on the four services that publish a port. That is the only
+thing that stops a plain `docker compose up` with a new project name from starting next to the
+live stack: the tests reach the databases by service name on the project's own network with fixed
+internal ports, and Compose prefixes the network, the volumes and the built image with the project
+name. Everything else is inherited, so `run-tests.sh` runs inside the second stack unchanged.
+
+It also publishes the devcontainer's ports 19290 and 19291, where `.placido/stack.sh serve` starts
+an auth server and an admin console for an agent to look at in a browser. They name no host port,
+so Docker picks a free one for each stack, on the loopback address only, and two stacks never
+collide; `docker compose port devcontainer 19290` tells which one it picked.
 
 ### Start
 
