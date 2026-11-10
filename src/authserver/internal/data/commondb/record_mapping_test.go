@@ -51,6 +51,11 @@ type mappingCase struct {
 	// nil for a record that has no whole-row UPDATE, which is then not checked.
 	insert func(ctx context.Context, d *Database, rec any) error
 	update func(ctx context.Context, d *Database, rec any) error
+	// insertLiterals are columns no field carries that every insert must still write, each as
+	// exactly the literal given: a NOT NULL column with no default that a previous release reads
+	// and this one does not, such as settings.ui_theme (#810 decision 2). A read or an update
+	// naming one is refused as for any column no field is tagged with.
+	insertLiterals map[string]string
 }
 
 var allDialects = []data.Dialect{data.SQLite, data.MySQL, data.Postgres, data.MSSQL}
@@ -817,9 +822,10 @@ func userConsentMapping() mappingCase {
 	}
 }
 
-// settingsMapping's whole-row UPDATE leaves created_at, aes_encryption_key and last_cleanup_at
-// alone, the three dont-update columns. CreateInitialSettings, which names the row's id, is held to
-// the tags by TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId.
+// settingsMapping's whole-row UPDATE leaves created_at, aes_encryption_key, last_cleanup_at and
+// default_brand_id alone, the four dont-update columns. CreateInitialSettings, which names the
+// row's id, is held to the tags by
+// TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId.
 func settingsMapping() mappingCase {
 	return mappingCase{
 		name:   "settings",
@@ -836,6 +842,7 @@ func settingsMapping() mappingCase {
 		update: func(ctx context.Context, d *Database, rec any) error {
 			return d.UpdateSettings(ctx, nil, rec.(*record.Settings))
 		},
+		insertLiterals: map[string]string{"ui_theme": "''"},
 	}
 }
 
@@ -928,6 +935,32 @@ func preRegistrationMapping() mappingCase {
 	}
 }
 
+// brandMapping's whole-row UPDATE leaves created_at alone, its one dont-update column.
+func brandMapping() mappingCase {
+	return mappingCase{
+		name:   "brand",
+		table:  "brands",
+		record: reflect.TypeOf(record.Brand{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetBrandById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetBrandById(ctx, nil, 1)
+			},
+			"GetAllBrands": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAllBrands(ctx, nil))
+			},
+			"GetDefaultBrand": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetDefaultBrand(ctx, nil)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateBrand(ctx, nil, rec.(*record.Brand))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateBrand(ctx, nil, rec.(*record.Brand))
+		},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
@@ -942,6 +975,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),
 		userSessionMapping(), userSessionClientMapping(), browserSessionMapping(), userConsentMapping(),
 		settingsMapping(), keyPairMapping(), auditLogMapping(), preRegistrationMapping(),
+		brandMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
@@ -1019,6 +1053,10 @@ func checkInitialSettingsInsert(t *testing.T, dialect data.Dialect, c mappingCas
 			problems = append(problems, fmt.Sprintf("%s: writes %s twice", where, col.name))
 		}
 		written[col.name] = true
+		if literalProblems, isLiteral := checkInsertLiteral(where, c, col, values[i]); isLiteral {
+			problems = append(problems, literalProblems...)
+			continue
+		}
 		argIndex, err := reader.read(values[i])
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", where, err))
@@ -1032,6 +1070,30 @@ func checkInitialSettingsInsert(t *testing.T, dialect data.Dialect, c mappingCas
 	for _, f := range fields {
 		if !written[f.column] {
 			problems = append(problems, fmt.Sprintf("%s: does not write %s", where, f.column))
+		}
+	}
+	return append(problems, unwrittenLiterals(where, c, written)...)
+}
+
+// checkInsertLiteral holds a written column that is one of c's insert literals to its literal,
+// and answers whether it is one.
+func checkInsertLiteral(where string, c mappingCase, col identifier, value string) ([]string, bool) {
+	literal, ok := c.insertLiterals[col.name]
+	if !ok {
+		return nil, false
+	}
+	if value = strings.TrimSpace(value); value != literal {
+		return []string{fmt.Sprintf("%s: column %s is written %s, want the literal %s", where, col.name, value, literal)}, true
+	}
+	return nil, true
+}
+
+// unwrittenLiterals names each of c's insert literals an insert left out.
+func unwrittenLiterals(where string, c mappingCase, written map[string]bool) []string {
+	var problems []string
+	for column := range c.insertLiterals {
+		if !written[column] {
+			problems = append(problems, fmt.Sprintf("%s: does not write %s", where, column))
 		}
 	}
 	return problems
@@ -1467,6 +1529,10 @@ func checkInsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []tag
 			problems = append(problems, fmt.Sprintf("%s: writes %s twice", where, col.name))
 		}
 		written[col.name] = true
+		if literalProblems, isLiteral := checkInsertLiteral(where, c, col, values[i]); isLiteral {
+			problems = append(problems, literalProblems...)
+			continue
+		}
 		argIndex, err := reader.read(values[i])
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", where, err))
@@ -1482,6 +1548,7 @@ func checkInsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []tag
 			problems = append(problems, fmt.Sprintf("%s: does not write %s", where, f.column))
 		}
 	}
+	problems = append(problems, unwrittenLiterals(where, c, written)...)
 
 	if id := rec.Elem().FieldByName("Id"); !id.IsValid() || id.Int() != newId {
 		problems = append(problems, fmt.Sprintf("%s: the record's Id is not the id the engine answered, %d", where, newId))
@@ -1766,4 +1833,42 @@ func TestRecordMapping_TheCheckerRefusesAUnionBranchSelectingAnotherList(t *test
 
 	problems := checkMapping(t, data.Postgres, broken)
 	assert.Contains(t, strings.Join(problems, "\n"), "postgres read: branch 2 of the union selects another list than the first")
+}
+
+// legacyWidgetInsert is rightWidgetSQL's insert also writing legacy, a column no field carries,
+// as the literal given, the way the settings inserts write ui_theme (#810 decision 2).
+func legacyWidgetInsert(literal string) statement {
+	return statement{
+		sqlite:   `INSERT INTO widgets (created_at, name, legacy, label, "key", enabled, visible) VALUES (?, ?, ` + literal + `, ?, ?, ?, ?)`,
+		mysql:    "INSERT INTO widgets (created_at, name, legacy, label, `key`, enabled, visible) VALUES (?, ?, " + literal + ", ?, ?, ?, ?)",
+		postgres: `INSERT INTO widgets (created_at, name, legacy, label, "key", enabled, visible) VALUES ($1, $2, ` + literal + `, $3, $4, $5, $6) RETURNING id`,
+		mssql:    `INSERT INTO widgets (created_at, name, legacy, label, "key", enabled, visible) OUTPUT INSERTED.id VALUES (@p1, @p2, ` + literal + `, @p3, @p4, @p5, @p6)`,
+	}
+}
+
+func legacyWidgetMapping(insert statement) mappingCase {
+	w := rightWidgetSQL()
+	w.insert = insert
+	c := widgetMapping(w)
+	c.insertLiterals = map[string]string{"legacy": "''"}
+	return c
+}
+
+func TestRecordMapping_TheCheckerPassesAnInsertLiteralOnEveryEngine(t *testing.T) {
+	for _, dialect := range allDialects {
+		t.Run(string(dialect), func(t *testing.T) {
+			problems := checkMapping(t, dialect, legacyWidgetMapping(legacyWidgetInsert("''")))
+			assert.Empty(t, problems, "\n%s", strings.Join(problems, "\n"))
+		})
+	}
+}
+
+func TestRecordMapping_TheCheckerRefusesAnInsertLiteralOtherThanDeclared(t *testing.T) {
+	problems := checkMapping(t, data.MySQL, legacyWidgetMapping(legacyWidgetInsert("'dark'")))
+	assert.Contains(t, strings.Join(problems, "\n"), "mysql insert: column legacy is written 'dark', want the literal ''")
+}
+
+func TestRecordMapping_TheCheckerRefusesAnInsertLeavingOutALiteral(t *testing.T) {
+	problems := checkMapping(t, data.MSSQL, legacyWidgetMapping(rightWidgetSQL().insert))
+	assert.Contains(t, strings.Join(problems, "\n"), "mssql insert: does not write legacy")
 }

@@ -11,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/uithemes"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -92,8 +91,6 @@ func TestAPISettingsSections_ConcurrentSavesOfDifferentSectionsAllSurvive(t *tes
 		settings.SMTPPasswordEncrypted = nil
 	})
 	accessToken, _ := createAdminClientWithToken(t)
-	themes := uithemes.Get()
-	require.GreaterOrEqual(t, len(themes), 2, "two themes, so consecutive rounds save different ones")
 
 	// Each round saves every section at once with values no other round uses, every field the
 	// section does not vary sent as the row started, so a section written back from a copy
@@ -101,7 +98,6 @@ func TestAPISettingsSections_ConcurrentSavesOfDifferentSectionsAllSurvive(t *tes
 	const rounds = 10
 	for round := 1; round <= rounds; round++ {
 		appName := fmt.Sprintf("Concurrent saves %d", round)
-		theme := themes[round%len(themes)]
 		idleTimeout := 3000 + round
 		tokenExpiration := 600 + round
 		retentionDays := 30 + round
@@ -119,9 +115,6 @@ func TestAPISettingsSections_ConcurrentSavesOfDifferentSectionsAllSurvive(t *tes
 				ImplicitFlowEnabled:                       start.ImplicitFlowEnabled,
 				ResourceOwnerPasswordCredentialsEnabled:   start.ResourceOwnerPasswordCredentialsEnabled,
 				AccountDeletionEnabled:                    accountDeletionOf(start.AccountDeletionEnabled),
-			}},
-			{section: "ui theme", route: "/api/v1/admin/settings/ui-theme", body: api.UpdateSettingsUIThemeRequest{
-				UITheme: theme,
 			}},
 			{section: "email", route: "/api/v1/admin/settings/email", body: api.UpdateSettingsEmailRequest{
 				SMTPEnabled:    true,
@@ -159,7 +152,6 @@ func TestAPISettingsSections_ConcurrentSavesOfDifferentSectionsAllSurvive(t *tes
 		row := settingsRow(t)
 		require.NotNil(t, row)
 		assert.Equal(t, appName, row.AppName, "round %d: the general save was lost", round)
-		assert.Equal(t, theme, row.UITheme, "round %d: the ui theme save was lost", round)
 		assert.Equal(t, fromName, row.SMTPFromName, "round %d: the email save was lost", round)
 		assert.Equal(t, idleTimeout, row.UserSessionIdleTimeoutInSeconds, "round %d: the sessions save was lost", round)
 		assert.Equal(t, tokenExpiration, row.TokenExpirationInSeconds, "round %d: the tokens save was lost", round)

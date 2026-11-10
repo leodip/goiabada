@@ -4,6 +4,9 @@ import (
 	"database/sql"
 )
 
+// Settings is the one settings row. No field carries its ui_theme column: a brand is the look
+// now, and the column stays unread for the previous release until #823 drops it. Only the inserts
+// name it, with the empty value (#810 decision 2).
 type Settings struct {
 	Id int64 `db:"id" fieldtag:"pk"`
 	// CreatedAt is when the row was inserted. It is tagged dont-update so UpdateSettings never
@@ -13,7 +16,6 @@ type Settings struct {
 	UpdatedAt                                 sql.NullTime   `db:"updated_at"`
 	AppName                                   string         `db:"app_name"`
 	Issuer                                    string         `db:"issuer"`
-	UITheme                                   string         `db:"ui_theme"`
 	PasswordPolicy                            PasswordPolicy `db:"password_policy"`
 	SelfRegistrationEnabled                   bool           `db:"self_registration_enabled"`
 	SelfRegistrationRequiresEmailVerification bool           `db:"self_registration_requires_email_verification"`
@@ -119,6 +121,18 @@ type Settings struct {
 	// and is unaffected by the tag, the same reasoning AESEncryptionKeyLegacy
 	// carries above.
 	LastCleanupAt sql.NullTime `db:"last_cleanup_at" fieldtag:"dont-update"`
+
+	// DefaultBrandId is the default brand's id, a foreign key to brands, so the engine refuses
+	// deleting the brand it points at (#810 decision 1). It is nullable only because SQLite cannot
+	// add a foreign-key column otherwise: migration 000089 and the first start's seed fill it, and
+	// nothing clears it.
+	//
+	// It is tagged dont-update so UpdateSettings never writes it: a settings save writes the row
+	// back from a copy read before it, which would move the default back to the brand that copy
+	// named, and SQL Server re-checks a foreign key whose column an UPDATE names, taking a shared
+	// lock on the brand on every settings save. The one writer after the insert is MakeBrandDefault,
+	// under the settings row's lock.
+	DefaultBrandId sql.NullInt64 `db:"default_brand_id" fieldtag:"dont-update"`
 }
 
 // IsSelfRegistrationAvailable says whether a visitor may register: self-registration on, and either

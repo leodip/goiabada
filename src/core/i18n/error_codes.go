@@ -166,6 +166,15 @@ const (
 	ErrCodeLegalDocumentAppsWithAllApps       = "handler.legal_document.apps_with_all_apps"
 	ErrCodeLegalDocumentAdminConsoleClient    = "handler.legal_document.admin_console_client"
 
+	// Brands (#810 decision 5).
+	ErrCodeBrandNameRequired            = "handler.brand.name_required"
+	ErrCodeBrandNameTooLong             = "handler.brand.name_too_long" // Args: {"max": int}
+	ErrCodeBrandNameAngleBrackets       = "handler.brand.name_angle_brackets"
+	ErrCodeBrandNameInUse               = "handler.brand.name_in_use"
+	ErrCodeBrandAppearanceInvalid       = "handler.brand.appearance_invalid"
+	ErrCodeBrandThemeInvalid            = "handler.brand.theme_invalid"
+	ErrCodeBrandDefaultDeleteNotAllowed = "handler.brand.default_delete_not_allowed"
+
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"
@@ -310,7 +319,7 @@ const (
 	ErrCodeAccountLogoutRedirectURINotAbsolute   = "handler.account_logout.post_logout_redirect_uri_not_absolute"
 	ErrCodeAccountLogoutRedirectURIInsecureHTTP  = "handler.account_logout.post_logout_redirect_uri_insecure_http"
 
-	// Settings: general, sessions, tokens, email, signing keys, the UI theme and audit logs. A settings
+	// Settings: general, sessions, tokens, email, signing keys and audit logs. A settings
 	// refusal sentence that a client's tokens or the account already say reuses that key: the offline
 	// idle timeout above its max lifetime is handler.client_tokens.offline_idle_timeout_above_max_lifetime,
 	// SMTP being off handler.smtp.not_enabled, and the test send's missing destination
@@ -388,7 +397,6 @@ const (
 	ErrCodeSettingsKeysKeyNotFound           = "handler.settings_keys.key_not_found"
 	ErrCodeSettingsKeysOnlyPreviousRevocable = "handler.settings_keys.only_previous_revocable"
 
-	ErrCodeSettingsUIThemeInvalid                 = "handler.settings_ui_theme.theme_invalid"
 	ErrCodeSettingsAuditLogsRetentionDaysNegative = "handler.settings_audit_logs.retention_days_negative"
 	ErrCodeSettingsAuditLogsRetentionDaysTooLarge = "handler.settings_audit_logs.retention_days_too_large"
 

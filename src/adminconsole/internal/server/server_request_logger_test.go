@@ -48,7 +48,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"appName":"Goiabada Test","uiTheme":"light","smtpEnabled":false}`))
+		_, _ = w.Write([]byte(`{"appName":"Goiabada Test","smtpEnabled":false}`))
 	}))
 	t.Cleanup(authServer.Close)
 

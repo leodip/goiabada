@@ -48,7 +48,7 @@ func renderEmailWithTags(t *testing.T, templateFS fstest.MapFS, tags ...string) 
 	if len(tags) > 0 {
 		req = req.WithContext(i18n.WithLocale(req.Context(), true, tags...))
 	}
-	buf, err := New(templateFS, nil).RenderTemplateToBuffer(req, "layouts/email_layout.html", "emails/note.html", nil)
+	buf, err := New(templateFS, nil, nil).RenderTemplateToBuffer(req, "layouts/email_layout.html", "emails/note.html", nil)
 	if err != nil {
 		return "", err
 	}
@@ -174,7 +174,7 @@ func TestRenderTemplateToBuffer_EmailLocaleDoesNotTouchOtherPages(t *testing.T) 
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "es-MX"))
 
-	buf, err := New(templateFS, nil).RenderTemplateToBuffer(req, "layouts/email_layout.html", "page.html", nil)
+	buf, err := New(templateFS, nil, nil).RenderTemplateToBuffer(req, "layouts/email_layout.html", "page.html", nil)
 
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "the page body")
@@ -259,7 +259,7 @@ func TestRenderTemplateToBuffer_EmailBodyFollowsTheSubjectCatalog(t *testing.T) 
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, tc.locale, "en"))
 
-			buf, err := New(templateFS, nil).RenderTemplateToBuffer(req, "layouts/email_layout.html", "emails/note.html", nil)
+			buf, err := New(templateFS, nil, nil).RenderTemplateToBuffer(req, "layouts/email_layout.html", "emails/note.html", nil)
 
 			require.NoError(t, err)
 			require.Equal(t, tc.want, i18n.CatalogTag(req.Context()), "the subject's catalog")
@@ -329,7 +329,7 @@ func TestRenderTemplateToBuffer_ShippedEmailsAreMarkedWithTheirBodyCopyLanguage(
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, locale, "en"))
 
-			buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
+			buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(req,
 				"/layouts/email_layout.html", "/emails/email_forgot_password.html",
 				map[string]interface{}{"name": "Ana", "link": "https://example.com/reset"})
 

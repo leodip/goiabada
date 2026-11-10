@@ -217,10 +217,6 @@ type SettingsTokenPost struct {
 	IncludeOpenIDConnectClaimsInIdToken     bool
 }
 
-type SettingsUITheme struct {
-	UITheme string
-}
-
 type SettingsAuditLogsGet struct {
 	AuditLogsInConsoleEnabled  bool
 	AuditLogsInDatabaseEnabled bool

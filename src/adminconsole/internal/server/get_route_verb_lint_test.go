@@ -75,6 +75,7 @@ var getVerbExemptions = map[string]string{
 	"adminclienthandlers.HandleGenerateNewSecretGet": "answers a random value for the form to show; " +
 		"it stores nothing, and the authentication POST saves a secret",
 	"adminsettingshandlers.HandleEmailSendTestGet": "renders the send-test form; the POST sends",
+	"adminsettingshandlers.HandleBrandDeleteGet":   "renders the delete confirmation; the POST deletes",
 }
 
 // stateChangingGet is one GET registration the walk refused, located.

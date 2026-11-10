@@ -70,6 +70,8 @@ func TestInitRoutes_ATokenFormThatDoesNotParseIsCountedOnceWhicheverAnswersIt(t 
 	for limiter, enabled := range map[string]bool{"on": true, "off": false} {
 		t.Run("limiter "+limiter, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
+			// A page reads the default brand; none leaves it automatic, in the built-in colors.
+			database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 			database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 			s := newTokenRefusalTestServer(database, func(cfg *config.Config) {
 				cfg.AuthServer.RateLimiterEnabled = enabled
@@ -87,6 +89,8 @@ func TestInitRoutes_ATokenFormThatDoesNotParseIsCountedOnceWhicheverAnswersIt(t 
 
 func TestInitRoutes_ATokenRequestStoppedByASettingsFaultIsCounted(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
 	s := newTokenRefusalTestServer(database, nil)
 
@@ -113,6 +117,8 @@ func TestInitRoutes_APasswordGrantStoppedByTheSharedCountIsCountedAsItsAnswer(t 
 	// request refused with server_error and no rate-limit refusal.
 	t.Run("a count that could not be read", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
+		// A page reads the default brand; none leaves it automatic, in the built-in colors.
+		database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 		database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 		database.On("ReserveRateLimitHit", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything).Return(false, errors.New("the database is down"))
@@ -133,6 +139,8 @@ func TestInitRoutes_APasswordGrantStoppedByTheSharedCountIsCountedAsItsAnswer(t 
 	// not as a token request refused.
 	t.Run("a spent budget", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
+		// A page reads the default brand; none leaves it automatic, in the built-in colors.
+		database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 		database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 		database.On("ReserveRateLimitHit", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything).Return(false, nil)

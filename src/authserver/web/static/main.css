@@ -828,12 +828,6 @@
     font-size: 0.8125rem;
     white-space: nowrap;
   }
-  .data-table .text-link {
-    text-decoration: none;
-  }
-  .data-table .text-link:hover {
-    text-decoration: underline;
-  }
   .cell-wrap {
     overflow-wrap: anywhere;
   }
@@ -1859,33 +1853,18 @@
     border-top: 1px solid var(--color-line);
   }
   .theme-swatch {
-    display: block;
+    display: flex;
     width: 100%;
     height: 4rem;
     margin-bottom: 0.375rem;
+    overflow: hidden;
     border: 1px solid var(--color-line);
     border-radius: 0.375rem;
-    background-repeat: no-repeat;
   }
-  .theme-swatch-light {
-    background-image: linear-gradient(#1a1f29, #1a1f29), linear-gradient(#535c6c, #535c6c), linear-gradient(#2456c4, #2456c4), linear-gradient(#ffffff, #ffffff);
-    background-position: 1rem 1rem, 1rem 1.75rem, 1rem 2.5rem, 0.5rem 0.5rem;
-    background-size: 55% 0.375rem, 35% 0.375rem, 2.75rem 0.625rem, calc(100% - 1rem) calc(100% - 1rem);
-    background-color: #f4f5f7;
-  }
-  .theme-swatch-dark {
-    background-image: linear-gradient(#e6e8ec, #e6e8ec), linear-gradient(#a0a8b6, #a0a8b6), linear-gradient(#8ab4ff, #8ab4ff), linear-gradient(#171b22, #171b22);
-    background-position: 1rem 1rem, 1rem 1.75rem, 1rem 2.5rem, 0.5rem 0.5rem;
-    background-size: 55% 0.375rem, 35% 0.375rem, 2.75rem 0.625rem, calc(100% - 1rem) calc(100% - 1rem);
-    background-color: #0f1217;
-  }
-  .theme-swatch-auto {
-    display: flex;
-    overflow: hidden;
-  }
-  .theme-swatch-auto > span {
+  .theme-swatch > svg {
     flex: 1;
-    background-repeat: no-repeat;
+    min-width: 0;
+    height: 100%;
   }
   @media (forced-colors: active) {
     .switch {
@@ -1914,7 +1893,7 @@
       border-left-color: Highlight;
       padding-left: 0.75rem;
     }
-    .theme-swatch, .theme-swatch-light, .theme-swatch-dark {
+    .theme-swatch {
       forced-color-adjust: none;
     }
     .tab-item[aria-current="page"], .tab-bar[data-wrapped] .tab-item[aria-current="page"] {

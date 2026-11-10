@@ -27,6 +27,7 @@ import {
   type ResourceTab,
   type UserTab,
 } from "../../lib/admin-console";
+import { brandUrl, defaultBrand } from "../../lib/brands";
 import { openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { signInToConsole } from "../../lib/console-user";
 import { env } from "../../lib/environment";
@@ -1093,6 +1094,7 @@ test("a user's attributes, groups, permissions, sessions, consents and legal doc
 // confirmations a save asks, are in axe.system.ts.
 test("the settings pages and the audit log", async ({ page }) => {
   const settings = (path: string) => `${env.adminUrl}/admin/settings/${path}`;
+  const seededBrand = await defaultBrand(page);
 
   await checkStates(page, [
     at(page, "general settings", settings("general")),
@@ -1109,7 +1111,10 @@ test("the settings pages and the audit log", async ({ page }) => {
         }
       },
     },
-    at(page, "theme settings", settings("ui-theme")),
+    at(page, "branding, the brands", settings("branding")),
+    at(page, "branding, a new brand", settings("branding/new")),
+    at(page, "branding, the default brand", brandUrl(seededBrand.id, "edit")),
+    at(page, "branding, the default brand's delete page", brandUrl(seededBrand.id, "delete")),
     at(page, "session settings", settings("sessions")),
     at(page, "token settings", settings("tokens")),
     at(page, "signing keys", settings("keys")),

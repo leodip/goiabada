@@ -31,7 +31,7 @@ func failingErrorPageHelper() *Renderer {
 	return New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}{{template \"never_defined\" .}}{{end}}")},
-	}, nil)
+	}, nil, nil)
 
 }
 

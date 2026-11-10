@@ -64,7 +64,7 @@ func newStartableTestServer(t *testing.T, configure func(*config.AdminConsoleCon
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"appName":"Goiabada Test","issuer":"https://auth.example.test","uiTheme":"light","smtpEnabled":false}`))
+		_, _ = w.Write([]byte(`{"appName":"Goiabada Test","issuer":"https://auth.example.test","smtpEnabled":false}`))
 	}))
 	t.Cleanup(authServer.Close)
 

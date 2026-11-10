@@ -192,6 +192,8 @@ func newRoutesTestServerRendering(t *testing.T, configure func(*config.Config), 
 	require.NoError(t, err)
 
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
 		Id:           1,
@@ -256,7 +258,7 @@ func newRoutesTestServerRendering(t *testing.T, configure func(*config.Config), 
 	t.Cleanup(func() { s.jobs.Wait(10 * time.Second) })
 	// Every branch is the bare router: these tests drive the registrations rather than the
 	// application chain, and put the settings on each request's context themselves.
-	s.initRoutes(appBranches{pages: s.router, files: s.router, protocol: s.router, api: s.router, token: s.router, revoke: s.router, introspect: s.router})
+	s.initRoutes(appBranches{pages: s.router, files: s.router, protocol: s.router, api: s.router, token: s.router, revoke: s.router, introspect: s.router, public: s.router})
 	return s
 }
 

@@ -160,9 +160,8 @@ func expectAuthStateMismatch(t *testing.T, pageRenderer *handlersmocks.PageRende
 // map handed to a mock.
 func stateMismatchPageRenderer() *render.Renderer {
 	return render.New(fstest.MapFS{
-		"layouts/no_menu_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)},
-		"auth_error.html":             {Data: []byte(`{{define "content"}}<h1>{{.title}}</h1><p>{{.error}}</p>{{end}}`)},
-	}, nil)
+		"layouts/no_menu_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)}, "auth_error.html": {Data: []byte(`{{define "content"}}<h1>{{.title}}</h1><p>{{.error}}</p>{{end}}`)},
+	}, nil, nil)
 
 }
 

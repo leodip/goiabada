@@ -66,6 +66,8 @@ func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) 
 // without it the case above is satisfied by a chain that was never mounted at all.
 func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1}, nil).Once()
 
 	s := newStaticBranchTestServer(database)

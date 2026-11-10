@@ -12,7 +12,6 @@ func TestCreateSettings(t *testing.T) {
 	settings := &record.Settings{
 		AppName:                 "TestApp",
 		Issuer:                  "https://test.com",
-		UITheme:                 "default",
 		PasswordPolicy:          record.PasswordPolicyMedium,
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
@@ -73,7 +72,6 @@ func TestUpdateSettings(t *testing.T) {
 
 	settings.AppName = "UpdatedApp"
 	settings.Issuer = "https://updated.com"
-	settings.UITheme = "dark"
 	settings.PasswordPolicy = record.PasswordPolicyHigh
 	settings.SelfRegistrationEnabled = false
 	settings.SelfRegistrationRequiresEmailVerification = false
@@ -151,7 +149,6 @@ func createTestSettings(t *testing.T) *record.Settings {
 	settings := &record.Settings{
 		AppName:                 "TestApp",
 		Issuer:                  "https://test.com",
-		UITheme:                 "default",
 		PasswordPolicy:          record.PasswordPolicyMedium,
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
@@ -195,9 +192,6 @@ func compareSettings(t *testing.T, expected, actual *record.Settings) {
 	}
 	if actual.Issuer != expected.Issuer {
 		t.Errorf("Expected Issuer %s, got %s", expected.Issuer, actual.Issuer)
-	}
-	if actual.UITheme != expected.UITheme {
-		t.Errorf("Expected UITheme %s, got %s", expected.UITheme, actual.UITheme)
 	}
 	if actual.PasswordPolicy != expected.PasswordPolicy {
 		t.Errorf("Expected PasswordPolicy %v, got %v", expected.PasswordPolicy, actual.PasswordPolicy)

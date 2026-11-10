@@ -46,7 +46,7 @@ func TestRoutes_TheCallbackByAnyMethodButPostAnswersTheSignInErrorPage(t *testin
 			capture := logtest.CaptureSlog(t)
 			req := httptest.NewRequest(method, "/auth/callback", nil)
 			req = req.WithContext(reqctx.WithSettings(req.Context(),
-				&api.PublicSettingsResponse{AppName: "Goiabada Test", UITheme: "light", Issuer: "https://auth.example.test"}))
+				&api.PublicSettingsResponse{AppName: "Goiabada Test", Issuer: "https://auth.example.test"}))
 			w := httptest.NewRecorder()
 			s.router.ServeHTTP(w, req)
 

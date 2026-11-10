@@ -24,7 +24,7 @@ import (
 func TestInitRoutes_TheHomePageLinksToTheConfiguredPublicAuthServerURL(t *testing.T) {
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"appName":"Goiabada Test","issuer":"https://auth.example.test","uiTheme":"light","smtpEnabled":false}`))
+		_, _ = w.Write([]byte(`{"appName":"Goiabada Test","issuer":"https://auth.example.test","smtpEnabled":false}`))
 	}))
 	t.Cleanup(authServer.Close)
 

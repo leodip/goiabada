@@ -12,9 +12,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,17 +33,27 @@ import (
 // directly.
 // =============================================================================
 
+// publicSettingsBaseURL is the auth server's base URL in these tests, the one a brand's stylesheet
+// URL is built from.
+const publicSettingsBaseURL = "https://auth.example.test"
+
+// expectNoDefaultBrand has database answer an empty default brand pointer, for a case about
+// something other than the brand.
+func expectNoDefaultBrand(database *datamocks.Database) {
+	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
+}
+
 func TestPublicSettings_Success(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := HandlePublicSettingsGet(database)
+	handler := HandlePublicSettingsGet(database, publicSettingsBaseURL)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 		Id:          1,
 		AppName:     "Goiabada Test",
-		UITheme:     "dark",
 		SMTPEnabled: true,
 		Issuer:      "https://issuer.example",
 	}, nil).Once()
+	expectNoDefaultBrand(database)
 
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
@@ -52,9 +64,97 @@ func TestPublicSettings_Success(t *testing.T) {
 	var body api.PublicSettingsResponse
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
 	assert.Equal(t, "Goiabada Test", body.AppName)
-	assert.Equal(t, "dark", body.UITheme)
 	assert.True(t, body.SMTPEnabled)
 	assert.Equal(t, "https://issuer.example", body.Issuer)
+}
+
+// The default brand rides with the public settings as brand: its appearance, and the absolute URL
+// of its stylesheet, built from the auth server's base URL as a client logo's URL is, so the admin
+// console links it after main.css and draws every page as the auth server draws its own (#810
+// decision 3). uiTheme is no longer answered.
+func TestPublicSettings_CarriesTheDefaultBrand(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		brand          *record.Brand
+		wantAppearance string
+		wantStylesheet string
+	}{
+		{"a dark brand", &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"},
+			"dark", "/brand/7/stylesheet.css?v="},
+		{"a light brand", &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"},
+			"light", "/brand/12/stylesheet.css?v="},
+		{"an automatic brand on Blueberry", &record.Brand{Id: 1, Name: "Default", Appearance: record.BrandAppearanceAuto, Theme: "blueberry"},
+			"auto", "/brand/1/stylesheet.css?v="},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+				Id: 1, AppName: "Goiabada",
+			}, nil).Once()
+			database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(tc.brand, nil).Once()
+
+			recorder := httptest.NewRecorder()
+			HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+
+			require.Equal(t, http.StatusOK, recorder.Code)
+			var body map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+			stylesheet, ok := brandthemes.StylesheetOf(tc.brand.Theme)
+			require.True(t, ok)
+			require.Regexp(t, `^[0-9a-f]{12}$`, stylesheet.Fingerprint)
+			assert.JSONEq(t, `{"appearance":"`+tc.wantAppearance+`","stylesheetUrl":"`+
+				publicSettingsBaseURL+tc.wantStylesheet+stylesheet.Fingerprint+`"}`, string(body["brand"]))
+			assert.NotContains(t, body, "uiTheme")
+		})
+	}
+}
+
+// A default brand that cannot be read leaves brand out of the answer, which is otherwise whole: the
+// console draws its pages automatic in the built-in colors, as the auth server draws its own then,
+// rather than every console page failing over the look. That is an empty pointer, a failed read,
+// and a stored theme that is none of the built-in ones; the last two are faults, and logged.
+func TestPublicSettings_AnswersNoBrandWhenTheDefaultCannotBeRead(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		brand   *record.Brand
+		err     error
+		wantLog string
+	}{
+		{name: "no default brand"},
+		{name: "a failed read", err: errors.New("the database went away"), wantLog: "unable to read the default brand"},
+		{name: "a theme none of the built-in ones",
+			brand:   &record.Brand{Id: 3, Name: "Odd", Appearance: record.BrandAppearanceDark, Theme: "mango"},
+			wantLog: "unable to link the default brand's stylesheet"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+			database := datamocks.NewDatabase(t)
+			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+				Id: 1, AppName: "Goiabada", Issuer: "https://issuer.example",
+			}, nil).Once()
+			database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(tc.brand, tc.err).Once()
+
+			recorder := httptest.NewRecorder()
+			HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+
+			require.Equal(t, http.StatusOK, recorder.Code)
+			var body map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+			assert.NotContains(t, body, "brand")
+			assert.JSONEq(t, `"Goiabada"`, string(body["appName"]))
+			assert.JSONEq(t, `"https://issuer.example"`, string(body["issuer"]))
+
+			var messages []string
+			for _, record := range logs.Records() {
+				messages = append(messages, record.Message)
+			}
+			if tc.wantLog == "" {
+				assert.Empty(t, messages)
+			} else {
+				assert.Equal(t, []string{tc.wantLog}, messages)
+			}
+		})
+	}
 }
 
 // The stored policy's rules ride with the public settings, as data, so the admin console states
@@ -77,9 +177,10 @@ func TestPublicSettings_CarriesTheStoredPolicysRules(t *testing.T) {
 			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 				Id: 1, AppName: "Goiabada", PasswordPolicy: tc.policy,
 			}, nil).Once()
+			expectNoDefaultBrand(database)
 
 			recorder := httptest.NewRecorder()
-			HandlePublicSettingsGet(database).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+			HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
 
 			require.Equal(t, http.StatusOK, recorder.Code)
 			var body map[string]json.RawMessage
@@ -97,9 +198,10 @@ func TestPublicSettings_CarriesAccountDeletionEnabled(t *testing.T) {
 		database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 			Id: 1, AppName: "Goiabada", AccountDeletionEnabled: stored,
 		}, nil).Once()
+		expectNoDefaultBrand(database)
 
 		recorder := httptest.NewRecorder()
-		HandlePublicSettingsGet(database).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+		HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
 
 		require.Equal(t, http.StatusOK, recorder.Code)
 		var body map[string]any
@@ -110,7 +212,7 @@ func TestPublicSettings_CarriesAccountDeletionEnabled(t *testing.T) {
 
 func TestPublicSettings_DatabaseError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := HandlePublicSettingsGet(database)
+	handler := HandlePublicSettingsGet(database, publicSettingsBaseURL)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(nil, errors.New("database is down")).Once()
@@ -130,7 +232,7 @@ func TestPublicSettings_DatabaseError(t *testing.T) {
 // authentication.
 func TestPublicSettings_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := HandlePublicSettingsGet(database)
+	handler := HandlePublicSettingsGet(database, publicSettingsBaseURL)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil).Once()
 
@@ -166,11 +268,12 @@ func (f *failingResponseWriter) WriteHeader(int) {}
 
 func TestPublicSettings_EncodeFailure(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := HandlePublicSettingsGet(database)
+	handler := HandlePublicSettingsGet(database, publicSettingsBaseURL)
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 		Id: 1, AppName: "Goiabada",
 	}, nil).Once()
+	expectNoDefaultBrand(database)
 
 	writer := &failingResponseWriter{}
 	assert.NotPanics(t, func() {
@@ -187,8 +290,11 @@ func TestPublicSettings_EncodeFailure(t *testing.T) {
 // value world-readable, so the list is spelled out rather than derived.
 var publicSettingsAllowedFields = map[string]string{
 	"AppName":     "appName",
-	"UITheme":     "uiTheme",
 	"SMTPEnabled": "smtpEnabled",
+	// The default brand's appearance and stylesheet URL, which the admin console draws its pages in
+	// (#810 decision 3). Every page the auth server serves to anyone already carries both, as
+	// data-theme and as a stylesheet link.
+	"Brand": "brand",
 	// Already world-readable: /.well-known/openid-configuration serves the same
 	// value to anonymous callers, as OIDC Discovery 1.0 section 3 requires.
 	"Issuer": "issuer",
@@ -215,12 +321,20 @@ var publicPasswordRulesAllowedFields = map[string]string{
 	"RefusesAccountWords": "refusesAccountWords",
 }
 
+// publicBrandAllowedFields is the complete set of fields the brand carries: its appearance and its
+// stylesheet's URL, and nothing else about the brand, its name among it.
+var publicBrandAllowedFields = map[string]string{
+	"Appearance":    "appearance",
+	"StylesheetURL": "stylesheetUrl",
+}
+
 // This fails if a field is added to PublicSettingsResponse without being added to
 // the allowlist above, which forces the question "should this really be public?"
 // into review.
 func TestPublicSettingsResponse_ExposesOnlyAllowlistedFields(t *testing.T) {
 	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PublicSettingsResponse{}), publicSettingsAllowedFields)
 	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PasswordRulesResponse{}), publicPasswordRulesAllowedFields)
+	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PublicBrandResponse{}), publicBrandAllowedFields)
 }
 
 // assertOnlyAllowlistedFields holds responseType to the fields allowed, each under its JSON name.
@@ -247,7 +361,7 @@ func assertOnlyAllowlistedFields(t *testing.T, responseType reflect.Type, allowe
 // namely someone replacing the DTO mapping with a direct encode of settings.
 func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	handler := HandlePublicSettingsGet(database)
+	handler := HandlePublicSettingsGet(database, publicSettingsBaseURL)
 
 	aesKey := []byte("SENTINEL-legacy-aes-encryption-key")
 	smtpPassword := []byte("SENTINEL-smtp-password-encrypted")
@@ -256,7 +370,6 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 	settings := &record.Settings{
 		Id:                          1,
 		AppName:                     "Goiabada Test",
-		UITheme:                     "light",
 		SMTPEnabled:                 true,
 		AESEncryptionKeyLegacy:      aesKey,
 		SMTPPasswordEncrypted:       smtpPassword,
@@ -272,6 +385,10 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 	}
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(settings, nil).Once()
+	// The brand's name is not one of its public fields.
+	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(&record.Brand{
+		Id: 4, Name: "SENTINEL-brand-name", Appearance: record.BrandAppearanceLight, Theme: "guava",
+	}, nil).Once()
 
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
@@ -287,6 +404,7 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 		"SENTINEL-smtp-from-name",
 		"SENTINEL-smtp-encryption",
 		"SENTINEL-turnstile-site-key",
+		"SENTINEL-brand-name",
 	} {
 		assert.NotContains(t, payload, secret, "the response must not expose %q", secret)
 	}

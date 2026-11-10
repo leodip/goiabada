@@ -73,7 +73,7 @@ type pageLanguageBrowser struct {
 func (b *pageLanguageBrowser) serve(handler http.Handler, method, target string, form url.Values) *httptest.ResponseRecorder {
 	b.t.Helper()
 	options := []handlertest.Option{handlertest.WithAccessToken(),
-		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"})}
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test"})}
 	if form != nil {
 		options = append(options, handlertest.WithForm(form))
 	}

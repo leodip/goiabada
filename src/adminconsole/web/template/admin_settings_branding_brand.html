@@ -1,0 +1,125 @@
+{{define "title"}}{{ if .isNew }}{{ T $.ctx "adminconsole.admin_branding.new.page_title" }}{{ else }}{{ T $.ctx "adminconsole.admin_branding.brand.page_title_prefix" }} – {{ .storedBrand.Name }}{{ end }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/settings/branding"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $.ctx "adminconsole.admin_menu.settings_branding" }}</a></p>
+    {{ if .isNew }}
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_branding.new.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.new.lead" }}</p>
+    {{ else if .storedBrand.IsDefault }}
+    <h1 class="page-title">{{ .storedBrand.Name }} <span class="tag tag-note">{{ T $.ctx "adminconsole.admin_branding.list.default_tag" }}</span></h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.brand.default_note" }}</p>
+    {{ else }}
+    <h1 class="page-title">{{ .storedBrand.Name }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.brand.other_note" }}</p>
+    {{ end }}
+  </div>
+  {{/* Making a brand the default draws every page in it at once, so it asks first, in the
+       confirm_change dialog, and answers with this page again, saying so. */}}
+  {{ if not .isNew }}{{ if not .storedBrand.IsDefault }}
+  <form class="page-actions" method="post" action="/admin/settings/branding/{{ .storedBrand.Id }}/make-default" data-confirm-dialog="makeDefault" data-confirm-title="{{ T $.ctx "adminconsole.admin_branding.brand.make_default_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_branding.brand.make_default_body" }}">
+    <button class="button" id="btnMakeDefault" type="submit">{{ T $.ctx "adminconsole.admin_branding.brand.make_default_button" }}</button>
+  </form>
+  {{ end }}{{ end }}
+</div>
+
+{{/* errorField names the field a refusal is about: the name input, or the appearance or theme
+     cards, which are marked invalid, described by the notice, and focused, the first card of a
+     group. A refusal naming no field leaves the focus on the name. The swatches are drawn from
+     the palettes the auth server lists: each theme card shows its light and its dark palette,
+     and the appearance cards show the form's theme in the light, the dark or both. */}}
+<form class="panel" method="post" novalidate>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="brand-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_branding.brand.saved" }}</p>
+    </div>
+    {{ end }}
+    {{ if .madeDefault }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_branding.brand.made_default" }}</p>
+    </div>
+    {{ end }}
+
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="name">{{ T $.ctx "adminconsole.admin_branding.brand.field.name" }}</label>
+        <input class="control" id="name" type="text" name="name" value="{{ .brand.Name }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "name" }}brand-error {{ end }}{{ end }}nameHint"
+          {{- if .error }}{{ if eq .errorField "name" }} aria-invalid="true"{{ end }}{{ if eq .errorField "name" "" }} autofocus{{ end }}{{ else }}{{ if .isNew }} autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="nameHint">{{ T $.ctx "adminconsole.admin_branding.brand.name_hint" }}</p>
+      </div>
+    </div>
+
+    <fieldset{{ if .error }}{{ if eq .errorField "appearance" }} aria-describedby="brand-error"{{ end }}{{ end }}>
+      <legend class="field-label mb-3">{{ T $.ctx "adminconsole.admin_branding.brand.field.appearance" }}</legend>
+      <div class="grid gap-3 md:grid-cols-3">
+        <label class="option-card">
+          <input type="radio" id="appearance-auto" name="appearance" value="auto"{{ if eq .brand.Appearance "auto" }} checked{{ end }} aria-labelledby="appearance-name-auto" aria-describedby="appearance-hint-auto"
+            {{- if .error }}{{ if eq .errorField "appearance" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="theme-swatch" aria-hidden="true">{{ template "brand_swatch" .appearanceTheme.Light }}{{ template "brand_swatch" .appearanceTheme.Dark }}</span>
+            <span class="choice-label" id="appearance-name-auto">{{ T $.ctx "adminconsole.admin_branding.appearance.auto" }}</span>
+            <span class="field-hint" id="appearance-hint-auto">{{ T $.ctx "adminconsole.admin_branding.appearance.auto_hint" }}</span>
+          </span>
+        </label>
+        <label class="option-card">
+          <input type="radio" id="appearance-light" name="appearance" value="light"{{ if eq .brand.Appearance "light" }} checked{{ end }} aria-labelledby="appearance-name-light" aria-describedby="appearance-hint-light"
+            {{- if .error }}{{ if eq .errorField "appearance" }} aria-invalid="true"{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="theme-swatch" aria-hidden="true">{{ template "brand_swatch" .appearanceTheme.Light }}</span>
+            <span class="choice-label" id="appearance-name-light">{{ T $.ctx "adminconsole.admin_branding.appearance.light" }}</span>
+            <span class="field-hint" id="appearance-hint-light">{{ T $.ctx "adminconsole.admin_branding.appearance.light_hint" }}</span>
+          </span>
+        </label>
+        <label class="option-card">
+          <input type="radio" id="appearance-dark" name="appearance" value="dark"{{ if eq .brand.Appearance "dark" }} checked{{ end }} aria-labelledby="appearance-name-dark" aria-describedby="appearance-hint-dark"
+            {{- if .error }}{{ if eq .errorField "appearance" }} aria-invalid="true"{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="theme-swatch" aria-hidden="true">{{ template "brand_swatch" .appearanceTheme.Dark }}</span>
+            <span class="choice-label" id="appearance-name-dark">{{ T $.ctx "adminconsole.admin_branding.appearance.dark" }}</span>
+            <span class="field-hint" id="appearance-hint-dark">{{ T $.ctx "adminconsole.admin_branding.appearance.dark_hint" }}</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset{{ if .error }}{{ if eq .errorField "theme" }} aria-describedby="brand-error"{{ end }}{{ end }}>
+      <legend class="field-label mb-3">{{ T $.ctx "adminconsole.admin_branding.brand.field.theme" }}</legend>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {{ range $i, $theme := .brandThemes }}
+        <label class="option-card">
+          <input type="radio" id="theme-{{ $theme.Key }}" name="theme" value="{{ $theme.Key }}"{{ if eq $theme.Key $.brand.Theme }} checked{{ end }} aria-labelledby="theme-name-{{ $theme.Key }}"
+            {{- if $.error }}{{ if eq $.errorField "theme" }} aria-invalid="true"{{ if eq $i 0 }} autofocus{{ end }}{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="theme-swatch" aria-hidden="true">{{ template "brand_swatch" $theme.Light }}{{ template "brand_swatch" $theme.Dark }}</span>
+            <span class="choice-label" id="theme-name-{{ $theme.Key }}">{{ $theme.Name }}</span>
+          </span>
+        </label>
+        {{ end }}
+      </div>
+    </fieldset>
+  </div>
+  <div class="panel-footer">
+    <a class="button button-quiet" href="/admin/settings/branding">{{ T $.ctx "common.button.cancel" }}</a>
+    {{ if .isNew }}
+    <button id="btnCreate" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_branding.new.create_button" }}</button>
+    {{ else }}
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
+    {{ end }}
+  </div>
+</form>
+{{ if not .isNew }}{{ if not .storedBrand.IsDefault }}
+{{ template "modal_dialog" (args "makeDefault" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_branding.brand.make_default_button") (T $.ctx "adminconsole.admin_branding.brand.make_default_title")) }}
+{{ end }}{{ end }}
+{{end}}

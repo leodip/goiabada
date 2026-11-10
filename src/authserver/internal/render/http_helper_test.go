@@ -43,7 +43,7 @@ func TestInternalServerError(t *testing.T) {
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
 	}
-	httpHelper := New(templateFS, nil)
+	httpHelper := New(templateFS, nil, nil)
 
 	r := routing.New()
 	r.Use(requestid.Middleware)
@@ -87,7 +87,7 @@ func TestNotFound(t *testing.T) {
 	httpHelper := New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
-	}, nil)
+	}, nil, nil)
 
 	r := routing.New()
 	r.Use(requestid.Middleware)
@@ -120,7 +120,7 @@ func TestNotFound_RenderFailureAnswers500(t *testing.T) {
 	httpHelper := New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	}, nil)
+	}, nil, nil)
 
 	r := routing.New()
 	r.Use(requestid.Middleware)
@@ -143,7 +143,7 @@ func TestRenderTemplate(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{.Name}}! Status: {{._httpStatus}}{{end}}")},
 	}
-	httpHelper := New(templateFS, nil)
+	httpHelper := New(templateFS, nil, nil)
 
 	t.Run("Without _httpStatus", func(t *testing.T) {
 		req := newRequest("GET", "/", nil)
@@ -195,7 +195,7 @@ func TestRenderTemplate(t *testing.T) {
 	// response this function never wrote a body for (#247).
 	t.Run("A failed render writes no headers at all", func(t *testing.T) {
 		emptyFS := fstest.MapFS{}
-		failing := New(emptyFS, nil)
+		failing := New(emptyFS, nil, nil)
 
 		req := newRequest("GET", "/", nil)
 		w := httptest.NewRecorder()
@@ -218,7 +218,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}")},
 	}
-	httpHelper := New(templateFS, nil)
+	httpHelper := New(templateFS, nil, nil)
 
 	// This renderer binds no loggedInUser and no isAdmin. Both were admin console page data
 	// living in the one core renderer both binaries used, and no auth server template binds
@@ -241,18 +241,19 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 			"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 			"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}")},
 		}
-		layoutHelper := New(layoutFS, nil)
+		layoutHelper := New(layoutFS, nil, nil)
 		req := httptest.NewRequest("GET", "/", nil)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
 			AppName:     "sentinel app",
-			UITheme:     "sentinel theme",
 			SMTPEnabled: true,
 		}))
 
 		buf, err := layoutHelper.RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", map[string]interface{}{})
 
 		require.NoError(t, err)
-		assert.Equal(t, "<html>sentinel app|sentinel theme|true</html>", buf.String())
+		// ui_theme is no longer bound: a layout copied from an older release, which reads it, draws
+		// every page automatic (#810).
+		assert.Equal(t, "<html>sentinel app||true</html>", buf.String())
 	})
 
 	// Every application route runs under middleware.Settings, so a render without settings is a
@@ -280,7 +281,7 @@ func TestRenderTemplateToBuffer_NilDataMap(t *testing.T) {
 	req := httptest.NewRequest("GET", "/some/page", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "sentinel app"}))
 
-	buf, err := New(templateFS, nil).RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", nil)
+	buf, err := New(templateFS, nil, nil).RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, "<html>sentinel app|/some/page</html>", buf.String())
@@ -293,7 +294,7 @@ func TestRenderTemplateToBuffer_Partials(t *testing.T) {
 	layout := []byte(`<html>{{template "content" .}}</html>`)
 	page := []byte(`{{define "content"}}[{{template "badge" .}}]{{end}}`)
 	render := func(templateFS fstest.MapFS) (*bytes.Buffer, error) {
-		return New(templateFS, nil).RenderTemplateToBuffer(
+		return New(templateFS, nil, nil).RenderTemplateToBuffer(
 			newRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
 	}
 
@@ -332,7 +333,7 @@ func TestRenderTemplateToBuffer_Partials(t *testing.T) {
 
 func TestJSONError(t *testing.T) {
 	templateFS := fstest.MapFS{}
-	httpHelper := New(templateFS, nil)
+	httpHelper := New(templateFS, nil, nil)
 
 	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -357,7 +358,7 @@ func TestJSONError(t *testing.T) {
 
 func TestEncodeJSON(t *testing.T) {
 	templateFS := fstest.MapFS{}
-	httpHelper := New(templateFS, nil)
+	httpHelper := New(templateFS, nil, nil)
 
 	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()

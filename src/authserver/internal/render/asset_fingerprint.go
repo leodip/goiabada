@@ -43,9 +43,28 @@ func newAssetFingerprints(staticFS fs.FS) *assetFingerprints {
 	return &assetFingerprints{fsys: staticFS, known: map[string]assetFingerprint{}}
 }
 
+// AssetFingerprint is the fingerprint a page links a static file with these contents by, for the
+// static file server: a URL whose fingerprint is that of the bytes it answers with may be kept for
+// a year, since the URL changes whenever the file does (#810 decision 7). The server checks it on
+// the bytes it sends, read once, so a file replaced while it is answered never earns the year for
+// contents its URL does not name.
+func AssetFingerprint(content []byte) string {
+	digest := sha256.Sum256(content)
+	return hex.EncodeToString(digest[:6])
+}
+
 // url returns path with its file's fingerprint. path names a file under /static/; anything else,
 // or a file that is not there, is an error, which fails the page rather than linking it to nothing.
 func (a *assetFingerprints) url(path string) (string, error) {
+	sum, err := a.fingerprint(path)
+	if err != nil {
+		return "", err
+	}
+	return path + "?v=" + sum, nil
+}
+
+// fingerprint returns the fingerprint of the file at path, under /static/, as url does.
+func (a *assetFingerprints) fingerprint(path string) (string, error) {
 	name, ok := strings.CutPrefix(path, "/static/")
 	if !ok || a.fsys == nil {
 		return "", errs.Errorf("asset %q is not a static file this server serves", path)
@@ -59,18 +78,17 @@ func (a *assetFingerprints) url(path string) (string, error) {
 	known, ok := a.known[name]
 	a.mu.Unlock()
 	if ok && known.size == info.Size() && known.modTime.Equal(info.ModTime()) {
-		return path + "?v=" + known.sum, nil
+		return known.sum, nil
 	}
 
 	content, err := fs.ReadFile(a.fsys, name)
 	if err != nil {
 		return "", errs.Wrapf(err, "unable to read static file %q", path)
 	}
-	digest := sha256.Sum256(content)
-	sum := hex.EncodeToString(digest[:6])
+	sum := AssetFingerprint(content)
 
 	a.mu.Lock()
 	a.known[name] = assetFingerprint{size: info.Size(), modTime: info.ModTime(), sum: sum}
 	a.mu.Unlock()
-	return path + "?v=" + sum, nil
+	return sum, nil
 }

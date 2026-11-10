@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
@@ -713,11 +712,12 @@ func (s *Server) initMiddleware() appBranches {
 	branches := appBranches{
 		pages:      s.router.With(s.pageChain()...),
 		files:      s.router.With(s.applicationChain(middleware.PageFaults())...),
-		protocol:   s.router.With(s.applicationChain(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)))...),
-		token:      s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))))...),
-		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS), s.revocationMetrics)))...),
-		introspect: s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.IntrospectionFaults(render.New(s.templateFS, s.staticFS), s.introspectionMetrics)))...),
+		protocol:   s.router.With(s.applicationChain(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS, s.database)))...),
+		token:      s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS, s.database))))...),
+		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS, s.database), s.revocationMetrics)))...),
+		introspect: s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.IntrospectionFaults(render.New(s.templateFS, s.staticFS, s.database), s.introspectionMetrics)))...),
 		api:        s.router.With(s.applicationChain(middleware.APIFaults())...),
+		public:     s.router,
 	}
 
 	slog.Info("finished initializing middleware")
@@ -792,6 +792,12 @@ type appBranches struct {
 	// out the page language, which only a drawn page uses, so an image costs no read of its user
 	// (#631).
 	files *routing.Router
+	// public carries what is answered alike to every visitor and kept by shared caches for a year:
+	// the brand stylesheets. It is the root itself, as the static files are, with none of the
+	// application chain: a session read there can reissue the browser-session cookie, to clear a
+	// pointer to a user session that has ended, and that cookie would ride on an answer any cache
+	// may store and replay to other visitors (#810).
+	public *routing.Router
 	// protocol carries the endpoints that answer RFC 6749 section 5.2's {error, error_description}:
 	// token, userinfo, JWKS, discovery and dynamic client registration.
 	protocol *routing.Router
@@ -950,8 +956,26 @@ func bodyLimitPolicy(profilePictureMaxSizeBytes int64) httpmw.BodyLimitPolicy {
 // name the file.
 const staticPrefix = "/static"
 
+const (
+	// staticCurrentCache is the answer to a request naming a static file by its current
+	// fingerprint, as the pages link it: the URL changes whenever the file does, so a browser may
+	// keep it for a year without asking again (#810 decision 7).
+	staticCurrentCache    = "public, max-age=31536000, immutable"
+	staticCurrentLifetime = 365 * 24 * time.Hour
+	// staticOtherCache is the answer to any other request, a stale fingerprint, a malformed one or
+	// none: the current file, kept five minutes, so a URL never holds for a year what it does not
+	// name.
+	staticOtherCache    = "public, max-age=300"
+	staticOtherLifetime = 5 * time.Minute
+)
+
 // serveStaticFiles serves the embedded static files under /static/. They are mounted nowhere else,
 // so neither the path nor the file system is a parameter.
+//
+// A file requested by its current fingerprint, as the pages link it, is kept for a year and
+// immutable; any other request, the favicons' among them, for five minutes. The fingerprint is
+// checked on the bytes the answer carries, read once and kept while the file is unchanged
+// (staticSnapshots); a file over staticSnapshotLimit is never read whole, and is kept five minutes.
 //
 // A directory is the 404 page, /static/ itself included, where Go's file server answered one with
 // a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
@@ -960,7 +984,8 @@ const staticPrefix = "/static"
 // language from, so a directory costs what an unmatched path costs; a file still costs neither.
 func (s *Server) serveStaticFiles() {
 	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
-	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS))
+	snapshots := newStaticSnapshots(s.staticFS)
+	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS, s.database))
 	directory := http.Handler(notFound)
 	chain := s.pageChain()
 	for i := len(chain) - 1; i >= 0; i-- {
@@ -973,12 +998,22 @@ func (s *Server) serveStaticFiles() {
 			return
 		}
 
-		cacheInSeconds := 5 * 60
-		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%v", cacheInSeconds))
-		w.Header().Set("Expires", time.Now().UTC().Add(time.Second*time.Duration(cacheInSeconds)).Format(http.TimeFormat))
+		cacheControl, lifetime := staticOtherCache, staticOtherLifetime
+		serve := files
+		if fingerprints := r.URL.Query()["v"]; len(fingerprints) == 1 {
+			// The fingerprint is checked on the bytes the answer carries.
+			if snapshot, ok := snapshots.read(r.URL.Path); ok {
+				serve = http.StripPrefix(staticPrefix, http.FileServer(http.FS(snapshot)))
+				if snapshot.fingerprint == fingerprints[0] {
+					cacheControl, lifetime = staticCurrentCache, staticCurrentLifetime
+				}
+			}
+		}
+		w.Header().Set("Cache-Control", cacheControl)
+		w.Header().Set("Expires", time.Now().UTC().Add(lifetime).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
-		files.ServeHTTP(w, r)
+		serve.ServeHTTP(w, r)
 	})
 }
 

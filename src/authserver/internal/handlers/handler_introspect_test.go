@@ -70,7 +70,7 @@ func newIntrospectEndpoint(t *testing.T) *introspectEndpoint {
 		// The password grant is on, as it must be for refreshTokenRow's token to refresh.
 		settings: &record.Settings{Id: 1, Issuer: introspectIssuer, ResourceOwnerPasswordCredentialsEnabled: true},
 	}
-	e.handler = HandleIntrospectPost(render.New(nil, nil), e.database, e.parser, testDataCipher,
+	e.handler = HandleIntrospectPost(render.New(nil, nil, nil), e.database, e.parser, testDataCipher,
 		introspectionmetrics.Register(e.registry))
 	return e
 }
@@ -602,7 +602,7 @@ func TestHandleIntrospectPost_AFaultAnswersInternalServerError(t *testing.T) {
 // the handler answers its own: 500, not stored, and counted as error.
 func TestIntrospectionFaults_AnswersAndCountsAFaultBeforeTheHandler(t *testing.T) {
 	registry := metrics.NewRegistry()
-	faults := IntrospectionFaults(render.New(nil, nil), introspectionmetrics.Register(registry))
+	faults := IntrospectionFaults(render.New(nil, nil, nil), introspectionmetrics.Register(registry))
 	logtest.CaptureSlog(t)
 
 	rr := httptest.NewRecorder()

@@ -1,11 +1,11 @@
 // Package publicsettings is how the admin console learns the auth server's public settings: the
-// application name, the UI theme, whether SMTP is configured, and the issuer the console checks its
-// own tokens' iss claim against. Client reads them from the auth server's unauthenticated
-// /api/public/settings, and Cache keeps them for a TTL so that every page, which needs them before
-// it renders, does not ask the auth server again. Every request arriving while a fetch is in flight
-// shares that one fetch, no lock is held across it, and an Invalidate, which a settings save calls,
-// is never undone by a fetch that started before it. It was internal/cache, and the client was
-// apiclient.SettingsClient, until #441.
+// application name, the default brand's appearance and stylesheet, whether SMTP is configured, and
+// the issuer the console checks its own tokens' iss claim against. Client reads them from the auth
+// server's unauthenticated /api/public/settings, and Cache keeps them for a TTL so that every page,
+// which needs them before it renders, does not ask the auth server again. Every request arriving
+// while a fetch is in flight shares that one fetch, no lock is held across it, and an Invalidate,
+// which a settings save calls, is never undone by a fetch that started before it. It was
+// internal/cache, and the client was apiclient.SettingsClient, until #441.
 package publicsettings
 
 import (

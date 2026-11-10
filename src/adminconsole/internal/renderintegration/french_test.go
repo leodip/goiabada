@@ -41,7 +41,7 @@ func TestFrench_AdminPageUsesQueryOrCanadianHeader(t *testing.T) {
 func TestFrench_ConsoleRefusalIsRenderedOnItsForm(t *testing.T) {
 	req := handlertest.Request(http.MethodPost, "/admin/resources/7/delete",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "7"),
-		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"}),
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test"}),
 		handlertest.WithLocale("fr-CA"),
 		handlertest.WithForm(url.Values{"resourceIdentifier": {"shipping"}}))
 	w := httptest.NewRecorder()

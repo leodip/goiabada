@@ -66,14 +66,17 @@ func TestMigration000065_UIThemeLightOrDark(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	// Seeded through the ORM at head, then carried down to 000064 and back up, as 000061's test
-	// does and for its reason: the ORM writes every column the record carries. 000065's down is a
-	// no-op, so the rows keep what the seed wrote until the up runs again. One settings row per
-	// value, which no constraint refuses, so the one up is held to every value at once.
+	// does and for its reason: the ORM writes every column the record carries. The record no longer
+	// carries ui_theme (#810 decision 2), so each row's value is written over the insert's empty one
+	// with raw SQL. 000065's down is a no-op, so the rows keep what the seed wrote until the up runs
+	// again. One settings row per value, which no constraint refuses, so the one up is held to every
+	// value at once.
 	migrateToHead000065(t, h)
 	ids := make([]int64, len(uiThemes000065))
 	for i, c := range uiThemes000065 {
-		settings := settings000065(c.stored)
-		require.NoErrorf(t, h.DB.CreateSettings(ctx, nil, settings), "seed a settings row holding %q on %s", c.stored, dbType())
+		settings := settings000065()
+		require.NoErrorf(t, h.DB.CreateSettings(ctx, nil, settings), "seed a settings row for %q on %s", c.stored, dbType())
+		setUIThemeUnread(t, h, settings.Id, c.stored)
 		ids[i] = settings.Id
 	}
 
@@ -93,7 +96,7 @@ func TestMigration000065_UIThemeLightOrDark(t *testing.T) {
 	// The row is written at head, since the ORM writes every column the record carries, a column a
 	// later migration adds to settings included (000079).
 	migrateToHead000065(t, h)
-	automatic := settings000065("")
+	automatic := settings000065()
 	require.NoError(t, h.DB.CreateSettings(ctx, nil, automatic))
 	migrateToHead000065(t, h)
 	assert.Emptyf(t, uiThemeOf000065(t, h, automatic.Id), "a later start leaves the automatic theme alone on %s", dbType())
@@ -113,13 +116,10 @@ func TestSeed_ANewInstallationFollowsTheDevice(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, bootstrap.Continue, outcome)
 
-	settings, err := h.DB.GetSettingsById(ctx, nil, 1)
-	require.NoError(t, err)
-	require.NotNil(t, settings)
-	assert.Emptyf(t, settings.UITheme, "a new installation stores the automatic theme on %s", dbType())
+	assert.Emptyf(t, uiThemeOf000065(t, h, 1), "a new installation stores the automatic theme on %s", dbType())
 
 	migrateToHead000065(t, h)
-	assert.Emptyf(t, uiThemeOf000065(t, h, settings.Id), "and keeps it on the next start on %s", dbType())
+	assert.Emptyf(t, uiThemeOf000065(t, h, 1), "and keeps it on the next start on %s", dbType())
 }
 
 func migrateToHead000065(t *testing.T, h *isolatedDB) {
@@ -129,11 +129,10 @@ func migrateToHead000065(t *testing.T, h *isolatedDB) {
 	}
 }
 
-func settings000065(uiTheme string) *record.Settings {
+func settings000065() *record.Settings {
 	return &record.Settings{
 		AppName:                         "Migration 000065",
 		Issuer:                          "https://m65.test",
-		UITheme:                         uiTheme,
 		PasswordPolicy:                  record.PasswordPolicyLow,
 		TokenExpirationInSeconds:        300,
 		UserSessionIdleTimeoutInSeconds: 7200,

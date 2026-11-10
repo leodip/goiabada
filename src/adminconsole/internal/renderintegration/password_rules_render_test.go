@@ -107,7 +107,7 @@ func passwordPageCases() []passwordPageCase {
 func servePasswordPage(t *testing.T, tc passwordPageCase, rules api.PasswordRulesResponse) string {
 	t.Helper()
 	options := append([]handlertest.Option{handlertest.WithAccessToken(),
-		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", PasswordRules: rules})},
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", PasswordRules: rules})},
 		tc.options...)
 	req := handlertest.Request(tc.method, tc.target, options...)
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "en"))

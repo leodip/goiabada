@@ -18,8 +18,8 @@ export interface State {
 
 // Every violation axe finds on the page as it stands, one line per element: the state, the scheme
 // and the page's address, then the rule, the element and what the rule asks, so a red run says what
-// to fix and where. The seeded theme is Automatic, which follows the device, so the emulated scheme
-// is what draws the page light or dark.
+// to fix and where. The seeded default brand is automatic, which follows the device, so the emulated
+// scheme is what draws the page light or dark.
 export async function axeViolations(page: Page, state: string): Promise<string[]> {
   await page.waitForLoadState("load");
   // Scrolled by what the state did, a page can sit under the sticky header, which axe then reads as
@@ -27,7 +27,7 @@ export async function axeViolations(page: Page, state: string): Promise<string[]
   await page.evaluate(() => window.scrollTo(0, 0));
   const address = new URL(page.url());
   const where = `${address.origin}${address.pathname}${address.search}`;
-  expect.soft(await page.locator("html").getAttribute("data-theme"), `${state}: the stored theme is Automatic`).toBeNull();
+  expect.soft(await page.locator("html").getAttribute("data-theme"), `${state}: the default brand is automatic`).toBeNull();
   const found: string[] = [];
   for (const colorScheme of ["light", "dark"] as const) {
     // Reduced motion, so no transition is caught half way between the schemes' colours.

@@ -3,6 +3,7 @@
 // run alone (playwright.config.ts).
 import { expect, type Page } from "@playwright/test";
 import { confirmDialog } from "./admin-console";
+import { restoreBaselineBrand } from "./brands";
 import { env } from "./environment";
 
 type FormValues = Record<string, string | boolean>;
@@ -95,7 +96,6 @@ const baseline: Record<string, FormValues> = {
     ropcFlowEnabled: false,
     accountDeletionEnabled: true,
   },
-  "/admin/settings/ui-theme": { themeSelection: "" },
   "/admin/settings/sessions": {
     userSessionIdleTimeoutInSeconds: "7200",
     userSessionMaxLifetimeInSeconds: "86400",
@@ -122,11 +122,12 @@ const baseline: Record<string, FormValues> = {
   "/admin/settings/turnstile": { turnstileEnabled: false },
 };
 
-// Puts every page's baseline values back where they differ, and returns what it had to change: a run
-// whose restore failed half way would otherwise leave the next run testing against other settings. A
-// freshly built environment has no SMTP set up, so the first run sets it up here.
+// Puts every page's baseline values back where they differ, and the seeded brand back as the default,
+// automatic on Blueberry (lib/brands.ts), and returns what it had to change: a run whose restore failed
+// half way would otherwise leave the next run testing against other settings. A freshly built
+// environment has no SMTP set up, so the first run sets it up here.
 export async function restoreBaselineSettings(page: Page): Promise<string[]> {
-  const drifted: string[] = [];
+  const drifted: string[] = await restoreBaselineBrand(page);
   for (const [path, values] of Object.entries(baseline)) {
     const now = await readSettingsForm(page, path);
     const changed = Object.fromEntries(Object.entries(values).filter(([name, value]) => now[name] !== value));

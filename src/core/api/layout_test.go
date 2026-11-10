@@ -30,6 +30,7 @@ func TestPackageFiles_OneFilePerResource(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"account.go",
 		"audit.go",
+		"brands.go",
 		"clients.go",
 		"doc.go",
 		"errors.go",

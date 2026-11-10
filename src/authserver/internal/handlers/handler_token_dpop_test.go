@@ -89,7 +89,7 @@ func newDPoPTokenEndpoint(t *testing.T, publicBaseURL string, sessionKey []byte)
 		now:                dpopNow,
 	}
 	proofs := TokenProofs{Checker: checker, Nonces: dpop.NewNonces(sessionKey), Replays: e.database, Now: func() time.Time { return e.now }}
-	e.handler = TokenDPoPNonce(proofs)(HandleTokenPost(render.New(nil, nil), e.database, e.issuer, e.validator, e.auditLogger,
+	e.handler = TokenDPoPNonce(proofs)(HandleTokenPost(render.New(nil, nil, nil), e.database, e.issuer, e.validator, e.auditLogger,
 		e.credentialFailures, tokenmetrics.Register(e.registry), &recordingLogoutTokens{}, proofs)).ServeHTTP
 	return e
 }

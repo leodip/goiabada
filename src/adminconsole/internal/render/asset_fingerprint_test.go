@@ -47,3 +47,16 @@ func TestAssetFingerprints_AFileTheServerDoesNotServeIsAnError(t *testing.T) {
 	_, err := newAssetFingerprints(nil).url("/static/main.css")
 	require.Error(t, err, "a renderer built with no static files names none")
 }
+
+// The static file server keeps a file for a year only when the bytes it answers with have the
+// fingerprint the URL names, which is the one a page links those contents by: the first 12 hex
+// digits of their SHA-256 (#810 decision 7).
+func TestAssetFingerprint_IsTheFingerprintAPageLinksTheseContentsBy(t *testing.T) {
+	assert.Equal(t, "15c42ab7768d", AssetFingerprint([]byte("body{color:red}")))
+	assert.Equal(t, "fab4811e9952", AssetFingerprint([]byte("body{color:blue}")))
+
+	fsys := fstest.MapFS{"main.css": {Data: []byte("body{color:red}"), ModTime: time.Unix(1, 0)}}
+	linked, err := newAssetFingerprints(fsys).url("/static/main.css")
+	require.NoError(t, err)
+	assert.Equal(t, "/static/main.css?v=15c42ab7768d", linked)
+}

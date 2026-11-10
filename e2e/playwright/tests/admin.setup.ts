@@ -10,6 +10,7 @@ import {
   putAwayLegalDocument,
   signInAsAdmin,
 } from "../lib/admin-console";
+import { deleteBrand, listBrands } from "../lib/brands";
 import { env } from "../lib/environment";
 import { test as setup } from "../lib/fixtures";
 import { restoreBaselineSettings } from "../lib/settings";
@@ -62,6 +63,10 @@ setup("sweep what earlier runs left", async ({ page }, testInfo) => {
       .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""))
   ).map(legalDocumentIdFrom);
   for (const id of legalDocumentIds) await putAwayLegalDocument(page, id);
+  // The settings were restored first, so no brand a test made is still the default.
+  for (const brand of (await listBrands(page)).filter((listed) => listed.name.startsWith(testPrefix))) {
+    await deleteBrand(page, brand.id);
+  }
   // The users list is paged; a search narrows it to the test users, a page at a time.
   const users = `${env.adminUrl}/admin/users?query=${testPrefix}`;
   for (let emails = await leftoversOn(page, users); emails.length > 0; emails = await leftoversOn(page, users)) {

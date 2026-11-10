@@ -24,7 +24,7 @@ func renderPasswordPage(t *testing.T, bind map[string]interface{}) string {
 	req.Header.Set("Accept-Language", "en")
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 	req = req.WithContext(i18n.ResolveRequestLocale(req.Context(), req))
-	buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
+	buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(req,
 		"layouts/auth_layout.html", "auth_pwd.html", bind)
 	require.NoError(t, err)
 	return buf.String()

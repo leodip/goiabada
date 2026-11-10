@@ -1,5 +1,5 @@
 // axe-core over the states only a change to the settings reaches (axe-check.ts): each settings page
-// saved and refused, the confirmations their saves ask, the audit log while no event is stored, and
+// saved and refused, the Branding pages among them, the confirmations their saves ask, the audit log while no event is stored, and
 // self-registration's pages. Runs alone, and each test puts back what it changes (lib/settings.ts).
 import { randomBytes } from "node:crypto";
 import { deleteUser, idFromListLink, publishLegalDocument, setLegalDocumentApps } from "../../lib/admin-console";
@@ -10,6 +10,7 @@ import { linksIn, waitForMail } from "../../lib/mailpit";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 import { uniqueIdentifier } from "../../lib/unique";
 import { asks, at, checkStates, refused, saved, titled, type State } from "../../lib/axe";
+import { brandUrl, createBrand, defaultBrand, deleteBrand, withDefaultBrandRestored } from "../../lib/brands";
 import { browserSignInClient } from "../../lib/test-clients";
 
 test.describe.configure({ timeout: 300_000 });
@@ -46,7 +47,6 @@ test("the settings pages saved, refused, and asking first", async ({ page }) => 
         }),
       ],
     },
-    { path: "ui-theme", states: [savedAsItStands("ui-theme", "theme settings saved")] },
     {
       path: "sessions",
       states: [
@@ -84,6 +84,42 @@ test("the settings pages saved, refused, and asking first", async ({ page }) => 
   for (const { path, states } of pages) {
     await withSettingsRestored(page, `/admin/settings/${path}`, () => checkStates(page, states));
   }
+
+  // A brand's page saved and refused, Make default asking first, and the delete page refusing a
+  // name, on a brand of the test's own; the default brand is saved as it stands.
+  await withDefaultBrandRestored(page, async () => {
+    const seeded = await defaultBrand(page);
+    const name = uniqueIdentifier("brand");
+    const id = await createBrand(page, { name, appearance: "dark", theme: "plum" });
+    try {
+      await checkStates(page, [
+        saved(page, "branding, the default brand saved", async () => {
+          await page.goto(brandUrl(seeded.id, "edit"));
+          await save();
+        }),
+        refused(page, "branding, a new brand's name refused", "name", async () => {
+          await page.goto(settings("branding/new"));
+          await page.locator("#btnCreate").click();
+        }),
+        refused(page, "branding, a brand's theme refused", "theme-blueberry", async () => {
+          await page.goto(brandUrl(id, "edit"));
+          await page.locator('input[name="theme"]:checked').evaluate((radio) => ((radio as HTMLInputElement).value = "sepia"));
+          await save();
+        }),
+        asks(page, "branding, Make default asking first", async () => {
+          await page.goto(brandUrl(id, "edit"));
+          await page.locator("#btnMakeDefault").click();
+        }),
+        refused(page, "branding, a deletion's name refused", "name", async () => {
+          await page.goto(brandUrl(id, "delete"));
+          await page.locator("#name").fill("not its name");
+          await page.locator("#btnDelete").click();
+        }),
+      ]);
+    } finally {
+      await deleteBrand(page, id);
+    }
+  });
 
   // Revoking the previous key, which a freshly built environment has none of, is checked in
   // keys.system.ts, once its rotation has made one.

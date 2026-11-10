@@ -76,7 +76,7 @@ func errorPageHelper() *Renderer {
 	return New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	}, nil)
+	}, nil, nil)
 
 }
 
@@ -85,7 +85,7 @@ func notFoundPageHelper() *Renderer {
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	}, nil)
+	}, nil, nil)
 
 }
 
@@ -234,7 +234,7 @@ func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
 
 func TestJSONError_LogsOnceOnTheGenericBranch(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := New(fstest.MapFS{}, nil)
+	httpHelper := New(fstest.MapFS{}, nil, nil)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JSONError(w, r, errs.New("not a wire error"))
@@ -272,7 +272,7 @@ func TestJSONError_LogsOnceOnTheGenericBranch(t *testing.T) {
 // status and the code and never looked at the record (#279 decisions 9 and 12).
 func TestJSONError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := New(fstest.MapFS{}, nil)
+	httpHelper := New(fstest.MapFS{}, nil, nil)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JSONError(w, r, oauth.NewErrorDetail("server_error", "The operation failed."))
@@ -312,7 +312,7 @@ func TestJSONError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 // the record and the id on the wire have to be the same string (#279 decision 9, #435).
 func TestJSONError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := New(fstest.MapFS{}, nil)
+	httpHelper := New(fstest.MapFS{}, nil, nil)
 
 	detail := oauth.NewErrorDetailWithHTTPStatus("server_error", "The operation failed.",
 		http.StatusInternalServerError)
@@ -427,7 +427,7 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			httpHelper := New(fstest.MapFS{}, nil)
+			httpHelper := New(fstest.MapFS{}, nil, nil)
 			var adoptedRequestId string
 			router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 				adoptedRequestId = requestid.FromContext(r.Context())
@@ -463,7 +463,7 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 // endpoint's validator error arrives. A chosen 401 is a client's mistake, so nothing is logged.
 func TestJSONError_CarriesTheBasicChallengeThrough(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := New(fstest.MapFS{}, nil)
+	httpHelper := New(fstest.MapFS{}, nil, nil)
 
 	refusal := oauth.NewErrorDetailWithHTTPStatus("invalid_client",
 		"Client authentication failed. Please review your client_secret.",
@@ -497,7 +497,7 @@ func TestJSONError_CarriesTheBasicChallengeThrough(t *testing.T) {
 // of to the client.
 func TestJSONError_ReadsAWrappedErrorDetail(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := New(fstest.MapFS{}, nil)
+	httpHelper := New(fstest.MapFS{}, nil, nil)
 
 	detail := oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 		"The redirect URI is not registered.", http.StatusBadRequest)
@@ -524,7 +524,7 @@ func TestJSONError_ReadsAWrappedErrorDetail(t *testing.T) {
 // RFC 6749 section 5.2 a bare assertion would have dropped in silence: the status would have become
 // 500 and the header simply would not be written.
 func TestJSONError_ReadsAWrappedErrorDetailsWWWAuthenticate(t *testing.T) {
-	httpHelper := New(fstest.MapFS{}, nil)
+	httpHelper := New(fstest.MapFS{}, nil, nil)
 
 	detail := oauth.NewErrorDetailWithHTTPStatus("invalid_token",
 		"The access token is invalid.", http.StatusUnauthorized).

@@ -61,6 +61,8 @@ func newRoutingDatabase(t *testing.T) *datamocks.Database {
 	t.Helper()
 
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Maybe()
 	return database
@@ -143,6 +145,8 @@ func TestRegisterRoutes_AnUnmatchedPathAtTheRootIsThe404Page(t *testing.T) {
 // settings read that fails answers its 500 rather than the 404.
 func TestRegisterRoutes_AnUnmatchedPageMeetsThePageChainFirst(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Return(nil, errors.New("the database is down"))
 	s := newRoutingTestServer(t, database)
@@ -476,6 +480,8 @@ func TestRegisterRoutes_RequestIdsAreAdoptedOrMinted(t *testing.T) {
 func newPanickingServer(t *testing.T, value any) *Server {
 	t.Helper()
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Run(func(mock.Arguments) { panic(value) }).Return(nil, nil)
 	return newRoutingTestServer(t, database)

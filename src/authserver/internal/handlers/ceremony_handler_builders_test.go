@@ -29,10 +29,11 @@ func testCeremonyBoundary(pageRenderer PageRenderer, ceremonyStore CeremonyStore
 
 // testClientErrorResponder is the client-error responder the route table would build from these
 // doubles, with formPostFS in place of the built-in templates, so a test can render a form_post page
-// that fails to parse or to execute.
+// that fails to parse or to execute, and with no default brand, so its page is drawn automatic and
+// database owes no brand read. The tests of the page's brand build the responder itself.
 func testClientErrorResponder(database *datamocks.Database, pageRenderer PageRenderer, formPostFS fs.FS) *ClientErrorResponder {
 	responder := NewClientErrorResponder(database, pageRenderer)
-	responder.formPostFS = formPostFS
+	responder.formPost = formPostTemplate{fs: formPostFS}
 	return responder
 }
 

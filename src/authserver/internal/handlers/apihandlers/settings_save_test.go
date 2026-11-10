@@ -18,7 +18,6 @@ import (
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/uithemes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -62,7 +61,7 @@ func allowSettingsSave(database *datamocks.Database) {
 		RunAndReturn(settingsRowAsTheRequestLoadedIt).Maybe()
 }
 
-// settingsSectionSave is one of the eight settings writes, with a body its handler accepts and the
+// settingsSectionSave is one of the seven settings writes, with a body its handler accepts and the
 // columns that section owns.
 type settingsSectionSave struct {
 	name    string
@@ -87,15 +86,6 @@ func settingsSectionSaves() []settingsSectionSave {
 			owns: []string{"AppName", "Issuer", "SelfRegistrationEnabled", "SelfRegistrationRequiresEmailVerification",
 				"DynamicClientRegistrationEnabled", "PasswordPolicy", "PKCERequired", "ImplicitFlowEnabled",
 				"ResourceOwnerPasswordCredentialsEnabled", "AccountDeletionEnabled"},
-		},
-		{
-			name: "ui theme",
-			path: "/api/v1/admin/settings/ui-theme",
-			body: func(*testing.T) string { return `{"uiTheme":"` + uithemes.Get()[0] + `"}` },
-			handler: func(database settingsSaveDatabase, auditLogger AuditLogger) http.Handler {
-				return HandleSettingsUIThemePut(database, auditLogger)
-			},
-			owns: []string{"UITheme"},
 		},
 		{
 			name: "email, enabled",
@@ -195,6 +185,7 @@ func settingsAsTheRequestLoadedThem() record.Settings {
 		SMTPEncryption:                          "none",
 		TurnstileSiteKey:                        "before-site-key",
 		AuditLogRetentionDays:                   30,
+		DefaultBrandId:                          sql.NullInt64{Int64: 1, Valid: true},
 	}
 }
 
@@ -208,7 +199,6 @@ func settingsSavedMeanwhile() record.Settings {
 		UpdatedAt:               sql.NullTime{Time: meanwhile, Valid: true},
 		AppName:                 "Meanwhile",
 		Issuer:                  "https://meanwhile.example",
-		UITheme:                 "meanwhile-theme",
 		PasswordPolicy:          record.PasswordPolicyHigh,
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
@@ -242,6 +232,7 @@ func settingsSavedMeanwhile() record.Settings {
 		AuditLogsInDatabaseEnabled:                true,
 		AuditLogRetentionDays:                     31,
 		LastCleanupAt:                             sql.NullTime{Time: meanwhile, Valid: true},
+		DefaultBrandId:                            sql.NullInt64{Int64: 2, Valid: true},
 	}
 }
 
@@ -363,7 +354,7 @@ func TestSettingsEmailPut_AKeptPasswordIsTheOneTheHostCheckRead(t *testing.T) {
 	loaded := settingsAsTheRequestLoadedThem()
 	loaded.SMTPHost = "127.0.0.1"
 	loaded.SMTPPasswordEncrypted = []byte("the-password-for-this-host")
-	save := settingsSectionSaves()[2]
+	save := settingsSectionSaves()[1]
 	rr := serveSectionSave(save, database, auditLogger, save.body(t), loaded)
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -461,7 +452,7 @@ func (s *lockingSettingsStore) UpdateSettings(_ context.Context, _ *sql.Tx, sett
 // nothing but the row's lock (#407).
 func TestSettingsSectionSaves_ConcurrentSavesOfDifferentSectionsAllSurvive(t *testing.T) {
 	saves := settingsSectionSaves()
-	concurrent := []settingsSectionSave{saves[0], saves[1], saves[4], saves[5], saves[6], saves[7]}
+	concurrent := []settingsSectionSave{saves[0], saves[3], saves[4], saves[5], saves[6]}
 
 	for round := 0; round < 10; round++ {
 		store := &lockingSettingsStore{row: settingsAsTheRequestLoadedThem(), holders: map[*sql.Tx]bool{}}
@@ -489,7 +480,6 @@ func TestSettingsSectionSaves_ConcurrentSavesOfDifferentSectionsAllSurvive(t *te
 		row := store.row
 		assert.Equal(t, "Mine", row.AppName, "round %d: the general save was lost", round)
 		assert.Equal(t, record.PasswordPolicyMedium, row.PasswordPolicy, "round %d: the general save was lost", round)
-		assert.Equal(t, uithemes.Get()[0], row.UITheme, "round %d: the ui theme save was lost", round)
 		assert.Equal(t, 7, row.MaxUserSessionsPerUser, "round %d: the sessions save was lost", round)
 		assert.Equal(t, record.KeepSignedInAlways, row.KeepSignedIn, "round %d: the sessions save was lost", round)
 		assert.Equal(t, 3000, row.UserSessionIdleTimeoutInSeconds, "round %d: the sessions save was lost", round)
@@ -513,9 +503,6 @@ var settingsSectionReplaced = map[string]func(stored record.Settings) map[string
 			"include_open_id_connect_claims_in_access_token": stored.IncludeOpenIDConnectClaimsInAccessToken,
 			"include_open_id_connect_claims_in_id_token":     stored.IncludeOpenIDConnectClaimsInIdToken,
 		}}
-	},
-	"ui theme": func(stored record.Settings) map[string]interface{} {
-		return map[string]interface{}{"old_ui_theme": stored.UITheme}
 	},
 	"turnstile": func(stored record.Settings) map[string]interface{} {
 		return map[string]interface{}{"old": map[string]interface{}{

@@ -103,7 +103,7 @@ func wantBody(t *testing.T, locale, key string) string {
 // iss claim against a stale configured value, and every sign-in attempt landed
 // back at / (#285).
 func TestSettingsCache_IssuerComesFromThePayload(t *testing.T) {
-	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":true,"issuer":"https://from-authserver.example"}`)
+	server := settingsServer(t, `{"appName":"A","smtpEnabled":true,"issuer":"https://from-authserver.example"}`)
 
 	recorder, settings := runSettingsChain(t, server.URL)
 
@@ -115,14 +115,16 @@ func TestSettingsCache_IssuerComesFromThePayload(t *testing.T) {
 // Without this, the case above is satisfied by a middleware that hardcodes a
 // response and ignores the payload entirely.
 func TestSettingsCache_TheOtherFieldsStillComeFromThePayload(t *testing.T) {
-	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":true,"issuer":"https://from-authserver.example"}`)
+	server := settingsServer(t, `{"appName":"A","smtpEnabled":true,"issuer":"https://from-authserver.example",`+
+		`"brand":{"appearance":"light","stylesheetUrl":"https://from-authserver.example/brand/1/stylesheet.css?v=0123456789ab"}}`)
 
 	recorder, settings := runSettingsChain(t, server.URL)
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	require.NotNil(t, settings)
 	assert.Equal(t, "A", settings.AppName)
-	assert.Equal(t, "light", settings.UITheme)
+	require.NotNil(t, settings.Brand)
+	assert.Equal(t, "light", settings.Brand.Appearance)
 	assert.True(t, settings.SMTPEnabled)
 }
 
@@ -130,7 +132,7 @@ func TestSettingsCache_TheOtherFieldsStillComeFromThePayload(t *testing.T) {
 // to the same Go value today, so they are separate cases on purpose: a later
 // change making the field a *string would split them.
 func TestSettingsCache_AbsentIssuerIsRefused(t *testing.T) {
-	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false}`)
+	server := settingsServer(t, `{"appName":"A","smtpEnabled":false}`)
 
 	recorder, settings := runSettingsChain(t, server.URL)
 
@@ -140,7 +142,7 @@ func TestSettingsCache_AbsentIssuerIsRefused(t *testing.T) {
 }
 
 func TestSettingsCache_EmptyIssuerIsRefused(t *testing.T) {
-	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":""}`)
+	server := settingsServer(t, `{"appName":"A","smtpEnabled":false,"issuer":""}`)
 
 	recorder, settings := runSettingsChain(t, server.URL)
 
@@ -153,7 +155,7 @@ func TestSettingsCache_EmptyIssuerIsRefused(t *testing.T) {
 // else in the repository asserts that a failed fetch stops the chain rather than
 // serving a zero-valued response.
 func TestSettingsCache_AnUnreachableAuthServerIsRefused(t *testing.T) {
-	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
+	server := settingsServer(t, `{"appName":"A","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
 	baseURL := server.URL
 	server.Close()
 
@@ -178,7 +180,7 @@ func TestSettingsCache_RefusalsAreLocalized(t *testing.T) {
 	}{
 		{
 			name:    "an auth server too old to report an issuer",
-			payload: `{"appName":"A","uiTheme":"light","smtpEnabled":false}`,
+			payload: `{"appName":"A","smtpEnabled":false}`,
 			key:     "adminconsole.error.issuer_missing",
 		},
 		{
@@ -218,7 +220,7 @@ func TestSettingsCache_RefusalsAreLocalized(t *testing.T) {
 // which is the operator's to read in the log and not the administrator's to read on
 // a page they cannot act on.
 func TestSettingsCache_TheFetchErrorStaysOutOfTheResponse(t *testing.T) {
-	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
+	server := settingsServer(t, `{"appName":"A","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
 	baseURL := server.URL
 	server.Close()
 
@@ -277,7 +279,7 @@ func stackFrameCount(err error) int {
 }
 
 func TestSettingsCache_TheFetchRefusalLogsTheStackedErrorValue(t *testing.T) {
-	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
+	server := settingsServer(t, `{"appName":"A","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
 	baseURL := server.URL
 	server.Close()
 
@@ -290,7 +292,7 @@ func TestSettingsCache_TheFetchRefusalLogsTheStackedErrorValue(t *testing.T) {
 }
 
 func TestSettingsCache_TheIssuerRefusalLogsAStackedErrorOfItsOwn(t *testing.T) {
-	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false}`)
+	server := settingsServer(t, `{"appName":"A","smtpEnabled":false}`)
 
 	var recorder *httptest.ResponseRecorder
 	logged := theOneLoggedError(t, func() { recorder, _ = runSettingsChain(t, server.URL) })

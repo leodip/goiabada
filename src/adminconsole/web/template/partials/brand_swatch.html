@@ -1,0 +1,6 @@
+{{define "brand_swatch"}}
+{{- /* One palette of a theme, as the auth server lists it, drawn as a page: its canvas, a card on
+     it, two lines of text and a button. The colors are attributes, never styles, so the swatch is
+     drawn whatever the page's own theme. */ -}}
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 64" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect width="120" height="64" fill="{{ index . "canvas" }}"/><rect x="8.5" y="8.5" width="103" height="47" rx="3" fill="{{ index . "surface" }}" stroke="{{ index . "line" }}" vector-effect="non-scaling-stroke"/><rect x="16" y="16" width="56" height="6" rx="1" fill="{{ index . "ink" }}"/><rect x="16" y="27" width="36" height="6" rx="1" fill="{{ index . "ink-muted" }}"/><rect x="16" y="39" width="30" height="10" rx="2" fill="{{ index . "brand" }}"/></svg>
+{{- end}}

@@ -46,6 +46,20 @@ var protocolRoutes = []string{
 // section 2.2.1 has the client assume the token still exists and retry (#676 decision 12).
 var revocationRoutes = []string{"POST /auth/revoke"}
 
+// publicRoutes are on no application branch: a brand's stylesheet is served as a static file is,
+// with neither the settings read nor the session load, so neither fault reaches it (#810).
+// TestRegisterRoutes_TheBrandStylesheetCarriesNoBrowserSession holds it to that.
+var publicRoutes = []string{"GET /brand/{id}/stylesheet.css", "HEAD /brand/{id}/stylesheet.css"}
+
+// applicationRoutes is routes less publicRoutes, each of which must be among them.
+func applicationRoutes(t *testing.T, routes []string) []string {
+	t.Helper()
+	for _, public := range publicRoutes {
+		require.Contains(t, routes, public, "a public route this test names is not registered")
+	}
+	return slices.DeleteFunc(slices.Clone(routes), func(route string) bool { return slices.Contains(publicRoutes, route) })
+}
+
 // routeFormat is the format a registered route must answer a fault in: the protocol and revocation
 // routes above, the API routes by their prefix, and a page's text/plain for everything else.
 func routeFormat(route string) string {
@@ -143,10 +157,12 @@ func requireEveryFormatReached(t *testing.T, routes []string) {
 // registration or the APIs as JSON could not parse the one fault that reaches them all at once.
 func TestInitRoutes_ASettingsFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
 	s := newFaultsTestServer(database)
 
-	routes := registeredRoutes(t, s)
+	routes := applicationRoutes(t, registeredRoutes(t, s))
 	requireEveryFormatReached(t, routes)
 
 	for _, route := range routes {
@@ -165,6 +181,8 @@ func TestInitRoutes_ASettingsFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 // that has signed in, which a client calling the token endpoint from the same origin can be.
 func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, errors.New("the database is down"))
 	s := newFaultsTestServer(database)
@@ -179,7 +197,7 @@ func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 	cookies := minted.Result().Cookies()
 	require.NotEmpty(t, cookies, "the store must have set the session cookie")
 
-	routes := registeredRoutes(t, s)
+	routes := applicationRoutes(t, registeredRoutes(t, s))
 	requireEveryFormatReached(t, routes)
 
 	for _, route := range routes {
@@ -203,6 +221,8 @@ func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 func TestInitRoutes_TheTokenEndpointStillRefusesGETWith405(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// The group's chain runs ahead of its 405, as it did when the route was the group's.
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 	s := newFaultsTestServer(database)
 
@@ -221,6 +241,8 @@ func TestInitRoutes_PublicSettingsRefusesOtherMethodsWith405(t *testing.T) {
 	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
 		t.Run(method, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
+			// A page reads the default brand; none leaves it automatic, in the built-in colors.
+			database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 			database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil).Maybe()
 			s := newFaultsTestServer(database)
 

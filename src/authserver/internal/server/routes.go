@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
+	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
@@ -42,8 +43,8 @@ const accountExportMaxAge = 300 * time.Second
 // protocol endpoints and the APIs answer a settings or session failure, or a panic, as JSON
 // (see appBranches, #435).
 func (s *Server) initRoutes(branches appBranches) {
-	pages, files, protocol, api, token, revoke, introspect := branches.pages, branches.files, branches.protocol, branches.api,
-		branches.token, branches.revoke, branches.introspect
+	pages, files, protocol, api, token, revoke, introspect, public := branches.pages, branches.files, branches.protocol, branches.api,
+		branches.token, branches.revoke, branches.introspect, branches.public
 
 	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database), middleware.ActingUser{})
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
@@ -69,7 +70,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
-	httpHelper := render.New(s.templateFS, s.staticFS)
+	httpHelper := render.New(s.templateFS, s.staticFS, s.database)
 	// The one notifier every account notice goes through, after its response (#724).
 	notifier := accountnotice.New(httpHelper, emailSender, s.jobs)
 	// The one sender every logout token goes through, after the end of the session it tells of has
@@ -151,6 +152,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	files.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(files, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(files, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
+	// A brand's stylesheet is answered as a static file is, to anyone and with no session, on the
+	// branch without the settings read and the session load, so no cookie rides on its public year.
+	getAndHead(public, brandthemes.StylesheetRoute, handlers.HandleBrandStylesheetGet(httpHelper, s.database))
 
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)
@@ -158,7 +162,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
-	api.Get("/api/public/settings", handlers.HandlePublicSettingsGet(s.database))
+	api.Get("/api/public/settings", handlers.HandlePublicSettingsGet(s.database, baseURL))
 
 	// One route boundary and one client-error responder, shared by every ceremony route: the
 	// ceremony load, its id check, the state gate, the step redirects and the error responses to a
@@ -444,9 +448,16 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/sessions", apihandlers.HandleSettingsSessionsGet())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/sessions", apihandlers.HandleSettingsSessionsPut(s.database, auditLogger))
 
-		// Settings - UI Theme
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/ui-theme", apihandlers.HandleSettingsUIThemeGet())
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/ui-theme", apihandlers.HandleSettingsUIThemePut(s.database, auditLogger))
+		// Brands (#810, settings domain): the looks the pages are drawn in, the default among them.
+		// Reading also accepts admin-read; every change needs manage-settings or manage.
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/brands", apihandlers.HandleBrandsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/brands", apihandlers.HandleBrandCreatePost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/brands/{id}", apihandlers.HandleBrandGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/brands/{id}", apihandlers.HandleBrandUpdatePut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/brands/{id}", apihandlers.HandleBrandDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/brands/{id}/make-default", apihandlers.HandleBrandMakeDefaultPost(s.database, auditLogger))
+		// The built-in themes a brand can take, reference data behind the same read scopes.
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/brand-themes", apihandlers.HandleBrandThemesGet())
 
 		// Settings - Tokens
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/tokens", apihandlers.HandleSettingsTokensGet())

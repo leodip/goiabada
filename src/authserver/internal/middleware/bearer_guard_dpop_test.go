@@ -112,7 +112,7 @@ func dpopGuards(t *testing.T, surface, baseURL string, store *replayStore) *Bear
 	if surface == "api" {
 		return NewBearerTokenForAPI(parser, proofs)
 	}
-	return NewBearerTokenForUserInfo(parser, render.New(nil, nil), proofs)
+	return NewBearerTokenForUserInfo(parser, render.New(nil, nil, nil), proofs)
 }
 
 // dpopChain is /userinfo's chain as routes.go mounts it, the session guard aside.

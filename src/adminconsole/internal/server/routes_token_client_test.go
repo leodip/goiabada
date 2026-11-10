@@ -97,7 +97,7 @@ func TestInitRoutes_TheSignInUsesTheTokenClientTheServerWasHanded(t *testing.T) 
 		callback.AddCookie(c)
 	}
 	callback = callback.WithContext(reqctx.WithSettings(callback.Context(),
-		&api.PublicSettingsResponse{AppName: "Goiabada Test", UITheme: "light", Issuer: "https://auth.example.test"}))
+		&api.PublicSettingsResponse{AppName: "Goiabada Test", Issuer: "https://auth.example.test"}))
 	s.router.ServeHTTP(httptest.NewRecorder(), callback)
 
 	assert.Equal(t, []string{"POST /auth/token", "GET /certs"}, transport.requests(),

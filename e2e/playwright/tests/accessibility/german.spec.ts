@@ -3,6 +3,7 @@
 import { addGroupAttribute, addRedirectUri, choose, clientUrl, confirmDialog, groupUrl, resourceUrl, userUrl } from "../../lib/admin-console";
 import { linksIn, waitForMail } from "../../lib/mailpit";
 import { signInToConsole } from "../../lib/console-user";
+import { brandUrl, defaultBrand } from "../../lib/brands";
 import { openSignIn } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { fitsInGerman } from "../../lib/german";
@@ -30,6 +31,7 @@ for (const theme of ["light", "dark"] as const) {
     const userEdit = await page.locator('a[href*="/attributes/edit/"]').first().getAttribute("href");
     await page.goto(resourceUrl(resource.id, "users-with-permission"));
     const grant = await page.locator('a[href*="/users-with-permission/add/"]').getAttribute("href");
+    const seededBrand = await defaultBrand(page);
 
     await page.setViewportSize({ width: 320, height: 740 });
     page.setDefaultTimeout(10_000);
@@ -45,7 +47,8 @@ for (const theme of ["light", "dark"] as const) {
       `${userUrl(user.id, "attributes")}/add`, new URL(userEdit!, env.adminUrl).href,
       ...(["settings", "permissions", "users-with-permission", "groups-with-permission", "delete"] as const).map((tab) => resourceUrl(resource.id, tab)),
       new URL(grant!, env.adminUrl).href,
-      ...["general", "ui-theme", "sessions", "tokens", "keys", "email", "email/send-test-email", "audit-logs", "audit-log-viewer"].map((tab) => `${env.adminUrl}/admin/settings/${tab}`),
+      ...["general", "branding", "branding/new", "sessions", "tokens", "keys", "email", "email/send-test-email", "audit-logs", "audit-log-viewer"].map((tab) => `${env.adminUrl}/admin/settings/${tab}`),
+      brandUrl(seededBrand.id, "edit"), brandUrl(seededBrand.id, "delete"),
       ...["profile", "picture", "email", "email-verification", "phone", "address", "change-password", "otp", "manage-consents", "legal-documents", "sessions", "data", "delete", "deleted"].map((tab) => `${env.adminUrl}/account/${tab}`),
       `${env.adminUrl}/missing-german-page`, `${env.adminUrl}/auth/callback`, `${env.adminUrl}/auth/logout`,
     ];

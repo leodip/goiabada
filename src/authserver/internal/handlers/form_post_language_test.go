@@ -28,7 +28,7 @@ func TestFormPost_ThePageIsMarkedWithTheCatalogLanguage(t *testing.T) {
 			r = r.WithContext(i18n.ResolveRequestLocale(r.Context(), r))
 			w := httptest.NewRecorder()
 
-			err := issueAuthCode(w, r, web.TemplateFS(),
+			err := issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()},
 				&record.Code{Code: "c0de", State: "st", RedirectURI: "https://example.com/callback"}, "form_post")
 
 			require.NoError(t, err)

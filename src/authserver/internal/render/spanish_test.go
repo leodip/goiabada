@@ -25,7 +25,7 @@ func TestSpanish_SignInPageFromRequestPreferences(t *testing.T) {
 			w := httptest.NewRecorder()
 			var renderErr error
 			i18n.Locale(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				renderErr = New(web.TemplateFS(), web.StaticFS()).RenderTemplate(w, r,
+				renderErr = New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplate(w, r,
 					"layouts/auth_layout.html", "auth_pwd.html", map[string]interface{}{"registrationAvailable": true})
 			})).ServeHTTP(w, r)
 			require.NoError(t, renderErr)
@@ -65,7 +65,7 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 				r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{AppName: "Acme"}))
 				r = r.WithContext(i18n.WithLocale(r.Context(), true, locale, "en"))
 				assert.Equal(t, tc.subject, i18n.T(r.Context(), "email."+tc.key+".subject", map[string]any{"code": "123456", "appName": "Acme"}))
-				buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(r,
+				buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(r,
 					"layouts/email_layout.html", "emails/"+tc.body+".html", map[string]interface{}{
 						"name": "Ana", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3,
 					})

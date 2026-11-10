@@ -49,7 +49,7 @@ func serveRefusal(t *testing.T, handler http.HandlerFunc, target string, form ur
 func servePage(t *testing.T, handler http.HandlerFunc, method, target string, options ...handlertest.Option) string {
 	t.Helper()
 	options = append([]handlertest.Option{handlertest.WithAccessToken(),
-		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"})}, options...)
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test"})}, options...)
 	req := handlertest.Request(method, target, options...)
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 	rec := httptest.NewRecorder()

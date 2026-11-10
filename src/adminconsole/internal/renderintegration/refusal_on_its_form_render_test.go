@@ -56,7 +56,7 @@ func TestRender_AdminSettingsEmailSendTest_AMalformedAddressIsDrawnOnTheForm(t *
 	out := serveRefusal(t,
 		adminsettingshandlers.HandleEmailSendTestPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/settings/email/send-test-email", url.Values{"destinationEmail": {"someone@@example"}},
-		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}))
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", SMTPEnabled: true}))
 
 	assert.Contains(t, out, refusal)
 	input := inputRe("destinationEmail").FindString(out)
@@ -119,7 +119,7 @@ func TestRender_AccountEmailVerification_ARefusalIsDrawnWhateverEmailsState(t *t
 			out := serveRefusal(t,
 				accounthandlers.HandleEmailVerificationPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 				"/account/email-verification", url.Values{"verificationCode": {"ABC123"}},
-				handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: tc.smtpEnabled}))
+				handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", SMTPEnabled: tc.smtpEnabled}))
 
 			want := tc.want
 			if want == "" {

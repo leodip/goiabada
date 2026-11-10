@@ -76,7 +76,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
 
-		err := issueImplicitTokens(w, r, web.TemplateFS(), "form_post", "https://example.com/callback",
+		err := issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", "https://example.com/callback",
 			"client-csrf-token", implicitTokenResponse())
 
 		require.NoError(t, err)
@@ -102,7 +102,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
 
-		err := issueImplicitTokens(w, r, web.TemplateFS(), "form_post", "https://example.com/callback", "s",
+		err := issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", "https://example.com/callback", "s",
 			implicitTokenResponse())
 
 		require.NoError(t, err)
@@ -141,7 +141,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
 
-				err := issueImplicitTokens(w, r, web.TemplateFS(), "form_post", "https://example.com/callback", "s", tc.response)
+				err := issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", "https://example.com/callback", "s", tc.response)
 
 				require.NoError(t, err)
 				body := w.Body.String()
@@ -177,7 +177,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 				r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
 				templateFS := fstest.MapFS{"form_post.html": {Data: []byte(keysTemplate)}}
 
-				err := issueImplicitTokens(w, r, templateFS, "form_post", "https://example.com/callback",
+				err := issueImplicitTokens(w, r, formPostTemplate{fs: templateFS}, "form_post", "https://example.com/callback",
 					tc.state, implicitTokenResponse())
 
 				require.NoError(t, err)
@@ -189,13 +189,13 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 	t.Run("the real template omits an absent state and echoes a whitespace-only one", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
-		err := issueImplicitTokens(w, r, web.TemplateFS(), "form_post", "https://example.com/callback", "",
+		err := issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", "https://example.com/callback", "",
 			implicitTokenResponse())
 		require.NoError(t, err)
 		assert.NotContains(t, w.Body.String(), `name="state"`)
 
 		w = httptest.NewRecorder()
-		err = issueImplicitTokens(w, r, web.TemplateFS(), "form_post", "https://example.com/callback", "   ",
+		err = issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", "https://example.com/callback", "   ",
 			implicitTokenResponse())
 		require.NoError(t, err)
 		assert.Contains(t, w.Body.String(), `<input type="hidden" name="state" value="   ">`)
@@ -208,7 +208,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
 
-		err := issueImplicitTokens(w, r, web.TemplateFS(), "form_post", "https://example.com/callback",
+		err := issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", "https://example.com/callback",
 			`"><script>alert(1)</script>`, implicitTokenResponse())
 
 		require.NoError(t, err)
@@ -236,7 +236,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
 
-				err := issueImplicitTokens(w, r, web.TemplateFS(), "form_post", redirectURI, "s", implicitTokenResponse())
+				err := issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", redirectURI, "s", implicitTokenResponse())
 
 				require.Error(t, err, "checkRedirectURIEmittable must refuse %q before the form is built", redirectURI)
 				assert.Empty(t, w.Body.String(), "no page may be written")
@@ -252,7 +252,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
 
-		err := issueImplicitTokens(w, r, fstest.MapFS{}, "form_post", "https://example.com/callback", "s",
+		err := issueImplicitTokens(w, r, formPostTemplate{fs: fstest.MapFS{}}, "form_post", "https://example.com/callback", "s",
 			implicitTokenResponse())
 
 		require.Error(t, err)
@@ -271,7 +271,7 @@ func TestIssueImplicitTokens_FragmentIsTheDefault(t *testing.T) {
 			w := httptest.NewRecorder()
 			r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
 
-			err := issueImplicitTokens(w, r, nil, mode, "https://example.com/callback", "test-state",
+			err := issueImplicitTokens(w, r, formPostTemplate{}, mode, "https://example.com/callback", "test-state",
 				implicitTokenResponse())
 
 			require.NoError(t, err)

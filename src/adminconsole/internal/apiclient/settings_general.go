@@ -24,7 +24,7 @@ import (
 //
 //  3. DATA SCOPE:
 //     - This file: Full general settings (appName, issuer, passwordPolicy, selfRegistration, etc.)
-//     - publicsettings.Client: Minimal public subset (appName, uiTheme, smtpEnabled)
+//     - publicsettings.Client: Minimal public subset (appName, brand, smtpEnabled)
 //
 //  4. OPERATIONS:
 //     - This file: GET (read) and PUT (update) operations
