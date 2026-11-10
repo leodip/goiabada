@@ -195,6 +195,7 @@ func settingsAsTheRequestLoadedThem() record.Settings {
 		SMTPEncryption:                          "none",
 		TurnstileSiteKey:                        "before-site-key",
 		AuditLogRetentionDays:                   30,
+		DefaultBrandId:                          sql.NullInt64{Int64: 1, Valid: true},
 	}
 }
 
@@ -242,6 +243,7 @@ func settingsSavedMeanwhile() record.Settings {
 		AuditLogsInDatabaseEnabled:                true,
 		AuditLogRetentionDays:                     31,
 		LastCleanupAt:                             sql.NullTime{Time: meanwhile, Valid: true},
+		DefaultBrandId:                            sql.NullInt64{Int64: 2, Valid: true},
 	}
 }
 

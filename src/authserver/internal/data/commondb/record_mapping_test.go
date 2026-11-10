@@ -817,9 +817,10 @@ func userConsentMapping() mappingCase {
 	}
 }
 
-// settingsMapping's whole-row UPDATE leaves created_at, aes_encryption_key and last_cleanup_at
-// alone, the three dont-update columns. CreateInitialSettings, which names the row's id, is held to
-// the tags by TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId.
+// settingsMapping's whole-row UPDATE leaves created_at, aes_encryption_key, last_cleanup_at and
+// default_brand_id alone, the four dont-update columns. CreateInitialSettings, which names the
+// row's id, is held to the tags by
+// TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId.
 func settingsMapping() mappingCase {
 	return mappingCase{
 		name:   "settings",
@@ -928,6 +929,32 @@ func preRegistrationMapping() mappingCase {
 	}
 }
 
+// brandMapping's whole-row UPDATE leaves created_at alone, its one dont-update column.
+func brandMapping() mappingCase {
+	return mappingCase{
+		name:   "brand",
+		table:  "brands",
+		record: reflect.TypeOf(record.Brand{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetBrandById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetBrandById(ctx, nil, 1)
+			},
+			"GetAllBrands": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAllBrands(ctx, nil))
+			},
+			"GetDefaultBrand": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetDefaultBrand(ctx, nil)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateBrand(ctx, nil, rec.(*record.Brand))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateBrand(ctx, nil, rec.(*record.Brand))
+		},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
@@ -942,6 +969,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),
 		userSessionMapping(), userSessionClientMapping(), browserSessionMapping(), userConsentMapping(),
 		settingsMapping(), keyPairMapping(), auditLogMapping(), preRegistrationMapping(),
+		brandMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {

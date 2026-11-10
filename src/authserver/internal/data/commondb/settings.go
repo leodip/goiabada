@@ -22,7 +22,7 @@ var settingsColumns = columnList{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at, " +
-		"account_deletion_enabled",
+		"account_deletion_enabled, default_brand_id",
 	mysql: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -34,7 +34,7 @@ var settingsColumns = columnList{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at, " +
-		"account_deletion_enabled",
+		"account_deletion_enabled, default_brand_id",
 	postgres: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -46,7 +46,7 @@ var settingsColumns = columnList{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at, " +
-		"account_deletion_enabled",
+		"account_deletion_enabled, default_brand_id",
 	mssql: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -58,7 +58,7 @@ var settingsColumns = columnList{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at, " +
-		"account_deletion_enabled",
+		"account_deletion_enabled, default_brand_id",
 }
 
 // scanSettings reads one row selected with settingsColumns.
@@ -103,6 +103,7 @@ func scanSettings(row rowScanner, settings *record.Settings) error {
 		&settings.AuditLogRetentionDays,
 		&settings.LastCleanupAt,
 		&settings.AccountDeletionEnabled,
+		&settings.DefaultBrandId,
 	)
 }
 
@@ -118,8 +119,8 @@ var insertSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -131,8 +132,8 @@ var insertSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -144,9 +145,9 @@ var insertSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
 		"$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, " +
-		"$33, $34, $35, $36, $37, $38) RETURNING id",
+		"$33, $34, $35, $36, $37, $38, $39) RETURNING id",
 	mssql: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -158,9 +159,9 @@ var insertSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, " +
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, " +
 		"@p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, " +
-		"@p27, @p28, @p29, @p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37, @p38)",
+		"@p27, @p28, @p29, @p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37, @p38, @p39)",
 }
 
 // insertInitialSettings is the settings row with its id named, written once, by
@@ -177,8 +178,8 @@ var insertInitialSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -190,8 +191,8 @@ var insertInitialSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
-		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -203,9 +204,9 @@ var insertInitialSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
 		"$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, " +
-		"$35, $36, $37, $38, $39)",
+		"$35, $36, $37, $38, $39, $40)",
 	mssql: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
 		"self_registration_enabled, self_registration_requires_email_verification, " +
 		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
@@ -217,13 +218,13 @@ var insertInitialSettings = statement{
 		"dynamic_client_registration_enabled, pkce_required, " +
 		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
 		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
-		"last_cleanup_at, account_deletion_enabled) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, " +
+		"last_cleanup_at, account_deletion_enabled, default_brand_id) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, " +
 		"@p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, " +
-		"@p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37, @p38, @p39)",
+		"@p30, @p31, @p32, @p33, @p34, @p35, @p36, @p37, @p38, @p39, @p40)",
 }
 
-// updateSettings writes the whole row but created_at, aes_encryption_key and last_cleanup_at, which
-// are dont-update: see the record for why each is left alone.
+// updateSettings writes the whole row but created_at, aes_encryption_key, last_cleanup_at and
+// default_brand_id, which are dont-update: see the record for why each is left alone.
 var updateSettings = statement{
 	sqlite: "UPDATE settings SET updated_at = ?, app_name = ?, issuer = ?, ui_theme = ?, " +
 		"password_policy = ?, self_registration_enabled = ?, " +
@@ -337,7 +338,7 @@ func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
 		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
 		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.LastCleanupAt,
-		settings.AccountDeletionEnabled)
+		settings.AccountDeletionEnabled, settings.DefaultBrandId)
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
@@ -407,7 +408,7 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
 		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
 		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.LastCleanupAt,
-		settings.AccountDeletionEnabled); err != nil {
+		settings.AccountDeletionEnabled, settings.DefaultBrandId); err != nil {
 		restore()
 		return d.wrapSQLError(err, "unable to insert the initial settings")
 	}

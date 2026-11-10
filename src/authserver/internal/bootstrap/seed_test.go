@@ -31,14 +31,14 @@ import (
 // so it hangs this tier rather than passing it. The same proof on the three server engines is the
 // data tier's (tests/data/database_seeder_test.go).
 
-// seededTables are the tables the seed's 18 writes land in.
+// seededTables are the tables the seed's 19 writes land in.
 var seededTables = []string{
 	"clients", "redirect_uris", "post_logout_redirect_uris", "users", "resources", "permissions",
-	"clients_permissions", "users_permissions", "key_pairs", "settings",
+	"clients_permissions", "users_permissions", "key_pairs", "brands", "settings",
 }
 
-// seedWrites is how many writes a seed makes, each through one of the port's ten creates.
-const seedWrites = 18
+// seedWrites is how many writes a seed makes, each through one of the port's eleven creates.
+const seedWrites = 19
 
 type seedDB struct {
 	*sqlitedb.Database
@@ -166,8 +166,8 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	counts := db.counts(t)
 	assert.Equal(t, map[string]int{
 		"clients": 1, "redirect_uris": 1, "post_logout_redirect_uris": 1, "users": 1, "resources": 1, "permissions": 7,
-		"clients_permissions": 1, "users_permissions": 2, "key_pairs": 2, "settings": 1,
-	}, counts, "eighteen rows, one per write")
+		"clients_permissions": 1, "users_permissions": 2, "key_pairs": 2, "brands": 1, "settings": 1,
+	}, counts, "nineteen rows, one per write")
 	return secret
 }
 
@@ -771,13 +771,17 @@ func (f *faultDB) CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record
 	return f.write(func() error { return f.runDatabase.CreateKeyPair(ctx, tx, keyPair) })
 }
 
+func (f *faultDB) CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error {
+	return f.write(func() error { return f.runDatabase.CreateBrand(ctx, tx, brand) })
+}
+
 func (f *faultDB) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
 	return f.write(func() error { return f.runDatabase.CreateInitialSettings(ctx, tx, settings) })
 }
 
-// Every write goes through the port's ten creates, and there are eighteen of them: the count the
+// Every write goes through the port's eleven creates, and there are nineteen of them: the count the
 // failure table below is written against.
-func TestRun_MakesEighteenWrites(t *testing.T) {
+func TestRun_MakesNineteenWrites(t *testing.T) {
 	db := newSeedDB(t)
 	faults := &faultDB{runDatabase: db}
 

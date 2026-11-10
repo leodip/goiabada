@@ -24,7 +24,7 @@ import (
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
-// seedDatabase is the seed's port: the transaction and the ten creates its 18 writes call.
+// seedDatabase is the seed's port: the transaction and the eleven creates its 19 writes call.
 type seedDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
@@ -36,6 +36,7 @@ type seedDatabase interface {
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error
+	CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
 	CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
@@ -55,7 +56,7 @@ type seedValues struct {
 //
 // WHY IT IS ORDERED THIS WAY. Every step that can fail without the database's help runs first --
 // the password check, the random keys, the encryption, both RSA keys, the hash and the bootstrap
-// file's staging -- and then all 18 writes run in one transaction, so a failure anywhere up to the
+// file's staging -- and then all 19 writes run in one transaction, so a failure anywhere up to the
 // commit leaves an empty database that the next start seeds from the beginning. The one step after
 // it, publishing the file, cannot be undone that way, and its failure keeps the staged file and
 // names it instead (below). They used to run one statement at a time with no transaction, the
@@ -340,6 +341,18 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		}
 	}
 
+	// The default brand, which the settings row points at: automatic, on the built-in Blueberry
+	// theme, as migration 000089 gives an upgraded installation one on the theme it had (#810
+	// decision 1).
+	brand := &record.Brand{
+		Name:       record.SeededBrandName,
+		Appearance: record.BrandAppearanceAuto,
+		Theme:      record.BrandThemeBlueberry,
+	}
+	if err := r.db.CreateBrand(ctx, tx, brand); err != nil {
+		return err
+	}
+
 	// Last, and at the id IsEmpty reads, so the database reads as seeded exactly when the
 	// transaction holding this row commits (#424 decision 14).
 	return r.db.CreateInitialSettings(ctx, tx, &record.Settings{
@@ -375,6 +388,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		AuditLogsInConsoleEnabled:               true,  // Enabled by default for observability
 		AuditLogsInDatabaseEnabled:              true,  // Enabled by default for compliance
 		AuditLogRetentionDays:                   180,   // 180 days default retention
+		DefaultBrandId:                          sql.NullInt64{Int64: brand.Id, Valid: true},
 	})
 }
 

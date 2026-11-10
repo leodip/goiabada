@@ -509,6 +509,28 @@ type Database interface {
 	// schedule on the wall clock instead of one process's uptime.
 	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 
+	// Brands (#810). A brand is a name, an appearance and a theme; one is the default, the brand the
+	// settings row's DefaultBrandId points at. CreateBrand and UpdateBrand refuse a name another
+	// brand holds with ErrUniqueViolation.
+	CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
+	// UpdateBrand writes a brand's name, appearance and theme.
+	UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
+	GetBrandById(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
+	// GetAllBrands answers every brand, in id order.
+	GetAllBrands(ctx context.Context, tx *sql.Tx) ([]record.Brand, error)
+	// GetDefaultBrand answers the brand the settings row points at, or nil when there is no
+	// settings row or its pointer is empty.
+	GetDefaultBrand(ctx context.Context, tx *sql.Tx) (*record.Brand, error)
+	// MakeBrandDefault moves the settings row's pointer to brandId under the settings row's lock,
+	// and answers the brand it pointed at before, 0 when it was empty. It answers brandId itself,
+	// writing nothing, when that brand already is the default, and ErrBrandNotFound, writing
+	// nothing, when there is no such brand. A transaction is required, as for AcquireSettingsRow.
+	MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int64) (previousDefaultBrandId int64, err error)
+	// DeleteBrand deletes a brand, reading the default under the settings row's lock: it answers
+	// ErrDefaultBrandNotDeletable for the default brand and ErrBrandNotFound for a brand that is not
+	// there, deleting nothing. A transaction is required, as for AcquireSettingsRow.
+	DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) error
+
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	GetUserPermissionById(ctx context.Context, tx *sql.Tx, userPermissionId int64) (*record.UserPermission, error)
@@ -990,3 +1012,12 @@ var ErrCommitOutcomeUnknown = errors.New("the transaction commit's outcome is un
 // against a count this charge would change after the fact, so nothing is charged. The caller
 // places the reservation again, in the later window (#394).
 var ErrRateLimitWindowMoved = errors.New("the rate limit window has moved on")
+
+// ErrBrandNotFound is MakeBrandDefault or DeleteBrand finding no brand of the id it was given, read
+// under the settings row's lock: another deletion committed first, or there never was one (#810).
+var ErrBrandNotFound = errors.New("the brand does not exist")
+
+// ErrDefaultBrandNotDeletable is DeleteBrand finding, under the settings row's lock, that the brand
+// it was asked to delete is the default one. The default is moved first, then the brand deleted
+// (#810 decision 1).
+var ErrDefaultBrandNotDeletable = errors.New("the default brand cannot be deleted")
