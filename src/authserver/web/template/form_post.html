@@ -12,6 +12,9 @@
   <meta name="color-scheme" content="{{ with .page.Theme }}{{ . }}{{ else }}light dark{{ end }}">
   <title>{{ .page.Title }} – {{ .page.AppName }}</title>
   <link rel="stylesheet" href="{{ .page.Stylesheet }}">
+  {{- with .page.BrandStylesheet }}
+  <link rel="stylesheet" href="{{ . }}">
+  {{- end }}
   <script src="{{ .page.Script }}" defer></script>
 </head>
 

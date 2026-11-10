@@ -192,6 +192,8 @@ func newRoutesTestServerRendering(t *testing.T, configure func(*config.Config), 
 	require.NoError(t, err)
 
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
 		Id:           1,

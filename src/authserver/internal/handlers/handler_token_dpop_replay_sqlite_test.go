@@ -65,7 +65,7 @@ func newDPoPTokenInstance(t *testing.T, replays *sqlitedb.Database) *dpopTokenEn
 		now:         dpopNow,
 	}
 	proofs := TokenProofs{Checker: checker, Nonces: dpop.NewNonces(dpopSessionKey), Replays: replays, Now: func() time.Time { return e.now }}
-	e.handler = TokenDPoPNonce(proofs)(HandleTokenPost(render.New(nil, nil), e.database, e.issuer, e.validator, e.auditLogger,
+	e.handler = TokenDPoPNonce(proofs)(HandleTokenPost(render.New(nil, nil, nil), e.database, e.issuer, e.validator, e.auditLogger,
 		&countingCredentialFailures{}, tokenmetrics.Register(e.registry), &recordingLogoutTokens{}, proofs)).ServeHTTP
 	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 		Return(&protocolvalidation.ClientCredentialsGrant{Client: &record.Client{Id: 1}, Scope: "r:p"}, nil)

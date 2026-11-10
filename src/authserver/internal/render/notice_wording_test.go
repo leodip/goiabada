@@ -40,7 +40,7 @@ func TestRecoveryCodeUsedNotice_AdviceFitsTheCodesLeft(t *testing.T) {
 				r := httptest.NewRequest(http.MethodGet, "/", nil)
 				r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{AppName: "Acme"}))
 				r = r.WithContext(i18n.WithLocale(r.Context(), true, tc.locale, "en"))
-				buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(r,
+				buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(r,
 					"layouts/email_layout.html", "emails/email_recovery_code_used.html",
 					map[string]interface{}{"name": "Ana", "remaining": remaining})
 				require.NoError(t, err)

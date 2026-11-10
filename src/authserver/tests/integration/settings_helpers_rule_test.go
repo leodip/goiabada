@@ -78,6 +78,10 @@ func changeField(t *testing.T, name string, field reflect.Value) {
 			field.Set(reflect.ValueOf(sql.NullTime{Time: nullTime.Time.Add(time.Hour), Valid: true}))
 			return
 		}
+		if nullInt, ok := field.Interface().(sql.NullInt64); ok {
+			field.Set(reflect.ValueOf(sql.NullInt64{Int64: nullInt.Int64 + 1, Valid: true}))
+			return
+		}
 		t.Fatalf("no way to change %s, a %s", name, field.Type())
 	default:
 		t.Fatalf("no way to change %s, a %s", name, field.Type())

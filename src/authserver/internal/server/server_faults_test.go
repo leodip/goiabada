@@ -143,6 +143,8 @@ func requireEveryFormatReached(t *testing.T, routes []string) {
 // registration or the APIs as JSON could not parse the one fault that reaches them all at once.
 func TestInitRoutes_ASettingsFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
 	s := newFaultsTestServer(database)
 
@@ -165,6 +167,8 @@ func TestInitRoutes_ASettingsFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 // that has signed in, which a client calling the token endpoint from the same origin can be.
 func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, errors.New("the database is down"))
 	s := newFaultsTestServer(database)
@@ -203,6 +207,8 @@ func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 func TestInitRoutes_TheTokenEndpointStillRefusesGETWith405(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// The group's chain runs ahead of its 405, as it did when the route was the group's.
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 	s := newFaultsTestServer(database)
 
@@ -221,6 +227,8 @@ func TestInitRoutes_PublicSettingsRefusesOtherMethodsWith405(t *testing.T) {
 	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
 		t.Run(method, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
+			// A page reads the default brand; none leaves it automatic, in the built-in colors.
+			database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 			database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil).Maybe()
 			s := newFaultsTestServer(database)
 

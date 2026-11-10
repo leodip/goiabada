@@ -74,7 +74,7 @@ func newRevokeEndpoint(t *testing.T) *revokeEndpoint {
 		registry:    metrics.NewRegistry(),
 		settings:    &record.Settings{Id: 1, Issuer: revokeIssuer},
 	}
-	e.handler = HandleRevokePost(render.New(nil, nil), e.database, e.parser, testDataCipher, e.auditLogger,
+	e.handler = HandleRevokePost(render.New(nil, nil, nil), e.database, e.parser, testDataCipher, e.auditLogger,
 		revocationmetrics.Register(e.registry))
 	return e
 }
@@ -897,7 +897,7 @@ func TestHandleRevokePost_RefusesAnotherClientsAccessTokenWithoutAGrant(t *testi
 // own: 503, counted as error.
 func TestRevocationFaults_AnswerServiceUnavailable(t *testing.T) {
 	registry := metrics.NewRegistry()
-	writer := RevocationFaults(render.New(nil, nil), revocationmetrics.Register(registry))
+	writer := RevocationFaults(render.New(nil, nil, nil), revocationmetrics.Register(registry))
 	logtest.CaptureSlog(t)
 
 	rr := httptest.NewRecorder()

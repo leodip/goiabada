@@ -2385,7 +2385,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			Scope:       "openid",
 		}
 
-		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, formPostTemplate{}, "", "https://example.com/callback", "test-state", tokenResponse)
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -2409,7 +2409,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			Scope:   "openid",
 		}
 
-		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, formPostTemplate{}, "", "https://example.com/callback", "test-state", tokenResponse)
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -2436,7 +2436,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			Scope:       "openid profile",
 		}
 
-		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, formPostTemplate{}, "", "https://example.com/callback", "test-state", tokenResponse)
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -2460,7 +2460,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "", tokenResponse)
+		err := issueImplicitTokens(w, r, formPostTemplate{}, "", "https://example.com/callback", "", tokenResponse)
 
 		require.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -2488,7 +2488,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "   ", tokenResponse)
+		err := issueImplicitTokens(w, r, formPostTemplate{}, "", "https://example.com/callback", "   ", tokenResponse)
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=+++&iss=https%3A%2F%2Fissuer.example",
@@ -2510,7 +2510,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "a b+c/d=e#f&g=h", tokenResponse)
+		err := issueImplicitTokens(w, r, formPostTemplate{}, "", "https://example.com/callback", "a b+c/d=e#f&g=h", tokenResponse)
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh&iss=https%3A%2F%2Fissuer.example",
@@ -2532,7 +2532,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", tokenResponse)
+		err := issueImplicitTokens(w, r, formPostTemplate{}, "", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", tokenResponse)
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=client-csrf-token&iss=https%3A%2F%2Fissuer.example",
@@ -2550,7 +2550,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 
-		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "test-state", tokenResponse)
+		err := issueImplicitTokens(w, r, formPostTemplate{}, "", "https://example.com/callback", "test-state", tokenResponse)
 
 		require.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -2609,7 +2609,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 					Scope:       "openid",
 				}
 
-				err := issueImplicitTokens(w, r, nil, "", tc.redirectURI, "test-state", tokenResponse)
+				err := issueImplicitTokens(w, r, formPostTemplate{}, "", tc.redirectURI, "test-state", tokenResponse)
 
 				require.Error(t, err, tc.why)
 				assert.Empty(t, w.Header().Get("Location"), "no Location may be written for %q", tc.redirectURI)
@@ -2900,7 +2900,7 @@ func TestIssueAuthCode(t *testing.T) {
 			State:       "test_state",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -2917,7 +2917,7 @@ func TestIssueAuthCode(t *testing.T) {
 			State:       "test_state",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "fragment")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "fragment")
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -2941,7 +2941,7 @@ func TestIssueAuthCode(t *testing.T) {
 				</form>`)},
 		}
 
-		err := issueAuthCode(w, r, templateFS, code, "form_post")
+		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -2960,7 +2960,7 @@ func TestIssueAuthCode(t *testing.T) {
 			State:       "test_state",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "")
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -2981,7 +2981,7 @@ func TestIssueAuthCode(t *testing.T) {
 			"form_post.html": {Data: []byte(`{{.InvalidTemplate`)},
 		}
 
-		err := issueAuthCode(w, r, templateFS, code, "form_post")
+		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to parse template")
@@ -3055,7 +3055,7 @@ func TestIssueAuthCode(t *testing.T) {
 						"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit></form>`)},
 					}
 
-					err := issueAuthCode(w, r, templateFS, code, mode.value)
+					err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, mode.value)
 
 					require.Error(t, err, tc.why)
 					assert.Empty(t, w.Header().Get("Location"), "no Location may be written for %q", tc.redirectURI)
@@ -3087,7 +3087,7 @@ func TestIssueAuthCode(t *testing.T) {
 			State:       "test_state",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -3118,7 +3118,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 			State:       "client-csrf-token",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		// Whole-string, not url.Values: parsing is the step that hid the duplicate, since Get
@@ -3137,7 +3137,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 			State:       "abc123",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		// Not a hypothetical variant of the state case: an RP whose callback is reached from more
@@ -3158,7 +3158,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 			State:       "abc123",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		// The retention half of the fix, which has nothing to do with state. url.Query discards
@@ -3178,7 +3178,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 			State:       "client-csrf-token",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "fragment")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "fragment")
 
 		require.NoError(t, err)
 		// The two branches construct differently and that difference is observable here: the
@@ -3201,7 +3201,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 			State:       "",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		// This is the redirect carrying the authorization code, so a state on it is what an RP's
@@ -3221,7 +3221,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 			State:       "client-csrf-token",
 		}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		// Otherwise the callback says success and failure at once, and an RP that checks for
@@ -3248,7 +3248,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback?code=test_code&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
@@ -3260,7 +3260,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
-		err := issueAuthCode(w, r, nil, code, "fragment")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "fragment")
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#code=test_code&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
@@ -3272,7 +3272,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback?code=test_code&state=+++&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
@@ -3284,7 +3284,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
-		err := issueAuthCode(w, r, nil, code, "fragment")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "fragment")
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#code=test_code&state=+++&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
@@ -3305,7 +3305,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
-		err := issueAuthCode(w, r, nil, code, "query")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "query")
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback?code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh&iss=https%3A%2F%2Fissuer.example",
@@ -3318,7 +3318,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
-		err := issueAuthCode(w, r, nil, code, "fragment")
+		err := issueAuthCode(w, r, formPostTemplate{}, code, "fragment")
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh&iss=https%3A%2F%2Fissuer.example",
@@ -3337,7 +3337,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 			"form_post.html": {Data: []byte(`<input name="state" value="{{.state}}">`)},
 		}
 
-		err := issueAuthCode(w, r, templateFS, code, "form_post")
+		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
 
 		require.NoError(t, err)
 		// html/template escapes "+" as &#43; and "&" as &amp; in an attribute; both decode back to
@@ -3363,7 +3363,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit></form>`)},
 		}
 
-		err := issueAuthCode(w, r, templateFS, code, "form_post")
+		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
 
 		require.NoError(t, err)
 		assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
@@ -3383,7 +3383,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form>{{index . "missing" 0}}</form>`)},
 		}
 
-		err := issueAuthCode(w, r, templateFS, code, "form_post")
+		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
 
 		require.Error(t, err)
 		assert.Empty(t, w.Header().Get("Cache-Control"))
@@ -3412,7 +3412,7 @@ func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 		"form_post.html": {Data: []byte(`<form action="{{.redirectURI}}"><input value="{{.code}}">{{index . "missing" 0}}</form>`)},
 	}
 
-	err := issueAuthCode(w, r, templateFS, code, "form_post")
+	err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to execute template")
@@ -3469,7 +3469,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 					"form_post.html": {Data: []byte(keysTemplate)},
 				}
 
-				err := issueAuthCode(w, r, templateFS, code, "form_post")
+				err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
 
 				require.NoError(t, err)
 				assert.Equal(t, tc.want, w.Body.String())
@@ -3536,7 +3536,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 				r = withSessionSettings(r)
 				code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
-				err := issueAuthCode(w, r, web.TemplateFS(), code, "form_post")
+				err := issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, code, "form_post")
 
 				require.NoError(t, err)
 				body := w.Body.String()

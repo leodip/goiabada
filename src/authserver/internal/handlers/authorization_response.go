@@ -210,7 +210,7 @@ func isResponseParamName(name string, params []responseParam) bool {
 // Deciding whether a response may be emitted at all is the caller's: each runs
 // checkRedirectURIEmittable, and the error emitter RedirectWillBeEmitted's provenance and
 // registration gates, above this call.
-func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, formPostFS fs.FS,
+func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, formPost formPostTemplate,
 	responseMode string, redirectURI string, params []responseParam) error {
 
 	settings, ok := reqctx.SettingsFrom(r.Context())
@@ -224,11 +224,11 @@ func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, formPost
 		writeFragmentRedirect(w, r, redirectURI, params)
 		return nil
 	case "form_post":
-		page, err := newFormPostPage(r.Context(), settings)
+		page, err := newFormPostPage(r.Context(), settings, formPost.brands)
 		if err != nil {
 			return err
 		}
-		return writeFormPost(w, formPostFS, page, redirectURI, params)
+		return writeFormPost(w, formPost.fs, page, redirectURI, params)
 	default:
 		return writeQueryRedirect(w, r, redirectURI, params)
 	}
@@ -303,29 +303,38 @@ func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI stri
 	return nil
 }
 
+// formPostTemplate is the form_post page: the template set form_post.html is read from, and the
+// default brand it is drawn in, which a nil brands leaves automatic in the built-in colors.
+type formPostTemplate struct {
+	fs     fs.FS
+	brands render.DefaultBrandReader
+}
+
 // formPostPage is what the form_post page shows around the response it carries: its language, the
-// theme, the text in the reader's language, and the stylesheet and script by their fingerprints. The
-// page is parsed alone, with no layout and none of the renderer's template functions, so every value
-// it shows arrives here (#617).
+// default brand's data-theme and stylesheet, the text in the reader's language, and the stylesheet
+// and script by their fingerprints. The page is parsed alone, with no layout and none of the
+// renderer's template functions, so every value it shows arrives here (#617).
 type formPostPage struct {
-	Lang       string
-	Theme      string
-	AppName    string
-	Title      string
-	Message    string
-	Button     string
-	Stylesheet string
-	Script     string
+	Lang            string
+	Theme           string
+	AppName         string
+	Title           string
+	Message         string
+	Button          string
+	Stylesheet      string
+	BrandStylesheet string
+	Script          string
 }
 
 // formPostAssetURL names the page's stylesheet and script by the fingerprints of the built-in static
 // files, the ones the built-in page is written against.
 var formPostAssetURL = render.NewAssetURLs(web.StaticFS())
 
-// newFormPostPage is the form_post page's presentation for a request in ctx under settings. The
-// theme is written only for light and dark, as the layouts write it, so any other value follows the
-// device.
-func newFormPostPage(ctx context.Context, settings *record.Settings) (formPostPage, error) {
+// newFormPostPage is the form_post page's presentation for a request in ctx under settings, drawn in
+// the default brand brands reads as the layouts are drawn: data-theme for a light or dark brand and
+// none for an automatic one, and the brand's stylesheet after main.css. A brand that cannot be read
+// leaves the page automatic in main.css's colors, and the response is still delivered.
+func newFormPostPage(ctx context.Context, settings *record.Settings, brands render.DefaultBrandReader) (formPostPage, error) {
 	stylesheet, err := formPostAssetURL("/static/main.css")
 	if err != nil {
 		return formPostPage{}, err
@@ -334,19 +343,18 @@ func newFormPostPage(ctx context.Context, settings *record.Settings) (formPostPa
 	if err != nil {
 		return formPostPage{}, err
 	}
-	page := formPostPage{
-		Lang:       i18n.CatalogTag(ctx),
-		AppName:    settings.AppName,
-		Title:      i18n.T(ctx, "form_post.title"),
-		Message:    i18n.T(ctx, "form_post.message"),
-		Button:     i18n.T(ctx, "form_post.button"),
-		Stylesheet: stylesheet,
-		Script:     script,
-	}
-	if settings.UITheme == "light" || settings.UITheme == "dark" {
-		page.Theme = settings.UITheme
-	}
-	return page, nil
+	brand := render.DefaultPageBrand(ctx, brands)
+	return formPostPage{
+		Lang:            i18n.CatalogTag(ctx),
+		Theme:           brand.DataTheme,
+		AppName:         settings.AppName,
+		Title:           i18n.T(ctx, "form_post.title"),
+		Message:         i18n.T(ctx, "form_post.message"),
+		Button:          i18n.T(ctx, "form_post.button"),
+		Stylesheet:      stylesheet,
+		BrandStylesheet: brand.Stylesheet,
+		Script:          script,
+	}, nil
 }
 
 // writeFormPost answers with form_post.html, a form posting params to redirectURI, which its script

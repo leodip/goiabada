@@ -70,7 +70,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
-	httpHelper := render.New(s.templateFS, s.staticFS)
+	httpHelper := render.New(s.templateFS, s.staticFS, s.database)
 	// The one notifier every account notice goes through, after its response (#724).
 	notifier := accountnotice.New(httpHelper, emailSender, s.jobs)
 	// The one sender every logout token goes through, after the end of the session it tells of has

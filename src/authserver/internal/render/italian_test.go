@@ -25,7 +25,7 @@ func TestItalian_SignInPageUsesQueryOrSwissHeader(t *testing.T) {
 			req.Header.Set("Accept-Language", tc.accept)
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 			req = req.WithContext(i18n.ResolveRequestLocale(req.Context(), req))
-			buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
+			buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(req,
 				"layouts/auth_layout.html", "auth_pwd.html", map[string]interface{}{
 					"error": i18n.NewLocalizedError(i18n.ErrCodeLoginAuthFailed, nil).Localize(req.Context()),
 				})
@@ -67,7 +67,7 @@ func TestItalian_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 				ctx := i18n.WithLocale(i18n.WithLocale(req.Context(), true, "en"), true, locale, "en")
 				req = req.WithContext(ctx)
 				assert.Equal(t, tc.subject, i18n.T(ctx, "email."+tc.name+".subject", map[string]any{"code": "123456", "appName": "Test"}))
-				buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
+				buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(req,
 					"layouts/email_layout.html", "emails/email_"+tc.name+".html",
 					map[string]interface{}{"name": "Andrea", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3})
 				require.NoError(t, err)
@@ -100,7 +100,7 @@ func TestItalian_ExactRegionalEmailOverrideStillWins(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "it-CH", "en"))
-	buf, err := New(templates, web.StaticFS()).RenderTemplateToBuffer(req,
+	buf, err := New(templates, web.StaticFS(), nil).RenderTemplateToBuffer(req,
 		"layouts/email_layout.html", "emails/email_forgot_password.html", nil)
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), `<html lang="it-CH">`)

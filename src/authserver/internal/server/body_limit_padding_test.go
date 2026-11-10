@@ -177,6 +177,8 @@ var paddingDCRTx = &sql.Tx{}
 
 func TestBodyLimitPadding_DynamicClientRegistration(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	// One registration per request, and the helper sends two: with a Content-Length and chunked.
 	for range 2 {
@@ -200,6 +202,8 @@ func TestBodyLimitPadding_DynamicClientRegistration(t *testing.T) {
 // The account phone PUT, one bearer JSON handler for the 45 that decode a body the same way.
 func TestBodyLimitPadding_ABearerJSONHandler(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
 		Return(&record.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)
@@ -222,6 +226,8 @@ func TestBodyLimitPadding_ABearerJSONHandler(t *testing.T) {
 // is the epilogue, which RFC 2046 section 5.1.1 says to ignore.
 func TestBodyLimitPadding_AnUpload(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
 		Return(&record.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)

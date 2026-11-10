@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
@@ -44,35 +45,35 @@ func TestAuthorizationResponse_EveryRedirectCarriesIssAfterState(t *testing.T) {
 		{
 			name: "a code in the query",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, nil, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "query")
+				return issueAuthCode(w, r, formPostTemplate{}, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "query")
 			},
 			want: callback + "?code=c0de&state=st&iss=" + testResponseIssuerEscaped,
 		},
 		{
 			name: "a code in the default mode, the query",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, nil, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "")
+				return issueAuthCode(w, r, formPostTemplate{}, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "")
 			},
 			want: callback + "?code=c0de&state=st&iss=" + testResponseIssuerEscaped,
 		},
 		{
 			name: "a code in the fragment",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, nil, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "fragment")
+				return issueAuthCode(w, r, formPostTemplate{}, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "fragment")
 			},
 			want: callback + "#code=c0de&state=st&iss=" + testResponseIssuerEscaped,
 		},
 		{
 			name: "a code for a request that sent no state",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, nil, &record.Code{Code: "c0de", RedirectURI: callback}, "query")
+				return issueAuthCode(w, r, formPostTemplate{}, &record.Code{Code: "c0de", RedirectURI: callback}, "query")
 			},
 			want: callback + "?code=c0de&iss=" + testResponseIssuerEscaped,
 		},
 		{
 			name: "implicit tokens in the fragment",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueImplicitTokens(w, r, nil, "", callback, "st", &issuance.ImplicitGrantResponse{
+				return issueImplicitTokens(w, r, formPostTemplate{}, "", callback, "st", &issuance.ImplicitGrantResponse{
 					AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IdToken: "it", Scope: "openid",
 				})
 			},
@@ -134,7 +135,7 @@ func TestAuthorizationResponse_ARegisteredIssIsReplaced(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := withResponseIssuer(httptest.NewRequest(http.MethodGet, "/auth/issue", nil))
 
-		require.NoError(t, issueAuthCode(w, r, nil, &record.Code{Code: "c0de", State: "st", RedirectURI: registered}, "query"))
+		require.NoError(t, issueAuthCode(w, r, formPostTemplate{}, &record.Code{Code: "c0de", State: "st", RedirectURI: registered}, "query"))
 
 		assert.Equal(t, "https://example.com/callback?lang=en&code=c0de&state=st&iss="+testResponseIssuerEscaped,
 			w.Header().Get("Location"))
@@ -176,14 +177,14 @@ func TestAuthorizationResponse_EveryFormPostCarriesIssAfterState(t *testing.T) {
 		{
 			name: "a code",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, web.TemplateFS(), &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "form_post")
+				return issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "form_post")
 			},
 			want: [][2]string{{"code", "c0de"}, {"state", "st"}, {"iss", testResponseIssuer}},
 		},
 		{
 			name: "implicit tokens",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueImplicitTokens(w, r, web.TemplateFS(), "form_post", callback, "st", &issuance.ImplicitGrantResponse{
+				return issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", callback, "st", &issuance.ImplicitGrantResponse{
 					AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IdToken: "it", Scope: "openid",
 				})
 			},
@@ -202,7 +203,7 @@ func TestAuthorizationResponse_EveryFormPostCarriesIssAfterState(t *testing.T) {
 		{
 			name: "a code for a request that sent no state",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, web.TemplateFS(), &record.Code{Code: "c0de", RedirectURI: callback}, "form_post")
+				return issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, &record.Code{Code: "c0de", RedirectURI: callback}, "form_post")
 			},
 			want: [][2]string{{"code", "c0de"}, {"iss", testResponseIssuer}},
 		},
@@ -230,7 +231,7 @@ func TestAuthorizationResponse_WithoutSettingsNothingIsWritten(t *testing.T) {
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodGet, "/auth/issue", nil)
 
-			err := issueAuthCode(w, r, web.TemplateFS(), &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, mode)
+			err := issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, mode)
 
 			require.Error(t, err)
 			assert.Empty(t, w.Header().Get("Location"))
@@ -249,7 +250,9 @@ func TestNewClientErrorResponder_TheFormPostPageIsTheBuiltInOne(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := withResponseIssuer(httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 
-	responder := NewClientErrorResponder(testRegisteredDatabase(t, callback), nil)
+	database := testRegisteredDatabase(t, callback)
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Once()
+	responder := NewClientErrorResponder(database, nil)
 	require.NoError(t, responder.redirToClientWithError(w, r,
 		testRedirectError("login_required", "Login required", "form_post", callback, "st", "code")))
 

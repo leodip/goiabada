@@ -3,13 +3,13 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"io/fs"
 	"log/slog"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/loopback"
@@ -17,9 +17,11 @@ import (
 )
 
 // clientErrorDatabase is what the client-error responder reads: the redirect URIs a client has
-// registered now, for the registration gate. data.Database satisfies it.
+// registered now, for the registration gate, and the default brand its form_post page is drawn in.
+// data.Database satisfies it.
 type clientErrorDatabase interface {
 	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error)
+	render.DefaultBrandReader
 }
 
 // ClientErrorResponder answers a client with an authorization error response: it decides whether
@@ -34,8 +36,8 @@ type clientErrorDatabase interface {
 type ClientErrorResponder struct {
 	database     clientErrorDatabase
 	pageRenderer PageRenderer
-	// formPostFS is where form_post.html is read from, for an error and for a success response alike.
-	formPostFS fs.FS
+	// formPost is the form_post page, for an error and for a success response alike.
+	formPost formPostTemplate
 }
 
 // NewClientErrorResponder builds the responder. Its form_post page is the built-in one whatever
@@ -47,7 +49,7 @@ func NewClientErrorResponder(database clientErrorDatabase, pageRenderer PageRend
 	return &ClientErrorResponder{
 		database:     database,
 		pageRenderer: pageRenderer,
-		formPostFS:   web.TemplateFS(),
+		formPost:     formPostTemplate{fs: web.TemplateFS(), brands: database},
 	}
 }
 
@@ -272,5 +274,5 @@ func (rsp *ClientErrorResponder) redirToClientWithError(w http.ResponseWriter, r
 		params = append(params, responseParam{"state", input.state})
 	}
 
-	return writeAuthorizationResponse(w, r, rsp.formPostFS, effectiveResponseMode, input.redirectURI, params)
+	return writeAuthorizationResponse(w, r, rsp.formPost, effectiveResponseMode, input.redirectURI, params)
 }

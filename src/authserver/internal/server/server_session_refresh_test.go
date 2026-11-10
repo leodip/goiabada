@@ -48,6 +48,8 @@ func (b *staleBackend) Touch(ctx context.Context, id string, authenticated bool)
 // cookie (#743 decisions 8 and 9).
 func TestInitMiddleware_OnlyThePageBranchRefreshesTheSessionAndSendsItsCookie(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, nilTx, int64(1)).Return(&record.Settings{Id: 1}, nil).Maybe()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "the-user-session").
 		Return(&record.UserSession{Id: 1, UserId: 1, SessionIdentifier: "the-user-session"}, nil).Maybe()

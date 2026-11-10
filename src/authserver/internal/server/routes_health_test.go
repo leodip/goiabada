@@ -24,6 +24,8 @@ import (
 // so either middleware reached would answer 500; the settings read is then denied outright.
 func TestRegisterRoutes_HealthAnswersWithTheDatabaseDown(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Return(nil, errors.New("the database is down")).Maybe()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
@@ -60,6 +62,8 @@ func TestRegisterRoutes_HealthAnswersWithTheDatabaseDown(t *testing.T) {
 // above is not satisfied by a database the router never reaches.
 func TestRegisterRoutes_ApplicationRoutesStillFailWithTheDatabaseDown(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	// A page reads the default brand; none leaves it automatic, in the built-in colors.
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Return(nil, errors.New("the database is down")).Once()
 
