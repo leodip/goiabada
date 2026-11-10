@@ -233,6 +233,17 @@ func (s *settingsTabAPI) UpdateClient(_ context.Context, _ string, _ int64,
 	return nil, &apiclient.APIError{Code: code, Message: s.refusal, StatusCode: http.StatusBadRequest}
 }
 
+// GetAllBrands answers the brands the Brand select offers when the refused tab is drawn again.
+func (s *settingsTabAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
+	return []api.BrandResponse{{Id: 5, Name: "Default", IsDefault: true}}, nil
+}
+
+// UpdateClientBrand is never reached: the settings' write before it is refused.
+func (s *settingsTabAPI) UpdateClientBrand(_ context.Context, _ string, _ int64,
+	_ *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
+	return nil, &apiclient.APIError{Code: "UNEXPECTED", Message: "the brand was written after a refused save", StatusCode: http.StatusInternalServerError}
+}
+
 // UpdateClientAdministrativeScopes is never reached: the settings' write before it is refused.
 func (s *settingsTabAPI) UpdateClientAdministrativeScopes(_ context.Context, _ string, _ int64,
 	_ *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
@@ -250,7 +261,7 @@ func postClientSettings(t *testing.T, apiClient *settingsTabAPI, form url.Values
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 	rec := httptest.NewRecorder()
 
-	adminclienthandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example").
+	adminclienthandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, noInvalidation{t}, "https://console.example").
 		ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code, "the refused save is drawn again, not redirected: %s", rec.Body.String())
@@ -420,4 +431,75 @@ func TestRender_AdminClientSettings_TheClientsDocumentURLFields(t *testing.T) {
 	}
 	assert.NotContains(t, out, `name="showPrivacyPolicyUrl"`, "no switch: the consent screen links it whenever set")
 	assert.NotContains(t, out, `name="showTermsOfServiceUrl"`)
+}
+
+// brandSelectRe matches the Brand select's opening tag, and brandOptionRe each of its options.
+var (
+	brandSelectRe = regexp.MustCompile(`<select [^>]*id="brandId"[^>]*>`)
+	brandOptionRe = regexp.MustCompile(`<option value="[^"]*"[^>]*>[^<]*</option>`)
+)
+
+// brandOptions are the Brand select's options, in order.
+func brandOptions(t *testing.T, out string) []string {
+	t.Helper()
+	start := strings.Index(out, `id="brandId"`)
+	require.Positive(t, start, "the Brand select is drawn")
+	end := strings.Index(out[start:], "</select>")
+	require.Positive(t, end)
+	return brandOptionRe.FindAllString(out[start:start+end], -1)
+}
+
+var renderBrands = []adminclienthandlers.BrandOption{{Id: 4, Name: "<i>Autumn</i>"}, {Id: 5, Name: "Default"}, {Id: 6, Name: "Spring"}}
+
+// The Brand select sits under Sign-in and consent pages, in the tab's one form (#812 decision 6):
+// Default brand first, naming the current default, then every brand by name, the client's brand
+// selected, or Default brand for a client with none of its own.
+func TestRender_AdminClientSettings_TheBrandSelect(t *testing.T) {
+	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"},
+		map[string]interface{}{"brands": renderBrands, "defaultBrandName": "Default"})
+
+	legendAt := strings.Index(out, "Páginas de entrada e de consentimento</legend>")
+	selectAt := strings.Index(out, `id="brandId"`)
+	formEnd := strings.Index(out, "</form>")
+	require.Positive(t, legendAt)
+	assert.True(t, selectAt > legendAt && selectAt < formEnd, "under Sign-in and consent pages, inside the form")
+	assert.Equal(t, 1, strings.Count(out, `id="formClientSettings"`), "the tab's one form")
+
+	assert.Regexp(t, `<label class="field-label" for="brandId">Marca</label>`, out)
+	tag := brandSelectRe.FindString(out)
+	assert.Contains(t, tag, `name="brandId"`)
+	assert.Contains(t, tag, `aria-describedby="brandIdHint"`)
+	assert.NotContains(t, tag, "aria-invalid")
+	assert.Contains(t, out, `<p class="field-hint" id="brandIdHint">A marca em que as páginas de entrada e de saída do cliente são exibidas. Na Marca padrão, elas acompanham a padrão quando ela muda.</p>`)
+
+	assert.Equal(t, []string{
+		`<option value="" selected>Marca padrão (Default)</option>`,
+		`<option value="4">&lt;i&gt;Autumn&lt;/i&gt;</option>`,
+		`<option value="5">Default</option>`,
+		`<option value="6">Spring</option>`,
+	}, brandOptions(t, out))
+
+	out = renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal", BrandId: 6},
+		map[string]interface{}{"brands": renderBrands, "defaultBrandName": "Default"})
+	assert.Equal(t, []string{
+		`<option value="">Marca padrão (Default)</option>`,
+		`<option value="4">&lt;i&gt;Autumn&lt;/i&gt;</option>`,
+		`<option value="5">Default</option>`,
+		`<option value="6" selected>Spring</option>`,
+	}, brandOptions(t, out), "a client given a brand has it selected")
+}
+
+// A brand refused by the auth server is said in a notice the select is described by, and the
+// select is marked invalid and focused.
+func TestRender_AdminClientSettings_ARefusedBrandIsShownOnTheSelect(t *testing.T) {
+	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"},
+		map[string]interface{}{"brands": renderBrands, "defaultBrandName": "Default",
+			"savedSuccessfully": true, "brandError": "A marca não existe."})
+
+	assert.Regexp(t, `<div class="notice notice-danger" role="alert" id="brand-error">\s*<svg[^>]*>.*</svg>\s*<p>A marca não existe\.</p>`, out)
+	tag := brandSelectRe.FindString(out)
+	assert.Contains(t, tag, `aria-describedby="brand-error brandIdHint"`)
+	assert.Contains(t, tag, `aria-invalid="true"`)
+	assert.True(t, hasAttr(tag, "autofocus"))
+	assert.Contains(t, out, `<div class="notice notice-positive" role="status">`, "the settings were saved")
 }

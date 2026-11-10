@@ -14,13 +14,28 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// clientSettingsAPI is what the client settings page needs: the client, the settings' write, and
-// the allowance's own write.
+// clientSettingsAPI is what the client settings page needs: the client, the brands its Brand
+// select offers, the settings' write, and the allowance's and the brand's own writes.
 type clientSettingsAPI interface {
 	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetAllBrands(ctx context.Context, accessToken string) ([]api.BrandResponse, error)
 	UpdateClient(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
 	UpdateClientAdministrativeScopes(ctx context.Context, accessToken string, clientId int64,
 		request *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error)
+	UpdateClientBrand(ctx context.Context, accessToken string, clientId int64,
+		request *api.UpdateClientBrandRequest) (*api.ClientResponse, error)
+}
+
+// settingsInvalidator drops the console's cached copy of the public settings, whose brand is the
+// brand of the console's own client, so the next page is drawn in the brand just saved.
+type settingsInvalidator interface {
+	Invalidate()
+}
+
+// BrandOption is one brand the Brand select offers by name: its id is the value the select sends.
+type BrandOption struct {
+	Id   int64
+	Name string
 }
 
 // ClientSettings is what the Settings tab is drawn from. AdministrativeScopesAllowed is a field of
@@ -54,6 +69,8 @@ type ClientSettings struct {
 	DefaultAcrLevel             string
 	IsSystemLevelClient         bool
 	CreatedViaDCR               bool
+	// BrandId is the client's own brand, or 0 for a client with none, drawn in the default brand.
+	BrandId int64
 	// IsPublic is not edited here; the tab bar reads it, from the client as stored, to leave out
 	// the Introspection tab of a public client.
 	IsPublic bool
@@ -81,7 +98,76 @@ func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
 		DefaultAcrLevel:             c.DefaultAcrLevel,
 		IsSystemLevelClient:         c.IsSystemLevelClient,
 		CreatedViaDCR:               c.CreatedViaDCR,
+		BrandId:                     brandIdOf(c.BrandId),
 		IsPublic:                    c.IsPublic,
+	}
+}
+
+// brandIdOf is the Brand select's value for a client's brand: the brand's id, or 0 for none.
+func brandIdOf(brandId *int64) int64 {
+	if brandId == nil {
+		return 0
+	}
+	return *brandId
+}
+
+// submittedBrand is the brand the save gives the client, as the Brand select sent it in the body:
+// empty puts it on the default brand, which is nil, and a brand's id gives it that brand. A select
+// that was not submitted, or a value it never sends, keeps the stored brand, so a save that says
+// nothing about the brand cannot reset it.
+func submittedBrand(r *http.Request, stored *int64) *int64 {
+	_ = r.PostFormValue("brandId") // parses the body
+	values, sent := r.PostForm["brandId"]
+	if !sent || len(values) == 0 {
+		return stored
+	}
+	if values[0] == "" {
+		return nil
+	}
+	id, err := strconv.ParseInt(values[0], 10, 64)
+	if err != nil || id <= 0 {
+		return stored
+	}
+	return &id
+}
+
+func sameBrand(a, b *int64) bool {
+	return brandIdOf(a) == brandIdOf(b)
+}
+
+// bindBrands adds what the Brand select is drawn from to bind: every brand by name, in the auth
+// server's order, and the name of the default brand, which its first choice names. It answers
+// false, having answered the page that says why, when the brands cannot be read.
+func bindBrands(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient clientSettingsAPI,
+	accessToken string, bind map[string]interface{}) bool {
+
+	brands, err := apiClient.GetAllBrands(r.Context(), accessToken)
+	if err != nil {
+		render.HandleAPIError(httpHelper, w, r, err)
+		return false
+	}
+	options := make([]BrandOption, 0, len(brands))
+	defaultName := ""
+	for _, brand := range brands {
+		options = append(options, BrandOption{Id: brand.Id, Name: brand.Name})
+		if brand.IsDefault {
+			defaultName = brand.Name
+		}
+	}
+	bind["brands"] = options
+	bind["defaultBrandName"] = defaultName
+	return true
+}
+
+// renderSettings draws the Settings tab from bind, with the Brand select's brands.
+func renderSettings(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient clientSettingsAPI,
+	accessToken string, bind map[string]interface{}) {
+
+	if !bindBrands(httpHelper, w, r, apiClient, accessToken, bind) {
+		return
+	}
+	if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind); err != nil {
+		httpHelper.InternalServerError(w, r, err)
 	}
 }
 
@@ -138,17 +224,11 @@ func HandleSettingsGet(
 			}
 		}
 
-		bind := map[string]interface{}{
+		renderSettings(httpHelper, w, r, apiClient, jwtInfo.TokenResponse.AccessToken, map[string]interface{}{
 			"client":            adminClientSettings,
 			"storedClient":      adminClientSettings,
 			"savedSuccessfully": savedSuccessfully,
-		}
-
-		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+		})
 	}
 }
 
@@ -165,13 +245,20 @@ func HandleSettingsGet(
 // nothing, so its absence means "not allowed", and a value in the query is no submission of this
 // form. Only the checkbox's own value switches it on.
 //
-// The two writes are two requests, so a refused allowance leaves the settings saved: the tab is drawn
-// again from the client as it now stands, saying the settings were saved, with the refusal beside
-// the switch.
+// The Brand select is saved the same way, last and only when it differs from the client's stored
+// brand, through the brand's own route (#812 decision 6): an empty value puts the client back on
+// the default brand, and a brand's id gives it that brand. A save of the admin console's own client
+// that changes its brand drops the console's cached public settings, whose brand is that client's,
+// so the console's pages take it at once rather than when the cache expires.
+//
+// The writes are separate requests, so a refused allowance or brand leaves the settings saved: the
+// tab is drawn again from the client as it now stands, saying the settings were saved, with the
+// refusal beside its control. A refused allowance writes no brand.
 func HandleSettingsPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
 	apiClient clientSettingsAPI,
+	settingsCache settingsInvalidator,
 	baseURL string,
 ) http.HandlerFunc {
 
@@ -236,6 +323,8 @@ func HandleSettingsPost(
 			sentRememberConsent = &rememberConsent
 		}
 
+		brandId := submittedBrand(r, clientResp.BrandId)
+
 		adminClientSettings := ClientSettings{
 			ClientId:                    id,
 			ClientIdentifier:            r.FormValue("clientIdentifier"),
@@ -256,24 +345,21 @@ func HandleSettingsPost(
 			DefaultAcrLevel:             r.FormValue("defaultAcrLevel"),
 			IsSystemLevelClient:         isSystemLevelClient,
 			CreatedViaDCR:               clientResp.CreatedViaDCR,
+			BrandId:                     brandIdOf(brandId),
 			IsPublic:                    clientResp.IsPublic,
 		}
+		accessToken := jwtInfo.TokenResponse.AccessToken
 
 		// A refusal draws the tab again with the inputs as typed, and the title and the dialogs'
 		// original values from the client as stored, so a second save of the same rename or
 		// disable still asks first.
 		renderError := func(message, errorField string) {
-			bind := map[string]interface{}{
+			renderSettings(httpHelper, w, r, apiClient, accessToken, map[string]interface{}{
 				"client":       adminClientSettings,
 				"storedClient": clientSettingsFrom(clientResp),
 				"error":        message,
 				"errorField":   errorField,
-			}
-
-			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
-			if renderErr != nil {
-				httpHelper.InternalServerError(w, r, renderErr)
-			}
+			})
 		}
 
 		// Build API request
@@ -296,7 +382,7 @@ func HandleSettingsPost(
 			updateReq.DefaultAcrLevel = r.FormValue("defaultAcrLevel")
 		}
 
-		updated, err := apiClient.UpdateClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
+		updated, err := apiClient.UpdateClient(r.Context(), accessToken, id, updateReq)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderError(message, render.ErrorField(err, clientErrorFields))
@@ -304,29 +390,44 @@ func HandleSettingsPost(
 			return
 		}
 
-		if allowed != clientResp.AdministrativeScopesAllowed {
-			renderAllowanceError := func(message string) {
-				stored := clientResp
-				if updated != nil {
-					stored = updated
-				}
+		// stored is the client as the writes so far have left it, which a later refusal draws the tab
+		// from, saying the settings were saved, with the refusal named by errorKey.
+		stored := clientResp
+		if updated != nil {
+			stored = updated
+		}
+		renderSavedWith := func(errorKey string) func(message string) {
+			return func(message string) {
 				saved := clientSettingsFrom(stored)
-				bind := map[string]interface{}{
-					"client":                    saved,
-					"storedClient":              saved,
-					"savedSuccessfully":         true,
-					"administrativeScopesError": message,
-				}
-				renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
-				if renderErr != nil {
-					httpHelper.InternalServerError(w, r, renderErr)
-				}
+				renderSettings(httpHelper, w, r, apiClient, accessToken, map[string]interface{}{
+					"client":            saved,
+					"storedClient":      saved,
+					"savedSuccessfully": true,
+					errorKey:            message,
+				})
 			}
-			_, err = apiClient.UpdateClientAdministrativeScopes(r.Context(), jwtInfo.TokenResponse.AccessToken, id,
+		}
+
+		if allowed != clientResp.AdministrativeScopesAllowed {
+			answered, allowanceErr := apiClient.UpdateClientAdministrativeScopes(r.Context(), accessToken, id,
 				&api.UpdateClientAdministrativeScopesRequest{Allowed: &allowed})
-			if err != nil {
-				render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderAllowanceError)
+			if allowanceErr != nil {
+				render.HandleAPIErrorWithCallback(httpHelper, w, r, allowanceErr, renderSavedWith("administrativeScopesError"))
 				return
+			}
+			if answered != nil {
+				stored = answered
+			}
+		}
+
+		if !sameBrand(brandId, clientResp.BrandId) {
+			_, err = apiClient.UpdateClientBrand(r.Context(), accessToken, id, &api.UpdateClientBrandRequest{BrandId: brandId})
+			if err != nil {
+				render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderSavedWith("brandError"))
+				return
+			}
+			if clientResp.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
+				settingsCache.Invalidate()
 			}
 		}
 

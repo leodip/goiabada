@@ -84,6 +84,14 @@ func (*clientPagesAPI) UpdateClientBackchannelLogout(context.Context, string, in
 	panic("unexpected call to UpdateClientBackchannelLogout")
 }
 
+func (*clientPagesAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
+	return []api.BrandResponse{{Id: 5, Name: "Default", IsDefault: true}}, nil
+}
+
+func (*clientPagesAPI) UpdateClientBrand(context.Context, string, int64, *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
+	panic("unexpected call to UpdateClientBrand")
+}
+
 func (*clientPagesAPI) UpdateClientAdministrativeScopes(context.Context, string, int64, *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClientAdministrativeScopes")
 }

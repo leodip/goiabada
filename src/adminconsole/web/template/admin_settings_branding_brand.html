@@ -11,10 +11,10 @@
     <p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.new.lead" }}</p>
     {{ else if .storedBrand.IsDefault }}
     <h1 class="page-title">{{ .storedBrand.Name }} <span class="tag tag-note">{{ T $.ctx "adminconsole.admin_branding.list.default_tag" }}</span></h1>
-    <p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.brand.default_note" }}</p>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.brand.default_note" }} {{ .clientsNote }}</p>
     {{ else }}
     <h1 class="page-title">{{ .storedBrand.Name }}</h1>
-    <p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.brand.other_note" }}</p>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.brand.other_note" }} {{ .clientsNote }}</p>
     {{ end }}
   </div>
   {{/* Making a brand the default draws every page in it at once, so it asks first, in the

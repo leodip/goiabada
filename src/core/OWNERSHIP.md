@@ -227,7 +227,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateClientAdministrativeScopesRequest` | both-apps | — |
 | `core/api` | `UpdateClientAuthenticationRequest` | both-apps | — |
 | `core/api` | `UpdateClientBackchannelLogoutRequest` | both-apps | — |
-| `core/api` | `UpdateClientBrandRequest` | contract | The request of `PUT /api/v1/admin/clients/{id}/brand` (#812 decision 2), which is what `core/api` is for. The auth server reads it; the admin console sends it from the Brand select on a client's Settings tab (#812 decision 6). |
+| `core/api` | `UpdateClientBrandRequest` | both-apps | The request of `PUT /api/v1/admin/clients/{id}/brand` (#812 decision 2), which is what `core/api` is for. The auth server reads it; the admin console sends it from the Brand select on a client's Settings tab (#812 decision 6). |
 | `core/api` | `UpdateClientDPoPRequest` | both-apps | — |
 | `core/api` | `UpdateClientIntrospectionResourcesRequest` | both-apps | — |
 | `core/api` | `UpdateClientOAuth2FlowsRequest` | both-apps | — |

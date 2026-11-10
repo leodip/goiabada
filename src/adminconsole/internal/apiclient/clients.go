@@ -231,6 +231,24 @@ func (c *AuthServerClient) UpdateClientDPoP(ctx context.Context, accessToken str
 	return &response.Client, nil
 }
 
+// UpdateClientBrand gives a client a brand of its own, or with a nil BrandId puts it back on the
+// default brand, on the one route that changes it, and answers the client as it now is (#812
+// decision 2). BrandId is always sent, as null for the default: the auth server refuses a body
+// without it. It accepts 200 alone, as UpdateClientDPoP above does.
+func (c *AuthServerClient) UpdateClientBrand(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/brand",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &response.Client, nil
+}
+
 // The three logo methods are the exception in this file: each accepts 200 alone, as it was
 // written.
 

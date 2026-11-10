@@ -49,6 +49,7 @@ var (
 	charUpdateClientAdmin = &api.UpdateClientAdministrativeScopesRequest{Allowed: &charAllowed}
 	charRequireDPoP       = false
 	charUpdateClientDPoP  = &api.UpdateClientDPoPRequest{DPoPBoundAccessTokens: &charRequireDPoP}
+	charUpdateClientBrand = &api.UpdateClientBrandRequest{BrandId: nil}
 
 	charCreateGroupAttr = &api.CreateGroupAttributeRequest{Key: "department", Value: "sales"}
 	charUpdateGroupAttr = &api.UpdateGroupAttributeRequest{Key: "department", Value: "support"}
@@ -719,6 +720,21 @@ func wireCharacterization() []wireCase {
 			// "dpopBoundAccessTokens", so a false is sent, never left out (#42 decision 12).
 			body: `{"dpopBoundAccessTokens":false}`, successStatus: 200,
 			reply: `{"client":{"id":3,"dpopBoundAccessTokens":false}}`, want: false,
+		},
+		{
+			name: "UpdateClientBrand",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.UpdateClientBrand(ctx, charAccessToken, 3, charUpdateClientBrand)
+				if err != nil {
+					return nil, err
+				}
+				return got.BrandId == nil, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/clients/3/brand", contentType: charJSON,
+			// The literal, not the struct marshalled: the auth server refuses a body without
+			// "brandId", so the default brand is sent as null, never left out (#812 decision 2).
+			body: `{"brandId":null}`, successStatus: 200,
+			reply: `{"client":{"id":3,"brandId":null}}`, want: true,
 		},
 		{
 			name: "GetClientLogo",

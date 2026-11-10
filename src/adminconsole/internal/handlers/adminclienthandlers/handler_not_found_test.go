@@ -41,6 +41,14 @@ func (*notFoundClientApiClient) UpdateClient(context.Context, string, int64, *ap
 	panic("unexpected call to UpdateClient")
 }
 
+func (*notFoundClientApiClient) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
+	panic("GetAllBrands is not part of this test")
+}
+
+func (*notFoundClientApiClient) UpdateClientBrand(context.Context, string, int64, *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
+	panic("UpdateClientBrand is not part of this test")
+}
+
 func (*notFoundClientApiClient) UpdateClientAdministrativeScopes(context.Context, string, int64, *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
 	panic("UpdateClientAdministrativeScopes is not part of this test")
 }

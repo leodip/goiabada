@@ -29,7 +29,9 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   rejected hint; its declining link carries that `client_id` to `/auth/logout/declined`, which
   names it for the look alone. The no-longer-active page forgets it. `render.RequestPageBrand` reads it for both layouts and the
   form_post page. Every console page takes the brand of the console's own client, its own or the
-  default, which `/api/public/settings` answers through `render.ClientPageBrand`. A page with no readable brand links none and is drawn automatic in the built-in
+  default, which `/api/public/settings` answers through `render.ClientPageBrand`. The console drops
+  its cached copy when its client's Brand select is saved and on every Branding write, so its pages
+  change at once; a change made through the admin API alone reaches them when the cache expires. A page with no readable brand links none and is drawn automatic in the built-in
   colors. The stylesheet sets the 23 `--color-*` tokens, the dark ones under the two
   selectors `ui.css`'s dark variant uses, so a change to that variant changes `stylesheetCSS` too.
   Blueberry's declares no colors, since `ui.css` holds its values, which
