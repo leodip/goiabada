@@ -195,10 +195,11 @@ type AuthorizationResult struct {
 	// response or the step redirect.
 	AuthContext *ceremony.AuthContext
 
-	// ClientId is the client_id of a request past the check of its client_id and redirect_uri,
-	// whose client is so known. It is set on every answer from there on, an error beside it
-	// included, so the handler draws the error response or the 500 in that client's brand. It is
-	// empty before that check, whose failures are drawn in the default brand (#812).
+	// ClientId is the client_id of a request whose client is known: past the check of its client_id
+	// and redirect_uri, or failing inside it after the client was read (clientKnownBy). It is set on
+	// every answer from there on, an error beside it included, so the handler draws the error
+	// response or the 500 in that client's brand. It is empty before the client is read, whose
+	// failures are drawn in the default brand (#812).
 	ClientId string
 
 	// ClientRefusal is the error the client is answered with now. The ceremony ends with it: it was
@@ -334,7 +335,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 
 	pageRefusal, err := refuseUnaddressableAuthorizeRequest(ctx, o.validator, arrival.RequestId, params)
 	if err != nil {
-		return AuthorizationResult{}, err
+		return AuthorizationResult{ClientId: clientKnownBy(err)}, err
 	}
 	if pageRefusal != nil {
 		return AuthorizationResult{PageRefusal: pageRefusal}, nil
@@ -534,6 +535,17 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		return saveFor("/auth/level1completed"), nil
 	}
 	return known, errs.Errorf("authorization request reached no route (%v)", route)
+}
+
+// clientKnownBy is the client_id a failure of refuseUnaddressableAuthorizeRequest names when the
+// address check had read the request's client before it failed, and "" when it failed before, so a
+// 500 is drawn in the client's brand only once the client is known (#812).
+func clientKnownBy(err error) string {
+	var clientKnown *protocolvalidation.ClientKnownError
+	if errors.As(err, &clientKnown) {
+		return clientKnown.ClientId
+	}
+	return ""
 }
 
 // refuseUnaddressableAuthorizeRequest answers the refusal page an authorization request is owed
