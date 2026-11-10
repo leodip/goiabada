@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -180,4 +182,32 @@ func TestServeStaticFiles_ConcurrentRequestsForAFileEachEarnTheYear(t *testing.T
 		})
 	}
 	wg.Wait()
+}
+
+// Spellings that reach one file are kept apart, here through directory symlinks as on a
+// case-insensitive file system, so requests could multiply one file's snapshot. The snapshots
+// together never pass the budget however many spellings are asked for.
+func TestStaticSnapshots_ManySpellingsOfOneFileNeverPassTheBudget(t *testing.T) {
+	content := bytes.Repeat([]byte("a"), staticSnapshotLimit)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "probe.css"), content, 0o600))
+	require.NoError(t, os.Symlink(".", filepath.Join(dir, "a")))
+	require.NoError(t, os.Symlink(".", filepath.Join(dir, "b")))
+	snapshots := newStaticSnapshots(os.DirFS(dir))
+
+	// a/a/a/a/a/a/a/a/probe.css, a/a/a/a/a/a/a/b/probe.css and on: eight symlinks deep at most, as a
+	// lookup follows forty.
+	steps := strings.NewReplacer("0", "a/", "1", "b/")
+	for spelling := range 2 * staticSnapshotsBudget / staticSnapshotLimit {
+		name := steps.Replace(fmt.Sprintf("%08b", spelling)) + "probe.css"
+		snapshot, ok := snapshots.read("/static/" + name)
+		require.True(t, ok, name)
+		require.Equal(t, staticFingerprint(content), snapshot.fingerprint)
+
+		kept := 0
+		for keptName, keptSnapshot := range snapshots.files {
+			kept += len(keptName) + len(keptSnapshot.content)
+		}
+		require.LessOrEqual(t, kept, staticSnapshotsBudget, "the snapshots kept after %d spellings", spelling+1)
+	}
 }

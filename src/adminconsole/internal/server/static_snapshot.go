@@ -34,14 +34,25 @@ const staticSnapshotReads = 3
 // anyone make the server hold the whole file in memory with a one-byte range request.
 const staticSnapshotLimit = 1 << 20
 
+// staticSnapshotsBudget is the most the kept snapshots hold together, each costing its bytes, its
+// name and staticSnapshotOverhead. Keeping one that would pass it empties the snapshots first: the
+// names are the requests' spellings, and on a case-insensitive file system or through a directory
+// symlink many spellings reach one file, each kept apart. They can make the server read the file
+// again, but never hold more than the budget.
+const staticSnapshotsBudget = 32 << 20
+
+// staticSnapshotOverhead is what a kept snapshot costs beyond its bytes and its name, its entry and
+// metadata, rounded up.
+const staticSnapshotOverhead = 1 << 10
+
 // staticSnapshots are the snapshots of the static files, each kept while its file's size and
 // modification date stay the same, so a request for an unchanged file costs a stat and no read.
-// They hold only files of the static directory up to staticSnapshotLimit each, which requests
-// cannot add to.
+// Each file is at most staticSnapshotLimit, and all of them together at most staticSnapshotsBudget.
 type staticSnapshots struct {
 	fsys  fs.FS
 	mu    sync.Mutex
 	files map[string]staticSnapshot
+	cost  int64 // the kept snapshots' costs together, as staticSnapshotCost counts them
 }
 
 func newStaticSnapshots(fsys fs.FS) *staticSnapshots {
@@ -65,7 +76,7 @@ func (s *staticSnapshots) read(urlPath string) (staticSnapshot, bool) {
 	info, err := fs.Stat(s.fsys, name)
 	if err != nil || info.IsDir() || info.Size() > staticSnapshotLimit {
 		s.mu.Lock()
-		delete(s.files, name)
+		s.forgetLocked(name)
 		s.mu.Unlock()
 		return staticSnapshot{}, false
 	}
@@ -81,15 +92,40 @@ func (s *staticSnapshots) read(urlPath string) (staticSnapshot, bool) {
 			return staticSnapshot{}, false
 		}
 		if unchanged {
-			s.mu.Lock()
-			s.files[name] = snapshot
-			s.mu.Unlock()
+			s.keep(name, snapshot)
 			return snapshot, true
 		}
 		if read == staticSnapshotReads {
 			return snapshot, true
 		}
 	}
+}
+
+// keep keeps the snapshot under name, in place of any kept before, emptying the snapshots first
+// when it would take them past staticSnapshotsBudget.
+func (s *staticSnapshots) keep(name string, snapshot staticSnapshot) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.forgetLocked(name)
+	cost := staticSnapshotCost(name, snapshot)
+	if s.cost+cost > staticSnapshotsBudget {
+		clear(s.files)
+		s.cost = 0
+	}
+	s.files[name] = snapshot
+	s.cost += cost
+}
+
+// forgetLocked drops the snapshot kept under name, if any. s.mu is held.
+func (s *staticSnapshots) forgetLocked(name string) {
+	if kept, ok := s.files[name]; ok {
+		s.cost -= staticSnapshotCost(name, kept)
+		delete(s.files, name)
+	}
+}
+
+func staticSnapshotCost(name string, snapshot staticSnapshot) int64 {
+	return int64(len(name)+len(snapshot.content)) + staticSnapshotOverhead
 }
 
 // readStaticFileOnce reads the file once and reports whether it stayed unchanged while read: the
