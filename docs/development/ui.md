@@ -11,10 +11,20 @@ utilities for layout (#617). The file is one copy in each application's `web/tai
 regenerate both `main.css`. Every class a page names has a rule in the served `main.css`
 (`core/guard.AssertClassesAreDrawn`), so a misspelt or leftover class fails the unit tier.
 
-- **Themes**: automatic (the settings' empty value: each visitor's device decides), light and dark.
-  The layouts write `data-theme` for light and dark alone. A color is a token, `bg-surface`,
-  `text-ink-muted`, `border-line`, never a raw value, and every pair a component draws text or a
-  boundary on is in `TestThemeContrast_EveryPairMeetsWCAGAA`, at WCAG AA in both themes.
+- **Themes**: every page is drawn in the default brand (#810): its appearance, `auto` (each
+  visitor's device decides), `light` or `dark`, and its theme, one of the eight presets in
+  `authserver/internal/brandthemes`. The layouts write `data-theme` for light and dark alone, and
+  link the brand's stylesheet after `main.css`: the auth server's pages by
+  `brandthemes.StylesheetPath`, the console's by the `stylesheetUrl` `/api/public/settings` answers,
+  which the console never builds. A page with no readable brand links none and is drawn automatic in
+  the built-in colors. The stylesheet sets the 23 `--color-*` tokens, the dark ones under the two
+  selectors `ui.css`'s dark variant uses, so a change to that variant changes `stylesheetCSS` too.
+  Blueberry's declares no colors, since `ui.css` holds its values, which
+  `TestThemeContrast_BlueberryIsBothCopiesOfUICSS` keeps equal to its preset; a token added to
+  `ui.css` is added to every preset. A color is a token, `bg-surface`, `text-ink-muted`,
+  `border-line`, never a raw value, and every pair a component draws text or a boundary on is in
+  `TestThemeContrast_EveryPairMeetsWCAGAA`, at WCAG AA in both modes of every preset and 7:1 for
+  High contrast's text.
 - **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
   `panel`, `panel-body` (several, each under a `panel-title`, for a panel in sections),
   `panel-footer`; `button`, with `-primary` for a form's one main action, `-danger`, `-quiet`,
@@ -84,7 +94,7 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   posts, asking first when the button carries `data-confirm`; a search that finds users to add is
   `#userSearchForm`, which `static/pages/user-search.js` turns into a search as the person types and
   never lets submit.
-- **Accessibility**: WCAG 2.2 AA on every page, in every state and both themes. An error is a
+- **Accessibility**: WCAG 2.2 AA on every page, in every state, appearance and theme. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
   is `aria-hidden="true"`, and a button showing one alone carries `sr-only` text; targets are at
@@ -128,7 +138,7 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   disabled (`admin_settings_email.html`). An action on the whole page that changes what is stored
   (`admin_settings_keys.html`, Rotate keys) is a form posted from `page-actions`, asked first in a
   `confirm_change` dialog, which answers with the page again. A choice among a few options
-  (`admin_settings_ui_theme.html`): `option-card`s in a fieldset with a legend; several of many
+  (`admin_settings_branding_brand.html`, its appearance): `option-card`s in a fieldset with a legend; several of many
   (`consent.html`): a `check-list` of `check-row`s in a fieldset with a legend. A confirmation that
   deletes or removes says so on its buttons: "Cancel", and the action in `button-danger`. On the
   auth server, a form (`auth_pwd.html`): the title, an `auth-lead` saying what the page asks when

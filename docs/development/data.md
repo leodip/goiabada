@@ -102,7 +102,13 @@ back with a security consequence, which today means #245's public/confidential s
 (`AcquireUserRow`), #407's settings section saves (`AcquireSettingsRow`), each of which reads
 the settings row again under it and writes its own section onto what it read, through
 `apihandlers.saveSettingsSection`, so a save of another section committed meanwhile is not written
-back over (#428), and #622's legal document lifecycle writes (`AcquireLegalDocumentRow`): a draft
+back over (#428), #810's change of default brand and brand deletion (`AcquireSettingsRow`), which
+read the settings row's `default_brand_id` under it: `MakeBrandDefault` then reads the brand and
+writes the pointer, and `DeleteBrand` refuses the brand the pointer names, so a deletion racing a
+change of default never leaves the pointer on a deleted brand, and the data tier's `brand_test.go`
+shows each order on every engine; `UpdateSettings`, which the section saves write through, leaves
+the pointer alone (`dont-update`), and #622's legal document lifecycle writes
+(`AcquireLegalDocumentRow`): a draft
 save, publish, retire, restore, delete and a change of apps each read the document again under its
 row and decide on that, so a publish clears only the draft it froze, a save cannot rename a document
 published meanwhile or undo a retirement, and the data tier's `legal_document_lifecycle_test.go`

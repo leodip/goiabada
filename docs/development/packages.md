@@ -269,9 +269,15 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `/auth/authorize`'s parameter parse, its settings read and its `ui_locales` swap of the request's
   localizer among them (#580)
 -
-  `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/`
+  `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload}/`
   - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image
-  uploads, themes
+  uploads
+- `internal/brandthemes/` - The eight built-in themes a brand is drawn in (#810): each preset's key
+  and its light and dark palettes, 23 `#rrggbb` values by token name, in display order, and the
+  stylesheet each draws, built once. `StylesheetRoute` is where a brand's stylesheet is served, and
+  `StylesheetPath` the fingerprinted path a page links it by. The brand validation, the admin API's
+  `GET /brand-themes`, the stylesheet handler and the pages read it; the console reaches it only
+  through the API and `/api/public/settings`
 - `internal/clientauth/` - Client authentication from plain values, the client identifier and the
   secret presented: the lookup, the secret check and their refusals' wording and shape, shared by
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a
