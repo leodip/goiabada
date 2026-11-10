@@ -82,13 +82,33 @@ func TestAdminSettingsHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 		{"HandleTurnstilePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleTurnstilePost(h, nil, c, consoleBaseURL, turnstileAuthServerBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/turnstile", handlertest.WithForm(url.Values{}))},
-		{"HandleUIThemeGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleUIThemeGet(h, nil, c)
-		}, handlertest.Request(http.MethodGet, "/admin/settings/ui-theme")},
-		{"HandleUIThemePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleUIThemePost(h, nil, c, nil, consoleBaseURL)
-		}, handlertest.Request(http.MethodPost, "/admin/settings/ui-theme",
-			handlertest.WithForm(url.Values{"themeSelection": {"dark"}}))},
+		{"HandleBrandingGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBrandingGet(h, c)
+		}, handlertest.Request(http.MethodGet, "/admin/settings/branding")},
+		{"HandleBrandNewGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBrandNewGet(h, c)
+		}, handlertest.Request(http.MethodGet, "/admin/settings/branding/new")},
+		{"HandleBrandNewPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBrandNewPost(h, c, nil, consoleBaseURL)
+		}, handlertest.Request(http.MethodPost, "/admin/settings/branding/new",
+			handlertest.WithForm(url.Values{"name": {"Spring"}, "appearance": {"dark"}, "theme": {"plum"}}))},
+		{"HandleBrandGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBrandGet(h, nil, c)
+		}, handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithPathValue("brandId", "4"))},
+		{"HandleBrandPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBrandPost(h, nil, c, nil, consoleBaseURL)
+		}, handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit", handlertest.WithPathValue("brandId", "4"),
+			handlertest.WithForm(url.Values{"name": {"Spring"}, "appearance": {"dark"}, "theme": {"plum"}}))},
+		{"HandleBrandMakeDefaultPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBrandMakeDefaultPost(h, nil, c, nil, consoleBaseURL)
+		}, handlertest.Request(http.MethodPost, "/admin/settings/branding/4/make-default", handlertest.WithPathValue("brandId", "4"))},
+		{"HandleBrandDeleteGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBrandDeleteGet(h, c)
+		}, handlertest.Request(http.MethodGet, "/admin/settings/branding/4/delete", handlertest.WithPathValue("brandId", "4"))},
+		{"HandleBrandDeletePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBrandDeletePost(h, c, nil, consoleBaseURL)
+		}, handlertest.Request(http.MethodPost, "/admin/settings/branding/4/delete", handlertest.WithPathValue("brandId", "4"),
+			handlertest.WithForm(url.Values{"name": {"Autumn"}}))},
 	}
 
 	for _, tc := range testCases {

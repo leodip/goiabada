@@ -49,17 +49,6 @@ func (a settingsSaveAPI) UpdateSettingsEmail(context.Context, string, *api.Updat
 	return &api.SettingsEmailResponse{}, nil
 }
 
-func (a settingsSaveAPI) GetSettingsUITheme(context.Context, string) (*api.SettingsUIThemeResponse, error) {
-	return &api.SettingsUIThemeResponse{AvailableThemes: []string{"light", "dark"}}, nil
-}
-
-func (a settingsSaveAPI) UpdateSettingsUITheme(context.Context, string, *api.UpdateSettingsUIThemeRequest) (*api.SettingsUIThemeResponse, error) {
-	if a.saveErr != nil {
-		return nil, a.saveErr
-	}
-	return &api.SettingsUIThemeResponse{}, nil
-}
-
 // The rest of the ports settingsSaveAPI is passed to, which no test here reaches.
 
 func (settingsSaveAPI) GetSettingsEmail(context.Context, string) (*api.SettingsEmailResponse, error) {
@@ -70,9 +59,9 @@ func (settingsSaveAPI) SendTestEmail(context.Context, string, *api.SendTestEmail
 	panic("unexpected call to SendTestEmail")
 }
 
-// The three saves whose values the console itself renders from (the app name, the theme, whether
-// SMTP is on) drop the cached public settings once the auth server has accepted the save, so the
-// next page shows what was saved. A refused save changed nothing and keeps the cache (#440
+// The two settings saves whose values the console itself renders from (the app name, whether SMTP
+// is on) drop the cached public settings once the auth server has accepted the save, so the next
+// page shows what was saved; the brands' writes do too, in the Branding pages' own tests. A refused save changed nothing and keeps the cache (#440
 // decision 5).
 func TestAdminSettingsSaves_InvalidateTheCacheOnlyWhenTheSaveIsAccepted(t *testing.T) {
 	handlerCases := []struct {
@@ -95,14 +84,6 @@ func TestAdminSettingsSaves_InvalidateTheCacheOnlyWhenTheSaveIsAccepted(t *testi
 			form:     url.Values{"hostOrIP": {"smtp.example.com"}, "port": {"587"}},
 			build: func(h *handlersmocks.HttpHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc {
 				return HandleEmailPost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
-			},
-		},
-		{
-			name:     "HandleUIThemePost",
-			template: "/admin_settings_ui_theme.html",
-			form:     url.Values{"themeSelection": {"dark"}},
-			build: func(h *handlersmocks.HttpHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc {
-				return HandleUIThemePost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
 			},
 		},
 	}

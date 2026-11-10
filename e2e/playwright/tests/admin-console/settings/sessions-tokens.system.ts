@@ -1,5 +1,5 @@
-// Settings - Theme, Sessions and Tokens. Runs alone, and every test puts the settings back.
-import type { Page } from "@playwright/test";
+// Settings - Sessions and Tokens. Runs alone, and every test puts the settings back. The look of the
+// pages is Settings - Branding, in admin-console/branding/brands.system.ts.
 import { expect, test } from "../../../lib/fixtures";
 import { env } from "../../../lib/environment";
 import { clientUrl, expectRefusal, grantClientPermission, readClientSecret } from "../../../lib/admin-console";
@@ -9,67 +9,8 @@ import { fillSettingsForm, readSettingsForm, saveSettings, withSettingsRestored 
 import { authorizeAgain, expectSessionDeleted, sessionIds } from "../../../lib/sessions";
 import { browserSignInClient, passwordGrantClient } from "../../../lib/test-clients";
 
-const themePath = "/admin/settings/ui-theme";
 const sessionsPath = "/admin/settings/sessions";
 const tokensPath = "/admin/settings/tokens";
-
-type Theme = "" | "light" | "dark";
-
-// What a page's root element says about its theme: Light and Dark name themselves, and Automatic
-// names none, leaving it to the device, as the color-scheme meta's "light dark" says. And what the
-// page draws: its background under a device asking for light and for dark, which Light and Dark keep
-// whatever the device asks, and Automatic follows.
-async function expectTheme(page: Page, theme: Theme) {
-  const html = page.locator("html");
-  if (theme) await expect(html).toHaveAttribute("data-theme", theme);
-  else await expect(html).not.toHaveAttribute("data-theme");
-  await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute("content", theme || "light dark");
-
-  const background = async (colorScheme: "light" | "dark") => {
-    // Reduced motion, so no transition is caught half way between the two.
-    await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
-    return page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  };
-  const onLight = await background("light");
-  const onDark = await background("dark");
-  await page.emulateMedia({ colorScheme: null, reducedMotion: null });
-  if (theme) expect(onDark, `${themeLabels[theme]} keeps its background on a dark device`).toBe(onLight);
-  else expect(onDark, "Automatic draws a dark device's page darker").not.toBe(onLight);
-}
-
-const themeLabels: Record<Theme, string> = { "": "Automatic", light: "Light", dark: "Dark" };
-
-test("a theme chosen here themes the console and the sign-in pages, and Automatic follows the device", async ({ page, browser }) => {
-  await withSettingsRestored(page, themePath, async () => {
-    // Automatic, Light and Dark, and no other.
-    await expect(page.getByRole("radio")).toHaveCount(3);
-    for (const theme of ["light", "dark", ""] as const) {
-      await page.goto(`${env.adminUrl}${themePath}`);
-      await page.getByRole("radio", { name: themeLabels[theme], exact: true }).check();
-      await saveSettings(page);
-      await expect(page.getByRole("radio", { name: themeLabels[theme], exact: true })).toBeChecked();
-      await expectTheme(page, theme);
-
-      const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-      const signIn = await context.newPage();
-      await signIn.goto(`${env.adminUrl}/account/profile`);
-      await expect(signIn.locator('input[name="password"]')).toBeVisible();
-      await expectTheme(signIn, theme);
-      await context.close();
-    }
-  });
-});
-
-test("choosing a theme shows it at once, and leaving without saving keeps the saved one", async ({ page }) => {
-  const saved = (await readSettingsForm(page, themePath)).themeSelection as Theme;
-  const other: Theme = saved === "dark" ? "light" : "dark";
-  await page.getByRole("radio", { name: themeLabels[other], exact: true }).check();
-  await expectTheme(page, other);
-
-  // Nothing was saved: the page drawn again shows the saved theme, chosen.
-  expect(await readSettingsForm(page, themePath)).toMatchObject({ themeSelection: saved });
-  await expectTheme(page, saved);
-});
 
 test("session timeouts are saved, and refused when out of range or inconsistent", async ({ page }) => {
   await withSettingsRestored(page, sessionsPath, async () => {

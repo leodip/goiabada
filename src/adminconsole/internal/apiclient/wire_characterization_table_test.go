@@ -70,7 +70,6 @@ var (
 	charUpdateSessionsSettings = &api.UpdateSettingsSessionsRequest{UserSessionIdleTimeoutInSeconds: 900}
 	charUpdateTokensSettings   = &api.UpdateSettingsTokensRequest{TokenExpirationInSeconds: 300}
 	charUpdateTurnstile        = &api.UpdateSettingsTurnstileRequest{TurnstileSiteKey: "1x00000000000000000000AA"}
-	charUpdateUIThemeSettings  = &api.UpdateSettingsUIThemeRequest{UITheme: "dark"}
 
 	charCreateUserAttr = &api.CreateUserAttributeRequest{Key: "team", Value: "green"}
 	charUpdateUserAttr = &api.UpdateUserAttributeRequest{Key: "team", Value: "blue"}
@@ -78,6 +77,9 @@ var (
 	charUpdateUserMail = &api.UpdateUserEmailRequest{Email: "jane@example.com"}
 	charUpdateUserPwd  = &api.UpdateUserPasswordRequest{NewPassword: "a-new-password"}
 	charUpdateUserOTP  = &api.UpdateUserOTPRequest{Enabled: false}
+
+	charCreateBrand = &api.CreateBrandRequest{Name: "Spring", Appearance: "dark", Theme: "plum"}
+	charUpdateBrand = &api.UpdateBrandRequest{Name: "Autumn", Appearance: "light", Theme: "tangerine"}
 
 	charCreateLegalDocument = &api.CreateLegalDocumentRequest{Kind: "must_accept", ShortName: "terms", Title: "Terms"}
 	charSaveLegalDocDraft   = &api.SaveLegalDocumentDraftRequest{Title: "Terms", Markdown: "Be kind."}
@@ -393,6 +395,93 @@ func wireCharacterization() []wireCase {
 			},
 			verb: "GET", path: "/api/v1/admin/audit-logs/event-types", contentType: charJSON,
 			successStatus: 200, reply: `{"auditEventTypes":["AuditUserLogin"]}`, want: "AuditUserLogin",
+		},
+
+		// --- brands.go --------------------------------------------------------------------
+		{
+			name: "GetAllBrands",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetAllBrands(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				return []any{got[0].Name, got[0].IsDefault}, nil
+			},
+			verb: "GET", path: "/api/v1/admin/brands", contentType: charJSON,
+			successStatus: 200, reply: `{"brands":[{"id":1,"name":"Default","isDefault":true}]}`,
+			want: []any{"Default", true},
+		},
+		{
+			name: "CreateBrand",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.CreateBrand(ctx, charAccessToken, charCreateBrand)
+				if err != nil {
+					return nil, err
+				}
+				return got.Id, nil
+			},
+			verb: "POST", path: "/api/v1/admin/brands", contentType: charJSON,
+			bodyOf:        charCreateBrand,
+			successStatus: 201, reply: `{"brand":{"id":5}}`, want: int64(5),
+		},
+		{
+			name: "GetBrandById",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetBrandById(ctx, charAccessToken, 5)
+				if err != nil {
+					return nil, err
+				}
+				return got.Theme, nil
+			},
+			verb: "GET", path: "/api/v1/admin/brands/5", contentType: charJSON,
+			successStatus: 200, reply: `{"brand":{"id":5,"theme":"plum"}}`, want: "plum",
+		},
+		{
+			name: "UpdateBrand",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.UpdateBrand(ctx, charAccessToken, 5, charUpdateBrand)
+				if err != nil {
+					return nil, err
+				}
+				return got.Name, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/brands/5", contentType: charJSON,
+			bodyOf:        charUpdateBrand,
+			successStatus: 200, reply: `{"brand":{"id":5,"name":"Autumn"}}`, want: "Autumn",
+		},
+		{
+			name: "DeleteBrand",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.DeleteBrand(ctx, charAccessToken, 5)
+			},
+			verb: "DELETE", path: "/api/v1/admin/brands/5", contentType: charJSON,
+			successStatus: 200, reply: `{"success":true}`,
+		},
+		{
+			name: "MakeBrandDefault",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.MakeBrandDefault(ctx, charAccessToken, 5)
+				if err != nil {
+					return nil, err
+				}
+				return []any{got.Id, got.IsDefault}, nil
+			},
+			verb: "POST", path: "/api/v1/admin/brands/5/make-default", contentType: charJSON,
+			successStatus: 200, reply: `{"brand":{"id":5,"isDefault":true}}`, want: []any{int64(5), true},
+		},
+		{
+			name: "GetBrandThemes",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetBrandThemes(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				return []any{got[1].Key, got[1].Dark["brand"]}, nil
+			},
+			verb: "GET", path: "/api/v1/admin/brand-themes", contentType: charJSON,
+			successStatus: 200,
+			reply:         `{"brandThemes":[{"key":"blueberry","light":{},"dark":{}},{"key":"plum","light":{"brand":"#7a3aa8"},"dark":{"brand":"#cda4f0"}}]}`,
+			want:          []any{"plum", "#cda4f0"},
 		},
 
 		// --- client_introspection_resources.go --------------------------------------------
@@ -1263,33 +1352,6 @@ func wireCharacterization() []wireCase {
 			verb: "PUT", path: "/api/v1/admin/settings/turnstile", contentType: charJSON,
 			bodyOf:        charUpdateTurnstile,
 			successStatus: 200, reply: `{"hasTurnstileSecretKey":true}`, want: true,
-		},
-
-		// --- settings_ui_theme.go ---------------------------------------------------------
-		{
-			name: "GetSettingsUITheme",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetSettingsUITheme(ctx, charAccessToken)
-				if err != nil {
-					return nil, err
-				}
-				return got.UITheme, nil
-			},
-			verb: "GET", path: "/api/v1/admin/settings/ui-theme", contentType: charJSON,
-			successStatus: 200, reply: `{"uiTheme":"dark"}`, want: "dark",
-		},
-		{
-			name: "UpdateSettingsUITheme",
-			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateSettingsUITheme(ctx, charAccessToken, charUpdateUIThemeSettings)
-				if err != nil {
-					return nil, err
-				}
-				return got.UITheme, nil
-			},
-			verb: "PUT", path: "/api/v1/admin/settings/ui-theme", contentType: charJSON,
-			bodyOf:        charUpdateUIThemeSettings,
-			successStatus: 200, reply: `{"uiTheme":"dark"}`, want: "dark",
 		},
 
 		// --- user_attributes.go -----------------------------------------------------------

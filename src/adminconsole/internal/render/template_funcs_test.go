@@ -145,7 +145,7 @@ func TestInstantOf(t *testing.T) {
 	}
 }
 
-// TestTemplateFuncMap_IsThisApplicationsTwentyFour pins the split #385 made. The one map in core
+// TestTemplateFuncMap_IsThisApplicationsTwentyFive pins the split #385 made. The one map in core
 // held twenty-two and the auth server parsed every template with all of them, though its pages
 // call four: T, Lang, args and versionComment, which are also here. The other nineteen -- the
 // five page predicates over this console's own URL paths, the JS bootstrap catalog, the
@@ -154,8 +154,8 @@ func TestInstantOf(t *testing.T) {
 // engine escaping that value itself. CatalogLang came in #559, the catalog a page rendered from,
 // which its scripts name back on every request, and ScopeList in #617, the scopes the account
 // consents page names in words. isAdminLegalDocumentPage came in #622, the sidebar's Legal
-// documents section.
-func TestTemplateFuncMap_IsThisApplicationsTwentyFour(t *testing.T) {
+// documents section, and isAdminBrandingPage in #810, the sidebar's Branding pages.
+func TestTemplateFuncMap_IsThisApplicationsTwentyFive(t *testing.T) {
 	keys := make([]string, 0, len(templateFuncMap))
 	for k := range templateFuncMap {
 		keys = append(keys, k)
@@ -165,7 +165,7 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyFour(t *testing.T) {
 	want := []string{
 		"CatalogLang", "DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
 		"RefTimezone", "ScopeList", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
-		"isAdminClientPage", "isAdminGroupPage", "isAdminLegalDocumentPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
+		"isAdminBrandingPage", "isAdminClientPage", "isAdminGroupPage", "isAdminLegalDocumentPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
 		"isAdminUserPage", "isLast", "versionComment",
 	}
 	if !reflect.DeepEqual(keys, want) {
@@ -184,6 +184,8 @@ func TestTemplateFuncMap_TheSectionPredicatesCoverEveryPageOfARecord(t *testing.
 		"isAdminResourcePage": {"/admin/resources", "/admin/resources/3/users-with-permission/add/9"},
 		"isAdminLegalDocumentPage": {"/admin/legal-documents", "/admin/legal-documents/new",
 			"/admin/legal-documents/7/versions/2"},
+		"isAdminBrandingPage": {"/admin/settings/branding", "/admin/settings/branding/new",
+			"/admin/settings/branding/4/edit", "/admin/settings/branding/4/delete"},
 	} {
 		in := templateFuncMap[name].(func(string) bool)
 		for _, path := range paths {

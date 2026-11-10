@@ -110,15 +110,15 @@ command itself and fails on a tree it changed.
 | `core/api` | `AccountRecoveryCodesResponse` | both-apps | — |
 | `core/api` | `AddGroupMemberRequest` | both-apps | — |
 | `core/api` | `AuditLogResponse` | both-apps | — |
-| `core/api` | `BrandResponse` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
-| `core/api` | `BrandThemeResponse` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
+| `core/api` | `BrandResponse` | both-apps | — |
+| `core/api` | `BrandThemeResponse` | both-apps | — |
 | `core/api` | `ClientLogoInfoResponse` | both-apps | — |
 | `core/api` | `ClientLogoUploadResponse` | both-apps | — |
 | `core/api` | `ClientResponse` | both-apps | — |
 | `core/api` | `CreateAccountRecoveryCodesRequest` | both-apps | — |
 | `core/api` | `CreateAccountRecoveryCodesResponse` | both-apps | — |
-| `core/api` | `CreateBrandRequest` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
-| `core/api` | `CreateBrandResponse` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
+| `core/api` | `CreateBrandRequest` | both-apps | — |
+| `core/api` | `CreateBrandResponse` | both-apps | — |
 | `core/api` | `CreateClientRequest` | both-apps | — |
 | `core/api` | `CreateClientResponse` | both-apps | — |
 | `core/api` | `CreateGroupAttributeRequest` | both-apps | — |
@@ -137,9 +137,9 @@ command itself and fails on a tree it changed.
 | `core/api` | `GenerateUserEmailVerificationCodeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetAuditEventTypesResponse` | both-apps | — |
 | `core/api` | `GetAuditLogsResponse` | both-apps | — |
-| `core/api` | `GetBrandResponse` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
-| `core/api` | `GetBrandThemesResponse` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
-| `core/api` | `GetBrandsResponse` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
+| `core/api` | `GetBrandResponse` | both-apps | — |
+| `core/api` | `GetBrandThemesResponse` | both-apps | — |
+| `core/api` | `GetBrandsResponse` | both-apps | — |
 | `core/api` | `GetClientIntrospectionResourcesResponse` | both-apps | — |
 | `core/api` | `GetClientLegalDocumentsResponse` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `GetClientPermissionsResponse` | both-apps | — |
@@ -179,7 +179,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `LegalDocumentResponse` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `LegalDocumentVersionResponse` | reachable | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `LegalDocumentVersionSummaryResponse` | reachable | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
-| `core/api` | `MakeBrandDefaultResponse` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
+| `core/api` | `MakeBrandDefaultResponse` | both-apps | — |
 | `core/api` | `PasswordRulesResponse` | kernel | — |
 | `core/api` | `PermissionResponse` | both-apps | — |
 | `core/api` | `PhoneCountryResponse` | contract | The element of `GET /api/v1/admin/phone-countries`, a published admin API route that stays when the admin console stops calling it, because its pages build the list from `core/phonecountries` (#563 decisions 1 and 2). The auth server writes it and no admin console file reads it. |
@@ -216,15 +216,15 @@ command itself and fails on a tree it changed.
 | `core/api` | `SettingsSigningKeyResponse` | both-apps | — |
 | `core/api` | `SettingsTokensResponse` | both-apps | — |
 | `core/api` | `SettingsTurnstileResponse` | both-apps | — |
-| `core/api` | `SettingsUIThemeResponse` | both-apps | — |
+| `core/api` | `SettingsUIThemeResponse` | contract | Admin API DTO of `/api/v1/admin/settings/ui-theme`, which is what `core/api` is for. The auth server still serves the operation, and no admin console file reads it since the Theme page gave way to Branding (#810), which retires the operation and this type with it; #385 exempts this package by name. |
 | `core/api` | `SuccessResponse` | both-apps | — |
 | `core/api` | `UpdateAccountEmailRequest` | both-apps | — |
 | `core/api` | `UpdateAccountOTPRequest` | both-apps | — |
 | `core/api` | `UpdateAccountOTPResponse` | both-apps | — |
 | `core/api` | `UpdateAccountPasswordRequest` | both-apps | — |
 | `core/api` | `UpdateAccountPhoneRequest` | both-apps | — |
-| `core/api` | `UpdateBrandRequest` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
-| `core/api` | `UpdateBrandResponse` | contract | Admin API DTO of the brands, `/api/v1/admin/brands` and `/api/v1/admin/brand-themes` (#810 decision 5), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet: the console's Branding pages do (#810); #385 exempts this package by name. |
+| `core/api` | `UpdateBrandRequest` | both-apps | — |
+| `core/api` | `UpdateBrandResponse` | both-apps | — |
 | `core/api` | `UpdateClientAdministrativeScopesRequest` | both-apps | — |
 | `core/api` | `UpdateClientAuthenticationRequest` | both-apps | — |
 | `core/api` | `UpdateClientBackchannelLogoutRequest` | both-apps | — |
@@ -253,7 +253,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateSettingsSessionsRequest` | both-apps | — |
 | `core/api` | `UpdateSettingsTokensRequest` | both-apps | — |
 | `core/api` | `UpdateSettingsTurnstileRequest` | both-apps | — |
-| `core/api` | `UpdateSettingsUIThemeRequest` | both-apps | — |
+| `core/api` | `UpdateSettingsUIThemeRequest` | contract | Admin API DTO of `/api/v1/admin/settings/ui-theme`, which is what `core/api` is for. The auth server still serves the operation, and no admin console file reads it since the Theme page gave way to Branding (#810), which retires the operation and this type with it; #385 exempts this package by name. |
 | `core/api` | `UpdateUserAddressRequest` | both-apps | — |
 | `core/api` | `UpdateUserAttributeRequest` | both-apps | — |
 | `core/api` | `UpdateUserAttributeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
@@ -427,13 +427,13 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeAuthorizeRedirectURIMissing` | contract | Catalog key of the refusal page `/auth/authorize` renders for a request with no `redirect_uri` (#213). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAuthorizeRedirectURINotAbsolute` | contract | Catalog key of the refusal page `/auth/authorize` renders for a `redirect_uri` that is not an absolute URI (#122). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAuthorizeRedirectURINotRegistered` | contract | Catalog key of the refusal page `/auth/authorize` renders for a `redirect_uri` that is not one of the client's redirect URIs (#213). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeBrandAppearanceInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandAppearanceInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeBrandDefaultDeleteNotAllowed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeBrandNameAngleBrackets` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeBrandNameInUse` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeBrandNameRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeBrandNameTooLong` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeBrandThemeInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandNameAngleBrackets` | both-apps | — |
+| `core/i18n` | `ErrCodeBrandNameInUse` | both-apps | — |
+| `core/i18n` | `ErrCodeBrandNameRequired` | both-apps | — |
+| `core/i18n` | `ErrCodeBrandNameTooLong` | both-apps | — |
+| `core/i18n` | `ErrCodeBrandThemeInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeChallengeFailed` | contract | Catalog key of the Turnstile challenge's refusal on the auth server's forms (#642). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientAdministrativeScopesAllowedRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientAdministrativeScopesConsoleAlwaysAllowed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
