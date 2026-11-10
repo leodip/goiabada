@@ -27,7 +27,7 @@ import {
   type ResourceTab,
   type UserTab,
 } from "../../lib/admin-console";
-import { brandUrl, defaultBrand } from "../../lib/brands";
+import { brandUrl, defaultBrand, newBrandUrl, previewSample, switchPreviewTo } from "../../lib/brands";
 import { openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { signInToConsole } from "../../lib/console-user";
 import { env } from "../../lib/environment";
@@ -37,7 +37,7 @@ import { linksIn, waitForMail } from "../../lib/mailpit";
 import { browserSignInClient } from "../../lib/test-clients";
 import { freshTotp } from "../../lib/totp";
 import { uniqueIdentifier } from "../../lib/unique";
-import { asks, at, checkStates, refused, saved, says, titled, type State } from "../../lib/axe";
+import { asks, at, checkStates, refused, saved, says, titled, withBrandPreview, type State } from "../../lib/axe";
 
 // Every state is checked twice, and a test walks a whole area.
 test.describe.configure({ timeout: 300_000 });
@@ -1112,8 +1112,17 @@ test("the settings pages and the audit log", async ({ page }) => {
       },
     },
     at(page, "branding, the brands", settings("branding")),
-    at(page, "branding, a new brand", settings("branding/new")),
-    at(page, "branding, the default brand", brandUrl(seededBrand.id, "edit")),
+    withBrandPreview(page, at(page, "branding, a new brand", newBrandUrl)),
+    {
+      // The preview's switch moved, never saved: the dark sample shown beside the console's own scheme.
+      name: "branding, a new brand, the preview switched to Dark",
+      reach: async () => {
+        await switchPreviewTo(page, "dark");
+        await expect(previewSample(page, "dark")).toBeVisible();
+        await expect(previewSample(page, "light")).toBeHidden();
+      },
+    },
+    withBrandPreview(page, at(page, "branding, the default brand", brandUrl(seededBrand.id, "edit"))),
     at(page, "branding, the default brand's delete page", brandUrl(seededBrand.id, "delete")),
     at(page, "session settings", settings("sessions")),
     at(page, "token settings", settings("tokens")),

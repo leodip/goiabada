@@ -5,6 +5,7 @@
 // sideways. Only the test's own tab is resized, so the fixtures work at the default size.
 import type { Locator, Page } from "@playwright/test";
 import { addRedirectUri, addSignOutRedirectUri, cancelDialog, clientUrl, userUrl } from "../../lib/admin-console";
+import { newBrandUrl } from "../../lib/brands";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 
@@ -167,6 +168,8 @@ for (const viewport of viewports) {
         { url: `${env.adminUrl}/admin/groups` },
         { url: `${env.adminUrl}/admin/resources` },
         { url: `${env.adminUrl}/admin/settings/general`, form: "main form.panel" },
+        // The brand editor: its fields and the preview, two panes collapsing into one (#811).
+        { url: newBrandUrl, form: "main .brand-editor" },
         { url: `${env.adminUrl}/admin/settings/keys` },
         { url: `${env.adminUrl}/admin/settings/audit-log-viewer` },
         { url: `${env.adminUrl}/account/profile`, form: "main form.panel" },

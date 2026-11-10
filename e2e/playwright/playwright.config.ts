@@ -9,8 +9,8 @@ import { defineConfig, devices } from "@playwright/test";
 // removes it afterwards, changes nothing global, and never depends on what another test left, so
 // the suite runs again and again without e2e/reset.sh.
 
-// The one spec the Firefox and WebKit projects run.
-const focusNotObscured = /accessibility\/focus-not-obscured\.spec\.ts$/;
+// The specs the Firefox and WebKit projects run.
+const inEveryEngine = [/accessibility\/focus-not-obscured\.spec\.ts$/, /admin-console\/branding\/preview\.spec\.ts$/];
 
 export default defineConfig({
   testDir: "./tests",
@@ -31,11 +31,13 @@ export default defineConfig({
     { name: "setup", testMatch: /.*\.setup\.ts/, teardown: "system" },
     // Each worker signs the administrator in for itself (lib/fixtures.ts).
     { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["setup"] },
-    // How a browser scrolls a focused field into view is its engine's own code, so the spec that
-    // keeps the focus clear of the console's header runs in Firefox and WebKit too (#722 decision 12).
-    // Every other spec runs in Chromium alone.
-    { name: "firefox", testMatch: focusNotObscured, use: { ...devices["Desktop Firefox"] }, dependencies: ["setup"] },
-    { name: "webkit", testMatch: focusNotObscured, use: { ...devices["Desktop Safari"] }, dependencies: ["setup"] },
+    // How a browser scrolls a focused field into view, and how it restores a form after Back, is its
+    // engine's own code, so the spec that keeps the focus clear of the console's header (#722 decision
+    // 12) and the brand editor's preview (#811 decision 5) run in Firefox and WebKit too. Every other
+    // spec runs in Chromium alone. Each of the two runs on one worker, since every worker signs the
+    // administrator in, under the seeded cap of sessions per user (e2e/README.md).
+    { name: "firefox", testMatch: inEveryEngine, use: { ...devices["Desktop Firefox"] }, workers: 1, dependencies: ["setup"] },
+    { name: "webkit", testMatch: inEveryEngine, use: { ...devices["Desktop Safari"] }, workers: 1, dependencies: ["setup"] },
     // Changes to what the whole instance shares: the settings, the signing keys, and the guards around
     // the system resource. Every other test would run against such a change, so these run once all of
     // them have finished, pass or fail (as setup's teardown, which runs after every project depending

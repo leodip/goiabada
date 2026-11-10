@@ -4,6 +4,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { cancelDialog } from "./admin-console";
+import { expectPreviewDrawn } from "./brands";
 import { expect, test } from "./fixtures";
 
 const wcagTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
@@ -122,5 +123,17 @@ export function asks(page: Page, name: string, act: () => Promise<unknown>): Sta
       await expect(page.locator("dialog[open]")).toBeVisible();
     },
     leave: () => cancelDialog(page),
+  };
+}
+
+// A state of the brand editor, reached once its preview is drawn: a sample styled and shown, the
+// switch and the sentences as the appearance has them, so axe reads the page as it is used (#811).
+export function withBrandPreview(page: Page, state: State): State {
+  return {
+    ...state,
+    reach: async () => {
+      await state.reach();
+      await expectPreviewDrawn(page);
+    },
   };
 }

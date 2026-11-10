@@ -9,8 +9,8 @@ import { expect, test } from "../../lib/fixtures";
 import { linksIn, waitForMail } from "../../lib/mailpit";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 import { uniqueIdentifier } from "../../lib/unique";
-import { asks, at, checkStates, refused, saved, titled, type State } from "../../lib/axe";
-import { brandUrl, createBrand, defaultBrand, deleteBrand, withDefaultBrandRestored } from "../../lib/brands";
+import { asks, at, checkStates, refused, saved, titled, withBrandPreview, type State } from "../../lib/axe";
+import { brandUrl, createBrand, defaultBrand, deleteBrand, newBrandUrl, withDefaultBrandRestored } from "../../lib/brands";
 import { browserSignInClient } from "../../lib/test-clients";
 
 test.describe.configure({ timeout: 300_000 });
@@ -93,19 +93,29 @@ test("the settings pages saved, refused, and asking first", async ({ page }) => 
     const id = await createBrand(page, { name, appearance: "dark", theme: "plum" });
     try {
       await checkStates(page, [
-        saved(page, "branding, the default brand saved", async () => {
-          await page.goto(brandUrl(seeded.id, "edit"));
-          await save();
-        }),
-        refused(page, "branding, a new brand's name refused", "name", async () => {
-          await page.goto(settings("branding/new"));
-          await page.locator("#btnCreate").click();
-        }),
-        refused(page, "branding, a brand's theme refused", "theme-blueberry", async () => {
-          await page.goto(brandUrl(id, "edit"));
-          await page.locator('input[name="theme"]:checked').evaluate((radio) => ((radio as HTMLInputElement).value = "sepia"));
-          await save();
-        }),
+        withBrandPreview(
+          page,
+          saved(page, "branding, the default brand saved", async () => {
+            await page.goto(brandUrl(seeded.id, "edit"));
+            await save();
+          }),
+        ),
+        withBrandPreview(
+          page,
+          refused(page, "branding, a new brand's name refused", "name", async () => {
+            await page.goto(newBrandUrl);
+            await page.locator("#btnCreate").click();
+          }),
+        ),
+        // Drawn again with a theme the auth server does not know, previewed in the first listed one.
+        withBrandPreview(
+          page,
+          refused(page, "branding, a brand's theme refused", "theme-blueberry", async () => {
+            await page.goto(brandUrl(id, "edit"));
+            await page.locator('input[name="theme"]:checked').evaluate((radio) => ((radio as HTMLInputElement).value = "sepia"));
+            await save();
+          }),
+        ),
         asks(page, "branding, Make default asking first", async () => {
           await page.goto(brandUrl(id, "edit"));
           await page.locator("#btnMakeDefault").click();
