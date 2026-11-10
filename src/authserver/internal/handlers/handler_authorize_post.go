@@ -38,6 +38,10 @@ func HandleAuthorizePost(
 		r = withUILocales(r, authflow.AuthorizeUILocales(params))
 
 		result, err := parking.Run(r.Context(), params, requestid.FromContext(r.Context()))
+		// A park that failed once the request's client is known is drawn in its brand (#812).
+		if result.ClientId != "" {
+			reqctx.NamePageClient(r.Context(), result.ClientId)
+		}
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return

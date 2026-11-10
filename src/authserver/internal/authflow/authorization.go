@@ -195,6 +195,12 @@ type AuthorizationResult struct {
 	// response or the step redirect.
 	AuthContext *ceremony.AuthContext
 
+	// ClientId is the client_id of a request past the check of its client_id and redirect_uri,
+	// whose client is so known. It is set on every answer from there on, an error beside it
+	// included, so the handler draws the error response or the 500 in that client's brand. It is
+	// empty before that check, whose failures are drawn in the default brand (#812).
+	ClientId string
+
 	// ClientRefusal is the error the client is answered with now. The ceremony ends with it: it was
 	// never stored, and whatever sign-in the browser holds is left as it was (#246).
 	ClientRefusal *ClientError
@@ -334,14 +340,17 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		return AuthorizationResult{PageRefusal: pageRefusal}, nil
 	}
 
+	// From here on the client is known, and every answer names it, a failure's included (#812).
+	known := AuthorizationResult{ClientId: authContext.ClientId}
+
 	// The address check above refuses a client that does not exist or is disabled, so the only way
 	// this finds nothing is a client deleted between the two lookups.
 	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
 	if err != nil {
-		return AuthorizationResult{}, err
+		return known, err
 	}
 	if client == nil {
-		return AuthorizationResult{}, errs.Errorf("client %v not found", authContext.ClientId)
+		return known, errs.Errorf("client %v not found", authContext.ClientId)
 	}
 
 	// The client's max_age as the session predicate applies it. A malformed value is refused by
@@ -381,7 +390,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		case authorizeFactSessionValidity:
 			userSession, err = o.database.GetUserSessionBySessionIdentifier(ctx, nil, arrival.SessionIdentifier)
 			if err != nil {
-				return AuthorizationResult{}, err
+				return known, err
 			}
 			valid := o.sessions.HasValidUserSession(userSession,
 				settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, requestedMaxAge)
@@ -405,7 +414,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 					MaxAge:                   authContext.MaxAge,
 				})
 			if validationErr != nil {
-				return AuthorizationResult{}, validationErr
+				return known, validationErr
 			}
 			refusal = validation.refusal
 			refusedAdministrativeScopes = validation.refusedAdministrativeScopes
@@ -429,7 +438,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 			// session.
 			err = o.database.UserSessionLoadUser(ctx, nil, userSession)
 			if err != nil {
-				return AuthorizationResult{}, err
+				return known, err
 			}
 			facts.sessionUserLoaded = true
 			if userSession != nil {
@@ -440,7 +449,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		route, need = decideAuthorizeRoute(facts)
 	}
 
-	result := AuthorizationResult{AuthContext: authContext}
+	result := AuthorizationResult{AuthContext: authContext, ClientId: authContext.ClientId}
 
 	// answerClient answers the client with an error now, whoever is at the browser, and stores
 	// nothing: a link or redirect that is not even a valid sign-in, sent to this browser from
@@ -466,7 +475,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 			if facts.sessionValid == nil {
 				userSession, err = o.database.GetUserSessionBySessionIdentifier(ctx, nil, arrival.SessionIdentifier)
 				if err != nil {
-					return AuthorizationResult{}, err
+					return known, err
 				}
 				valid := o.sessions.HasValidUserSession(userSession,
 					settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, requestedMaxAge)
@@ -495,7 +504,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		silent, silentErr := o.silentAuthentication.Run(ctx, browser, settings, authContext, client,
 			arrival.SessionIdentifier, arrival.IpAddress)
 		if silentErr != nil {
-			return AuthorizationResult{}, silentErr
+			return known, silentErr
 		}
 		if silent.Refusal != nil {
 			result.ClientRefusal = silent.Refusal
@@ -524,7 +533,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		authContext.AuthState = ceremony.AuthStateLevel1ExistingSession
 		return saveFor("/auth/level1completed"), nil
 	}
-	return AuthorizationResult{}, errs.Errorf("authorization request reached no route (%v)", route)
+	return known, errs.Errorf("authorization request reached no route (%v)", route)
 }
 
 // refuseUnaddressableAuthorizeRequest answers the refusal page an authorization request is owed

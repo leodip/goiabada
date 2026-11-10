@@ -64,6 +64,9 @@ type AuthorizationParkingResult struct {
 	PageRefusal *AuthorizePageRefusal
 	// Handle names the parked request, for the handler's redirect to the GET.
 	Handle string
+	// ClientId is the client_id of a request past the check of its client_id and redirect_uri, set
+	// also beside the error of a park that failed, so its 500 is drawn in that client's brand (#812).
+	ClientId string
 }
 
 // Run, in order:
@@ -73,7 +76,8 @@ type AuthorizationParkingResult struct {
 //     row. Whatever else the GET would refuse, it refuses when it runs the parked request.
 //  2. Parks what the endpoint reads of params (parkedAuthorizeForm) and returns its handle.
 //
-// A failure of the address check that is no refusal, or of the insert, is returned as an error.
+// A failure of the address check that is no refusal, or of the insert, is returned as an error; the
+// insert's names the request's client beside it.
 func (o *AuthorizationParking) Run(ctx context.Context, params url.Values, requestId string) (AuthorizationParkingResult, error) {
 	pageRefusal, err := refuseUnaddressableAuthorizeRequest(ctx, o.validator, requestId, params)
 	if err != nil {
@@ -83,9 +87,10 @@ func (o *AuthorizationParking) Run(ctx context.Context, params url.Values, reque
 		return AuthorizationParkingResult{PageRefusal: pageRefusal}, nil
 	}
 
+	clientId := params.Get("client_id")
 	handle, err := authorizerequest.Park(ctx, o.database, parkedAuthorizeForm(params))
 	if err != nil {
-		return AuthorizationParkingResult{}, err
+		return AuthorizationParkingResult{ClientId: clientId}, err
 	}
-	return AuthorizationParkingResult{Handle: handle}, nil
+	return AuthorizationParkingResult{Handle: handle, ClientId: clientId}, nil
 }

@@ -70,15 +70,15 @@ func HandleAuthorizeGet(
 				UserAgent:         r.UserAgent(),
 				IpAddress:         middleware.ClientIP(r),
 			})
+		// Past the address check the request's client is known, and the error response, a form_post
+		// above all, and a 500, of a save or of a read after that check, are drawn in its brand
+		// (#812). A page refusal names its own client.
+		if result.ClientId != "" {
+			reqctx.NamePageClient(r.Context(), result.ClientId)
+		}
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
-		}
-
-		// Past a page refusal the request's client is known, and the error response, a form_post
-		// above all, and the 500 of a save that failed are drawn in its brand (#812).
-		if result.PageRefusal == nil && result.AuthContext != nil {
-			reqctx.NamePageClient(r.Context(), result.AuthContext.ClientId)
 		}
 
 		switch {
