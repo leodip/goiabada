@@ -3,12 +3,13 @@
 // setup step restores, and none of these tests changes it.
 import type { APIRequestContext, Page } from "@playwright/test";
 import { deleteUser } from "../../lib/admin-console";
+import { openSignIn, redirectParams, testRedirectUri } from "../../lib/browser-sign-in";
 import { signInToConsole } from "../../lib/console-user";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { linksIn, mailTo, waitForMail } from "../../lib/mailpit";
 import { passwordToken } from "../../lib/oauth";
-import { passwordGrantClient } from "../../lib/test-clients";
+import { browserSignInClient, passwordGrantClient } from "../../lib/test-clients";
 import { uniqueIdentifier } from "../../lib/unique";
 
 const sendTest = `${env.adminUrl}/admin/settings/email/send-test-email`;
@@ -141,15 +142,9 @@ test("forgot password: the emailed link sets a new password, and the old one sto
   const user = await users.create({ emailVerified: true });
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const forgot = await context.newPage();
-  await forgot.goto(`${env.adminUrl}/account/profile`);
-  await forgot.getByRole("link", { name: "Forgot your password?" }).click();
-  await expect(forgot.getByRole("heading", { name: "Reset your password" })).toBeVisible();
-  await forgot.locator("#email").fill(user.email);
-  await forgot.getByRole("button", { name: "Send reset link", exact: true }).click();
-  await expectLinkSent(forgot, user.email);
-
-  const mail = await waitForMail(request, user.email);
-  const link = linksIn(mail).find((l) => l.startsWith(env.authUrl))!;
+  // Asked for on the page naming no sign-in, so the reset ends on its own page; one started from a
+  // sign-in carries it on (below).
+  const link = await mailedResetLink(forgot, request, user.email);
   await forgot.goto(link);
   // The password's rules, under the seeded policy, are said under its field.
   await expect(forgot.locator("#password-rules")).toHaveText(
@@ -169,6 +164,57 @@ test("forgot password: the emailed link sets a new password, and the old one sto
   expect(linksIn(notice)).toEqual([]);
   expect(notice.text + notice.html).not.toContain("a-reset-password");
   expect(notice.text + notice.html).not.toContain(user.password);
+});
+
+test("a reset started from an application's sign-in carries it on into the application, and the forgot-password page links back to the sign-in", async ({
+  page,
+  browser,
+  request,
+  clients,
+  users,
+}) => {
+  const { client } = await browserSignInClient(page, clients);
+  const user = await users.create({ emailVerified: true });
+  const { context, page: app } = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
+  await expect(app).toHaveURL(/\/auth\/pwd/);
+  const ceremonyId = new URL(await app.getByRole("link", { name: "Forgot your password?" }).getAttribute("href") ?? "", env.authUrl)
+    .searchParams.get("ceremony");
+  expect(ceremonyId, "the Forgot your password? link names the sign-in").toBeTruthy();
+  const backToSignIn = `/auth/pwd?ceremony=${ceremonyId}`;
+
+  // Back to sign in leads to the sign-in's password step, under the form and once the link is sent.
+  await app.getByRole("link", { name: "Forgot your password?" }).click();
+  await expect(app.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+  await expect(app.getByRole("link", { name: "Back to sign in", exact: true })).toHaveAttribute("href", backToSignIn);
+  await app.getByRole("link", { name: "Back to sign in", exact: true }).click();
+  await expect(app).toHaveURL(/\/auth\/pwd/);
+  await expect(app.locator('input[name="password"]')).toBeVisible();
+  await app.getByRole("link", { name: "Forgot your password?" }).click();
+  await app.locator("#email").fill(user.email);
+  await app.getByRole("button", { name: "Send reset link", exact: true }).click();
+  await expectLinkSent(app, user.email);
+  await expect(app.getByRole("link", { name: "Back to sign in", exact: true })).toHaveAttribute("href", backToSignIn);
+
+  // The mailed link names the sign-in beside its code.
+  const link = new URL(linksIn(await waitForMail(request, user.email)).find((l) => l.startsWith(env.authUrl))!);
+  expect(link.searchParams.get("ceremony")).toBe(ceremonyId);
+  expect(link.searchParams.get("code")).toBeTruthy();
+
+  // Opened in the browser holding the sign-in, the new password signs the user in and on into the
+  // application, with no "Password set" page and no password typed again.
+  await app.goto(link.href);
+  await expect(app.getByRole("heading", { name: "Set your password" })).toBeVisible();
+  await app.locator("#password").fill("a-reset-password");
+  await app.locator("#passwordConfirmation").fill("a-reset-password");
+  await app.getByRole("button", { name: "Set password", exact: true }).click();
+  await app.waitForURL((url) => url.href.startsWith(testRedirectUri));
+  expect(redirectParams(new URL(app.url())).get("code"), "the application gets its code").toBeTruthy();
+  await context.close();
+
+  // The reset itself is the same: the new password works, and the address is told.
+  const { client: grant, secret } = await passwordGrantClient(page, clients);
+  expect((await passwordToken(request, grant.identifier, secret, user.email, "a-reset-password", "openid")).status).toBe(200);
+  expect((await waitForMail(request, user.email, 2)).subject).toBe("Your password was reset");
 });
 
 test("the reset form refuses a password too short or not confirmed, and the link still sets one after", async ({

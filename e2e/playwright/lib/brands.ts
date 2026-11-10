@@ -1,10 +1,13 @@
-// The admin console's Branding pages (Settings - Branding): the brands, one of them the default every
-// page of the auth server and the console is drawn in. Changing the default, or the default brand,
-// changes what the whole instance looks like, so the tests doing it are *.system.ts files, and put back
-// the default brand they found (withDefaultBrandRestored).
+// The admin console's Branding pages (Settings - Branding): the brands, one of them the default. A
+// client's pages are drawn in the brand chosen on its Settings tab, or in the default when it has none,
+// and the console in the brand of its own client (#812). Changing the default, the default brand, or
+// the console's own client's brand changes what the whole instance looks like, so the tests doing it
+// are *.system.ts files, and put back what they found (withDefaultBrandRestored). A brand that is not
+// the default, given to a client of a test's own, changes only that client's pages (withBrand).
 import { expect, type Locator, type Page } from "@playwright/test";
 import { confirmDialog } from "./admin-console";
 import { env } from "./environment";
+import { uniqueIdentifier } from "./unique";
 
 export const brandingPath = "/admin/settings/branding";
 export const brandingUrl = `${env.adminUrl}${brandingPath}`;
@@ -227,4 +230,91 @@ export async function restoreBaselineBrand(page: Page): Promise<string[]> {
     drifted.push(`${brandingPath}: the default brand's appearance and theme`);
   }
   return drifted;
+}
+
+// Creates a brand under a fresh name, with this appearance and theme, runs body with it, and deletes it
+// afterwards, pass or fail, unless body deleted it. Deleting it moves the clients that use it to the
+// default brand, so the brand can be left given to a client of the test's own.
+export async function withBrand(
+  page: Page,
+  values: Omit<BrandValues, "name">,
+  body: (brand: { id: number; name: string }) => Promise<void>,
+) {
+  const name = uniqueIdentifier("brand");
+  const id = await createBrand(page, { name, ...values });
+  try {
+    await body({ id, name });
+  } finally {
+    if ((await listBrands(page)).some((brand) => brand.id === id)) await deleteBrand(page, id);
+  }
+}
+
+// The Branding list's row for a brand, by its name.
+export function brandRow(page: Page, name: string): Locator {
+  return page.locator("#brandsTable tbody tr", { has: page.getByRole("link", { name, exact: true }) });
+}
+
+// How many clients the Branding list says each brand draws, by the brand's name: the Clients column.
+export async function brandClientCounts(page: Page): Promise<Record<string, number>> {
+  await page.goto(brandingUrl);
+  const counts: Record<string, number> = {};
+  for (const row of await page.locator("#brandsTable tbody tr").all()) {
+    const name = (await row.locator("td:first-child a").innerText()).trim();
+    counts[name] = Number((await row.locator('td[data-label="Clients"]').innerText()).trim());
+  }
+  return counts;
+}
+
+// Plum's page background in light and in dark, the canvas token of the palettes approved for #810, as
+// a browser reports a computed color.
+export const plumCanvas = { light: "rgb(246, 244, 247)", dark: "rgb(18, 15, 21)" } as const;
+
+// The page's background under a device asking for light and for dark.
+export async function pageBackgrounds(page: Page): Promise<{ onLight: string; onDark: string }> {
+  const background = async (colorScheme: "light" | "dark") => {
+    // Reduced motion, so no transition is caught half way between the two.
+    await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+    return page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  };
+  const onLight = await background("light");
+  const onDark = await background("dark");
+  await page.emulateMedia({ colorScheme: null, reducedMotion: null });
+  return { onLight, onDark };
+}
+
+// The brand a page of the auth server or the console names in its head: the id in the brand
+// stylesheet it links (/brand/7/stylesheet.css), or null when it links none.
+export function pageStylesheetBrand(page: Page): Promise<number | null> {
+  return page.evaluate(() => {
+    for (const link of Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))) {
+      const match = new URL(link.href, document.baseURI).pathname.match(/^\/brand\/(\d+)\/stylesheet\.css$/);
+      if (match) return Number(match[1]);
+    }
+    return null;
+  });
+}
+
+// A page drawn in Plum on Dark, the brand the client tests give a client: it links that brand's
+// stylesheet, names Dark on its root element and in its color-scheme meta, and keeps Plum's dark
+// canvas whatever the device asks.
+export async function expectDrawnInPlumDark(page: Page, brandId: number) {
+  expect(await pageStylesheetBrand(page), "the page links the client's brand").toBe(brandId);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute("content", "dark");
+  const { onLight, onDark } = await pageBackgrounds(page);
+  expect(onLight, "Plum's dark canvas on a light device").toBe(plumCanvas.dark);
+  expect(onDark, "and on a dark device").toBe(plumCanvas.dark);
+}
+
+// A page drawn in the default brand as the baseline keeps it, the seeded Default, automatic on
+// Blueberry: it links the default brand's stylesheet, names no theme, follows the device, and is not
+// drawn in Plum.
+export async function expectDrawnInSeededDefault(page: Page, defaultBrandId: number) {
+  expect(await pageStylesheetBrand(page), "the page links the default brand").toBe(defaultBrandId);
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme");
+  await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute("content", "light dark");
+  const { onLight, onDark } = await pageBackgrounds(page);
+  expect(onLight, "a light device draws the default's light canvas").not.toBe(onDark);
+  expect([onLight, onDark], "neither is Plum's").not.toContain(plumCanvas.dark);
+  expect([onLight, onDark], "neither is Plum's").not.toContain(plumCanvas.light);
 }
