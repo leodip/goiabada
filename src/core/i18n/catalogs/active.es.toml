@@ -1723,6 +1723,13 @@
 "adminconsole.admin_branding.delete.confirm_field_label" = "Para confirmar, escribe el nombre de la marca"
 "adminconsole.admin_branding.delete.delete_button" = "Eliminar marca"
 "adminconsole.admin_branding.delete.back_button" = "Volver a las marcas"
+"adminconsole.admin_branding.preview.title" = "Vista previa"
+"adminconsole.admin_branding.preview.description" = "Una muestra de una página de inicio de sesión con esta marca, tal como está ahora el formulario. La marca solo cambia cuando guardas."
+"adminconsole.admin_branding.preview.auto_note" = "Los visitantes la ven clara u oscura, según su dispositivo."
+"adminconsole.admin_branding.preview.light_note" = "Esta marca es siempre clara."
+"adminconsole.admin_branding.preview.dark_note" = "Esta marca es siempre oscura."
+"adminconsole.admin_branding.preview.mode_legend" = "Ver en"
+"adminconsole.admin_branding.preview.sample_lead" = "Introduce tu correo electrónico y tu contraseña para continuar."
 
 "adminconsole.admin_settings.tokens.page_title" = "Configuración de tokens"
 "adminconsole.admin_settings.tokens.subtitle" = "Tokens"

@@ -1,0 +1,39 @@
+{{define "brand_sample"}}
+{{- /* (args mode ctx appName): the brand editor's sample of a sign-in page in mode, "light" or
+     "dark" (#811), a refused sign-in drawn with the auth server's components and, wherever the
+     sign-in page has one, its own message, so it reads as the real page does. It is an
+     illustration: inert and hidden from assistive technology, with nothing in it that can be
+     focused or operated, which is why its fields, buttons and link are drawn on spans. It is
+     drawn hidden, and brand-preview.js shows it once it has given it the theme's colors, which it
+     sets on this element alone. */ -}}
+{{- $mode := index . 0 }}
+{{- $ctx := index . 1 }}
+<div class="brand-sample" data-brand-sample="{{ $mode }}" hidden inert aria-hidden="true">
+  <div class="panel auth-card">
+    <div class="panel-body">
+      <p class="auth-brand">{{ index . 2 }}</p>
+      <p class="auth-title">{{ T $ctx "auth.pwd.title" }}</p>
+      <p class="auth-lead">{{ T $ctx "adminconsole.admin_branding.preview.sample_lead" }}</p>
+      <div class="stacked">
+        <div class="notice notice-danger">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+          <p>{{ T $ctx "validator.login.password_required" }}</p>
+        </div>
+        <div class="field">
+          <span class="field-label">{{ T $ctx "auth.pwd.email_label" }}</span>
+          <span class="control">alex@example.com</span>
+        </div>
+        <div class="field">
+          <span class="field-label">{{ T $ctx "auth.pwd.password_label" }}</span>
+          <span class="control" aria-invalid="true"></span>
+          <p class="text-right text-sm"><span class="text-link">{{ T $ctx "auth.pwd.forgot_password" }}</span></p>
+        </div>
+        <div class="auth-actions">
+          <span class="button">{{ T $ctx "common.button.cancel" }}</span>
+          <span class="button button-primary">{{ T $ctx "auth.pwd.button" }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{- end}}

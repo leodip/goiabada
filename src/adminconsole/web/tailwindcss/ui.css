@@ -2115,6 +2115,77 @@
     height: 100%;
   }
 
+  /* A grid of option cards that reflows to the width it is given, rather than to the window's, as
+     in the brand editor's narrower column of fields. */
+
+  .option-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.25rem), 1fr));
+    gap: 0.75rem;
+  }
+
+  /* The brand editor (#811): its form, and the preview of the brand beside it, which stays in view
+     while the page scrolls, so the sample is beside whatever field is being edited. In a window too
+     narrow for both the preview follows the form and scrolls with it. */
+
+  .brand-editor {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 1.5rem;
+  }
+
+  .brand-preview {
+    display: grid;
+    min-width: 0;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 75rem) {
+    .brand-editor {
+      grid-template-columns: minmax(0, 1fr) 24rem;
+      gap: 2rem;
+    }
+
+    .brand-preview {
+      position: sticky;
+      top: calc(var(--app-header-height) + 1.25rem);
+    }
+  }
+
+  .brand-preview-title {
+    font-size: 1.0625rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+
+  /* The switch's name sits on the line of its two choices: a floated legend is laid out as any
+     other child of the fieldset. */
+
+  .brand-preview-switch {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.25rem;
+  }
+
+  .brand-preview-switch > legend {
+    float: left;
+  }
+
+  /* A sample of a sign-in page in the brand being edited: the auth server's card on its canvas.
+     brand-preview.js sets the theme's tokens on this element, which every color inside it reads. */
+
+  .brand-sample {
+    display: flex;
+    justify-content: center;
+    padding: 1.5rem 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
   /* Windows high-contrast mode, and any other forced palette: draw with the system's colors where
      a component's state was shown by its own colors alone. */
 
@@ -2155,8 +2226,10 @@
       padding-left: 0.75rem;
     }
 
-    /* A theme's picture shows the theme's own colors, which is all it is for. */
-    .theme-swatch {
+    /* A theme's picture, and a brand's sample, show the theme's own colors, which is all they are
+       for. */
+    .theme-swatch,
+    .brand-sample {
       forced-color-adjust: none;
     }
 

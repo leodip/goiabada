@@ -1654,6 +1654,13 @@
 "adminconsole.admin_branding.delete.confirm_field_label" = "Para confirmar, digite o nome da marca"
 "adminconsole.admin_branding.delete.delete_button" = "Excluir marca"
 "adminconsole.admin_branding.delete.back_button" = "Voltar às marcas"
+"adminconsole.admin_branding.preview.title" = "Pré-visualização"
+"adminconsole.admin_branding.preview.description" = "Uma amostra de uma página de entrada nesta marca, como o formulário está agora. A marca só muda quando você salva."
+"adminconsole.admin_branding.preview.auto_note" = "Os visitantes a veem clara ou escura, conforme o dispositivo deles."
+"adminconsole.admin_branding.preview.light_note" = "Esta marca é sempre clara."
+"adminconsole.admin_branding.preview.dark_note" = "Esta marca é sempre escura."
+"adminconsole.admin_branding.preview.mode_legend" = "Visualizar em"
+"adminconsole.admin_branding.preview.sample_lead" = "Digite seu e-mail e sua senha para continuar."
 
 "adminconsole.admin_settings.tokens.page_title" = "Configurações de tokens"
 "adminconsole.admin_settings.tokens.subtitle" = "Tokens"
