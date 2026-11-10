@@ -43,9 +43,30 @@ func newAssetFingerprints(staticFS fs.FS) *assetFingerprints {
 	return &assetFingerprints{fsys: staticFS, known: map[string]assetFingerprint{}}
 }
 
+// NewAssetFingerprintCheck reports whether fingerprint is the one a page links the static file at
+// path with now, over staticFS, for the static file server: a URL whose fingerprint is current may
+// be kept for a year, since the URL changes whenever the file does (#810 decision 7). A path that
+// is no static file is current under no fingerprint.
+func NewAssetFingerprintCheck(staticFS fs.FS) func(path, fingerprint string) bool {
+	assets := newAssetFingerprints(staticFS)
+	return func(path, fingerprint string) bool {
+		current, err := assets.fingerprint(path)
+		return err == nil && fingerprint == current
+	}
+}
+
 // url returns path with its file's fingerprint. path names a file under /static/; anything else,
 // or a file that is not there, is an error, which fails the page rather than linking it to nothing.
 func (a *assetFingerprints) url(path string) (string, error) {
+	sum, err := a.fingerprint(path)
+	if err != nil {
+		return "", err
+	}
+	return path + "?v=" + sum, nil
+}
+
+// fingerprint returns the fingerprint of the file at path, under /static/, as url does.
+func (a *assetFingerprints) fingerprint(path string) (string, error) {
 	name, ok := strings.CutPrefix(path, "/static/")
 	if !ok || a.fsys == nil {
 		return "", errs.Errorf("asset %q is not a static file this server serves", path)
@@ -59,7 +80,7 @@ func (a *assetFingerprints) url(path string) (string, error) {
 	known, ok := a.known[name]
 	a.mu.Unlock()
 	if ok && known.size == info.Size() && known.modTime.Equal(info.ModTime()) {
-		return path + "?v=" + known.sum, nil
+		return known.sum, nil
 	}
 
 	content, err := fs.ReadFile(a.fsys, name)
@@ -72,5 +93,5 @@ func (a *assetFingerprints) url(path string) (string, error) {
 	a.mu.Lock()
 	a.known[name] = assetFingerprint{size: info.Size(), modTime: info.ModTime(), sum: sum}
 	a.mu.Unlock()
-	return path + "?v=" + sum, nil
+	return sum, nil
 }

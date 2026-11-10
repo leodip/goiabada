@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
@@ -750,8 +749,24 @@ func bodyLimitPolicy() httpmw.BodyLimitPolicy {
 // name the file.
 const staticPrefix = "/static"
 
+const (
+	// staticCurrentCache is the answer to a request naming a static file by its current
+	// fingerprint, as the pages link it: the URL changes whenever the file does, so a browser may
+	// keep it for a year without asking again (#810 decision 7).
+	staticCurrentCache    = "public, max-age=31536000, immutable"
+	staticCurrentLifetime = 365 * 24 * time.Hour
+	// staticOtherCache is the answer to any other request, a stale fingerprint, a malformed one or
+	// none: the current file, kept five minutes, so a URL never holds for a year what it does not
+	// name.
+	staticOtherCache    = "public, max-age=300"
+	staticOtherLifetime = 5 * time.Minute
+)
+
 // serveStaticFiles serves the embedded static files under /static/. They are mounted nowhere else,
 // so neither the path nor the file system is a parameter.
+//
+// A file requested by its current fingerprint, as the pages link it, is kept for a year and
+// immutable; any other request, the favicons' among them, for five minutes.
 //
 // A directory is the 404 page, /static/ itself included, where Go's file server answered one with
 // a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
@@ -762,6 +777,7 @@ const staticPrefix = "/static"
 // unmatched path costs; a file still costs neither.
 func (s *Server) serveStaticFiles(notFound http.Handler) {
 	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
+	isCurrent := render.NewAssetFingerprintCheck(s.staticFS)
 	directory := notFound
 	chain := s.applicationChain()
 	for i := len(chain) - 1; i >= 0; i-- {
@@ -774,9 +790,12 @@ func (s *Server) serveStaticFiles(notFound http.Handler) {
 			return
 		}
 
-		cacheInSeconds := 5 * 60
-		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%v", cacheInSeconds))
-		w.Header().Set("Expires", time.Now().UTC().Add(time.Second*time.Duration(cacheInSeconds)).Format(http.TimeFormat))
+		cacheControl, lifetime := staticOtherCache, staticOtherLifetime
+		if fingerprints := r.URL.Query()["v"]; len(fingerprints) == 1 && isCurrent(r.URL.Path, fingerprints[0]) {
+			cacheControl, lifetime = staticCurrentCache, staticCurrentLifetime
+		}
+		w.Header().Set("Cache-Control", cacheControl)
+		w.Header().Set("Expires", time.Now().UTC().Add(lifetime).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
 		files.ServeHTTP(w, r)

@@ -180,7 +180,7 @@ An email's subject is in the catalogs, and its body is a template under `emails/
 
 ## Templates and static files
 
-A server reads a template each time it renders the page, so an edited template shows on the next request with no restart. Static files are served with `Cache-Control: public, max-age=300`. The four directory variables are on [Environment variables](/reference/environment-variables/#customization).
+A server reads a template each time it renders the page, so an edited template shows on the next request with no restart. The pages link a static file with a fingerprint of its contents in the URL, which changes when the file does, so an edited file shows on the next page too. Requested by that URL, a static file is served with `Cache-Control: public, max-age=31536000, immutable`; requested by any other, such as a favicon's, with `public, max-age=300`. The four directory variables are on [Environment variables](/reference/environment-variables/#customization).
 
 ## Next steps
 
