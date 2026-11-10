@@ -614,7 +614,10 @@ When user has valid session (`UserSession` in DB + session cookie):
   answered first would otherwise be undone by a cookie naming the removed row or built from the
   older contents, such as a Keep me signed in answer just replaced. Every answer on that branch is
   `no-store`, the router's 405 under a page group included, and the files, protocol and API branches
-  read the session without touching it, so no reissued cookie rides on a cacheable answer (#743)
+  read the session without touching it, so no reissued cookie rides on a cacheable answer (#743).
+  A brand's stylesheet, public and kept for a year, is registered on the root as the static files
+  are and reads no session at all: clearing a dangling user-session pointer reissues the cookie
+  (#810)
 - Whether a signed-in cookie outlives the browser is the store's `KeepSignedIn` rule
   (`sessionbackend.NewKeepSignedIn`), asked per cookie write. Under Let each user choose it reads the
   password page's Keep me signed in answer from the browser session (`sessionkeys.KeepSignedIn`, a

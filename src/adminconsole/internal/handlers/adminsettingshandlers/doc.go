@@ -1,6 +1,6 @@
 // Package adminsettingshandlers serves the admin pages for the auth server's settings, under
 // /admin/settings: general, sessions, tokens, email and its test message, the Turnstile challenge,
-// UI theme, signing keys and their rotation and revocation, and the audit log switches and viewer.
+// branding, signing keys and their rotation and revocation, and the audit log switches and viewer.
 // Every page reads and writes through the auth server's admin API with the administrator's token,
 // which carries the authserver:manage permission the routes require.
 //

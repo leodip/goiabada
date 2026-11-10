@@ -43,8 +43,8 @@ const accountExportMaxAge = 300 * time.Second
 // protocol endpoints and the APIs answer a settings or session failure, or a panic, as JSON
 // (see appBranches, #435).
 func (s *Server) initRoutes(branches appBranches) {
-	pages, files, protocol, api, token, revoke, introspect := branches.pages, branches.files, branches.protocol, branches.api,
-		branches.token, branches.revoke, branches.introspect
+	pages, files, protocol, api, token, revoke, introspect, public := branches.pages, branches.files, branches.protocol, branches.api,
+		branches.token, branches.revoke, branches.introspect, branches.public
 
 	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database), middleware.ActingUser{})
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
@@ -152,7 +152,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	files.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(files, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(files, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
-	getAndHead(files, brandthemes.StylesheetRoute, handlers.HandleBrandStylesheetGet(httpHelper, s.database))
+	// A brand's stylesheet is answered as a static file is, to anyone and with no session, on the
+	// branch without the settings read and the session load, so no cookie rides on its public year.
+	getAndHead(public, brandthemes.StylesheetRoute, handlers.HandleBrandStylesheetGet(httpHelper, s.database))
 
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)

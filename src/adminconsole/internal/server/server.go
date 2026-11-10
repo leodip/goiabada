@@ -766,7 +766,8 @@ const (
 // so neither the path nor the file system is a parameter.
 //
 // A file requested by its current fingerprint, as the pages link it, is kept for a year and
-// immutable; any other request, the favicons' among them, for five minutes.
+// immutable; any other request, the favicons' among them, for five minutes. The fingerprint is
+// checked on the bytes the answer carries, read once (staticSnapshot).
 //
 // A directory is the 404 page, /static/ itself included, where Go's file server answered one with
 // a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
@@ -777,7 +778,6 @@ const (
 // unmatched path costs; a file still costs neither.
 func (s *Server) serveStaticFiles(notFound http.Handler) {
 	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
-	isCurrent := render.NewAssetFingerprintCheck(s.staticFS)
 	directory := notFound
 	chain := s.applicationChain()
 	for i := len(chain) - 1; i >= 0; i-- {
@@ -791,14 +791,21 @@ func (s *Server) serveStaticFiles(notFound http.Handler) {
 		}
 
 		cacheControl, lifetime := staticOtherCache, staticOtherLifetime
-		if fingerprints := r.URL.Query()["v"]; len(fingerprints) == 1 && isCurrent(r.URL.Path, fingerprints[0]) {
-			cacheControl, lifetime = staticCurrentCache, staticCurrentLifetime
+		serve := files
+		if fingerprints := r.URL.Query()["v"]; len(fingerprints) == 1 {
+			// The file is read once, and the fingerprint checked on the bytes the answer carries.
+			if snapshot, ok := readStaticSnapshot(s.staticFS, r.URL.Path); ok {
+				serve = http.StripPrefix(staticPrefix, http.FileServer(http.FS(snapshot)))
+				if render.AssetFingerprint(snapshot.content) == fingerprints[0] {
+					cacheControl, lifetime = staticCurrentCache, staticCurrentLifetime
+				}
+			}
 		}
 		w.Header().Set("Cache-Control", cacheControl)
 		w.Header().Set("Expires", time.Now().UTC().Add(lifetime).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
-		files.ServeHTTP(w, r)
+		serve.ServeHTTP(w, r)
 	})
 }
 

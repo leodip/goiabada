@@ -43,16 +43,14 @@ func newAssetFingerprints(staticFS fs.FS) *assetFingerprints {
 	return &assetFingerprints{fsys: staticFS, known: map[string]assetFingerprint{}}
 }
 
-// NewAssetFingerprintCheck reports whether fingerprint is the one a page links the static file at
-// path with now, over staticFS, for the static file server: a URL whose fingerprint is current may
-// be kept for a year, since the URL changes whenever the file does (#810 decision 7). A path that
-// is no static file is current under no fingerprint.
-func NewAssetFingerprintCheck(staticFS fs.FS) func(path, fingerprint string) bool {
-	assets := newAssetFingerprints(staticFS)
-	return func(path, fingerprint string) bool {
-		current, err := assets.fingerprint(path)
-		return err == nil && fingerprint == current
-	}
+// AssetFingerprint is the fingerprint a page links a static file with these contents by, for the
+// static file server: a URL whose fingerprint is that of the bytes it answers with may be kept for
+// a year, since the URL changes whenever the file does (#810 decision 7). The server checks it on
+// the bytes it sends, read once, so a file replaced while it is answered never earns the year for
+// contents its URL does not name.
+func AssetFingerprint(content []byte) string {
+	digest := sha256.Sum256(content)
+	return hex.EncodeToString(digest[:6])
 }
 
 // url returns path with its file's fingerprint. path names a file under /static/; anything else,
@@ -87,8 +85,7 @@ func (a *assetFingerprints) fingerprint(path string) (string, error) {
 	if err != nil {
 		return "", errs.Wrapf(err, "unable to read static file %q", path)
 	}
-	digest := sha256.Sum256(content)
-	sum := hex.EncodeToString(digest[:6])
+	sum := AssetFingerprint(content)
 
 	a.mu.Lock()
 	a.known[name] = assetFingerprint{size: info.Size(), modTime: info.ModTime(), sum: sum}

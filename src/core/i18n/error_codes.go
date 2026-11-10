@@ -319,7 +319,7 @@ const (
 	ErrCodeAccountLogoutRedirectURINotAbsolute   = "handler.account_logout.post_logout_redirect_uri_not_absolute"
 	ErrCodeAccountLogoutRedirectURIInsecureHTTP  = "handler.account_logout.post_logout_redirect_uri_insecure_http"
 
-	// Settings: general, sessions, tokens, email, signing keys, the UI theme and audit logs. A settings
+	// Settings: general, sessions, tokens, email, signing keys and audit logs. A settings
 	// refusal sentence that a client's tokens or the account already say reuses that key: the offline
 	// idle timeout above its max lifetime is handler.client_tokens.offline_idle_timeout_above_max_lifetime,
 	// SMTP being off handler.smtp.not_enabled, and the test send's missing destination
