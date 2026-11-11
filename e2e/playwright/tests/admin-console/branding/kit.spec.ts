@@ -150,8 +150,8 @@ test("a file the kit's rules refuse is said at its field, and the slot keeps wha
   expect(await pickInEditor(page, "logo", tooLarge)).toBe("The image can be at most 1048576 bytes.");
   expect(sent, "a file over the limit is not sent").toEqual([]);
 
-  expect(await pickInEditor(page, "favicon", pngFile("wide.png", 64, 32, [10, 20, 30]))).toBe(
-    "The image must be square. This one is 64x32 pixels.",
+  expect(await pickInEditor(page, "favicon", pngFile("wide.png", 96, 64, [10, 20, 30]))).toBe(
+    "The image must be square. This one is 96x64 pixels.",
   );
   expect(await pickInEditor(page, "background", woff2File("not-an-image.woff2"))).toBe(
     "The image type is not supported. Allowed types are PNG, JPEG and WebP.",

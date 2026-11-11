@@ -103,12 +103,13 @@ for (const { locale, query, typed, global, restored } of [
 
 // The durations are written by the console's own script, so the page needs nothing from elsewhere,
 // and nothing of the duration library it used to load (#645). The one exception is the default
-// brand's stylesheet, which every console page links from the auth server (#810).
+// brand's stylesheet, which every console page links from the auth server (#810): the colors-only
+// one on an admin page (#813 decision 9).
 test("the page requests no script from another origin, no stylesheet but the auth server's brand one, nor the removed duration library", async ({ page, clients }) => {
   const client = await clients.create();
   const adminOrigin = new URL(env.adminUrl).origin;
   const authOrigin = new URL(env.authUrl).origin;
-  const brandStylesheet = /^\/brand\/\d+\/stylesheet\.css$/;
+  const brandStylesheet = /^\/brand\/\d+\/(stylesheet|colors)\.css$/;
   const foreign: string[] = [];
   const removed: string[] = [];
   page.on("request", (request) => {

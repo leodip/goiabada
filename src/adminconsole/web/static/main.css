@@ -2223,7 +2223,7 @@
     --radius-box: min(var(--radius-control), 1rem);
     display: flex;
     justify-content: center;
-    padding: 0.75rem;
+    padding: 0.5rem;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-panel);
     background-color: var(--color-canvas);
@@ -2231,10 +2231,13 @@
     font-family: var(--font-sans);
   }
   .brand-sample .auth-card > .panel-body {
-    padding: 1.75rem 1.25rem;
+    padding: 1.25rem;
   }
   .brand-sample .auth-logo img {
-    max-height: 3rem;
+    max-height: 2rem;
+  }
+  .brand-sample .auth-brand {
+    margin-bottom: 1rem;
   }
   .brand-asset {
     min-width: 0;

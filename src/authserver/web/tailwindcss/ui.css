@@ -2258,7 +2258,7 @@
     --radius-box: min(var(--radius-control), 1rem);
     display: flex;
     justify-content: center;
-    padding: 0.75rem;
+    padding: 0.5rem;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-panel);
     background-color: var(--color-canvas);
@@ -2266,16 +2266,20 @@
     font-family: var(--font-sans);
   }
 
-  /* The sample's card is drawn as a narrow screen draws a sign-in card, and its logo at most 3rem tall,
-     so the whole preview, a logo and the longest languages' sentences with it, stays on a 1280x800
-     screen beside the form (#813). */
+  /* The sample's card is drawn closer than a sign-in card, and its logo at most 2rem tall, so the
+     whole preview, a logo, the app name and the longest languages' sentences with them, stays on a
+     1280x800 screen beside the form in every engine, down to the page's end (#813). */
 
   .brand-sample .auth-card > .panel-body {
-    padding: 1.75rem 1.25rem;
+    padding: 1.25rem;
   }
 
   .brand-sample .auth-logo img {
-    max-height: 3rem;
+    max-height: 2rem;
+  }
+
+  .brand-sample .auth-brand {
+    margin-bottom: 1rem;
   }
 
   /* An upload field of the brand editor (#813 decision 1): an image's thumbnail, the sentence saying

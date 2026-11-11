@@ -1193,7 +1193,7 @@ test("the settings pages and the audit log", async ({ page }) => {
       await expectPreviewDrawn(page);
     }),
     says(page, "branding, a new brand, a file refused at its field", "faviconStatus", async () => {
-      expect(await pickInEditor(page, "favicon", pngFile("wide.png", 64, 32, [10, 20, 30]))).toContain("must be square");
+      expect(await pickInEditor(page, "favicon", pngFile("wide.png", 96, 64, [10, 20, 30]))).toContain("must be square");
     }),
     {
       name: "branding, a new brand, a dark logo without a logo refused at the logo's field",
