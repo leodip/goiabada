@@ -3,8 +3,10 @@ package integration
 import (
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -235,6 +237,8 @@ func TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileRegistrationIsAvailable
 // not a server redirect: the password page's "Register" link and the registration page's "Sign in"
 // link. Register from a sign-in and go back, and the visitor lands on the same sign-in's password
 // form, where a bare link would load a step naming no ceremony and get the "no longer active" page.
+// A registration page naming no sign-in therefore never links a bare /auth/pwd: its Sign in leads to
+// the console's account page, which starts the console's own sign-in.
 func TestAuthorize_TheRegistrationLinksCarryTheSignInThroughAndBack(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
@@ -266,14 +270,24 @@ func TestAuthorize_TheRegistrationLinksCarryTheSignInThroughAndBack(t *testing.T
 	assert.Equal(t, http.StatusOK, back.StatusCode)
 	assert.Equal(t, ceremonyId, getCeremonyIdFromPage(t, back), "the same sign-in, not a new one")
 
-	t.Run("the registration page reached from anywhere else links back bare", func(t *testing.T) {
+	// consoleSignIn asserts the page links no step of the auth server's sign-in, and links Sign in to
+	// the console's account page instead.
+	consoleSignIn := func(t *testing.T, page *goquery.Document) {
+		t.Helper()
+		assert.Zero(t, page.Find(`a[href^="/auth/pwd"]`).Length(), "no link to a password step")
+		link := page.Find(`a[href="` + appConfig.AdminConsole.BaseURL + `/account/profile"]`)
+		require.Equal(t, 1, link.Length(), "Sign in leads to the console's account page")
+		assert.Equal(t, "Sign in", strings.TrimSpace(link.Text()))
+	}
+
+	t.Run("the registration page reached from anywhere else links to the console's account page", func(t *testing.T) {
 		bare := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
 		defer func() { _ = bare.Body.Close() }()
 		require.Equal(t, http.StatusOK, bare.StatusCode)
 
-		link, ok := parseHTMLResponse(t, bare).Find(`a[href^="/auth/pwd"]`).Attr("href")
-		require.True(t, ok)
-		assert.Equal(t, "/auth/pwd", link)
+		// This browser holds the sign-in above, which a bare /auth/pwd would refuse as no longer
+		// active.
+		consoleSignIn(t, parseHTMLResponse(t, bare))
 	})
 
 	for name, value := range map[string]string{
@@ -288,9 +302,7 @@ func TestAuthorize_TheRegistrationLinksCarryTheSignInThroughAndBack(t *testing.T
 			require.Equal(t, http.StatusOK, resp.StatusCode)
 
 			doc := parseHTMLResponse(t, resp)
-			link, ok := doc.Find(`a[href^="/auth/pwd"]`).Attr("href")
-			require.True(t, ok)
-			assert.Equal(t, "/auth/pwd", link, "a value that is not an id is not repeated into the page")
+			consoleSignIn(t, doc) // a value that is not an id is not repeated into the page
 			assert.NotContains(t, doc.Text(), "<script>alert(1)</script>")
 		})
 	}

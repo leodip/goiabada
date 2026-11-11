@@ -84,7 +84,7 @@ func TestHandleRegisterGet_TheFormAsksForThePasswordOnlyWithoutVerification(t *t
 				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
 				Return(nil).Once()
 
-			HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}).ServeHTTP(httptest.NewRecorder(), req)
+			HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, testAdminConsoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, rendered)
 			assert.Equal(t, tc.wantRequiresVerification, rendered["requiresEmailVerification"])
@@ -139,7 +139,7 @@ func TestHandleRegisterPost_TheRedrawnFormKeepsItsMode(t *testing.T) {
 func TestHandleRegisterGet(t *testing.T) {
 	t.Run("Self registration enabled", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
-		handler := HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{})
+		handler := HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
@@ -161,7 +161,7 @@ func TestHandleRegisterGet(t *testing.T) {
 
 	t.Run("Self registration disabled", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
-		handler := RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}))
+		handler := RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, testAdminConsoleBaseURL))
 
 		req, _ := http.NewRequest("GET", "/account/register", nil)
 		rr := httptest.NewRecorder()
@@ -227,7 +227,7 @@ func TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testi
 		pageRenderer.On("NotFound", rr, req).Return().Once()
 		logs := logtest.CaptureSlog(t)
 
-		RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{})).ServeHTTP(rr, req)
+		RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, testAdminConsoleBaseURL)).ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
 		assertRegistrationWithoutEmailLogged(t, logs)
@@ -268,7 +268,7 @@ func TestHandleRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testi
 				Run(func(args mock.Arguments) { rendered = args.Get(4).(map[string]interface{}) }).
 				Return(nil).Once()
 
-			RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{})).ServeHTTP(httptest.NewRecorder(), req)
+			RefuseUnavailableRegistration(pageRenderer)(HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, testAdminConsoleBaseURL)).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, rendered)
 			assert.Equal(t, tc.wantRequiresVerification, rendered["requiresEmailVerification"])

@@ -33,8 +33,8 @@ var registrationEchoCases = []struct {
 }{
 	{"an id of the right shape is kept", "?ceremony=" + aCeremonyId, aCeremonyId},
 	{"an id with every punctuation character of the alphabet is kept", "?ceremony=aB-_.EfGhIjKlMnOpQrStUvWxYz01234", "aB-_.EfGhIjKlMnOpQrStUvWxYz01234"},
-	{"no parameter leaves the link bare", "", ""},
-	{"an empty parameter leaves the link bare", "?ceremony=", ""},
+	{"no parameter names no sign-in", "", ""},
+	{"an empty parameter names no sign-in", "?ceremony=", ""},
 	{"one character short is dropped", "?ceremony=" + aCeremonyId[:ceremony.IdLength-1], ""},
 	{"one character over is dropped", "?ceremony=" + aCeremonyId + "x", ""},
 	{"far over is dropped", "?ceremony=" + strings.Repeat("a", 4096), ""},
@@ -49,7 +49,7 @@ func TestHandleRegisterGet_EchoesOnlyAWellFormedCeremony(t *testing.T) {
 	for _, tc := range registrationEchoCases {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
-			handler := HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{})
+			handler := HandleRegisterGet(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, testAdminConsoleBaseURL)
 
 			req := httptest.NewRequest(http.MethodGet, "/account/register"+tc.query, nil)
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SelfRegistrationEnabled: true}))

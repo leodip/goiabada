@@ -81,7 +81,7 @@ func TestHandleRegisterGet_LinksTheAllAppsDocumentsAndTheSignInsApps(t *testing.
 			var asked []string
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			req := registerRequest(http.MethodGet, tc.query)
-			bind := renderedRegisterBind(t, pageRenderer, HandleRegisterGet(pageRenderer, tc.ceremonies, shopDocuments(&asked)), req)
+			bind := renderedRegisterBind(t, pageRenderer, HandleRegisterGet(pageRenderer, tc.ceremonies, shopDocuments(&asked), testAdminConsoleBaseURL), req)
 
 			assert.Equal(t, tc.want, bind["legalDocuments"])
 			assert.Equal(t, []string{tc.client}, asked)
@@ -117,7 +117,7 @@ func TestRequireRegistrationChallenge_TheRedrawnFormLinksTheSameDocuments(t *tes
 		t.Fatal("a refused submission reached the handler")
 	})
 	handler := RequireRegistrationChallenge(pageRenderer, held, shopDocuments(&asked),
-		refusingVerifier{})(unreached)
+		refusingVerifier{}, testAdminConsoleBaseURL)(unreached)
 	req := registerRequest(http.MethodPost, "?ceremony="+aCeremonyId)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
 		SelfRegistrationEnabled: true, TurnstileEnabled: true, TurnstileSiteKey: "1x00000000000000000000AA",
@@ -156,7 +156,7 @@ func TestHandleRegisterGet_AFailedReadIsTheErrorPage(t *testing.T) {
 				return errors.Is(err, failure)
 			})).Return().Once()
 
-			HandleRegisterGet(pageRenderer, tc.ceremonies, tc.documents).
+			HandleRegisterGet(pageRenderer, tc.ceremonies, tc.documents, testAdminConsoleBaseURL).
 				ServeHTTP(httptest.NewRecorder(), registerRequest(http.MethodGet, "?ceremony="+aCeremonyId))
 		})
 	}

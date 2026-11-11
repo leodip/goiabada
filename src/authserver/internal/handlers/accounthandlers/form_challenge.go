@@ -16,12 +16,14 @@ import (
 // verifier refuses, or that carries none, is answered with the form again, beside the challenge's
 // message and with the address as typed, before any tier of the limiter counts it and before the
 // address is looked up. A pass, and every way the check fails open, go on as with the challenge off.
-func RequireForgotPasswordChallenge(pageRenderer PageRenderer, verifier ChallengeVerifier) func(http.Handler) http.Handler {
+// adminConsoleBaseURL is the redrawn form's, as HandleForgotPasswordGet's is.
+func RequireForgotPasswordChallenge(pageRenderer PageRenderer, verifier ChallengeVerifier,
+	adminConsoleBaseURL string) func(http.Handler) http.Handler {
 	return requireChallenge(turnstile.FormForgotPassword, verifier,
 		func(w http.ResponseWriter, r *http.Request, settings *record.Settings, refusal string) {
 			// As typed, as the handler draws back an address it refuses. No field is marked: the
 			// refusal is about the widget, not the address.
-			renderForgotPasswordForm(w, r, pageRenderer, settings, r.PostFormValue("email"), refusal, "")
+			renderForgotPasswordForm(w, r, pageRenderer, adminConsoleBaseURL, settings, r.PostFormValue("email"), refusal, "")
 		})
 }
 
@@ -29,15 +31,17 @@ func RequireForgotPasswordChallenge(pageRenderer PageRenderer, verifier Challeng
 // RefuseUnavailableRegistration and ahead of the form's rate limiter, as
 // RequireForgotPasswordChallenge is on its form. The redrawn form keeps the address normalized as
 // the handler's own refusals keep it, the sign-in the visitor came from, and the legal documents
-// that sign-in's app links on the form.
+// that sign-in's app links on the form. adminConsoleBaseURL is the redrawn form's, as
+// HandleRegisterGet's is.
 func RequireRegistrationChallenge(pageRenderer PageRenderer, ceremonies registrationCeremonies,
-	legalDocuments registrationLegalDocuments, verifier ChallengeVerifier) func(http.Handler) http.Handler {
+	legalDocuments registrationLegalDocuments, verifier ChallengeVerifier,
+	adminConsoleBaseURL string) func(http.Handler) http.Handler {
 	return requireChallenge(turnstile.FormRegister, verifier,
 		func(w http.ResponseWriter, r *http.Request, settings *record.Settings, refusal string) {
 			// No field is marked: the refusal is about the widget, and the password fields come
 			// back empty, so focus goes where typing starts again.
 			email := strings.TrimSpace(strings.ToLower(r.PostFormValue("email")))
-			renderRegisterForm(w, r, pageRenderer, ceremonies, legalDocuments, settings, email, refusal, "")
+			renderRegisterForm(w, r, pageRenderer, ceremonies, legalDocuments, adminConsoleBaseURL, settings, email, refusal, "")
 		})
 }
 

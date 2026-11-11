@@ -35,7 +35,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 	t.Run("Successful render", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 
-		handler := HandleForgotPasswordGet(pageRenderer)
+		handler := HandleForgotPasswordGet(pageRenderer, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/forgot-password", nil)
 		require.NoError(t, err)
@@ -63,7 +63,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 	t.Run("RenderTemplate error", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 
-		handler := HandleForgotPasswordGet(pageRenderer)
+		handler := HandleForgotPasswordGet(pageRenderer, testAdminConsoleBaseURL)
 
 		req, err := http.NewRequest("GET", "/forgot-password", nil)
 		require.NoError(t, err)
@@ -161,7 +161,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
-		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		req := withEmailOn(httptest.NewRequest("POST", "/forgot-password", strings.NewReader("")))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -205,7 +205,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
-		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 		req := forgotPasswordRequest("nonexistent@example.com")
 		rr := httptest.NewRecorder()
 
@@ -214,7 +214,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, map[string]interface{}{"linkSent": true, "email": "nonexistent@example.com", "ceremonyId": ""}, *bound)
+		assert.Equal(t, map[string]interface{}{"linkSent": true, "email": "nonexistent@example.com", "ceremonyId": "", "adminConsoleBaseUrl": testAdminConsoleBaseURL}, *bound)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
 		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -234,7 +234,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
-		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 		req := forgotPasswordRequest("existing@example.com")
 		rr := httptest.NewRecorder()
 
@@ -251,7 +251,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, map[string]interface{}{"linkSent": true, "email": "existing@example.com", "ceremonyId": ""}, *bound)
+		assert.Equal(t, map[string]interface{}{"linkSent": true, "email": "existing@example.com", "ceremonyId": "", "adminConsoleBaseUrl": testAdminConsoleBaseURL}, *bound)
 
 		// The code is stored by the narrow conditional write, predicated on the address the
 		// lookup found, and never by writing the loaded row back (#404 decision 2).
@@ -324,7 +324,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
-		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 		req := forgotPasswordRequest("existing@example.com")
 		rr := httptest.NewRecorder()
 
@@ -356,7 +356,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		jobs := &heldJobs{}
 
 		// A nil cipher refuses every encryption, which is the one way to make the real one fail.
-		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, nil, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, nil, testBaseURL, testAdminConsoleBaseURL)
 		req := forgotPasswordRequest("existing@example.com")
 		rr := httptest.NewRecorder()
 
@@ -389,7 +389,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
-		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 		req := forgotPasswordRequest("existing@example.com")
 		rr := httptest.NewRecorder()
 
@@ -460,7 +460,7 @@ func TestHandleForgotPasswordPost_WritesTheEmailInTheRecipientsLanguage(t *testi
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 
-			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 			req := forgotPasswordRequest("existing@example.com")
 			// The browser asks for Italian, which every case's email ignores.
 			ctx := i18n.WithLocale(req.Context(), false, "it")
@@ -554,7 +554,7 @@ func TestHandleForgotPasswordPost_SendsNothingUnlessTheAccountIsVerifiedAndEnabl
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 
-			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 			req := forgotPasswordRequest(email)
 			rr := httptest.NewRecorder()
 
@@ -570,7 +570,7 @@ func TestHandleForgotPasswordPost_SendsNothingUnlessTheAccountIsVerifiedAndEnabl
 			jobs.runAll(t, afterresponse.ClassRecovery)
 
 			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, map[string]interface{}{"linkSent": true, "email": email, "ceremonyId": ""}, *bound,
+			assert.Equal(t, map[string]interface{}{"linkSent": true, "email": email, "ceremonyId": "", "adminConsoleBaseUrl": testAdminConsoleBaseURL}, *bound,
 				"the page must be exactly the one an address with no account gets")
 			assert.Equal(t, tc.wantAudit, *details)
 
@@ -611,7 +611,7 @@ func TestHandleForgotPasswordPost_AnswersAfterTheLookupAlone(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 
-			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 			req := forgotPasswordRequest(email)
 			rr := httptest.NewRecorder()
 
@@ -621,7 +621,7 @@ func TestHandleForgotPasswordPost_AnswersAfterTheLookupAlone(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, map[string]interface{}{"linkSent": true, "email": email, "ceremonyId": ""}, *bound)
+			assert.Equal(t, map[string]interface{}{"linkSent": true, "email": email, "ceremonyId": "", "adminConsoleBaseUrl": testAdminConsoleBaseURL}, *bound)
 			pageRenderer.AssertExpectations(t)
 			database.AssertExpectations(t)
 
@@ -678,7 +678,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
-		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 		req := forgotPasswordRequest("Not-An-Address")
 		rr := httptest.NewRecorder()
 
@@ -707,7 +707,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
-		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 		req := forgotPasswordRequest("SomeOne@Example.COM")
 		rr := httptest.NewRecorder()
 
@@ -757,7 +757,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		jobs := &heldJobs{}
 
-		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+		handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 		req := forgotPasswordRequest("someone@example.com")
 		rr := httptest.NewRecorder()
 
@@ -775,7 +775,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		jobs.runAll(t, afterresponse.ClassRecovery)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, map[string]interface{}{"linkSent": true, "email": "someone@example.com", "ceremonyId": ""}, *bound, "the requester is told a link was sent")
+		assert.Equal(t, map[string]interface{}{"linkSent": true, "email": "someone@example.com", "ceremonyId": "", "adminConsoleBaseUrl": testAdminConsoleBaseURL}, *bound, "the requester is told a link was sent")
 		assert.Equal(t, "code_issued", (*details)["outcome"])
 		pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 		assertOneErrorRecordOnTheRequest(t, capture)
@@ -851,7 +851,7 @@ func TestHandleForgotPasswordPost_TheLinkNamesTheSignInThePageNamed(t *testing.T
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 
-			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL)
+			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 			req := forgotPasswordRequest("existing@example.com")
 			req.URL.RawQuery = strings.TrimPrefix(tc.query, "?")
 			rr := httptest.NewRecorder()

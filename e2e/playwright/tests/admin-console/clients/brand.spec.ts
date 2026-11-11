@@ -64,6 +64,9 @@ test("a client given a brand on its Settings tab has its sign-in, forgot-passwor
     await own.page.goto(`${env.authUrl}/forgot-password`);
     await expect(own.page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
     await expectDrawnInSeededDefault(own.page, seeded.id);
+    // Its sign-in link leads to the console's account page: a bare password step would be refused
+    // as no longer active while this browser holds the client's sign-in.
+    await expect(own.page.getByRole("link", { name: "Sign in to your account", exact: true })).toHaveAttribute("href", `${env.adminUrl}/account/profile`);
     await own.context.close();
 
     // Another client's sign-in keeps the default.

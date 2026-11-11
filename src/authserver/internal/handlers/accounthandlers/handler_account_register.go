@@ -86,8 +86,10 @@ func RefuseUnavailableRegistration(pageRenderer PageRenderer) func(http.Handler)
 // It is only ever echoed into a link, and never checked against a stored ceremony here, so a value
 // that is not an id is dropped and not repeated into the page, whatever the visitor put in the query:
 // a length and an alphabet that need no escaping and leave no room to smuggle a URL through. Empty
-// means the page was reached from anywhere else, an emailed link or a bookmark, and its "Sign in" link
-// stays bare.
+// means the page was reached from anywhere else, an emailed link or a bookmark, and its sign-in link
+// leads to the admin console's account page, which starts the console's own sign-in, rather than a
+// bare /auth/pwd: in a browser holding any other sign-in, an app's open in another tab, that is
+// refused as no longer active and audited as a ceremony mismatch (#812).
 func registrationCeremonyId(r *http.Request) string {
 	id := r.URL.Query().Get(ceremony.QueryParameter)
 	if !ceremony.IsWellFormedId(id) {
@@ -183,6 +185,7 @@ func HandleRegisterGet(
 	pageRenderer PageRenderer,
 	ceremonies registrationCeremonies,
 	legalDocuments registrationLegalDocuments,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +196,7 @@ func HandleRegisterGet(
 			return
 		}
 
-		renderRegisterForm(w, r, pageRenderer, ceremonies, legalDocuments, settings, "", "", "")
+		renderRegisterForm(w, r, pageRenderer, ceremonies, legalDocuments, adminConsoleBaseURL, settings, "", "", "")
 	}
 }
 
@@ -202,16 +205,18 @@ func HandleRegisterGet(
 // action="", so the URL the visitor arrived at, ceremony parameter included, is the one a
 // submission has, and a redrawn form carries the id on. Every render of the form, its first and
 // each beside a refusal, carries a fresh Turnstile widget while the challenge is on (#642 decision
-// 2); the pages answering a registration, which have no form, carry none.
+// 2); the pages answering a registration, which have no form, carry none. adminConsoleBaseURL is for
+// the form's Sign in link when its URL names no sign-in (registrationCeremonyId).
 func renderRegisterForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
 	ceremonies registrationCeremonies, legalDocuments registrationLegalDocuments,
-	settings *record.Settings, email, refusal, field string) {
+	adminConsoleBaseURL string, settings *record.Settings, email, refusal, field string) {
 
 	bind := map[string]interface{}{
 		"email":                     email,
 		"error":                     refusal,
 		"errorField":                field,
 		"ceremonyId":                registrationCeremonyId(r),
+		"adminConsoleBaseUrl":       adminConsoleBaseURL,
 		"requiresEmailVerification": registrationRequiresEmailVerification(settings),
 		"passwordRules":             passwordRulesHint(r),
 	}
@@ -367,7 +372,7 @@ func HandleRegisterPost(
 
 		// renderError redraws the form with message, marking the field it names invalid.
 		renderError := func(field, message string) {
-			renderRegisterForm(w, r, pageRenderer, ceremonies, legalDocuments, settings, email, message, field)
+			renderRegisterForm(w, r, pageRenderer, ceremonies, legalDocuments, adminConsoleBaseURL, settings, email, message, field)
 		}
 
 		// refuseAddress redraws the form for an address the format or length check refused.

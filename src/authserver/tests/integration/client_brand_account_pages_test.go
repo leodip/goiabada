@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -20,7 +19,9 @@ import (
 // while their URL names that sign-in and the browser still holds it. A URL naming a sign-in the
 // browser does not hold, a malformed id, or none draws the page in the default brand, and is never
 // an error there (#812 decision 4). The forgot-password page links back to the sign-in it names
-// (decision 8).
+// (decision 8), and the registration page's Sign in does the same. A page naming none links to the
+// console's account page, which starts the console's own sign-in, where a bare /auth/pwd would be
+// refused as no longer active in the browser holding the app's sign-in.
 //
 // Each test makes a dark Plum brand the default and gives the app a light Avocado brand, as the
 // sign-in pages' tests do.
@@ -43,16 +44,22 @@ func forgotPasswordLink(t *testing.T, browser *http.Client, authorizeURL string)
 	return appConfig.AuthServer.BaseURL + href, ceremonyId
 }
 
-// backToSignInHref answers the href of the page's Back to sign in link, which it must have once.
-func backToSignInHref(t *testing.T, resp *http.Response) string {
+// signInLink is the link under a page's form that goes back to signing in: what it says and where
+// it leads.
+type signInLink struct{ Text, Href string }
+
+// signInLinkOf answers the page's one link under its form.
+func signInLinkOf(t *testing.T, resp *http.Response) signInLink {
 	t.Helper()
-	page := parseHTMLResponse(t, resp)
-	links := page.Find(`a.text-link`).FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return strings.TrimSpace(s.Text()) == "Back to sign in"
-	})
-	require.Equal(t, 1, links.Length(), "the page links Back to sign in once")
+	links := parseHTMLResponse(t, resp).Find(`.auth-footer a.text-link`)
+	require.Equal(t, 1, links.Length(), "the page has one link under its form")
 	href, _ := links.Attr("href")
-	return href
+	return signInLink{Text: strings.TrimSpace(links.Text()), Href: href}
+}
+
+// consoleAccountPage is where a page naming no sign-in sends a person to sign in.
+func consoleAccountPage() string {
+	return appConfig.AdminConsole.BaseURL + "/account/profile"
 }
 
 // peekBody reads resp's body and puts it back, so the page can still be parsed after.
@@ -81,14 +88,15 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 	client, clientBrand, redirectURI := brandedSignInClient(t, record.AcrLevel1)
 	browser := createHttpClient(t)
 	forgotURL, ceremonyId := forgotPasswordLink(t, browser, brandAuthorizeURL(client, redirectURI, ""))
-	wantBack := "/auth/pwd?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	wantBack := signInLink{"Back to sign in", "/auth/pwd?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()}
+	wantAccount := signInLink{"Sign in to your account", consoleAccountPage()}
 
 	t.Run("the form", func(t *testing.T) {
 		page := loadPage(t, browser, forgotURL)
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, clientBrand, "light")
-		assert.Equal(t, wantBack, backToSignInHref(t, page),
+		assert.Equal(t, wantBack, signInLinkOf(t, page),
 			"Back to sign in leads to the sign-in's password step")
 	})
 
@@ -106,7 +114,7 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 		body := peekBody(t, resp)
 		require.Contains(t, body, "Check your email")
 		assertDrawnInBrand(t, resp, clientBrand, "light")
-		assert.Equal(t, wantBack, backToSignInHref(t, resp))
+		assert.Equal(t, wantBack, signInLinkOf(t, resp))
 	})
 
 	t.Run("the same link in another browser", func(t *testing.T) {
@@ -114,7 +122,7 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
-		assert.Equal(t, wantBack, backToSignInHref(t, page),
+		assert.Equal(t, wantBack, signInLinkOf(t, page),
 			"the link still names the sign-in, which it echoes without reading it")
 	})
 
@@ -130,7 +138,7 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
-		assert.Equal(t, "/auth/pwd", backToSignInHref(t, page),
+		assert.Equal(t, wantAccount, signInLinkOf(t, page),
 			"an id of the wrong shape is not echoed")
 	})
 
@@ -139,8 +147,8 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
-		assert.Equal(t, "/auth/pwd", backToSignInHref(t, page),
-			"a page naming no sign-in shows the link bare")
+		assert.Equal(t, wantAccount, signInLinkOf(t, page),
+			"a page naming no sign-in, in a browser holding one, links to the console's account page")
 	})
 
 	t.Run("the link sent page naming no sign-in", func(t *testing.T) {
@@ -149,7 +157,7 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		assertDrawnInBrand(t, resp, defaultBrand, "dark")
-		assert.Equal(t, "/auth/pwd", backToSignInHref(t, resp))
+		assert.Equal(t, wantAccount, signInLinkOf(t, resp))
 	})
 }
 
@@ -160,12 +168,15 @@ func TestRegistrationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *t
 	clientBrand := giveClientBrand(t, f.client, record.BrandAppearanceLight, "avocado")
 	browser := createHttpClient(t)
 	registerURL, ceremonyId := f.createAnAccountLink(t, browser)
+	wantBack := signInLink{"Sign in", "/auth/pwd?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()}
+	wantAccount := signInLink{"Sign in", consoleAccountPage()}
 
 	t.Run("the form", func(t *testing.T) {
 		page := loadPage(t, browser, registerURL)
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, clientBrand, "light")
+		assert.Equal(t, wantBack, signInLinkOf(t, page), "Sign in leads to the sign-in's password step")
 	})
 
 	t.Run("the form refusing a submission", func(t *testing.T) {
@@ -196,6 +207,7 @@ func TestRegistrationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *t
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
+		assert.Equal(t, wantAccount, signInLinkOf(t, page), "an id of the wrong shape is not echoed")
 	})
 
 	t.Run("no sign-in named", func(t *testing.T) {
@@ -203,6 +215,8 @@ func TestRegistrationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *t
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
+		assert.Equal(t, wantAccount, signInLinkOf(t, page),
+			"a page naming no sign-in, in a browser holding one, links to the console's account page")
 	})
 }
 

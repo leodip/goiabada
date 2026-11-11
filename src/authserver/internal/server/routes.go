@@ -127,10 +127,10 @@ func (s *Server) initRoutes(branches appBranches) {
 	linkedSignInPageClient := middleware.LinkedSignInPageClient(ceremonyStore)
 	// The email check runs ahead of the limiter, so a request refused for email being off spends
 	// no budget and is never answered 429 (#542).
-	pages.With(linkedSignInPageClient, accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper))
+	pages.With(linkedSignInPageClient, accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper, adminConsoleBaseURL))
 	// The Turnstile challenge after the email check and ahead of the limiter, while it is on: a
 	// submission without a verified token is refused before any tier counts it (#642 decision 5).
-	pages.With(linkedSignInPageClient, accounthandlers.ForgotPasswordRequiresEmail(httpHelper), accounthandlers.RequireForgotPasswordChallenge(httpHelper, s.challengeVerifier), rateLimiter.LimitForgotPwd).Post(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL))
+	pages.With(linkedSignInPageClient, accounthandlers.ForgotPasswordRequiresEmail(httpHelper), accounthandlers.RequireForgotPasswordChallenge(httpHelper, s.challengeVerifier, adminConsoleBaseURL), rateLimiter.LimitForgotPwd).Post(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	// The two endpoints an emailed link points at register from the constants the links are
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
 	pages.With(linkedSignInPageClient, rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
@@ -239,9 +239,9 @@ func (s *Server) initRoutes(branches appBranches) {
 		// submission spends no budget (#526 decision 2). The POST alone is limited: the GET renders
 		// a static form, while the POST probes whether an address already has an account, sends
 		// mail to it and writes a row.
-		r.With(linkedSignInPageClient, accounthandlers.RefuseUnavailableRegistration(httpHelper)).Get("/register", accounthandlers.HandleRegisterGet(httpHelper, ceremonyStore, legalDocuments))
+		r.With(linkedSignInPageClient, accounthandlers.RefuseUnavailableRegistration(httpHelper)).Get("/register", accounthandlers.HandleRegisterGet(httpHelper, ceremonyStore, legalDocuments, adminConsoleBaseURL))
 		// The Turnstile challenge sits between the two, while it is on, as on forgot-password (#642).
-		r.With(linkedSignInPageClient, accounthandlers.RefuseUnavailableRegistration(httpHelper), accounthandlers.RequireRegistrationChallenge(httpHelper, ceremonyStore, legalDocuments, s.challengeVerifier), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, ceremonyStore, legalDocuments, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
+		r.With(linkedSignInPageClient, accounthandlers.RefuseUnavailableRegistration(httpHelper), accounthandlers.RequireRegistrationChallenge(httpHelper, ceremonyStore, legalDocuments, s.challengeVerifier, adminConsoleBaseURL), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, ceremonyStore, legalDocuments, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	})
 	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
 	pages.With(linkedSignInPageClient, rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
