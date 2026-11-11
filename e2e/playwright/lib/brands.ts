@@ -4,9 +4,11 @@
 // the console's own client's brand changes what the whole instance looks like, so the tests doing it
 // are *.system.ts files, and put back what they found (withDefaultBrandRestored). A brand that is not
 // the default, given to a client of a test's own, changes only that client's pages (withBrand).
-import { expect, type Locator, type Page } from "@playwright/test";
-import { confirmDialog } from "./admin-console";
+import { type APIRequestContext, expect, type Locator, type Page } from "@playwright/test";
+import { confirmDialog, grantClientPermission, readClientSecret } from "./admin-console";
 import { env } from "./environment";
+import type { TestClient } from "./fixtures";
+import { clientCredentialsToken } from "./oauth";
 import { uniqueIdentifier } from "./unique";
 
 export const brandingPath = "/admin/settings/branding";
@@ -282,16 +284,133 @@ export async function pageBackgrounds(page: Page): Promise<{ onLight: string; on
   return { onLight, onDark };
 }
 
-// The brand a page of the auth server or the console names in its head: the id in the brand
-// stylesheet it links (/brand/7/stylesheet.css), or null when it links none.
-export function pageStylesheetBrand(page: Page): Promise<number | null> {
+// The brand stylesheets a page links, in order: each one's brand, and whether it is the full one
+// (/brand/7/stylesheet.css), which the auth server's pages and the console's end-user pages link, or
+// the colors-only one (/brand/7/colors.css), which the console's admin pages link (#813 decision 9).
+export interface LinkedBrandStylesheet {
+  brandId: number;
+  kind: "full" | "colors";
+}
+
+export function pageBrandStylesheets(page: Page): Promise<LinkedBrandStylesheet[]> {
   return page.evaluate(() => {
+    const linked: { brandId: number; kind: "full" | "colors" }[] = [];
     for (const link of Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))) {
-      const match = new URL(link.href, document.baseURI).pathname.match(/^\/brand\/(\d+)\/stylesheet\.css$/);
-      if (match) return Number(match[1]);
+      const match = new URL(link.href, document.baseURI).pathname.match(/^\/brand\/(\d+)\/(stylesheet|colors)\.css$/);
+      if (match) linked.push({ brandId: Number(match[1]), kind: match[2] === "colors" ? "colors" : "full" });
     }
-    return null;
+    return linked;
   });
+}
+
+// The brand a page of the auth server or the console names in its head: the brand of the one brand
+// stylesheet it links, full or colors-only, or null when it links none.
+export async function pageStylesheetBrand(page: Page): Promise<number | null> {
+  const linked = await pageBrandStylesheets(page);
+  expect(linked.length, "a page links one brand stylesheet at most").toBeLessThanOrEqual(1);
+  return linked[0]?.brandId ?? null;
+}
+
+// The icons a page links, each as "rel href" with the href absolute, in order.
+export function pageIcons(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="apple-touch-icon"], link[rel="manifest"]'),
+      (link) => `${link.rel} ${link.href}`,
+    ),
+  );
+}
+
+// Goiabada's own icons and web manifest, as a page of the origin named links them.
+export function goiabadaIcons(origin: string): string[] {
+  return [
+    `icon ${origin}/static/favicon/favicon.ico`,
+    `apple-touch-icon ${origin}/static/favicon/apple-touch-icon.png`,
+    `icon ${origin}/static/favicon/favicon-32x32.png`,
+    `icon ${origin}/static/favicon/favicon-16x16.png`,
+    `manifest ${origin}/static/favicon/site.webmanifest`,
+  ];
+}
+
+// A brand's favicon, as a page links it in place of Goiabada's icons: the one stored image, as its
+// icon and its Apple touch icon (#813 decision 4).
+export function brandFaviconIcons(faviconUrl: string): string[] {
+  return [`icon ${faviconUrl}`, `apple-touch-icon ${faviconUrl}`];
+}
+
+// A brand's kit set through the Admin API, as the brand editor cannot set it yet: a file is uploaded
+// as a brand asset of its kind, then named in the brand's slot (#813 decision 1). The caller is a
+// client of the test's own holding authserver:manage-settings.
+export interface UploadedBrandAsset {
+  id: number;
+  url: string;
+}
+
+export interface BrandKit {
+  logo?: UploadedBrandAsset;
+  darkLogo?: UploadedBrandAsset;
+  favicon?: UploadedBrandAsset;
+  hideAppName?: boolean;
+}
+
+export async function brandKitToken(
+  page: Page,
+  request: APIRequestContext,
+  clients: { create(options: { authorizationCode: boolean; clientCredentials: boolean }): Promise<TestClient> },
+): Promise<string> {
+  const caller = await clients.create({ authorizationCode: false, clientCredentials: true });
+  await grantClientPermission(page, caller.id, "authserver", "manage-settings");
+  const token = await clientCredentialsToken(request, caller.identifier, await readClientSecret(page, caller.id), "authserver:manage-settings");
+  expect(token.status, JSON.stringify(token.body)).toBe(200);
+  return String(token.body.access_token);
+}
+
+// Uploads a PNG as a brand asset of the kind named, and answers its id and URL.
+export async function uploadBrandAsset(
+  request: APIRequestContext,
+  token: string,
+  kind: "logo" | "favicon",
+  png: Buffer,
+): Promise<UploadedBrandAsset> {
+  const response = await request.post(`${env.authUrl}/api/v1/admin/brand-assets/${kind}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    multipart: { file: { name: `${kind}.png`, mimeType: "image/png", buffer: png } },
+    failOnStatusCode: false,
+  });
+  expect(response.status(), await response.text()).toBe(201);
+  const { brandAsset } = await response.json();
+  return { id: brandAsset.id, url: brandAsset.url };
+}
+
+// Writes a brand's logo, dark logo, favicon and switch as kit has them, an absent one empty or off,
+// and keeps the rest of the brand as it is stored.
+export async function setBrandKit(request: APIRequestContext, token: string, brandId: number, kit: BrandKit) {
+  const url = `${env.authUrl}/api/v1/admin/brands/${brandId}`;
+  const headers = { Authorization: `Bearer ${token}` };
+  const read = await request.get(url, { headers, failOnStatusCode: false });
+  expect(read.status(), await read.text()).toBe(200);
+  const { brand } = await read.json();
+  const slot = (asset?: { id: number } | null) => (asset ? { id: asset.id } : null);
+  const written = await request.put(url, {
+    headers,
+    data: {
+      name: brand.name,
+      appearance: brand.appearance,
+      theme: brand.theme,
+      corners: brand.corners,
+      font: brand.font,
+      backgroundFit: brand.backgroundFit,
+      hideAppName: kit.hideAppName ?? false,
+      logo: slot(kit.logo),
+      darkLogo: slot(kit.darkLogo),
+      favicon: slot(kit.favicon),
+      background: slot(brand.background),
+      regularFont: slot(brand.regularFont),
+      boldFont: slot(brand.boldFont),
+    },
+    failOnStatusCode: false,
+  });
+  expect(written.status(), await written.text()).toBe(200);
 }
 
 // A page drawn in Plum on Dark, the brand the client tests give a client: it links that brand's

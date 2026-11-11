@@ -11,11 +11,18 @@
   {{- with .brandStylesheet }}
   <link rel="stylesheet" href="{{ . }}">
   {{- end }}
+  {{- /* A brand's favicon is linked as the one stored image, in place of Goiabada's icons and web
+       manifest; an admin page has none bound, and keeps Goiabada's (#813 decisions 4 and 9). */}}
+  {{- with .brandFavicon }}
+  <link rel="icon" type="image/png" href="{{ . }}">
+  <link rel="apple-touch-icon" href="{{ . }}">
+  {{- else }}
   <link rel="icon" href="/static/favicon/favicon.ico">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
   <link rel="manifest" href="/static/favicon/site.webmanifest">
+  {{- end }}
   <script type="application/json" id="js-i18n">{{ JSBootstrap $.ctx }}</script>
   <script src="{{ asset "/static/utils.js" }}" defer></script>
   <script src="{{ asset "/static/shell.js" }}" defer></script>
@@ -36,7 +43,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg>
           <span class="sr-only">{{ T $.ctx "adminconsole.layout.open_menu" }}</span>
         </button>
-        <a class="app-header-brand" href="/">{{ .appName }}</a>
+        <a class="app-header-brand" href="/">{{ template "brand_home_link" . }}</a>
         {{ if .loggedInUser }}
         <div class="app-header-end user-menu">
           <button type="button" class="user-menu-button" aria-expanded="false" aria-controls="user-menu-panel" data-user-menu-button>

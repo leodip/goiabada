@@ -1890,12 +1890,31 @@
     background-color: var(--color-surface);
   }
   .app-header-brand {
+    display: flex;
     min-width: 0;
-    overflow: hidden;
+    align-items: center;
+    gap: 0.5rem;
     font-weight: 650;
-    text-overflow: ellipsis;
     white-space: nowrap;
     text-decoration: none;
+  }
+  .app-header-brand .app-brand-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .app-brand-logo {
+    display: flex;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .app-brand-logo img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(10rem, 100%);
+    max-height: 2rem;
+    object-fit: contain;
   }
   .app-header-end {
     margin-left: auto;
@@ -1953,11 +1972,17 @@
     border-bottom: 1px solid var(--color-line);
   }
   .sidebar-brand {
+    display: flex;
     min-width: 0;
+    align-items: center;
+    gap: 0.5rem;
     overflow-wrap: anywhere;
     font-size: 1.0625rem;
     font-weight: 700;
     text-decoration: none;
+  }
+  .sidebar-brand .app-brand-name {
+    min-width: 0;
   }
   .sidebar-nav {
     flex: 1;

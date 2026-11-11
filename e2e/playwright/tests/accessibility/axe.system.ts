@@ -1,8 +1,10 @@
 // axe-core over the states only a change to the settings reaches (axe-check.ts): each settings page
 // saved and refused, the Branding pages among them, the confirmations their saves ask, the audit log while no event is stored, and
-// self-registration's pages. Runs alone, and each test puts back what it changes (lib/settings.ts).
+// self-registration's pages, and the console drawn in a brand with a logo (#813): its header and its
+// cards, with the app name shown and hidden. Runs alone, and each test puts back what it changes
+// (lib/settings.ts).
 import { randomBytes } from "node:crypto";
-import { deleteUser, idFromListLink, publishLegalDocument, setLegalDocumentApps } from "../../lib/admin-console";
+import { clientIdFromList, deleteUser, idFromListLink, publishLegalDocument, setClientBrand, setLegalDocumentApps } from "../../lib/admin-console";
 import { openSignIn, submitPassword } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
@@ -10,7 +12,21 @@ import { linksIn, waitForMail } from "../../lib/mailpit";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 import { uniqueIdentifier } from "../../lib/unique";
 import { asks, at, checkStates, refused, saved, titled, withBrandPreview, type State } from "../../lib/axe";
-import { brandUrl, createBrand, defaultBrand, deleteBrand, newBrandUrl, withDefaultBrandRestored } from "../../lib/brands";
+import {
+  brandKitToken,
+  brandUrl,
+  brandingUrl,
+  createBrand,
+  defaultBrand,
+  deleteBrand,
+  newBrandUrl,
+  saveBrand,
+  setBrandKit,
+  uploadBrandAsset,
+  withBrand,
+  withDefaultBrandRestored,
+} from "../../lib/brands";
+import { solidPng } from "../../lib/images";
 import { browserSignInClient } from "../../lib/test-clients";
 
 test.describe.configure({ timeout: 300_000 });
@@ -135,6 +151,48 @@ test("the settings pages saved, refused, and asking first", async ({ page }) => 
   // keys.system.ts, once its rotation has made one.
   await page.goto(settings("keys"));
   await checkStates(page, [asks(page, "signing keys, a rotation asking first", () => page.locator("#btnRotate").click())]);
+});
+
+// The console's own client given an automatic brand with a logo and a dark logo: an admin page's and
+// an Account page's header, and home's card, with the logo beside the app name and in its place. The
+// client is put back on the default brand.
+test("the console's header and cards with its brand's logo", async ({ page, request, clients }) => {
+  const token = await brandKitToken(page, request, clients);
+  const consoleClient = await clientIdFromList(page, "admin-console-client");
+  const sidebarLogo = page.locator("a.sidebar-brand img");
+  const cardLogo = page.locator(".auth-card .auth-logo img");
+
+  await withBrand(page, { appearance: "auto", theme: "blueberry" }, async (brand) => {
+    const logo = await uploadBrandAsset(request, token, "logo", solidPng(200, 50, [30, 60, 160]));
+    const darkLogo = await uploadBrandAsset(request, token, "logo", solidPng(200, 50, [220, 230, 250]));
+    await setBrandKit(request, token, brand.id, { logo, darkLogo });
+    try {
+      await setClientBrand(page, consoleClient, brand);
+      const withLogo = (name: string, url: string, image: typeof cardLogo) => ({
+        name,
+        reach: async () => {
+          await page.goto(url);
+          await expect(image).toBeVisible();
+        },
+      });
+      await checkStates(page, [
+        withLogo("an admin page's header with the brand's logo", brandingUrl, sidebarLogo),
+        withLogo("an Account page's header with the brand's logo", `${env.adminUrl}/account/profile`, sidebarLogo),
+        withLogo("the console's home card with the brand's logo", `${env.adminUrl}/`, cardLogo),
+      ]);
+
+      // The name hidden, saved as it stands in the editor so every console page is drawn again.
+      await setBrandKit(request, token, brand.id, { logo, darkLogo, hideAppName: true });
+      await saveBrand(page, brand.id, {});
+      await checkStates(page, [
+        withLogo("an admin page's header with the logo in the name's place", brandingUrl, sidebarLogo),
+        withLogo("an Account page's header with the logo in the name's place", `${env.adminUrl}/account/profile`, sidebarLogo),
+        withLogo("the console's home card with the logo in the name's place", `${env.adminUrl}/`, cardLogo),
+      ]);
+    } finally {
+      await setClientBrand(page, consoleClient, "default");
+    }
+  });
 });
 
 test("the audit log while no event is stored", async ({ page }) => {

@@ -1,7 +1,10 @@
 // A client's brand, chosen on its Settings tab under Sign-in and consent pages (#812): the client's
 // sign-in, forgot-password and sign-out pages are drawn in it, while another client's sign-in keeps the
 // default brand. Deleting the brand says how many clients use it, and moves them back to the default.
-// The brand is not the default and the clients are the test's own, so no other page changes.
+// The brand is not the default and the clients are the test's own, so no other page changes. The
+// console's own pages, in the brand it is drawn in as the run finds it, link the brand's colors-only
+// stylesheet on its admin pages and the full one on its end-user pages (#813); the kit drawn on them,
+// which changes every console page, is brand.system.ts's.
 import type { Browser } from "@playwright/test";
 import { clientBrandChoice, clientBrandSelect, setClientBrand } from "../../../lib/admin-console";
 import {
@@ -12,7 +15,10 @@ import {
   deleteBrand,
   expectDrawnInPlumDark,
   expectDrawnInSeededDefault,
+  goiabadaIcons,
   listBrands,
+  pageBrandStylesheets,
+  pageIcons,
   withBrand,
 } from "../../../lib/brands";
 import { openSignIn } from "../../../lib/browser-sign-in";
@@ -133,4 +139,37 @@ test("deleting a brand a client uses says so, and puts the client back on the de
     await expectDrawnInSeededDefault(signIn.page, seeded.id);
     await signIn.context.close();
   });
+});
+
+test("the console's admin pages link its brand's colors-only stylesheet and Goiabada's icons, and its end-user pages the full stylesheet", async ({
+  page,
+}) => {
+  // The console is drawn in the default brand, as the baseline leaves its own client, and the seeded
+  // default has no favicon, so every page keeps Goiabada's icons.
+  const seeded = await defaultBrand(page);
+  const consoleIcons = goiabadaIcons(new URL(env.adminUrl).origin);
+
+  // An admin page, one drawn with the admin menu: the brand's colors and nothing else of its kit.
+  for (const path of ["/admin/clients", "/admin/settings/branding"]) {
+    await page.goto(`${env.adminUrl}${path}`);
+    await expect(page.getByRole("navigation", { name: "Admin", exact: true })).toBeVisible();
+    expect(await pageBrandStylesheets(page), path).toEqual([{ brandId: seeded.id, kind: "colors" }]);
+    expect(await pageIcons(page), path).toEqual(consoleIcons);
+  }
+
+  // The end-user pages: an Account page, home, and an error answered for an admin URL, a card page.
+  await page.goto(`${env.adminUrl}/account/profile`);
+  await expect(page.getByRole("navigation", { name: "Account", exact: true })).toBeVisible();
+  expect(await pageBrandStylesheets(page), "an Account page").toEqual([{ brandId: seeded.id, kind: "full" }]);
+  expect(await pageIcons(page), "an Account page").toEqual(consoleIcons);
+
+  await page.goto(`${env.adminUrl}/`);
+  await expect(page.locator(".auth-card")).toBeVisible();
+  expect(await pageBrandStylesheets(page), "home").toEqual([{ brandId: seeded.id, kind: "full" }]);
+
+  const missing = await page.goto(`${env.adminUrl}/admin/clients/999999999/settings`);
+  expect(missing?.status()).toBe(404);
+  await expect(page.locator(".auth-card")).toBeVisible();
+  expect(await pageBrandStylesheets(page), "an error page at an admin URL").toEqual([{ brandId: seeded.id, kind: "full" }]);
+  expect(await pageIcons(page), "an error page at an admin URL").toEqual(consoleIcons);
 });

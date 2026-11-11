@@ -11,11 +11,18 @@
   {{- with .brandStylesheet }}
   <link rel="stylesheet" href="{{ . }}">
   {{- end }}
+  {{- /* A brand's favicon is linked as the one stored image, in place of Goiabada's icons and web
+       manifest (#813 decision 4). */}}
+  {{- with .brandFavicon }}
+  <link rel="icon" type="image/png" href="{{ . }}">
+  <link rel="apple-touch-icon" href="{{ . }}">
+  {{- else }}
   <link rel="icon" href="/static/favicon/favicon.ico">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
   <link rel="manifest" href="/static/favicon/site.webmanifest">
+  {{- end }}
   <script type="application/json" id="js-i18n">{{ JSBootstrap $.ctx }}</script>
   <script src="{{ asset "/static/utils.js" }}" defer></script>
   {{ template "head" . }}
@@ -25,7 +32,14 @@
   <main id="main" class="auth-page">
     <div class="panel auth-card">
       <div class="panel-body">
+        {{- /* The brand's logo sits above the app name, or in its place while the switch hides it
+             (#813 decision 5). */}}
+        {{- if .brandLogo }}
+        <div class="auth-logo">{{ if .brandHideAppName }}{{ template "brand_logo_named" . }}{{ else }}{{ template "brand_logo" . }}{{ end }}</div>
+        {{- end }}
+        {{- if not .brandHideAppName }}
         <p class="auth-brand">{{ .appName }}</p>
+        {{- end }}
         {{ template "body" . }}
       </div>
     </div>
