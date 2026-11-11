@@ -167,9 +167,12 @@ func TestHandleBrandNewGet_StartsAutomaticOnTheFirstTheme(t *testing.T) {
 	HandleBrandNewGet(httpHelper, newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, "/admin/settings/branding/new", handlertest.WithAccessToken()))
 
+	// A new brand starts as a brand nobody has changed is drawn: rounded, System UI, cover, the name
+	// shown (#813 decision 2).
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, true, bind["isNew"])
-	assert.Equal(t, BrandForm{Appearance: "auto", Theme: "blueberry"}, bind["brand"])
+	assert.Equal(t, BrandForm{Appearance: "auto", Theme: "blueberry", Corners: "rounded", Font: "system-ui",
+		BackgroundFit: "cover", HideAppName: false}, bind["brand"])
 	assert.Equal(t, wantThemeOptions, bind["brandThemes"])
 	assert.Equal(t, wantThemeOptions[0], bind["appearanceTheme"], "the appearance cards show the chosen theme")
 }
@@ -183,19 +186,38 @@ func TestHandleBrandNewPost_CreatesTheBrandAndGoesBackToTheList(t *testing.T) {
 
 	HandleBrandNewPost(httpHelper, apiClient, cache, consoleBaseURL).ServeHTTP(w,
 		handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
-			handlertest.WithForm(url.Values{"name": {"  Spring  "}, "appearance": {"dark"}, "theme": {"plum"}})))
+			handlertest.WithForm(url.Values{"name": {"  Spring  "}, "appearance": {"dark"}, "theme": {"plum"},
+				"corners": {"pill"}, "font": {"neo-grotesque"}, "backgroundFit": {"contain"}, "hideAppName": {"on"}})))
 
-	// The form has no field for the kit's choices yet, so a new brand is sent with the ones a brand
-	// nobody has changed is drawn in (#813 decision 10): rounded, System UI, cover, the name shown.
+	// The kit's four choices are sent as the form holds them (#813 decision 10), the switch on.
 	assert.Equal(t, &api.CreateBrandRequest{Name: "Spring", Appearance: "dark", Theme: "plum",
-		Corners: "rounded", Font: "system-ui", BackgroundFit: "cover", HideAppName: false}, apiClient.created)
+		Corners: "pill", Font: "neo-grotesque", BackgroundFit: "contain", HideAppName: true}, apiClient.created)
 	assert.Equal(t, http.StatusFound, w.Code)
 	assert.Equal(t, "https://console.example.test/admin/settings/branding", w.Header().Get("Location"))
 	assert.Equal(t, 1, cache.invalidations)
 }
 
+// The hide-app-name switch is a checkbox, which a browser leaves out of the form when it is off, so
+// a form without it sends the switch off; the choices are sent exactly as the form holds them, for
+// the admin API to refuse one it does not know.
+func TestHandleBrandNewPost_SendsTheSwitchOffWhenTheFormLeavesItOut(t *testing.T) {
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	apiClient := newBrandingAPI()
+
+	HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+		handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
+			handlertest.WithForm(url.Values{"name": {"Spring"}, "appearance": {"auto"}, "theme": {"plum"},
+				"corners": {"square"}, "font": {"Serif"}, "backgroundFit": {"tile"}})))
+
+	assert.Equal(t, &api.CreateBrandRequest{Name: "Spring", Appearance: "auto", Theme: "plum",
+		Corners: "square", Font: "Serif", BackgroundFit: "tile", HideAppName: false}, apiClient.created)
+}
+
 // Every refusal the admin API answers a brand's save with, and the field the form marks for it:
-// the name for the four about the name, and the appearance and theme choices for theirs.
+// the name for the four about the name, the appearance, theme, corners and background fit choices
+// for theirs, and the font family for an unknown family and for the uploaded font without a regular
+// font file (#813 decision 7).
 var brandRefusals = []struct {
 	code  string
 	field string
@@ -206,6 +228,10 @@ var brandRefusals = []struct {
 	{"handler.brand.name_in_use", "name"},
 	{"handler.brand.appearance_invalid", "appearance"},
 	{"handler.brand.theme_invalid", "theme"},
+	{"handler.brand.corners_invalid", "corners"},
+	{"handler.brand.font_invalid", "font"},
+	{"handler.brand.uploaded_font_regular_required", "font"},
+	{"handler.brand.background_fit_invalid", "backgroundFit"},
 	{"INVALID_REQUEST_BODY", ""},
 }
 
@@ -221,12 +247,14 @@ func TestHandleBrandNewPost_EachRefusalIsShownOnItsField(t *testing.T) {
 
 			HandleBrandNewPost(httpHelper, apiClient, cache, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
-					handlertest.WithForm(url.Values{"name": {"<Spring>"}, "appearance": {"sepia"}, "theme": {"plum"}})))
+					handlertest.WithForm(url.Values{"name": {"<Spring>"}, "appearance": {"sepia"}, "theme": {"plum"},
+						"corners": {"oval"}, "font": {"uploaded"}, "backgroundFit": {"stretch"}, "hideAppName": {"on"}})))
 
 			bind := handlertest.Bind(t, httpHelper)
 			assert.Equal(t, "Not that.", bind["error"])
 			assert.Equal(t, tc.field, bind["errorField"])
-			assert.Equal(t, BrandForm{Name: "<Spring>", Appearance: "sepia", Theme: "plum"}, bind["brand"], "with what was sent")
+			assert.Equal(t, BrandForm{Name: "<Spring>", Appearance: "sepia", Theme: "plum", Corners: "oval", Font: "uploaded",
+				BackgroundFit: "stretch", HideAppName: true}, bind["brand"], "with what was sent")
 			assert.Equal(t, true, bind["isNew"])
 			assert.Equal(t, wantThemeOptions, bind["brandThemes"])
 			assert.Equal(t, wantThemeOptions[1], bind["appearanceTheme"])
@@ -246,7 +274,8 @@ func TestHandleBrandGet_DrawsTheStoredBrand(t *testing.T) {
 
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, false, bind["isNew"])
-	assert.Equal(t, BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum"}, bind["brand"])
+	assert.Equal(t, BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum", Corners: "pill", Font: "serif",
+		BackgroundFit: "tile", HideAppName: true}, bind["brand"], "the stored choices")
 	assert.Equal(t, newBrandingAPI().brands[0], bind["storedBrand"])
 	assert.Equal(t, wantThemeOptions, bind["brandThemes"])
 	assert.Equal(t, wantThemeOptions[1], bind["appearanceTheme"], "the appearance cards show the brand's theme")
@@ -268,10 +297,10 @@ func TestHandleBrandGet_AnUnknownOrMalformedBrandIsNotFound(t *testing.T) {
 	}
 }
 
-// A save of a brand's three fields, and the edit page it lands on, which says it was saved once. The
-// form has no field for the kit's choices or its slots yet, so the brand's stored ones are sent back
-// unchanged, each slot by its asset's id and an empty one as none, as an update replaces every field
-// (#813 decision 10).
+// A save of a brand's fields, and the edit page it lands on, which says it was saved once. The kit's
+// four choices are sent as the form holds them, the switch off as the form leaves it out. The form has
+// no field for the slots yet, so the brand's stored ones are sent back unchanged, each by its asset's
+// id and an empty one as none, as an update replaces every field (#813 decision 10).
 func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	store := newSettingsTestStore()
 	apiClient := newBrandingAPI()
@@ -283,11 +312,12 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	HandleBrandPost(httpHelper, store, apiClient, cache, consoleBaseURL).ServeHTTP(w,
 		handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
 			handlertest.WithPathValue("brandId", "4"),
-			handlertest.WithForm(url.Values{"name": {" Winter "}, "appearance": {"light"}, "theme": {"blueberry"}})))
+			handlertest.WithForm(url.Values{"name": {" Winter "}, "appearance": {"light"}, "theme": {"blueberry"},
+				"corners": {"square"}, "font": {"uploaded"}, "backgroundFit": {"contain"}})))
 
 	assert.Equal(t, int64(4), apiClient.updatedId)
 	assert.Equal(t, &api.UpdateBrandRequest{Name: "Winter", Appearance: "light", Theme: "blueberry",
-		Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true,
+		Corners: "square", Font: "uploaded", BackgroundFit: "contain", HideAppName: false,
 		Logo: &api.BrandAssetRef{Id: 11}, Favicon: &api.BrandAssetRef{Id: 13}, RegularFont: &api.BrandAssetRef{Id: 15}},
 		apiClient.updated)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -312,12 +342,14 @@ func TestHandleBrandPost_EachRefusalIsShownOnItsField(t *testing.T) {
 			HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, cache, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
 					handlertest.WithPathValue("brandId", "4"),
-					handlertest.WithForm(url.Values{"name": {"Default"}, "appearance": {"light"}, "theme": {"guava"}})))
+					handlertest.WithForm(url.Values{"name": {"Default"}, "appearance": {"light"}, "theme": {"guava"},
+						"corners": {"rounded"}, "font": {"geometric"}, "backgroundFit": {"cover"}})))
 
 			bind := handlertest.Bind(t, httpHelper)
 			assert.Equal(t, "Not that.", bind["error"])
 			assert.Equal(t, tc.field, bind["errorField"])
-			assert.Equal(t, BrandForm{Name: "Default", Appearance: "light", Theme: "guava"}, bind["brand"], "with what was sent")
+			assert.Equal(t, BrandForm{Name: "Default", Appearance: "light", Theme: "guava", Corners: "rounded", Font: "geometric",
+				BackgroundFit: "cover"}, bind["brand"], "with what was sent")
 			assert.Equal(t, "Autumn", bind["storedBrand"].(api.BrandResponse).Name, "the title keeps the stored name")
 			assert.Equal(t, false, bind["isNew"])
 			assert.Equal(t, wantThemeOptions, bind["brandThemes"])
@@ -555,6 +587,64 @@ func TestBrandEditor_HandsThePreviewEveryThemesPalettes(t *testing.T) {
 			drawPage(httpHelper)
 
 			encoded, err := json.Marshal(handlertest.Bind(t, httpHelper)["brandThemes"])
+			require.NoError(t, err)
+			assert.JSONEq(t, want, string(encoded))
+		})
+	}
+}
+
+// The brand editor hands its preview script what each corner shape and font family draws, so the
+// sample takes them as they are picked (#813): the radii of square and pill and the font-family list
+// of each family but System UI, the uploaded font's followed by System UI. Rounded and System UI are
+// today's look, the console's own, so they draw nothing. The values are the auth server's stylesheet's,
+// spelt out here.
+func TestBrandEditor_HandsThePreviewWhatEachCornerShapeAndFamilyDraws(t *testing.T) {
+	const want = `{"corners":{` +
+		`"square":{"control":"0","panel":"0"},` +
+		`"pill":{"control":"9999px","panel":"1.5rem"}},` +
+		`"fonts":{` +
+		`"humanist":"Seravek, 'Gill Sans Nova', Ubuntu, Calibri, 'DejaVu Sans', source-sans-pro, sans-serif",` +
+		`"geometric":"Avenir, Montserrat, Corbel, 'URW Gothic', source-sans-pro, sans-serif",` +
+		`"serif":"Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif",` +
+		`"neo-grotesque":"Inter, Roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', Arial, sans-serif",` +
+		`"rounded":"ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, Manjari, 'Arial Rounded MT', 'Arial Rounded MT Bold', Calibri, source-sans-pro, sans-serif",` +
+		`"uploaded":"\"brand-font\", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"}}`
+
+	draw := map[string]func(httpHelper *handlersmocks.HttpHelper){
+		"new form": func(httpHelper *handlersmocks.HttpHelper) {
+			HandleBrandNewGet(httpHelper, newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
+				handlertest.Request(http.MethodGet, "/admin/settings/branding/new", handlertest.WithAccessToken()))
+		},
+		"refused new form": func(httpHelper *handlersmocks.HttpHelper) {
+			apiClient := newBrandingAPI()
+			apiClient.writeErr = refusal("handler.brand.corners_invalid", "Not that.")
+			HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+				handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
+					handlertest.WithForm(url.Values{"name": {"Spring"}, "appearance": {"auto"}, "theme": {"plum"}})))
+		},
+		"stored brand": func(httpHelper *handlersmocks.HttpHelper) {
+			HandleBrandGet(httpHelper, newSettingsTestStore(), newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
+				handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
+					handlertest.WithPathValue("brandId", "4")))
+		},
+		"refused form": func(httpHelper *handlersmocks.HttpHelper) {
+			apiClient := newBrandingAPI()
+			apiClient.writeErr = refusal("handler.brand.font_invalid", "Not that.")
+			HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
+				httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit",
+					handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", "4"),
+					handlertest.WithForm(url.Values{"name": {"Autumn"}, "appearance": {"auto"}, "theme": {"plum"}, "font": {"comic"}})))
+		},
+	}
+	for name, drawPage := range draw {
+		t.Run(name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
+
+			drawPage(httpHelper)
+
+			encoded, err := json.Marshal(handlertest.Bind(t, httpHelper)["brandKitStyles"])
 			require.NoError(t, err)
 			assert.JSONEq(t, want, string(encoded))
 		})

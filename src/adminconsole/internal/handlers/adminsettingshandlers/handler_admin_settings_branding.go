@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/brandkit"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -18,17 +19,18 @@ import (
 // The Branding pages, under /admin/settings/branding (#810): the brands, each with how many clients
 // are drawn in it, one of them the default a client with no brand of its own is drawn in (#812
 // decision 3); a brand created and edited, its appearance and theme chosen on option cards whose
-// swatches are drawn from the auth server's own palettes (GET /brand-themes), made the default, and
-// deleted, its clients moving to the default. Every write drops the cached public settings, whose
-// brand is the console's own client's, which may be the brand written or follow the default.
+// swatches are drawn from the auth server's own palettes (GET /brand-themes), its corners, font
+// family, background fit and the switch hiding the app name chosen beside them (#813), made the
+// default, and deleted, its clients moving to the default. Every write drops the cached public
+// settings, whose brand is the console's own client's, which may be the brand written or follow the
+// default.
 
 // brandingPath is the list, which a creation and a deletion go back to.
 const brandingPath = "/admin/settings/branding"
 
-// The kit's choices a new brand is created with, which draw it as a brand nobody has changed is
-// drawn: rounded corners, the System UI family and a background drawn as cover, the app name shown.
-// The admin API refuses a write that leaves a choice out (#813 decision 10), and the form has no
-// field for them yet.
+// The kit's choices a new brand's form starts with, which draw it as a brand nobody has changed is
+// drawn (#813 decision 2): rounded corners, the System UI family and a background drawn as cover, the
+// app name shown.
 const (
 	newBrandCorners       = "rounded"
 	newBrandFont          = "system-ui"
@@ -44,11 +46,33 @@ type BrandRow struct {
 }
 
 // BrandForm is what the brand form holds: the stored brand, the defaults of a new one, or what was
-// sent when the auth server refused it.
+// sent when the auth server refused it. Corners, Font and BackgroundFit are the kit's choices, by the
+// value a brand stores, and HideAppName the switch hiding the app name beside a logo (#813).
 type BrandForm struct {
-	Name       string
-	Appearance string
-	Theme      string
+	Name          string
+	Appearance    string
+	Theme         string
+	Corners       string
+	Font          string
+	BackgroundFit string
+	HideAppName   bool
+}
+
+// brandCornerShapes and brandFontFamilies are the corner shapes and the font families the form
+// offers, by the value a brand stores.
+var (
+	brandCornerShapes = []string{"square", "rounded", "pill"}
+	brandFontFamilies = []string{"system-ui", "humanist", "geometric", "serif", "neo-grotesque", "rounded", "uploaded"}
+)
+
+// BrandKitStyles is what each corner shape and font family draws, which the editor hands its preview
+// script in a JSON data block so the sample takes them as they are picked (#813): the radii of each
+// shape and the font-family list of each family that sets any, by the value the form sends. They are
+// brandkit's, as the auth server's stylesheet draws them. Rounded and System UI, today's look, are
+// absent, since they set nothing.
+type BrandKitStyles struct {
+	Corners map[string]brandkit.Radii `json:"corners"`
+	Fonts   map[string]string         `json:"fonts"`
 }
 
 // BrandThemeOption is one theme card: the key the form sends, the theme's name in words, and the
@@ -63,14 +87,20 @@ type BrandThemeOption struct {
 }
 
 // brandErrorFields maps the refusals a brand's save can meet to the field each is about: the four
-// about the name to the name, and the appearance and theme choices to theirs.
+// about the name to the name; the appearance, theme, corners and background fit choices to theirs;
+// and an unknown family and the uploaded font without a regular font file to the font family (#813
+// decision 7).
 var brandErrorFields = map[string]string{
-	i18n.ErrCodeBrandNameRequired:      "name",
-	i18n.ErrCodeBrandNameTooLong:       "name",
-	i18n.ErrCodeBrandNameAngleBrackets: "name",
-	i18n.ErrCodeBrandNameInUse:         "name",
-	i18n.ErrCodeBrandAppearanceInvalid: "appearance",
-	i18n.ErrCodeBrandThemeInvalid:      "theme",
+	i18n.ErrCodeBrandNameRequired:                "name",
+	i18n.ErrCodeBrandNameTooLong:                 "name",
+	i18n.ErrCodeBrandNameAngleBrackets:           "name",
+	i18n.ErrCodeBrandNameInUse:                   "name",
+	i18n.ErrCodeBrandAppearanceInvalid:           "appearance",
+	i18n.ErrCodeBrandThemeInvalid:                "theme",
+	i18n.ErrCodeBrandCornersInvalid:              "corners",
+	i18n.ErrCodeBrandFontInvalid:                 "font",
+	i18n.ErrCodeBrandUploadedFontRegularRequired: "font",
+	i18n.ErrCodeBrandBackgroundFitInvalid:        "backgroundFit",
 }
 
 // brandThemeNames are the message IDs of the built-in themes' names, by key. A theme missing here,
@@ -165,13 +195,34 @@ func appearanceTheme(options []BrandThemeOption, key string) BrandThemeOption {
 	return BrandThemeOption{}
 }
 
+// brandKitStyles is what each of the form's corner shapes and font families draws.
+func brandKitStyles() BrandKitStyles {
+	styles := BrandKitStyles{Corners: map[string]brandkit.Radii{}, Fonts: map[string]string{}}
+	for _, corners := range brandCornerShapes {
+		if radii, ok := brandkit.CornerRadii(corners); ok {
+			styles.Corners[corners] = radii
+		}
+	}
+	for _, font := range brandFontFamilies {
+		if stack, ok := brandkit.FontStack(font); ok {
+			styles.Fonts[font] = stack
+		}
+	}
+	return styles
+}
+
 // brandFormFrom reads the brand form: the name trimmed, as the auth server stores it, and the
-// appearance and theme as sent, which the auth server compares exactly.
+// appearance, theme and kit choices as sent, which the auth server compares exactly. The switch is a
+// checkbox, which a browser sends only while it is on.
 func brandFormFrom(r *http.Request) BrandForm {
 	return BrandForm{
-		Name:       strings.TrimSpace(r.PostFormValue("name")),
-		Appearance: r.PostFormValue("appearance"),
-		Theme:      r.PostFormValue("theme"),
+		Name:          strings.TrimSpace(r.PostFormValue("name")),
+		Appearance:    r.PostFormValue("appearance"),
+		Theme:         r.PostFormValue("theme"),
+		Corners:       r.PostFormValue("corners"),
+		Font:          r.PostFormValue("font"),
+		BackgroundFit: r.PostFormValue("backgroundFit"),
+		HideAppName:   r.PostFormValue("hideAppName") == "on",
 	}
 }
 
@@ -195,7 +246,8 @@ func accessTokenFrom(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 	return jwtInfo.TokenResponse.AccessToken, true
 }
 
-// renderBrandForm draws the brand form, new or of a stored brand, with the theme cards.
+// renderBrandForm draws the brand form, new or of a stored brand, with the theme cards, and hands the
+// preview what each theme, corner shape and font family draws.
 func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, form BrandForm,
 	themes []api.BrandThemeResponse, extra map[string]interface{}) {
 
@@ -204,6 +256,7 @@ func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 		"brand":           form,
 		"brandThemes":     options,
 		"appearanceTheme": appearanceTheme(options, form.Theme),
+		"brandKitStyles":  brandKitStyles(),
 	}
 	for key, value := range extra {
 		bind[key] = value
@@ -280,7 +333,7 @@ func HandleBrandNewGet(
 			return
 		}
 
-		form := BrandForm{Appearance: "auto"}
+		form := BrandForm{Appearance: "auto", Corners: newBrandCorners, Font: newBrandFont, BackgroundFit: newBrandBackgroundFit}
 		if len(themes) > 0 {
 			form.Theme = themes[0].Key
 		}
@@ -312,9 +365,10 @@ func HandleBrandNewPost(
 			Name:          form.Name,
 			Appearance:    form.Appearance,
 			Theme:         form.Theme,
-			Corners:       newBrandCorners,
-			Font:          newBrandFont,
-			BackgroundFit: newBrandBackgroundFit,
+			Corners:       form.Corners,
+			Font:          form.Font,
+			BackgroundFit: form.BackgroundFit,
+			HideAppName:   form.HideAppName,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -398,7 +452,8 @@ func HandleBrandGet(
 			}
 		}
 
-		form := BrandForm{Name: brand.Name, Appearance: brand.Appearance, Theme: brand.Theme}
+		form := BrandForm{Name: brand.Name, Appearance: brand.Appearance, Theme: brand.Theme, Corners: brand.Corners,
+			Font: brand.Font, BackgroundFit: brand.BackgroundFit, HideAppName: brand.HideAppName}
 		renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
 			"isNew":             false,
 			"storedBrand":       *brand,
@@ -432,16 +487,16 @@ func HandleBrandPost(
 		}
 
 		// An update replaces every field (#813 decision 10), and the form has no field for the kit's
-		// choices or its slots yet, so the brand's stored ones are sent back unchanged.
+		// slots yet, so the brand's stored ones are sent back unchanged.
 		form := brandFormFrom(r)
 		_, err := apiClient.UpdateBrand(r.Context(), token, id, &api.UpdateBrandRequest{
 			Name:          form.Name,
 			Appearance:    form.Appearance,
 			Theme:         form.Theme,
-			Corners:       brand.Corners,
-			Font:          brand.Font,
-			BackgroundFit: brand.BackgroundFit,
-			HideAppName:   brand.HideAppName,
+			Corners:       form.Corners,
+			Font:          form.Font,
+			BackgroundFit: form.BackgroundFit,
+			HideAppName:   form.HideAppName,
 			Logo:          storedSlot(brand.Logo),
 			DarkLogo:      storedSlot(brand.DarkLogo),
 			Favicon:       storedSlot(brand.Favicon),

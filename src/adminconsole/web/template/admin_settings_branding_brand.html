@@ -113,6 +113,54 @@
         {{ end }}
       </div>
     </fieldset>
+
+    {{/* The kit's choices (#813): the corners and the background fit as radios, the font family as
+         a select, and the switch hiding the app name beside a logo. A refusal about one is marked on
+         it as on the theme cards, and brand-preview.js draws the sample in the corners and the family
+         as they are picked. */}}
+    <fieldset{{ if .error }}{{ if eq .errorField "corners" }} aria-describedby="brand-error"{{ end }}{{ end }}>
+      <legend class="field-label mb-2">{{ T $.ctx "adminconsole.admin_branding.brand.field.corners" }}</legend>
+      <div class="flex flex-wrap gap-x-6 gap-y-2">
+        <label class="choice"><input type="radio" id="corners-square" name="corners" value="square"{{ if eq .brand.Corners "square" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "corners" }} aria-invalid="true" autofocus{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.corners.square" }}</span></label>
+        <label class="choice"><input type="radio" id="corners-rounded" name="corners" value="rounded"{{ if eq .brand.Corners "rounded" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "corners" }} aria-invalid="true"{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.corners.rounded" }}</span></label>
+        <label class="choice"><input type="radio" id="corners-pill" name="corners" value="pill"{{ if eq .brand.Corners "pill" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "corners" }} aria-invalid="true"{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.corners.pill" }}</span></label>
+      </div>
+    </fieldset>
+
+    <div class="field">
+      <label class="field-label" for="font">{{ T $.ctx "adminconsole.admin_branding.brand.field.font" }}</label>
+      <select class="control" id="font" name="font" aria-describedby="{{ if .error }}{{ if eq .errorField "font" }}brand-error {{ end }}{{ end }}fontHint"
+        {{- if .error }}{{ if eq .errorField "font" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <option value="system-ui"{{ if eq .brand.Font "system-ui" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.system_ui" }}</option>
+        <option value="humanist"{{ if eq .brand.Font "humanist" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.humanist" }}</option>
+        <option value="geometric"{{ if eq .brand.Font "geometric" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.geometric" }}</option>
+        <option value="serif"{{ if eq .brand.Font "serif" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.serif" }}</option>
+        <option value="neo-grotesque"{{ if eq .brand.Font "neo-grotesque" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.neo_grotesque" }}</option>
+        <option value="rounded"{{ if eq .brand.Font "rounded" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.rounded" }}</option>
+        <option value="uploaded"{{ if eq .brand.Font "uploaded" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.uploaded" }}</option>
+      </select>
+      <p class="field-hint" id="fontHint">{{ T $.ctx "adminconsole.admin_branding.brand.font_hint" }}</p>
+    </div>
+
+    <fieldset aria-describedby="{{ if .error }}{{ if eq .errorField "backgroundFit" }}brand-error {{ end }}{{ end }}backgroundFitHint">
+      <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_branding.brand.field.background_fit" }}</legend>
+      <p class="field-hint mb-2" id="backgroundFitHint">{{ T $.ctx "adminconsole.admin_branding.brand.background_fit_hint" }}</p>
+      <div class="flex flex-wrap gap-x-6 gap-y-2">
+        <label class="choice"><input type="radio" id="backgroundFit-cover" name="backgroundFit" value="cover"{{ if eq .brand.BackgroundFit "cover" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "backgroundFit" }} aria-invalid="true" autofocus{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.background_fit.cover" }}</span></label>
+        <label class="choice"><input type="radio" id="backgroundFit-contain" name="backgroundFit" value="contain"{{ if eq .brand.BackgroundFit "contain" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "backgroundFit" }} aria-invalid="true"{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.background_fit.contain" }}</span></label>
+        <label class="choice"><input type="radio" id="backgroundFit-tile" name="backgroundFit" value="tile"{{ if eq .brand.BackgroundFit "tile" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "backgroundFit" }} aria-invalid="true"{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.background_fit.tile" }}</span></label>
+      </div>
+    </fieldset>
+
+    <div class="check-list">
+      <label class="check-row" for="hideAppName">
+        <input type="checkbox" id="hideAppName" name="hideAppName" aria-describedby="hideAppNameHint"{{ if .brand.HideAppName }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_branding.brand.field.hide_app_name" }}</span>
+          <span class="field-hint" id="hideAppNameHint">{{ T $.ctx "adminconsole.admin_branding.brand.hide_app_name_hint" }}</span>
+        </span>
+      </label>
+    </div>
   </div>
   <div class="panel-footer">
     <a class="button button-quiet" href="/admin/settings/branding">{{ T $.ctx "common.button.cancel" }}</a>
@@ -153,6 +201,7 @@
 </section>
 </div>
 <script type="application/json" id="brand-palettes">{{ .brandThemes }}</script>
+<script type="application/json" id="brand-kit-styles">{{ .brandKitStyles }}</script>
 {{ if not .isNew }}{{ if not .storedBrand.IsDefault }}
 {{ template "modal_dialog" (args "makeDefault" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_branding.brand.make_default_button") (T $.ctx "adminconsole.admin_branding.brand.make_default_title")) }}
 {{ end }}{{ end }}

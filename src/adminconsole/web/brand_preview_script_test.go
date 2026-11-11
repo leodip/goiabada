@@ -265,6 +265,11 @@ function build(request) {
   if (drawnAppearance !== "auto") { switchAttrs.hidden = ""; }
   const palettes = el("script", { type: "application/json", id: "brand-palettes" });
   palettes.textContent = JSON.stringify(request.palettes);
+  const kitStyles = el("script", { type: "application/json", id: "brand-kit-styles" });
+  kitStyles.textContent = JSON.stringify(request.kitStyles);
+  // The font select: its value is the option the form holds, as a browser answers it.
+  const fontSelect = el("select", { class: "control", id: "font", name: "font", value: request.font },
+    request.fonts.map(function (font) { return el("option", { value: font }); }));
   const html = el("html", { lang: "en" }, [
     el("head"),
     el("body", {}, [el("main", { id: "main" }, [
@@ -277,6 +282,10 @@ function build(request) {
             appearanceCard("dark", ["dark"]),
           ]),
           el("fieldset", {}, request.themeCards.map(themeCard)),
+          el("fieldset", {}, ["square", "rounded", "pill"].map(function (corners) {
+            return el("label", { class: "choice" }, [radio("corners", corners, request.corners === corners)]);
+          })),
+          el("div", { class: "field" }, [fontSelect]),
         ]),
         el("section", { class: "brand-preview" }, [
           el("div", { class: "brand-preview-header" }, [
@@ -297,6 +306,7 @@ function build(request) {
         ]),
       ]),
       palettes,
+      kitStyles,
     ])]),
   ]);
   doc.appendChild(html);
@@ -361,6 +371,14 @@ process.stdin.on("end", function () {
     if (step.do === "load") {
       vm.runInContext(request.script, context, { filename: "brand-preview.js" });
       dispatch(doc, event("DOMContentLoaded", true), doc, win);
+    } else if ((step.do === "pick" || step.do === "restore") && step.name === "font") {
+      // A family chosen in the select, as a person or a browser restoring the form does.
+      const target = doc.getElementById("font");
+      target.setAttribute("value", step.value);
+      if (step.do === "pick") {
+        dispatch(target, event("input", true), doc, win);
+        dispatch(target, event("change", true), doc, win);
+      }
     } else if (step.do === "pick" || step.do === "restore") {
       const target = doc.querySelector("input[name=\"" + step.name + "\"][value=\"" + step.value + "\"]");
       if (!target) { throw new Error("no " + step.name + " radio " + step.value); }
@@ -444,12 +462,32 @@ type previewLook struct {
 }
 
 // previewPage is the editor the stand-in document draws: the theme cards, which are the listed
-// themes' and need not be, the theme checked (none when it is no card's) and the appearance.
+// themes' and need not be, the theme checked (none when it is no card's), the appearance, the corner
+// shape checked (none when it is no radio's) and the family the font select holds.
 type previewPage struct {
 	themeCards []string
 	theme      string
 	appearance string
+	corners    string
+	font       string
 }
+
+// previewKitStyles is what the page hands the script for each corner shape and family, in values no
+// brand draws, so a sample drawn from anything but the data block cannot pass.
+var previewKitStyles = map[string]any{
+	"corners": map[string]map[string]string{
+		"square": {"control": "0", "panel": "0"},
+		"pill":   {"control": "91px", "panel": "17px"},
+	},
+	"fonts": map[string]string{
+		"humanist": "Testhumanist, sans-serif",
+		"serif":    "Testserif, 'Test Serif Two', serif",
+		"uploaded": `"brand-font", Testsystem, sans-serif`,
+	},
+}
+
+// previewFonts are the font select's options, as the page draws them.
+var previewFonts = []string{"system-ui", "humanist", "geometric", "serif", "neo-grotesque", "rounded", "uploaded"}
 
 func runBrandPreview(t *testing.T, page previewPage, steps ...previewStep) []previewLook {
 	t.Helper()
@@ -472,6 +510,10 @@ func runBrandPreview(t *testing.T, page previewPage, steps ...previewStep) []pre
 		"themeCards": page.themeCards,
 		"theme":      page.theme,
 		"appearance": page.appearance,
+		"corners":    page.corners,
+		"font":       page.font,
+		"fonts":      previewFonts,
+		"kitStyles":  previewKitStyles,
 		"steps":      steps,
 	})
 	require.NoError(t, err)
@@ -783,4 +825,122 @@ func TestBrandPreviewJS_PageshowDrawsTheRestoredAppearance(t *testing.T) {
 			assertSampleDrawn(t, looks[2].Samples["light"], previewPlum.Light, "light")
 		})
 	}
+}
+
+// assertSampleDrawnWithKit holds a sample to its mode's palette, shadow and color-scheme, as
+// assertSampleDrawn does, and to exactly the kit's tokens in kit, and nothing else.
+func assertSampleDrawnWithKit(t *testing.T, sample previewSample, palette map[string]string, mode string, kit map[string]string, msg string) {
+	t.Helper()
+	want := map[string]string{"color-scheme": mode, "--shadow-panel": lightPanelShadow}
+	if mode == "dark" {
+		want["--shadow-panel"] = darkPanelShadow
+	}
+	for token, value := range palette {
+		want["--color-"+token] = value
+	}
+	for token, value := range kit {
+		want[token] = value
+	}
+	assert.Equal(t, want, sample.Style, msg)
+}
+
+// The sample takes the corners and the family as they are picked, before anything is saved (#813):
+// square and pill set the two radius tokens the stylesheet sets for them, a family its font-family
+// list, on both samples and on no other element. Rounded and System UI are today's look, the console's
+// own, so picking them back takes the tokens off again.
+func TestBrandPreviewJS_TheSampleTakesTheCornersAndTheFamilyPicked(t *testing.T) {
+	looks := runBrandPreview(t, previewPage{themeCards: bothCards, theme: "plum", appearance: "auto", corners: "rounded", font: "system-ui"},
+		load(), lookAt(),
+		pick("corners", "square"), lookAt(),
+		pick("corners", "pill"), lookAt(),
+		pick("font", "serif"), lookAt(),
+		pick("corners", "rounded"), lookAt(),
+		pick("font", "system-ui"), lookAt())
+
+	pill := map[string]string{"--radius-control": "91px", "--radius-panel": "17px"}
+	serif := map[string]string{"--font-sans": "Testserif, 'Test Serif Two', serif"}
+	want := []struct {
+		kit map[string]string
+		msg string
+	}{
+		{map[string]string{}, "drawn rounded in System UI, nothing set"},
+		{map[string]string{"--radius-control": "0", "--radius-panel": "0"}, "square picked"},
+		{pill, "pill picked"},
+		{map[string]string{"--radius-control": "91px", "--radius-panel": "17px", "--font-sans": "Testserif, 'Test Serif Two', serif"}, "serif picked, pill kept"},
+		{serif, "rounded picked again, serif kept"},
+		{map[string]string{}, "System UI picked again"},
+	}
+	require.Len(t, looks, len(want))
+	for i, w := range want {
+		assertSampleDrawnWithKit(t, looks[i].Samples["light"], previewPlum.Light, "light", w.kit, w.msg)
+		assertSampleDrawnWithKit(t, looks[i].Samples["dark"], previewPlum.Dark, "dark", w.kit, w.msg)
+		assert.Empty(t, looks[i].StyledElsewhere, "look %d: only the samples are styled", i)
+	}
+}
+
+// A brand's page is drawn with its stored corners and family, which the sample takes on load; the
+// uploaded font is drawn with the list the page hands for it.
+func TestBrandPreviewJS_TheSampleTakesTheStoredCornersAndFamilyOnLoad(t *testing.T) {
+	looks := runBrandPreview(t, previewPage{themeCards: bothCards, theme: "blueberry", appearance: "dark", corners: "pill", font: "uploaded"},
+		lookAt(), load(), lookAt())
+
+	assert.Empty(t, looks[0].Samples["dark"].Style, "nothing is drawn before the script runs")
+	kit := map[string]string{"--radius-control": "91px", "--radius-panel": "17px", "--font-sans": `"brand-font", Testsystem, sans-serif`}
+	assertSampleDrawnWithKit(t, looks[1].Samples["dark"], previewBlueberry.Dark, "dark", kit, "the stored pill and uploaded font")
+	assertSampleDrawnWithKit(t, looks[1].Samples["light"], previewBlueberry.Light, "light", kit, "the stored pill and uploaded font")
+}
+
+// A form holding a corner shape or a family the page hands nothing for, as a refused form drawn
+// again can, draws the sample as today: rounded, in System UI. A family named like a property every
+// object has is no family either.
+func TestBrandPreviewJS_ACornerShapeOrFamilyWithNothingHandedDrawsTodaysLook(t *testing.T) {
+	for _, page := range []previewPage{
+		{corners: "", font: "comic"},
+		{corners: "", font: "constructor"},
+		{corners: "", font: "geometric"},
+		{corners: "", font: ""},
+	} {
+		t.Run(page.font, func(t *testing.T) {
+			page.themeCards, page.theme, page.appearance = bothCards, "plum", "light"
+			looks := runBrandPreview(t, page, load(), lookAt())
+			assertSampleDrawn(t, looks[0].Samples["light"], previewPlum.Light, "light")
+			assertSampleDrawn(t, looks[0].Samples["dark"], previewPlum.Dark, "dark")
+		})
+	}
+
+	// Pill picked, then a family with nothing handed: the radii stay, and the family is taken off.
+	looks := runBrandPreview(t, previewPage{themeCards: bothCards, theme: "plum", appearance: "light", corners: "rounded", font: "humanist"},
+		load(), lookAt(), pick("corners", "pill"), pick("font", "toString"), lookAt())
+	assertSampleDrawnWithKit(t, looks[0].Samples["light"], previewPlum.Light, "light",
+		map[string]string{"--font-sans": "Testhumanist, sans-serif"}, "the stored humanist")
+	assertSampleDrawnWithKit(t, looks[1].Samples["light"], previewPlum.Light, "light",
+		map[string]string{"--radius-control": "91px", "--radius-panel": "17px"}, "no family handed for toString")
+}
+
+// A browser restoring the form, as on Back, fires no input: the corners and the family it restores are
+// drawn on pageshow.
+func TestBrandPreviewJS_PageshowDrawsTheRestoredCornersAndFamily(t *testing.T) {
+	looks := runBrandPreview(t, previewPage{themeCards: bothCards, theme: "plum", appearance: "auto", corners: "rounded", font: "system-ui"},
+		load(), restore("corners", "square"), restore("font", "humanist"), lookAt(),
+		previewStep{Do: "pageshow", Persisted: true}, lookAt())
+
+	assertSampleDrawn(t, looks[0].Samples["light"], previewPlum.Light, "light")
+	kit := map[string]string{"--radius-control": "0", "--radius-panel": "0", "--font-sans": "Testhumanist, sans-serif"}
+	assertSampleDrawnWithKit(t, looks[1].Samples["light"], previewPlum.Light, "light", kit, "the restored square and humanist")
+	assertSampleDrawnWithKit(t, looks[1].Samples["dark"], previewPlum.Dark, "dark", kit, "the restored square and humanist")
+}
+
+// The sample reads the tokens the script sets: ui.css rounds a sample's multi-line boxes from its own
+// --radius-control, as :root does a page's, and draws its text in its own --font-sans.
+func TestBrandPreviewJS_TheSampleReadsTheKitsTokens(t *testing.T) {
+	source, err := os.ReadFile("tailwindcss/ui.css")
+	require.NoError(t, err)
+	css := string(source)
+	start := strings.Index(css, "  .brand-sample {\n")
+	require.GreaterOrEqual(t, start, 0, "the sample's rule")
+	end := strings.Index(css[start:], "\n  }\n")
+	require.Positive(t, end)
+	rule := css[start : start+end+1]
+	assert.Contains(t, rule, "    --radius-box: min(var(--radius-control), 1rem);\n")
+	assert.Contains(t, rule, "    font-family: var(--font-sans);\n")
 }

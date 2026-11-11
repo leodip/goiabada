@@ -23,6 +23,19 @@ export interface BrandValues {
   theme: string;
 }
 
+// The kit's choices in the brand form (#813): the corners, the font family, the background fit and
+// the switch hiding the app name beside a logo.
+export type Corners = "square" | "rounded" | "pill";
+export type FontFamily = "system-ui" | "humanist" | "geometric" | "serif" | "neo-grotesque" | "rounded" | "uploaded";
+export type BackgroundFit = "cover" | "contain" | "tile";
+
+export interface BrandKitChoices {
+  corners: Corners;
+  font: FontFamily;
+  backgroundFit: BackgroundFit;
+  hideAppName: boolean;
+}
+
 export interface ListedBrand {
   id: number;
   name: string;
@@ -69,10 +82,24 @@ export async function brandIdFromList(page: Page, name: string): Promise<number>
 }
 
 // Fills the brand form on the page as it stands, the new one or a brand's own.
-export async function fillBrandForm(page: Page, values: Partial<BrandValues>) {
+export async function fillBrandForm(page: Page, values: Partial<BrandValues & BrandKitChoices>) {
   if (values.name !== undefined) await page.locator("#name").fill(values.name);
   if (values.appearance) await page.locator(`#appearance-${values.appearance}`).check();
   if (values.theme) await page.locator(`#theme-${values.theme}`).check();
+  if (values.corners) await page.locator(`#corners-${values.corners}`).check();
+  if (values.font) await page.locator("#font").selectOption(values.font);
+  if (values.backgroundFit) await page.locator(`#backgroundFit-${values.backgroundFit}`).check();
+  if (values.hideAppName !== undefined) await page.locator("#hideAppName").setChecked(values.hideAppName);
+}
+
+// The kit's choices the brand form holds.
+export async function readBrandKitChoices(page: Page): Promise<BrandKitChoices> {
+  return {
+    corners: (await page.locator('input[name="corners"]:checked').getAttribute("value")) as Corners,
+    font: (await page.locator("#font").inputValue()) as FontFamily,
+    backgroundFit: (await page.locator('input[name="backgroundFit"]:checked').getAttribute("value")) as BackgroundFit,
+    hideAppName: await page.locator("#hideAppName").isChecked(),
+  };
 }
 
 // The brand editor's preview (#811): a sample of a sign-in page in each mode, drawn in the theme the
@@ -132,6 +159,37 @@ export function sampleColors(sample: Locator): Promise<SampleColors> {
       colorScheme: getComputedStyle(sample).colorScheme,
     };
   });
+}
+
+// The corners and the font a sample is drawn with, as the browser computes them: the radius of the
+// card, of a field and of a button, which a corner shape sets, and of the danger notice, a box that may
+// hold several lines; and the first font of the family the sample's title asks for, unquoted. Which
+// font a device then finds is its own: the headless browser has almost none of the families' fonts.
+export interface SampleShape {
+  card: string;
+  control: string;
+  button: string;
+  notice: string;
+  firstFont: string;
+}
+
+// firstFontOf is the first font of a computed font-family list, without its quotes.
+export function firstFontOf(fontFamily: string): string {
+  return fontFamily.split(",")[0].trim().replace(/^["']|["']$/g, "");
+}
+
+export async function sampleShape(sample: Locator): Promise<SampleShape> {
+  const shape = await sample.evaluate((sample) => {
+    const radius = (selector: string) => getComputedStyle(sample.querySelector(selector)!).borderTopLeftRadius;
+    return {
+      card: radius(".auth-card"),
+      control: radius(".control"),
+      button: radius(".button-primary"),
+      notice: radius(".notice-danger"),
+      fontFamily: getComputedStyle(sample.querySelector(".auth-title")!).fontFamily,
+    };
+  });
+  return { card: shape.card, control: shape.control, button: shape.button, notice: shape.notice, firstFont: firstFontOf(shape.fontFamily) };
 }
 
 // What each Appearance card's swatch is drawn in, one entry per mode it shows, in order: the canvas

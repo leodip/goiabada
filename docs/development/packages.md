@@ -25,6 +25,11 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   client, session backend, token client and JWKS parser; by `internal/pinnedfetch`, which the
   generators download through; and by the timezones generator for the decompressed tarball (#386,
   #432)
+- `brandkit/` - What a brand's corners and font family draw (#813): `CornerRadii`, the two radius
+  tokens of square and pill, and `FontStack`, the font-family list of each system family but System
+  UI and of the uploaded font, followed by System UI. Rounded and System UI are ui.css's and
+  main.css's own tokens and set nothing. The auth server's full brand stylesheet and the admin
+  console's brand editor, whose sample takes them as they are picked, both draw from it
 - `buildinfo/` - The build stamp both servers report, `Version`, `BuildDate` and `GitCommit`, which
   the release builds set with `-ldflags -X` and which read `development` in any other build. It left
   `core/constants` beside `builtin/` when that package split, because the linker writes these values
@@ -275,7 +280,7 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 - `internal/brandthemes/` - The eight built-in themes a brand is drawn in (#810): each preset's key
   and its light and dark palettes, 23 `#rrggbb` values by token name, in display order, and the
   colors stylesheet each draws, built once. A brand has two stylesheets (#813): the full one, its
-  colors then the radius and font tokens its corners and system family set, served at
+  colors then the radius and font tokens its corners and family set, from `core/brandkit`, served at
   `StylesheetRoute` and linked by `StylesheetPath`; and the colors-only one, served at
   `ColorsStylesheetRoute` and linked by `ColorsStylesheetPath`. The brand validation, the admin API's
   `GET /brand-themes`, the stylesheet handlers and the pages read it; the console reaches it only

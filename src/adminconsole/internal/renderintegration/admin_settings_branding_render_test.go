@@ -1,12 +1,14 @@
 package renderintegration
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/brandkit"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -414,4 +416,178 @@ func TestRender_AdminSettingsBrandingFormMarksTheAppearanceSwatches(t *testing.T
 	} {
 		assert.Contains(t, light[1], shape)
 	}
+}
+
+// optionTag is the whole <option> of the font select with the value named.
+func optionTag(t *testing.T, out, value string) string {
+	t.Helper()
+	tag := regexp.MustCompile(`<option value="` + regexp.QuoteMeta(value) + `"[^>]*>`).FindString(out)
+	require.NotEmpty(t, tag, "no font option %s", value)
+	return tag
+}
+
+// The kit's four choices in the brand form (#813): the corners and the background fit as radios, the
+// font family as a select of the six system families and the uploaded font, and the switch hiding
+// the app name, each holding what the form holds, in the console's language.
+func TestRender_AdminSettingsBrandingFormDrawsTheKitsChoices(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
+		"isNew":       false,
+		"storedBrand": api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
+		"brand": adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum",
+			Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true},
+		"brandThemes":     renderThemes,
+		"appearanceTheme": renderThemes[1],
+	})
+	// The brand form, after the page's Make default form.
+	editorStart := strings.Index(out, `<div class="brand-editor">`)
+	require.GreaterOrEqual(t, editorStart, 0)
+	form := out[editorStart:]
+	formEnd := strings.Index(form, "</form>")
+	require.Positive(t, formEnd)
+	form = form[:formEnd]
+
+	// Corners: square, rounded and pill, the stored one checked.
+	assert.Regexp(t, `<legend class="field-label mb-2">Cantos</legend>`, form)
+	for value, label := range map[string]string{"square": "Quadrados", "rounded": "Arredondados", "pill": "Em pílula"} {
+		tag := radioTag(t, form, "corners-"+value)
+		assert.Contains(t, tag, `name="corners" value="`+value+`"`)
+		assert.Regexp(t, regexp.QuoteMeta(tag)+`<span>`+label+`</span></label>`, form)
+	}
+	assert.Contains(t, radioTag(t, form, "corners-pill"), " checked")
+	assert.NotContains(t, radioTag(t, form, "corners-square"), " checked")
+	assert.NotContains(t, radioTag(t, form, "corners-rounded"), " checked")
+
+	// The font family, labelled and described, the stored one selected.
+	assert.Contains(t, form, `<label class="field-label" for="font">Fonte</label>`)
+	assert.Regexp(t, `<select class="control" id="font" name="font" aria-describedby="fontHint">`, form)
+	assert.Contains(t, form, `<p class="field-hint" id="fontHint">As famílias do sistema usam fontes que o dispositivo de cada visitante já tem, então o texto muda um pouco de um dispositivo para outro.</p>`)
+	families := regexp.MustCompile(`<option value="([^"]*)"[^>]*>([^<]*)</option>`).FindAllStringSubmatch(form, -1)
+	got := make([][2]string, 0, len(families))
+	for _, family := range families {
+		got = append(got, [2]string{family[1], family[2]})
+	}
+	assert.Equal(t, [][2]string{
+		{"system-ui", "Interface do sistema"},
+		{"humanist", "Humanista"},
+		{"geometric", "Geométrica"},
+		{"serif", "Serifada"},
+		{"neo-grotesque", "Neogrotesca"},
+		{"rounded", "Arredondada"},
+		{"uploaded", "Fonte enviada"},
+	}, got, "the six system families, System UI first, then the uploaded font")
+	assert.Equal(t, `<option value="serif" selected>`, optionTag(t, form, "serif"))
+	assert.Equal(t, 1, strings.Count(form, " selected>"), "one family selected")
+
+	// The background fit: cover, contain and tile, described, the stored one checked.
+	assert.Regexp(t, `<fieldset aria-describedby="backgroundFitHint">\s*<legend class="field-label mb-1">Imagem de fundo</legend>\s*`+
+		`<p class="field-hint mb-2" id="backgroundFitHint">Como uma imagem de fundo preenche a página atrás do cartão de entrada: cobrir preenche a página e pode cortar a imagem, conter mostra a imagem inteira e ladrilho a repete no tamanho original\.</p>`, form)
+	for value, label := range map[string]string{"cover": "Cobrir", "contain": "Conter", "tile": "Ladrilho"} {
+		tag := radioTag(t, form, "backgroundFit-"+value)
+		assert.Contains(t, tag, `name="backgroundFit" value="`+value+`"`)
+		assert.Regexp(t, regexp.QuoteMeta(tag)+`<span>`+label+`</span></label>`, form)
+	}
+	assert.Contains(t, radioTag(t, form, "backgroundFit-tile"), " checked")
+	assert.NotContains(t, radioTag(t, form, "backgroundFit-cover"), " checked")
+
+	// The switch, on, with what it does said beside it.
+	assert.Regexp(t, `<label class="check-row" for="hideAppName">\s*<input type="checkbox" id="hideAppName" name="hideAppName" aria-describedby="hideAppNameHint" checked>\s*`+
+		`<span class="grid min-w-0 flex-1 gap-0\.5">\s*<span class="choice-label">Ocultar o nome do aplicativo</span>\s*`+
+		`<span class="field-hint" id="hideAppNameHint">Para um logotipo que já mostra o nome\. Uma marca sem logotipo sempre mostra o nome\.</span>`, form)
+}
+
+// A new brand's form holds the choices a brand nobody has changed is drawn in: rounded, System UI,
+// cover, and the app name shown.
+func TestRender_AdminSettingsBrandingNewFormHoldsTodaysLook(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
+		"isNew": true,
+		"brand": adminsettingshandlers.BrandForm{Appearance: "auto", Theme: "blueberry",
+			Corners: "rounded", Font: "system-ui", BackgroundFit: "cover"},
+		"brandThemes":     renderThemes,
+		"appearanceTheme": renderThemes[0],
+	})
+	assert.Contains(t, radioTag(t, out, "corners-rounded"), " checked")
+	assert.Equal(t, `<option value="system-ui" selected>`, optionTag(t, out, "system-ui"))
+	assert.Contains(t, radioTag(t, out, "backgroundFit-cover"), " checked")
+	assert.Regexp(t, `<input type="checkbox" id="hideAppName" name="hideAppName" aria-describedby="hideAppNameHint">`, out)
+}
+
+// A refusal about a kit choice is marked on its field (#813 decision 10): the corners or the
+// background fit radios, each group described by the notice and its first radio focused, or the font
+// select, described by the notice and its hint and focused. The other fields are left unmarked.
+func TestRender_AdminSettingsBrandingFormMarksTheRefusedKitChoice(t *testing.T) {
+	render := func(errorField string) string {
+		out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
+			"isNew": true,
+			"brand": adminsettingshandlers.BrandForm{Name: "Spring", Appearance: "auto", Theme: "plum",
+				Corners: "oval", Font: "uploaded", BackgroundFit: "stretch"},
+			"brandThemes":     renderThemes,
+			"appearanceTheme": renderThemes[1],
+			"error":           "Não.",
+			"errorField":      errorField,
+		})
+		formEnd := strings.Index(out, "</form>")
+		require.Positive(t, formEnd)
+		return out[:formEnd]
+	}
+	fontTag := func(form string) string {
+		tag := regexp.MustCompile(`<select class="control" id="font"[^>]*>`).FindString(form)
+		require.NotEmpty(t, tag)
+		return tag
+	}
+
+	form := render("corners")
+	assert.Regexp(t, `<fieldset aria-describedby="brand-error">\s*<legend class="field-label mb-2">Cantos</legend>`, form)
+	for _, value := range []string{"square", "rounded", "pill"} {
+		assert.Contains(t, radioTag(t, form, "corners-"+value), `aria-invalid="true"`)
+	}
+	assert.Contains(t, radioTag(t, form, "corners-square"), "autofocus", "the first corner shape takes the focus")
+	assert.NotContains(t, radioTag(t, form, "corners-pill"), "autofocus")
+	assert.NotRegexp(t, `id="name"[^>]*autofocus`, form)
+	assert.Equal(t, `<select class="control" id="font" name="font" aria-describedby="fontHint">`, fontTag(form))
+	assert.NotContains(t, radioTag(t, form, "backgroundFit-cover"), "aria-invalid")
+
+	form = render("font")
+	assert.Equal(t, `<select class="control" id="font" name="font" aria-describedby="brand-error fontHint" aria-invalid="true" autofocus>`, fontTag(form))
+	assert.Equal(t, `<option value="uploaded" selected>`, optionTag(t, form, "uploaded"), "with what was sent")
+	assert.NotContains(t, radioTag(t, form, "corners-square"), "aria-invalid")
+	assert.NotContains(t, radioTag(t, form, "backgroundFit-cover"), "aria-invalid")
+	assert.NotRegexp(t, `id="name"[^>]*autofocus`, form)
+
+	form = render("backgroundFit")
+	assert.Regexp(t, `<fieldset aria-describedby="brand-error backgroundFitHint">\s*<legend class="field-label mb-1">Imagem de fundo</legend>`, form)
+	for _, value := range []string{"cover", "contain", "tile"} {
+		assert.Contains(t, radioTag(t, form, "backgroundFit-"+value), `aria-invalid="true"`)
+	}
+	assert.Contains(t, radioTag(t, form, "backgroundFit-cover"), "autofocus")
+	assert.NotContains(t, radioTag(t, form, "corners-square"), "aria-invalid")
+	assert.Equal(t, `<select class="control" id="font" name="font" aria-describedby="fontHint">`, fontTag(form))
+	assert.NotRegexp(t, `id="name"[^>]*autofocus`, form)
+
+	// A refusal about the name leaves the kit's fields unmarked.
+	form = render("name")
+	assert.NotContains(t, radioTag(t, form, "corners-square"), "aria-invalid")
+	assert.NotContains(t, radioTag(t, form, "backgroundFit-cover"), "aria-invalid")
+	assert.Equal(t, `<select class="control" id="font" name="font" aria-describedby="fontHint">`, fontTag(form))
+	assert.Equal(t, 1, strings.Count(form, "autofocus"), "the name alone takes the focus")
+}
+
+// The preview's script is handed what each corner shape and family draws, beside the palettes, in a
+// data block of its own.
+func TestRender_AdminSettingsBrandingFormHandsThePreviewTheKitsStyles(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
+		"isNew":           true,
+		"brand":           adminsettingshandlers.BrandForm{Appearance: "auto", Theme: "plum", Corners: "rounded", Font: "system-ui", BackgroundFit: "cover"},
+		"brandThemes":     renderThemes,
+		"appearanceTheme": renderThemes[1],
+		"brandKitStyles": adminsettingshandlers.BrandKitStyles{
+			Corners: map[string]brandkit.Radii{"pill": {Control: "9999px", Panel: "1.5rem"}},
+			Fonts:   map[string]string{"serif": "Charter, 'Bitstream Charter', serif"},
+		},
+	})
+	block := regexp.MustCompile(`<script type="application/json" id="brand-kit-styles">(.*?)</script>`).FindStringSubmatch(out)
+	require.Len(t, block, 2, "the kit's styles data block")
+	var styles adminsettingshandlers.BrandKitStyles
+	require.NoError(t, json.Unmarshal([]byte(block[1]), &styles), block[1])
+	assert.Equal(t, map[string]brandkit.Radii{"pill": {Control: "9999px", Panel: "1.5rem"}}, styles.Corners)
+	assert.Equal(t, map[string]string{"serif": "Charter, 'Bitstream Charter', serif"}, styles.Fonts)
 }

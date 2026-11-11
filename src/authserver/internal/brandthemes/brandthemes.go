@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/brandkit"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -81,39 +82,6 @@ func StylesheetOf(key string) (Stylesheet, bool) {
 // never its kit (#813 decision 9).
 const ColorsStylesheetRoute = "/brand/{id}/colors.css"
 
-// cornerRadii are the two radius tokens ui.css declares, --radius-control and --radius-panel, for
-// each corner shape but rounded, whose are today's, main.css's (#813). Square rounds nothing. Pill
-// rounds a single-line control fully, and the card and the other panels to 1.5rem, which leaves
-// their content unclipped; ui.css holds a multi-line box drawn with --radius-control (a text area,
-// a notice, a list) to 1rem, so it is rounded only as far as its content stays unclipped too.
-var cornerRadii = map[record.BrandCorners][2]string{
-	record.BrandCornersSquare: {"0", "0"},
-	record.BrandCornersPill:   {"9999px", "1.5rem"},
-}
-
-// fontStacks are the five system families besides System UI, each a list of fonts a visitor's
-// device already has, so neither the server nor a visitor downloads a font for them (#813 decision
-// 7). They are the matching text stacks of Modern Font Stacks (modernfontstacks.com, public domain):
-// Humanist, Geometric Humanist, Transitional, Neo-Grotesque and Rounded Sans. System UI is today's
-// family, main.css's --font-sans, so it declares none; the uploaded font draws a file its slot names.
-var fontStacks = map[record.BrandFont]string{
-	record.BrandFontHumanist:     "Seravek, 'Gill Sans Nova', Ubuntu, Calibri, 'DejaVu Sans', source-sans-pro, sans-serif",
-	record.BrandFontGeometric:    "Avenir, Montserrat, Corbel, 'URW Gothic', source-sans-pro, sans-serif",
-	record.BrandFontSerif:        "Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif",
-	record.BrandFontNeoGrotesque: "Inter, Roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', Arial, sans-serif",
-	record.BrandFontRounded:      "ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, Manjari, 'Arial Rounded MT', 'Arial Rounded MT Bold', Calibri, source-sans-pro, sans-serif",
-}
-
-// uploadedFontFamily is the family name the full stylesheet gives a brand's uploaded font, which
-// --font-sans then names first.
-const uploadedFontFamily = `"brand-font"`
-
-// systemUIStack is main.css's --font-sans, the System UI family, which follows an uploaded font as
-// its fallback: text is drawn in it at once while the font loads, and for any character the font
-// lacks (#813 decision 7).
-const systemUIStack = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, " +
-	"sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
-
 // FullStylesheet returns the stylesheet brand is drawn with on the auth server's pages and the
 // console's end-user pages: its theme's colors, as ColorsStylesheet answers them, then its kit
 // (#813 decision 9). slots are the assets brand's slots name, read without their bytes.
@@ -149,15 +117,18 @@ func FullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, er
 		}
 	}
 
+	// The corners' radii and the family's list are brandkit's, which the console's editor draws its
+	// sample from too. The uploaded font's list is set only while a regular font file is there to
+	// draw it; without one the brand is drawn in System UI, which sets nothing.
 	var root strings.Builder
-	if radii, ok := cornerRadii[brand.Corners]; ok {
-		root.WriteString("  --radius-control: " + radii[0] + ";\n")
-		root.WriteString("  --radius-panel: " + radii[1] + ";\n")
+	if radii, ok := brandkit.CornerRadii(string(brand.Corners)); ok {
+		root.WriteString("  --radius-control: " + radii.Control + ";\n")
+		root.WriteString("  --radius-panel: " + radii.Panel + ";\n")
 	}
-	if uploadedFont {
-		root.WriteString("  --font-sans: " + uploadedFontFamily + ", " + systemUIStack + ";\n")
-	} else if stack, ok := fontStacks[brand.Font]; ok {
-		root.WriteString("  --font-sans: " + stack + ";\n")
+	if brand.Font != record.BrandFontUploaded || uploadedFont {
+		if stack, ok := brandkit.FontStack(string(brand.Font)); ok {
+			root.WriteString("  --font-sans: " + stack + ";\n")
+		}
 	}
 	if root.Len() > 0 {
 		rules = append(rules, ":root {\n"+root.String()+"}\n")
@@ -178,7 +149,7 @@ func FullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, er
 func fontFace(font *record.BrandAsset, weight string) string {
 	var b strings.Builder
 	b.WriteString("@font-face {\n")
-	b.WriteString("  font-family: " + uploadedFontFamily + ";\n")
+	b.WriteString("  font-family: " + brandkit.UploadedFontFamily + ";\n")
 	b.WriteString("  src: url(\"" + brandasset.Path(font) + "\") format(\"woff2\");\n")
 	if weight != "" {
 		b.WriteString("  font-weight: " + weight + ";\n")

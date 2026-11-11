@@ -286,6 +286,10 @@ command itself and fails on a tree it changed.
 | `core/api` | `WebOriginResponse` | reachable | — |
 | `core/boundedread` | `ErrResponseTooLarge` | own-package | — |
 | `core/boundedread` | `Read` | kernel | — |
+| `core/brandkit` | `CornerRadii` | both-apps | — |
+| `core/brandkit` | `FontStack` | both-apps | — |
+| `core/brandkit` | `Radii` | own-package | — |
+| `core/brandkit` | `UploadedFontFamily` | own-package | — |
 | `core/buildinfo` | `BuildDate` | both-apps | — |
 | `core/buildinfo` | `GitCommit` | kernel | — |
 | `core/buildinfo` | `Version` | kernel | — |
@@ -433,15 +437,15 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeBrandAppearanceInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeBrandAssetUploadNoFile` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandBackgroundAssetInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeBrandBackgroundFitInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandBackgroundFitInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeBrandBoldFontAssetInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandBoldFontRegularRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeBrandCornersInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandCornersInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeBrandDarkLogoAssetInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandDarkLogoLogoRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandDefaultDeleteNotAllowed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandFaviconAssetInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeBrandFontInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandFontInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeBrandLogoAssetInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandNameAngleBrackets` | both-apps | — |
 | `core/i18n` | `ErrCodeBrandNameInUse` | both-apps | — |
@@ -449,7 +453,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeBrandNameTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodeBrandRegularFontAssetInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandThemeInvalid` | both-apps | — |
-| `core/i18n` | `ErrCodeBrandUploadedFontRegularRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandUploadedFontRegularRequired` | both-apps | — |
 | `core/i18n` | `ErrCodeChallengeFailed` | contract | Catalog key of the Turnstile challenge's refusal on the auth server's forms (#642). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientAdministrativeScopesAllowedRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientAdministrativeScopesConsoleAlwaysAllowed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |

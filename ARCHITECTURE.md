@@ -97,6 +97,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/adminpassword` | kernel | — |
 | `core/api` | kernel | — |
 | `core/boundedread` | kernel | — |
+| `core/brandkit` | kernel | — |
 | `core/buildinfo` | kernel | — |
 | `core/builtin` | kernel | — |
 | `core/cmd` | kernel | — |
@@ -227,6 +228,12 @@ Notes on rows that are not self-evident:
   both word them through its one function from the rules the public settings carry, so the two
   cannot word the same rules differently. It is a package of its own rather than part of `core/api`,
   which declares and does nothing, and of `core/i18n`, which owns no message of a domain (#550).
+- `core/brandkit` is kernel because both applications draw a brand's corners and font family from
+  it: the auth server in the brand's full stylesheet, and the admin console's brand editor on its
+  sample of a sign-in page as they are picked, before the brand is saved, so the sample cannot show
+  a shape or a family the saved brand would draw differently (#813). It is a package of its own
+  rather than part of `core/api`, which declares and does nothing, and the console reaches no auth
+  server package.
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are

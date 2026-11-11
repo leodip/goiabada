@@ -13,6 +13,13 @@
 // it is never submitted. The samples are drawn hidden, so neither shows in the console's own
 // colors before this script has styled it.
 //
+// Each sample also takes the corners and the font family the form holds (#813), from what the page
+// hands it for each in the brand-kit-styles data block, the values the auth server's stylesheet sets:
+// a shape's two radius tokens and a family's --font-sans, which ui.css reads on the sample as :root
+// reads them on a real page. Rounded and System UI, today's look, are handed nothing, so the sample
+// keeps the console's own tokens, which are ui.css's; so does a value the page hands nothing for, as a
+// refused form drawn again can hold.
+//
 // The three Appearance cards' swatches are redrawn in the chosen theme too, from the same
 // palettes: each names the modes it shows, one SVG per mode in order, and each shape the token its
 // fill or border is drawn from. The colors are set as attributes, as the server draws them. The
@@ -22,6 +29,7 @@
 // pageshow.
 
 const brandPalettes = JSON.parse(document.getElementById("brand-palettes").textContent);
+const brandKitStyles = JSON.parse(document.getElementById("brand-kit-styles").textContent);
 
 // The panel shadow ui.css gives each mode, which the token palettes do not carry.
 const samplePanelShadows = {
@@ -41,6 +49,34 @@ function chosenTheme() {
 function chosenAppearance() {
   const checked = document.querySelector('input[name="appearance"]:checked');
   return checked ? checked.value : "auto";
+}
+
+// handed answers what the page hands for key in styles, or undefined when it hands nothing, a key
+// every object answers, such as constructor, included.
+function handed(styles, key) {
+  return styles && Object.prototype.hasOwnProperty.call(styles, key) ? styles[key] : undefined;
+}
+
+// chosenRadii answers the radii of the corner shape the form holds, undefined for one that sets none.
+function chosenRadii() {
+  const checked = document.querySelector('input[name="corners"]:checked');
+  return handed(brandKitStyles.corners, checked ? checked.value : "");
+}
+
+// chosenFontStack answers the font-family list of the family the form holds, undefined for one that
+// sets none.
+function chosenFontStack() {
+  const select = document.getElementById("font");
+  return handed(brandKitStyles.fonts, select ? select.value : "");
+}
+
+// setOrRemove sets a property on a sample's style, or takes it off when there is no value.
+function setOrRemove(style, property, value) {
+  if (typeof value === "string") {
+    style.setProperty(property, value);
+  } else {
+    style.removeProperty(property);
+  }
 }
 
 // previewMode answers the mode the switch is on, light unless it is on dark.
@@ -82,6 +118,8 @@ function drawPreview() {
   }
   const appearance = chosenAppearance();
   const mode = appearance === "auto" ? previewMode() : appearance;
+  const radii = chosenRadii() || {};
+  const fontStack = chosenFontStack();
   for (const sample of document.querySelectorAll("[data-brand-sample]")) {
     const sampleMode = sample.dataset.brandSample === "dark" ? "dark" : "light";
     const palette = theme[sampleMode] || {};
@@ -90,6 +128,9 @@ function drawPreview() {
     }
     sample.style.setProperty("--shadow-panel", samplePanelShadows[sampleMode]);
     sample.style.setProperty("color-scheme", sampleMode);
+    setOrRemove(sample.style, "--radius-control", radii.control);
+    setOrRemove(sample.style, "--radius-panel", radii.panel);
+    setOrRemove(sample.style, "--font-sans", fontStack);
     sample.hidden = sampleMode !== mode;
   }
   const modeSwitch = document.querySelector(".brand-preview-switch");
