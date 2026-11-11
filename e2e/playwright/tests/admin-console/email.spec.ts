@@ -200,6 +200,11 @@ test("a reset started from an application's sign-in carries it on into the appli
   expect(link.searchParams.get("ceremony")).toBe(ceremonyId);
   expect(link.searchParams.get("code")).toBeTruthy();
 
+  // A link naming the sign-in that can't be used asks for a new one on a page naming it too.
+  await app.goto(`${env.authUrl}/reset-password?code=not-a-code&ceremony=${ceremonyId}`);
+  await expect(app.getByRole("heading", { name: "This link can't be used" })).toBeVisible();
+  await expect(app.getByRole("link", { name: "Request a new link" })).toHaveAttribute("href", `/forgot-password?ceremony=${ceremonyId}`);
+
   // Opened in the browser holding the sign-in, the new password signs the user in and on into the
   // application, with no "Password set" page and no password typed again.
   await app.goto(link.href);

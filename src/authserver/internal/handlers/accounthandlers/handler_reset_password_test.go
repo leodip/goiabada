@@ -1857,6 +1857,60 @@ func TestRenderResetPasswordCodeInvalid_RenderFailureFallsBackToInternalServerEr
 	pageRenderer.AssertExpectations(t)
 }
 
+// A refused link's page names the sign-in its URL names, on the first hop and on the form's
+// submission, for its Request a new link to carry on; an id of the wrong shape, or none, names
+// nothing. Neither request is read against the browser: no marker and no sign-in is held (#812).
+func TestRenderResetPasswordCodeInvalid_NamesTheSignInTheURLNames(t *testing.T) {
+	const ceremonyId = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+	const unknownCode = "a-code-matching-nothing"
+	for _, tc := range []struct {
+		name   string
+		query  string
+		wantId string
+	}{
+		{name: "a sign-in named", query: "ceremony=" + ceremonyId, wantId: ceremonyId},
+		{name: "an id of the wrong shape", query: "ceremony=" + ceremonyId + "x", wantId: ""},
+		{name: "none", query: "", wantId: ""},
+	} {
+		t.Run(tc.name+", the first hop", func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), hashutil.HashString(unknownCode)).
+				Return(nil, nil).Once()
+			expectAuditFailedCode(auditLogger, auditReasonUnknownCode, 0)
+			bind := captureResetRender(t, pageRenderer)
+			req := resetLinkFollowedRequest(unknownCode)
+			if tc.query != "" {
+				req.URL.RawQuery += "&" + tc.query
+			}
+
+			HandleResetPasswordGet(pageRenderer, newMarkerTestStore(), database, auditLogger, testDataCipher).
+				ServeHTTP(httptest.NewRecorder(), req)
+
+			assert.Equal(t, true, (*bind)["codeInvalidOrExpired"])
+			assert.Equal(t, tc.wantId, (*bind)["ceremonyId"])
+		})
+
+		t.Run(tc.name+", the form", func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerMissing), 0)
+			bind := captureResetRender(t, pageRenderer)
+			req := postResetRequest("Str0ngP4ss!", "Str0ngP4ss!", "")
+			req.URL.RawQuery = tc.query
+
+			HandleResetPasswordPost(pageRenderer, newMarkerTestStore(), heldCeremonies{}, datamocks.NewDatabase(t),
+				accounthandlersmocks.NewPasswordValidator(t), auditLogger, testBaseURL, testAdminConsoleBaseURL,
+				heldResetNotifier(t, pageRenderer), &recordingLogoutTokens{}).ServeHTTP(httptest.NewRecorder(), req)
+
+			assert.Equal(t, true, (*bind)["codeInvalidOrExpired"])
+			assert.Equal(t, http.StatusBadRequest, (*bind)["_httpStatus"])
+			assert.Equal(t, tc.wantId, (*bind)["ceremonyId"])
+		})
+	}
+}
+
 // The audit payload is what an administrator watching for probing reads, and #112 replaced
 // every field in it. These pin the shape directly rather than only through the handlers.
 func TestAuditFailedResetPasswordCode(t *testing.T) {

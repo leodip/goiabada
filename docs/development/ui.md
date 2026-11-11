@@ -24,7 +24,8 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `middleware.LinkedSignInPageClient` does the same on forgot password, registration, activation
   and password reset, from the well-formed `ceremony` parameter of their URL on a GET and a POST
   alike, while the browser holds that sign-in; the password page's links to the first two carry it,
-  and the activation and reset links mailed from them carry it through their first hop.
+  the activation and reset links mailed from them carry it through their first hop, and a refused
+  reset link's Request a new link carries it back to forgot password.
   `/auth/logout` names the client of a confirmed hint or, with no hint, `client_id`, and none for a
   rejected hint; its declining link carries that `client_id` to `/auth/logout/declined`, which
   names it for the look alone. The no-longer-active page forgets it. `render.RequestPageBrand` reads it for both layouts and the

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -23,8 +24,9 @@ import (
 // mailed link names it beside the code, and its first hop keeps it when it drops the code. Saved in
 // the browser that still holds the sign-in at its password step, the new password is recorded as
 // proven on it and the browser goes on into the app. Anywhere else the reset ends on its page, which
-// tells a person whose link named a sign-in to go back to the application. The setup link an
-// administrator mails a new user carries the code alone, as before.
+// tells a person whose link named a sign-in to go back to the application. A refused link's Request a
+// new link names the sign-in the refused link named. The setup link an administrator mails a new user
+// carries the code alone, as before.
 
 // resetReturnToAppText is the reset page's text when the link named a sign-in the reset could not
 // carry on.
@@ -231,4 +233,71 @@ func TestResetPasswordContinuesSignIn_TheSetupLinkIsNeverCarriedOn(t *testing.T)
 	defer func() { _ = pwdPage.Body.Close() }()
 	require.Equal(t, http.StatusOK, pwdPage.StatusCode, "the sign-in is still at its password step")
 	assert.Contains(t, bodyString(t, pwdPage), `name="password"`)
+}
+
+// requestNewLinkHref answers the href of a refused link's Request a new link, which the page must
+// have once.
+func requestNewLinkHref(t *testing.T, resp *http.Response) string {
+	t.Helper()
+	page := parseHTMLResponse(t, resp)
+	links := page.Find(`.auth-status a`).FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return strings.TrimSpace(s.Text()) == "Request a new link"
+	})
+	require.Equal(t, 1, links.Length(), "the page links Request a new link once")
+	href, _ := links.Attr("href")
+	return href
+}
+
+// A refused link naming the sign-in leads to a forgot password page naming it too, drawn in the
+// app's brand while the browser holds the sign-in. The new link mailed from it names the sign-in, and
+// a reset from it in the same browser goes on into the app. A refused link naming an id of the wrong
+// shape, or none, leads to a bare forgot password page (#812).
+func TestResetPasswordContinuesSignIn_ARefusedLinksNewLinkKeepsTheSignIn(t *testing.T) {
+	useMailpitSMTP(t)
+	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
+	f, termsId := newRegistrationApp(t)
+	clientBrand := giveClientBrand(t, f.client, record.BrandAppearanceLight, "avocado")
+	user, _ := resetFromTheAppUser(t)
+	browser := createHttpClient(t)
+	_, ceremonyId := forgotPasswordLink(t, browser, f.link(""))
+	refusedLink := appConfig.AuthServer.BaseURL + "/reset-password?code=" + fake.LetterN(32)
+
+	t.Run("an id of the wrong shape", func(t *testing.T) {
+		resp := loadPage(t, browser, withCeremonyParameter(t, refusedLink, ceremonyId+"x"))
+		defer func() { _ = resp.Body.Close() }()
+		require.Contains(t, peekBody(t, resp), resetCodeInvalidText)
+		assert.Equal(t, "/forgot-password", requestNewLinkHref(t, resp))
+	})
+
+	t.Run("no sign-in named", func(t *testing.T) {
+		resp := loadPage(t, browser, refusedLink)
+		defer func() { _ = resp.Body.Close() }()
+		require.Contains(t, peekBody(t, resp), resetCodeInvalidText)
+		assert.Equal(t, "/forgot-password", requestNewLinkHref(t, resp))
+	})
+
+	// Last, because the reset finishes the sign-in.
+	t.Run("the sign-in named", func(t *testing.T) {
+		resp := loadPage(t, browser, withCeremonyParameter(t, refusedLink, ceremonyId))
+		require.Contains(t, peekBody(t, resp), resetCodeInvalidText)
+		newLink := requestNewLinkHref(t, resp)
+		_ = resp.Body.Close()
+		assert.Equal(t, "/forgot-password?"+url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode(), newLink)
+
+		forgotURL := appConfig.AuthServer.BaseURL + newLink
+		forgot := loadPage(t, browser, forgotURL)
+		require.Equal(t, http.StatusOK, forgot.StatusCode)
+		assertDrawnInBrand(t, forgot, clientBrand, "light")
+		_ = forgot.Body.Close()
+
+		sent := postRegisterAt(t, browser, forgotURL, url.Values{"email": {user.Email}})
+		_ = sent.Body.Close()
+		require.Equal(t, http.StatusOK, sent.StatusCode)
+		link := resetLinkWithSignIn(t, user.Email, ceremonyId)
+
+		cleanURL := followResetLinkWithSignIn(t, browser, link, ceremonyId)
+		continuationId := loadResetForm(t, browser, cleanURL)
+		reset := postCleanReset(t, browser, cleanURL, fake.Password(20), continuationId)
+		f.carriedOnToTheApp(t, browser, reset, ceremonyId, user, termsId)
+	})
 }

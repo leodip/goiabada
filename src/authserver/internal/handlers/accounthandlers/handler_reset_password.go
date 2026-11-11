@@ -175,9 +175,16 @@ func continuationMatches(markerContinuationId string, submitted string) bool {
 // Genuine server faults must NOT come here. A stored code that will not decrypt,
 // a database failure, or a session store that cannot be read, stays an
 // InternalServerError so it keeps its stack trace and keeps alerting.
+//
+// The page's Request a new link names the sign-in the request's URL names, when it is well formed
+// (registrationCeremonyId), so the forgot password page it opens, and the new link mailed from it,
+// carry that sign-in on as the refused link did (#812). The id is echoed without being read against
+// the browser, as the forgot password page's own links echo it, so the page depends on the URL
+// alone and still reads the same for every cause.
 func renderResetPasswordCodeInvalid(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, httpStatus int) {
 	bind := map[string]interface{}{
 		"codeInvalidOrExpired": true,
+		"ceremonyId":           registrationCeremonyId(r),
 	}
 	if httpStatus != 0 {
 		bind["_httpStatus"] = httpStatus
