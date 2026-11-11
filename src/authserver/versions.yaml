@@ -66,8 +66,8 @@
 # counted from when the npm registry records the release published, and deps
 # upgrades the npm projects' dependencies only to releases that old.
 tools:
-  go: "1.27.3"
-  tailwind: "4.3.4"
+  go: "1.27.4"
+  tailwind: "4.3.5"
   node: "26.13.0"
   golangci-lint: "2.15.0"
   mockery: "3.9.0"

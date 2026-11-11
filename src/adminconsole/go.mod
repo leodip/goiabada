@@ -1,6 +1,6 @@
 module github.com/leodip/goiabada/adminconsole
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -16,5 +16,5 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/stretchr/objx v0.8.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 )
