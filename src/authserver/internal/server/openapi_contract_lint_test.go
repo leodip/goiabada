@@ -14,6 +14,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
+	"github.com/leodip/goiabada/authserver/internal/brandthemes"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/guard"
 	"gopkg.in/yaml.v3"
@@ -232,6 +235,9 @@ func TestOpenAPI_DeclaresNoStatusTheHandlersCannotEmit(t *testing.T) {
 // bytes, and the audit log and group search shapes were already declared in src/core/api. All
 // eleven were written out (#245), so a new API route now has one way to satisfy this test,
 // which is to be documented.
+//
+// The public routes outside /api/v1 that the document describes for callers are held the same
+// way, in documentedPublicRoutes, so a GET dropped from the spec fails here as an API route would.
 func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 	routes := parseRoutes(t)
 	spec := parseSpec(t)
@@ -239,7 +245,8 @@ func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 	routed := map[string]bool{}
 	for _, r := range routes {
 		routed[r.key] = true
-		if !strings.HasPrefix(r.path, "/api/v1/") {
+		public := r.method == "get" && slices.Contains(documentedPublicRoutes, r.path)
+		if !strings.HasPrefix(r.path, "/api/v1/") && !public {
 			continue
 		}
 		if _, documented := spec[r.key]; !documented {
@@ -254,6 +261,112 @@ func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 			t.Errorf("openapi.yaml describes %s (%s), which routes.go does not register",
 				op.operationId, key)
 		}
+	}
+
+	// A listed path routes.go no longer registers would hold nothing; the list goes with it.
+	for _, path := range documentedPublicRoutes {
+		if !routed[routeKey("get", path)] {
+			t.Errorf("documentedPublicRoutes lists GET %s, which routes.go does not register", path)
+		}
+	}
+}
+
+// documentedPublicRoutes are the routes outside /api/v1 that openapi.yaml describes for callers,
+// each by its GET: the public client logo and settings, and a brand's two stylesheets and its
+// assets, whose URLs the admin API and the public settings hand out.
+var documentedPublicRoutes = []string{
+	"/client/logo/{clientIdentifier}",
+	"/api/public/settings",
+	brandthemes.StylesheetRoute,
+	brandthemes.ColorsStylesheetRoute,
+	brandasset.Route,
+}
+
+// routeConstants is each package constant routes.go registers a route by, mapped to the
+// constant's own value, so the table cannot drift from what the constants say. A route
+// registered by a constant this table does not hold is one collectRoutes cannot read, which
+// TestOpenAPI_ResolvesEveryRouteConstant fails on rather than letting every test here skip it.
+var routeConstants = map[string]string{
+	"brandthemes.StylesheetRoute":       brandthemes.StylesheetRoute,
+	"brandthemes.ColorsStylesheetRoute": brandthemes.ColorsStylesheetRoute,
+	"brandasset.Route":                  brandasset.Route,
+	"emaillinks.ForgotPasswordPath":     emaillinks.ForgotPasswordPath,
+	"emaillinks.ResetPasswordPath":      emaillinks.ResetPasswordPath,
+	"emaillinks.AccountActivatePath":    emaillinks.AccountActivatePath,
+}
+
+// routePath reads a registration's path: a string literal, or a package constant routeConstants
+// holds.
+func routePath(e ast.Expr) (string, bool) {
+	if path, ok := stringLiteral(e); ok {
+		return path, true
+	}
+	if name, ok := selectorName(e); ok {
+		path, known := routeConstants[name]
+		return path, known
+	}
+	return "", false
+}
+
+// selectorName is pkg.Name for a selector on a package identifier.
+func selectorName(e ast.Expr) (string, bool) {
+	sel, ok := e.(*ast.SelectorExpr)
+	if !ok {
+		return "", false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return "", false
+	}
+	return pkg.Name + "." + sel.Sel.Name, true
+}
+
+// TestOpenAPI_ResolvesEveryRouteConstant holds routeConstants to routes.go: a route registered
+// by a package constant the table does not hold would be skipped by collectRoutes, and so be
+// invisible to every test in this file, documented or not.
+func TestOpenAPI_ResolvesEveryRouteConstant(t *testing.T) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "routes.go", nil, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatalf("parsing routes.go: %v", err)
+	}
+
+	assertRouteConstantsResolve(t, fset, file)
+}
+
+func assertRouteConstantsResolve(r guard.Reporter, fset *token.FileSet, file *ast.File) {
+	resolved := 0
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		var path ast.Expr
+		switch fn := call.Fun.(type) {
+		case *ast.Ident:
+			if fn.Name == "getAndHead" && len(call.Args) == 3 {
+				path = call.Args[1]
+			}
+		case *ast.SelectorExpr:
+			if _, isVerb := httpVerbs[fn.Sel.Name]; (isVerb || fn.Sel.Name == "Route") && len(call.Args) == 2 {
+				path = call.Args[0]
+			}
+		}
+		name, isSelector := selectorName(path)
+		if path == nil || !isSelector {
+			return true
+		}
+		if _, known := routeConstants[name]; !known {
+			r.Errorf("routes.go:%d registers a route by %s, which routeConstants does not hold, so "+
+				"the OpenAPI contract tests cannot see it; add it there", fset.Position(call.Pos()).Line, name)
+			return true
+		}
+		resolved++
+		return true
+	})
+	if resolved < len(routeConstants) {
+		r.Errorf("routes.go registers %d routes by a constant routeConstants holds, fewer than its %d "+
+			"entries: remove the ones it no longer uses", resolved, len(routeConstants))
 	}
 }
 
@@ -623,7 +736,7 @@ func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
 		// getAndHead(r, "/certs", handler) registers handler for GET and for HEAD on r (server.go),
 		// so it is read as those two registrations, each guarded as r is.
 		if fn, isIdent := call.Fun.(*ast.Ident); isIdent && fn.Name == "getAndHead" && len(call.Args) == 3 {
-			path, pathOK := stringLiteral(call.Args[1])
+			path, pathOK := routePath(call.Args[1])
 			handler, handlerOK := handlerConstructor(call.Args[2])
 			if pathOK && handlerOK {
 				full := prefix + path
@@ -665,7 +778,7 @@ func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
 		if !isVerb || len(call.Args) != 2 {
 			return true
 		}
-		path, pathOK := stringLiteral(call.Args[0])
+		path, pathOK := routePath(call.Args[0])
 		handler, handlerOK := handlerConstructor(call.Args[1])
 		if !pathOK || !handlerOK {
 			return true
@@ -935,6 +1048,13 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 					out[500] = true
 				case "writeLegalDocumentNotFound":
 					out[404] = true
+				}
+				// A brand's two stylesheets are answered by serveBrandStylesheet (#813): 200, 404
+				// for a path id that is not one or names no brand, 500 for a failed read.
+				if f.Name == "serveBrandStylesheet" {
+					out[200] = true
+					out[404] = true
+					out[500] = true
 				}
 				// The brand handlers' readers answer their own refusals (#810): brandId 400 for a
 				// path id that is not one, loadBrand that 400, 404 for no such brand and 500 for a

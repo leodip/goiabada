@@ -17,8 +17,10 @@ info:
     Authorization: DPoP <access_token>
     DPoP: <proof>
     ```
-    `getClientLogoImage`, at `/client/logo/{clientIdentifier}`, and `getPublicSettings`, at
-    `/api/public/settings`, are outside `/api/v1`: they are public and marked `security: []`.
+    `getClientLogoImage`, at `/client/logo/{clientIdentifier}`, `getPublicSettings`, at
+    `/api/public/settings`, and a brand's stylesheets and assets, `getBrandStylesheet`,
+    `getBrandColorsStylesheet` and `getBrandAsset`, are outside `/api/v1`: they are public and
+    marked `security: []`.
 
     ## API Groups
 
@@ -3754,6 +3756,182 @@ paths:
             this endpoint, the body is the server's HTML error page rather than
             the JSON error envelope, because this handler renders the shared
             error template.
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /brand/{id}/stylesheet.css:
+    get:
+      tags: [Brands]
+      summary: Get a brand's full stylesheet
+      description: |
+        Serve a brand's full stylesheet: its theme's colors, corners, font and background, which
+        the auth server's pages and the admin console's end-user pages link after main.css. This
+        is a public endpoint that does not require authentication.
+
+        Linked by the URL a brand's answer carries, with the stylesheet's fingerprint in `v`.
+        Asked for by that fingerprint, the answer may be kept a year; asked for by any other
+        fingerprint, or none, it is the current stylesheet, kept five minutes.
+      operationId: getBrandStylesheet
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The brand's ID
+          schema:
+            type: integer
+            format: int64
+        - name: v
+          in: query
+          description: The stylesheet's fingerprint, as the URL a brand's answer carries names it.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The stylesheet
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: >-
+                "public, max-age=31536000, immutable" when `v` names the current stylesheet,
+                "public, max-age=300" otherwise
+          content:
+            text/css:
+              schema:
+                type: string
+        '404':
+          description: No brand has this ID, or the ID is not a positive integer
+        '500':
+          description: |
+            The request failed inside the server. The body is the server's HTML error page,
+            because this handler renders the shared error template.
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /brand/{id}/colors.css:
+    get:
+      tags: [Brands]
+      summary: Get a brand's colors stylesheet
+      description: |
+        Serve the stylesheet that sets a brand's colors alone, which the admin console's admin
+        pages link after main.css. This is a public endpoint that does not require authentication.
+
+        Linked by the URL a brand's answer carries, with the stylesheet's fingerprint in `v`.
+        Asked for by that fingerprint, the answer may be kept a year; asked for by any other
+        fingerprint, or none, it is the current stylesheet, kept five minutes.
+      operationId: getBrandColorsStylesheet
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The brand's ID
+          schema:
+            type: integer
+            format: int64
+        - name: v
+          in: query
+          description: The stylesheet's fingerprint, as the URL a brand's answer carries names it.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The stylesheet
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: >-
+                "public, max-age=31536000, immutable" when `v` names the current stylesheet,
+                "public, max-age=300" otherwise
+          content:
+            text/css:
+              schema:
+                type: string
+        '404':
+          description: No brand has this ID, or the ID is not a positive integer
+        '500':
+          description: |
+            The request failed inside the server. The body is the server's HTML error page,
+            because this handler renders the shared error template.
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /brand-assets/{id}:
+    get:
+      tags: [Brands]
+      summary: Get a brand asset
+      description: |
+        Serve an uploaded brand asset: a logo, a favicon, a background image or a font. This is
+        a public endpoint that does not require authentication.
+
+        Linked by an asset's `url`, with its content fingerprint in `v`. Asked for by that
+        fingerprint, the answer may be kept a year; asked for by any other fingerprint, or none,
+        it is kept five minutes. A font is answered with `Access-Control-Allow-Origin` naming
+        the admin console's origin, so the console's pages may draw it, and no other site's.
+      operationId: getBrandAsset
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The asset's ID
+          schema:
+            type: integer
+            format: int64
+        - name: v
+          in: query
+          description: The asset's content fingerprint, as its `url` names it.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The asset, under the type its upload was validated as
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: >-
+                "public, max-age=31536000, immutable" when `v` names the asset's fingerprint,
+                "public, max-age=300" otherwise
+            X-Content-Type-Options:
+              schema:
+                type: string
+              description: nosniff
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+              description: The admin console's origin, on a font alone
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            font/woff2:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: No asset has this ID, or the ID is not a positive integer
+        '500':
+          description: |
+            The request failed inside the server. The body is the server's HTML error page,
+            because this handler renders the shared error template.
           content:
             text/html:
               schema:

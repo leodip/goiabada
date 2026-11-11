@@ -22,6 +22,7 @@ function spec(paths) {
 		security: [{ BearerAuth: [] }],
 		tags: [
 			{ name: 'Users', description: 'User management (Admin API)' },
+			{ name: 'Brands', description: 'Brand management (Admin API)' },
 			{ name: 'Clients', description: 'OAuth client management (Admin API)' },
 			{ name: 'Settings', description: 'System settings (Admin API)' },
 			{ name: 'Account', description: 'Self-service account management (Account API)' },
@@ -49,6 +50,9 @@ const fullSpec = () =>
 		'/api/v1/admin/clients/{id}': { get: operation('getClient', ['Clients']) },
 		'/client/logo/{clientIdentifier}': { get: { ...operation('getClientLogoImage', ['Clients']), security: [] } },
 		'/api/public/settings': { get: { ...operation('getPublicSettings', ['Settings']), security: [] } },
+		'/brand/{id}/stylesheet.css': { get: { ...operation('getBrandStylesheet', ['Brands']), security: [] } },
+		'/brand/{id}/colors.css': { get: { ...operation('getBrandColorsStylesheet', ['Brands']), security: [] } },
+		'/brand-assets/{id}': { get: { ...operation('getBrandAsset', ['Brands']), security: [] } },
 		'/api/v1/account/profile': { get: operation('getAccountProfile', ['Account']) },
 		'/api/v1/account/profile-picture': { post: operation('uploadAccountProfilePicture', ['Account']) },
 		'/api/v1/account/otp/enrollment': { get: operation('getAccountOTPEnrollment', ['Account']) },
@@ -56,7 +60,7 @@ const fullSpec = () =>
 		'/api/v1/sessions/load': { post: operation('loadBrowserSession', ['Browser Sessions']) },
 	});
 
-test('the Admin API holds the admin operations, the public client logo and the public settings, under their own tags', () => {
+test("the Admin API holds the admin operations, the public client logo, the public settings and a brand's public files, under their own tags", () => {
 	const { admin } = splitApiReference(fullSpec());
 	assert.deepEqual(operations(admin), [
 		'GET /api/v1/admin/users/{id} getUser [Users]',
@@ -64,11 +68,14 @@ test('the Admin API holds the admin operations, the public client logo and the p
 		'GET /api/v1/admin/clients/{id} getClient [Clients]',
 		'GET /client/logo/{clientIdentifier} getClientLogoImage [Clients]',
 		'GET /api/public/settings getPublicSettings [Settings]',
+		'GET /brand/{id}/stylesheet.css getBrandStylesheet [Brands]',
+		'GET /brand/{id}/colors.css getBrandColorsStylesheet [Brands]',
+		'GET /brand-assets/{id} getBrandAsset [Brands]',
 	]);
 	assert.equal(admin.info.title, 'Admin API');
 	assert.deepEqual(
 		admin.tags.map((tag) => tag.name),
-		['Users', 'Clients', 'Settings'],
+		['Users', 'Brands', 'Clients', 'Settings'],
 	);
 	assert.deepEqual(admin.paths['/client/logo/{clientIdentifier}'].get.security, []);
 	assert.deepEqual(admin.paths['/api/public/settings'].get.security, []);
