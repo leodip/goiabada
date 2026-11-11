@@ -498,6 +498,15 @@ test("the sample draws each mode's logo, the background at each fit and the uplo
     await page.evaluate(() => Array.from(document.fonts, (face) => face.family.replace(/["']/g, ""))),
     "the uploaded font declared for the sample",
   ).toContain("brand-font");
+  // The console draws the font from the auth server, another origin, which must grant it to the
+  // console's: a request from this page in the mode a font load uses answers the file uploaded.
+  expect(
+    await page.evaluate(
+      async (url) => Array.from(new Uint8Array(await (await fetch(url, { mode: "cors" })).arrayBuffer())),
+      urls.regularFont!,
+    ),
+    "the uploaded font, read across origins as the console's pages load it",
+  ).toEqual(Array.from(kitFiles.regularFont.buffer));
   // One file alone is declared with no weight, as the saved stylesheet declares it, so a variable font
   // draws every weight on its own axis in the sample too (#813 decision 7).
   expect(
