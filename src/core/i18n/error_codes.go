@@ -182,6 +182,16 @@ const (
 	ErrCodeBrandBackgroundFitInvalid        = "handler.brand.background_fit_invalid"
 	ErrCodeBrandUploadedFontRegularRequired = "handler.brand.uploaded_font_regular_required"
 
+	// A brand's slots (#813 decisions 5, 7 and 10): each names a stored asset of its kind.
+	ErrCodeBrandLogoAssetInvalid        = "handler.brand.logo_asset_invalid"
+	ErrCodeBrandDarkLogoAssetInvalid    = "handler.brand.dark_logo_asset_invalid"
+	ErrCodeBrandFaviconAssetInvalid     = "handler.brand.favicon_asset_invalid"
+	ErrCodeBrandBackgroundAssetInvalid  = "handler.brand.background_asset_invalid"
+	ErrCodeBrandRegularFontAssetInvalid = "handler.brand.regular_font_asset_invalid"
+	ErrCodeBrandBoldFontAssetInvalid    = "handler.brand.bold_font_asset_invalid"
+	ErrCodeBrandDarkLogoLogoRequired    = "handler.brand.dark_logo_logo_required"
+	ErrCodeBrandBoldFontRegularRequired = "handler.brand.bold_font_regular_required"
+
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"

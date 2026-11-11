@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -127,7 +128,7 @@ func kitBrand(theme string, corners record.BrandCorners, font record.BrandFont) 
 // brandStylesheetPath is a brand's stylesheet path as the pages link it, fingerprint included.
 func brandStylesheetPath(t *testing.T, brandId int64, theme string) string {
 	t.Helper()
-	path, err := brandthemes.StylesheetPath(themedBrand(brandId, theme))
+	path, err := brandthemes.StylesheetPath(themedBrand(brandId, theme), brandasset.Slots{})
 	require.NoError(t, err)
 	return path
 }
@@ -197,7 +198,7 @@ func TestBrandStylesheetPath_NamesTheBrandAndTheContents(t *testing.T) {
 	assert.NotEqual(t, avocado, brandStylesheetPath(t, 7, "plum"))
 	assert.Equal(t, strings.Replace(avocado, "/brand/7/", "/brand/8/", 1), brandStylesheetPath(t, 8, "avocado"))
 
-	_, err := brandthemes.StylesheetPath(themedBrand(7, "lime"))
+	_, err := brandthemes.StylesheetPath(themedBrand(7, "lime"), brandasset.Slots{})
 	assert.Error(t, err, "lime is no built-in theme")
 }
 
@@ -299,7 +300,7 @@ func TestHandleBrandStylesheetGet_DrawsEachCornerShape(t *testing.T) {
 	} {
 		t.Run(string(tc.corners), func(t *testing.T) {
 			brand := kitBrand("avocado", tc.corners, "system-ui")
-			path, err := brandthemes.StylesheetPath(brand)
+			path, err := brandthemes.StylesheetPath(brand, brandasset.Slots{})
 			require.NoError(t, err)
 
 			rr := getBrandStylesheet(t, path, brand)
@@ -329,7 +330,7 @@ func TestHandleBrandStylesheetGet_DrawsEachSystemFamily(t *testing.T) {
 	} {
 		t.Run(string(tc.font), func(t *testing.T) {
 			brand := kitBrand("avocado", "rounded", tc.font)
-			path, err := brandthemes.StylesheetPath(brand)
+			path, err := brandthemes.StylesheetPath(brand, brandasset.Slots{})
 			require.NoError(t, err)
 
 			rr := getBrandStylesheet(t, path, brand)
@@ -349,7 +350,7 @@ func TestHandleBrandStylesheetGet_DrawsEachSystemFamily(t *testing.T) {
 // main.css's, the kit follows the note that the stylesheet declares no colors.
 func TestHandleBrandStylesheetGet_DrawsTheCornersAndTheFamilyTogether(t *testing.T) {
 	brand := kitBrand("blueberry", "pill", "serif")
-	path, err := brandthemes.StylesheetPath(brand)
+	path, err := brandthemes.StylesheetPath(brand, brandasset.Slots{})
 	require.NoError(t, err)
 
 	rr := getBrandStylesheet(t, path, brand)
@@ -368,7 +369,7 @@ func TestHandleBrandStylesheetGet_DrawsTheCornersAndTheFamilyTogether(t *testing
 // stylesheet declares nothing at all.
 func TestHandleBrandStylesheetGet_ABrandNobodyChangedDeclaresNothing(t *testing.T) {
 	brand := kitBrand("blueberry", "rounded", "system-ui")
-	path, err := brandthemes.StylesheetPath(brand)
+	path, err := brandthemes.StylesheetPath(brand, brandasset.Slots{})
 	require.NoError(t, err)
 
 	rr := getBrandStylesheet(t, path, brand)
@@ -412,7 +413,7 @@ func TestBrandStylesheetPaths_NameEachStylesheetsContents(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/brand/7/colors.css?v="+avocadoFingerprint, colors)
 
-	full, err := brandthemes.StylesheetPath(pillSerif)
+	full, err := brandthemes.StylesheetPath(pillSerif, brandasset.Slots{})
 	require.NoError(t, err)
 	fullDigest := sha256.Sum256([]byte(avocadoStylesheet + "\n:root {\n  --radius-control: 9999px;\n  --radius-panel: 1.5rem;\n" +
 		"  --font-sans: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif;\n}\n"))
@@ -422,7 +423,7 @@ func TestBrandStylesheetPaths_NameEachStylesheetsContents(t *testing.T) {
 	for _, corners := range []record.BrandCorners{"square", "rounded", "pill"} {
 		for _, font := range []record.BrandFont{"system-ui", "humanist", "geometric", "serif", "neo-grotesque", "rounded"} {
 			brand := kitBrand("avocado", corners, font)
-			path, pathErr := brandthemes.StylesheetPath(brand)
+			path, pathErr := brandthemes.StylesheetPath(brand, brandasset.Slots{})
 			require.NoError(t, pathErr)
 			kit := string(corners) + " " + string(font)
 			if other, ok := seen[path]; ok {
@@ -444,7 +445,7 @@ func TestBrandStylesheetPaths_NameEachStylesheetsContents(t *testing.T) {
 // minutes, and the other way round.
 func TestBrandStylesheets_OnlyTheirOwnCurrentFingerprintIsCachedForAYear(t *testing.T) {
 	brand := kitBrand("avocado", "pill", "serif")
-	full, err := brandthemes.StylesheetPath(brand)
+	full, err := brandthemes.StylesheetPath(brand, brandasset.Slots{})
 	require.NoError(t, err)
 	colors, err := brandthemes.ColorsStylesheetPath(brand)
 	require.NoError(t, err)
@@ -477,4 +478,222 @@ func TestHandleBrandColorsStylesheetGet_AnswersFaultsAsTheFullOneDoes(t *testing
 	})).Once()
 	req = withPathValue(httptest.NewRequest(http.MethodGet, "/brand/7/colors.css", nil), "id", "7")
 	HandleBrandColorsStylesheetGet(pageRenderer, database).ServeHTTP(httptest.NewRecorder(), req)
+}
+
+// --- the kit's files (#813 decisions 6 and 7) ---------------------------------------------------
+
+// kitAsset is a stored asset as a slot names it, read without its bytes.
+func kitAsset(id int64, kind record.BrandAssetKind, fingerprint string) record.BrandAsset {
+	return record.BrandAsset{Id: id, Kind: kind, ContentType: "image/png", Fingerprint: fingerprint, Width: 64, Height: 64}
+}
+
+// getFullStylesheetWithAssets requests target from the full stylesheet's handler, the brand of id 7
+// being brand, whose slots name assets, read by their ids in slot order.
+func getFullStylesheetWithAssets(t *testing.T, target string, brand *record.Brand, ids []int64,
+	assets []record.BrandAsset) *httptest.ResponseRecorder {
+	t.Helper()
+	database := datamocks.NewDatabase(t)
+	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
+	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), ids).Return(assets, nil).Once()
+
+	req := withPathValue(httptest.NewRequest(http.MethodGet, target, nil), "id", "7")
+	rr := httptest.NewRecorder()
+	HandleBrandStylesheetGet(handlersmocks.NewPageRenderer(t), database).ServeHTTP(rr, req)
+	return rr
+}
+
+// blueberryNote is the whole colors part of a stylesheet on Blueberry, whose colors are main.css's.
+const blueberryNote = "/* Blueberry is the palette main.css is built with: this stylesheet declares no colors. */\n"
+
+// The full stylesheet draws a brand's background behind the card at its fit, over the theme's
+// background color, so contain leaves that color around it (#813 decision 6): cover fills the page
+// and contain shows the whole image, both centred and held to the window, and tile repeats the image
+// at its own size.
+func TestHandleBrandStylesheetGet_DrawsTheBackgroundAtItsFit(t *testing.T) {
+	for _, tc := range []struct {
+		fit  record.BrandBackgroundFit
+		want string
+	}{
+		{"cover", ".auth-page {\n" +
+			"  background-image: url(\"/brand-assets/14?v=0a1b2c3d4e5f\");\n" +
+			"  background-position: center;\n" +
+			"  background-size: cover;\n" +
+			"  background-repeat: no-repeat;\n" +
+			"  background-attachment: fixed;\n" +
+			"}\n"},
+		{"contain", ".auth-page {\n" +
+			"  background-image: url(\"/brand-assets/14?v=0a1b2c3d4e5f\");\n" +
+			"  background-position: center;\n" +
+			"  background-size: contain;\n" +
+			"  background-repeat: no-repeat;\n" +
+			"  background-attachment: fixed;\n" +
+			"}\n"},
+		{"tile", ".auth-page {\n" +
+			"  background-image: url(\"/brand-assets/14?v=0a1b2c3d4e5f\");\n" +
+			"  background-repeat: repeat;\n" +
+			"}\n"},
+	} {
+		t.Run(string(tc.fit), func(t *testing.T) {
+			brand := kitBrand("blueberry", "rounded", "system-ui")
+			brand.BackgroundFit = tc.fit
+			brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+			background := kitAsset(14, record.BrandAssetKindBackground, "0a1b2c3d4e5f")
+
+			rr := getFullStylesheetWithAssets(t, "/brand/7/stylesheet.css", brand, []int64{14}, []record.BrandAsset{background})
+
+			require.Equal(t, http.StatusOK, rr.Code)
+			assert.Equal(t, blueberryNote+"\n"+tc.want, rr.Body.String())
+		})
+	}
+}
+
+// The uploaded font with one file draws every weight from it, declaring none, so a variable font
+// takes its own range and a static one gets the browser's synthesized bold. The System UI family
+// follows it as the fallback, and the font is swapped in when it has loaded, so text is drawn at once
+// (#813 decision 7).
+func TestHandleBrandStylesheetGet_DrawsTheUploadedFontFromOneFile(t *testing.T) {
+	brand := kitBrand("blueberry", "rounded", "uploaded")
+	brand.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
+	regular := kitAsset(15, record.BrandAssetKindFont, "aaaaaaaaaaaa")
+
+	rr := getFullStylesheetWithAssets(t, "/brand/7/stylesheet.css", brand, []int64{15}, []record.BrandAsset{regular})
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, blueberryNote+
+		"\n"+
+		"@font-face {\n"+
+		"  font-family: \"brand-font\";\n"+
+		"  src: url(\"/brand-assets/15?v=aaaaaaaaaaaa\") format(\"woff2\");\n"+
+		"  font-display: swap;\n"+
+		"}\n"+
+		"\n"+
+		":root {\n"+
+		"  --font-sans: \"brand-font\", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\n"+
+		"}\n", rr.Body.String())
+}
+
+// With a bold file too, the regular file draws the weights up to 500 and the bold one the heavier
+// ones (#813 decision 7). The corners come first in the root rule, as they do beside a system family.
+func TestHandleBrandStylesheetGet_DrawsTheUploadedFontFromTwoFiles(t *testing.T) {
+	brand := kitBrand("avocado", "square", "uploaded")
+	brand.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
+	brand.BoldFontAssetId = sql.NullInt64{Int64: 16, Valid: true}
+	assets := []record.BrandAsset{
+		kitAsset(16, record.BrandAssetKindFont, "bbbbbbbbbbbb"),
+		kitAsset(15, record.BrandAssetKindFont, "aaaaaaaaaaaa"),
+	}
+
+	rr := getFullStylesheetWithAssets(t, "/brand/7/stylesheet.css", brand, []int64{15, 16}, assets)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, avocadoStylesheet+
+		"\n"+
+		"@font-face {\n"+
+		"  font-family: \"brand-font\";\n"+
+		"  src: url(\"/brand-assets/15?v=aaaaaaaaaaaa\") format(\"woff2\");\n"+
+		"  font-weight: 1 500;\n"+
+		"  font-display: swap;\n"+
+		"}\n"+
+		"\n"+
+		"@font-face {\n"+
+		"  font-family: \"brand-font\";\n"+
+		"  src: url(\"/brand-assets/16?v=bbbbbbbbbbbb\") format(\"woff2\");\n"+
+		"  font-weight: 501 1000;\n"+
+		"  font-display: swap;\n"+
+		"}\n"+
+		"\n"+
+		":root {\n"+
+		"  --radius-control: 0;\n"+
+		"  --radius-panel: 0;\n"+
+		"  --font-sans: \"brand-font\", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';\n"+
+		"}\n", rr.Body.String())
+}
+
+// Font files stay attached while a system family is chosen, so switching back needs no second
+// upload (#813 decision 7), and the stylesheet then draws the family and loads no file. The
+// background follows the root rule.
+func TestHandleBrandStylesheetGet_ASystemFamilyLoadsNoAttachedFontFile(t *testing.T) {
+	brand := kitBrand("blueberry", "rounded", "serif")
+	brand.BackgroundFit = "tile"
+	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+	brand.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
+	assets := []record.BrandAsset{
+		kitAsset(14, record.BrandAssetKindBackground, "0a1b2c3d4e5f"),
+		kitAsset(15, record.BrandAssetKindFont, "aaaaaaaaaaaa"),
+	}
+
+	rr := getFullStylesheetWithAssets(t, "/brand/7/stylesheet.css", brand, []int64{14, 15}, assets)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, blueberryNote+
+		"\n"+
+		":root {\n"+
+		"  --font-sans: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif;\n"+
+		"}\n"+
+		"\n"+
+		".auth-page {\n"+
+		"  background-image: url(\"/brand-assets/14?v=0a1b2c3d4e5f\");\n"+
+		"  background-repeat: repeat;\n"+
+		"}\n", rr.Body.String())
+}
+
+// The logo, the dark logo and the favicon are drawn by the page, not the stylesheet, and the
+// colors-only stylesheet reads no asset at all: an admin page never receives the kit (#813
+// decision 9).
+func TestBrandStylesheets_TheImagesOnThePageAndTheColorsOnlyOneReadNoAsset(t *testing.T) {
+	brand := kitBrand("avocado", "rounded", "system-ui")
+	brand.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
+	brand.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
+	brand.FaviconAssetId = sql.NullInt64{Int64: 13, Valid: true}
+	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+	assets := []record.BrandAsset{
+		kitAsset(11, record.BrandAssetKindLogo, "111111111111"),
+		kitAsset(12, record.BrandAssetKindLogo, "222222222222"),
+		kitAsset(13, record.BrandAssetKindFavicon, "333333333333"),
+		kitAsset(14, record.BrandAssetKindBackground, "444444444444"),
+	}
+
+	full := getFullStylesheetWithAssets(t, "/brand/7/stylesheet.css", brand, []int64{11, 12, 13, 14}, assets)
+	require.Equal(t, http.StatusOK, full.Code)
+	assert.NotContains(t, full.Body.String(), "/brand-assets/11")
+	assert.NotContains(t, full.Body.String(), "/brand-assets/12")
+	assert.NotContains(t, full.Body.String(), "/brand-assets/13")
+	assert.Contains(t, full.Body.String(), "/brand-assets/14?v=444444444444")
+
+	// The generated mock fails on any call it was not told of, so a read of the assets fails here.
+	colors := getColorsStylesheet(t, "/brand/7/colors.css", brand)
+	require.Equal(t, http.StatusOK, colors.Code)
+	assert.Equal(t, avocadoStylesheet, colors.Body.String())
+}
+
+// The full stylesheet's path names its contents, so it changes when a slot names another file: a
+// replaced background is a new asset, with a new id and fingerprint, and the stylesheet's URL moves
+// with it. A brand's assets that cannot be read are a server fault.
+func TestHandleBrandStylesheetGet_ThePathFollowsTheFilesAndAFailedReadIsAFault(t *testing.T) {
+	brand := kitBrand("blueberry", "rounded", "system-ui")
+	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+	first := brandasset.Slots{Background: &record.BrandAsset{Id: 14, Kind: record.BrandAssetKindBackground, Fingerprint: "0a1b2c3d4e5f"}}
+	second := brandasset.Slots{Background: &record.BrandAsset{Id: 21, Kind: record.BrandAssetKindBackground, Fingerprint: "5f4e3d2c1b0a"}}
+	firstPath, err := brandthemes.StylesheetPath(brand, first)
+	require.NoError(t, err)
+	secondPath, err := brandthemes.StylesheetPath(brand, second)
+	require.NoError(t, err)
+	nonePath, err := brandthemes.StylesheetPath(brand, brandasset.Slots{})
+	require.NoError(t, err)
+	assert.NotEqual(t, firstPath, secondPath)
+	assert.NotEqual(t, firstPath, nonePath)
+
+	rr := getFullStylesheetWithAssets(t, firstPath, brand, []int64{14},
+		[]record.BrandAsset{kitAsset(14, record.BrandAssetKindBackground, "0a1b2c3d4e5f")})
+	assert.Equal(t, yearCache, rr.Header().Get("Cache-Control"))
+
+	database := datamocks.NewDatabase(t)
+	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
+	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{14}).Return(nil, errors.New("connection refused")).Once()
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+		return strings.Contains(err.Error(), "connection refused")
+	})).Once()
+	req := withPathValue(httptest.NewRequest(http.MethodGet, "/brand/7/stylesheet.css", nil), "id", "7")
+	HandleBrandStylesheetGet(pageRenderer, database).ServeHTTP(httptest.NewRecorder(), req)
 }

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -103,29 +104,107 @@ var fontStacks = map[record.BrandFont]string{
 	record.BrandFontRounded:      "ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, Manjari, 'Arial Rounded MT', 'Arial Rounded MT Bold', Calibri, source-sans-pro, sans-serif",
 }
 
+// uploadedFontFamily is the family name the full stylesheet gives a brand's uploaded font, which
+// --font-sans then names first.
+const uploadedFontFamily = `"brand-font"`
+
+// systemUIStack is main.css's --font-sans, the System UI family, which follows an uploaded font as
+// its fallback: text is drawn in it at once while the font loads, and for any character the font
+// lacks (#813 decision 7).
+const systemUIStack = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, " +
+	"sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
+
 // FullStylesheet returns the stylesheet brand is drawn with on the auth server's pages and the
-// console's end-user pages: its theme's colors, as ColorsStylesheet answers them, then one rule on
-// the root setting the tokens its kit changes, its corners' two radii and its family's
-// --font-sans, which every text but monospace is drawn in (#813 decision 9). A choice drawn as today
-// sets no token, so a brand nobody has changed is drawn exactly as before the kit, and its full
-// stylesheet is its colors-only one. A theme that is none of the built-in ones is an error.
-func FullStylesheet(brand *record.Brand) (Stylesheet, error) {
+// console's end-user pages: its theme's colors, as ColorsStylesheet answers them, then its kit
+// (#813 decision 9). slots are the assets brand's slots name, read without their bytes.
+//
+//   - The uploaded font, while the font is uploaded and a regular font file fills its slot: one
+//     @font-face per file, swapped in once loaded. With one file it declares no weight, so the file
+//     is used for every weight; with a bold file too, the regular one draws the weights up to 500 and
+//     the bold one the heavier ones (decision 7). Files left attached beside a system family load
+//     nothing.
+//   - One rule on the root setting the tokens the kit changes: its corners' two radii and its
+//     family's --font-sans, which every text but monospace is drawn in, the uploaded font followed
+//     by the System UI family.
+//   - The background image, on the card pages' .auth-page, over the theme's background color, so a
+//     contained image leaves that color around it and one that fails to load leaves the page as it
+//     was (decision 6): cover and contain centred on the window, tile repeated at its own size.
+//
+// A choice drawn as today sets nothing, so a brand nobody has changed is drawn exactly as before the
+// kit, and its full stylesheet is its colors-only one. The logo, the dark logo and the favicon are
+// the page's to draw. A theme that is none of the built-in ones is an error.
+func FullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, error) {
 	colors, err := ColorsStylesheet(brand)
 	if err != nil {
 		return Stylesheet{}, err
 	}
-	var kit strings.Builder
+	var rules []string
+
+	uploadedFont := brand.Font == record.BrandFontUploaded && slots.RegularFont != nil
+	if uploadedFont {
+		if slots.BoldFont == nil {
+			rules = append(rules, fontFace(slots.RegularFont, ""))
+		} else {
+			rules = append(rules, fontFace(slots.RegularFont, "1 500"), fontFace(slots.BoldFont, "501 1000"))
+		}
+	}
+
+	var root strings.Builder
 	if radii, ok := cornerRadii[brand.Corners]; ok {
-		kit.WriteString("  --radius-control: " + radii[0] + ";\n")
-		kit.WriteString("  --radius-panel: " + radii[1] + ";\n")
+		root.WriteString("  --radius-control: " + radii[0] + ";\n")
+		root.WriteString("  --radius-panel: " + radii[1] + ";\n")
 	}
-	if stack, ok := fontStacks[brand.Font]; ok {
-		kit.WriteString("  --font-sans: " + stack + ";\n")
+	if uploadedFont {
+		root.WriteString("  --font-sans: " + uploadedFontFamily + ", " + systemUIStack + ";\n")
+	} else if stack, ok := fontStacks[brand.Font]; ok {
+		root.WriteString("  --font-sans: " + stack + ";\n")
 	}
-	if kit.Len() == 0 {
+	if root.Len() > 0 {
+		rules = append(rules, ":root {\n"+root.String()+"}\n")
+	}
+
+	if slots.Background != nil {
+		rules = append(rules, backgroundRule(slots.Background, brand.BackgroundFit))
+	}
+
+	if len(rules) == 0 {
 		return colors, nil
 	}
-	return newStylesheet(colors.CSS + "\n:root {\n" + kit.String() + "}\n"), nil
+	return newStylesheet(colors.CSS + "\n" + strings.Join(rules, "\n")), nil
+}
+
+// fontFace is the @font-face rule of an uploaded font file, for the weights in weight, or for every
+// weight when weight is empty.
+func fontFace(font *record.BrandAsset, weight string) string {
+	var b strings.Builder
+	b.WriteString("@font-face {\n")
+	b.WriteString("  font-family: " + uploadedFontFamily + ";\n")
+	b.WriteString("  src: url(\"" + brandasset.Path(font) + "\") format(\"woff2\");\n")
+	if weight != "" {
+		b.WriteString("  font-weight: " + weight + ";\n")
+	}
+	b.WriteString("  font-display: swap;\n")
+	b.WriteString("}\n")
+	return b.String()
+}
+
+// backgroundRule draws background behind the card at fit. A fit that is none of the three, which no
+// write stores, draws as cover, the fit migration 000091 gives every brand.
+func backgroundRule(background *record.BrandAsset, fit record.BrandBackgroundFit) string {
+	image := "  background-image: url(\"" + brandasset.Path(background) + "\");\n"
+	if fit == record.BrandBackgroundFitTile {
+		return ".auth-page {\n" + image + "  background-repeat: repeat;\n}\n"
+	}
+	size := "cover"
+	if fit == record.BrandBackgroundFitContain {
+		size = "contain"
+	}
+	return ".auth-page {\n" + image +
+		"  background-position: center;\n" +
+		"  background-size: " + size + ";\n" +
+		"  background-repeat: no-repeat;\n" +
+		"  background-attachment: fixed;\n" +
+		"}\n"
 }
 
 // ColorsStylesheet returns the stylesheet that sets brand's colors alone, its theme's, whatever its
@@ -138,11 +217,12 @@ func ColorsStylesheet(brand *record.Brand) (Stylesheet, error) {
 	return stylesheet, nil
 }
 
-// StylesheetPath returns the path a page links brand's full stylesheet by: the brand's id, and the
-// fingerprint of the stylesheet's contents, so the path changes exactly when the stylesheet does and
-// a browser may keep it for a year. A theme that is none of the built-in ones is an error.
-func StylesheetPath(brand *record.Brand) (string, error) {
-	stylesheet, err := FullStylesheet(brand)
+// StylesheetPath returns the path a page links brand's full stylesheet by, slots being the assets its
+// slots name: the brand's id, and the fingerprint of the stylesheet's contents, which name each file
+// it draws by the file's own fingerprint, so the path changes exactly when the stylesheet or a file
+// it draws does and a browser may keep it for a year. A theme that is none of the built-in ones is an error.
+func StylesheetPath(brand *record.Brand, slots brandasset.Slots) (string, error) {
+	stylesheet, err := FullStylesheet(brand, slots)
 	if err != nil {
 		return "", err
 	}

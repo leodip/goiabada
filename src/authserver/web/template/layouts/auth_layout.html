@@ -11,11 +11,18 @@
   {{- with .brandStylesheet }}
   <link rel="stylesheet" href="{{ . }}">
   {{- end }}
+  {{- /* A brand's favicon is linked as the one stored image, in place of Goiabada's icons and web
+       manifest (#813 decision 4). */}}
+  {{- with .brandFavicon }}
+  <link rel="icon" type="image/png" href="{{ . }}">
+  <link rel="apple-touch-icon" href="{{ . }}">
+  {{- else }}
   <link rel="icon" href="/static/favicon/favicon.ico">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
   <link rel="manifest" href="/static/favicon/site.webmanifest">
+  {{- end }}
   <script src="{{ asset "/static/utils.js" }}" defer></script>
   {{ template "head" . }}
 </head>
@@ -24,7 +31,27 @@
   <main class="auth-page">
     <div class="panel auth-card{{ if .layoutWide }} auth-card-wide{{ end }}">
       <div class="panel-body">
+        {{- /* The brand's logo sits above the app name, one image whichever mode the page is in. Its
+             alt is the app name only while the name's text is hidden, so a screen reader says the
+             name once (#813 decision 5). */}}
+        {{- if .brandLogo }}
+        {{- $alt := "" }}{{ if .brandHideAppName }}{{ $alt = .appName }}{{ end }}
+        <div class="auth-logo">
+          {{- if and .brandDarkLogo (eq $theme "dark") }}
+          <img src="{{ .brandDarkLogo }}" alt="{{ $alt }}">
+          {{- else if and .brandDarkLogo (not $theme) }}
+          <picture>
+            <source srcset="{{ .brandDarkLogo }}" media="(prefers-color-scheme: dark)">
+            <img src="{{ .brandLogo }}" alt="{{ $alt }}">
+          </picture>
+          {{- else }}
+          <img src="{{ .brandLogo }}" alt="{{ $alt }}">
+          {{- end }}
+        </div>
+        {{- end }}
+        {{- if not .brandHideAppName }}
         <p class="auth-brand">{{ .appName }}</p>
+        {{- end }}
         {{ if .layoutShowClientSection }}
         <div class="auth-client">
           {{ if .layoutHasClientLogo }}

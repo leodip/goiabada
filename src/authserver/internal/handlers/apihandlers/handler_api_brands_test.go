@@ -144,7 +144,7 @@ func TestBrandsGet_SortedByNameWithTheDefaultMarked(t *testing.T) {
 	// Zest draws no client, so the count leaves it out.
 	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{1: 5, 3: 2}, nil).Once()
 
-	status, body := serveBrand(HandleBrandsGet(database), brandRequest(t, http.MethodGet, nil))
+	status, body := serveBrand(HandleBrandsGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil))
 
 	require.Equal(t, http.StatusOK, status)
 	brands, _ := body["brands"].([]any)
@@ -163,6 +163,7 @@ func TestBrandsGet_SortedByNameWithTheDefaultMarked(t *testing.T) {
 	assert.Equal(t, map[string]any{
 		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum",
 		"corners": "rounded", "font": "system-ui", "backgroundFit": "cover", "hideAppName": false,
+		"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
 		"isDefault": false, "clientCount": float64(2),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, brands[0])
@@ -176,7 +177,7 @@ func TestBrandsGet_NoDefaultMarksNone(t *testing.T) {
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
 	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Once()
 
-	status, body := serveBrand(HandleBrandsGet(database), brandRequest(t, http.MethodGet, nil))
+	status, body := serveBrand(HandleBrandsGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil))
 
 	require.Equal(t, http.StatusOK, status)
 	brands, _ := body["brands"].([]any)
@@ -193,7 +194,7 @@ func TestBrandCreate_Refusals(t *testing.T) {
 			body := validBrandBody()
 			c.edit(body)
 
-			status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t)),
+			status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 				brandRequest(t, http.MethodPost, body))
 
 			assert.Equal(t, http.StatusBadRequest, status)
@@ -208,7 +209,7 @@ func TestBrandCreate_ANameAnotherBrandHoldsIsRefused(t *testing.T) {
 	database.On("CreateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(errs.Wrap(data.ErrUniqueViolation, "unable to insert brand")).Once()
 
-	status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t)),
+	status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 		brandRequest(t, http.MethodPost, validBrandBody()))
 
 	assert.Equal(t, http.StatusBadRequest, status)
@@ -220,7 +221,7 @@ func TestBrandWrites_AFailureOtherThanATakenNameIsAServerError(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.On("CreateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(errs.New("connection reset")).Once()
 
-		status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t)),
+		status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 			brandRequest(t, http.MethodPost, validBrandBody()))
 
 		assert.Equal(t, http.StatusInternalServerError, status)
@@ -232,7 +233,7 @@ func TestBrandWrites_AFailureOtherThanATakenNameIsAServerError(t *testing.T) {
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(errs.New("connection reset")).Once()
 
-		status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t)),
+		status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 			brandRequest(t, http.MethodPut, validBrandBody(), "id", "3"))
 
 		assert.Equal(t, http.StatusInternalServerError, status)
@@ -255,7 +256,7 @@ func TestBrandCreate_StoresTheTrimmedNameAndAudits(t *testing.T) {
 		"brand_id": int64(7), "brand_name": "Acme Corp", "logged_in_user": brandCaller,
 	}).Once()
 
-	status, body := serveBrand(HandleBrandCreatePost(database, auditLogger),
+	status, body := serveBrand(HandleBrandCreatePost(database, auditLogger, brandBaseURL),
 		brandRequest(t, http.MethodPost, map[string]any{"name": "  Acme Corp  ", "appearance": "light", "theme": "high-contrast",
 			"corners": "square", "font": "neo-grotesque", "backgroundFit": "tile", "hideAppName": true}))
 
@@ -266,6 +267,7 @@ func TestBrandCreate_StoresTheTrimmedNameAndAudits(t *testing.T) {
 	assert.Equal(t, map[string]any{
 		"id": float64(7), "name": "Acme Corp", "appearance": "light", "theme": "high-contrast",
 		"corners": "square", "font": "neo-grotesque", "backgroundFit": "tile", "hideAppName": true,
+		"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
 		"isDefault": false, "clientCount": float64(0),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, body["brand"])
@@ -292,7 +294,7 @@ func TestBrandCreate_EveryChoiceIsTakenAndTheSwitchIsFalseWhenAbsent(t *testing.
 			body := validBrandBody()
 			body[c.field] = c.value
 
-			status, answer := serveBrand(HandleBrandCreatePost(database, auditLogger), brandRequest(t, http.MethodPost, body))
+			status, answer := serveBrand(HandleBrandCreatePost(database, auditLogger, brandBaseURL), brandRequest(t, http.MethodPost, body))
 
 			require.Equal(t, http.StatusCreated, status, "%v", answer)
 			assert.Equal(t, c.value, brandAt(answer, "brand", c.field))
@@ -310,7 +312,7 @@ func TestBrandCreate_TheUploadedFontWithoutARegularFileIsRefused(t *testing.T) {
 	body := validBrandBody()
 	body["font"] = "uploaded"
 
-	status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t)),
+	status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 		brandRequest(t, http.MethodPost, body))
 
 	assert.Equal(t, http.StatusBadRequest, status)
@@ -326,7 +328,7 @@ func TestBrandCreate_SixtyCharactersAndEveryAppearanceAreTaken(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			auditLogger.On("Log", mock.Anything, audit.EventCreatedBrand, mock.Anything).Once()
 
-			status, _ := serveBrand(HandleBrandCreatePost(database, auditLogger),
+			status, _ := serveBrand(HandleBrandCreatePost(database, auditLogger, brandBaseURL),
 				brandRequest(t, http.MethodPost, map[string]any{"name": strings.Repeat("é", 60), "appearance": appearance, "theme": "blueberry",
 					"corners": "rounded", "font": "system-ui", "backgroundFit": "cover"}))
 
@@ -340,7 +342,7 @@ func TestBrandCreate_AnUnreadableBodyIsRefused(t *testing.T) {
 	req := brandRequest(t, http.MethodPost, nil)
 	req.Body = http.NoBody
 
-	status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t)), req)
+	status, answer := serveBrand(HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t), brandBaseURL), req)
 
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Equal(t, "INVALID_REQUEST_BODY", errorCode(answer))
@@ -357,12 +359,13 @@ func TestBrandGet(t *testing.T) {
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 		database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{1: 9, 3: 4}, nil).Once()
 
-		status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "3"))
+		status, body := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", "3"))
 
 		require.Equal(t, http.StatusOK, status)
 		assert.Equal(t, map[string]any{
 			"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum",
 			"corners": "rounded", "font": "system-ui", "backgroundFit": "cover", "hideAppName": false,
+			"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
 			"isDefault": false, "clientCount": float64(4),
 			"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 		}, body["brand"])
@@ -375,7 +378,7 @@ func TestBrandGet(t *testing.T) {
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 		database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{1: 9, 3: 4}, nil).Once()
 
-		status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "1"))
+		status, body := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", "1"))
 
 		require.Equal(t, http.StatusOK, status)
 		assert.Equal(t, true, brandAt(body, "brand", "isDefault"))
@@ -389,7 +392,7 @@ func TestBrandGet(t *testing.T) {
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 		database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{1: 9}, nil).Once()
 
-		status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "3"))
+		status, body := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", "3"))
 
 		require.Equal(t, http.StatusOK, status)
 		assert.InDelta(t, 0, brandAt(body, "brand", "clientCount"), 0)
@@ -402,7 +405,7 @@ func TestBrandGet(t *testing.T) {
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 		database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(nil, errs.New("connection reset")).Once()
 
-		status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "3"))
+		status, body := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", "3"))
 
 		assert.Equal(t, http.StatusInternalServerError, status)
 		assert.Nil(t, body["brand"])
@@ -411,7 +414,7 @@ func TestBrandGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
 
-		status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "99"))
+		status, body := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", "99"))
 
 		assert.Equal(t, http.StatusNotFound, status)
 		assert.Equal(t, "NOT_FOUND", errorCode(body))
@@ -420,7 +423,7 @@ func TestBrandGet(t *testing.T) {
 		t.Run("the id "+id, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 
-			status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", id))
+			status, body := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", id))
 
 			assert.Equal(t, http.StatusBadRequest, status)
 			assert.Equal(t, "VALIDATION_ERROR", errorCode(body))
@@ -439,7 +442,7 @@ func TestBrandUpdate_Refusals(t *testing.T) {
 			body := validBrandBody()
 			c.edit(body)
 
-			status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t)),
+			status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 				brandRequest(t, http.MethodPut, body, "id", "3"))
 
 			assert.Equal(t, http.StatusBadRequest, status)
@@ -453,7 +456,7 @@ func TestBrandUpdate_AnUnknownBrandIsNotFound(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
 
-	status, body := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t)),
+	status, body := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 		brandRequest(t, http.MethodPut, validBrandBody(), "id", "99"))
 
 	assert.Equal(t, http.StatusNotFound, status)
@@ -468,7 +471,7 @@ func TestBrandUpdate_ANameAnotherBrandHoldsIsRefused(t *testing.T) {
 	database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(errs.Wrap(data.ErrUniqueViolation, "unable to update brand")).Once()
 
-	status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t)),
+	status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 		brandRequest(t, http.MethodPut, map[string]any{"name": "Default", "appearance": "dark", "theme": "plum",
 			"corners": "rounded", "font": "system-ui", "backgroundFit": "cover"}, "id", "3"))
 
@@ -496,7 +499,7 @@ func TestBrandUpdate_ReplacesEveryFieldAndAudits(t *testing.T) {
 	}).Once()
 
 	// hideAppName is left out, so the stored true becomes false: an update is a full replace.
-	status, body := serveBrand(HandleBrandUpdatePut(database, auditLogger),
+	status, body := serveBrand(HandleBrandUpdatePut(database, auditLogger, brandBaseURL),
 		brandRequest(t, http.MethodPut, map[string]any{"name": " House ", "appearance": "light", "theme": "guava",
 			"corners": "pill", "font": "humanist", "backgroundFit": "contain"}, "id", "1"))
 
@@ -517,8 +520,7 @@ func TestBrandUpdate_ReplacesEveryFieldAndAudits(t *testing.T) {
 	assert.InDelta(t, 6, brandAt(body, "brand", "clientCount"), 0)
 }
 
-// storedKitBrand is a brand whose six slots are all filled, as no write of this API can fill them
-// yet: a brand read and written back keeps them.
+// storedKitBrand is a brand whose six slots are all filled: assets 11 to 16, kitAssets.
 func storedKitBrand() *record.Brand {
 	stored := storedBrand(4, "Acme", record.BrandAppearanceDark, "plum")
 	stored.Corners, stored.Font, stored.BackgroundFit, stored.HideAppName = "pill", "uploaded", "tile", true
@@ -531,11 +533,13 @@ func storedKitBrand() *record.Brand {
 	return stored
 }
 
-// An update names no slot yet, so the brand's stored slots are written back as they were, beside
-// the choices the update names (#813). A brand with a regular font file may keep the uploaded font.
-func TestBrandUpdate_KeepsTheStoredSlots(t *testing.T) {
+// An update is a full replace, the slots included: a slot the request leaves out is emptied, and one
+// it names takes the asset it names (#813 decision 10). The audit event lists the slots the brand
+// holds after the save, by asset id, and leaves an empty one out.
+func TestBrandUpdate_ReplacesTheSlots(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
+	expectBrandAssets(database)
 	var written record.Brand
 	database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
 		written = *args.Get(2).(*record.Brand)
@@ -544,28 +548,36 @@ func TestBrandUpdate_KeepsTheStoredSlots(t *testing.T) {
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Once()
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	auditLogger.On("Log", mock.Anything, audit.EventUpdatedBrand, mock.Anything).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedBrand, map[string]interface{}{
+		"brand_id": int64(4), "brand_name": "Acme", "appearance": "light", "theme": "guava",
+		"corners": "square", "font": "serif", "background_fit": "cover", "hide_app_name": true,
+		"logo_asset_id": int64(21), "background_asset_id": int64(23),
+		"logged_in_user": brandCaller,
+	}).Once()
 
-	status, body := serveBrand(HandleBrandUpdatePut(database, auditLogger),
+	status, body := serveBrand(HandleBrandUpdatePut(database, auditLogger, brandBaseURL),
 		brandRequest(t, http.MethodPut, map[string]any{"name": "Acme", "appearance": "light", "theme": "guava",
-			"corners": "square", "font": "uploaded", "backgroundFit": "cover", "hideAppName": true}, "id", "4"))
+			"corners": "square", "font": "serif", "backgroundFit": "cover", "hideAppName": true,
+			"logo": map[string]any{"id": 21}, "darkLogo": nil, "background": map[string]any{"id": 23}}, "id", "4"))
 
 	require.Equal(t, http.StatusOK, status, "%v", body)
-	assert.Equal(t, record.BrandCorners("square"), written.Corners)
-	assert.Equal(t, record.BrandFont("uploaded"), written.Font)
-	assert.Equal(t, record.BrandBackgroundFit("cover"), written.BackgroundFit)
-	assert.True(t, written.HideAppName)
-	assert.Equal(t, []sql.NullInt64{
-		{Int64: 11, Valid: true}, {Int64: 12, Valid: true}, {Int64: 13, Valid: true},
-		{Int64: 14, Valid: true}, {Int64: 15, Valid: true}, {Int64: 16, Valid: true},
-	}, []sql.NullInt64{written.LogoAssetId, written.DarkLogoAssetId, written.FaviconAssetId,
-		written.BackgroundAssetId, written.RegularFontAssetId, written.BoldFontAssetId})
+	assert.Equal(t, []sql.NullInt64{{Int64: 21, Valid: true}, {}, {}, {Int64: 23, Valid: true}, {}, {}},
+		[]sql.NullInt64{written.LogoAssetId, written.DarkLogoAssetId, written.FaviconAssetId,
+			written.BackgroundAssetId, written.RegularFontAssetId, written.BoldFontAssetId})
+	assert.InDelta(t, 21, brandAt(body, "brand", "logo", "id"), 0)
+	assert.Nil(t, brandAt(body, "brand", "darkLogo"))
+	assert.Nil(t, brandAt(body, "brand", "favicon"))
+	assert.InDelta(t, 23, brandAt(body, "brand", "background", "id"), 0)
+	assert.Nil(t, brandAt(body, "brand", "regularFont"))
+	assert.Nil(t, brandAt(body, "brand", "boldFont"))
 }
 
-// A brand read and written back is unchanged: its answer, sent as an update, writes what was stored.
+// A brand answered, then sent back as its own update, is written exactly as it was stored, its six
+// slots included: each slot answers the id a write names it by (#813 decision 10).
 func TestBrandUpdate_ABrandReadAndWrittenBackIsUnchanged(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Twice()
+	expectBrandAssets(database)
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Twice()
 	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Twice()
@@ -576,34 +588,35 @@ func TestBrandUpdate_ABrandReadAndWrittenBackIsUnchanged(t *testing.T) {
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedBrand, mock.Anything).Once()
 
-	status, read := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "4"))
+	status, read := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", "4"))
 	require.Equal(t, http.StatusOK, status)
-	status, _ = serveBrand(HandleBrandUpdatePut(database, auditLogger),
+	status, again := serveBrand(HandleBrandUpdatePut(database, auditLogger, brandBaseURL),
 		brandRequest(t, http.MethodPut, read["brand"], "id", "4"))
 
-	require.Equal(t, http.StatusOK, status)
+	require.Equal(t, http.StatusOK, status, "%v", again)
 	assert.Equal(t, *storedKitBrand(), written)
+	assert.Equal(t, read["brand"], again["brand"])
 }
 
-// The uploaded font is refused on an update while the brand has no regular font file, and a bold
-// file alone is not one (#813 decision 7).
+// The uploaded font is refused while the brand names no regular font file, and a bold file alone is
+// not one (#813 decision 7).
 func TestBrandUpdate_TheUploadedFontWithoutARegularFileIsRefused(t *testing.T) {
 	for _, tc := range []struct {
 		name string
-		bold sql.NullInt64
+		bold any
 	}{
-		{"no font file", sql.NullInt64{}},
-		{"a bold file alone", sql.NullInt64{Int64: 16, Valid: true}},
+		{"no font file", nil},
+		{"a bold file alone", map[string]any{"id": 24}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			stored := storedBrand(4, "Acme", record.BrandAppearanceDark, "plum")
-			stored.BoldFontAssetId = tc.bold
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(stored, nil).Once()
+			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
+			expectBrandAssets(database).Maybe()
 			body := validBrandBody()
 			body["font"] = "uploaded"
+			body["boldFont"] = tc.bold
 
-			status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t)),
+			status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 				brandRequest(t, http.MethodPut, body, "id", "4"))
 
 			assert.Equal(t, http.StatusBadRequest, status)
@@ -692,13 +705,14 @@ func TestBrandMakeDefault_MovesTheDefaultAndAuditsBothBrands(t *testing.T) {
 		"logged_in_user": brandCaller,
 	}).Once()
 
-	status, body := serveBrand(HandleBrandMakeDefaultPost(database, auditLogger),
+	status, body := serveBrand(HandleBrandMakeDefaultPost(database, auditLogger, brandBaseURL),
 		brandRequest(t, http.MethodPost, nil, "id", "3"))
 
 	require.Equal(t, http.StatusOK, status)
 	assert.Equal(t, map[string]any{
 		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum",
 		"corners": "rounded", "font": "system-ui", "backgroundFit": "cover", "hideAppName": false,
+		"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
 		"isDefault": true, "clientCount": float64(8),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, body["brand"])
@@ -712,7 +726,7 @@ func TestBrandMakeDefault_TheDefaultAlreadyRecordsNothing(t *testing.T) {
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 	database.On("CountClientsPerBrand", mock.Anything, brandTx).Return(map[int64]int{1: 4}, nil).Once()
 
-	status, body := serveBrand(HandleBrandMakeDefaultPost(database, handlersmocks.NewAuditLogger(t)),
+	status, body := serveBrand(HandleBrandMakeDefaultPost(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 		brandRequest(t, http.MethodPost, nil, "id", "1"))
 
 	require.Equal(t, http.StatusOK, status)
@@ -724,7 +738,7 @@ func TestBrandMakeDefault_AnUnknownBrandIsNotFound(t *testing.T) {
 	datamocks.ExpectRunInTransaction(database, brandTx)
 	database.On("MakeBrandDefault", mock.Anything, brandTx, int64(99)).Return(int64(0), errs.WithStack(data.ErrBrandNotFound)).Once()
 
-	status, body := serveBrand(HandleBrandMakeDefaultPost(database, handlersmocks.NewAuditLogger(t)),
+	status, body := serveBrand(HandleBrandMakeDefaultPost(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 		brandRequest(t, http.MethodPost, nil, "id", "99"))
 
 	assert.Equal(t, http.StatusNotFound, status)

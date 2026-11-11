@@ -124,7 +124,9 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
 | `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
 | `auth_state` | The step of the sign-in the browser most recently moved, when a page of a sign-in it no longer holds, or of none, was refused. |
+| `background_asset_id` | The row id of the brand asset in a brand's background slot after the save, left out when the slot is empty. |
 | `background_fit` | How a brand's background image fills the page after the save: `cover`, `contain` or `tile`. |
+| `bold_font_asset_id` | The row id of the brand asset in a brand's bold font slot after the save, left out when the slot is empty. |
 | `brand_asset_id` | The row id of an uploaded brand asset. |
 | `brand_id` | The brand's row id. On `updated_default_brand`, the brand that is now the default. On `updated_client_brand`, the brand the client was given, left out when it went back to the default brand. |
 | `brand_name` | The brand's name. On `updated_default_brand`, the brand that is now the default. On `updated_client_brand`, the brand the client was given, left out when it went back to the default brand. |
@@ -138,8 +140,10 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `command` | `goiabada-authserver recover`, on every entry the `recover` command writes. An entry an API request made names its token's subject under `logged_in_user` instead. |
 | `consent_id` | The row id of a consent a user gave a client. |
 | `corners` | A brand's corners after the save: `square`, `rounded` or `pill`. |
+| `dark_logo_asset_id` | The row id of the brand asset in a brand's dark logo slot after the save, left out when the slot is empty. |
 | `dpop_bound_access_tokens` | Whether the client now requires DPoP for its token requests. |
 | `email_digest` | The SHA-256 hex digest of the email address the entry is about, in lowercase and, except on a forgot-password request, trimmed: one typed into a form or named by a password grant, an account's, or a test email's recipient. |
+| `favicon_asset_id` | The row id of the brand asset in a brand's favicon slot after the save, left out when the slot is empty. |
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
 | `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
 | `font` | A brand's font family after the save, such as `system-ui`, or `uploaded` for its uploaded font. |
@@ -166,6 +170,7 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `legal_document_id` | The legal document's row id. |
 | `limiter` | The name of the rate limiter that refused. |
 | `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. A user's token also fills the entry's `logged_in_user_id` column with that user's row id. |
+| `logo_asset_id` | The row id of the brand asset in a brand's logo slot after the save, left out when the slot is empty. |
 | `max_user_sessions_per_user` | Under `old` and `new`: the most sessions one user can hold, 0 for no limit. |
 | `method` | The HTTP method of a refused Admin API request. |
 | `new` | The default token settings, the session settings, or the Turnstile settings, after the change, keyed as below. |
@@ -187,6 +192,7 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `refresh_token_jti` | The `jti` of the refresh token issued. |
 | `refresh_token_offline_idle_timeout_in_seconds` | Under `old` and `new`: the default idle timeout of an offline refresh token, in seconds. |
 | `refresh_token_offline_max_lifetime_in_seconds` | Under `old` and `new`: the default maximum lifetime of an offline refresh token, in seconds. |
+| `regular_font_asset_id` | The row id of the brand asset in a brand's regular font slot after the save, left out when the slot is empty. |
 | `remaining` | How many of a user's recovery codes are left unused after one signed in. |
 | `removed_client_ids` | The row ids of the clients a save of a legal document's apps removed. |
 | `removed_resource_ids` | The row ids of the resources a save of a client's introspection resources removed. |
@@ -433,7 +439,7 @@ These come from the Account API, which users reach through the admin console's a
 | Event | Meaning |
 |---|---|
 | `created_brand` | An administrator created a brand. |
-| `updated_brand` | An administrator saved a brand's name, appearance, theme, corners, font, background fit and whether the app name is hidden. |
+| `updated_brand` | An administrator saved a brand's name, appearance, theme, corners, font, background fit, whether the app name is hidden, and the assets in its logo, dark logo, favicon, background and font slots. |
 | `deleted_brand` | An administrator deleted a brand. The entry says how many clients moved to the default brand. |
 | `updated_default_brand` | An administrator made another brand the default. The entry names the new and the old default. |
 | `uploaded_brand_asset` | An administrator uploaded a file for a brand's logo, favicon, background or font. No brand uses it until one is saved naming it. |

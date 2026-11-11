@@ -432,7 +432,7 @@ func HandleBrandPost(
 		}
 
 		// An update replaces every field (#813 decision 10), and the form has no field for the kit's
-		// choices yet, so the brand's stored ones are sent back unchanged.
+		// choices or its slots yet, so the brand's stored ones are sent back unchanged.
 		form := brandFormFrom(r)
 		_, err := apiClient.UpdateBrand(r.Context(), token, id, &api.UpdateBrandRequest{
 			Name:          form.Name,
@@ -442,6 +442,12 @@ func HandleBrandPost(
 			Font:          brand.Font,
 			BackgroundFit: brand.BackgroundFit,
 			HideAppName:   brand.HideAppName,
+			Logo:          storedSlot(brand.Logo),
+			DarkLogo:      storedSlot(brand.DarkLogo),
+			Favicon:       storedSlot(brand.Favicon),
+			Background:    storedSlot(brand.Background),
+			RegularFont:   storedSlot(brand.RegularFont),
+			BoldFont:      storedSlot(brand.BoldFont),
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -459,6 +465,14 @@ func HandleBrandPost(
 		settingsCache.Invalidate()
 		redirectToBrandWithFlash(httpHelper, httpSession, w, r, baseURL, id, "savedSuccessfully")
 	}
+}
+
+// storedSlot names the asset a stored slot holds, as a write names it, or none for an empty slot.
+func storedSlot(asset *api.BrandAssetResponse) *api.BrandAssetRef {
+	if asset == nil {
+		return nil
+	}
+	return &api.BrandAssetRef{Id: asset.Id}
 }
 
 // redirectToBrandWithFlash goes back to the brand's page, which says once what flash names.

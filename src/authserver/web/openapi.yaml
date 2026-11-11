@@ -2346,7 +2346,8 @@ paths:
       tags: [Brands]
       summary: Create brand
       description: |
-        Create a brand. It is not the default until it is made the default.
+        Create a brand. It is not the default until it is made the default. Each asset slot
+        names a file uploaded first as a brand asset of the slot's kind.
       operationId: createBrand
       requestBody:
         required: true
@@ -2410,9 +2411,10 @@ paths:
       tags: [Brands]
       summary: Update brand
       description: |
-        Replace a brand's name, appearance, theme and kit choices. Every field is written: a
-        choice left out is refused, and hideAppName left out is false. A change to the default
-        brand restyles every page at once.
+        Replace a brand's name, appearance, theme, kit choices and asset slots. Every field is
+        written: a choice left out is refused, hideAppName left out is false, and a slot left out
+        or null is emptied. A brand read and sent back is unchanged. A change to the default brand
+        restyles every page at once.
       operationId: updateBrand
       parameters:
         - $ref: '#/components/parameters/BrandIdParam'
@@ -8438,10 +8440,34 @@ components:
           description: >-
             The absolute URL of the brand's stylesheet that sets its colors alone, which an admin
             page links after main.css. The URL changes whenever the stylesheet does.
+        logoUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's logo, absent when it has none. The URL changes whenever
+            the image does.
+        darkLogoUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the logo drawn in dark mode in place of logoUrl, absent when the
+            brand has no dark logo or no logo.
+        faviconUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's favicon, a square PNG, absent when it has none. A page
+            links it as its icon and its Apple touch icon, in place of the built-in icons.
+        hideAppName:
+          type: boolean
+          description: >-
+            Whether the app name's text gives way to the logo, which then carries the name as its
+            alternative text. Always false while the brand has no logo.
       required:
         - appearance
         - stylesheetUrl
         - colorsStylesheetUrl
+        - hideAppName
 
     PasswordRulesResponse:
       type: object
@@ -8820,6 +8846,36 @@ components:
         hideAppName:
           type: boolean
           description: Whether the app name's text is hidden beside the brand's logo.
+        logo:
+          description: The logo drawn above the app name on a card, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        darkLogo:
+          description: The logo drawn in dark mode in place of logo, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        favicon:
+          description: The favicon, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        background:
+          description: The image behind the card, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        regularFont:
+          description: The uploaded font's regular file, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        boldFont:
+          description: The uploaded font's bold file, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
         isDefault:
           type: boolean
           description: True for the default brand, the one a client with no brand of its own is drawn in.
@@ -8843,6 +8899,12 @@ components:
         - font
         - backgroundFit
         - hideAppName
+        - logo
+        - darkLogo
+        - favicon
+        - background
+        - regularFont
+        - boldFont
         - isDefault
         - clientCount
         - createdAt
@@ -8886,6 +8948,36 @@ components:
         hideAppName:
           type: boolean
           default: false
+        logo:
+          description: A stored asset of kind logo. Left out or null for none.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        darkLogo:
+          description: A stored asset of kind logo, drawn in dark mode. Refused without a logo.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        favicon:
+          description: A stored asset of kind favicon.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        background:
+          description: A stored asset of kind background.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        regularFont:
+          description: A stored asset of kind font. The uploaded font is drawn from it.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        boldFont:
+          description: A stored asset of kind font, for the heavier weights. Refused without a regular font file.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
       required:
         - name
         - appearance
@@ -8938,6 +9030,36 @@ components:
         hideAppName:
           type: boolean
           default: false
+        logo:
+          description: A stored asset of kind logo. Left out or null for none.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        darkLogo:
+          description: A stored asset of kind logo, drawn in dark mode. Refused without a logo.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        favicon:
+          description: A stored asset of kind favicon.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        background:
+          description: A stored asset of kind background.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        regularFont:
+          description: A stored asset of kind font. The uploaded font is drawn from it.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        boldFont:
+          description: A stored asset of kind font, for the heavier weights. Refused without a regular font file.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
       required:
         - name
         - appearance
@@ -8994,6 +9116,19 @@ components:
             $ref: '#/components/schemas/BrandThemeResponse'
       required:
         - brandThemes
+
+    BrandAssetRef:
+      type: object
+      description: |
+        A stored brand asset named by its id, as uploaded with a brand asset upload. A slot must
+        name an asset of its own kind; an asset no brand has used for a day is swept, and an id
+        naming none is refused.
+      properties:
+        id:
+          type: integer
+          format: int64
+      required:
+        - id
 
     BrandAssetResponse:
       type: object

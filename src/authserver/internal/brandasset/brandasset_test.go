@@ -3,12 +3,14 @@ package brandasset
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"image"
 	"image/png"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -124,4 +126,87 @@ func TestPath_NamesTheAssetByIdAndItsFingerprint(t *testing.T) {
 	asset := &record.BrandAsset{Id: 7, Fingerprint: "0123456789ab"}
 
 	assert.Equal(t, "/brand-assets/7?v=0123456789ab", Path(asset))
+}
+
+// slotsBrand is a brand whose six slots name the assets 11 to 16, in slot order.
+func slotsBrand() *record.Brand {
+	brand := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
+	for i, slot := range []*sql.NullInt64{&brand.LogoAssetId, &brand.DarkLogoAssetId, &brand.FaviconAssetId,
+		&brand.BackgroundAssetId, &brand.RegularFontAssetId, &brand.BoldFontAssetId} {
+		*slot = sql.NullInt64{Int64: int64(11 + i), Valid: true}
+	}
+	return &brand
+}
+
+func TestSlotIds_TheFilledSlotsInSlotOrder(t *testing.T) {
+	assert.Equal(t, []int64{11, 12, 13, 14, 15, 16}, SlotIds(slotsBrand()))
+
+	brand := slotsBrand()
+	brand.LogoAssetId, brand.FaviconAssetId, brand.BoldFontAssetId = sql.NullInt64{}, sql.NullInt64{}, sql.NullInt64{}
+	assert.Equal(t, []int64{12, 14, 15}, SlotIds(brand))
+
+	empty := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
+	assert.Empty(t, SlotIds(&empty))
+
+	// An asset two slots name, as the two logo slots may, is read once.
+	brand = slotsBrand()
+	brand.DarkLogoAssetId = brand.LogoAssetId
+	assert.Equal(t, []int64{11, 13, 14, 15, 16}, SlotIds(brand))
+}
+
+func TestSlotsOf_EachSlotTakesTheAssetItNames(t *testing.T) {
+	assets := []record.BrandAsset{{Id: 16}, {Id: 99}, {Id: 14}, {Id: 13}, {Id: 12}, {Id: 11}, {Id: 15}}
+
+	slots := SlotsOf(slotsBrand(), assets)
+
+	got := []*record.BrandAsset{slots.Logo, slots.DarkLogo, slots.Favicon, slots.Background, slots.RegularFont, slots.BoldFont}
+	for i, asset := range got {
+		require.NotNil(t, asset, "slot %d", i)
+		assert.Equal(t, int64(11+i), asset.Id, "slot %d", i)
+	}
+
+	// An empty slot stays empty whatever is read, and so does one whose asset was not.
+	brand := slotsBrand()
+	brand.FaviconAssetId = sql.NullInt64{}
+	slots = SlotsOf(brand, []record.BrandAsset{{Id: 11}, {Id: 13}})
+	assert.Equal(t, int64(11), slots.Logo.Id)
+	assert.Nil(t, slots.DarkLogo)
+	assert.Nil(t, slots.Favicon)
+	assert.Nil(t, slots.Background)
+}
+
+// assetsStub answers the assets of the ids it is asked for among its own, and counts the reads.
+type assetsStub struct {
+	assets []record.BrandAsset
+	err    error
+	asked  [][]int64
+}
+
+func (s *assetsStub) GetBrandAssetsByIds(_ context.Context, _ *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
+	s.asked = append(s.asked, ids)
+	return s.assets, s.err
+}
+
+func TestReadSlots_ReadsTheFilledSlotsOnceAndNothingForAnEmptyBrand(t *testing.T) {
+	reader := &assetsStub{assets: []record.BrandAsset{{Id: 12, Kind: record.BrandAssetKindLogo, Fingerprint: "abcdefabcdef"}}}
+	brand := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
+	brand.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
+
+	slots, err := ReadSlots(context.Background(), reader, &brand)
+
+	require.NoError(t, err)
+	assert.Equal(t, [][]int64{{12}}, reader.asked)
+	require.NotNil(t, slots.DarkLogo)
+	assert.Equal(t, "abcdefabcdef", slots.DarkLogo.Fingerprint)
+
+	empty := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
+	none := &assetsStub{}
+	slots, err = ReadSlots(context.Background(), none, &empty)
+	require.NoError(t, err)
+	assert.Equal(t, Slots{}, slots)
+	assert.Empty(t, none.asked, "a brand with every slot empty reads no asset")
+
+	failing := &assetsStub{err: errs.New("connection reset")}
+	_, err = ReadSlots(context.Background(), failing, slotsBrand())
+	assert.ErrorContains(t, err, "connection reset")
 }

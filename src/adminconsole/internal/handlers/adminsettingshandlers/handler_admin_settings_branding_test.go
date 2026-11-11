@@ -98,7 +98,10 @@ func newBrandingAPI() *brandingAPI {
 	return &brandingAPI{
 		brands: []api.BrandResponse{
 			{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
-				Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true},
+				Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true,
+				Logo:        &api.BrandAssetResponse{Id: 11, Kind: "logo", Url: "https://auth.example.test/brand-assets/11?v=a", ContentType: "image/png", Width: 200, Height: 60},
+				Favicon:     &api.BrandAssetResponse{Id: 13, Kind: "favicon", Url: "https://auth.example.test/brand-assets/13?v=c", ContentType: "image/png", Width: 64, Height: 64},
+				RegularFont: &api.BrandAssetResponse{Id: 15, Kind: "font", Url: "https://auth.example.test/brand-assets/15?v=e", ContentType: "font/woff2"}},
 			{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 			{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
 			{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
@@ -121,9 +124,7 @@ func TestHandleBrandingGet_ListsTheBrandsInTheServersOrderWithTheirLookInWords(t
 		handlertest.Request(http.MethodGet, "/admin/settings/branding", handlertest.WithAccessToken()))
 
 	assert.Equal(t, []BrandRow{
-		{BrandResponse: api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
-			Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true},
-			AppearanceName: "Dark", ThemeName: "Plum"},
+		{BrandResponse: newBrandingAPI().brands[0], AppearanceName: "Dark", ThemeName: "Plum"},
 		{BrandResponse: api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 			AppearanceName: "Automatic", ThemeName: "Blueberry"},
 		{BrandResponse: api.BrandResponse{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
@@ -246,8 +247,7 @@ func TestHandleBrandGet_DrawsTheStoredBrand(t *testing.T) {
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, false, bind["isNew"])
 	assert.Equal(t, BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum"}, bind["brand"])
-	assert.Equal(t, api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
-		Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true}, bind["storedBrand"])
+	assert.Equal(t, newBrandingAPI().brands[0], bind["storedBrand"])
 	assert.Equal(t, wantThemeOptions, bind["brandThemes"])
 	assert.Equal(t, wantThemeOptions[1], bind["appearanceTheme"], "the appearance cards show the brand's theme")
 	assert.Equal(t, false, bind["savedSuccessfully"])
@@ -269,8 +269,9 @@ func TestHandleBrandGet_AnUnknownOrMalformedBrandIsNotFound(t *testing.T) {
 }
 
 // A save of a brand's three fields, and the edit page it lands on, which says it was saved once. The
-// form has no field for the kit's choices yet, so the brand's stored ones are sent back unchanged,
-// as an update replaces every field (#813 decision 10).
+// form has no field for the kit's choices or its slots yet, so the brand's stored ones are sent back
+// unchanged, each slot by its asset's id and an empty one as none, as an update replaces every field
+// (#813 decision 10).
 func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	store := newSettingsTestStore()
 	apiClient := newBrandingAPI()
@@ -286,7 +287,9 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 
 	assert.Equal(t, int64(4), apiClient.updatedId)
 	assert.Equal(t, &api.UpdateBrandRequest{Name: "Winter", Appearance: "light", Theme: "blueberry",
-		Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true}, apiClient.updated)
+		Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true,
+		Logo: &api.BrandAssetRef{Id: 11}, Favicon: &api.BrandAssetRef{Id: 13}, RegularFont: &api.BrandAssetRef{Id: 15}},
+		apiClient.updated)
 	assert.Equal(t, http.StatusFound, w.Code)
 	assert.Equal(t, "https://console.example.test/admin/settings/branding/4/edit", w.Header().Get("Location"))
 	assert.Equal(t, 1, cache.invalidations, "a saved brand may be the default, so every page is drawn again")

@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -29,7 +30,8 @@ import (
 // last write of a brand wins, as for resources and groups.
 
 // brandsDatabase is what the brand endpoints need: the brands, the default pointer, the count of
-// clients drawn in each, and the transaction the pointer's writes take the settings row's lock in.
+// clients drawn in each, the assets the brands' slots name, read without their bytes, and the
+// transaction the pointer's writes take the settings row's lock in.
 type brandsDatabase interface {
 	CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
 	UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
@@ -39,17 +41,42 @@ type brandsDatabase interface {
 	MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int64) (int64, error)
 	DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (int, error)
 	CountClientsPerBrand(ctx context.Context, tx *sql.Tx) (map[int64]int, error)
+	brandasset.SlotsReader
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
-// brandFields are what a create and an update name: every field of a brand but its asset slots.
+// brandFields are what a create and an update name: every field of a brand, each slot by the id of
+// the asset it holds, nil for an empty slot.
 type brandFields struct {
 	name, appearance, theme, corners, font, backgroundFit string
 	hideAppName                                           bool
+	logo, darkLogo, favicon, background, regularFont      *api.BrandAssetRef
+	boldFont                                              *api.BrandAssetRef
+}
+
+func createBrandFields(req api.CreateBrandRequest) brandFields {
+	return brandFields{
+		name: req.Name, appearance: req.Appearance, theme: req.Theme,
+		corners: req.Corners, font: req.Font, backgroundFit: req.BackgroundFit, hideAppName: req.HideAppName,
+		logo: req.Logo, darkLogo: req.DarkLogo, favicon: req.Favicon, background: req.Background,
+		regularFont: req.RegularFont, boldFont: req.BoldFont,
+	}
+}
+
+func updateBrandFields(req api.UpdateBrandRequest) brandFields {
+	return createBrandFields(api.CreateBrandRequest(req))
+}
+
+// slotOf is the slot a reference fills: the asset id it names, or an empty slot for none.
+func slotOf(ref *api.BrandAssetRef) sql.NullInt64 {
+	if ref == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: ref.Id, Valid: true}
 }
 
 // validateBrand holds a create's or an update's fields to #810 decision 5 and #813 decision 10, and
-// answers them as stored, on a brand with every slot empty: the name trimmed, required, at most
+// answers them as stored, each slot naming the asset id the request names: the name trimmed, required, at most
 // record.BrandNameMaxLength characters and without angle brackets; the appearance, the theme, the
 // corners, the font and the background fit each one of their keys, exactly. A missing choice is
 // refused as an unknown one, so a misspelt field name is reported and never becomes a default. The
@@ -86,17 +113,88 @@ func validateBrand(fields brandFields) (record.Brand, error) {
 	brand.Font = record.BrandFont(fields.font)
 	brand.BackgroundFit = record.BrandBackgroundFit(fields.backgroundFit)
 	brand.HideAppName = fields.hideAppName
+	brand.LogoAssetId = slotOf(fields.logo)
+	brand.DarkLogoAssetId = slotOf(fields.darkLogo)
+	brand.FaviconAssetId = slotOf(fields.favicon)
+	brand.BackgroundAssetId = slotOf(fields.background)
+	brand.RegularFontAssetId = slotOf(fields.regularFont)
+	brand.BoldFontAssetId = slotOf(fields.boldFont)
 	return brand, nil
 }
 
-// validateBrandFont holds a brand's font to the slots it is written with: the uploaded font is
-// drawn from the regular font file, so it is refused while that slot is empty, a bold file alone
-// included (#813 decision 7).
-func validateBrandFont(brand *record.Brand) error {
-	if brand.Font == record.BrandFontUploaded && !brand.RegularFontAssetId.Valid {
-		return i18n.NewLocalizedError(i18n.ErrCodeBrandUploadedFontRegularRequired, nil)
+// brandSlotRules are the six slots in slot order, each with the kind of asset it holds and its
+// refusal: both logo slots hold a logo, and both font slots a font (#813 decision 3).
+var brandSlotRules = []struct {
+	slot func(brand *record.Brand) sql.NullInt64
+	kind record.BrandAssetKind
+	code string
+}{
+	{func(b *record.Brand) sql.NullInt64 { return b.LogoAssetId }, record.BrandAssetKindLogo, i18n.ErrCodeBrandLogoAssetInvalid},
+	{func(b *record.Brand) sql.NullInt64 { return b.DarkLogoAssetId }, record.BrandAssetKindLogo, i18n.ErrCodeBrandDarkLogoAssetInvalid},
+	{func(b *record.Brand) sql.NullInt64 { return b.FaviconAssetId }, record.BrandAssetKindFavicon, i18n.ErrCodeBrandFaviconAssetInvalid},
+	{func(b *record.Brand) sql.NullInt64 { return b.BackgroundAssetId }, record.BrandAssetKindBackground, i18n.ErrCodeBrandBackgroundAssetInvalid},
+	{func(b *record.Brand) sql.NullInt64 { return b.RegularFontAssetId }, record.BrandAssetKindFont, i18n.ErrCodeBrandRegularFontAssetInvalid},
+	{func(b *record.Brand) sql.NullInt64 { return b.BoldFontAssetId }, record.BrandAssetKindFont, i18n.ErrCodeBrandBoldFontAssetInvalid},
+}
+
+// validateBrandSlots holds the slots brand is written with to #813 decisions 5, 7 and 10, and answers
+// the assets they name, read without their bytes. A dark logo is drawn in place of the logo, so it is
+// refused without one; the uploaded font is drawn from the regular font file, so it is refused while
+// that slot is empty, a bold file alone included; and a bold file is refused without a regular one.
+// Then each filled slot must name a stored asset of its kind, or the write is refused at that slot,
+// an asset since swept being none. A refusal is an *i18n.LocalizedError; a read that fails is not.
+func validateBrandSlots(ctx context.Context, assets brandasset.SlotsReader, brand *record.Brand) (brandasset.Slots, error) {
+	switch {
+	case brand.DarkLogoAssetId.Valid && !brand.LogoAssetId.Valid:
+		return brandasset.Slots{}, i18n.NewLocalizedError(i18n.ErrCodeBrandDarkLogoLogoRequired, nil)
+	case brand.Font == record.BrandFontUploaded && !brand.RegularFontAssetId.Valid:
+		return brandasset.Slots{}, i18n.NewLocalizedError(i18n.ErrCodeBrandUploadedFontRegularRequired, nil)
+	case brand.BoldFontAssetId.Valid && !brand.RegularFontAssetId.Valid:
+		return brandasset.Slots{}, i18n.NewLocalizedError(i18n.ErrCodeBrandBoldFontRegularRequired, nil)
 	}
-	return nil
+
+	ids := brandasset.SlotIds(brand)
+	if len(ids) == 0 {
+		return brandasset.Slots{}, nil
+	}
+	stored, err := assets.GetBrandAssetsByIds(ctx, nil, ids)
+	if err != nil {
+		return brandasset.Slots{}, errs.Wrap(err, "database error reading the assets a brand's slots name")
+	}
+	for _, rule := range brandSlotRules {
+		slot := rule.slot(brand)
+		if !slot.Valid {
+			continue
+		}
+		found := slices.ContainsFunc(stored, func(asset record.BrandAsset) bool {
+			return asset.Id == slot.Int64 && asset.Kind == rule.kind
+		})
+		if !found {
+			return brandasset.Slots{}, i18n.NewLocalizedError(rule.code, nil)
+		}
+	}
+	return brandasset.SlotsOf(brand, stored), nil
+}
+
+// writeBrandSlotsError answers a write whose slots validateBrandSlots refused or could not read.
+func writeBrandSlotsError(w http.ResponseWriter, r *http.Request, err error) {
+	var localized *i18n.LocalizedError
+	if errors.As(err, &localized) {
+		writeValidationError(w, r, err)
+		return
+	}
+	writeInternalServerError(w, r, err)
+}
+
+// readBrandSlots reads the assets brand's slots name, answering the request when it cannot: an answer
+// without them would read back as a brand with empty slots.
+func readBrandSlots(w http.ResponseWriter, r *http.Request, assets brandasset.SlotsReader, brand *record.Brand) (brandasset.Slots, bool) {
+	slots, err := brandasset.ReadSlots(r.Context(), assets, brand)
+	if err != nil {
+		writeInternalServerError(w, r, err, "brand_id", brand.Id)
+		return brandasset.Slots{}, false
+	}
+	return slots, true
 }
 
 // brandNameTaken answers a brand write the engine refused on the name's unique key: the name was
@@ -169,7 +267,7 @@ func brandClientCounts(w http.ResponseWriter, r *http.Request, database brandsDa
 }
 
 // HandleBrandsGet - GET /api/v1/admin/brands
-func HandleBrandsGet(database brandsDatabase) http.HandlerFunc {
+func HandleBrandsGet(database brandsDatabase, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		brands, err := database.GetAllBrands(r.Context(), nil)
 		if err != nil {
@@ -185,34 +283,51 @@ func HandleBrandsGet(database brandsDatabase) http.HandlerFunc {
 			return
 		}
 
+		// Every brand's assets are read at once, without their bytes, and none when no slot is filled.
+		var ids []int64
+		for i := range brands {
+			for _, id := range brandasset.SlotIds(&brands[i]) {
+				if !slices.Contains(ids, id) {
+					ids = append(ids, id)
+				}
+			}
+		}
+		var assets []record.BrandAsset
+		if len(ids) > 0 {
+			assets, err = database.GetBrandAssetsByIds(r.Context(), nil, ids)
+			if err != nil {
+				writeInternalServerError(w, r, errs.Wrap(err, "database error reading the assets of the brands' slots"))
+				return
+			}
+		}
+
 		slices.SortFunc(brands, func(a, b record.Brand) int { return strings.Compare(a.Name, b.Name) })
 
 		response := api.GetBrandsResponse{Brands: make([]api.BrandResponse, 0, len(brands))}
 		for i := range brands {
-			response.Brands = append(response.Brands, apimapping.ToBrandResponse(&brands[i], brands[i].Id == defaultId, counts[brands[i].Id]))
+			response.Brands = append(response.Brands, apimapping.ToBrandResponse(&brands[i], brandasset.SlotsOf(&brands[i], assets), baseURL,
+				brands[i].Id == defaultId, counts[brands[i].Id]))
 		}
 		writeJSON(w, r, http.StatusOK, response)
 	}
 }
 
 // HandleBrandCreatePost - POST /api/v1/admin/brands
-func HandleBrandCreatePost(database brandsDatabase, auditLogger AuditLogger) http.HandlerFunc {
+func HandleBrandCreatePost(database brandsDatabase, auditLogger AuditLogger, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.CreateBrandRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		brand, err := validateBrand(brandFields{
-			name: req.Name, appearance: req.Appearance, theme: req.Theme,
-			corners: req.Corners, font: req.Font, backgroundFit: req.BackgroundFit, hideAppName: req.HideAppName,
-		})
-		if err == nil {
-			// A create names no asset yet, so every slot is empty.
-			err = validateBrandFont(&brand)
-		}
+		brand, err := validateBrand(createBrandFields(req))
 		if err != nil {
 			writeValidationError(w, r, err)
+			return
+		}
+		slots, err := validateBrandSlots(r.Context(), database, &brand)
+		if err != nil {
+			writeBrandSlotsError(w, r, err)
 			return
 		}
 
@@ -231,12 +346,12 @@ func HandleBrandCreatePost(database brandsDatabase, auditLogger AuditLogger) htt
 
 		// A brand just created is never the default, the pointer names a brand that existed, and no
 		// client can have been given it yet: it draws no client.
-		writeJSON(w, r, http.StatusCreated, api.CreateBrandResponse{Brand: apimapping.ToBrandResponse(&brand, false, 0)})
+		writeJSON(w, r, http.StatusCreated, api.CreateBrandResponse{Brand: apimapping.ToBrandResponse(&brand, slots, baseURL, false, 0)})
 	}
 }
 
 // HandleBrandGet - GET /api/v1/admin/brands/{id}
-func HandleBrandGet(database brandsDatabase) http.HandlerFunc {
+func HandleBrandGet(database brandsDatabase, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		brand, ok := loadBrand(w, r, database)
 		if !ok {
@@ -250,12 +365,16 @@ func HandleBrandGet(database brandsDatabase) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.GetBrandResponse{Brand: apimapping.ToBrandResponse(brand, brand.Id == defaultId, counts[brand.Id])})
+		slots, ok := readBrandSlots(w, r, database, brand)
+		if !ok {
+			return
+		}
+		writeJSON(w, r, http.StatusOK, api.GetBrandResponse{Brand: apimapping.ToBrandResponse(brand, slots, baseURL, brand.Id == defaultId, counts[brand.Id])})
 	}
 }
 
 // HandleBrandUpdatePut - PUT /api/v1/admin/brands/{id}
-func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger) http.HandlerFunc {
+func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		brand, ok := loadBrand(w, r, database)
 		if !ok {
@@ -267,26 +386,22 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger) http
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		fields, err := validateBrand(brandFields{
-			name: req.Name, appearance: req.Appearance, theme: req.Theme,
-			corners: req.Corners, font: req.Font, backgroundFit: req.BackgroundFit, hideAppName: req.HideAppName,
-		})
+		fields, err := validateBrand(updateBrandFields(req))
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
 
-		// Every field the request names replaces the stored one; the slots, which it does not name
-		// yet, are written back as they were loaded.
-		brand.Name = fields.Name
-		brand.Appearance = fields.Appearance
-		brand.Theme = fields.Theme
-		brand.Corners = fields.Corners
-		brand.Font = fields.Font
-		brand.BackgroundFit = fields.BackgroundFit
-		brand.HideAppName = fields.HideAppName
-		if err := validateBrandFont(brand); err != nil {
-			writeValidationError(w, r, err)
+		// An update is a full replace: every field, each slot included, takes what the request
+		// names, and a slot it leaves out is emptied (#813 decision 10). The asset a slot named
+		// before is left unattached unless another slot names it, for the sweep.
+		fields.Id = brand.Id
+		fields.CreatedAt = brand.CreatedAt
+		fields.UpdatedAt = brand.UpdatedAt
+		brand = &fields
+		slots, err := validateBrandSlots(r.Context(), database, brand)
+		if err != nil {
+			writeBrandSlotsError(w, r, err)
 			return
 		}
 		if err := database.UpdateBrand(r.Context(), nil, brand); err != nil {
@@ -296,7 +411,7 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger) http
 			return
 		}
 
-		auditLogger.Log(r.Context(), audit.EventUpdatedBrand, map[string]interface{}{
+		details := map[string]interface{}{
 			"brand_id":       brand.Id,
 			"brand_name":     brand.Name,
 			"appearance":     string(brand.Appearance),
@@ -306,7 +421,27 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger) http
 			"background_fit": string(brand.BackgroundFit),
 			"hide_app_name":  brand.HideAppName,
 			"logged_in_user": callerSubject(r),
-		})
+		}
+		// Each filled slot by the id of the asset it holds after the save; an empty one is left out.
+		if brand.LogoAssetId.Valid {
+			details["logo_asset_id"] = brand.LogoAssetId.Int64
+		}
+		if brand.DarkLogoAssetId.Valid {
+			details["dark_logo_asset_id"] = brand.DarkLogoAssetId.Int64
+		}
+		if brand.FaviconAssetId.Valid {
+			details["favicon_asset_id"] = brand.FaviconAssetId.Int64
+		}
+		if brand.BackgroundAssetId.Valid {
+			details["background_asset_id"] = brand.BackgroundAssetId.Int64
+		}
+		if brand.RegularFontAssetId.Valid {
+			details["regular_font_asset_id"] = brand.RegularFontAssetId.Int64
+		}
+		if brand.BoldFontAssetId.Valid {
+			details["bold_font_asset_id"] = brand.BoldFontAssetId.Int64
+		}
+		auditLogger.Log(r.Context(), audit.EventUpdatedBrand, details)
 
 		defaultId, ok := defaultBrandId(w, r, database)
 		if !ok {
@@ -316,7 +451,7 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger) http
 		if !ok {
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.UpdateBrandResponse{Brand: apimapping.ToBrandResponse(brand, brand.Id == defaultId, counts[brand.Id])})
+		writeJSON(w, r, http.StatusOK, api.UpdateBrandResponse{Brand: apimapping.ToBrandResponse(brand, slots, baseURL, brand.Id == defaultId, counts[brand.Id])})
 	}
 }
 
@@ -370,7 +505,7 @@ func HandleBrandDelete(database brandsDatabase, auditLogger AuditLogger) http.Ha
 // the one it replaces and the count of clients each brand draws are read in the same transaction,
 // after the move, for the answer and the audit event. A brand that already is the default is answered as it is, and nothing is
 // recorded.
-func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger) http.HandlerFunc {
+func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, ok := brandId(w, r)
 		if !ok {
@@ -430,7 +565,11 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 			})
 		}
 
-		writeJSON(w, r, http.StatusOK, api.MakeBrandDefaultResponse{Brand: apimapping.ToBrandResponse(brand, true, counts[brand.Id])})
+		slots, ok := readBrandSlots(w, r, database, brand)
+		if !ok {
+			return
+		}
+		writeJSON(w, r, http.StatusOK, api.MakeBrandDefaultResponse{Brand: apimapping.ToBrandResponse(brand, slots, baseURL, true, counts[brand.Id])})
 	}
 }
 

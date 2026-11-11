@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -115,16 +116,75 @@ func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 			colors, ok := brandthemes.StylesheetOf(tc.brand.Theme)
 			require.True(t, ok)
 			require.Regexp(t, `^[0-9a-f]{12}$`, colors.Fingerprint)
-			full, err := brandthemes.FullStylesheet(tc.brand)
+			full, err := brandthemes.FullStylesheet(tc.brand, brandasset.Slots{})
 			require.NoError(t, err)
 			require.NotEqual(t, colors.Fingerprint, full.Fingerprint, "pill corners are not the colors alone")
 			assert.JSONEq(t, `{"appearance":"`+tc.wantAppearance+`",`+
 				`"stylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`stylesheet.css?v=`+full.Fingerprint+`",`+
-				`"colorsStylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`colors.css?v=`+colors.Fingerprint+`"}`,
+				`"colorsStylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`colors.css?v=`+colors.Fingerprint+`",`+
+				`"hideAppName":false}`,
 				string(body["brand"]))
 			assert.NotContains(t, body, "uiTheme")
 		})
 	}
+}
+
+// The brand also carries the absolute URLs of its logo, dark logo and favicon, each with its asset's
+// fingerprint, and whether the app name's text gives way to the logo, which it does only beside one
+// (#813 decisions 5 and 9). An empty slot is left out. The full stylesheet's URL names the
+// stylesheet the brand's files draw.
+func TestPublicSettings_CarriesTheBrandsLogosFaviconAndSwitch(t *testing.T) {
+	brand := record.NewBrand("Night", record.BrandAppearanceDark, "plum")
+	brand.Id = 7
+	brand.HideAppName = true
+	brand.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
+	brand.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
+	brand.FaviconAssetId = sql.NullInt64{Int64: 13, Valid: true}
+	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+	assets := []record.BrandAsset{
+		{Id: 14, Kind: record.BrandAssetKindBackground, Fingerprint: "444444444444"},
+		{Id: 13, Kind: record.BrandAssetKindFavicon, Fingerprint: "333333333333"},
+		{Id: 12, Kind: record.BrandAssetKindLogo, Fingerprint: "222222222222"},
+		{Id: 11, Kind: record.BrandAssetKindLogo, Fingerprint: "111111111111"},
+	}
+	database := datamocks.NewDatabase(t)
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Once()
+	expectConsoleClientBrand(database, &brand, nil)
+	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{11, 12, 13, 14}).Return(assets, nil).Once()
+
+	recorder := httptest.NewRecorder()
+	HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var body struct {
+		Brand map[string]any `json:"brand"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+	assert.Equal(t, publicSettingsBaseURL+"/brand-assets/11?v=111111111111", body.Brand["logoUrl"])
+	assert.Equal(t, publicSettingsBaseURL+"/brand-assets/12?v=222222222222", body.Brand["darkLogoUrl"])
+	assert.Equal(t, publicSettingsBaseURL+"/brand-assets/13?v=333333333333", body.Brand["faviconUrl"])
+	assert.Equal(t, true, body.Brand["hideAppName"])
+	full, err := brandthemes.FullStylesheet(&brand, brandasset.Slots{Background: &assets[0]})
+	require.NoError(t, err)
+	assert.Equal(t, publicSettingsBaseURL+"/brand/7/stylesheet.css?v="+full.Fingerprint, body.Brand["stylesheetUrl"])
+
+	// Without a logo the switch has no effect, and the empty slots are left out.
+	brand.LogoAssetId, brand.DarkLogoAssetId, brand.BackgroundAssetId = sql.NullInt64{}, sql.NullInt64{}, sql.NullInt64{}
+	database = datamocks.NewDatabase(t)
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Once()
+	expectConsoleClientBrand(database, &brand, nil)
+	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{13}).Return(assets[1:2], nil).Once()
+
+	recorder = httptest.NewRecorder()
+	HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	body.Brand = nil
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+	assert.NotContains(t, body.Brand, "logoUrl")
+	assert.NotContains(t, body.Brand, "darkLogoUrl")
+	assert.Equal(t, publicSettingsBaseURL+"/brand-assets/13?v=333333333333", body.Brand["faviconUrl"])
+	assert.Equal(t, false, body.Brand["hideAppName"])
 }
 
 // With no brand for the admin console's client, the client not being there, the answer is the
@@ -379,6 +439,12 @@ var publicBrandAllowedFields = map[string]string{
 	"Appearance":          "appearance",
 	"StylesheetURL":       "stylesheetUrl",
 	"ColorsStylesheetURL": "colorsStylesheetUrl",
+	// The brand's images and whether its name gives way to the logo, which its sign-in pages show
+	// anyone (#813 decision 9).
+	"LogoURL":     "logoUrl",
+	"DarkLogoURL": "darkLogoUrl",
+	"FaviconURL":  "faviconUrl",
+	"HideAppName": "hideAppName",
 }
 
 // This fails if a field is added to PublicSettingsResponse without being added to

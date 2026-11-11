@@ -316,6 +316,14 @@ cause, each a whole sentence.
 | `handler.brand.font_invalid` | (none) | Choose one of the system font families, or the uploaded font. |
 | `handler.brand.background_fit_invalid` | (none) | Choose cover, contain or tile for the background image. |
 | `handler.brand.uploaded_font_regular_required` | (none) | Upload a regular font file to use the uploaded font. |
+| `handler.brand.logo_asset_invalid` | (none) | The logo is not a stored logo. Upload it again. |
+| `handler.brand.dark_logo_asset_invalid` | (none) | The dark logo is not a stored logo. Upload it again. |
+| `handler.brand.favicon_asset_invalid` | (none) | The favicon is not a stored favicon. Upload it again. |
+| `handler.brand.background_asset_invalid` | (none) | The background image is not a stored background image. Upload it again. |
+| `handler.brand.regular_font_asset_invalid` | (none) | The regular font file is not a stored font. Upload it again. |
+| `handler.brand.bold_font_asset_invalid` | (none) | The bold font file is not a stored font. Upload it again. |
+| `handler.brand.dark_logo_logo_required` | (none) | Upload a logo to use a dark logo. |
+| `handler.brand.bold_font_regular_required` | (none) | Upload a regular font file to use a bold one. |
 | `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
 | `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
 | `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |

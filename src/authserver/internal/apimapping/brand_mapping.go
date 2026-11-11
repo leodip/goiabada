@@ -9,9 +9,17 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// ToBrandResponse answers a brand with its kit's choices, isDefault saying whether the settings row
-// points at it and clientCount how many clients are drawn in it.
-func ToBrandResponse(brand *record.Brand, isDefault bool, clientCount int) api.BrandResponse {
+// ToBrandResponse answers a brand with its kit's choices and its six slots, slots being the assets
+// they name, each answered as ToBrandAssetResponse answers it and null for an empty slot; isDefault
+// says whether the settings row points at the brand and clientCount how many clients are drawn in it.
+func ToBrandResponse(brand *record.Brand, slots brandasset.Slots, baseURL string, isDefault bool, clientCount int) api.BrandResponse {
+	slot := func(asset *record.BrandAsset) *api.BrandAssetResponse {
+		if asset == nil {
+			return nil
+		}
+		answer := ToBrandAssetResponse(asset, baseURL)
+		return &answer
+	}
 	resp := api.BrandResponse{
 		Id:            brand.Id,
 		Name:          brand.Name,
@@ -21,6 +29,12 @@ func ToBrandResponse(brand *record.Brand, isDefault bool, clientCount int) api.B
 		Font:          string(brand.Font),
 		BackgroundFit: string(brand.BackgroundFit),
 		HideAppName:   brand.HideAppName,
+		Logo:          slot(slots.Logo),
+		DarkLogo:      slot(slots.DarkLogo),
+		Favicon:       slot(slots.Favicon),
+		Background:    slot(slots.Background),
+		RegularFont:   slot(slots.RegularFont),
+		BoldFont:      slot(slots.BoldFont),
 		IsDefault:     isDefault,
 		ClientCount:   clientCount,
 	}

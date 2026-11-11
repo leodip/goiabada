@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -29,6 +30,22 @@ type defaultBrandStub struct {
 	reads     int
 	clients   map[string]*record.Brand
 	clientErr error
+	// assets are the brand assets it answers by id, without their bytes, or assetErr.
+	assets   []record.BrandAsset
+	assetErr error
+}
+
+func (s *defaultBrandStub) GetBrandAssetsByIds(_ context.Context, _ *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
+	if s.assetErr != nil {
+		return nil, s.assetErr
+	}
+	var found []record.BrandAsset
+	for _, asset := range s.assets {
+		if slices.Contains(ids, asset.Id) {
+			found = append(found, asset)
+		}
+	}
+	return found, nil
 }
 
 func (s *defaultBrandStub) GetDefaultBrand(_ context.Context, _ *sql.Tx) (*record.Brand, error) {

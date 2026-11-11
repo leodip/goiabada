@@ -33,9 +33,10 @@ type publicSettingsDatabase interface {
 // through the same render.ClientPageBrand, with its two stylesheets' URLs made absolute on baseURL,
 // as a client logo's is, so the console links them and draws its pages alike (#810 decision 3): the
 // full one, which the auth server's own pages link, and the colors-only one for the console's admin
-// pages (#813 decision 9). A brand that
-// cannot be read leaves brand out rather than failing the answer: the console then draws automatic
-// in the built-in colors, as the auth server's own pages are drawn then.
+// pages (#813 decision 9). Its logo's, dark logo's and favicon's URLs are made absolute alike, and
+// the switch says whether the name gives way to the logo. A brand that cannot be read leaves brand
+// out rather than failing the answer: the console then draws automatic in the built-in colors, as
+// the auth server's own pages are drawn then.
 //
 // The route is registered for GET only, so the router answers any other method itself, 405 with
 // an Allow header and no body, as it does for every API route (#522 decision 5).
@@ -77,8 +78,9 @@ func HandlePublicSettingsGet(database publicSettingsDatabase, baseURL string) ht
 		// anyone.
 		//
 		// Brand is here because the admin console draws its pages in its own client's brand (#810
-		// decision 3, #812 decision 7). It is its appearance and its two stylesheets' URLs alone,
-		// which that client's sign-in pages already serve anyone (#813 decision 9).
+		// decision 3, #812 decision 7). It is its appearance, its two stylesheets' URLs, its logo's,
+		// dark logo's and favicon's URLs and whether the name gives way to the logo, all of which
+		// that client's sign-in pages already show anyone (#813 decision 9).
 		response := api.PublicSettingsResponse{
 			AppName:       settings.AppName,
 			SMTPEnabled:   settings.SMTPEnabled,
@@ -106,9 +108,21 @@ func publicBrand(ctx context.Context, brands render.PageBrandReader, baseURL str
 	if appearance == "" {
 		appearance = string(record.BrandAppearanceAuto)
 	}
-	return &api.PublicBrandResponse{
+	response := &api.PublicBrandResponse{
 		Appearance:          appearance,
 		StylesheetURL:       baseURL + brand.Stylesheet,
 		ColorsStylesheetURL: baseURL + brand.ColorsStylesheet,
+		HideAppName:         brand.HideAppName,
 	}
+	// An empty slot is left out, as the URL of nothing.
+	absolute := func(path string) string {
+		if path == "" {
+			return ""
+		}
+		return baseURL + path
+	}
+	response.LogoURL = absolute(brand.Logo)
+	response.DarkLogoURL = absolute(brand.DarkLogo)
+	response.FaviconURL = absolute(brand.Favicon)
+	return response
 }

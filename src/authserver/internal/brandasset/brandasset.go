@@ -6,8 +6,11 @@ package brandasset
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -93,4 +96,79 @@ func Fingerprint(content []byte) string {
 // changes whenever the bytes do and a browser may keep it for a year.
 func Path(asset *record.BrandAsset) string {
 	return strings.Replace(Route, "{id}", strconv.FormatInt(asset.Id, 10), 1) + "?v=" + asset.Fingerprint
+}
+
+// Slots are the assets a brand's six slots name, each read without its bytes, and nil for an empty
+// slot (#813 decision 2). The logo and dark logo hold a logo, the favicon a favicon, the background a
+// background, and the two font slots a font.
+type Slots struct {
+	Logo        *record.BrandAsset
+	DarkLogo    *record.BrandAsset
+	Favicon     *record.BrandAsset
+	Background  *record.BrandAsset
+	RegularFont *record.BrandAsset
+	BoldFont    *record.BrandAsset
+}
+
+// SlotsReader is what reads a brand's slots: assets by their ids, without their bytes.
+// data.Database satisfies it.
+type SlotsReader interface {
+	GetBrandAssetsByIds(ctx context.Context, tx *sql.Tx, assetIds []int64) ([]record.BrandAsset, error)
+}
+
+// SlotIds answers the ids of the assets brand's filled slots name, in slot order, each once.
+func SlotIds(brand *record.Brand) []int64 {
+	var ids []int64
+	for _, slot := range slotsOf(brand) {
+		if slot.Valid && !slices.Contains(ids, slot.Int64) {
+			ids = append(ids, slot.Int64)
+		}
+	}
+	return ids
+}
+
+// slotsOf is brand's six slots in slot order: logo, dark logo, favicon, background, regular font and
+// bold font.
+func slotsOf(brand *record.Brand) [6]sql.NullInt64 {
+	return [6]sql.NullInt64{brand.LogoAssetId, brand.DarkLogoAssetId, brand.FaviconAssetId,
+		brand.BackgroundAssetId, brand.RegularFontAssetId, brand.BoldFontAssetId}
+}
+
+// SlotsOf answers brand's slots from assets, which may hold others' too: a slot whose asset is not
+// among them is left empty.
+func SlotsOf(brand *record.Brand, assets []record.BrandAsset) Slots {
+	find := func(slot sql.NullInt64) *record.BrandAsset {
+		if !slot.Valid {
+			return nil
+		}
+		for i := range assets {
+			if assets[i].Id == slot.Int64 {
+				asset := assets[i]
+				return &asset
+			}
+		}
+		return nil
+	}
+	return Slots{
+		Logo:        find(brand.LogoAssetId),
+		DarkLogo:    find(brand.DarkLogoAssetId),
+		Favicon:     find(brand.FaviconAssetId),
+		Background:  find(brand.BackgroundAssetId),
+		RegularFont: find(brand.RegularFontAssetId),
+		BoldFont:    find(brand.BoldFontAssetId),
+	}
+}
+
+// ReadSlots reads the assets brand's slots name, without their bytes, and reads nothing when every
+// slot is empty, as a brand nobody has given a file is.
+func ReadSlots(ctx context.Context, reader SlotsReader, brand *record.Brand) (Slots, error) {
+	ids := SlotIds(brand)
+	if len(ids) == 0 {
+		return Slots{}, nil
+	}
+	assets, err := reader.GetBrandAssetsByIds(ctx, nil, ids)
+	if err != nil {
+		return Slots{}, errs.Wrap(err, "unable to read the assets of the brand's slots")
+	}
+	return SlotsOf(brand, assets), nil
 }

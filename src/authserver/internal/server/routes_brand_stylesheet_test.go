@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -31,7 +32,9 @@ func TestRegisterRoutes_TheBrandStylesheetCarriesNoBrowserSession(t *testing.T) 
 		name string
 		path func(*record.Brand) (string, error)
 	}{
-		{"full", brandthemes.StylesheetPath},
+		{"full", func(brand *record.Brand) (string, error) {
+			return brandthemes.StylesheetPath(brand, brandasset.Slots{})
+		}},
 		{"colors only", brandthemes.ColorsStylesheetPath},
 	} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
