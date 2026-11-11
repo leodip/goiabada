@@ -311,6 +311,10 @@ cause, each a whole sentence.
 | `handler.brand.appearance_invalid` | (none) | Choose automatic, light or dark. |
 | `handler.brand.theme_invalid` | (none) | Choose one of the built-in themes. |
 | `handler.brand.default_delete_not_allowed` | (none) | The default brand cannot be deleted. Make another brand the default first. |
+| `handler.brand.corners_invalid` | (none) | Choose square, rounded or pill corners. |
+| `handler.brand.font_invalid` | (none) | Choose one of the system font families, or the uploaded font. |
+| `handler.brand.background_fit_invalid` | (none) | Choose cover, contain or tile for the background image. |
+| `handler.brand.uploaded_font_regular_required` | (none) | Upload a regular font file to use the uploaded font. |
 | `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
 | `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
 | `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |

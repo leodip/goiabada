@@ -274,9 +274,11 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   uploads
 - `internal/brandthemes/` - The eight built-in themes a brand is drawn in (#810): each preset's key
   and its light and dark palettes, 23 `#rrggbb` values by token name, in display order, and the
-  stylesheet each draws, built once. `StylesheetRoute` is where a brand's stylesheet is served, and
-  `StylesheetPath` the fingerprinted path a page links it by. The brand validation, the admin API's
-  `GET /brand-themes`, the stylesheet handler and the pages read it; the console reaches it only
+  colors stylesheet each draws, built once. A brand has two stylesheets (#813): the full one, its
+  colors then the radius and font tokens its corners and system family set, served at
+  `StylesheetRoute` and linked by `StylesheetPath`; and the colors-only one, served at
+  `ColorsStylesheetRoute` and linked by `ColorsStylesheetPath`. The brand validation, the admin API's
+  `GET /brand-themes`, the stylesheet handlers and the pages read it; the console reaches it only
   through the API and `/api/public/settings`
 - `internal/clientauth/` - Client authentication from plain values, the client identifier and the
   secret presented: the lookup, the secret check and their refusals' wording and shape, shared by

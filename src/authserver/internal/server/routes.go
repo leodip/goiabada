@@ -157,9 +157,11 @@ func (s *Server) initRoutes(branches appBranches) {
 	files.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(files, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(files, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
-	// A brand's stylesheet is answered as a static file is, to anyone and with no session, on the
-	// branch without the settings read and the session load, so no cookie rides on its public year.
+	// A brand's two stylesheets are answered as a static file is, to anyone and with no session, on
+	// the branch without the settings read and the session load, so no cookie rides on their public
+	// year (#813 decision 11).
 	getAndHead(public, brandthemes.StylesheetRoute, handlers.HandleBrandStylesheetGet(httpHelper, s.database))
+	getAndHead(public, brandthemes.ColorsStylesheetRoute, handlers.HandleBrandColorsStylesheetGet(httpHelper, s.database))
 
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)

@@ -21,34 +21,46 @@ import (
 // to clear the dangling pointer. The stylesheet must be answered without any cookie, and without
 // reading the settings or the session: datamocks.NewDatabase(t) fails the test on any call nobody
 // expected, so the brand read is the only one the route may make.
+//
+// The colors-only stylesheet is answered alike, at its own route (#813 decision 11).
 func TestRegisterRoutes_TheBrandStylesheetCarriesNoBrowserSession(t *testing.T) {
-	for _, method := range []string{http.MethodGet, http.MethodHead} {
-		t.Run(method, func(t *testing.T) {
-			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, mock.Anything, int64(7)).
-				Return(&record.Brand{Id: 7, Name: "Shop", Appearance: "auto", Theme: "plum"}, nil).Once()
-			s := newRoutingTestServer(t, database)
+	brand := record.NewBrand("Shop", record.BrandAppearanceAuto, "plum")
+	brand.Id = 7
+	brand.Corners = record.BrandCornersPill
+	for _, stylesheet := range []struct {
+		name string
+		path func(*record.Brand) (string, error)
+	}{
+		{"full", brandthemes.StylesheetPath},
+		{"colors only", brandthemes.ColorsStylesheetPath},
+	} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			t.Run(stylesheet.name+" "+method, func(t *testing.T) {
+				database := datamocks.NewDatabase(t)
+				database.On("GetBrandById", mock.Anything, mock.Anything, int64(7)).Return(&brand, nil).Once()
+				s := newRoutingTestServer(t, database)
 
-			seed := httptest.NewRequest(http.MethodGet, "/", nil)
-			session, err := s.sessionStore.Get(seed, sessionkeys.AuthServerSessionName)
-			require.NoError(t, err)
-			session.Values[sessionkeys.SessionIdentifier] = "ended-session"
-			seeded := httptest.NewRecorder()
-			require.NoError(t, s.sessionStore.Save(seed, seeded, session))
-			cookies := seeded.Result().Cookies()
-			require.Len(t, cookies, 1)
+				seed := httptest.NewRequest(http.MethodGet, "/", nil)
+				session, err := s.sessionStore.Get(seed, sessionkeys.AuthServerSessionName)
+				require.NoError(t, err)
+				session.Values[sessionkeys.SessionIdentifier] = "ended-session"
+				seeded := httptest.NewRecorder()
+				require.NoError(t, s.sessionStore.Save(seed, seeded, session))
+				cookies := seeded.Result().Cookies()
+				require.Len(t, cookies, 1)
 
-			target, err := brandthemes.StylesheetPath(7, "plum")
-			require.NoError(t, err)
-			request := httptest.NewRequest(method, target, nil)
-			request.AddCookie(cookies[0])
-			rr := httptest.NewRecorder()
-			s.router.ServeHTTP(rr, request)
+				target, err := stylesheet.path(&brand)
+				require.NoError(t, err)
+				request := httptest.NewRequest(method, target, nil)
+				request.AddCookie(cookies[0])
+				rr := httptest.NewRecorder()
+				s.router.ServeHTTP(rr, request)
 
-			require.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, "public, max-age=31536000, immutable", rr.Header().Get("Cache-Control"))
-			assert.Equal(t, "text/css; charset=utf-8", rr.Header().Get("Content-Type"))
-			assert.Empty(t, rr.Header().Values("Set-Cookie"), "a publicly cacheable stylesheet sets no cookie")
-		})
+				require.Equal(t, http.StatusOK, rr.Code)
+				assert.Equal(t, "public, max-age=31536000, immutable", rr.Header().Get("Cache-Control"))
+				assert.Equal(t, "text/css; charset=utf-8", rr.Header().Get("Content-Type"))
+				assert.Empty(t, rr.Header().Values("Set-Cookie"), "a publicly cacheable stylesheet sets no cookie")
+			})
+		}
 	}
 }

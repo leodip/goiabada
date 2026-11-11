@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -55,43 +56,125 @@ func Get(key string) (Preset, bool) {
 	return Preset{}, false
 }
 
-// StylesheetRoute is the route a brand's stylesheet is served at, the brand's id in {id}.
+// StylesheetRoute is the route a brand's full stylesheet is served at, the brand's id in {id}.
 const StylesheetRoute = "/brand/{id}/stylesheet.css"
 
-// Stylesheet is the stylesheet a brand on a theme is drawn with, and the fingerprint of its
-// contents a page links it by.
+// Stylesheet is a stylesheet a brand is drawn with, and the fingerprint of its contents a page
+// links it by.
 type Stylesheet struct {
 	CSS         string
 	Fingerprint string
 }
 
-// stylesheets are every theme's stylesheet, built once: they change only with a release.
+// stylesheets are every theme's colors stylesheet, built once: they change only with a release.
 var stylesheets = buildStylesheets()
 
-// StylesheetOf returns the stylesheet of the built-in theme of key, and whether there is one.
+// StylesheetOf returns the colors stylesheet of the built-in theme of key, and whether there is one.
 func StylesheetOf(key string) (Stylesheet, bool) {
 	stylesheet, ok := stylesheets[key]
 	return stylesheet, ok
 }
 
-// StylesheetPath returns the path a page links a brand's stylesheet by: the brand's id, and the
-// fingerprint of the stylesheet its theme draws, so the path changes exactly when the stylesheet
-// does and a browser may keep it for a year. A theme that is none of the built-in ones is an error.
-func StylesheetPath(brandId int64, theme string) (string, error) {
-	stylesheet, ok := stylesheets[theme]
-	if !ok {
-		return "", errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brandId, theme)
+// ColorsStylesheetRoute is the route a brand's colors-only stylesheet is served at, the brand's id
+// in {id}: the stylesheet the admin console's admin pages link, so they take a brand's colors and
+// never its kit (#813 decision 9).
+const ColorsStylesheetRoute = "/brand/{id}/colors.css"
+
+// cornerRadii are the two radius tokens ui.css declares, --radius-control and --radius-panel, for
+// each corner shape but rounded, whose are today's, main.css's (#813). Square rounds nothing. Pill
+// rounds a single-line control fully, and the card and the other panels to 1.5rem, which leaves
+// their content unclipped; ui.css holds a multi-line box drawn with --radius-control (a text area,
+// a notice, a list) to 1rem, so it is rounded only as far as its content stays unclipped too.
+var cornerRadii = map[record.BrandCorners][2]string{
+	record.BrandCornersSquare: {"0", "0"},
+	record.BrandCornersPill:   {"9999px", "1.5rem"},
+}
+
+// fontStacks are the five system families besides System UI, each a list of fonts a visitor's
+// device already has, so neither the server nor a visitor downloads a font for them (#813 decision
+// 7). They are the matching text stacks of Modern Font Stacks (modernfontstacks.com, public domain):
+// Humanist, Geometric Humanist, Transitional, Neo-Grotesque and Rounded Sans. System UI is today's
+// family, main.css's --font-sans, so it declares none; the uploaded font draws a file its slot names.
+var fontStacks = map[record.BrandFont]string{
+	record.BrandFontHumanist:     "Seravek, 'Gill Sans Nova', Ubuntu, Calibri, 'DejaVu Sans', source-sans-pro, sans-serif",
+	record.BrandFontGeometric:    "Avenir, Montserrat, Corbel, 'URW Gothic', source-sans-pro, sans-serif",
+	record.BrandFontSerif:        "Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif",
+	record.BrandFontNeoGrotesque: "Inter, Roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', Arial, sans-serif",
+	record.BrandFontRounded:      "ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, Manjari, 'Arial Rounded MT', 'Arial Rounded MT Bold', Calibri, source-sans-pro, sans-serif",
+}
+
+// FullStylesheet returns the stylesheet brand is drawn with on the auth server's pages and the
+// console's end-user pages: its theme's colors, as ColorsStylesheet answers them, then one rule on
+// the root setting the tokens its kit changes, its corners' two radii and its family's
+// --font-sans, which every text but monospace is drawn in (#813 decision 9). A choice drawn as today
+// sets no token, so a brand nobody has changed is drawn exactly as before the kit, and its full
+// stylesheet is its colors-only one. A theme that is none of the built-in ones is an error.
+func FullStylesheet(brand *record.Brand) (Stylesheet, error) {
+	colors, err := ColorsStylesheet(brand)
+	if err != nil {
+		return Stylesheet{}, err
 	}
-	path := strings.Replace(StylesheetRoute, "{id}", strconv.FormatInt(brandId, 10), 1)
-	return path + "?v=" + stylesheet.Fingerprint, nil
+	var kit strings.Builder
+	if radii, ok := cornerRadii[brand.Corners]; ok {
+		kit.WriteString("  --radius-control: " + radii[0] + ";\n")
+		kit.WriteString("  --radius-panel: " + radii[1] + ";\n")
+	}
+	if stack, ok := fontStacks[brand.Font]; ok {
+		kit.WriteString("  --font-sans: " + stack + ";\n")
+	}
+	if kit.Len() == 0 {
+		return colors, nil
+	}
+	return newStylesheet(colors.CSS + "\n:root {\n" + kit.String() + "}\n"), nil
+}
+
+// ColorsStylesheet returns the stylesheet that sets brand's colors alone, its theme's, whatever its
+// kit holds. A theme that is none of the built-in ones is an error.
+func ColorsStylesheet(brand *record.Brand) (Stylesheet, error) {
+	stylesheet, ok := stylesheets[brand.Theme]
+	if !ok {
+		return Stylesheet{}, errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brand.Id, brand.Theme)
+	}
+	return stylesheet, nil
+}
+
+// StylesheetPath returns the path a page links brand's full stylesheet by: the brand's id, and the
+// fingerprint of the stylesheet's contents, so the path changes exactly when the stylesheet does and
+// a browser may keep it for a year. A theme that is none of the built-in ones is an error.
+func StylesheetPath(brand *record.Brand) (string, error) {
+	stylesheet, err := FullStylesheet(brand)
+	if err != nil {
+		return "", err
+	}
+	return linkPath(StylesheetRoute, brand.Id, stylesheet), nil
+}
+
+// ColorsStylesheetPath returns the path a page links brand's colors-only stylesheet by, as
+// StylesheetPath does the full one's.
+func ColorsStylesheetPath(brand *record.Brand) (string, error) {
+	stylesheet, err := ColorsStylesheet(brand)
+	if err != nil {
+		return "", err
+	}
+	return linkPath(ColorsStylesheetRoute, brand.Id, stylesheet), nil
+}
+
+func linkPath(route string, brandId int64, stylesheet Stylesheet) string {
+	path := strings.Replace(route, "{id}", strconv.FormatInt(brandId, 10), 1)
+	return path + "?v=" + stylesheet.Fingerprint
+}
+
+// newStylesheet is css with its fingerprint: the first twelve hex digits of its SHA-256, as a static
+// file's.
+func newStylesheet(css string) Stylesheet {
+	digest := sha256.Sum256([]byte(css))
+	return Stylesheet{CSS: css, Fingerprint: hex.EncodeToString(digest[:6])}
 }
 
 func buildStylesheets() map[string]Stylesheet {
 	built := make(map[string]Stylesheet, len(presets))
 	for _, preset := range presets {
-		css := stylesheetCSS(preset)
-		digest := sha256.Sum256([]byte(css))
-		built[preset.Key] = Stylesheet{CSS: css, Fingerprint: hex.EncodeToString(digest[:6])}
+		built[preset.Key] = newStylesheet(stylesheetCSS(preset))
 	}
 	return built
 }

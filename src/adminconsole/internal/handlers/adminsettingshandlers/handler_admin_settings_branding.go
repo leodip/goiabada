@@ -25,6 +25,16 @@ import (
 // brandingPath is the list, which a creation and a deletion go back to.
 const brandingPath = "/admin/settings/branding"
 
+// The kit's choices a new brand is created with, which draw it as a brand nobody has changed is
+// drawn: rounded corners, the System UI family and a background drawn as cover, the app name shown.
+// The admin API refuses a write that leaves a choice out (#813 decision 10), and the form has no
+// field for them yet.
+const (
+	newBrandCorners       = "rounded"
+	newBrandFont          = "system-ui"
+	newBrandBackgroundFit = "cover"
+)
+
 // BrandRow is a brand as the list and the delete page draw it: the brand, with its appearance and
 // its theme in words.
 type BrandRow struct {
@@ -299,9 +309,12 @@ func HandleBrandNewPost(
 
 		form := brandFormFrom(r)
 		_, err = apiClient.CreateBrand(r.Context(), token, &api.CreateBrandRequest{
-			Name:       form.Name,
-			Appearance: form.Appearance,
-			Theme:      form.Theme,
+			Name:          form.Name,
+			Appearance:    form.Appearance,
+			Theme:         form.Theme,
+			Corners:       newBrandCorners,
+			Font:          newBrandFont,
+			BackgroundFit: newBrandBackgroundFit,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -418,11 +431,17 @@ func HandleBrandPost(
 			return
 		}
 
+		// An update replaces every field (#813 decision 10), and the form has no field for the kit's
+		// choices yet, so the brand's stored ones are sent back unchanged.
 		form := brandFormFrom(r)
 		_, err := apiClient.UpdateBrand(r.Context(), token, id, &api.UpdateBrandRequest{
-			Name:       form.Name,
-			Appearance: form.Appearance,
-			Theme:      form.Theme,
+			Name:          form.Name,
+			Appearance:    form.Appearance,
+			Theme:         form.Theme,
+			Corners:       brand.Corners,
+			Font:          brand.Font,
+			BackgroundFit: brand.BackgroundFit,
+			HideAppName:   brand.HideAppName,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {

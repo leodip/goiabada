@@ -77,22 +77,27 @@ func TestPublicSettings_Success(t *testing.T) {
 
 // The brand of the admin console's own client rides with the public settings as brand: its own, or
 // the default brand when it has none, which the data layer answers alike (#812 decision 7). It is the
-// brand's appearance, and the absolute URL of its stylesheet, built from the auth server's base URL as
-// a client logo's URL is, so the admin console links it after main.css and draws every page as the
-// auth server draws its own client's (#810 decision 3). uiTheme is no longer answered.
+// brand's appearance, and the absolute URLs of its two stylesheets, built from the auth server's base
+// URL as a client logo's URL is (#810 decision 3): stylesheetUrl is the full one, which the auth
+// server's own pages link, and colorsStylesheetUrl the one with the colors alone, which the console's
+// admin pages link (#813 decision 9). uiTheme is no longer answered.
 func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
+	pill := func(brand record.Brand) *record.Brand {
+		brand.Corners = record.BrandCornersPill
+		return &brand
+	}
 	for _, tc := range []struct {
 		name           string
 		brand          *record.Brand
 		wantAppearance string
-		wantStylesheet string
+		wantPath       string
 	}{
-		{"a dark brand", &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"},
-			"dark", "/brand/7/stylesheet.css?v="},
-		{"a light brand", &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"},
-			"light", "/brand/12/stylesheet.css?v="},
-		{"an automatic brand on Blueberry", &record.Brand{Id: 1, Name: "Default", Appearance: record.BrandAppearanceAuto, Theme: "blueberry"},
-			"auto", "/brand/1/stylesheet.css?v="},
+		{"a dark brand", pill(record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}),
+			"dark", "/brand/7/"},
+		{"a light brand", pill(record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}),
+			"light", "/brand/12/"},
+		{"an automatic brand on Blueberry", pill(record.Brand{Id: 1, Name: "Default", Appearance: record.BrandAppearanceAuto, Theme: "blueberry"}),
+			"auto", "/brand/1/"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -107,11 +112,16 @@ func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 			require.Equal(t, http.StatusOK, recorder.Code)
 			var body map[string]json.RawMessage
 			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
-			stylesheet, ok := brandthemes.StylesheetOf(tc.brand.Theme)
+			colors, ok := brandthemes.StylesheetOf(tc.brand.Theme)
 			require.True(t, ok)
-			require.Regexp(t, `^[0-9a-f]{12}$`, stylesheet.Fingerprint)
-			assert.JSONEq(t, `{"appearance":"`+tc.wantAppearance+`","stylesheetUrl":"`+
-				publicSettingsBaseURL+tc.wantStylesheet+stylesheet.Fingerprint+`"}`, string(body["brand"]))
+			require.Regexp(t, `^[0-9a-f]{12}$`, colors.Fingerprint)
+			full, err := brandthemes.FullStylesheet(tc.brand)
+			require.NoError(t, err)
+			require.NotEqual(t, colors.Fingerprint, full.Fingerprint, "pill corners are not the colors alone")
+			assert.JSONEq(t, `{"appearance":"`+tc.wantAppearance+`",`+
+				`"stylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`stylesheet.css?v=`+full.Fingerprint+`",`+
+				`"colorsStylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`colors.css?v=`+colors.Fingerprint+`"}`,
+				string(body["brand"]))
 			assert.NotContains(t, body, "uiTheme")
 		})
 	}
@@ -362,11 +372,13 @@ var publicPasswordRulesAllowedFields = map[string]string{
 	"RefusesAccountWords": "refusesAccountWords",
 }
 
-// publicBrandAllowedFields is the complete set of fields the brand carries: its appearance and its
-// stylesheet's URL, and nothing else about the brand, its name among it.
+// publicBrandAllowedFields is the complete set of fields the brand carries: its appearance and the
+// URLs of its two stylesheets, which a sign-in page drawn in the brand already serves anyone (#813
+// decision 9), and nothing else about the brand, its name among it.
 var publicBrandAllowedFields = map[string]string{
-	"Appearance":    "appearance",
-	"StylesheetURL": "stylesheetUrl",
+	"Appearance":          "appearance",
+	"StylesheetURL":       "stylesheetUrl",
+	"ColorsStylesheetURL": "colorsStylesheetUrl",
 }
 
 // This fails if a field is added to PublicSettingsResponse without being added to

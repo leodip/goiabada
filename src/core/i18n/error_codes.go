@@ -175,6 +175,12 @@ const (
 	ErrCodeBrandThemeInvalid            = "handler.brand.theme_invalid"
 	ErrCodeBrandDefaultDeleteNotAllowed = "handler.brand.default_delete_not_allowed"
 
+	// A brand's kit (#813 decisions 7 and 10).
+	ErrCodeBrandCornersInvalid              = "handler.brand.corners_invalid"
+	ErrCodeBrandFontInvalid                 = "handler.brand.font_invalid"
+	ErrCodeBrandBackgroundFitInvalid        = "handler.brand.background_fit_invalid"
+	ErrCodeBrandUploadedFontRegularRequired = "handler.brand.uploaded_font_regular_required"
+
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"

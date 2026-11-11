@@ -124,6 +124,7 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
 | `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
 | `auth_state` | The step of the sign-in the browser most recently moved, when a page of a sign-in it no longer holds, or of none, was refused. |
+| `background_fit` | How a brand's background image fills the page after the save: `cover`, `contain` or `tile`. |
 | `brand_id` | The brand's row id. On `updated_default_brand`, the brand that is now the default. On `updated_client_brand`, the brand the client was given, left out when it went back to the default brand. |
 | `brand_name` | The brand's name. On `updated_default_brand`, the brand that is now the default. On `updated_client_brand`, the brand the client was given, left out when it went back to the default brand. |
 | `ceiling` | Which rule refused an administrator change: `grant`, `target`, `settings` or `backchannel_logout_uri`. |
@@ -135,10 +136,12 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `code_id` | The row id of an authorization code. |
 | `command` | `goiabada-authserver recover`, on every entry the `recover` command writes. An entry an API request made names its token's subject under `logged_in_user` instead. |
 | `consent_id` | The row id of a consent a user gave a client. |
+| `corners` | A brand's corners after the save: `square`, `rounded` or `pill`. |
 | `dpop_bound_access_tokens` | Whether the client now requires DPoP for its token requests. |
 | `email_digest` | The SHA-256 hex digest of the email address the entry is about, in lowercase and, except on a forgot-password request, trimmed: one typed into a form or named by a password grant, an account's, or a test email's recipient. |
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
 | `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
+| `font` | A brand's font family after the save, such as `system-ui`, or `uploaded` for its uploaded font. |
 | `grant_id` | The grant a client revoked: the `jti` of its first refresh token, which its access tokens carry as `grant_id`. |
 | `grant_type` | The `grant_type` of a token request. |
 | `grant_types` | The grant types a client asked for when it registered itself. |
@@ -148,6 +151,7 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `group_identifier` | The identifier the group is known by. |
 | `group_ids` | The row ids of the administrative groups a refused membership change would have moved the user into or out of. |
 | `has_turnstile_secret_key` | Under `old` and `new`: whether a Turnstile secret key is stored. The key itself is never recorded. |
+| `hide_app_name` | Whether a brand hides the app name's text beside its logo, after the save. |
 | `include_open_id_connect_claims_in_access_token` | Under `old` and `new`: whether OpenID Connect claims go in access tokens by default. |
 | `include_open_id_connect_claims_in_id_token` | Under `old` and `new`: whether OpenID Connect claims go in ID tokens by default. |
 | `ip` | The client's IP address, as the auth server resolved it. On `rate_limit_exceeded`, the block the limiter counts: the address for IPv4, its /64 for IPv6. |
@@ -428,7 +432,7 @@ These come from the Account API, which users reach through the admin console's a
 | Event | Meaning |
 |---|---|
 | `created_brand` | An administrator created a brand. |
-| `updated_brand` | An administrator saved a brand's name, appearance and theme. |
+| `updated_brand` | An administrator saved a brand's name, appearance, theme, corners, font, background fit and whether the app name is hidden. |
 | `deleted_brand` | An administrator deleted a brand. The entry says how many clients moved to the default brand. |
 | `updated_default_brand` | An administrator made another brand the default. The entry names the new and the old default. |
 

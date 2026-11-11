@@ -50,6 +50,8 @@
   --color-note-ink: #1d4796;
   --color-focus: #2456c4;
 
+  /* The two radii a brand's corners set (#813): --radius-control rounds a control, and
+     --radius-panel a panel, the card among them. */
   --radius-control: 0.5rem;
   --radius-panel: 0.75rem;
 
@@ -61,10 +63,14 @@
   /* The root carries the page color too, so an overscroll shows the canvas rather than white. The
      console's header height is here, where both the header and the page's scroll offset below
      read it. */
+  /* --radius-box rounds a box that may hold more than one line, such as a notice, a text area or a
+     list, as a control is rounded, but never past 1rem: a brand with pill corners rounds a
+     single-line control fully, and such a box only as far as its content stays unclipped. */
   :root {
     color-scheme: light;
     background-color: var(--color-canvas);
     --app-header-height: 4rem;
+    --radius-box: min(var(--radius-control), 1rem);
 
     @variant dark {
       color-scheme: dark;
@@ -437,6 +443,7 @@
 
   textarea.control {
     min-height: 6rem;
+    border-radius: var(--radius-box);
     resize: vertical;
   }
 
@@ -548,7 +555,7 @@
     gap: 0.75rem;
     padding: 0.875rem 1rem;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     cursor: pointer;
   }
@@ -576,7 +583,7 @@
 
   .check-list {
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     overflow: hidden;
   }
@@ -625,7 +632,7 @@
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     color: var(--color-ink);
     font-size: 0.9375rem;
@@ -1120,7 +1127,7 @@
     width: 4.5rem;
     height: 4.5rem;
     margin-bottom: 0.5rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     object-fit: contain;
   }
 
@@ -1225,7 +1232,7 @@
     display: block;
     margin-top: 0.5rem;
     padding: 0.5rem 0.75rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
     font-size: 0.9375rem;
@@ -1310,7 +1317,7 @@
     height: 12rem;
     margin: 0.75rem auto 0;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
   }
 
   /* A secret a person copies by hand, such as an authenticator key, and the button that copies it
@@ -1333,7 +1340,7 @@
     display: block;
     margin-top: 0.5rem;
     padding: 0.5rem 0.625rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
     font-size: 0.8125rem;
@@ -1478,7 +1485,7 @@
 
   .legal-text pre {
     padding: 0.75rem 1rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     white-space: pre-wrap;
   }
@@ -1514,7 +1521,7 @@
 
   .legal-source {
     padding: 0.75rem 1rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
     font-size: 0.875rem;
@@ -1531,7 +1538,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
   }
 
@@ -1562,7 +1569,7 @@
     gap: 0.75rem;
     padding: 0.75rem 0.875rem;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     color: var(--color-ink);
     text-decoration: none;
@@ -1631,7 +1638,7 @@
     max-height: 16rem;
     padding: 0.25rem;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     box-shadow: var(--shadow-overlay);
   }

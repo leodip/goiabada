@@ -97,7 +97,8 @@ var (
 func newBrandingAPI() *brandingAPI {
 	return &brandingAPI{
 		brands: []api.BrandResponse{
-			{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2},
+			{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
+				Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true},
 			{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 			{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
 			{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
@@ -120,7 +121,8 @@ func TestHandleBrandingGet_ListsTheBrandsInTheServersOrderWithTheirLookInWords(t
 		handlertest.Request(http.MethodGet, "/admin/settings/branding", handlertest.WithAccessToken()))
 
 	assert.Equal(t, []BrandRow{
-		{BrandResponse: api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2},
+		{BrandResponse: api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
+			Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true},
 			AppearanceName: "Dark", ThemeName: "Plum"},
 		{BrandResponse: api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 			AppearanceName: "Automatic", ThemeName: "Blueberry"},
@@ -182,7 +184,10 @@ func TestHandleBrandNewPost_CreatesTheBrandAndGoesBackToTheList(t *testing.T) {
 		handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
 			handlertest.WithForm(url.Values{"name": {"  Spring  "}, "appearance": {"dark"}, "theme": {"plum"}})))
 
-	assert.Equal(t, &api.CreateBrandRequest{Name: "Spring", Appearance: "dark", Theme: "plum"}, apiClient.created)
+	// The form has no field for the kit's choices yet, so a new brand is sent with the ones a brand
+	// nobody has changed is drawn in (#813 decision 10): rounded, System UI, cover, the name shown.
+	assert.Equal(t, &api.CreateBrandRequest{Name: "Spring", Appearance: "dark", Theme: "plum",
+		Corners: "rounded", Font: "system-ui", BackgroundFit: "cover", HideAppName: false}, apiClient.created)
 	assert.Equal(t, http.StatusFound, w.Code)
 	assert.Equal(t, "https://console.example.test/admin/settings/branding", w.Header().Get("Location"))
 	assert.Equal(t, 1, cache.invalidations)
@@ -241,7 +246,8 @@ func TestHandleBrandGet_DrawsTheStoredBrand(t *testing.T) {
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, false, bind["isNew"])
 	assert.Equal(t, BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum"}, bind["brand"])
-	assert.Equal(t, api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2}, bind["storedBrand"])
+	assert.Equal(t, api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
+		Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true}, bind["storedBrand"])
 	assert.Equal(t, wantThemeOptions, bind["brandThemes"])
 	assert.Equal(t, wantThemeOptions[1], bind["appearanceTheme"], "the appearance cards show the brand's theme")
 	assert.Equal(t, false, bind["savedSuccessfully"])
@@ -262,7 +268,9 @@ func TestHandleBrandGet_AnUnknownOrMalformedBrandIsNotFound(t *testing.T) {
 	}
 }
 
-// A save of a brand's three fields, and the edit page it lands on, which says it was saved once.
+// A save of a brand's three fields, and the edit page it lands on, which says it was saved once. The
+// form has no field for the kit's choices yet, so the brand's stored ones are sent back unchanged,
+// as an update replaces every field (#813 decision 10).
 func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	store := newSettingsTestStore()
 	apiClient := newBrandingAPI()
@@ -277,7 +285,8 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 			handlertest.WithForm(url.Values{"name": {" Winter "}, "appearance": {"light"}, "theme": {"blueberry"}})))
 
 	assert.Equal(t, int64(4), apiClient.updatedId)
-	assert.Equal(t, &api.UpdateBrandRequest{Name: "Winter", Appearance: "light", Theme: "blueberry"}, apiClient.updated)
+	assert.Equal(t, &api.UpdateBrandRequest{Name: "Winter", Appearance: "light", Theme: "blueberry",
+		Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true}, apiClient.updated)
 	assert.Equal(t, http.StatusFound, w.Code)
 	assert.Equal(t, "https://console.example.test/admin/settings/branding/4/edit", w.Header().Get("Location"))
 	assert.Equal(t, 1, cache.invalidations, "a saved brand may be the default, so every page is drawn again")

@@ -3,19 +3,26 @@ package api
 import "time"
 
 // BrandResponse is a brand as the admin API answers it (#810 decision 5): a name, an appearance
-// (auto, light or dark) and the key of one of the built-in themes. IsDefault marks the brand a
-// client with no brand of its own is drawn in. ClientCount is how many clients are drawn in the
-// brand: those given it and, for the default brand, those with no brand of their own too, so the
-// counts of all brands add up to every client (#812 decision 3).
+// (auto, light or dark) and the key of one of the built-in themes, and the choices of its kit (#813
+// decision 10): its corners (square, rounded or pill), its font (system-ui, humanist, geometric,
+// serif, neo-grotesque, rounded or uploaded), its background fit (cover, contain or tile), and
+// whether the app name's text is hidden beside a logo. IsDefault marks the brand a client with no
+// brand of its own is drawn in. ClientCount is how many clients are drawn in the brand: those given
+// it and, for the default brand, those with no brand of their own too, so the counts of all brands
+// add up to every client (#812 decision 3).
 type BrandResponse struct {
-	Id          int64      `json:"id"`
-	Name        string     `json:"name"`
-	Appearance  string     `json:"appearance"`
-	Theme       string     `json:"theme"`
-	IsDefault   bool       `json:"isDefault"`
-	ClientCount int        `json:"clientCount"`
-	CreatedAt   *time.Time `json:"createdAt"`
-	UpdatedAt   *time.Time `json:"updatedAt"`
+	Id            int64      `json:"id"`
+	Name          string     `json:"name"`
+	Appearance    string     `json:"appearance"`
+	Theme         string     `json:"theme"`
+	Corners       string     `json:"corners"`
+	Font          string     `json:"font"`
+	BackgroundFit string     `json:"backgroundFit"`
+	HideAppName   bool       `json:"hideAppName"`
+	IsDefault     bool       `json:"isDefault"`
+	ClientCount   int        `json:"clientCount"`
+	CreatedAt     *time.Time `json:"createdAt"`
+	UpdatedAt     *time.Time `json:"updatedAt"`
 }
 
 // GetBrandsResponse is every brand, sorted by name.
@@ -24,12 +31,18 @@ type GetBrandsResponse struct {
 }
 
 // CreateBrandRequest creates a brand. The auth server trims the name and refuses an empty one, one
-// longer than 60 characters, one with an angle bracket and one another brand holds; an appearance
-// or a theme that is missing or unknown is refused too.
+// longer than 60 characters, one with an angle bracket and one another brand holds; an appearance,
+// a theme, corners, a font or a background fit that is missing or unknown is refused too, so a
+// misspelt field is reported rather than taken as a default (#813 decision 10). HideAppName is
+// false when absent. The uploaded font is refused while the brand has no regular font file.
 type CreateBrandRequest struct {
-	Name       string `json:"name"`
-	Appearance string `json:"appearance"`
-	Theme      string `json:"theme"`
+	Name          string `json:"name"`
+	Appearance    string `json:"appearance"`
+	Theme         string `json:"theme"`
+	Corners       string `json:"corners"`
+	Font          string `json:"font"`
+	BackgroundFit string `json:"backgroundFit"`
+	HideAppName   bool   `json:"hideAppName"`
 }
 
 type CreateBrandResponse struct {
@@ -40,11 +53,16 @@ type GetBrandResponse struct {
 	Brand BrandResponse `json:"brand"`
 }
 
-// UpdateBrandRequest replaces a brand's three fields, validated as CreateBrandRequest's are.
+// UpdateBrandRequest replaces a brand's fields, validated as CreateBrandRequest's are: every field
+// is written, so a field left out is refused or, for HideAppName, false (#813 decision 10).
 type UpdateBrandRequest struct {
-	Name       string `json:"name"`
-	Appearance string `json:"appearance"`
-	Theme      string `json:"theme"`
+	Name          string `json:"name"`
+	Appearance    string `json:"appearance"`
+	Theme         string `json:"theme"`
+	Corners       string `json:"corners"`
+	Font          string `json:"font"`
+	BackgroundFit string `json:"backgroundFit"`
+	HideAppName   bool   `json:"hideAppName"`
 }
 
 type UpdateBrandResponse struct {

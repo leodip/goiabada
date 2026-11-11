@@ -2030,6 +2030,24 @@ var publishedRequestEnums = map[string]string{
 	"UpdateBrandRequest.appearance": "enforced: handler_api_brands.go refuses any appearance but " +
 		"[auto, light, dark], an absent one included, with 400 before writing. Covered by " +
 		"TestBrandUpdate_Refusals' appearance cases. Published in #810",
+	"CreateBrandRequest.corners": "enforced: handler_api_brands.go refuses any corners but " +
+		"[square, rounded, pill], an absent one included, with 400 before writing. Covered by " +
+		"TestBrandCreate_Refusals' corners cases. Published in #813",
+	"CreateBrandRequest.font": "enforced: handler_api_brands.go refuses any font but " +
+		"[system-ui, humanist, geometric, serif, neo-grotesque, rounded, uploaded], an absent one included, with 400 before writing. Covered by " +
+		"TestBrandCreate_Refusals' font cases. Published in #813",
+	"CreateBrandRequest.backgroundFit": "enforced: handler_api_brands.go refuses any background fit but " +
+		"[cover, contain, tile], an absent one included, with 400 before writing. Covered by " +
+		"TestBrandCreate_Refusals' background fit cases. Published in #813",
+	"UpdateBrandRequest.corners": "enforced: handler_api_brands.go refuses any corners but " +
+		"[square, rounded, pill], an absent one included, with 400 before writing. Covered by " +
+		"TestBrandUpdate_Refusals' corners cases. Published in #813",
+	"UpdateBrandRequest.font": "enforced: handler_api_brands.go refuses any font but " +
+		"[system-ui, humanist, geometric, serif, neo-grotesque, rounded, uploaded], an absent one included, with 400 before writing. Covered by " +
+		"TestBrandUpdate_Refusals' font cases. Published in #813",
+	"UpdateBrandRequest.backgroundFit": "enforced: handler_api_brands.go refuses any background fit but " +
+		"[cover, contain, tile], an absent one included, with 400 before writing. Covered by " +
+		"TestBrandUpdate_Refusals' background fit cases. Published in #813",
 	"CreateLegalDocumentRequest.kind": "enforced: handler_api_legal_documents.go refuses any kind but " +
 		"[must_accept, for_information], an absent one included, with 400 before writing. Covered by " +
 		"TestLegalDocumentCreate_Refusals' unknown and missing kind cases. Published in #622",

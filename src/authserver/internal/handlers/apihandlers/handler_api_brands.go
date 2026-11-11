@@ -23,10 +23,10 @@ import (
 )
 
 // The admin API's brands (#810), in the settings domain: a brand is a name, an appearance and one
-// of the built-in themes, and the one the settings row points at is the default, which a client
-// with no brand of its own is drawn in (decisions 1 and 5; #812 decision 1). Every brand answer
-// says how many clients are drawn in it (#812 decision 3). The last write of a brand wins, as for
-// resources and groups.
+// of the built-in themes, with its kit's choices (#813 decision 10), and the one the settings row
+// points at is the default, which a client with no brand of its own is drawn in (decisions 1 and 5;
+// #812 decision 1). Every brand answer says how many clients are drawn in it (#812 decision 3). The
+// last write of a brand wins, as for resources and groups.
 
 // brandsDatabase is what the brand endpoints need: the brands, the default pointer, the count of
 // clients drawn in each, and the transaction the pointer's writes take the settings row's lock in.
@@ -42,12 +42,20 @@ type brandsDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
-// validateBrand holds a create's or an update's three fields to decision 5 and answers them as
-// stored, on a brand drawn as one was before the kit (record.NewBrand): the name trimmed, required, at most record.BrandNameMaxLength characters and without
-// angle brackets; the appearance one of the three, exactly; the theme one of the built-in keys,
-// exactly. A missing appearance or theme is refused as an unknown one.
-func validateBrand(name, appearance, theme string) (record.Brand, error) {
-	name = strings.TrimSpace(name)
+// brandFields are what a create and an update name: every field of a brand but its asset slots.
+type brandFields struct {
+	name, appearance, theme, corners, font, backgroundFit string
+	hideAppName                                           bool
+}
+
+// validateBrand holds a create's or an update's fields to #810 decision 5 and #813 decision 10, and
+// answers them as stored, on a brand with every slot empty: the name trimmed, required, at most
+// record.BrandNameMaxLength characters and without angle brackets; the appearance, the theme, the
+// corners, the font and the background fit each one of their keys, exactly. A missing choice is
+// refused as an unknown one, so a misspelt field name is reported and never becomes a default. The
+// hide-app-name switch is taken as sent, false when absent.
+func validateBrand(fields brandFields) (record.Brand, error) {
+	name := strings.TrimSpace(fields.name)
 	if name == "" {
 		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandNameRequired, nil)
 	}
@@ -58,13 +66,37 @@ func validateBrand(name, appearance, theme string) (record.Brand, error) {
 	if err := accountvalidation.ValidateNoAngleBrackets(name, i18n.ErrCodeBrandNameAngleBrackets); err != nil {
 		return record.Brand{}, err
 	}
-	if !record.BrandAppearance(appearance).IsValid() {
+	if !record.BrandAppearance(fields.appearance).IsValid() {
 		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandAppearanceInvalid, nil)
 	}
-	if _, ok := brandthemes.StylesheetOf(theme); !ok {
+	if _, ok := brandthemes.StylesheetOf(fields.theme); !ok {
 		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandThemeInvalid, nil)
 	}
-	return record.NewBrand(name, record.BrandAppearance(appearance), theme), nil
+	if !record.BrandCorners(fields.corners).IsValid() {
+		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandCornersInvalid, nil)
+	}
+	if !record.BrandFont(fields.font).IsValid() {
+		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandFontInvalid, nil)
+	}
+	if !record.BrandBackgroundFit(fields.backgroundFit).IsValid() {
+		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandBackgroundFitInvalid, nil)
+	}
+	brand := record.NewBrand(name, record.BrandAppearance(fields.appearance), fields.theme)
+	brand.Corners = record.BrandCorners(fields.corners)
+	brand.Font = record.BrandFont(fields.font)
+	brand.BackgroundFit = record.BrandBackgroundFit(fields.backgroundFit)
+	brand.HideAppName = fields.hideAppName
+	return brand, nil
+}
+
+// validateBrandFont holds a brand's font to the slots it is written with: the uploaded font is
+// drawn from the regular font file, so it is refused while that slot is empty, a bold file alone
+// included (#813 decision 7).
+func validateBrandFont(brand *record.Brand) error {
+	if brand.Font == record.BrandFontUploaded && !brand.RegularFontAssetId.Valid {
+		return i18n.NewLocalizedError(i18n.ErrCodeBrandUploadedFontRegularRequired, nil)
+	}
+	return nil
 }
 
 // brandNameTaken answers a brand write the engine refused on the name's unique key: the name was
@@ -171,7 +203,14 @@ func HandleBrandCreatePost(database brandsDatabase, auditLogger AuditLogger) htt
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		brand, err := validateBrand(req.Name, req.Appearance, req.Theme)
+		brand, err := validateBrand(brandFields{
+			name: req.Name, appearance: req.Appearance, theme: req.Theme,
+			corners: req.Corners, font: req.Font, backgroundFit: req.BackgroundFit, hideAppName: req.HideAppName,
+		})
+		if err == nil {
+			// A create names no asset yet, so every slot is empty.
+			err = validateBrandFont(&brand)
+		}
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
@@ -228,15 +267,28 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger) http
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		fields, err := validateBrand(req.Name, req.Appearance, req.Theme)
+		fields, err := validateBrand(brandFields{
+			name: req.Name, appearance: req.Appearance, theme: req.Theme,
+			corners: req.Corners, font: req.Font, backgroundFit: req.BackgroundFit, hideAppName: req.HideAppName,
+		})
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
 
+		// Every field the request names replaces the stored one; the slots, which it does not name
+		// yet, are written back as they were loaded.
 		brand.Name = fields.Name
 		brand.Appearance = fields.Appearance
 		brand.Theme = fields.Theme
+		brand.Corners = fields.Corners
+		brand.Font = fields.Font
+		brand.BackgroundFit = fields.BackgroundFit
+		brand.HideAppName = fields.HideAppName
+		if err := validateBrandFont(brand); err != nil {
+			writeValidationError(w, r, err)
+			return
+		}
 		if err := database.UpdateBrand(r.Context(), nil, brand); err != nil {
 			if !brandNameTaken(w, r, err) {
 				writeInternalServerError(w, r, errs.Wrap(err, "database error updating brand"), "brand_id", brand.Id)
@@ -249,6 +301,10 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger) http
 			"brand_name":     brand.Name,
 			"appearance":     string(brand.Appearance),
 			"theme":          brand.Theme,
+			"corners":        string(brand.Corners),
+			"font":           string(brand.Font),
+			"background_fit": string(brand.BackgroundFit),
+			"hide_app_name":  brand.HideAppName,
 			"logged_in_user": callerSubject(r),
 		})
 

@@ -116,6 +116,8 @@ var fileRoutes = []string{
 	"HEAD /client/logo/{clientIdentifier}",
 	"GET /brand/{id}/stylesheet.css",
 	"HEAD /brand/{id}/stylesheet.css",
+	"GET /brand/{id}/colors.css",
+	"HEAD /brand/{id}/colors.css",
 }
 
 // Every page route of the real registrations runs the page-language middleware, and the routes that

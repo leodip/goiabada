@@ -2366,7 +2366,10 @@ paths:
             error_code is INVALID_REQUEST_BODY for a body that is not JSON, or one of
             handler.brand.name_required, handler.brand.name_too_long,
             handler.brand.name_angle_brackets, handler.brand.name_in_use,
-            handler.brand.appearance_invalid and handler.brand.theme_invalid.
+            handler.brand.appearance_invalid, handler.brand.theme_invalid,
+            handler.brand.corners_invalid, handler.brand.font_invalid,
+            handler.brand.background_fit_invalid and
+            handler.brand.uploaded_font_regular_required.
           content:
             application/json:
               schema:
@@ -2407,8 +2410,9 @@ paths:
       tags: [Brands]
       summary: Update brand
       description: |
-        Replace a brand's name, appearance and theme. A change to the default brand restyles
-        every page at once.
+        Replace a brand's name, appearance, theme and kit choices. Every field is written: a
+        choice left out is refused, and hideAppName left out is false. A change to the default
+        brand restyles every page at once.
       operationId: updateBrand
       parameters:
         - $ref: '#/components/parameters/BrandIdParam'
@@ -8209,11 +8213,18 @@ components:
           type: string
           format: uri
           description: >-
-            The absolute URL of the brand's stylesheet, which a page links after main.css. The URL
-            changes whenever the stylesheet does.
+            The absolute URL of the brand's full stylesheet, its colors, corners and font, which an
+            end-user page links after main.css. The URL changes whenever the stylesheet does.
+        colorsStylesheetUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's stylesheet that sets its colors alone, which an admin
+            page links after main.css. The URL changes whenever the stylesheet does.
       required:
         - appearance
         - stylesheetUrl
+        - colorsStylesheetUrl
 
     PasswordRulesResponse:
       type: object
@@ -8577,6 +8588,21 @@ components:
         theme:
           type: string
           description: The key of one of the built-in themes getBrandThemes lists.
+        corners:
+          type: string
+          enum: [square, rounded, pill]
+          description: How round the brand's controls and panels are drawn.
+        font:
+          type: string
+          enum: [system-ui, humanist, geometric, serif, neo-grotesque, rounded, uploaded]
+          description: The font family the brand's text is drawn in, one of the six system families or the uploaded font.
+        backgroundFit:
+          type: string
+          enum: [cover, contain, tile]
+          description: How the brand's background image fills the page behind the card.
+        hideAppName:
+          type: boolean
+          description: Whether the app name's text is hidden beside the brand's logo.
         isDefault:
           type: boolean
           description: True for the default brand, the one a client with no brand of its own is drawn in.
@@ -8596,6 +8622,10 @@ components:
         - name
         - appearance
         - theme
+        - corners
+        - font
+        - backgroundFit
+        - hideAppName
         - isDefault
         - clientCount
         - createdAt
@@ -8626,10 +8656,26 @@ components:
         theme:
           type: string
           description: The key of one of the built-in themes getBrandThemes lists.
+        corners:
+          type: string
+          enum: [square, rounded, pill]
+        font:
+          type: string
+          enum: [system-ui, humanist, geometric, serif, neo-grotesque, rounded, uploaded]
+          description: The uploaded font is refused while the brand has no regular font file.
+        backgroundFit:
+          type: string
+          enum: [cover, contain, tile]
+        hideAppName:
+          type: boolean
+          default: false
       required:
         - name
         - appearance
         - theme
+        - corners
+        - font
+        - backgroundFit
 
     CreateBrandResponse:
       type: object
@@ -8662,10 +8708,26 @@ components:
         theme:
           type: string
           description: The key of one of the built-in themes getBrandThemes lists.
+        corners:
+          type: string
+          enum: [square, rounded, pill]
+        font:
+          type: string
+          enum: [system-ui, humanist, geometric, serif, neo-grotesque, rounded, uploaded]
+          description: The uploaded font is refused while the brand has no regular font file.
+        backgroundFit:
+          type: string
+          enum: [cover, contain, tile]
+        hideAppName:
+          type: boolean
+          default: false
       required:
         - name
         - appearance
         - theme
+        - corners
+        - font
+        - backgroundFit
 
     UpdateBrandResponse:
       type: object

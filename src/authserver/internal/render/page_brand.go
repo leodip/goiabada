@@ -56,11 +56,14 @@ func ClientPageBrand(ctx context.Context, brands PageBrandReader, clientIdentifi
 }
 
 // PageBrand is what a page takes from its brand: the data-theme its html element carries,
-// light or dark, or empty for automatic, and the path it links the brand's stylesheet by after
-// main.css, or empty for none.
+// light or dark, or empty for automatic, and the path it links the brand's full stylesheet by after
+// main.css, or empty for none. ColorsStylesheet is the path of the brand's colors-only stylesheet,
+// which no page of the auth server links: the public settings carry it for the admin console's admin
+// pages (#813 decision 9). Both are empty, or both are set.
 type PageBrand struct {
-	DataTheme  string
-	Stylesheet string
+	DataTheme        string
+	Stylesheet       string
+	ColorsStylesheet string
 }
 
 // DefaultPageBrand answers what a page drawn in ctx takes from the default brand brands reads: every
@@ -88,13 +91,18 @@ func DefaultPageBrand(ctx context.Context, brands DefaultBrandReader) PageBrand 
 // pageBrandOf is what a page drawn in brand takes from it, or nothing when its stored theme is none
 // of the built-in ones, which names no stylesheet and is logged.
 func pageBrandOf(ctx context.Context, brand *record.Brand) PageBrand {
-	stylesheet, err := brandthemes.StylesheetPath(brand.Id, brand.Theme)
+	stylesheet, err := brandthemes.StylesheetPath(brand)
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to link the brand's stylesheet", "brand_id", brand.Id, "error", err)
+		return PageBrand{}
+	}
+	colorsStylesheet, err := brandthemes.ColorsStylesheetPath(brand)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to link the brand's stylesheet", "brand_id", brand.Id, "error", err)
 		return PageBrand{}
 	}
 
-	page := PageBrand{Stylesheet: stylesheet}
+	page := PageBrand{Stylesheet: stylesheet, ColorsStylesheet: colorsStylesheet}
 	// data-theme is written for light and dark alone, as ui.css reads it: automatic is no attribute,
 	// so the device's preference decides.
 	if brand.Appearance == record.BrandAppearanceLight || brand.Appearance == record.BrandAppearanceDark {

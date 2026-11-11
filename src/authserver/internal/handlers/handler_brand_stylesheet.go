@@ -8,7 +8,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/core/errs"
 )
 
 // brandStylesheetDatabase is what a brand's stylesheet needs: the brand.
@@ -27,10 +26,27 @@ const (
 	brandStylesheetOtherCache = "public, max-age=300"
 )
 
-// HandleBrandStylesheetGet answers a brand's stylesheet, at brandthemes.StylesheetRoute, to anyone,
-// as a static file is answered: the colors of the brand's theme, or none for Blueberry, whose are
-// main.css's. A brand that does not exist is not found.
+// HandleBrandStylesheetGet answers a brand's full stylesheet, at brandthemes.StylesheetRoute, to
+// anyone, as a static file is answered: the colors of the brand's theme, or none for Blueberry,
+// whose are main.css's, and its corners and font (#813 decision 9). The auth server's pages and the
+// admin console's end-user pages link it. A brand that does not exist is not found.
 func HandleBrandStylesheetGet(pageRenderer PageRenderer, database brandStylesheetDatabase) http.HandlerFunc {
+	return serveBrandStylesheet(pageRenderer, database, brandthemes.FullStylesheet)
+}
+
+// HandleBrandColorsStylesheetGet answers a brand's colors-only stylesheet, at
+// brandthemes.ColorsStylesheetRoute, as HandleBrandStylesheetGet answers the full one: the colors of
+// the brand's theme and nothing of its kit, which the admin console's admin pages link, so they
+// never receive the kit (#813 decision 9).
+func HandleBrandColorsStylesheetGet(pageRenderer PageRenderer, database brandStylesheetDatabase) http.HandlerFunc {
+	return serveBrandStylesheet(pageRenderer, database, brandthemes.ColorsStylesheet)
+}
+
+// serveBrandStylesheet answers the stylesheet stylesheetOf builds for the brand the path names,
+// kept for a year when the request names its current fingerprint and five minutes otherwise.
+func serveBrandStylesheet(pageRenderer PageRenderer, database brandStylesheetDatabase,
+	stylesheetOf func(*record.Brand) (brandthemes.Stylesheet, error)) http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		brandId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil || brandId <= 0 {
@@ -48,9 +64,9 @@ func HandleBrandStylesheetGet(pageRenderer PageRenderer, database brandStyleshee
 			return
 		}
 
-		stylesheet, ok := brandthemes.StylesheetOf(brand.Theme)
-		if !ok {
-			pageRenderer.InternalServerError(w, r, errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brand.Id, brand.Theme))
+		stylesheet, err := stylesheetOf(brand)
+		if err != nil {
+			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 

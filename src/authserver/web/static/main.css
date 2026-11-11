@@ -256,6 +256,7 @@
     color-scheme: light;
     background-color: var(--color-canvas);
     --app-header-height: 4rem;
+    --radius-box: min(var(--radius-control), 1rem);
     @media (prefers-color-scheme: dark) {
       &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
         color-scheme: dark;
@@ -568,6 +569,7 @@
   }
   textarea.control {
     min-height: 6rem;
+    border-radius: var(--radius-box);
     resize: vertical;
   }
   select.control, .control.combobox-input {
@@ -657,7 +659,7 @@
     gap: 0.75rem;
     padding: 0.875rem 1rem;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     cursor: pointer;
   }
@@ -678,7 +680,7 @@
   }
   .check-list {
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     overflow: hidden;
   }
@@ -720,7 +722,7 @@
     @supports (color: color-mix(in lab, red, red)) {
       border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
     }
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     color: var(--color-ink);
     font-size: 0.9375rem;
@@ -1101,7 +1103,7 @@
     width: 4.5rem;
     height: 4.5rem;
     margin-bottom: 0.5rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     object-fit: contain;
   }
   .auth-client-name {
@@ -1170,7 +1172,7 @@
     display: block;
     margin-top: 0.5rem;
     padding: 0.5rem 0.75rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
     font-size: 0.9375rem;
@@ -1238,7 +1240,7 @@
     height: 12rem;
     margin: 0.75rem auto 0;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
   }
   .secret-key-row {
     display: flex;
@@ -1255,7 +1257,7 @@
     display: block;
     margin-top: 0.5rem;
     padding: 0.5rem 0.625rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
     font-size: 0.8125rem;
@@ -1365,7 +1367,7 @@
   }
   .legal-text pre {
     padding: 0.75rem 1rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     white-space: pre-wrap;
   }
@@ -1393,7 +1395,7 @@
   }
   .legal-source {
     padding: 0.75rem 1rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
     font-size: 0.875rem;
@@ -1407,7 +1409,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
   }
   .identity-row-who {
@@ -1431,7 +1433,7 @@
     gap: 0.75rem;
     padding: 0.75rem 0.875rem;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     color: var(--color-ink);
     text-decoration: none;
@@ -1485,7 +1487,7 @@
     max-height: 16rem;
     padding: 0.25rem;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     box-shadow: var(--shadow-overlay);
   }

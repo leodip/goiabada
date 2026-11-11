@@ -33,8 +33,15 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   default, which `/api/public/settings` answers through `render.ClientPageBrand`. The console drops
   its cached copy when its client's Brand select is saved and on every Branding write, so its pages
   change at once; a change made through the admin API alone reaches them when the cache expires. A page with no readable brand links none and is drawn automatic in the built-in
-  colors. The stylesheet sets the 23 `--color-*` tokens, the dark ones under the two
-  selectors `ui.css`'s dark variant uses, so a change to that variant changes `stylesheetCSS` too.
+  colors. A brand has two stylesheets (#813 decision 9): the full one, which the auth server's pages
+  link, and the colors-only one at `brandthemes.ColorsStylesheetRoute`, which
+  `/api/public/settings` names as `colorsStylesheetUrl`. Both set the 23 `--color-*` tokens, the
+  dark ones under the two selectors `ui.css`'s dark variant uses, so a change to that variant
+  changes `stylesheetCSS` too. The full one then sets the tokens the brand's corners and system
+  family change, `--radius-control`, `--radius-panel` and `--font-sans`, and none for rounded and
+  System UI, which are `ui.css`'s. A box that may hold more than one line is rounded by
+  `--radius-box`, `--radius-control` capped at 1rem, so pill corners round a single-line control
+  fully and leave such a box's content unclipped; draw a new multi-line component with it.
   Blueberry's declares no colors, since `ui.css` holds its values, which
   `TestThemeContrast_BlueberryIsBothCopiesOfUICSS` keeps equal to its preset; a token added to
   `ui.css` is added to every preset. A color is a token, `bg-surface`, `text-ink-muted`,
