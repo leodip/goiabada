@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"io/fs"
 	"path/filepath"
 	"regexp"
@@ -285,7 +286,7 @@ var documentedPublicRoutes = []string{
 // routeConstants is each package constant routes.go registers a route by, mapped to the
 // constant's own value, so the table cannot drift from what the constants say. A route
 // registered by a constant this table does not hold is one collectRoutes cannot read, which
-// TestOpenAPI_ResolvesEveryRouteConstant fails on rather than letting every test here skip it.
+// TestOpenAPI_ReadsEveryRoutePath fails on rather than letting every test here skip it.
 var routeConstants = map[string]string{
 	"brandthemes.StylesheetRoute":       brandthemes.StylesheetRoute,
 	"brandthemes.ColorsStylesheetRoute": brandthemes.ColorsStylesheetRoute,
@@ -296,8 +297,15 @@ var routeConstants = map[string]string{
 }
 
 // routePath reads a registration's path: a string literal, or a package constant routeConstants
-// holds.
+// holds, either in parentheses or not.
 func routePath(e ast.Expr) (string, bool) {
+	for {
+		paren, ok := e.(*ast.ParenExpr)
+		if !ok {
+			break
+		}
+		e = paren.X
+	}
 	if path, ok := stringLiteral(e); ok {
 		return path, true
 	}
@@ -321,52 +329,173 @@ func selectorName(e ast.Expr) (string, bool) {
 	return pkg.Name + "." + sel.Sel.Name, true
 }
 
-// TestOpenAPI_ResolvesEveryRouteConstant holds routeConstants to routes.go: a route registered
-// by a package constant the table does not hold would be skipped by collectRoutes, and so be
-// invisible to every test in this file, documented or not.
-func TestOpenAPI_ResolvesEveryRouteConstant(t *testing.T) {
+// TestOpenAPI_ReadsEveryRoutePath holds collectRoutes to routes.go: a route whose path the parser
+// cannot read is skipped by every test in this file, documented or not, and by the administrative
+// route classification, which shares collectRoutes.
+func TestOpenAPI_ReadsEveryRoutePath(t *testing.T) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "routes.go", nil, parser.SkipObjectResolution)
 	if err != nil {
 		t.Fatalf("parsing routes.go: %v", err)
 	}
 
-	assertRouteConstantsResolve(t, fset, file)
+	assertRoutePathsReadable(t, fset, file)
 }
 
-func assertRouteConstantsResolve(r guard.Reporter, fset *token.FileSet, file *ast.File) {
-	resolved := 0
+// assertRoutePathsReadable reports each route registration in file whose path routePath cannot
+// read, which is anything but a string literal or a constant routeConstants holds: a constant of
+// the file's own, one of a package the table does not hold, a variable. It also reports a table
+// entry no registration uses, and stops on a file with no registration at all, a walk that no
+// longer matches how routes are registered.
+func assertRoutePathsReadable(r guard.Reporter, fset *token.FileSet, file *ast.File) {
+	r.Helper()
+	registrations := 0
+	used := map[string]bool{}
 	ast.Inspect(file, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true
 		}
-		var path ast.Expr
-		switch fn := call.Fun.(type) {
-		case *ast.Ident:
-			if fn.Name == "getAndHead" && len(call.Args) == 3 {
-				path = call.Args[1]
-			}
-		case *ast.SelectorExpr:
-			if _, isVerb := httpVerbs[fn.Sel.Name]; (isVerb || fn.Sel.Name == "Route") && len(call.Args) == 2 {
-				path = call.Args[0]
-			}
-		}
-		name, isSelector := selectorName(path)
-		if path == nil || !isSelector {
+		path, ok := registrationPath(call)
+		if !ok {
 			return true
 		}
-		if _, known := routeConstants[name]; !known {
-			r.Errorf("routes.go:%d registers a route by %s, which routeConstants does not hold, so "+
-				"the OpenAPI contract tests cannot see it; add it there", fset.Position(call.Pos()).Line, name)
+		registrations++
+		if _, readable := routePath(path); !readable {
+			r.Errorf("routes.go:%d registers a route at %s, which the OpenAPI contract tests cannot "+
+				"read: use a string literal, or a package constant added to routeConstants",
+				fset.Position(call.Pos()).Line, types.ExprString(path))
 			return true
 		}
-		resolved++
+		if name, ok := selectorName(ast.Unparen(path)); ok {
+			used[name] = true
+		}
 		return true
 	})
-	if resolved < len(routeConstants) {
-		r.Errorf("routes.go registers %d routes by a constant routeConstants holds, fewer than its %d "+
-			"entries: remove the ones it no longer uses", resolved, len(routeConstants))
+	if registrations == 0 {
+		r.Fatalf("read no route registration in routes.go; the walk no longer matches the way routes are registered")
+		return
+	}
+	names := make([]string, 0, len(routeConstants))
+	for name := range routeConstants {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if !used[name] {
+			r.Errorf("routeConstants holds %s, which no registration in routes.go uses: remove it", name)
+		}
+	}
+}
+
+// registrationPath is the path of a call that registers a route as collectRoutes reads one:
+// getAndHead(r, path, pkg.HandleX(...)), r.Verb(path, pkg.HandleX(...)) or r.Route(path, func...).
+func registrationPath(call *ast.CallExpr) (ast.Expr, bool) {
+	switch fn := call.Fun.(type) {
+	case *ast.Ident:
+		if fn.Name == "getAndHead" && len(call.Args) == 3 {
+			if _, ok := handlerConstructor(call.Args[2]); ok {
+				return call.Args[1], true
+			}
+		}
+	case *ast.SelectorExpr:
+		if fn.Sel.Name == "Route" && len(call.Args) == 2 {
+			if _, ok := call.Args[1].(*ast.FuncLit); ok {
+				return call.Args[0], true
+			}
+		}
+		if _, isVerb := httpVerbs[fn.Sel.Name]; isVerb && len(call.Args) == 2 {
+			if _, ok := handlerConstructor(call.Args[1]); ok {
+				return call.Args[0], true
+			}
+		}
+	}
+	return nil, false
+}
+
+// routePathsFixture is a routes.go source registering each routeConstants entry once, by
+// getAndHead, then the lines extra adds.
+func routePathsFixture(extra string) string {
+	names := make([]string, 0, len(routeConstants))
+	for name := range routeConstants {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var b strings.Builder
+	b.WriteString("package server\n\nfunc routes() {\n")
+	for _, name := range names {
+		fmt.Fprintf(&b, "\tgetAndHead(public, %s, handlers.HandleThing(h))\n", name)
+	}
+	b.WriteString(extra)
+	b.WriteString("}\n")
+	return b.String()
+}
+
+func runRoutePathsGuard(t *testing.T, src string) guard.Report {
+	t.Helper()
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "routes.go", src, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatalf("parsing the fixture: %v", err)
+	}
+	return guard.Run(func(r guard.Reporter) {
+		assertRoutePathsReadable(r, fset, file)
+	})
+}
+
+func TestRoutePaths_AnUnreadablePathFails(t *testing.T) {
+	src := routePathsFixture("" +
+		"\tr.Post(listPath, apihandlers.HandleThingsPost(db))\n" +
+		"\tr.Get(routes.NotListed, handlers.HandleThing(h))\n" +
+		"\tr.Get((routes.NotListed), handlers.HandleThing(h))\n" +
+		"\tr.Route(prefix, func(r *routing.Router) {})\n")
+
+	report := runRoutePathsGuard(t, src)
+
+	if report.Stopped {
+		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+	}
+	first := 4 + len(routeConstants)
+	want := []string{}
+	for i, path := range []string{"listPath", "routes.NotListed", "(routes.NotListed)", "prefix"} {
+		want = append(want, fmt.Sprintf("routes.go:%d registers a route at %s, which the OpenAPI contract "+
+			"tests cannot read: use a string literal, or a package constant added to routeConstants", first+i, path))
+	}
+	if !slices.Equal(report.Errors, want) {
+		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
+	}
+}
+
+func TestRoutePaths_StaleTableEntryFails(t *testing.T) {
+	src := strings.Replace(routePathsFixture(""), "\tgetAndHead(public, brandasset.Route, handlers.HandleThing(h))\n", "", 1)
+
+	report := runRoutePathsGuard(t, src)
+
+	want := []string{"routeConstants holds brandasset.Route, which no registration in routes.go uses: remove it"}
+	if report.Stopped || !slices.Equal(report.Errors, want) {
+		t.Errorf("stopped %v, failures\n%q\nwant\n%q", report.Stopped, report.Errors, want)
+	}
+}
+
+func TestRoutePaths_ReadablePathsPass(t *testing.T) {
+	src := routePathsFixture("" +
+		"\tr.Get(\"/api/v1/admin/things\", apihandlers.HandleThingsGet(db))\n" +
+		"\tr.Get((brandasset.Route), handlers.HandleThing(h))\n" +
+		"\tr.Route(\"/api/v1/account\", func(r *routing.Router) {})\n" +
+		"\tvalues.Get(\"key\", fallback)\n")
+
+	report := runRoutePathsGuard(t, src)
+
+	if report.Stopped || len(report.Errors) > 0 {
+		t.Errorf("stopped %v (%s), failures %q", report.Stopped, report.Fatal, report.Errors)
+	}
+}
+
+func TestRoutePaths_AWalkThatReachedNoRegistrationStops(t *testing.T) {
+	report := runRoutePathsGuard(t, "package server\n\nfunc routes() {}\n")
+
+	if !report.Stopped {
+		t.Errorf("the check did not stop on a file with no route registration; failures %q", report.Errors)
 	}
 }
 
@@ -763,7 +892,7 @@ func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
 		// r.Route("/api/v1/admin", func(r *routing.Router) { ... }): descend with the prefix and
 		// stop the outer walk, so the body is read once and under the right path.
 		if sel.Sel.Name == "Route" && len(call.Args) == 2 {
-			sub, subOK := stringLiteral(call.Args[0])
+			sub, subOK := routePath(call.Args[0])
 			body, bodyOK := call.Args[1].(*ast.FuncLit)
 			if subOK && bodyOK {
 				// A guard mounted with r.Use here covers every route in the body, and a
