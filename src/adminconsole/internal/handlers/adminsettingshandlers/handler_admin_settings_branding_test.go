@@ -28,6 +28,8 @@ import (
 type brandingAPI struct {
 	brands   []api.BrandResponse
 	themes   []api.BrandThemeResponse
+	assets   []api.BrandAssetResponse
+	assetErr error
 	writeErr error
 
 	created     *api.CreateBrandRequest
@@ -48,6 +50,18 @@ func (a *brandingAPI) GetBrandById(_ context.Context, _ string, brandId int64) (
 		}
 	}
 	return nil, &apiclient.APIError{Code: "NOT_FOUND", Message: "Brand not found", StatusCode: http.StatusNotFound}
+}
+
+func (a *brandingAPI) GetBrandAssetById(_ context.Context, _ string, assetId int64) (*api.BrandAssetResponse, error) {
+	if a.assetErr != nil {
+		return nil, a.assetErr
+	}
+	for _, asset := range a.assets {
+		if asset.Id == assetId {
+			return &asset, nil
+		}
+	}
+	return nil, &apiclient.APIError{Code: "NOT_FOUND", Message: "Brand asset not found", StatusCode: http.StatusNotFound}
 }
 
 func (a *brandingAPI) GetBrandThemes(context.Context, string) ([]api.BrandThemeResponse, error) {
@@ -107,7 +121,36 @@ func newBrandingAPI() *brandingAPI {
 			{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
 		},
 		themes: []api.BrandThemeResponse{testBlueberry, testPlum},
+		assets: []api.BrandAssetResponse{uploadedLogo, uploadedDarkLogo, uploadedFavicon, uploadedBackground, uploadedRegularFont, uploadedBoldFont},
 	}
+}
+
+// Assets uploaded in the editor and not yet saved, as the admin API answers each read by its id.
+var (
+	uploadedLogo        = api.BrandAssetResponse{Id: 21, Kind: "logo", Url: "https://auth.example.test/brand-assets/21?v=l", ContentType: "image/png", Width: 240, Height: 80}
+	uploadedDarkLogo    = api.BrandAssetResponse{Id: 22, Kind: "logo", Url: "https://auth.example.test/brand-assets/22?v=d", ContentType: "image/webp", Width: 240, Height: 80}
+	uploadedFavicon     = api.BrandAssetResponse{Id: 23, Kind: "favicon", Url: "https://auth.example.test/brand-assets/23?v=f", ContentType: "image/png", Width: 64, Height: 64}
+	uploadedBackground  = api.BrandAssetResponse{Id: 24, Kind: "background", Url: "https://auth.example.test/brand-assets/24?v=b", ContentType: "image/jpeg", Width: 1920, Height: 1080}
+	uploadedRegularFont = api.BrandAssetResponse{Id: 25, Kind: "font", Url: "https://auth.example.test/brand-assets/25?v=r", ContentType: "font/woff2"}
+	uploadedBoldFont    = api.BrandAssetResponse{Id: 26, Kind: "font", Url: "https://auth.example.test/brand-assets/26?v=o", ContentType: "font/woff2"}
+)
+
+// slotsForm is the six slots' fields as the editor posts them: each slot's asset id, or empty.
+func slotsForm(logo, darkLogo, favicon, background, regularFont, boldFont string) url.Values {
+	return url.Values{"logo": {logo}, "darkLogo": {darkLogo}, "favicon": {favicon}, "background": {background},
+		"regularFont": {regularFont}, "boldFont": {boldFont}}
+}
+
+// withValues is form with values added.
+func withValues(form url.Values, values url.Values) url.Values {
+	merged := url.Values{}
+	for key, value := range form {
+		merged[key] = value
+	}
+	for key, value := range values {
+		merged[key] = value
+	}
+	return merged
 }
 
 func refusal(code, message string) error {
@@ -217,7 +260,9 @@ func TestHandleBrandNewPost_SendsTheSwitchOffWhenTheFormLeavesItOut(t *testing.T
 // Every refusal the admin API answers a brand's save with, and the field the form marks for it:
 // the name for the four about the name, the appearance, theme, corners and background fit choices
 // for theirs, and the font family for an unknown family and for the uploaded font without a regular
-// font file (#813 decision 7).
+// font file (#813 decision 7). A slot naming no stored asset of its kind is marked at its own field,
+// a dark logo without a logo at the logo, and a bold font file without a regular one at the regular
+// font file, the field that wants a file.
 var brandRefusals = []struct {
 	code  string
 	field string
@@ -232,6 +277,14 @@ var brandRefusals = []struct {
 	{"handler.brand.font_invalid", "font"},
 	{"handler.brand.uploaded_font_regular_required", "font"},
 	{"handler.brand.background_fit_invalid", "backgroundFit"},
+	{"handler.brand.logo_asset_invalid", "logo"},
+	{"handler.brand.dark_logo_asset_invalid", "darkLogo"},
+	{"handler.brand.favicon_asset_invalid", "favicon"},
+	{"handler.brand.background_asset_invalid", "background"},
+	{"handler.brand.regular_font_asset_invalid", "regularFont"},
+	{"handler.brand.bold_font_asset_invalid", "boldFont"},
+	{"handler.brand.dark_logo_logo_required", "logo"},
+	{"handler.brand.bold_font_regular_required", "regularFont"},
 	{"INVALID_REQUEST_BODY", ""},
 }
 
@@ -274,8 +327,10 @@ func TestHandleBrandGet_DrawsTheStoredBrand(t *testing.T) {
 
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, false, bind["isNew"])
+	stored := newBrandingAPI().brands[0]
 	assert.Equal(t, BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum", Corners: "pill", Font: "serif",
-		BackgroundFit: "tile", HideAppName: true}, bind["brand"], "the stored choices")
+		BackgroundFit: "tile", HideAppName: true, Logo: stored.Logo, Favicon: stored.Favicon, RegularFont: stored.RegularFont},
+		bind["brand"], "the stored choices and slots")
 	assert.Equal(t, newBrandingAPI().brands[0], bind["storedBrand"])
 	assert.Equal(t, wantThemeOptions, bind["brandThemes"])
 	assert.Equal(t, wantThemeOptions[1], bind["appearanceTheme"], "the appearance cards show the brand's theme")
@@ -298,9 +353,10 @@ func TestHandleBrandGet_AnUnknownOrMalformedBrandIsNotFound(t *testing.T) {
 }
 
 // A save of a brand's fields, and the edit page it lands on, which says it was saved once. The kit's
-// four choices are sent as the form holds them, the switch off as the form leaves it out. The form has
-// no field for the slots yet, so the brand's stored ones are sent back unchanged, each by its asset's
-// id and an empty one as none, as an update replaces every field (#813 decision 10).
+// four choices are sent as the form holds them, the switch off as the form leaves it out, and each
+// slot as the form holds it, by its asset's id (#813 decision 1): one kept from the stored brand, one
+// replaced by an upload, one added and one removed, which the form sends empty, as an update replaces
+// every field (#813 decision 10).
 func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	store := newSettingsTestStore()
 	apiClient := newBrandingAPI()
@@ -312,13 +368,15 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	HandleBrandPost(httpHelper, store, apiClient, cache, consoleBaseURL).ServeHTTP(w,
 		handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
 			handlertest.WithPathValue("brandId", "4"),
-			handlertest.WithForm(url.Values{"name": {" Winter "}, "appearance": {"light"}, "theme": {"blueberry"},
-				"corners": {"square"}, "font": {"uploaded"}, "backgroundFit": {"contain"}})))
+			handlertest.WithForm(withValues(slotsForm("11", "", "", "24", "25", ""), url.Values{
+				"name": {" Winter "}, "appearance": {"light"}, "theme": {"blueberry"},
+				"corners": {"square"}, "font": {"uploaded"}, "backgroundFit": {"contain"},
+				"logoUrl": {"https://elsewhere.example/a.png"}}))))
 
 	assert.Equal(t, int64(4), apiClient.updatedId)
 	assert.Equal(t, &api.UpdateBrandRequest{Name: "Winter", Appearance: "light", Theme: "blueberry",
 		Corners: "square", Font: "uploaded", BackgroundFit: "contain", HideAppName: false,
-		Logo: &api.BrandAssetRef{Id: 11}, Favicon: &api.BrandAssetRef{Id: 13}, RegularFont: &api.BrandAssetRef{Id: 15}},
+		Logo: &api.BrandAssetRef{Id: 11}, Background: &api.BrandAssetRef{Id: 24}, RegularFont: &api.BrandAssetRef{Id: 25}},
 		apiClient.updated)
 	assert.Equal(t, http.StatusFound, w.Code)
 	assert.Equal(t, "https://console.example.test/admin/settings/branding/4/edit", w.Header().Get("Location"))
@@ -327,6 +385,100 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	bind := editPageAfter(t, store, apiClient, w)
 	assert.Equal(t, true, bind["savedSuccessfully"])
 	assert.Equal(t, false, bind["madeDefault"])
+}
+
+// Create attaches the files uploaded in the new brand's form, each slot by its asset's id, and sends
+// an empty slot empty (#813 decision 1).
+func TestHandleBrandNewPost_AttachesTheUploadedFiles(t *testing.T) {
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	apiClient := newBrandingAPI()
+
+	HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+		handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
+			handlertest.WithForm(withValues(slotsForm("21", "22", "23", "", "25", "26"), url.Values{
+				"name": {"Spring"}, "appearance": {"auto"}, "theme": {"plum"},
+				"corners": {"rounded"}, "font": {"uploaded"}, "backgroundFit": {"cover"}}))))
+
+	assert.Equal(t, &api.CreateBrandRequest{Name: "Spring", Appearance: "auto", Theme: "plum",
+		Corners: "rounded", Font: "uploaded", BackgroundFit: "cover",
+		Logo: &api.BrandAssetRef{Id: 21}, DarkLogo: &api.BrandAssetRef{Id: 22}, Favicon: &api.BrandAssetRef{Id: 23},
+		RegularFont: &api.BrandAssetRef{Id: 25}, BoldFont: &api.BrandAssetRef{Id: 26}}, apiClient.created)
+}
+
+// A slot holding no number, which the editor never sends, is sent as an asset no store holds, for the
+// admin API to refuse at its field, rather than emptied without a word.
+func TestHandleBrandNewPost_ASlotHoldingNoNumberIsSentForTheAPIToRefuse(t *testing.T) {
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	apiClient := newBrandingAPI()
+
+	HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+		handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
+			handlertest.WithForm(withValues(slotsForm("logo.png", "", "", "", "", ""), url.Values{
+				"name": {"Spring"}, "appearance": {"auto"}, "theme": {"plum"},
+				"corners": {"rounded"}, "font": {"system-ui"}, "backgroundFit": {"cover"}}))))
+
+	require.NotNil(t, apiClient.created)
+	assert.Equal(t, &api.BrandAssetRef{Id: 0}, apiClient.created.Logo)
+}
+
+// A refused form is drawn again with the files it held, each read by its id, so an upload not yet
+// saved is still drawn and sent with the next Save (#813 decision 10). One the admin API no longer
+// holds, swept or never stored, is drawn empty, for the refusal at its field to be answered with a new
+// upload.
+func TestHandleBrandWrite_ARefusedFormKeepsItsUploads(t *testing.T) {
+	form := withValues(slotsForm("21", "22", "", "24", "99", "26"), url.Values{
+		"name": {"Spring"}, "appearance": {"auto"}, "theme": {"plum"},
+		"corners": {"rounded"}, "font": {"uploaded"}, "backgroundFit": {"tile"}})
+	want := BrandForm{Name: "Spring", Appearance: "auto", Theme: "plum", Corners: "rounded", Font: "uploaded",
+		BackgroundFit: "tile", Logo: &uploadedLogo, DarkLogo: &uploadedDarkLogo, Background: &uploadedBackground,
+		BoldFont: &uploadedBoldFont}
+
+	draw := map[string]func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI){
+		"new form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+			HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+				handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
+					handlertest.WithForm(form)))
+		},
+		"brand's form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+			HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
+				httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit",
+					handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", "4"), handlertest.WithForm(form)))
+		},
+	}
+	for name, drawPage := range draw {
+		t.Run(name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
+			apiClient := newBrandingAPI()
+			apiClient.writeErr = refusal("handler.brand.regular_font_asset_invalid", "Upload it again.")
+
+			drawPage(httpHelper, apiClient)
+
+			bind := handlertest.Bind(t, httpHelper)
+			assert.Equal(t, "regularFont", bind["errorField"])
+			assert.Equal(t, want, bind["brand"])
+		})
+	}
+}
+
+// A refused form whose file cannot be read for a reason other than its absence answers the page that
+// says why, as any other failed read does.
+func TestHandleBrandNewPost_AFailedReadOfARefusedFormsFileIsAnswered(t *testing.T) {
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+	apiClient := newBrandingAPI()
+	apiClient.writeErr = refusal("handler.brand.name_required", "Not that.")
+	apiClient.assets = nil
+	apiClient.assetErr = &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "on fire", StatusCode: http.StatusInternalServerError}
+
+	HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+		handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
+			handlertest.WithForm(withValues(slotsForm("21", "", "", "", "", ""), url.Values{"name": {""}}))))
+
+	httpHelper.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestHandleBrandPost_EachRefusalIsShownOnItsField(t *testing.T) {
@@ -596,8 +748,9 @@ func TestBrandEditor_HandsThePreviewEveryThemesPalettes(t *testing.T) {
 // The brand editor hands its preview script what each corner shape and font family draws, so the
 // sample takes them as they are picked (#813): the radii of square and pill and the font-family list
 // of each family but System UI, the uploaded font's followed by System UI. Rounded and System UI are
-// today's look, the console's own, so they draw nothing. The values are the auth server's stylesheet's,
-// spelt out here.
+// today's look, the console's own, so they draw nothing. It also hands the weights each file of an
+// uploaded font draws with a bold file, and how a background is laid out at each fit. The values are
+// the auth server's stylesheet's, spelt out here.
 func TestBrandEditor_HandsThePreviewWhatEachCornerShapeAndFamilyDraws(t *testing.T) {
 	const want = `{"corners":{` +
 		`"square":{"control":"0","panel":"0"},` +
@@ -608,7 +761,13 @@ func TestBrandEditor_HandsThePreviewWhatEachCornerShapeAndFamilyDraws(t *testing
 		`"serif":"Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif",` +
 		`"neo-grotesque":"Inter, Roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', Arial, sans-serif",` +
 		`"rounded":"ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, Manjari, 'Arial Rounded MT', 'Arial Rounded MT Bold', Calibri, source-sans-pro, sans-serif",` +
-		`"uploaded":"\"brand-font\", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"}}`
+		`"uploaded":"\"brand-font\", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"},` +
+		`"uploadedFamily":"brand-font",` +
+		`"fontWeights":{"regular":"1 500","bold":"501 1000"},` +
+		`"backgrounds":{` +
+		`"cover":{"size":"cover","position":"center","repeat":"no-repeat"},` +
+		`"contain":{"size":"contain","position":"center","repeat":"no-repeat"},` +
+		`"tile":{"size":"","position":"","repeat":"repeat"}}}`
 
 	draw := map[string]func(httpHelper *handlersmocks.HttpHelper){
 		"new form": func(httpHelper *handlersmocks.HttpHelper) {

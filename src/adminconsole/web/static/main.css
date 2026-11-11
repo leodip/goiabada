@@ -1354,7 +1354,7 @@
     justify-content: center;
     margin-bottom: 1.5rem;
   }
-  .auth-logo:has(+ .auth-brand) {
+  .auth-logo:has(+ .auth-brand:not([hidden])) {
     margin-bottom: 0.75rem;
   }
   .auth-logo img {
@@ -2224,6 +2224,51 @@
     background-color: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);
+  }
+  .brand-sample .auth-card > .panel-body {
+    padding: 1.75rem 1.25rem;
+  }
+  .brand-sample .auth-logo img {
+    max-height: 3rem;
+  }
+  .brand-asset {
+    min-width: 0;
+  }
+  .brand-asset-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+  .brand-asset-state {
+    flex: 1 1 8rem;
+    min-width: 0;
+  }
+  .brand-asset-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .brand-asset-thumb {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 4.5rem;
+    height: 3rem;
+    padding: 0.25rem;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: 0.375rem;
+    background-color: var(--color-subtle);
+  }
+  .brand-asset-thumb img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .brand-asset-thumb-dark {
+    background-color: rgb(15 18 23);
   }
   @media (forced-colors: active) {
     .switch {

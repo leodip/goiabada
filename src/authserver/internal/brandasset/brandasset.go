@@ -16,6 +16,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/brandkit"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -23,8 +24,9 @@ import (
 // Route is the route an asset is served at, to anyone, its id in {id}.
 const Route = "/brand-assets/{id}"
 
-// FontMaxBytes is the most bytes an uploaded font may hold, fixed as the image kinds' limits are.
-const FontMaxBytes = 2 << 20
+// FontMaxBytes is the most bytes an uploaded font may hold, fixed as the image kinds' limits are,
+// and brandkit's, as theirs are.
+const FontMaxBytes = brandkit.FontMaxBytes
 
 // imageRules is the rules of an image kind, and false for the font and any unknown kind.
 func imageRules(kind record.BrandAssetKind) (imageupload.Rules, bool) {

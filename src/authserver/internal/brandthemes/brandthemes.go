@@ -113,7 +113,7 @@ func FullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, er
 		if slots.BoldFont == nil {
 			rules = append(rules, fontFace(slots.RegularFont, ""))
 		} else {
-			rules = append(rules, fontFace(slots.RegularFont, "1 500"), fontFace(slots.BoldFont, "501 1000"))
+			rules = append(rules, fontFace(slots.RegularFont, brandkit.RegularFontWeights), fontFace(slots.BoldFont, brandkit.BoldFontWeights))
 		}
 	}
 
@@ -159,23 +159,27 @@ func fontFace(font *record.BrandAsset, weight string) string {
 	return b.String()
 }
 
-// backgroundRule draws background behind the card at fit. A fit that is none of the three, which no
-// write stores, draws as cover, the fit migration 000091 gives every brand.
+// backgroundRule draws background behind the card at fit, laid out as brandkit lays it out, which
+// the console's sample of a sign-in page draws it from too. A fit that is none of the three, which no
+// write stores, draws as cover, the fit migration 000091 gives every brand. A cover or contained image
+// is fixed to the window, so it stays put behind a card taller than the screen.
 func backgroundRule(background *record.BrandAsset, fit record.BrandBackgroundFit) string {
-	image := "  background-image: url(\"" + brandasset.Path(background) + "\");\n"
-	if fit == record.BrandBackgroundFitTile {
-		return ".auth-page {\n" + image + "  background-repeat: repeat;\n}\n"
+	layout := brandkit.BackgroundLayout(string(fit))
+	var b strings.Builder
+	b.WriteString(".auth-page {\n")
+	b.WriteString("  background-image: url(\"" + brandasset.Path(background) + "\");\n")
+	if layout.Position != "" {
+		b.WriteString("  background-position: " + layout.Position + ";\n")
 	}
-	size := "cover"
-	if fit == record.BrandBackgroundFitContain {
-		size = "contain"
+	if layout.Size != "" {
+		b.WriteString("  background-size: " + layout.Size + ";\n")
 	}
-	return ".auth-page {\n" + image +
-		"  background-position: center;\n" +
-		"  background-size: " + size + ";\n" +
-		"  background-repeat: no-repeat;\n" +
-		"  background-attachment: fixed;\n" +
-		"}\n"
+	b.WriteString("  background-repeat: " + layout.Repeat + ";\n")
+	if layout.Size != "" {
+		b.WriteString("  background-attachment: fixed;\n")
+	}
+	b.WriteString("}\n")
+	return b.String()
 }
 
 // ColorsStylesheet returns the stylesheet that sets brand's colors alone, its theme's, whatever its

@@ -58,3 +58,38 @@ func TestFontStack(t *testing.T) {
 		})
 	}
 }
+
+// The byte limits of decision 3: a logo and a favicon up to 1 MiB, a background and a font up to 2 MiB.
+func TestMaxBytes(t *testing.T) {
+	assert.Equal(t, 1048576, LogoMaxBytes)
+	assert.Equal(t, 1048576, FaviconMaxBytes)
+	assert.Equal(t, 2097152, BackgroundMaxBytes)
+	assert.Equal(t, 2097152, FontMaxBytes)
+}
+
+// With a bold file, the regular one draws the weights up to 500 and the bold one the heavier ones
+// (#813 decision 7).
+func TestFontWeights(t *testing.T) {
+	assert.Equal(t, "1 500", RegularFontWeights)
+	assert.Equal(t, "501 1000", BoldFontWeights)
+}
+
+// Cover and contain centre the image once, unrepeated; tile repeats it at its own size. A fit no
+// write stores is laid out as cover.
+func TestBackgroundLayout(t *testing.T) {
+	cover := Background{Size: "cover", Position: "center", Repeat: "no-repeat"}
+	for _, tc := range []struct {
+		fit  string
+		want Background
+	}{
+		{"cover", cover},
+		{"contain", Background{Size: "contain", Position: "center", Repeat: "no-repeat"}},
+		{"tile", Background{Repeat: "repeat"}},
+		{"", cover},
+		{"stretch", cover},
+	} {
+		t.Run(tc.fit, func(t *testing.T) {
+			assert.Equal(t, tc.want, BackgroundLayout(tc.fit))
+		})
+	}
+}

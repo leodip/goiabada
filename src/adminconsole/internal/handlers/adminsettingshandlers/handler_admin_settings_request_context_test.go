@@ -123,6 +123,14 @@ func (s *ctxRecordingApiClient) GetBrandThemes(ctx context.Context, _ string) ([
 	return nil, s.record(ctx)
 }
 
+func (s *ctxRecordingApiClient) GetBrandAssetById(ctx context.Context, _ string, _ int64) (*api.BrandAssetResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) UploadBrandAsset(ctx context.Context, _ string, _ string, _ []byte, _ string) (*api.BrandAssetResponse, error) {
+	return nil, s.record(ctx)
+}
+
 func (s *ctxRecordingApiClient) CreateBrand(ctx context.Context, _ string, _ *api.CreateBrandRequest) (*api.BrandResponse, error) {
 	return nil, s.record(ctx)
 }
@@ -338,6 +346,13 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
 				handlertest.WithForm(url.Values{"name": {"Spring"}, "appearance": {"dark"}, "theme": {"plum"}})),
+		},
+		{
+			name: "HandleBrandAssetPost",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleBrandAssetPost(h, c, "background")
+			},
+			request: uploadRequest(t, "background", "file", "beach.webp", []byte("the-file-bytes")),
 		},
 		{
 			name: "HandleBrandGet",

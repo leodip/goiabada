@@ -2,11 +2,13 @@ package adminsettingshandlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -47,7 +49,9 @@ type BrandRow struct {
 
 // BrandForm is what the brand form holds: the stored brand, the defaults of a new one, or what was
 // sent when the auth server refused it. Corners, Font and BackgroundFit are the kit's choices, by the
-// value a brand stores, and HideAppName the switch hiding the app name beside a logo (#813).
+// value a brand stores, and HideAppName the switch hiding the app name beside a logo (#813). The six
+// slots hold the asset each names, nil for an empty one: the stored brand's, or the ones a refused
+// form sent, uploaded and not yet saved, read again by their ids (#813 decisions 1 and 10).
 type BrandForm struct {
 	Name          string
 	Appearance    string
@@ -56,23 +60,63 @@ type BrandForm struct {
 	Font          string
 	BackgroundFit string
 	HideAppName   bool
+
+	Logo        *api.BrandAssetResponse
+	DarkLogo    *api.BrandAssetResponse
+	Favicon     *api.BrandAssetResponse
+	Background  *api.BrandAssetResponse
+	RegularFont *api.BrandAssetResponse
+	BoldFont    *api.BrandAssetResponse
 }
 
-// brandCornerShapes and brandFontFamilies are the corner shapes and the font families the form
-// offers, by the value a brand stores.
+// brandSlots are the brand form's six slots, by the name of the field holding the asset's id, which
+// is the name the admin API gives the slot.
+var brandSlots = []string{"logo", "darkLogo", "favicon", "background", "regularFont", "boldFont"}
+
+// slot answers the form's slot named name.
+func (f *BrandForm) slot(name string) **api.BrandAssetResponse {
+	switch name {
+	case "logo":
+		return &f.Logo
+	case "darkLogo":
+		return &f.DarkLogo
+	case "favicon":
+		return &f.Favicon
+	case "background":
+		return &f.Background
+	case "regularFont":
+		return &f.RegularFont
+	}
+	return &f.BoldFont
+}
+
+// brandCornerShapes, brandFontFamilies and brandBackgroundFits are the corner shapes, the font
+// families and the background fits the form offers, by the value a brand stores.
 var (
-	brandCornerShapes = []string{"square", "rounded", "pill"}
-	brandFontFamilies = []string{"system-ui", "humanist", "geometric", "serif", "neo-grotesque", "rounded", "uploaded"}
+	brandCornerShapes   = []string{"square", "rounded", "pill"}
+	brandFontFamilies   = []string{"system-ui", "humanist", "geometric", "serif", "neo-grotesque", "rounded", "uploaded"}
+	brandBackgroundFits = []string{"cover", "contain", "tile"}
 )
 
 // BrandKitStyles is what each corner shape and font family draws, which the editor hands its preview
 // script in a JSON data block so the sample takes them as they are picked (#813): the radii of each
-// shape and the font-family list of each family that sets any, by the value the form sends. They are
-// brandkit's, as the auth server's stylesheet draws them. Rounded and System UI, today's look, are
-// absent, since they set nothing.
+// shape and the font-family list of each family that sets any, by the value the form sends. Rounded
+// and System UI, today's look, are absent, since they set nothing. With them, the family name the
+// uploaded font's files are declared under, which its list names first, the weights each of them
+// draws while both are uploaded, and how a background is laid out at each fit.
+// They are brandkit's, as the auth server's stylesheet draws them.
 type BrandKitStyles struct {
-	Corners map[string]brandkit.Radii `json:"corners"`
-	Fonts   map[string]string         `json:"fonts"`
+	Corners        map[string]brandkit.Radii      `json:"corners"`
+	Fonts          map[string]string              `json:"fonts"`
+	UploadedFamily string                         `json:"uploadedFamily"`
+	FontWeights    BrandFontWeights               `json:"fontWeights"`
+	Backgrounds    map[string]brandkit.Background `json:"backgrounds"`
+}
+
+// BrandFontWeights are the weights each file of an uploaded font draws while both are uploaded.
+type BrandFontWeights struct {
+	Regular string `json:"regular"`
+	Bold    string `json:"bold"`
 }
 
 // BrandThemeOption is one theme card: the key the form sends, the theme's name in words, and the
@@ -88,8 +132,9 @@ type BrandThemeOption struct {
 
 // brandErrorFields maps the refusals a brand's save can meet to the field each is about: the four
 // about the name to the name; the appearance, theme, corners and background fit choices to theirs;
-// and an unknown family and the uploaded font without a regular font file to the font family (#813
-// decision 7).
+// an unknown family and the uploaded font without a regular font file to the font family (#813
+// decision 7); a slot naming no stored asset of its kind to its own field; and a dark logo without a
+// logo, and a bold font file without a regular one, to the field that wants a file.
 var brandErrorFields = map[string]string{
 	i18n.ErrCodeBrandNameRequired:                "name",
 	i18n.ErrCodeBrandNameTooLong:                 "name",
@@ -101,6 +146,14 @@ var brandErrorFields = map[string]string{
 	i18n.ErrCodeBrandFontInvalid:                 "font",
 	i18n.ErrCodeBrandUploadedFontRegularRequired: "font",
 	i18n.ErrCodeBrandBackgroundFitInvalid:        "backgroundFit",
+	i18n.ErrCodeBrandLogoAssetInvalid:            "logo",
+	i18n.ErrCodeBrandDarkLogoAssetInvalid:        "darkLogo",
+	i18n.ErrCodeBrandFaviconAssetInvalid:         "favicon",
+	i18n.ErrCodeBrandBackgroundAssetInvalid:      "background",
+	i18n.ErrCodeBrandRegularFontAssetInvalid:     "regularFont",
+	i18n.ErrCodeBrandBoldFontAssetInvalid:        "boldFont",
+	i18n.ErrCodeBrandDarkLogoLogoRequired:        "logo",
+	i18n.ErrCodeBrandBoldFontRegularRequired:     "regularFont",
 }
 
 // brandThemeNames are the message IDs of the built-in themes' names, by key. A theme missing here,
@@ -195,9 +248,18 @@ func appearanceTheme(options []BrandThemeOption, key string) BrandThemeOption {
 	return BrandThemeOption{}
 }
 
-// brandKitStyles is what each of the form's corner shapes and font families draws.
+// brandKitStyles is what each of the form's corner shapes, font families and background fits draws.
 func brandKitStyles() BrandKitStyles {
-	styles := BrandKitStyles{Corners: map[string]brandkit.Radii{}, Fonts: map[string]string{}}
+	styles := BrandKitStyles{
+		Corners:        map[string]brandkit.Radii{},
+		Fonts:          map[string]string{},
+		UploadedFamily: strings.Trim(brandkit.UploadedFontFamily, `"`),
+		FontWeights:    BrandFontWeights{Regular: brandkit.RegularFontWeights, Bold: brandkit.BoldFontWeights},
+		Backgrounds:    map[string]brandkit.Background{},
+	}
+	for _, fit := range brandBackgroundFits {
+		styles.Backgrounds[fit] = brandkit.BackgroundLayout(fit)
+	}
 	for _, corners := range brandCornerShapes {
 		if radii, ok := brandkit.CornerRadii(corners); ok {
 			styles.Corners[corners] = radii
@@ -226,6 +288,68 @@ func brandFormFrom(r *http.Request) BrandForm {
 	}
 }
 
+// brandSlotIds are the asset ids the form's slots hold, by slot, nil for an empty one.
+type brandSlotIds map[string]*int64
+
+// brandSlotIdsFrom reads the form's slots, each the id of the asset it names, which the editor sets
+// when a file is uploaded and empties when it is removed. A slot holding no number, which the editor
+// never sends, names asset 0, which no store holds, so the admin API refuses it at its field rather
+// than the slot being emptied without a word.
+func brandSlotIdsFrom(r *http.Request) brandSlotIds {
+	ids := brandSlotIds{}
+	for _, name := range brandSlots {
+		value := strings.TrimSpace(r.PostFormValue(name))
+		if value == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			id = 0
+		}
+		ids[name] = &id
+	}
+	return ids
+}
+
+// ref names the asset slot holds, as a brand's write names it, or none for an empty slot.
+func (ids brandSlotIds) ref(slot string) *api.BrandAssetRef {
+	if id := ids[slot]; id != nil {
+		return &api.BrandAssetRef{Id: *id}
+	}
+	return nil
+}
+
+// brandAssetReadAPI is what a refused form needs to draw its slots again: each asset read by its id.
+type brandAssetReadAPI interface {
+	GetBrandAssetById(ctx context.Context, accessToken string, assetId int64) (*api.BrandAssetResponse, error)
+}
+
+// readFormSlots fills form's slots with the assets ids names, as a refused form is drawn again: each
+// read by its id, attached to a brand or not. An asset the admin API no longer holds, swept or never
+// stored, leaves its slot empty, for the refusal at its field to be answered with a new upload. Any
+// other failed read is answered with the page that says why.
+func readFormSlots(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient brandAssetReadAPI,
+	token string, ids brandSlotIds, form *BrandForm) bool {
+
+	for _, name := range brandSlots {
+		id := ids[name]
+		if id == nil {
+			continue
+		}
+		asset, err := apiClient.GetBrandAssetById(r.Context(), token, *id)
+		if err != nil {
+			var apiErr *apiclient.APIError
+			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+				continue
+			}
+			render.HandleAPIError(httpHelper, w, r, err)
+			return false
+		}
+		*form.slot(name) = asset
+	}
+	return true
+}
+
 // brandIdFrom reads the brand's id from the path, answering the 404 page for one that is not a
 // number.
 func brandIdFrom(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) (int64, bool) {
@@ -246,8 +370,8 @@ func accessTokenFrom(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 	return jwtInfo.TokenResponse.AccessToken, true
 }
 
-// renderBrandForm draws the brand form, new or of a stored brand, with the theme cards, and hands the
-// preview what each theme, corner shape and font family draws.
+// renderBrandForm draws the brand form, new or of a stored brand, with the theme cards and the kit's
+// upload fields, and hands the preview what each theme, corner shape, font family and fit draws.
 func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, form BrandForm,
 	themes []api.BrandThemeResponse, extra map[string]interface{}) {
 
@@ -257,6 +381,8 @@ func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 		"brandThemes":     options,
 		"appearanceTheme": appearanceTheme(options, form.Theme),
 		"brandKitStyles":  brandKitStyles(),
+		// The upload field of each kind (#813 decision 1).
+		"brandAssetUploads": brandAssetUploads(r.Context()),
 	}
 	for key, value := range extra {
 		bind[key] = value
@@ -307,10 +433,11 @@ type brandThemesAPI interface {
 	GetBrandThemes(ctx context.Context, accessToken string) ([]api.BrandThemeResponse, error)
 }
 
-// brandNewAPI is what the new brand form needs to be saved: the themes it is drawn again with, and
-// the write.
+// brandNewAPI is what the new brand form needs to be saved: the themes and the uploaded files it is
+// drawn again with, and the write.
 type brandNewAPI interface {
 	brandThemesAPI
+	brandAssetReadAPI
 	CreateBrand(ctx context.Context, accessToken string, request *api.CreateBrandRequest) (*api.BrandResponse, error)
 }
 
@@ -360,7 +487,9 @@ func HandleBrandNewPost(
 			return
 		}
 
+		// The slots name the files uploaded in this form, which Create attaches (#813 decision 1).
 		form := brandFormFrom(r)
+		ids := brandSlotIdsFrom(r)
 		_, err = apiClient.CreateBrand(r.Context(), token, &api.CreateBrandRequest{
 			Name:          form.Name,
 			Appearance:    form.Appearance,
@@ -369,9 +498,18 @@ func HandleBrandNewPost(
 			Font:          form.Font,
 			BackgroundFit: form.BackgroundFit,
 			HideAppName:   form.HideAppName,
+			Logo:          ids.ref("logo"),
+			DarkLogo:      ids.ref("darkLogo"),
+			Favicon:       ids.ref("favicon"),
+			Background:    ids.ref("background"),
+			RegularFont:   ids.ref("regularFont"),
+			BoldFont:      ids.ref("boldFont"),
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				if !readFormSlots(httpHelper, w, r, apiClient, token, ids, &form) {
+					return
+				}
 				renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
 					"isNew":      true,
 					"error":      message,
@@ -392,9 +530,11 @@ type brandEditReadAPI interface {
 	GetBrandById(ctx context.Context, accessToken string, brandId int64) (*api.BrandResponse, error)
 }
 
-// brandEditAPI is what a brand's page needs to be saved: what it is drawn with, and the write.
+// brandEditAPI is what a brand's page needs to be saved: what it is drawn with, the uploaded files a
+// refused form is drawn again with, and the write.
 type brandEditAPI interface {
 	brandEditReadAPI
+	brandAssetReadAPI
 	UpdateBrand(ctx context.Context, accessToken string, brandId int64, request *api.UpdateBrandRequest) (*api.BrandResponse, error)
 }
 
@@ -453,7 +593,9 @@ func HandleBrandGet(
 		}
 
 		form := BrandForm{Name: brand.Name, Appearance: brand.Appearance, Theme: brand.Theme, Corners: brand.Corners,
-			Font: brand.Font, BackgroundFit: brand.BackgroundFit, HideAppName: brand.HideAppName}
+			Font: brand.Font, BackgroundFit: brand.BackgroundFit, HideAppName: brand.HideAppName,
+			Logo: brand.Logo, DarkLogo: brand.DarkLogo, Favicon: brand.Favicon, Background: brand.Background,
+			RegularFont: brand.RegularFont, BoldFont: brand.BoldFont}
 		renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
 			"isNew":             false,
 			"storedBrand":       *brand,
@@ -486,9 +628,10 @@ func HandleBrandPost(
 			return
 		}
 
-		// An update replaces every field (#813 decision 10), and the form has no field for the kit's
-		// slots yet, so the brand's stored ones are sent back unchanged.
+		// An update replaces every field (#813 decision 10): each slot is sent as the form holds it,
+		// the stored asset, a file uploaded in place of it, or none once removed, which Save attaches.
 		form := brandFormFrom(r)
+		ids := brandSlotIdsFrom(r)
 		_, err := apiClient.UpdateBrand(r.Context(), token, id, &api.UpdateBrandRequest{
 			Name:          form.Name,
 			Appearance:    form.Appearance,
@@ -497,15 +640,18 @@ func HandleBrandPost(
 			Font:          form.Font,
 			BackgroundFit: form.BackgroundFit,
 			HideAppName:   form.HideAppName,
-			Logo:          storedSlot(brand.Logo),
-			DarkLogo:      storedSlot(brand.DarkLogo),
-			Favicon:       storedSlot(brand.Favicon),
-			Background:    storedSlot(brand.Background),
-			RegularFont:   storedSlot(brand.RegularFont),
-			BoldFont:      storedSlot(brand.BoldFont),
+			Logo:          ids.ref("logo"),
+			DarkLogo:      ids.ref("darkLogo"),
+			Favicon:       ids.ref("favicon"),
+			Background:    ids.ref("background"),
+			RegularFont:   ids.ref("regularFont"),
+			BoldFont:      ids.ref("boldFont"),
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				if !readFormSlots(httpHelper, w, r, apiClient, token, ids, &form) {
+					return
+				}
 				renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
 					"isNew":       false,
 					"storedBrand": *brand,
@@ -520,14 +666,6 @@ func HandleBrandPost(
 		settingsCache.Invalidate()
 		redirectToBrandWithFlash(httpHelper, httpSession, w, r, baseURL, id, "savedSuccessfully")
 	}
-}
-
-// storedSlot names the asset a stored slot holds, as a write names it, or none for an empty slot.
-func storedSlot(asset *api.BrandAssetResponse) *api.BrandAssetRef {
-	if asset == nil {
-		return nil
-	}
-	return &api.BrandAssetRef{Id: asset.Id}
 }
 
 // redirectToBrandWithFlash goes back to the brand's page, which says once what flash names.

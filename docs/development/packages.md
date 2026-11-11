@@ -25,11 +25,14 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   client, session backend, token client and JWKS parser; by `internal/pinnedfetch`, which the
   generators download through; and by the timezones generator for the decompressed tarball (#386,
   #432)
-- `brandkit/` - What a brand's corners and font family draw (#813): `CornerRadii`, the two radius
-  tokens of square and pill, and `FontStack`, the font-family list of each system family but System
-  UI and of the uploaded font, followed by System UI. Rounded and System UI are ui.css's and
-  main.css's own tokens and set nothing. The auth server's full brand stylesheet and the admin
-  console's brand editor, whose sample takes them as they are picked, both draw from it
+- `brandkit/` - What a brand's kit draws (#813): `CornerRadii`, the two radius tokens of square and
+  pill; `FontStack`, the font-family list of each system family but System UI and of the uploaded
+  font, followed by System UI; `RegularFontWeights` and `BoldFontWeights`, the weights each uploaded
+  font file draws while both are there; and `BackgroundLayout`, how a background is laid out at each
+  fit. Rounded and System UI are ui.css's and main.css's own tokens and set nothing. The auth
+  server's full brand stylesheet and the admin console's brand editor, whose sample takes them as
+  they are picked, both draw from it. It also holds each kind of brand asset's byte limit, which the
+  auth server holds an upload to and the console's request-body table sizes its upload routes from
 - `buildinfo/` - The build stamp both servers report, `Version`, `BuildDate` and `GitCommit`, which
   the release builds set with `-ldflags -X` and which read `development` in any other build. It left
   `core/constants` beside `builtin/` when that package split, because the linker writes these values

@@ -1,8 +1,10 @@
-// Package brandkit holds what a brand's corners and font family draw (#813), which both
-// applications draw alike: the auth server sets them in a brand's full stylesheet, on its own pages
-// and the admin console's end-user pages, and the console's brand editor sets them on its sample of a
-// sign-in page as they are picked, before the brand is saved. Drawn from one place, the sample cannot
-// show a family or a corner shape the saved brand would draw differently.
+// Package brandkit holds what a brand's kit draws (#813), which both applications draw alike: its
+// corners, its font family, its uploaded font's weights and its background's fit. The auth server
+// sets them in a brand's full stylesheet, on its own pages and the admin console's end-user pages,
+// and the console's brand editor sets them on its sample of a sign-in page as they are picked, before
+// the brand is saved. Drawn from one place, the sample cannot show a family, a corner shape or a fit
+// the saved brand would draw differently. It also holds each kind of asset's byte limit, which the
+// auth server holds an upload to and the console's request-body table sizes its upload routes from.
 //
 // A choice is named by the value a brand stores. Rounded corners and the System UI family are
 // today's look, ui.css's and main.css's own tokens, so they set nothing, and a brand nobody has
@@ -63,4 +65,52 @@ func CornerRadii(corners string) (Radii, bool) {
 func FontStack(font string) (string, bool) {
 	stack, ok := fontStacks[font]
 	return stack, ok
+}
+
+// The most bytes an upload of each kind of brand asset may hold, fixed so the admin API behaves alike
+// on every deployment (#813 decision 3): a logo or a dark logo, a favicon, a background image and a
+// font file.
+const (
+	LogoMaxBytes       = 1 << 20
+	FaviconMaxBytes    = 1 << 20
+	BackgroundMaxBytes = 2 << 20
+	FontMaxBytes       = 2 << 20
+)
+
+// The weights each file of an uploaded font draws while both are uploaded (#813 decision 7): the
+// regular file those up to 500, the bold one the heavier ones. A regular file alone declares no
+// weight, so it draws every weight.
+const (
+	RegularFontWeights = "1 500"
+	BoldFontWeights    = "501 1000"
+)
+
+// Background is how a background image is laid out at a fit, as CSS values: its background-size,
+// background-position and background-repeat, an empty one left as CSS's initial value. On a page,
+// where the image is drawn behind the window, the auth server also fixes a cover or contained image
+// to the window; the editor's sample is no window, so that is the stylesheet's alone.
+type Background struct {
+	Size     string `json:"size"`
+	Position string `json:"position"`
+	Repeat   string `json:"repeat"`
+}
+
+// backgrounds are the layouts of the fits but cover: contained, the whole image centred with the
+// theme's background color around it, and tiled, repeated at its own size.
+var backgrounds = map[string]Background{
+	"contain": {Size: "contain", Position: "center", Repeat: "no-repeat"},
+	"tile":    {Repeat: "repeat"},
+}
+
+// coverBackground covers the area with the image, centred, cropping what overflows.
+var coverBackground = Background{Size: "cover", Position: "center", Repeat: "no-repeat"}
+
+// BackgroundLayout returns how a background image is laid out at fit, a brand's stored background fit.
+// A value that is none of the three, which no write stores, is laid out as cover, the fit migration
+// 000091 gives every brand.
+func BackgroundLayout(fit string) Background {
+	if layout, ok := backgrounds[fit]; ok {
+		return layout
+	}
+	return coverBackground
 }

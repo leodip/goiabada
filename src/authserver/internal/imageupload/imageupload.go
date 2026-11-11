@@ -13,6 +13,7 @@ import (
 	_ "image/png"
 	"net/http"
 
+	"github.com/leodip/goiabada/core/brandkit"
 	"github.com/leodip/goiabada/core/i18n"
 
 	_ "golang.org/x/image/webp"
@@ -62,11 +63,12 @@ func userImage(maxBytes int64) Rules {
 }
 
 // The byte limits of a brand's image kinds, fixed so the admin API behaves alike on every
-// deployment (#813 decision 3).
+// deployment (#813 decision 3). They are brandkit's, which the admin console's request-body table
+// sizes its upload routes from.
 const (
-	BrandLogoMaxBytes       = 1 << 20
-	BrandFaviconMaxBytes    = 1 << 20
-	BrandBackgroundMaxBytes = 2 << 20
+	BrandLogoMaxBytes       = brandkit.LogoMaxBytes
+	BrandFaviconMaxBytes    = brandkit.FaviconMaxBytes
+	BrandBackgroundMaxBytes = brandkit.BackgroundMaxBytes
 )
 
 // BrandLogo is the rules a brand's logo and dark logo are held to: a still PNG, JPEG or WebP, each

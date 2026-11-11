@@ -7,6 +7,7 @@
 import { type APIRequestContext, expect, type Locator, type Page } from "@playwright/test";
 import { confirmDialog, grantClientPermission, readClientSecret } from "./admin-console";
 import { env } from "./environment";
+import { solidPng } from "./images";
 import type { TestClient } from "./fixtures";
 import { clientCredentialsToken } from "./oauth";
 import { uniqueIdentifier } from "./unique";
@@ -396,8 +397,9 @@ export function brandFaviconIcons(faviconUrl: string): string[] {
   return [`icon ${faviconUrl}`, `apple-touch-icon ${faviconUrl}`];
 }
 
-// A brand's kit set through the Admin API, as the brand editor cannot set it yet: a file is uploaded
-// as a brand asset of its kind, then named in the brand's slot (#813 decision 1). The caller is a
+// A brand's kit set through the Admin API, as an application does, in two steps: a file is uploaded
+// as a brand asset of its kind, then named in the brand's slot (#813 decision 1). The editor's own
+// uploads are uploadInEditor's. The caller is a
 // client of the test's own holding authserver:manage-settings.
 export interface UploadedBrandAsset {
   id: number;
@@ -494,4 +496,101 @@ export async function expectDrawnInSeededDefault(page: Page, defaultBrandId: num
   expect(onLight, "a light device draws the default's light canvas").not.toBe(onDark);
   expect([onLight, onDark], "neither is Plum's").not.toContain(plumCanvas.dark);
   expect([onLight, onDark], "neither is Plum's").not.toContain(plumCanvas.light);
+}
+
+// The brand editor's six upload fields (#813 decision 1), by the name the form gives each slot. A file
+// picked at one is uploaded at once, through the console, as a brand asset of the slot's kind: the
+// field says so in its status region, and its two hidden fields hold the asset's id and URL, which the
+// preview draws and Save names in the slot.
+export type BrandSlot = "logo" | "darkLogo" | "favicon" | "background" | "regularFont" | "boldFont";
+
+export interface PickedFile {
+  name: string;
+  mimeType: string;
+  buffer: Buffer;
+}
+
+// What the uploads in the editor's fields answer, the sentences its status region shows.
+export const uploadSays = {
+  uploaded: "Uploaded. Save the brand to use it.",
+  removed: "Removed. Save the brand to apply it.",
+} as const;
+
+// A PNG made on the spot, as a file picked in the editor.
+export function pngFile(name: string, width: number, height: number, rgb: [number, number, number]): PickedFile {
+  return { name, mimeType: "image/png", buffer: solidPng(width, height, rgb) };
+}
+
+// A file the auth server takes as a WOFF2 font, which it tells by the signature its first four bytes
+// hold. No browser draws it, and no spec needs one to: they check the family a page asks for, not how
+// its letters look.
+export function woff2File(name: string): PickedFile {
+  return { name, mimeType: "font/woff2", buffer: Buffer.concat([Buffer.from("wOF2", "ascii"), Buffer.alloc(124)]) };
+}
+
+// Picks file at slot's field, as Upload and the file picker do, and answers what the field then says,
+// once its upload has been answered.
+export async function pickInEditor(page: Page, slot: BrandSlot, file: PickedFile): Promise<string> {
+  await page.locator(`#${slot}File`).setInputFiles(file);
+  const answer = page.locator(`#${slot}Status .notice:not(.notice-note)`);
+  await expect(answer).toBeVisible();
+  return (await answer.innerText()).trim();
+}
+
+// Uploads file at slot's field and waits for the field to say it was uploaded, answering the URL the
+// asset is served at.
+export async function uploadInEditor(page: Page, slot: BrandSlot, file: PickedFile): Promise<string> {
+  expect(await pickInEditor(page, slot, file), `the ${slot} uploaded`).toBe(uploadSays.uploaded);
+  return slotHolds(page, slot).then((held) => held.url);
+}
+
+// What a slot's hidden fields hold: the asset's id and URL, both empty for an empty slot.
+export async function slotHolds(page: Page, slot: BrandSlot): Promise<{ id: string; url: string }> {
+  return {
+    id: await page.locator(`input[type="hidden"][name="${slot}"]`).inputValue(),
+    url: await page.locator(`input[type="hidden"][name="${slot}Url"]`).inputValue(),
+  };
+}
+
+// The kit a test uploads in the editor: a logo, a dark logo of another color, a square favicon, a
+// background and the uploaded font's two files.
+export const kitFiles: Record<BrandSlot, PickedFile> = {
+  logo: pngFile("logo.png", 240, 80, [36, 86, 196]),
+  darkLogo: pngFile("dark-logo.png", 240, 80, [138, 180, 255]),
+  favicon: pngFile("favicon.png", 64, 64, [176, 32, 106]),
+  background: pngFile("background.png", 320, 200, [240, 200, 120]),
+  regularFont: woff2File("brand-regular.woff2"),
+  boldFont: woff2File("brand-bold.woff2"),
+};
+
+// Uploads each file of kitFiles in the editor's fields, answering the URL each is served at.
+export async function uploadKit(page: Page, slots: BrandSlot[] = Object.keys(kitFiles) as BrandSlot[]): Promise<Partial<Record<BrandSlot, string>>> {
+  const urls: Partial<Record<BrandSlot, string>> = {};
+  for (const slot of slots) urls[slot] = await uploadInEditor(page, slot, kitFiles[slot]);
+  return urls;
+}
+
+// What a sample of the preview draws of the kit: its logo box's image, if it shows one, whether the
+// app name shows, its background image and how it is laid out, as the browser computes them.
+export interface SampleKit {
+  logo: string | null;
+  nameShown: boolean;
+  backgroundImage: string;
+  backgroundSize: string;
+  backgroundRepeat: string;
+}
+
+export function sampleKit(sample: Locator): Promise<SampleKit> {
+  return sample.evaluate((sample) => {
+    const box = sample.querySelector<HTMLElement>(".auth-logo")!;
+    const image = box.querySelector("img");
+    const style = getComputedStyle(sample);
+    return {
+      logo: !box.hidden && image ? image.getAttribute("src") : null,
+      nameShown: !sample.querySelector<HTMLElement>(".auth-brand")!.hidden,
+      backgroundImage: style.backgroundImage,
+      backgroundSize: style.backgroundSize,
+      backgroundRepeat: style.backgroundRepeat,
+    };
+  });
 }

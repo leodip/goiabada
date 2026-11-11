@@ -5,27 +5,37 @@
 // cannot be focused, assistive technology skips it, and the page says in text what it shows. Beside
 // the form, the whole preview stays on screen as the page scrolls, at 1440×900 and 1280×800.
 // The sample takes the brand's corners and font family as they are picked too (#813), and a refused
-// choice is marked at its field. The font is checked by the family the sample asks for, not by how its
-// letters look: the headless browsers have almost none of the families' fonts.
+// choice is marked at its field; and the kit's files as they are uploaded, the whole preview fitting
+// those desktop sizes with a logo, a background and a font in it. The font is checked by the family the
+// sample asks for, not by how its letters look: the headless browsers have almost none of the
+// families' fonts.
 //
-// Everything here is on the New brand page and nothing is saved, so this is an ordinary parallel spec.
+// Everything here is on the New brand page and nothing is saved, or on a brand of the test's own that no
+// client uses, so this is an ordinary parallel spec.
 // A browser restores the form after Back without firing a change, each engine in its own way, so this
 // file runs in Chromium, Firefox and WebKit (playwright.config.ts, #811 decision 5).
 import type { Page } from "@playwright/test";
 import {
   appearanceSwatchFills,
+  brandIdFromList,
   brandPreview,
+  brandUrl,
   brandingUrl,
+  deleteBrand,
   expectPreviewDrawn,
   fillBrandForm,
   firstFontOf,
+  kitFiles,
   newBrandUrl,
   previewSample,
   previewSwitch,
   readBrandKitChoices,
   sampleColors,
+  sampleKit,
   sampleShape,
   switchPreviewTo,
+  uploadInEditor,
+  uploadKit,
   type Appearance,
   type Corners,
   type FontFamily,
@@ -396,30 +406,110 @@ test("the uploaded font without a regular font file is refused at the font field
 // Beside the form, the whole preview is on screen at the two desktop sizes the editor is laid out for
 // (#811 decision 1), beneath the console's header, once the page is scrolled and down to its end, in
 // every built-in language: Automatic's, whose sentence and switch make it the tallest, in English and
-// in the languages whose words run longer.
+// in the languages whose words run longer. A brand with a logo, a background and an uploaded font in
+// its sample fits too (#813).
 const locales = ["en", "pt-BR", "de", "es", "fr", "it"];
-for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }]) {
+const desktops = [{ width: 1440, height: 900 }, { width: 1280, height: 800 }];
+
+async function expectWholePreviewOnScreen(page: Page, viewport: { width: number; height: number }, locale: string) {
+  const preview = brandPreview(page);
+  await expect(page.locator("html")).toHaveAttribute("lang", locale);
+  await expect(page.locator("#appearance-auto")).toBeChecked();
+  await expectPreviewDrawn(page);
+  await expect(preview.locator(".brand-preview-switch")).toBeVisible();
+  for (const scroll of ["scrolled", "at the end"] as const) {
+    await page.evaluate((toEnd) => window.scrollTo(0, toEnd ? document.documentElement.scrollHeight : 400), scroll === "at the end");
+    const where = `${locale}, ${scroll}`;
+    const header = await page.locator(".app-header").boundingBox();
+    const form = await page.locator(".brand-editor > form").boundingBox();
+    const box = await preview.boundingBox();
+    if (!header || !form || !box) throw new Error(`the header, the form or the preview is not drawn (${where})`);
+    expect(box.x, `the preview beside the form (${where})`).toBeGreaterThanOrEqual(form.x + form.width);
+    expect(box.y, `the preview's top beneath the header (${where})`).toBeGreaterThanOrEqual(header.y + header.height);
+    expect(box.y + box.height, `the preview's bottom on screen (${where})`).toBeLessThanOrEqual(viewport.height);
+  }
+}
+
+for (const viewport of desktops) {
   test(`at ${viewport.width}×${viewport.height} the whole preview stays on screen beside the form as the page scrolls, in every language`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.emulateMedia({ reducedMotion: "reduce" });
-    const preview = brandPreview(page);
     for (const locale of locales) {
       await page.goto(`${newBrandUrl}?${new URLSearchParams({ ui_locales: locale })}`);
-      await expect(page.locator("html")).toHaveAttribute("lang", locale);
-      await expect(page.locator("#appearance-auto")).toBeChecked();
-      await expectPreviewDrawn(page);
-      await expect(preview.locator(".brand-preview-switch")).toBeVisible();
-      for (const scroll of ["scrolled", "at the end"] as const) {
-        await page.evaluate((toEnd) => window.scrollTo(0, toEnd ? document.documentElement.scrollHeight : 400), scroll === "at the end");
-        const where = `${locale}, ${scroll}`;
-        const header = await page.locator(".app-header").boundingBox();
-        const form = await page.locator(".brand-editor > form").boundingBox();
-        const box = await preview.boundingBox();
-        if (!header || !form || !box) throw new Error(`the header, the form or the preview is not drawn (${where})`);
-        expect(box.x, `the preview beside the form (${where})`).toBeGreaterThanOrEqual(form.x + form.width);
-        expect(box.y, `the preview's top beneath the header (${where})`).toBeGreaterThanOrEqual(header.y + header.height);
-        expect(box.y + box.height, `the preview's bottom on screen (${where})`).toBeLessThanOrEqual(viewport.height);
+      await expectWholePreviewOnScreen(page, viewport, locale);
+    }
+  });
+
+  test(`at ${viewport.width}×${viewport.height} the whole preview of a brand with a logo, a background and an uploaded font stays on screen beside the form, in every language`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const name = uniqueIdentifier("brand");
+    await page.goto(newBrandUrl);
+    await fillBrandForm(page, { name, font: "uploaded", hideAppName: false });
+    await uploadKit(page, ["logo", "darkLogo", "background", "regularFont"]);
+    await page.locator("#btnCreate").click();
+    await expect(page).toHaveURL(brandingUrl);
+    const id = await brandIdFromList(page, name);
+    try {
+      for (const locale of locales) {
+        await page.goto(`${brandUrl(id, "edit")}?${new URLSearchParams({ ui_locales: locale })}`);
+        await expect(previewSample(page, "light").locator(".auth-logo img"), `the logo in the sample (${locale})`).toBeVisible();
+        await expectWholePreviewOnScreen(page, viewport, locale);
       }
+    } finally {
+      await deleteBrand(page, id);
     }
   });
 }
+
+// The sample draws the kit's files as they are uploaded, before anything is saved (#813): the logo of
+// each mode above the app name, the logo in both while there is no dark logo, the name hidden beside a
+// logo while the switch hides it, the background behind the card at each fit, and the uploaded font.
+// The favicon has no place on a sign-in card: its field shows it as a thumbnail.
+test("the sample draws each mode's logo, the background at each fit and the uploaded font as they are uploaded, and the favicon shows beside its field", async ({
+  page,
+}) => {
+  await openNewBrand(page, "light");
+  const urls = await uploadKit(page, ["logo", "favicon", "background", "regularFont"]);
+  await expectPreviewDrawn(page);
+
+  expect(await sampleKit(previewSample(page, "light")), "the light sample").toEqual({
+    logo: urls.logo,
+    nameShown: true,
+    backgroundImage: `url("${urls.background}")`,
+    backgroundSize: "cover",
+    backgroundRepeat: "no-repeat",
+  });
+  await switchPreviewTo(page, "dark");
+  expect((await sampleKit(previewSample(page, "dark"))).logo, "the dark sample, no dark logo yet").toBe(urls.logo);
+  const darkLogo = await uploadInEditor(page, "darkLogo", kitFiles.darkLogo);
+  expect((await sampleKit(previewSample(page, "dark"))).logo, "the dark sample, the dark logo uploaded").toBe(darkLogo);
+  await switchPreviewTo(page, "light");
+  expect((await sampleKit(previewSample(page, "light"))).logo, "the light sample keeps the logo").toBe(urls.logo);
+
+  await fillBrandForm(page, { backgroundFit: "contain" });
+  expect(await sampleKit(previewSample(page, "light"))).toMatchObject({ backgroundSize: "contain", backgroundRepeat: "no-repeat" });
+  await fillBrandForm(page, { backgroundFit: "tile" });
+  expect(await sampleKit(previewSample(page, "light"))).toMatchObject({ backgroundRepeat: "repeat" });
+
+  await fillBrandForm(page, { font: "uploaded" });
+  await expectSampleShape(page, "light", "rounded", "uploaded");
+  expect(
+    await page.evaluate(() => Array.from(document.fonts, (face) => face.family.replace(/["']/g, ""))),
+    "the uploaded font declared for the sample",
+  ).toContain("brand-font");
+  await expectConsoleShape(page);
+
+  await fillBrandForm(page, { hideAppName: true });
+  for (const mode of ["light", "dark"] as const) {
+    expect((await sampleKit(previewSample(page, mode))).nameShown, `${mode}: the name hidden beside the logo`).toBe(false);
+  }
+  await page.locator("#logoRemove").click();
+  await page.locator("#darkLogoRemove").click();
+  expect(await sampleKit(previewSample(page, "light")), "no logo: the name is shown, whatever the switch").toMatchObject({ logo: null, nameShown: true });
+
+  const thumbnail = page.locator('[data-brand-asset="favicon"] .brand-asset-thumb img');
+  await expect(thumbnail).toBeVisible();
+  await expect(thumbnail).toHaveAttribute("src", urls.favicon!);
+  await expect(previewSample(page, "light").locator(`img[src="${urls.favicon}"]`)).toHaveCount(0);
+});

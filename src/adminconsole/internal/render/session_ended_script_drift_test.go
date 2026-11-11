@@ -25,10 +25,10 @@ import (
 //
 //   - utils.js declares the code and the path with the literals the helper emits and the route is
 //     mounted at, so renaming either on one side fails here;
-//   - the recount of request sites under web/ still finds exactly the three this change handled,
-//     sendAjaxRequest in utils.js and uploadImage and handleDelete in image-upload.js, so a fourth
-//     raw fetch() fails until it is handled too;
-//   - each of the three, within its own function, calls isSessionEnded and goToSessionEnded, and
+//   - the recount of request sites under web/ still finds exactly the four handled, sendAjaxRequest
+//     in utils.js, uploadImage and handleDelete in image-upload.js, and the brand editor's upload in
+//     pages/brand-assets.js (#813), so a fifth raw fetch() fails until it is handled too;
+//   - each of the four, within its own function, calls isSessionEnded and goToSessionEnded, and
 //     sends its URL through withPageLanguage, which names the page's catalog as ui_locales (#559).
 //
 // It does not prove that any of them navigates. That is read, not run.
@@ -71,10 +71,10 @@ func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
 		found = append(found, name)
 	}
 	sort.Strings(found)
-	assert.Equal(t, map[string]int{"static/utils.js": 1, "static/image-upload.js": 2}, sites,
+	assert.Equal(t, map[string]int{"static/utils.js": 1, "static/image-upload.js": 2, "static/pages/brand-assets.js": 1}, sites,
 		"a request site was added or removed under web/ (%v): one that can receive an admin API 401 "+
 			"that ends the session "+
-			"must follow %q to %s the way the three handled here do, and then this count moves", found,
+			"must follow %q to %s the way the four handled here do, and then this count moves", found,
 		sessionEndedCode, sessionEndedPath)
 
 	utils := sources["static/utils.js"]

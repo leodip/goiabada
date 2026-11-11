@@ -1,0 +1,32 @@
+{{define "brand_asset"}}
+{{- /* (args ctx slot asset uploads kind invalid thumb): the upload of one of a brand's six slots in the
+     brand form (#813 decision 1), inside the slot's fieldset, whose legend's id the page writes as
+     {{ $slot }}Label, as this writes the slot's ids, so the markup guard reads them as one. Picking a
+     file with Upload sends it at once to the console's route of its kind (brand-assets.js), which
+     stores it as a brand asset and answers its id and URL: the two hidden fields take them, the
+     preview draws the file from the URL, and Save names the id in the slot. Remove empties both.
+     Nothing reaches a real page until Save. What the slot holds is said in text, beside an image's
+     thumbnail, which is decorative; thumb is the thumbnail's class, empty for a font, which has none.
+     A refused upload is said in the status region, at the field, and a refusal of the Save about the
+     slot focuses its Upload. uploads are the BrandAssetUpload of each kind, by kind, and kind is the
+     slot's. */ -}}
+{{- $ctx := index . 0 }}{{ $slot := index . 1 }}{{ $asset := index . 2 }}{{ $invalid := index . 5 }}{{ $thumb := index . 6 }}
+{{- $uploads := index . 3 }}{{ $kind := index . 4 }}
+<div class="brand-asset" data-brand-asset="{{ $slot }}"{{ with $uploads }}{{ with index . $kind }} data-upload-url="{{ .URL }}" data-max-bytes="{{ .MaxBytes }}" data-too-large="{{ .TooLarge }}"{{ end }}{{ end }}>
+  <div class="brand-asset-row">
+    {{- if $thumb }}
+    <span class="{{ $thumb }}" aria-hidden="true"{{ if not $asset }} hidden{{ end }}>{{ if $asset }}<img src="{{ $asset.Url }}" alt="">{{ end }}</span>
+    {{- end }}
+    <span class="brand-asset-state field-hint" id="{{ $slot }}State"><span data-brand-asset-state="empty"{{ if $asset }} hidden{{ end }}>{{ T $ctx "adminconsole.admin_branding.asset.empty" }}</span><span data-brand-asset-state="filled"{{ if not $asset }} hidden{{ end }}>{{ T $ctx "adminconsole.admin_branding.asset.filled" }}</span></span>
+    <span class="brand-asset-actions">
+      <input type="file" id="{{ $slot }}File"{{ with $uploads }}{{ with index . $kind }} accept="{{ .Accept }}"{{ end }}{{ end }} aria-labelledby="{{ $slot }}Label" hidden>
+      <button class="button" type="button" id="{{ $slot }}Upload" aria-labelledby="{{ $slot }}Upload {{ $slot }}Label" data-brand-asset-upload{{ if $invalid }} autofocus{{ end }}>{{ T $ctx "adminconsole.admin_branding.asset.upload" }}</button>
+      <button class="button button-quiet" type="button" id="{{ $slot }}Remove" aria-labelledby="{{ $slot }}Remove {{ $slot }}Label" data-brand-asset-remove{{ if not $asset }} hidden{{ end }}>{{ T $ctx "adminconsole.admin_branding.asset.remove" }}</button>
+    </span>
+  </div>
+  <div class="not-empty:mt-2" id="{{ $slot }}Status" role="status"></div>
+</div>
+<input type="hidden" name="{{ $slot }}" value="{{ if $asset }}{{ $asset.Id }}{{ end }}">
+<input type="hidden" name="{{ $slot }}Url" value="{{ if $asset }}{{ $asset.Url }}{{ end }}">
+{{- end}}
+

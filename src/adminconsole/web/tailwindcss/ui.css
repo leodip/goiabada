@@ -1121,7 +1121,8 @@
     margin-bottom: 1.5rem;
   }
 
-  .auth-logo:has(+ .auth-brand) {
+  /* The name beside it, where it is drawn: the editor's sample hides it rather than leaving it out. */
+  .auth-logo:has(+ .auth-brand:not([hidden])) {
     margin-bottom: 0.75rem;
   }
 
@@ -2260,6 +2261,69 @@
     background-color: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);
+  }
+
+  /* The sample's card is drawn as a narrow screen draws a sign-in card, and its logo at most 3rem tall,
+     so the whole preview, a logo and the longest languages' sentences with it, stays on a 1280x800
+     screen beside the form (#813). */
+
+  .brand-sample .auth-card > .panel-body {
+    padding: 1.75rem 1.25rem;
+  }
+
+  .brand-sample .auth-logo img {
+    max-height: 3rem;
+  }
+
+  /* An upload field of the brand editor (#813 decision 1): an image's thumbnail, the sentence saying
+     whether the slot holds a file, and Upload and Remove, wrapping where the form is narrow. The
+     thumbnail shows the whole image, never stretched or cropped; a dark logo's is drawn on a dark
+     ground, as a dark page draws it. */
+
+  .brand-asset {
+    min-width: 0;
+  }
+
+  .brand-asset-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .brand-asset-state {
+    flex: 1 1 8rem;
+    min-width: 0;
+  }
+
+  .brand-asset-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .brand-asset-thumb {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 4.5rem;
+    height: 3rem;
+    padding: 0.25rem;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: 0.375rem;
+    background-color: var(--color-subtle);
+  }
+
+  .brand-asset-thumb img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .brand-asset-thumb-dark {
+    background-color: rgb(15 18 23);
   }
 
   /* Windows high-contrast mode, and any other forced palette: draw with the system's colors where
