@@ -7,10 +7,12 @@
 # browser or a database client, not for the tests, which reach the databases
 # by service name on the project's private network. Everything else (image,
 # service names, internal ports, `command`, volumes) is inherited unchanged,
-# so run-tests.sh works inside the second stack as it is.
+# so run-tests.sh works inside the second stack as it is, but for MySQL's data,
+# below.
 #
-# `!reset` needs Compose 2.24 or later. Never apply this file to the human
-# container: VS Code reads docker-compose.yml alone, and keeps its ports.
+# `!reset` and `!override` need Compose 2.24 or later. Never apply this file to
+# the human container: VS Code reads docker-compose.yml alone, and keeps its
+# ports and its MySQL volume.
 #
 # The one port it adds is a pair on the devcontainer, for the auth server and
 # admin console that `.placido/stack.sh serve` starts so an agent can look at
@@ -26,6 +28,16 @@ services:
       - "127.0.0.1::19291"
   mysql-server:
     ports: !reset []
+    # MySQL keeps its data in memory here, not in the mysql-data volume. Every
+    # schema change waits for a write to disk, and the data tier's migration
+    # tests make thousands: a migration from empty took 8.8 seconds on the
+    # volume and 1.3 in memory, and the MySQL data tier 12 to 18 minutes on the
+    # volume and about 4 in memory (2026-11-11). The data are the tests', which
+    # make their own, so losing them when the container stops costs nothing.
+    volumes: !override
+      - db-tls:/db-tls:ro
+    tmpfs:
+      - /var/lib/mysql
   postgres-server:
     ports: !reset []
   mssql-server:

@@ -57,7 +57,11 @@ in flight. It sets `ports: !reset []` on the four services that publish a port. 
 thing that stops a plain `docker compose up` with a new project name from starting next to the
 live stack: the tests reach the databases by service name on the project's own network with fixed
 internal ports, and Compose prefixes the network, the volumes and the built image with the project
-name. Everything else is inherited, so `run-tests.sh` runs inside the second stack unchanged.
+name. Everything else is inherited, so `run-tests.sh` runs inside the second stack unchanged,
+except where MySQL keeps its data: in memory, not in the `mysql-data` volume, because every
+schema change waits for a write to disk and the data tier's migration tests make thousands. That
+takes the MySQL data tier from 12 to 18 minutes down to about 4. The data are the tests', so
+losing them when the stack stops costs nothing.
 
 It also publishes the devcontainer's ports 19290 and 19291, where `.placido/stack.sh serve` starts
 an auth server and an admin console for an agent to look at in a browser. They name no host port,

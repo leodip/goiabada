@@ -15,7 +15,7 @@ about = "go vet in all four modules (core, authserver, adminconsole, setup); abo
 
 [commands.unit]
 run   = "$PLACIDO_REPO/.placido/stack.sh run --type modules --no-build"
-about = "Unit tests of authserver (internal and web), core, and adminconsole; also checks gofmt, about 40 seconds. Narrow with --type internal|core|adminconsole and --run '<regex>'; a pattern that matches no test fails the run. Add --race to run them under the race detector, as CI does (about 5 minutes); it turns cgo on for its own run."
+about = "Unit tests of authserver (internal and web), core, and adminconsole; also checks gofmt, about a minute. Narrow with --type internal|core|adminconsole and --run '<regex>'; a pattern that matches no test fails the run. Add --race to run them under the race detector, as CI does (about 5 minutes); it turns cgo on for its own run."
 
 [commands.setup-wizard]
 run   = "$PLACIDO_REPO/.placido/stack.sh run --type setup"
@@ -23,19 +23,19 @@ about = "Tests of the setup wizard module, src/cmd/goiabada-setup."
 
 [commands.data-sqlite]
 run   = "$PLACIDO_REPO/.placido/stack.sh run --type data --db sqlite --no-build"
-about = "The data-layer tier on SQLite, about 20 seconds. Narrow with --run '<regex>'. Use data for another engine."
+about = "The data-layer tier on SQLite, about a minute. Narrow with --run '<regex>'. Use data for another engine."
 
 [commands.data]
 run   = "$PLACIDO_REPO/.placido/stack.sh run --type data --no-build --db"
-about = "The data-layer tier on one engine: append mysql, postgres, mssql, or sqlite (about 4, 0.5, 2 minutes, and 20 seconds). Narrow with --run '<regex>'."
+about = "The data-layer tier on one engine: append mysql, postgres, mssql, or sqlite (about 4, 2, 6 minutes, and 1). Narrow with --run '<regex>'."
 
 [commands.integration-sqlite]
 run   = "$PLACIDO_REPO/.placido/stack.sh run --type integration --db sqlite"
-about = "Builds the server and runs the end-to-end tier on SQLite, about a minute. Narrow with --run '<regex>'. Use integration for another engine."
+about = "Builds the server and runs the end-to-end tier on SQLite, about 2½ minutes. Narrow with --run '<regex>'. Use integration for another engine."
 
 [commands.integration]
 run   = "$PLACIDO_REPO/.placido/stack.sh run --type integration --db"
-about = "Builds the server and runs the end-to-end tier on one engine: append mysql, postgres, mssql, or sqlite (about 1, 1.5, 2 minutes, and 45 seconds). Narrow with --run '<regex>'."
+about = "Builds the server and runs the end-to-end tier on one engine: append mysql, postgres, mssql, or sqlite (about 6, 4, 6½ and 2½ minutes). Narrow with --run '<regex>'."
 
 [commands.lint]
 run   = "$PLACIDO_REPO/.placido/stack.sh run --type lint --no-build"
