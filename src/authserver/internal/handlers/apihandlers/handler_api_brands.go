@@ -208,6 +208,25 @@ func brandNameTaken(w http.ResponseWriter, r *http.Request, err error) bool {
 	return true
 }
 
+// brandSlotSwept answers a brand write the engine refused after its slots were checked, when the
+// asset a slot names is no longer stored: the sweep deleted it between the check and the write, and
+// the slot's foreign key refused the write. Such a write is refused at that slot, as an id naming no
+// asset is (#813 decision 10). It reports whether it answered; a write whose slots all still hold
+// their assets, or whose slots cannot be read again, failed for another reason and is the caller's
+// to answer.
+func brandSlotSwept(w http.ResponseWriter, r *http.Request, assets brandasset.SlotsReader, brand *record.Brand) bool {
+	if len(brandasset.SlotIds(brand)) == 0 {
+		return false
+	}
+	_, err := validateBrandSlots(r.Context(), assets, brand)
+	var localized *i18n.LocalizedError
+	if !errors.As(err, &localized) {
+		return false
+	}
+	writeValidationError(w, r, err)
+	return true
+}
+
 // brandId reads the {id} path value, answering the request when it is not an id.
 func brandId(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -332,7 +351,7 @@ func HandleBrandCreatePost(database brandsDatabase, auditLogger AuditLogger, bas
 		}
 
 		if err := database.CreateBrand(r.Context(), nil, &brand); err != nil {
-			if !brandNameTaken(w, r, err) {
+			if !brandNameTaken(w, r, err) && !brandSlotSwept(w, r, database, &brand) {
 				writeInternalServerError(w, r, errs.Wrap(err, "database error creating brand"))
 			}
 			return
@@ -405,7 +424,7 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger, base
 			return
 		}
 		if err := database.UpdateBrand(r.Context(), nil, brand); err != nil {
-			if !brandNameTaken(w, r, err) {
+			if !brandNameTaken(w, r, err) && !brandSlotSwept(w, r, database, brand) {
 				writeInternalServerError(w, r, errs.Wrap(err, "database error updating brand"), "brand_id", brand.Id)
 			}
 			return

@@ -1641,7 +1641,8 @@
   }
   .app-header-brand {
     display: flex;
-    min-width: 0;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
     align-items: center;
     gap: 0.5rem;
     font-weight: 650;
@@ -1723,7 +1724,8 @@
   }
   .sidebar-brand {
     display: flex;
-    min-width: 0;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
     align-items: center;
     gap: 0.5rem;
     overflow-wrap: anywhere;

@@ -498,6 +498,17 @@ test("the sample draws each mode's logo, the background at each fit and the uplo
     await page.evaluate(() => Array.from(document.fonts, (face) => face.family.replace(/["']/g, ""))),
     "the uploaded font declared for the sample",
   ).toContain("brand-font");
+  // One file alone is declared with no weight, as the saved stylesheet declares it, so a variable font
+  // draws every weight on its own axis in the sample too (#813 decision 7).
+  expect(
+    await page.evaluate(() =>
+      Array.from(document.adoptedStyleSheets)
+        .flatMap((sheet) => Array.from(sheet.cssRules))
+        .filter((rule): rule is CSSFontFaceRule => rule instanceof CSSFontFaceRule)
+        .map((rule) => ({ family: rule.style.getPropertyValue("font-family").replace(/["']/g, ""), weight: rule.style.getPropertyValue("font-weight") })),
+    ),
+    "the regular file's face, for every weight",
+  ).toEqual([{ family: "brand-font", weight: "" }]);
   await expectConsoleShape(page);
 
   await fillBrandForm(page, { hideAppName: true });

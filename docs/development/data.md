@@ -132,7 +132,9 @@ every asset no slot names that is older than a day. No lock orders the sweep and
 Save attaching an old unattached asset while the sweep runs makes the slot's foreign key refuse the
 sweep's delete, which fails that run's step and is logged; the next run deletes the rest. A brand
 write checks its slots' assets before it writes, so a sweep deleting one in between fails the write
-on the same foreign key, as a 500 rather than the slot's refusal. Reading a brand for a page reads
+on the same foreign key. The handler then reads the slots' assets again and answers the slot whose
+asset is gone with that slot's refusal; a write that fails while every asset is still stored stays a
+500. Reading a brand for a page reads
 its assets with `GetBrandAssetsByIds`, which leaves out the bytes; only the public asset route reads
 them, with `GetBrandAssetById`.
 

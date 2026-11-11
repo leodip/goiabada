@@ -19,6 +19,7 @@ import {
   fillBrandForm,
   firstFontOf,
   goiabadaIcons,
+  kitFiles,
   listBrands,
   newBrandUrl,
   pageIcons,
@@ -189,4 +190,62 @@ test("a dark logo without a logo is refused at the logo's field, and the form ke
 
   await page.goto(brandingUrl);
   await expect(page.locator("#brandsTable").getByText(name, { exact: true })).toHaveCount(0);
+});
+
+// Save sends the slots' hidden fields as they stand, so an upload still under way holds the brand
+// back (#813 decision 1): while two fields' uploads are unanswered, Create is disabled and Enter sends
+// nothing; one answered still holds it, and once both are, Create attaches both files.
+test("a brand is not sent while a file is uploading, and Create then attaches every file picked", async ({ page }) => {
+  const name = uniqueIdentifier("brand");
+  await page.goto(newBrandUrl);
+  await fillBrandForm(page, { name });
+
+  // Each upload reaches the admin API and is stored; only its answer is held back until released.
+  const releases: Record<string, () => void> = {};
+  await page.route("**/admin/settings/branding/assets/*", async (route) => {
+    const response = await route.fetch();
+    const kind = new URL(route.request().url()).pathname.split("/").pop()!;
+    await new Promise<void>((resolve) => {
+      releases[kind] = resolve;
+    });
+    await route.fulfill({ response });
+  });
+  const formPosts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === new URL(newBrandUrl).pathname) {
+      formPosts.push(request.url());
+    }
+  });
+
+  await page.locator("#logoFile").setInputFiles(kitFiles.logo);
+  await page.locator("#faviconFile").setInputFiles(kitFiles.favicon);
+  await expect(page.locator("#logoStatus")).toHaveText("Uploading…");
+  await expect(page.locator("#faviconStatus")).toHaveText("Uploading…");
+  await expect.poll(() => Object.keys(releases).sort(), "both uploads reached the server").toEqual(["favicon", "logo"]);
+  await expect(page.locator("#btnCreate"), "Create waits for the uploads").toBeDisabled();
+  await page.locator("#name").press("Enter");
+
+  releases.logo();
+  await expect(page.locator("#logoStatus")).toHaveText(uploadSays.uploaded);
+  await expect(page.locator("#btnCreate"), "the favicon's upload still holds Create").toBeDisabled();
+  await page.locator("#name").press("Enter");
+
+  releases.favicon();
+  await expect(page.locator("#faviconStatus")).toHaveText(uploadSays.uploaded);
+  await expect(page.locator("#btnCreate")).toBeEnabled();
+  expect(formPosts, "Enter sent nothing while an upload was under way").toEqual([]);
+  await expect(page).toHaveURL(newBrandUrl);
+  const logo = await slotHolds(page, "logo");
+  const favicon = await slotHolds(page, "favicon");
+
+  await page.locator("#btnCreate").click();
+  await expect(page).toHaveURL(brandingUrl);
+  const id = await brandIdFromList(page, name);
+  try {
+    await page.goto(brandUrl(id, "edit"));
+    expect(await slotHolds(page, "logo"), "the logo Create attached").toEqual(logo);
+    expect(await slotHolds(page, "favicon"), "the favicon Create attached").toEqual(favicon);
+  } finally {
+    await deleteBrand(page, id);
+  }
 });

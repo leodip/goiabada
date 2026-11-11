@@ -176,7 +176,7 @@ class Element extends Node {
 }
 
 class Document extends Node {
-  constructor() { super(); this.readyState = "interactive"; this.documentElement = null; this.fonts = new FontFaceSet(); }
+  constructor() { super(); this.readyState = "interactive"; this.documentElement = null; this.adoptedStyleSheets = []; }
   get body() { return this.documentElement.children[1]; }
   getElementById(id) { return this.querySelector("#" + id); }
   createElement(tag) { return new Element(this, tag); }
@@ -184,16 +184,11 @@ class Document extends Node {
 
 class Window extends Node {}
 
-// FontFace and document.fonts, the CSS Font Loading API, as far as a page script uses them: a face
-// is its family, its source and its descriptors, and the set holds the faces added and not deleted.
-class FontFace {
-  constructor(family, source, descriptors) { this.family = family; this.source = source; this.descriptors = Object.assign({}, descriptors || {}); }
-}
-class FontFaceSet {
-  constructor() { this.faces = []; }
-  add(face) { if (this.faces.indexOf(face) < 0) { this.faces.push(face); } return this; }
-  delete(face) { const before = this.faces.length; this.faces = this.faces.filter(function (f) { return f !== face; }); return this.faces.length < before; }
-  has(face) { return this.faces.indexOf(face) >= 0; }
+// A constructed stylesheet and document.adoptedStyleSheets, as far as a page script uses them: a
+// sheet is the CSS text it was last given.
+class CSSStyleSheet {
+  constructor() { this.cssText = ""; }
+  replaceSync(text) { this.cssText = String(text); }
 }
 
 function event(type, bubbles, extra) {
@@ -383,7 +378,7 @@ function look(doc) {
   }
   return {
     samples: samples,
-    fonts: doc.fonts.faces.map(function (f) { return { family: f.family, source: f.source, descriptors: f.descriptors }; }),
+    fontSheets: doc.adoptedStyleSheets.map(function (sheet) { return sheet.cssText; }),
     styledElsewhere: styledElsewhere,
     switchHidden: doc.querySelector(".brand-preview-switch").hidden,
     notesHidden: notes,
@@ -400,7 +395,7 @@ process.stdin.on("end", function () {
   const doc = page.doc;
   const win = page.win;
   const looks = [];
-  const context = { document: doc, window: win, console: console, JSON: JSON, Object: Object, FontFace: FontFace };
+  const context = { document: doc, window: win, console: console, JSON: JSON, Object: Object, CSSStyleSheet: CSSStyleSheet };
   win.document = doc;
   vm.createContext(context);
   for (const step of request.steps) {
@@ -511,13 +506,6 @@ type previewSample struct {
 	NameHidden bool              `json:"nameHidden"`
 }
 
-// previewFace is a font face the page declared, through the CSS Font Loading API.
-type previewFace struct {
-	Family      string            `json:"family"`
-	Source      string            `json:"source"`
-	Descriptors map[string]string `json:"descriptors"`
-}
-
 // previewSlot is what a slot's hidden fields hold: an asset's id and URL.
 type previewSlot struct {
 	ID  string `json:"id"`
@@ -529,7 +517,7 @@ type previewSwatch map[string]string
 
 type previewLook struct {
 	Samples         map[string]previewSample `json:"samples"`
-	Fonts           []previewFace            `json:"fonts"`
+	FontSheets      []string                 `json:"fontSheets"`
 	StyledElsewhere []string                 `json:"styledElsewhere"`
 	SwitchHidden    bool                     `json:"switchHidden"`
 	NotesHidden     map[string]bool          `json:"notesHidden"`
@@ -565,7 +553,7 @@ var previewKitStyles = map[string]any{
 		"serif":    "Testserif, 'Test Serif Two', serif",
 		"uploaded": `"brand-font", Testsystem, sans-serif`,
 	},
-	"uploadedFamily": "brand-font",
+	"uploadedFamily": `"brand-font"`,
 	"fontWeights":    map[string]string{"regular": "1 450", "bold": "451 1000"},
 	"backgrounds": map[string]map[string]string{
 		"cover":   {"size": "testcover", "position": "testcenter", "repeat": "testonce"},
@@ -1163,9 +1151,11 @@ func TestBrandPreviewJS_ABackgroundAtAFitWithNothingHandedIsCover(t *testing.T) 
 }
 
 // The uploaded font is declared in the page under the family its list names first, swapped in once it
-// loads (#813 decision 7): one regular file for every weight, or with a bold file, each for the
-// weights the page hands. Nothing is declared while another family is chosen or no regular file is
-// there, and a face no longer used is taken out of the page.
+// loads (#813 decision 7), by the @font-face rules the auth server's stylesheet declares it with: one
+// regular file with no weight, so a browser gives a variable font its own weight range and a static
+// one its synthesized bold, or with a bold file, each for the weights the page hands. The rules are in
+// one stylesheet the page adopts once. Nothing is declared while another family is chosen or no
+// regular file is there, and a face no longer used is taken out of the page.
 func TestBrandPreviewJS_TheSampleDeclaresTheUploadedFont(t *testing.T) {
 	looks := runBrandPreview(t, previewPage{themeCards: bothCards, theme: "plum", appearance: "light", font: "uploaded"},
 		load(), lookAt(),
@@ -1175,20 +1165,34 @@ func TestBrandPreviewJS_TheSampleDeclaresTheUploadedFont(t *testing.T) {
 		pick("font", "uploaded"), remove("boldFont"), lookAt(),
 		remove("regularFont"), lookAt())
 
-	regular := `url("` + testRegularURL + `") format("woff2")`
-	bold := `url("` + testBoldURL + `") format("woff2")`
-	want := [][]previewFace{
+	regularAlone := "@font-face {\n" +
+		"  font-family: \"brand-font\";\n" +
+		"  src: url(\"" + testRegularURL + "\") format(\"woff2\");\n" +
+		"  font-display: swap;\n" +
+		"}\n"
+	regularAndBold := "@font-face {\n" +
+		"  font-family: \"brand-font\";\n" +
+		"  src: url(\"" + testRegularURL + "\") format(\"woff2\");\n" +
+		"  font-weight: 1 450;\n" +
+		"  font-display: swap;\n" +
+		"}\n" +
+		"@font-face {\n" +
+		"  font-family: \"brand-font\";\n" +
+		"  src: url(\"" + testBoldURL + "\") format(\"woff2\");\n" +
+		"  font-weight: 451 1000;\n" +
+		"  font-display: swap;\n" +
+		"}\n"
+	want := [][]string{
 		{},
-		{{Family: "brand-font", Source: regular, Descriptors: map[string]string{"display": "swap"}}},
-		{{Family: "brand-font", Source: regular, Descriptors: map[string]string{"display": "swap", "weight": "1 450"}},
-			{Family: "brand-font", Source: bold, Descriptors: map[string]string{"display": "swap", "weight": "451 1000"}}},
-		{},
-		{{Family: "brand-font", Source: regular, Descriptors: map[string]string{"display": "swap"}}},
-		{},
+		{regularAlone},
+		{regularAndBold},
+		{""},
+		{regularAlone},
+		{""},
 	}
 	require.Len(t, looks, len(want))
-	for i, faces := range want {
-		assert.ElementsMatch(t, faces, looks[i].Fonts, "look %d: the faces the page declares", i)
+	for i, sheets := range want {
+		assert.Equal(t, sheets, looks[i].FontSheets, "look %d: the stylesheets the page adopts and their rules", i)
 	}
 	assert.Equal(t, `"brand-font", Testsystem, sans-serif`, looks[2].Samples["light"].Style["--font-sans"], "the sample's text in the uploaded font")
 	assert.Equal(t, "Testserif, 'Test Serif Two', serif", looks[3].Samples["light"].Style["--font-sans"])
@@ -1205,10 +1209,11 @@ func TestBrandPreviewJS_PageshowDrawsTheRestoredFiles(t *testing.T) {
 		lookAt(), previewStep{Do: "pageshow", Persisted: false}, lookAt())
 
 	assert.Empty(t, logoOf(t, looks[0].Samples["dark"]), "nothing is drawn before pageshow")
-	assert.Empty(t, looks[0].Fonts)
+	assert.Empty(t, looks[0].FontSheets)
 	assert.Equal(t, testLogoURL, logoOf(t, looks[1].Samples["dark"]))
 	assert.Equal(t, `url("`+testBackgroundURL+`")`, looks[1].Samples["dark"].Style["background-image"])
-	assert.Len(t, looks[1].Fonts, 1)
+	require.Len(t, looks[1].FontSheets, 1)
+	assert.Contains(t, looks[1].FontSheets[0], `src: url("`+testRegularURL+`") format("woff2");`)
 }
 
 // A slot whose id field is empty holds nothing, whatever its URL field holds.
@@ -1218,5 +1223,5 @@ func TestBrandPreviewJS_ASlotWithoutAnIdHoldsNothing(t *testing.T) {
 		load(), lookAt())
 	assert.Empty(t, logoOf(t, looks[0].Samples["light"]))
 	assert.Empty(t, looks[0].Samples["light"].Style["background-image"])
-	assert.Empty(t, looks[0].Fonts)
+	assert.Empty(t, looks[0].FontSheets)
 }

@@ -28,7 +28,7 @@ func multipartRequest(t *testing.T, field string, data []byte) *http.Request {
 	return req
 }
 
-// TestRead owns Read's two sentinels and its bound: the image size plus multipartOverhead, over
+// TestRead owns Read's three sentinels and its bound: the image size plus multipartOverhead, over
 // the whole body, so a file of exactly the configured size still reads.
 func TestRead(t *testing.T) {
 	const maxSize = 1000
@@ -54,16 +54,27 @@ func TestRead(t *testing.T) {
 		data, err := Read(httptest.NewRecorder(), multipartRequest(t, "picture", tooLarge), "picture", maxSize)
 
 		require.ErrorIs(t, err, ErrUploadTooLarge)
+		require.NotErrorIs(t, err, ErrNotMultipart)
 		assert.Nil(t, data)
 	})
 
-	t.Run("a body that is not a multipart form answers as too large, as it always has", func(t *testing.T) {
+	t.Run("a body far past the bound is too large", func(t *testing.T) {
+		tooLarge := bytes.Repeat([]byte{0xAB}, 4*(maxSize+multipartOverhead))
+
+		data, err := Read(httptest.NewRecorder(), multipartRequest(t, "picture", tooLarge), "picture", maxSize)
+
+		require.ErrorIs(t, err, ErrUploadTooLarge)
+		assert.Nil(t, data)
+	})
+
+	t.Run("a body that is not a multipart form is told from one too large", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(`{"picture":"x"}`))
 		req.Header.Set("Content-Type", "application/json")
 
 		data, err := Read(httptest.NewRecorder(), req, "picture", maxSize)
 
-		require.ErrorIs(t, err, ErrUploadTooLarge)
+		require.ErrorIs(t, err, ErrNotMultipart)
+		require.NotErrorIs(t, err, ErrUploadTooLarge)
 		assert.Nil(t, data)
 	})
 

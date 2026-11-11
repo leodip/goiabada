@@ -32,9 +32,8 @@ type brandAssetsDatabase interface {
 // held to its kind's rules (#813 decision 3) and stored as it came, with the type it was validated
 // as, its fingerprint and its pixel size.
 func HandleBrandAssetPost(database brandAssetsDatabase, auditLogger AuditLogger, baseURL string, kind record.BrandAssetKind) http.HandlerFunc {
-	maxBytes := brandasset.MaxBytes(kind)
 	return func(w http.ResponseWriter, r *http.Request) {
-		data, ok := readUploadedBrandAsset(w, r, maxBytes)
+		data, ok := readUploadedBrandAsset(w, r, kind)
 		if !ok {
 			return
 		}

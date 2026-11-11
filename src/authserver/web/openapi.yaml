@@ -2571,8 +2571,8 @@ paths:
                 $ref: '#/components/schemas/CreateBrandAssetResponse'
         '400':
           description: |
-            The file is missing (NO_FILE), the body is too large or not a multipart form
-            (FILE_TOO_LARGE), or the file breaks a rule of its kind, named by its error_code.
+            The file is missing (NO_FILE), the body is not a multipart form (FILE_TOO_LARGE), or
+            the file breaks a rule of its kind, its byte limit included, named by its error_code.
           content:
             application/json:
               schema:
@@ -2619,8 +2619,8 @@ paths:
                 $ref: '#/components/schemas/CreateBrandAssetResponse'
         '400':
           description: |
-            The file is missing (NO_FILE), the body is too large or not a multipart form
-            (FILE_TOO_LARGE), or the file breaks a rule of its kind, named by its error_code.
+            The file is missing (NO_FILE), the body is not a multipart form (FILE_TOO_LARGE), or
+            the file breaks a rule of its kind, its byte limit included, named by its error_code.
           content:
             application/json:
               schema:
@@ -2666,8 +2666,8 @@ paths:
                 $ref: '#/components/schemas/CreateBrandAssetResponse'
         '400':
           description: |
-            The file is missing (NO_FILE), the body is too large or not a multipart form
-            (FILE_TOO_LARGE), or the file breaks a rule of its kind, named by its error_code.
+            The file is missing (NO_FILE), the body is not a multipart form (FILE_TOO_LARGE), or
+            the file breaks a rule of its kind, its byte limit included, named by its error_code.
           content:
             application/json:
               schema:
@@ -2713,8 +2713,8 @@ paths:
                 $ref: '#/components/schemas/CreateBrandAssetResponse'
         '400':
           description: |
-            The file is missing (NO_FILE), the body is too large or not a multipart form
-            (FILE_TOO_LARGE), or the file breaks a rule of its kind, named by its error_code.
+            The file is missing (NO_FILE), the body is not a multipart form (FILE_TOO_LARGE), or
+            the file breaks a rule of its kind, its byte limit included, named by its error_code.
           content:
             application/json:
               schema:
@@ -9133,8 +9133,8 @@ components:
       type: object
       description: |
         A stored brand asset named by its id, as uploaded with a brand asset upload. A slot must
-        name an asset of its own kind; an asset no brand has used for a day is swept, and an id
-        naming none is refused.
+        name an asset of its own kind. An asset no brand names is swept once it is a day old,
+        counted from its upload, and an id naming none is refused.
       properties:
         id:
           type: integer

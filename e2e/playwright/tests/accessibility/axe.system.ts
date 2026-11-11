@@ -189,6 +189,33 @@ test("the console's header and cards with its brand's logo", async ({ page, requ
         withLogo("an Account page's header with the logo in the name's place", `${env.adminUrl}/account/profile`, sidebarLogo),
         withLogo("the console's home card with the logo in the name's place", `${env.adminUrl}/`, cardLogo),
       ]);
+
+      // A logo short and wide, as the logo's rules allow, in the name's place: each link to home is
+      // still a target of at least 24 by 24 pixels, the phone's header link and the desktop's sidebar
+      // link, and the pages pass.
+      const wide = await uploadBrandAsset(request, token, "logo", solidPng(512, 10, [30, 60, 160]));
+      await setBrandKit(request, token, brand.id, { logo: wide, hideAppName: true });
+      await saveBrand(page, brand.id, {});
+      const viewport = page.viewportSize();
+      try {
+        for (const [width, link] of [
+          [375, "a.app-header-brand"],
+          [1440, "a.sidebar-brand"],
+        ] as const) {
+          await page.setViewportSize({ width, height: 900 });
+          await page.goto(`${env.adminUrl}/account/profile`);
+          await expect(page.locator(`${link} img`)).toBeVisible();
+          const box = await page.locator(link).boundingBox();
+          expect(box, `${link} at ${width}px`).not.toBeNull();
+          expect(box!.width, `${link}'s width at ${width}px`).toBeGreaterThanOrEqual(24);
+          expect(box!.height, `${link}'s height at ${width}px`).toBeGreaterThanOrEqual(24);
+        }
+        await checkStates(page, [
+          withLogo("an Account page's header with a short, wide logo in the name's place", `${env.adminUrl}/account/profile`, page.locator("a.sidebar-brand img")),
+        ]);
+      } finally {
+        if (viewport) await page.setViewportSize(viewport);
+      }
     } finally {
       await setClientBrand(page, consoleClient, "default");
     }

@@ -11,6 +11,11 @@
 // pixels, shape or animation, said at the field, in the page's language. The admin API refusing the
 // access token signs the administrator out, as every other request of the console's pages does.
 //
+// An upload under way holds the brand back, since Save sends the slot's hidden fields as they stand
+// and the answer that would fill them cannot arrive once the page has left: while any field's upload
+// is unanswered, Create or Save is disabled and a submission by Enter is stopped. Each upload is
+// counted, so two fields uploading at once release the form only when both are answered.
+//
 // What a field shows is drawn from its two hidden fields alone, on load and on pageshow too, as a
 // browser restoring the form on Back fills them and fires nothing: the image's thumbnail, the sentence
 // saying whether the slot holds a file, and Remove while it does.
@@ -26,6 +31,24 @@
     removed: form.dataset.assetRemoved || "",
     failed: form.dataset.assetUploadFailed || "",
   };
+
+  // The uploads not yet answered, across every field, and the form's buttons they hold back.
+  let pending = 0;
+  const submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+
+  function holdForm(delta) {
+    pending += delta;
+    const held = pending > 0;
+    for (const button of submitButtons) {
+      button.disabled = held;
+    }
+  }
+
+  form.addEventListener("submit", function (event) {
+    if (pending > 0) {
+      event.preventDefault();
+    }
+  });
 
   // The CSRF header, when the page carries the token.
   function csrfHeaders() {
@@ -84,6 +107,9 @@
     }
 
     function setBusy(on) {
+      if (busy !== on) {
+        holdForm(on ? 1 : -1);
+      }
       busy = on;
       upload.disabled = on;
       remove.disabled = on;

@@ -275,3 +275,53 @@ func TestBrandReads_ABrandWithoutFilesReadsNoAsset(t *testing.T) {
 	assert.Equal(t, http.StatusOK, status)
 	database.AssertNotCalled(t, "GetBrandAssetsByIds", mock.Anything, mock.Anything, mock.Anything)
 }
+
+// A brand write checks its slots' assets before it writes, and the sweep may delete an old,
+// unattached one in between: the engine then refuses the write on the slot's foreign key. That
+// write is refused at the slot whose asset is gone, as an id naming no asset is (#813 decision 10),
+// and a write that fails while every slot's asset is still stored stays a server error.
+func TestBrandWrites_AnAssetSweptBeforeTheWriteIsRefusedAtItsSlot(t *testing.T) {
+	foreignKey := errs.New("FOREIGN KEY constraint failed")
+	logo := []record.BrandAsset{{Id: 21, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "21aaaaaaaaaa", Width: 100, Height: 100}}
+
+	tests := []struct {
+		name       string
+		afterWrite []record.BrandAsset // what a read of the slots' assets answers after the failed write
+		readErr    error
+		status     int
+		code       string
+	}{
+		{"the logo was swept", nil, nil, http.StatusBadRequest, "handler.brand.logo_asset_invalid"},
+		{"the logo is still stored", logo, nil, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR"},
+		{"the second read fails", nil, errs.New("connection reset"), http.StatusInternalServerError, "INTERNAL_SERVER_ERROR"},
+	}
+	for _, method := range []string{http.MethodPost, http.MethodPut} {
+		for _, tc := range tests {
+			t.Run(method+" "+tc.name, func(t *testing.T) {
+				database := datamocks.NewDatabase(t)
+				database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{21}).Return(logo, nil).Once()
+				database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{21}).Return(tc.afterWrite, tc.readErr).Once()
+				body := validBrandBody()
+				body["logo"] = map[string]any{"id": 21}
+
+				var handler http.HandlerFunc
+				var req *http.Request
+				if method == http.MethodPost {
+					database.On("CreateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(foreignKey).Once()
+					handler = HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t), brandBaseURL)
+					req = brandRequest(t, method, body)
+				} else {
+					database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
+					database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(foreignKey).Once()
+					handler = HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL)
+					req = brandRequest(t, method, body, "id", "4")
+				}
+
+				status, answer := serveBrand(handler, req)
+
+				assert.Equal(t, tc.status, status, "%v", answer)
+				assert.Equal(t, tc.code, errorCode(answer))
+			})
+		}
+	}
+}

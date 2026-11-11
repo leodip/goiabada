@@ -101,39 +101,50 @@ function cssUrl(address) {
   return "url(" + JSON.stringify(address) + ")";
 }
 
-// The uploaded font's faces the page has declared, and the files they were declared from.
-let declaredFaces = [];
+// The stylesheet the uploaded font's faces are declared in, adopted by the page when a face is first
+// declared, and the files they were declared from.
+let fontSheet = null;
 let declaredFiles = "";
+
+// fontFaceRule is the @font-face rule of an uploaded font file, as the auth server's stylesheet
+// declares it: for the weights in weight, or for every weight when weight is empty. A rule with no
+// weight gives a variable font its own weight range and a static one the browser's synthesized bold,
+// as the saved brand draws them (#813 decision 7). A FontFace cannot say that: one without a weight
+// is pinned to normal, and Firefox and Safari refuse "auto".
+function fontFaceRule(family, url, weight) {
+  return "@font-face {\n" +
+    "  font-family: " + family + ";\n" +
+    "  src: " + cssUrl(url) + ' format("woff2");\n' +
+    (weight ? "  font-weight: " + weight + ";\n" : "") +
+    "  font-display: swap;\n" +
+    "}\n";
+}
 
 // declareUploadedFont declares the uploaded font's faces from its regular and bold files, or none for
 // no regular file, replacing the ones declared before. A browser loads a face once text asks for its
 // family, so a face declared costs nothing until the sample draws it.
 function declareUploadedFont(regular, bold) {
   const files = regular ? regular + "\n" + bold : "";
-  if (files === declaredFiles || !document.fonts || typeof FontFace !== "function") {
+  if (files === declaredFiles || typeof CSSStyleSheet !== "function" || !("adoptedStyleSheets" in document)) {
     return;
   }
-  for (const face of declaredFaces) {
-    document.fonts.delete(face);
-  }
-  declaredFaces = [];
   declaredFiles = files;
-  if (!regular) {
-    return;
+  if (!fontSheet) {
+    if (!regular) {
+      return;
+    }
+    fontSheet = new CSSStyleSheet();
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, fontSheet];
   }
   const family = brandKitStyles.uploadedFamily;
   const weights = brandKitStyles.fontWeights || {};
-  const face = function (url, weight) {
-    const descriptors = { display: "swap" };
-    if (weight) {
-      descriptors.weight = weight;
-    }
-    return new FontFace(family, cssUrl(url) + ' format("woff2")', descriptors);
-  };
-  declaredFaces = bold ? [face(regular, weights.regular), face(bold, weights.bold)] : [face(regular, "")];
-  for (const declared of declaredFaces) {
-    document.fonts.add(declared);
+  let rules = "";
+  if (regular && bold) {
+    rules = fontFaceRule(family, regular, weights.regular) + fontFaceRule(family, bold, weights.bold);
+  } else if (regular) {
+    rules = fontFaceRule(family, regular, "");
   }
+  fontSheet.replaceSync(rules);
 }
 
 // drawLogo puts the logo at url in a sample's logo box above the app name, or empties the box for

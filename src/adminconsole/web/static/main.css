@@ -211,6 +211,9 @@
     white-space: nowrap;
     border-width: 0;
   }
+  .static {
+    position: static;
+  }
   .container {
     width: 100%;
     @media (width >= 40rem) {
@@ -1900,7 +1903,8 @@
   }
   .app-header-brand {
     display: flex;
-    min-width: 0;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
     align-items: center;
     gap: 0.5rem;
     font-weight: 650;
@@ -1982,7 +1986,8 @@
   }
   .sidebar-brand {
     display: flex;
-    min-width: 0;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
     align-items: center;
     gap: 0.5rem;
     overflow-wrap: anywhere;

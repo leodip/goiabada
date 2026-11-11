@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -209,8 +210,8 @@ func TestBrandAssetPost_RefusesAFileItsKindDoesNotTake(t *testing.T) {
 	}
 }
 
-// The file is the multipart field "file": a request without it is refused, and so is a body past
-// the kind's limit and its multipart allowance, which is never read whole.
+// The file is the multipart field "file": a request without it is refused, and so is a body that is
+// not a multipart form.
 func TestBrandAssetPost_RefusesARequestWithoutTheFile(t *testing.T) {
 	handler := HandleBrandAssetPost(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), testBaseURL, record.BrandAssetKindLogo)
 
@@ -222,12 +223,47 @@ func TestBrandAssetPost_RefusesARequestWithoutTheFile(t *testing.T) {
 	assert.Equal(t, "NO_FILE", code)
 	assert.Equal(t, "No file provided", description)
 
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/brand-assets/logo", strings.NewReader(`{"file":"x"}`))
+	req.Header.Set("Content-Type", "application/json")
 	rr = httptest.NewRecorder()
-	handler.ServeHTTP(rr, brandAssetUpload(t, "logo", "file", paddedAsset(createTestPNG(100, 100), 1048576+4096), "admin-sub"))
+	handler.ServeHTTP(rr, setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage-settings", "sub": "admin-sub"}))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	code, _ = decodeAssetRefusal(t, rr)
 	assert.Equal(t, "FILE_TOO_LARGE", code)
+}
+
+// A body past the kind's limit and its multipart allowance is cut, never read whole, and still
+// refused with the kind's limit, as a file one byte over it is (#813 decision 3).
+func TestBrandAssetPost_ABodyPastTheReadBoundIsRefusedWithTheKindsLimit(t *testing.T) {
+	tests := []struct {
+		kind    record.BrandAssetKind
+		data    []byte
+		code    string
+		english string
+	}{
+		{record.BrandAssetKindLogo, paddedAsset(createTestPNG(100, 100), 1048576+4096),
+			"validator.image.too_large", "The image can be at most 1048576 bytes."},
+		{record.BrandAssetKindFavicon, paddedAsset(createTestPNG(64, 64), 1048576+4096),
+			"validator.image.too_large", "The image can be at most 1048576 bytes."},
+		{record.BrandAssetKindBackground, paddedAsset(createTestPNG(100, 100), 2097152+4096),
+			"validator.image.too_large", "The image can be at most 2097152 bytes."},
+		{record.BrandAssetKindFont, assetWOFF2(2097152 + 4096),
+			"validator.font.too_large", "The font can be at most 2097152 bytes."},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.kind), func(t *testing.T) {
+			handler := HandleBrandAssetPost(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), testBaseURL, tt.kind)
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, brandAssetUpload(t, string(tt.kind), "file", tt.data, "admin-sub"))
+
+			require.Equal(t, http.StatusBadRequest, rr.Code)
+			code, description := decodeAssetRefusal(t, rr)
+			assert.Equal(t, tt.code, code)
+			assert.Equal(t, tt.english, description)
+		})
+	}
 }
 
 func TestBrandAssetPost_AStoreThatFailsIsA500AndNotAudited(t *testing.T) {

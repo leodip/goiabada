@@ -53,6 +53,16 @@ func MaxBytes(kind record.BrandAssetKind) int64 {
 	return 0
 }
 
+// TooLarge is the refusal of an upload of kind past its byte limit, naming the limit: Validate's
+// for a file one byte over it, and the handler's for a body cut at the read's bound (#813
+// decision 3).
+func TooLarge(kind record.BrandAssetKind) error {
+	if kind == record.BrandAssetKindFont {
+		return i18n.NewLocalizedError(i18n.ErrCodeFontTooLarge, map[string]any{"max": int64(FontMaxBytes)})
+	}
+	return i18n.NewLocalizedError(i18n.ErrCodeImageTooLarge, map[string]any{"max": MaxBytes(kind)})
+}
+
 // Validate accepts an upload of kind its rules allow, and answers the type it was validated as
 // and its pixel size, zero for a font. An image kind is held to imageupload's rules for it; a font
 // must be a WOFF2 file of at most FontMaxBytes. A refusal is an *i18n.LocalizedError naming the
@@ -76,7 +86,7 @@ var woff2Signature = []byte("wOF2")
 // reads the rest, and a file it cannot read falls back to the next family in the stack.
 func validateFont(data []byte) (imageupload.Info, error) {
 	if len(data) > FontMaxBytes {
-		return imageupload.Info{}, i18n.NewLocalizedError(i18n.ErrCodeFontTooLarge, map[string]any{"max": int64(FontMaxBytes)})
+		return imageupload.Info{}, TooLarge(record.BrandAssetKindFont)
 	}
 	if len(data) == 0 {
 		return imageupload.Info{}, i18n.NewLocalizedError(i18n.ErrCodeFontEmpty, nil)

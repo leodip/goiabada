@@ -100,10 +100,11 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `.brand-sample`, as `:root` does on a page. The files come from each slot's two hidden fields,
   its asset's id and URL, which `static/pages/brand-assets.js` fills as a file is uploaded to the
   console's route of its kind and empties on Remove; Save names the held ids in their slots. The
-  sample draws the logo of its mode, the background at its fit and the uploaded font through the
-  CSS Font Loading API; the favicon is a thumbnail beside its field. To keep the preview on a
-  1280×800 screen with a logo in it, the sample's card takes the narrow-screen padding and caps its
-  logo at 3rem.
+  sample draws the logo of its mode, the background at its fit and the uploaded font, whose
+  `@font-face` rules the script writes as the auth server's stylesheet does into a stylesheet the
+  page adopts: a `FontFace` cannot leave the weight automatic, so a variable font would be pinned to
+  400. The favicon is a thumbnail beside its field. To keep the preview on a 1280×800 screen with a
+  logo in it, the sample's card takes the narrow-screen padding and caps its logo at 3rem.
 - **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
   `panel`, `panel-body` (several, each under a `panel-title`, for a panel in sections),
   `panel-footer`; `button`, with `-primary` for a form's one main action, `-danger`, `-quiet`,
