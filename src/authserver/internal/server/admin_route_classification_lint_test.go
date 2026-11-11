@@ -203,6 +203,14 @@ var adminRouteClassification = map[string]adminRouteClass{
 		"how no page looks and gives the caller no authority it lacks (#402 decision 7)"),
 	"POST /api/v1/admin/brands/{id}/make-default": outsideCeilings("changes how pages look and gives the caller " +
 		"no authority it lacks (#402 decision 7)"),
+	"POST /api/v1/admin/brand-assets/logo": outsideCeilings("stores a file no page draws until a brand " +
+		"names it, and gives the caller no authority it lacks (#402 decision 7)"),
+	"POST /api/v1/admin/brand-assets/favicon": outsideCeilings("stores a file no page draws until a brand " +
+		"names it, and gives the caller no authority it lacks (#402 decision 7)"),
+	"POST /api/v1/admin/brand-assets/background": outsideCeilings("stores a file no page draws until a brand " +
+		"names it, and gives the caller no authority it lacks (#402 decision 7)"),
+	"POST /api/v1/admin/brand-assets/font": outsideCeilings("stores a file no page draws until a brand " +
+		"names it, and gives the caller no authority it lacks (#402 decision 7)"),
 	"PUT /api/v1/admin/settings/tokens": outsideCeilings("changes posture and gives the caller no authority it " +
 		"lacks (#402 decision 7)"),
 	"PUT /api/v1/admin/settings/turnstile": outsideCeilings("changes posture, which a wrong site key can turn " +

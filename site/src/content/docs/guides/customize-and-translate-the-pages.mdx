@@ -15,7 +15,7 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's shown at the top of the sign-in pages and ends their titles, as in "Sign in – Acme". It also signs every email, and it's the name authenticator apps list your users' accounts under.
 
-2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, and click **Save**. See [Brands and themes](#brands-and-themes) for the choices, and [Regenerate the CSS](#regenerate-the-css) to use your own colors.
+2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and [Regenerate the CSS](#regenerate-the-css) to use your own colors.
 
 3. To give one client a look of its own, click **New brand** and create one, then choose it under **Brand** on the client's **Settings** tab. See [Clients](/concepts/clients/#brand) for the pages it draws.
 
@@ -79,7 +79,7 @@ To change the layout of a page, or an email's body, you give a server its own co
 
    `tailwindcss` isn't served: it's what [regenerating the CSS](#regenerate-the-css) reads.
 
-2. Edit the templates. They're Go [`html/template`](https://pkg.go.dev/html/template) files. Keep the element IDs and the scripts the pages use, or the forms stop working. In the layouts, keep the `data-theme` attribute and the brand's stylesheet link after `main.css`, or the pages lose their brand's appearance and theme. The servers' [`Content-Security-Policy`](/reference/security/#response-headers) makes the browser refuse an inline `<script>`, an `on…` attribute such as `onclick`, a `javascript:` URL and a `<base>` element. A `<script type="application/json">` data block is fine. Put a script of your own in a file in the `static` directory, and load it with `<script src="{{ asset "/static/your-file.js" }}" defer></script>`. Anything your templates load needs its own consent: see [Personal data](/deploy/personal-data/#whats-yours-to-decide).
+2. Edit the templates. They're Go [`html/template`](https://pkg.go.dev/html/template) files. Keep the element IDs and the scripts the pages use, or the forms stop working. In the layouts, keep the `data-theme` attribute, the brand's stylesheet link after `main.css`, its icon links and its logo, or the pages lose their brand's look. The servers' [`Content-Security-Policy`](/reference/security/#response-headers) makes the browser refuse an inline `<script>`, an `on…` attribute such as `onclick`, a `javascript:` URL and a `<base>` element. A `<script type="application/json">` data block is fine. Put a script of your own in a file in the `static` directory, and load it with `<script src="{{ asset "/static/your-file.js" }}" defer></script>`. Anything your templates load needs its own consent: see [Personal data](/deploy/personal-data/#whats-yours-to-decide).
 
 3. Make the files readable by the containers. Both images run as uid 10001 and gid 10001 (see [the user the images run as](/deploy/docker-compose/#the-user-the-images-run-as)), and a page whose template the server can't read fails with a 500:
 
@@ -142,7 +142,7 @@ The colors are tokens at the top of `tailwindcss/ui.css`: the light palette in i
 
 ## Brands and themes
 
-A brand is a look the pages are drawn in: a name, an appearance and a theme. A client's pages are drawn in the [brand chosen for it](/concepts/clients/#brand). The pages of a client with none, and the pages that belong to no client, are drawn in the default brand. A new install has one brand, **Default**, on **Automatic** and **Blueberry**.
+A brand is a look the pages are drawn in: a name, an appearance, a theme and [its kit](#the-brand-kit). A client's pages are drawn in the [brand chosen for it](/concepts/clients/#brand). The pages of a client with none, and the pages that belong to no client, are drawn in the default brand. A new install has one brand, **Default**, on **Automatic** and **Blueberry**.
 
 The appearance is **Automatic**, **Light** or **Dark**. Automatic draws the pages light or dark, as each visitor's device prefers.
 
@@ -153,6 +153,98 @@ The theme is one of eight built-in themes: **Blueberry**, **Blackberry**, **Avoc
 Deleting a brand moves the clients that use it to the default brand. The default brand can't be deleted, so make another one the default first.
 
 The Admin API manages the same brands, from [`GET /api/v1/admin/brands`](/reference/api/admin/operations/getbrands/), and [`GET /api/v1/admin/brand-themes`](/reference/api/admin/operations/getbrandthemes/) lists each theme's colors.
+
+## The brand kit
+
+A brand's kit puts your logo, favicon, background image, font and corners on its pages. Each is optional: a brand you haven't changed is drawn in Goiabada's own look.
+
+The auth server's pages and the admin console's **Account** pages, home and its other card pages are drawn with the whole kit. The admin console's admin pages take only its colors and logo, as [the admin console's client](/concepts/clients/#the-admin-consoles-client) explains.
+
+### Logo and app name
+
+**Logo** is drawn above the app name on the sign-in card, and before the app name in the admin console's header and sidebar. **Dark logo** takes its place in dark mode. Without one, the logo is drawn in both modes. A dark logo needs a logo.
+
+Turn on **Hide the app name** for a logo that already shows the name. The logo then stands for the name, and screen readers announce it as the app name. A brand without a logo always shows the name. Page titles keep the app name either way.
+
+A client's own [logo](/concepts/clients/#display-name-description-and-logo) still shows on its screens, below the brand's.
+
+### Favicon
+
+**Favicon** is the icon in the browser's tab. A page whose brand has one links it in place of Goiabada's icons and web manifest.
+
+### Background image
+
+**Background image** is drawn behind the sign-in card, over the theme's background color. It's drawn on card pages only: the auth server's pages and the admin console's home and card pages, not its **Account** pages. Choose how it fills the page:
+
+- **Cover** fills the page and may crop the image.
+- **Contain** shows the whole image, with the theme's background color around it.
+- **Tile** repeats the image at its own size.
+
+The card stays opaque over the image, so its text is as readable as on a page without one.
+
+### Font
+
+**Font** is one of six system families: **System UI**, **Humanist**, **Geometric**, **Serif**, **Neo-grotesque** and **Rounded**. Each is a list of fonts your visitors' devices already have, so nothing is downloaded and text looks a little different from one device to another. Apple devices draw **Rounded** rounded. Windows and Android have no rounded font installed and draw it as an ordinary sans.
+
+To use your own typeface, upload it under **Font file** and choose **Uploaded font**. One file is used for every weight, so a variable font works as it should, and a static one gets the browser's own bold. Add a **Bold font file** too, and the font file draws the weights up to 500 and the bold one the heavier ones. Text shows in System UI while the font loads, and for any character it lacks. Code and other monospace text keep their own font.
+
+Choosing another family keeps the files, so you can switch back without uploading them again.
+
+### Corners
+
+**Corners** are **Square**, **Rounded** or **Pill**. Rounded is Goiabada's own look. Pill rounds a button or a single-line field fully, and rounds the card and boxes of several lines only as far as their content stays clear of the curve.
+
+### What you can upload
+
+| Field | Type | Size | Largest file |
+|---|---|---|---|
+| **Logo**, **Dark logo** | PNG, JPEG or WebP | 10 to 512 pixels a side | 1 MiB |
+| **Favicon** | PNG, square | 48 to 512 pixels a side | 1 MiB |
+| **Background image** | PNG, JPEG or WebP | 10 to 3840 pixels a side | 2 MiB |
+| **Font file**, **Bold font file** | WOFF2 | | 2 MiB |
+
+Animated images are refused, since a looping animation on or behind the sign-in card has no way to pause it. GIF and SVG are refused too.
+
+**Upload** sends a file as soon as you pick it, and the preview draws it at once. Nothing reaches a real page until you click **Save**, and **Remove** empties the field. A file no brand uses is deleted once it's a day old, so save the brand the same day you upload it.
+
+A brand's files are public, as the pages that draw them are: anyone can download them from `/brand-assets/{id}` on the auth server.
+
+### The kit through the Admin API
+
+The Admin API sets the kit in two steps. Each upload leaves an `uploaded_brand_asset` entry in the [audit log](/concepts/audit-log/).
+
+<Steps>
+
+1. Upload each file as a brand asset of its kind, in the multipart field `file`, with [`POST /api/v1/admin/brand-assets/logo`](/reference/api/admin/operations/uploadbrandlogo/), [`/favicon`](/reference/api/admin/operations/uploadbrandfavicon/), [`/background`](/reference/api/admin/operations/uploadbrandbackground/) or [`/font`](/reference/api/admin/operations/uploadbrandfont/). A dark logo is uploaded as a logo, and both font files as a font. The answer holds the asset's `id`:
+
+   ```bash
+   curl -X POST https://auth.example.com/api/v1/admin/brand-assets/logo \
+     -H "Authorization: Bearer $TOKEN" \
+     -F "file=@logo.png"
+   ```
+
+2. Name the asset by its `id` in a slot of the brand, with [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/) or [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/). The slots are `logo`, `darkLogo`, `favicon`, `background`, `regularFont` and `boldFont`:
+
+   ```bash
+   curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Acme",
+       "appearance": "auto",
+       "theme": "blueberry",
+       "corners": "rounded",
+       "font": "uploaded",
+       "backgroundFit": "cover",
+       "hideAppName": true,
+       "logo": {"id": 42},
+       "regularFont": {"id": 43}
+     }'
+   ```
+
+</Steps>
+
+An update replaces the whole brand. `corners`, `font` and `backgroundFit` are required, `hideAppName` is false when you leave it out, and a slot you leave out or set to `null` is emptied. A `brand` you read with [`GET /api/v1/admin/brands/{id}`](/reference/api/admin/operations/getbrand/) and send back as it came is saved unchanged.
 
 ## How the language is chosen
 

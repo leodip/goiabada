@@ -50,6 +50,8 @@
   --color-note-ink: #1d4796;
   --color-focus: #2456c4;
 
+  /* The two radii a brand's corners set (#813): --radius-control rounds a control, and
+     --radius-panel a panel, the card among them. */
   --radius-control: 0.5rem;
   --radius-panel: 0.75rem;
 
@@ -61,10 +63,14 @@
   /* The root carries the page color too, so an overscroll shows the canvas rather than white. The
      console's header height is here, where both the header and the page's scroll offset below
      read it. */
+  /* --radius-box rounds a box that may hold more than one line, such as a notice, a text area or a
+     list, as a control is rounded, but never past 1rem: a brand with pill corners rounds a
+     single-line control fully, and such a box only as far as its content stays unclipped. */
   :root {
     color-scheme: light;
     background-color: var(--color-canvas);
     --app-header-height: 4rem;
+    --radius-box: min(var(--radius-control), 1rem);
 
     @variant dark {
       color-scheme: dark;
@@ -437,6 +443,7 @@
 
   textarea.control {
     min-height: 6rem;
+    border-radius: var(--radius-box);
     resize: vertical;
   }
 
@@ -548,7 +555,7 @@
     gap: 0.75rem;
     padding: 0.875rem 1rem;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     cursor: pointer;
   }
@@ -576,7 +583,7 @@
 
   .check-list {
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     overflow: hidden;
   }
@@ -625,7 +632,7 @@
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     color: var(--color-ink);
     font-size: 0.9375rem;
@@ -1106,6 +1113,27 @@
     text-align: center;
   }
 
+  /* A brand's logo, above the app name on a card or in its place: one image, scaled to fit and never
+     stretched or cropped (#813 decision 5). */
+  .auth-logo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+
+  /* The name beside it, where it is drawn: the editor's sample hides it rather than leaving it out. */
+  .auth-logo:has(+ .auth-brand:not([hidden])) {
+    margin-bottom: 0.75rem;
+  }
+
+  .auth-logo img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 4rem;
+    object-fit: contain;
+  }
+
   .auth-client {
     display: flex;
     flex-direction: column;
@@ -1120,7 +1148,7 @@
     width: 4.5rem;
     height: 4.5rem;
     margin-bottom: 0.5rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     object-fit: contain;
   }
 
@@ -1225,7 +1253,7 @@
     display: block;
     margin-top: 0.5rem;
     padding: 0.5rem 0.75rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
     font-size: 0.9375rem;
@@ -1310,7 +1338,7 @@
     height: 12rem;
     margin: 0.75rem auto 0;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
   }
 
   /* A secret a person copies by hand, such as an authenticator key, and the button that copies it
@@ -1333,7 +1361,7 @@
     display: block;
     margin-top: 0.5rem;
     padding: 0.5rem 0.625rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
     font-size: 0.8125rem;
@@ -1478,7 +1506,7 @@
 
   .legal-text pre {
     padding: 0.75rem 1rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     white-space: pre-wrap;
   }
@@ -1514,7 +1542,7 @@
 
   .legal-source {
     padding: 0.75rem 1rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
     font-size: 0.875rem;
@@ -1531,7 +1559,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-subtle);
   }
 
@@ -1562,7 +1590,7 @@
     gap: 0.75rem;
     padding: 0.75rem 0.875rem;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     color: var(--color-ink);
     text-decoration: none;
@@ -1631,7 +1659,7 @@
     max-height: 16rem;
     padding: 0.25rem;
     border: 1px solid var(--color-line);
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-box);
     background-color: var(--color-surface);
     box-shadow: var(--shadow-overlay);
   }
@@ -1820,13 +1848,39 @@
     background-color: var(--color-surface);
   }
 
+  /* A link to home keeps a 24px target while a logo short and wide stands in for the name. */
   .app-header-brand {
-    min-width: 0;
-    overflow: hidden;
+    display: flex;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    align-items: center;
+    gap: 0.5rem;
     font-weight: 650;
-    text-overflow: ellipsis;
     white-space: nowrap;
     text-decoration: none;
+  }
+
+  .app-header-brand .app-brand-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* A brand's logo before the app name in a link to home, or in its place: one image, scaled to fit
+     the header and never stretched or cropped (#813 decision 5). */
+  .app-brand-logo {
+    display: flex;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .app-brand-logo img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(10rem, 100%);
+    max-height: 2rem;
+    object-fit: contain;
   }
 
   .app-header-end {
@@ -1899,11 +1953,19 @@
   }
 
   .sidebar-brand {
-    min-width: 0;
+    display: flex;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    align-items: center;
+    gap: 0.5rem;
     overflow-wrap: anywhere;
     font-size: 1.0625rem;
     font-weight: 700;
     text-decoration: none;
+  }
+
+  .sidebar-brand .app-brand-name {
+    min-width: 0;
   }
 
   .sidebar-nav {
@@ -2187,16 +2249,88 @@
   }
 
   /* A sample of a sign-in page in the brand being edited: the auth server's card on its canvas.
-     brand-preview.js sets the theme's tokens on this element, which every color inside it reads. */
+     brand-preview.js sets the theme's tokens on this element, which every color inside it reads, and
+     the corners' and the family's (#813): the box radius and the text's font are read from them again
+     here, as :root reads them on a real page, since a custom property inherits the value :root
+     computed. */
 
   .brand-sample {
+    --radius-box: min(var(--radius-control), 1rem);
     display: flex;
     justify-content: center;
-    padding: 0.75rem;
+    padding: 0.5rem;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-panel);
     background-color: var(--color-canvas);
     color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  /* The sample's card is drawn closer than a sign-in card, and its logo at most 2rem tall, so the
+     whole preview, a logo, the app name and the longest languages' sentences with them, stays on a
+     1280x800 screen beside the form in every engine, down to the page's end (#813). */
+
+  .brand-sample .auth-card > .panel-body {
+    padding: 1.25rem;
+  }
+
+  .brand-sample .auth-logo img {
+    max-height: 2rem;
+  }
+
+  .brand-sample .auth-brand {
+    margin-bottom: 1rem;
+  }
+
+  /* An upload field of the brand editor (#813 decision 1): an image's thumbnail, the sentence saying
+     whether the slot holds a file, and Upload and Remove, wrapping where the form is narrow. The
+     thumbnail shows the whole image, never stretched or cropped; a dark logo's is drawn on a dark
+     ground, as a dark page draws it. */
+
+  .brand-asset {
+    min-width: 0;
+  }
+
+  .brand-asset-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .brand-asset-state {
+    flex: 1 1 8rem;
+    min-width: 0;
+  }
+
+  .brand-asset-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .brand-asset-thumb {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 4.5rem;
+    height: 3rem;
+    padding: 0.25rem;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: 0.375rem;
+    background-color: var(--color-subtle);
+  }
+
+  .brand-asset-thumb img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .brand-asset-thumb-dark {
+    background-color: rgb(15 18 23);
   }
 
   /* Windows high-contrast mode, and any other forced palette: draw with the system's colors where

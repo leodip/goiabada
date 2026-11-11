@@ -68,6 +68,12 @@ func TestBodyLimitPolicy_EachRowAtItsBoundary(t *testing.T) {
 		{"the account picture upload", "/account/picture", "/account/picture", upload},
 		{"the client logo upload", "/admin/clients/{clientId}/logo", "/admin/clients/1/logo", upload},
 		{"the admin user picture upload", "/admin/users/{userId}/picture", "/admin/users/1/picture", upload},
+		// A brand asset's upload, at its kind's byte limit and 64 KiB of multipart framing (#813
+		// decision 3): 1 MiB for a logo and a favicon, 2 MiB for a background and a font.
+		{"a brand's logo upload", "/admin/settings/branding/assets/logo", "/admin/settings/branding/assets/logo", 1114112},
+		{"a brand's favicon upload", "/admin/settings/branding/assets/favicon", "/admin/settings/branding/assets/favicon", 1114112},
+		{"a brand's background upload", "/admin/settings/branding/assets/background", "/admin/settings/branding/assets/background", 2162688},
+		{"a brand's font upload", "/admin/settings/branding/assets/font", "/admin/settings/branding/assets/font", 2162688},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

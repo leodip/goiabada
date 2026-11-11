@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+
+	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
 // absentIdBase is the first of a run of ids no row holds. Every table's ids are assigned by the
@@ -142,6 +144,21 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				found := make([]int64, 0, len(resources))
 				for _, resource := range resources {
 					found = append(found, resource.Id)
+				}
+				return found
+			},
+		},
+		{
+			name: "GetBrandAssetsByIds",
+			rows: func(t *testing.T) []int64 {
+				return idsOfThree(func() int64 { return createTestBrandAsset(t, database, record.BrandAssetKindLogo).Id })
+			},
+			answered: func(t *testing.T, ids []int64) []int64 {
+				assets, err := database.GetBrandAssetsByIds(context.Background(), nil, ids)
+				requireNoLookupError(t, err)
+				found := make([]int64, 0, len(assets))
+				for _, asset := range assets {
+					found = append(found, asset.Id)
 				}
 				return found
 			},

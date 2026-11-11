@@ -247,15 +247,21 @@ func newAPIRequest(ctx context.Context, accessToken string, r apiRequest) (*http
 // holding data under filename. It returns the body and the content type the boundary belongs to,
 // which is the one place a method supplies its own rather than taking the executor's default.
 func multipartPicture(filename string, data []byte) ([]byte, string, error) {
+	return multipartFile("picture", filename, data)
+}
+
+// multipartFile builds an upload body of one part, field, holding data under filename, and answers
+// it with the content type its boundary belongs to: the pictures' "picture", a brand asset's "file".
+func multipartFile(field, filename string, data []byte) ([]byte, string, error) {
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 
-	part, err := writer.CreateFormFile("picture", filename)
+	part, err := writer.CreateFormFile(field, filename)
 	if err != nil {
 		return nil, "", errs.Errorf("failed to create form file: %w", err)
 	}
 	if _, err := part.Write(data); err != nil {
-		return nil, "", errs.Errorf("failed to write picture data: %w", err)
+		return nil, "", errs.Errorf("failed to write %s data: %w", field, err)
 	}
 	if err := writer.Close(); err != nil {
 		return nil, "", errs.Errorf("failed to close multipart writer: %w", err)

@@ -226,10 +226,13 @@ const (
 	// the one it replaced as old_brand_id and old_brand_name; a make-default that changes nothing
 	// writes none. deleted_brand adds client_count, how many clients the deletion moved to the
 	// default brand (#812 decision 3); no event is written for each client it moved.
+	// uploaded_brand_asset is an asset stored by an upload (#813 decision 10), with brand_asset_id,
+	// kind and logged_in_user and no brand: the brand write that names the asset is its own event.
 	EventCreatedBrand                 = "created_brand"
 	EventUpdatedBrand                 = "updated_brand"
 	EventDeletedBrand                 = "deleted_brand"
 	EventUpdatedDefaultBrand          = "updated_default_brand"
+	EventUploadedBrandAsset           = "uploaded_brand_asset"
 	EventUpdatedAuditLogsSettings     = "updated_audit_logs_settings"
 	EventUpdatedWebOrigins            = "updated_web_origins"
 	EventUpdatedClientSettings        = "updated_client_settings"
@@ -854,6 +857,7 @@ var auditEventTypes = []string{
 	EventUpdatedUserProfile,
 	EventUpdatedUserProfilePicture,
 	EventUpdatedWebOrigins,
+	EventUploadedBrandAsset,
 	EventUserAddedToGroup,
 	EventUserDisabled,
 	EventUserRemovedFromGroup,

@@ -17,8 +17,10 @@ info:
     Authorization: DPoP <access_token>
     DPoP: <proof>
     ```
-    `getClientLogoImage`, at `/client/logo/{clientIdentifier}`, and `getPublicSettings`, at
-    `/api/public/settings`, are outside `/api/v1`: they are public and marked `security: []`.
+    `getClientLogoImage`, at `/client/logo/{clientIdentifier}`, `getPublicSettings`, at
+    `/api/public/settings`, and a brand's stylesheets and assets, `getBrandStylesheet`,
+    `getBrandColorsStylesheet` and `getBrandAsset`, are outside `/api/v1`: they are public and
+    marked `security: []`.
 
     ## API Groups
 
@@ -599,9 +601,9 @@ paths:
       description: |
         Upload or replace the user's profile picture.
 
-        Send it as `multipart/form-data` in the field `picture`: a JPEG, PNG, GIF or WebP image,
-        from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` bytes,
-        3 MiB by default.
+        Send it as `multipart/form-data` in the field `picture`: a still JPEG, PNG, GIF or WebP
+        image, from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`
+        bytes, 3 MiB by default. An animated image is refused.
       operationId: uploadUserProfilePicture
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -2346,7 +2348,10 @@ paths:
       tags: [Brands]
       summary: Create brand
       description: |
-        Create a brand. It is not the default until it is made the default.
+        Create a brand. It is not the default until it is made the default. Each asset slot
+        names a file uploaded first as a brand asset of the slot's kind: uploadBrandLogo for
+        `logo` and `darkLogo`, uploadBrandFavicon, uploadBrandBackground, and uploadBrandFont for
+        `regularFont` and `boldFont`. A slot left out or null is empty.
       operationId: createBrand
       requestBody:
         required: true
@@ -2366,7 +2371,14 @@ paths:
             error_code is INVALID_REQUEST_BODY for a body that is not JSON, or one of
             handler.brand.name_required, handler.brand.name_too_long,
             handler.brand.name_angle_brackets, handler.brand.name_in_use,
-            handler.brand.appearance_invalid and handler.brand.theme_invalid.
+            handler.brand.appearance_invalid, handler.brand.theme_invalid,
+            handler.brand.corners_invalid, handler.brand.font_invalid,
+            handler.brand.background_fit_invalid,
+            handler.brand.uploaded_font_regular_required, handler.brand.dark_logo_logo_required,
+            handler.brand.bold_font_regular_required, and, for a slot naming no stored asset of
+            its kind, handler.brand.logo_asset_invalid, handler.brand.dark_logo_asset_invalid,
+            handler.brand.favicon_asset_invalid, handler.brand.background_asset_invalid,
+            handler.brand.regular_font_asset_invalid and handler.brand.bold_font_asset_invalid.
           content:
             application/json:
               schema:
@@ -2407,8 +2419,10 @@ paths:
       tags: [Brands]
       summary: Update brand
       description: |
-        Replace a brand's name, appearance and theme. A change to the default brand restyles
-        every page at once.
+        Replace a brand's name, appearance, theme, kit choices and asset slots. Every field is
+        written: a choice left out is refused, hideAppName left out is false, and a slot left out
+        or null is emptied. A brand read and sent back is unchanged. A change to the default brand
+        restyles every page at once.
       operationId: updateBrand
       parameters:
         - $ref: '#/components/parameters/BrandIdParam'
@@ -2522,6 +2536,229 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-assets/logo:
+    post:
+      tags: [Brands]
+      summary: Upload brand logo
+      description: |
+        Store a file as a brand asset of this kind, attached to no brand, and answer its id and
+        URL. A brand's create or update then names the asset by its id. An asset no brand names is
+        deleted once it is a day old.
+
+        Send it as `multipart/form-data` in the field `file`. A logo or a dark logo: a still
+        PNG, JPEG or WebP image, each side from 10 to 512 pixels, of at most 1 MiB (1048576
+        bytes). An animated image, a GIF and an SVG are refused.
+      operationId: uploadBrandLogo
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Asset stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBrandAssetResponse'
+        '400':
+          description: |
+            The file is missing (NO_FILE), the body is not a multipart form (FILE_TOO_LARGE), or
+            the file breaks a rule of its kind, its byte limit included, named by its error_code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-assets/favicon:
+    post:
+      tags: [Brands]
+      summary: Upload brand favicon
+      description: |
+        Store a file as a brand asset of this kind, attached to no brand, and answer its id and
+        URL. A brand's create or update then names the asset by its id. An asset no brand names is
+        deleted once it is a day old.
+
+        Send it as `multipart/form-data` in the field `file`. A favicon: a still, square PNG
+        image from 48x48 to 512x512 pixels, of at most 1 MiB (1048576 bytes). An animated image
+        is refused. A page whose brand has a favicon links it as its icon and its Apple touch
+        icon, in place of the built-in icons and web manifest.
+      operationId: uploadBrandFavicon
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Asset stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBrandAssetResponse'
+        '400':
+          description: |
+            The file is missing (NO_FILE), the body is not a multipart form (FILE_TOO_LARGE), or
+            the file breaks a rule of its kind, its byte limit included, named by its error_code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-assets/background:
+    post:
+      tags: [Brands]
+      summary: Upload brand background
+      description: |
+        Store a file as a brand asset of this kind, attached to no brand, and answer its id and
+        URL. A brand's create or update then names the asset by its id. An asset no brand names is
+        deleted once it is a day old.
+
+        Send it as `multipart/form-data` in the field `file`. A background image: a still PNG,
+        JPEG or WebP image, each side from 10 to 3840 pixels, of at most 2 MiB (2097152 bytes).
+        An animated image, a GIF and an SVG are refused.
+      operationId: uploadBrandBackground
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Asset stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBrandAssetResponse'
+        '400':
+          description: |
+            The file is missing (NO_FILE), the body is not a multipart form (FILE_TOO_LARGE), or
+            the file breaks a rule of its kind, its byte limit included, named by its error_code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-assets/font:
+    post:
+      tags: [Brands]
+      summary: Upload brand font
+      description: |
+        Store a file as a brand asset of this kind, attached to no brand, and answer its id and
+        URL. A brand's create or update then names the asset by its id. An asset no brand names is
+        deleted once it is a day old.
+
+        Send it as `multipart/form-data` in the field `file`. A regular or bold font: a WOFF2
+        file, told by its signature, of at most 2 MiB (2097152 bytes). Its answer at the asset's
+        URL grants the admin console's origin, so the console's pages can draw it.
+      operationId: uploadBrandFont
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Asset stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBrandAssetResponse'
+        '400':
+          description: |
+            The file is missing (NO_FILE), the body is not a multipart form (FILE_TOO_LARGE), or
+            the file breaks a rule of its kind, its byte limit included, named by its error_code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-assets/{id}:
+    get:
+      tags: [Brands]
+      summary: Get brand asset
+      description: |
+        A stored brand asset by its id, attached to a brand or not, without its bytes: its kind,
+        the URL it is served at, its type and its pixel size, zero for a font.
+      operationId: getBrandAsset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Brand asset ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Brand asset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetBrandAssetResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -3402,9 +3639,9 @@ paths:
       description: |
         Upload or replace the client logo image.
 
-        Send it as `multipart/form-data` in the field `picture`: a JPEG, PNG, GIF or WebP image,
-        from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` bytes,
-        3 MiB by default.
+        Send it as `multipart/form-data` in the field `picture`: a still JPEG, PNG, GIF or WebP
+        image, from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`
+        bytes, 3 MiB by default. An animated image is refused.
         The limit is the one profile pictures have.
       operationId: uploadClientLogo
       parameters:
@@ -3519,6 +3756,182 @@ paths:
             this endpoint, the body is the server's HTML error page rather than
             the JSON error envelope, because this handler renders the shared
             error template.
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /brand/{id}/stylesheet.css:
+    get:
+      tags: [Brands]
+      summary: Get a brand's full stylesheet
+      description: |
+        Serve a brand's full stylesheet: its theme's colors, corners, font and background, which
+        the auth server's pages and the admin console's end-user pages link after main.css. This
+        is a public endpoint that does not require authentication.
+
+        Linked by the URL a brand's answer carries, with the stylesheet's fingerprint in `v`.
+        Asked for by that fingerprint, the answer may be kept a year; asked for by any other
+        fingerprint, or none, it is the current stylesheet, kept five minutes.
+      operationId: getBrandStylesheet
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The brand's ID
+          schema:
+            type: integer
+            format: int64
+        - name: v
+          in: query
+          description: The stylesheet's fingerprint, as the URL a brand's answer carries names it.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The stylesheet
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: >-
+                "public, max-age=31536000, immutable" when `v` names the current stylesheet,
+                "public, max-age=300" otherwise
+          content:
+            text/css:
+              schema:
+                type: string
+        '404':
+          description: No brand has this ID, or the ID is not a positive integer
+        '500':
+          description: |
+            The request failed inside the server. The body is the server's HTML error page,
+            because this handler renders the shared error template.
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /brand/{id}/colors.css:
+    get:
+      tags: [Brands]
+      summary: Get a brand's colors stylesheet
+      description: |
+        Serve the stylesheet that sets a brand's colors alone, which the admin console's admin
+        pages link after main.css. This is a public endpoint that does not require authentication.
+
+        Linked by the URL a brand's answer carries, with the stylesheet's fingerprint in `v`.
+        Asked for by that fingerprint, the answer may be kept a year; asked for by any other
+        fingerprint, or none, it is the current stylesheet, kept five minutes.
+      operationId: getBrandColorsStylesheet
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The brand's ID
+          schema:
+            type: integer
+            format: int64
+        - name: v
+          in: query
+          description: The stylesheet's fingerprint, as the URL a brand's answer carries names it.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The stylesheet
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: >-
+                "public, max-age=31536000, immutable" when `v` names the current stylesheet,
+                "public, max-age=300" otherwise
+          content:
+            text/css:
+              schema:
+                type: string
+        '404':
+          description: No brand has this ID, or the ID is not a positive integer
+        '500':
+          description: |
+            The request failed inside the server. The body is the server's HTML error page,
+            because this handler renders the shared error template.
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /brand-assets/{id}:
+    get:
+      tags: [Brands]
+      summary: Get a brand asset
+      description: |
+        Serve an uploaded brand asset: a logo, a favicon, a background image or a font. This is
+        a public endpoint that does not require authentication.
+
+        Linked by an asset's `url`, with its content fingerprint in `v`. Asked for by that
+        fingerprint, the answer may be kept a year; asked for by any other fingerprint, or none,
+        it is kept five minutes. A font is answered with `Access-Control-Allow-Origin` naming
+        the admin console's origin, so the console's pages may draw it, and no other site's.
+      operationId: getBrandAsset
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The asset's ID
+          schema:
+            type: integer
+            format: int64
+        - name: v
+          in: query
+          description: The asset's content fingerprint, as its `url` names it.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The asset, under the type its upload was validated as
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: >-
+                "public, max-age=31536000, immutable" when `v` names the asset's fingerprint,
+                "public, max-age=300" otherwise
+            X-Content-Type-Options:
+              schema:
+                type: string
+              description: nosniff
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+              description: The admin console's origin, on a font alone
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            font/woff2:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: No asset has this ID, or the ID is not a positive integer
+        '500':
+          description: |
+            The request failed inside the server. The body is the server's HTML error page,
+            because this handler renders the shared error template.
           content:
             text/html:
               schema:
@@ -5052,9 +5465,9 @@ paths:
       description: |
         Upload or replace the authenticated user's profile picture.
 
-        Send it as `multipart/form-data` in the field `picture`: a JPEG, PNG, GIF or WebP image,
-        from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` bytes,
-        3 MiB by default.
+        Send it as `multipart/form-data` in the field `picture`: a still JPEG, PNG, GIF or WebP
+        image, from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`
+        bytes, 3 MiB by default. An animated image is refused.
       operationId: uploadAccountProfilePicture
       requestBody:
         required: true
@@ -8209,11 +8622,42 @@ components:
           type: string
           format: uri
           description: >-
-            The absolute URL of the brand's stylesheet, which a page links after main.css. The URL
-            changes whenever the stylesheet does.
+            The absolute URL of the brand's full stylesheet, its colors, corners and font, which an
+            end-user page links after main.css. The URL changes whenever the stylesheet does.
+        colorsStylesheetUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's stylesheet that sets its colors alone, which an admin
+            page links after main.css. The URL changes whenever the stylesheet does.
+        logoUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's logo, absent when it has none. The URL changes whenever
+            the image does.
+        darkLogoUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the logo drawn in dark mode in place of logoUrl, absent when the
+            brand has no dark logo or no logo.
+        faviconUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's favicon, a square PNG, absent when it has none. A page
+            links it as its icon and its Apple touch icon, in place of the built-in icons.
+        hideAppName:
+          type: boolean
+          description: >-
+            Whether the app name's text gives way to the logo, which then carries the name as its
+            alternative text. Always false while the brand has no logo.
       required:
         - appearance
         - stylesheetUrl
+        - colorsStylesheetUrl
+        - hideAppName
 
     PasswordRulesResponse:
       type: object
@@ -8577,6 +9021,51 @@ components:
         theme:
           type: string
           description: The key of one of the built-in themes getBrandThemes lists.
+        corners:
+          type: string
+          enum: [square, rounded, pill]
+          description: How round the brand's controls and panels are drawn.
+        font:
+          type: string
+          enum: [system-ui, humanist, geometric, serif, neo-grotesque, rounded, uploaded]
+          description: The font family the brand's text is drawn in, one of the six system families or the uploaded font.
+        backgroundFit:
+          type: string
+          enum: [cover, contain, tile]
+          description: How the brand's background image fills the page behind the card.
+        hideAppName:
+          type: boolean
+          description: Whether the app name's text is hidden beside the brand's logo.
+        logo:
+          description: The logo drawn above the app name on a card, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        darkLogo:
+          description: The logo drawn in dark mode in place of logo, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        favicon:
+          description: The favicon, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        background:
+          description: The image behind the card, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        regularFont:
+          description: The uploaded font's regular file, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
+        boldFont:
+          description: The uploaded font's bold file, or null.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetResponse'
+          nullable: true
         isDefault:
           type: boolean
           description: True for the default brand, the one a client with no brand of its own is drawn in.
@@ -8596,6 +9085,16 @@ components:
         - name
         - appearance
         - theme
+        - corners
+        - font
+        - backgroundFit
+        - hideAppName
+        - logo
+        - darkLogo
+        - favicon
+        - background
+        - regularFont
+        - boldFont
         - isDefault
         - clientCount
         - createdAt
@@ -8626,10 +9125,56 @@ components:
         theme:
           type: string
           description: The key of one of the built-in themes getBrandThemes lists.
+        corners:
+          type: string
+          enum: [square, rounded, pill]
+        font:
+          type: string
+          enum: [system-ui, humanist, geometric, serif, neo-grotesque, rounded, uploaded]
+          description: The uploaded font is refused while the brand has no regular font file.
+        backgroundFit:
+          type: string
+          enum: [cover, contain, tile]
+        hideAppName:
+          type: boolean
+          default: false
+        logo:
+          description: A stored asset of kind logo. Left out or null for none.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        darkLogo:
+          description: A stored asset of kind logo, drawn in dark mode. Refused without a logo.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        favicon:
+          description: A stored asset of kind favicon.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        background:
+          description: A stored asset of kind background.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        regularFont:
+          description: A stored asset of kind font. The uploaded font is drawn from it.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        boldFont:
+          description: A stored asset of kind font, for the heavier weights. Refused without a regular font file.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
       required:
         - name
         - appearance
         - theme
+        - corners
+        - font
+        - backgroundFit
 
     CreateBrandResponse:
       type: object
@@ -8662,10 +9207,56 @@ components:
         theme:
           type: string
           description: The key of one of the built-in themes getBrandThemes lists.
+        corners:
+          type: string
+          enum: [square, rounded, pill]
+        font:
+          type: string
+          enum: [system-ui, humanist, geometric, serif, neo-grotesque, rounded, uploaded]
+          description: The uploaded font is refused while the brand has no regular font file.
+        backgroundFit:
+          type: string
+          enum: [cover, contain, tile]
+        hideAppName:
+          type: boolean
+          default: false
+        logo:
+          description: A stored asset of kind logo. Left out or null for none.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        darkLogo:
+          description: A stored asset of kind logo, drawn in dark mode. Refused without a logo.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        favicon:
+          description: A stored asset of kind favicon.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        background:
+          description: A stored asset of kind background.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        regularFont:
+          description: A stored asset of kind font. The uploaded font is drawn from it.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
+        boldFont:
+          description: A stored asset of kind font, for the heavier weights. Refused without a regular font file.
+          allOf:
+            - $ref: '#/components/schemas/BrandAssetRef'
+          nullable: true
       required:
         - name
         - appearance
         - theme
+        - corners
+        - font
+        - backgroundFit
 
     UpdateBrandResponse:
       type: object
@@ -8715,6 +9306,66 @@ components:
             $ref: '#/components/schemas/BrandThemeResponse'
       required:
         - brandThemes
+
+    BrandAssetRef:
+      type: object
+      description: |
+        A stored brand asset named by its id, as uploaded with a brand asset upload. A slot must
+        name an asset of its own kind. An asset no brand names is swept once it is a day old,
+        counted from its upload, and an id naming none is refused.
+      properties:
+        id:
+          type: integer
+          format: int64
+      required:
+        - id
+
+    BrandAssetResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        kind:
+          type: string
+          enum: [logo, favicon, background, font]
+        url:
+          type: string
+          description: |
+            Where the asset is served, to anyone, its content fingerprint in `v`. Served by that
+            fingerprint, it may be cached for a year.
+        contentType:
+          type: string
+          enum: [image/png, image/jpeg, image/webp, font/woff2]
+        width:
+          type: integer
+          description: Width in pixels, 0 for a font.
+        height:
+          type: integer
+          description: Height in pixels, 0 for a font.
+      required:
+        - id
+        - kind
+        - url
+        - contentType
+        - width
+        - height
+
+    CreateBrandAssetResponse:
+      type: object
+      properties:
+        brandAsset:
+          $ref: '#/components/schemas/BrandAssetResponse'
+      required:
+        - brandAsset
+
+    GetBrandAssetResponse:
+      type: object
+      properties:
+        brandAsset:
+          $ref: '#/components/schemas/BrandAssetResponse'
+      required:
+        - brandAsset
 
     SettingsTokensResponse:
       type: object

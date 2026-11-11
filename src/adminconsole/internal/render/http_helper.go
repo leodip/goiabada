@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"text/template/parse"
 
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -171,13 +172,6 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 		data = map[string]interface{}{}
 	}
 	data["appName"] = settings.AppName
-	// A page is drawn in the brand the auth server publishes, the console's own client's or the
-	// default (#812 decision 7): the layouts write brandDataTheme on the html element and link
-	// brandStylesheet after main.css, as the auth server's own layouts do (#810 decision 3). The
-	// stylesheet URL is the auth server's, linked as given. Given no brand, as by an auth server
-	// older than brands, a page is drawn automatic in main.css's colors. uiTheme is no longer bound,
-	// so a layout copied from an older release draws every page automatic.
-	data["brandDataTheme"], data["brandStylesheet"] = pageBrand(settings.Brand)
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled
 	// The account menu lists Delete account only while users may delete their own account (#783
@@ -259,6 +253,24 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to render template")
 	}
+
+	// A page is drawn in the brand the auth server publishes, the console's own client's or the
+	// default (#812 decision 7): the layouts write brandDataTheme on the html element and link
+	// brandStylesheet after main.css, as the auth server's own layouts do (#810 decision 3). An admin
+	// page, one drawn with the admin menu, links the brand's colors-only stylesheet and keeps
+	// Goiabada's icons; every other page links the full one and brandFavicon in their place (#813
+	// decisions 4 and 9). Both draw brandLogo and brandDarkLogo beside the app name, or in its place
+	// while brandHideAppName (#813 decision 5). The URLs are the auth server's, linked as given. Given
+	// no brand, as by an auth server older than brands, a page is drawn automatic in main.css's colors.
+	// uiTheme is no longer bound, so a layout copied from an older release draws every page automatic.
+	brand := pageBrand(settings.Brand, drawsAdminMenu(templ))
+	data["brandDataTheme"] = brand.DataTheme
+	data["brandStylesheet"] = brand.Stylesheet
+	data["brandLogo"] = brand.Logo
+	data["brandDarkLogo"] = brand.DarkLogo
+	data["brandHideAppName"] = brand.HideAppName
+	data["brandFavicon"] = brand.Favicon
+
 	var buf bytes.Buffer
 	err = templ.Execute(&buf, data)
 	if err != nil {
@@ -334,15 +346,77 @@ func (h *Renderer) EncodeJSON(w http.ResponseWriter, r *http.Request, data inter
 	}
 }
 
-// pageBrand is what a page takes from the published brand: the data-theme its html element carries,
-// light or dark, or empty for automatic and for an appearance the console does not know, and the
-// URL it links the brand's stylesheet by, or empty for none.
-func pageBrand(brand *api.PublicBrandResponse) (dataTheme string, stylesheet string) {
+// PageBrand is what a console page takes from the published brand. DataTheme is the data-theme its
+// html element carries, light or dark, or empty for automatic and for an appearance the console does
+// not know. Stylesheet is the URL it links the brand's stylesheet by, or empty for none. Logo and
+// DarkLogo are the URLs of the logo it draws beside the app name, empty for none; DarkLogo is empty
+// too while there is no Logo. HideAppName is whether the logo stands in for the name's text, which it
+// does only beside a logo, so the name never disappears with nothing in its place. Favicon is the URL
+// of the icon it links in place of Goiabada's, empty for Goiabada's own.
+type PageBrand struct {
+	DataTheme   string
+	Stylesheet  string
+	Logo        string
+	DarkLogo    string
+	HideAppName bool
+	Favicon     string
+}
+
+// pageBrand is what a page takes from brand. An admin page takes the brand's colors and logo and
+// nothing else: the colors-only stylesheet, and Goiabada's icons (#813 decision 9).
+func pageBrand(brand *api.PublicBrandResponse, adminPage bool) PageBrand {
 	if brand == nil {
-		return "", ""
+		return PageBrand{}
 	}
+	var page PageBrand
 	if brand.Appearance == "light" || brand.Appearance == "dark" {
-		dataTheme = brand.Appearance
+		page.DataTheme = brand.Appearance
 	}
-	return dataTheme, brand.StylesheetURL
+	if adminPage {
+		page.Stylesheet = brand.ColorsStylesheetURL
+	} else {
+		page.Stylesheet = brand.StylesheetURL
+		page.Favicon = brand.FaviconURL
+	}
+	if brand.LogoURL != "" {
+		page.Logo = brand.LogoURL
+		page.DarkLogo = brand.DarkLogoURL
+		page.HideAppName = brand.HideAppName
+	}
+	return page
+}
+
+// drawsAdminMenu is whether a page is an admin page: one whose menu is the admin menu. The menu
+// layout draws whichever menu the page's "menu" template calls, and a page with no menu is drawn on
+// a card, which is never an admin page (#813 decision 9).
+func drawsAdminMenu(templ *template.Template) bool {
+	menu := templ.Lookup("menu")
+	if menu == nil || menu.Tree == nil {
+		return false
+	}
+	return callsTemplate(menu.Tree.Root, "admin_menu")
+}
+
+// callsTemplate is whether node, or anything under it, calls the template named.
+func callsTemplate(node parse.Node, name string) bool {
+	switch n := node.(type) {
+	case *parse.TemplateNode:
+		return n.Name == name
+	case *parse.ListNode:
+		if n == nil {
+			return false
+		}
+		for _, child := range n.Nodes {
+			if callsTemplate(child, name) {
+				return true
+			}
+		}
+	case *parse.IfNode:
+		return callsTemplate(n.List, name) || callsTemplate(n.ElseList, name)
+	case *parse.WithNode:
+		return callsTemplate(n.List, name) || callsTemplate(n.ElseList, name)
+	case *parse.RangeNode:
+		return callsTemplate(n.List, name) || callsTemplate(n.ElseList, name)
+	}
+	return false
 }

@@ -28,7 +28,19 @@ import {
   type ResourceTab,
   type UserTab,
 } from "../../lib/admin-console";
-import { brandUrl, defaultBrand, newBrandUrl, previewSample, switchPreviewTo, withBrand } from "../../lib/brands";
+import {
+  brandUrl,
+  defaultBrand,
+  expectPreviewDrawn,
+  fillBrandForm,
+  newBrandUrl,
+  pickInEditor,
+  pngFile,
+  previewSample,
+  switchPreviewTo,
+  uploadKit,
+  withBrand,
+} from "../../lib/brands";
 import { openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { signInToConsole } from "../../lib/console-user";
 import { env } from "../../lib/environment";
@@ -209,6 +221,42 @@ test("the auth server's sign-in, two-factor, consent and sign-out pages", async 
     titled(own, "still signed in, having declined to sign out", "Still signed in", () => own.goto(`${env.authUrl}/auth/logout/declined`)),
   ]);
   await context.close();
+});
+
+// A sign-in page drawn in a brand with the kit (#813), a brand of the test's own given to a client of
+// its own, so no other page changes: its logo, a dark logo for a dark device, a background, the
+// uploaded font and pill corners, the app name drawn beside the logo, then hidden, when the logo
+// stands in for it and its alt is the name. The brand is automatic, so each scheme draws its logo.
+test("the auth server's sign-in in a brand with the kit", async ({ page, browser, clients }) => {
+  const { client } = await browserSignInClient(page, clients);
+  await withBrand(page, { appearance: "auto", theme: "plum" }, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await fillBrandForm(page, { corners: "pill", font: "uploaded", backgroundFit: "contain" });
+    await uploadKit(page);
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
+    await setClientBrand(page, client.id, brand);
+
+    const context = await browser.newContext(signedOut);
+    const own = await context.newPage();
+    await checkStates(own, [
+      titled(own, "sign-in in a brand with the kit, the app name beside the logo", "Sign in", async () => {
+        await own.goto(authorizeUrl(client.identifier));
+        await expect(own.locator(".auth-logo img")).toHaveAttribute("alt", "");
+        await expect(own.locator(".auth-card .auth-brand")).toBeVisible();
+      }),
+      titled(own, "sign-in in a brand with the kit, the app name hidden beside the logo", "Sign in", async () => {
+        await page.goto(brandUrl(brand.id, "edit"));
+        await fillBrandForm(page, { hideAppName: true });
+        await page.locator("#btnSave").click();
+        await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
+        await own.goto(authorizeUrl(client.identifier));
+        await expect(own.locator(".auth-logo img")).not.toHaveAttribute("alt", "");
+        await expect(own.locator(".auth-card .auth-brand")).toHaveCount(0);
+      }),
+    ]);
+    await context.close();
+  });
 });
 
 test("the auth server's forgot password and reset pages", async ({ browser, request, users }) => {
@@ -1134,6 +1182,28 @@ test("the settings pages and the audit log", async ({ page }) => {
         await switchPreviewTo(page, "dark");
         await expect(previewSample(page, "dark")).toBeVisible();
         await expect(previewSample(page, "light")).toBeHidden();
+      },
+    },
+    // The kit's fields (#813): each file uploaded and drawn in the sample, a file refused at its field,
+    // and a dark logo without a logo refused at the logo's field. Nothing is saved.
+    says(page, "branding, a new brand, its files uploaded", "boldFontStatus", async () => {
+      await page.goto(newBrandUrl);
+      await fillBrandForm(page, { font: "uploaded" });
+      await uploadKit(page);
+      await expectPreviewDrawn(page);
+    }),
+    says(page, "branding, a new brand, a file refused at its field", "faviconStatus", async () => {
+      expect(await pickInEditor(page, "favicon", pngFile("wide.png", 96, 64, [10, 20, 30]))).toContain("must be square");
+    }),
+    {
+      name: "branding, a new brand, a dark logo without a logo refused at the logo's field",
+      reach: async () => {
+        await page.locator("#logoRemove").click();
+        await page.locator("#name").fill(uniqueIdentifier("brand"));
+        await page.locator("#btnCreate").click();
+        await expect(page.locator("#brand-error")).toHaveText("Upload a logo to use a dark logo.");
+        await expect(page.locator("#logoUpload")).toBeFocused();
+        await expectPreviewDrawn(page);
       },
     },
     withBrandPreview(page, at(page, "branding, the default brand", brandUrl(seededBrand.id, "edit"))),

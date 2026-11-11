@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/leodip/goiabada/core/brandkit"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -722,6 +723,10 @@ const (
 	// GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES, which this binary does not read: a deployment that
 	// raises that setting still uploads through this page, which stops at 3 MB (#426).
 	uploadBodyLimit = 3<<20 + 64<<10
+
+	// brandAssetMultipartAllowance is what a brand asset's upload may carry beyond its kind's byte
+	// limit: the multipart framing around the file, as uploadBodyLimit allows the three image uploads.
+	brandAssetMultipartAllowance = 64 << 10
 )
 
 // bodyLimitPolicy is the admin console's request-body table (#426): how many bytes each route may
@@ -741,6 +746,13 @@ func bodyLimitPolicy() httpmw.BodyLimitPolicy {
 			"POST /account/picture":               uploadBodyLimit,
 			"POST /admin/clients/{clientId}/logo": uploadBodyLimit,
 			"POST /admin/users/{userId}/picture":  uploadBodyLimit,
+
+			// A brand asset's upload, at its kind's byte limit, which the admin API holds the file to
+			// (#813 decision 3). A file over it is refused here or there with the same sentence.
+			"POST /admin/settings/branding/assets/logo":       brandkit.LogoMaxBytes + brandAssetMultipartAllowance,
+			"POST /admin/settings/branding/assets/favicon":    brandkit.FaviconMaxBytes + brandAssetMultipartAllowance,
+			"POST /admin/settings/branding/assets/background": brandkit.BackgroundMaxBytes + brandAssetMultipartAllowance,
+			"POST /admin/settings/branding/assets/font":       brandkit.FontMaxBytes + brandAssetMultipartAllowance,
 		},
 	}
 }

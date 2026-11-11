@@ -19,6 +19,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/cleanup"
 	"github.com/leodip/goiabada/authserver/internal/config"
@@ -28,6 +29,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/introspectionmetrics"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/poolmetrics"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -948,6 +950,13 @@ func bodyLimitPolicy(profilePictureMaxSizeBytes int64) httpmw.BodyLimitPolicy {
 			"POST /api/v1/admin/users/{id}/profile-picture": uploadLimit,
 			"POST /api/v1/admin/clients/{id}/logo":          uploadLimit,
 			"POST /api/v1/account/profile-picture":          uploadLimit,
+
+			// A brand asset's upload, one row per kind at the kind's fixed byte limit, which
+			// GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES does not move (#813 decision 3).
+			"POST /api/v1/admin/brand-assets/logo":       brandasset.MaxBytes(record.BrandAssetKindLogo) + uploadMultipartAllowance,
+			"POST /api/v1/admin/brand-assets/favicon":    brandasset.MaxBytes(record.BrandAssetKindFavicon) + uploadMultipartAllowance,
+			"POST /api/v1/admin/brand-assets/background": brandasset.MaxBytes(record.BrandAssetKindBackground) + uploadMultipartAllowance,
+			"POST /api/v1/admin/brand-assets/font":       brandasset.MaxBytes(record.BrandAssetKindFont) + uploadMultipartAllowance,
 		},
 	}
 }

@@ -36,6 +36,7 @@ func TestWorker_AuditLogRetention_Enabled(t *testing.T) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -74,6 +75,7 @@ func TestWorker_AuditLogRetention_Disabled(t *testing.T) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -107,6 +109,7 @@ func TestWorker_AuditLogRetention_BatchDeletion(t *testing.T) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -142,6 +145,7 @@ func TestWorker_AuditLogRetention_MaxBatches(t *testing.T) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -177,6 +181,7 @@ func TestWorker_AuditLogRetention_Error(t *testing.T) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -213,6 +218,7 @@ func TestWorker_AuditLogRetention_NoDeletion(t *testing.T) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteExpiredSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -377,6 +383,7 @@ func expectFullCleanup(mockDB *datamocks.Database) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
@@ -474,6 +481,7 @@ func TestWorker_PerformTask_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	assert.NotPanics(t, func() {
@@ -500,6 +508,7 @@ func TestWorker_PerformTask_SweepsCodesPastTheGrace(t *testing.T) {
 		Run(func(args mock.Arguments) { createdBefore = args.Get(2).(time.Time) }).
 		Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	before := time.Now().UTC()
@@ -526,6 +535,7 @@ func TestWorker_PerformTask_ContinuesAfterAStepFails(t *testing.T) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,

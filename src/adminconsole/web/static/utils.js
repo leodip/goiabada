@@ -50,11 +50,12 @@ function escapeHtml(str) {
     .split("'").join("&#39;");
 }
 
-// The error code the console answers an AJAX request with when the admin API refused its access
-// token, and the route that then signs the administrator out and says why on the home page. The
-// code is HandleAPIErrorJSON's sessionEndedCode and the path its sessionEndedPath; a drift test in
-// internal/handlers holds the three to each other. Every fetch site here and in image-upload.js
-// keys on the code rather than on the 403 it arrives with, so no other 403 signs anybody out (#427).
+// The error code the console answers a script's request with once its sign-in has ended, the admin
+// API having refused its access token or the session holding none any more, and the route that then
+// signs the administrator out and says why on the home page. The code is render's sessionEndedCode
+// and the path its sessionEndedPath; a drift test in internal/render holds them to each other. Every
+// fetch site keys on the code rather than on the 403 it arrives with, so no other 403 signs anybody
+// out (#427).
 const SESSION_ENDED_CODE = "session_ended";
 const SESSION_ENDED_PATH = "/auth/session-ended";
 
@@ -64,6 +65,19 @@ function isSessionEnded(err) {
 
 function goToSessionEnded() {
   window.location.assign(SESSION_ENDED_PATH);
+}
+
+// scriptRequestHeaders is the headers of every request a page's script sends, with the request's
+// own in extra: X-Requested-With, by which the console tells the request from a navigation and
+// answers one whose sign-in has ended with SESSION_ENDED_CODE rather than a redirect to sign in that
+// fetch cannot follow (render.IsScriptRequest), and the CSRF token, when the page carries it.
+function scriptRequestHeaders(extra) {
+  const headers = Object.assign({ "X-Requested-With": "XMLHttpRequest" }, extra);
+  const token = document.querySelector('input[name="gorilla.csrf.Token"]');
+  if (token) {
+    headers["X-CSRF-Token"] = token.value;
+  }
+  return headers;
 }
 
 // submitSignOut ends the administrator's session as the sign-out confirmation's own button does:
@@ -1012,19 +1026,12 @@ function sendAjaxRequest(props) {
 
     setLoading(true);
 
-    let headers = {
-      "Content-Type": "application/json; charset=UTF-8",
-      "Accept": "application/json",
-      "X-Requested-With": "XMLHttpRequest"
-    };
-
-    if (document.getElementsByName("gorilla.csrf.Token").length > 0) {
-      headers["X-CSRF-Token"] = document.getElementsByName("gorilla.csrf.Token")[0].value;
-    }
-
     fetch(withPageLanguage(props.url), {
       method: props.method,
-      headers: headers,
+      headers: scriptRequestHeaders({
+        "Content-Type": "application/json; charset=UTF-8",
+        "Accept": "application/json",
+      }),
       body: props.bodyData,
     })
       .then((response) => {
@@ -1041,7 +1048,7 @@ function sendAjaxRequest(props) {
           return response.text().then((text) => {
             try {
               const err = JSON.parse(text);
-              // The admin API refused the access token: say so, and sign out once the dialog
+              // The sign-in has ended: say so, and sign out once the dialog
               // closes, by its button or by Escape alike.
               if (isSessionEnded(err)) {
                 setLoading(false);

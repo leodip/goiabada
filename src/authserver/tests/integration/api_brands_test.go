@@ -18,8 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The admin API's brands end to end (#810 decision 5): the seven operations, their refusals, what
-// they store, read back through the data layer, and the audit events they record.
+// The admin API's brands end to end (#810 decision 5) with their kit's choices (#813 decision 10):
+// the seven operations, their refusals, what they store, read back through the data layer, and the
+// audit events they record.
 
 const (
 	brandsPath      = "/api/v1/admin/brands"
@@ -42,6 +43,16 @@ func brandCall(t *testing.T, accessToken, method, path string, body any) (int, m
 
 func brandName(prefix string) string {
 	return prefix + " " + fake.LetterN(10)
+}
+
+// brandBody is a brand write's body: fields, with the kit's three required choices a brand nobody
+// has changed holds for each fields leaves out.
+func brandBody(fields map[string]any) map[string]any {
+	body := map[string]any{"corners": "rounded", "font": "system-ui", "backgroundFit": "cover"}
+	for key, value := range fields {
+		body[key] = value
+	}
+	return body
 }
 
 // keepDefaultBrand puts back, when the test ends, the default brand the test started with, then
@@ -74,7 +85,7 @@ func keepDefaultBrand(t *testing.T) (defaultId int64, created *[]int64) {
 func createBrandOverAPI(t *testing.T, accessToken string, created *[]int64, name, appearance, theme string) int64 {
 	t.Helper()
 	status, body, _ := brandCall(t, accessToken, http.MethodPost, brandsPath,
-		map[string]any{"name": name, "appearance": appearance, "theme": theme})
+		brandBody(map[string]any{"name": name, "appearance": appearance, "theme": theme}))
 	require.Equal(t, http.StatusCreated, status, "create: %v", body)
 	id := int64(body["brand"].(map[string]any)["id"].(float64))
 	*created = append(*created, id)
@@ -113,7 +124,8 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	name := brandName("Acme")
 
 	status, body, _ := brandCall(t, accessToken, http.MethodPost, brandsPath,
-		map[string]any{"name": "  " + name + "  ", "appearance": "dark", "theme": "plum"})
+		map[string]any{"name": "  " + name + "  ", "appearance": "dark", "theme": "plum",
+			"corners": "pill", "font": "geometric", "backgroundFit": "tile", "hideAppName": true})
 	require.Equal(t, http.StatusCreated, status, "create: %v", body)
 	brand := body["brand"].(map[string]any)
 	id := int64(brand["id"].(float64))
@@ -121,6 +133,10 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	assert.Equal(t, name, brand["name"])
 	assert.Equal(t, "dark", brand["appearance"])
 	assert.Equal(t, "plum", brand["theme"])
+	assert.Equal(t, "pill", brand["corners"])
+	assert.Equal(t, "geometric", brand["font"])
+	assert.Equal(t, "tile", brand["backgroundFit"])
+	assert.Equal(t, true, brand["hideAppName"])
 	assert.Equal(t, false, brand["isDefault"])
 	assert.InDelta(t, 0, brand["clientCount"], 0, "a new brand draws no client")
 	assert.NotNil(t, brand["createdAt"])
@@ -132,21 +148,42 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	assert.Equal(t, name, stored.Name)
 	assert.Equal(t, "dark", string(stored.Appearance))
 	assert.Equal(t, "plum", stored.Theme)
+	assert.Equal(t, "pill", string(stored.Corners))
+	assert.Equal(t, "geometric", string(stored.Font))
+	assert.Equal(t, "tile", string(stored.BackgroundFit))
+	assert.True(t, stored.HideAppName)
 
 	status, body, _ = brandCall(t, accessToken, http.MethodGet, brandPath(id, ""), nil)
 	require.Equal(t, http.StatusOK, status)
-	assertBrandReadsAsCreated(t, brand, body["brand"].(map[string]any))
+	read := body["brand"].(map[string]any)
+	assertBrandReadsAsCreated(t, brand, read)
 
+	// A brand read and written back is unchanged.
+	status, body, _ = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""), read)
+	require.Equal(t, http.StatusOK, status, "write back: %v", body)
+	rewritten, err := database.GetBrandById(ctx, nil, id)
+	require.NoError(t, err)
+	rewritten.UpdatedAt = stored.UpdatedAt
+	assert.Equal(t, stored, rewritten, "a brand read and written back is unchanged")
+
+	// An update is a full replace: hideAppName left out is false.
 	renamed := brandName("Zest")
 	status, body, _ = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
-		map[string]any{"name": renamed, "appearance": "light", "theme": "high-contrast"})
+		map[string]any{"name": renamed, "appearance": "light", "theme": "high-contrast",
+			"corners": "square", "font": "serif", "backgroundFit": "contain"})
 	require.Equal(t, http.StatusOK, status, "update: %v", body)
 	assert.Equal(t, renamed, body["brand"].(map[string]any)["name"])
+	assert.Equal(t, "square", body["brand"].(map[string]any)["corners"])
+	assert.Equal(t, false, body["brand"].(map[string]any)["hideAppName"])
 	stored, err = database.GetBrandById(ctx, nil, id)
 	require.NoError(t, err)
 	assert.Equal(t, renamed, stored.Name)
 	assert.Equal(t, "light", string(stored.Appearance))
 	assert.Equal(t, "high-contrast", stored.Theme)
+	assert.Equal(t, "square", string(stored.Corners))
+	assert.Equal(t, "serif", string(stored.Font))
+	assert.Equal(t, "contain", string(stored.BackgroundFit))
+	assert.False(t, stored.HideAppName)
 
 	status, body, _ = brandCall(t, accessToken, http.MethodDelete, brandPath(id, ""), nil)
 	require.Equal(t, http.StatusOK, status, "delete: %v", body)
@@ -159,7 +196,7 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, status)
 	assert.Equal(t, "NOT_FOUND", body["error_code"])
 	status, _, _ = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
-		map[string]any{"name": renamed, "appearance": "light", "theme": "plum"})
+		brandBody(map[string]any{"name": renamed, "appearance": "light", "theme": "plum"}))
 	assert.Equal(t, http.StatusNotFound, status)
 	status, _, _ = brandCall(t, accessToken, http.MethodDelete, brandPath(id, ""), nil)
 	assert.Equal(t, http.StatusNotFound, status)
@@ -208,7 +245,7 @@ func TestAPIBrands_Refusals(t *testing.T) {
 	}()
 
 	valid := func(edit func(map[string]any)) map[string]any {
-		body := map[string]any{"name": brandName("New"), "appearance": "auto", "theme": "avocado"}
+		body := brandBody(map[string]any{"name": brandName("New"), "appearance": "auto", "theme": "avocado"})
 		edit(body)
 		return body
 	}
@@ -226,6 +263,13 @@ func TestAPIBrands_Refusals(t *testing.T) {
 		{"an unknown appearance", valid(func(b map[string]any) { b["appearance"] = "sepia" }), "handler.brand.appearance_invalid"},
 		{"no theme", valid(func(b map[string]any) { delete(b, "theme") }), "handler.brand.theme_invalid"},
 		{"an unknown theme", valid(func(b map[string]any) { b["theme"] = "graphite" }), "handler.brand.theme_invalid"},
+		{"no corners", valid(func(b map[string]any) { delete(b, "corners") }), "handler.brand.corners_invalid"},
+		{"unknown corners", valid(func(b map[string]any) { b["corners"] = "round" }), "handler.brand.corners_invalid"},
+		{"no font", valid(func(b map[string]any) { delete(b, "font") }), "handler.brand.font_invalid"},
+		{"an unknown font", valid(func(b map[string]any) { b["font"] = "Comic Sans" }), "handler.brand.font_invalid"},
+		{"no background fit", valid(func(b map[string]any) { delete(b, "backgroundFit") }), "handler.brand.background_fit_invalid"},
+		{"an unknown background fit", valid(func(b map[string]any) { b["backgroundFit"] = "stretch" }), "handler.brand.background_fit_invalid"},
+		{"the uploaded font with no font file", valid(func(b map[string]any) { b["font"] = "uploaded" }), "handler.brand.uploaded_font_regular_required"},
 	}
 	for _, c := range refusals {
 		t.Run("create: "+c.name, func(t *testing.T) {
@@ -245,10 +289,18 @@ func TestAPIBrands_Refusals(t *testing.T) {
 	assert.Equal(t, "The name cannot exceed a maximum length of 60 characters.", body["error_description"])
 	_, body, _ = brandCall(t, accessToken, http.MethodPost, brandsPath, refusals[3].body)
 	assert.Equal(t, "Another brand already uses this name.", body["error_description"])
+	_, body, _ = brandCall(t, accessToken, http.MethodPost, brandsPath, refusals[9].body)
+	assert.Equal(t, "Choose square, rounded or pill corners.", body["error_description"])
+	_, body, _ = brandCall(t, accessToken, http.MethodPost, brandsPath, refusals[11].body)
+	assert.Equal(t, "Choose one of the system font families, or the uploaded font.", body["error_description"])
+	_, body, _ = brandCall(t, accessToken, http.MethodPost, brandsPath, refusals[13].body)
+	assert.Equal(t, "Choose cover, contain or tile for the background image.", body["error_description"])
+	_, body, _ = brandCall(t, accessToken, http.MethodPost, brandsPath, refusals[15].body)
+	assert.Equal(t, "Upload a regular font file to use the uploaded font.", body["error_description"])
 
 	// Sixty characters are taken.
 	status, body, _ := brandCall(t, accessToken, http.MethodPut, brandPath(other, ""),
-		map[string]any{"name": strings.Repeat("ü", 50) + fake.LetterN(10), "appearance": "dark", "theme": "tangerine"})
+		brandBody(map[string]any{"name": strings.Repeat("ü", 50) + fake.LetterN(10), "appearance": "dark", "theme": "tangerine"}))
 	assert.Equal(t, http.StatusOK, status, "60 characters: %v", body)
 
 	// The default brand cannot be deleted, and stays.
@@ -317,7 +369,7 @@ func TestAPIBrands_ChangesAreAudited(t *testing.T) {
 
 	name := brandName("Audit")
 	resp, requestId := sendAdmin(t, accessToken, http.MethodPost, brandsPath,
-		map[string]any{"name": name, "appearance": "auto", "theme": "guava"})
+		brandBody(map[string]any{"name": name, "appearance": "auto", "theme": "guava"}))
 	var answer map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&answer))
 	_ = resp.Body.Close()
@@ -329,9 +381,11 @@ func TestAPIBrands_ChangesAreAudited(t *testing.T) {
 
 	renamed := brandName("Audited")
 	_, _, requestId = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
-		map[string]any{"name": renamed, "appearance": "dark", "theme": "coconut"})
+		map[string]any{"name": renamed, "appearance": "dark", "theme": "coconut",
+			"corners": "square", "font": "rounded", "backgroundFit": "contain", "hideAppName": true})
 	assert.Equal(t, []map[string]any{{"brand_id": float64(id), "brand_name": renamed, "appearance": "dark",
-		"theme": "coconut", "logged_in_user": who}},
+		"theme": "coconut", "corners": "square", "font": "rounded", "background_fit": "contain",
+		"hide_app_name": true, "logged_in_user": who}},
 		auditRows(t, accessToken, "updated_brand", requestId))
 
 	_, _, requestId = brandCall(t, accessToken, http.MethodPost, brandPath(id, "/make-default"), nil)

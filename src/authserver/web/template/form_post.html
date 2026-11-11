@@ -15,6 +15,10 @@
   {{- with .page.BrandStylesheet }}
   <link rel="stylesheet" href="{{ . }}">
   {{- end }}
+  {{- with .page.Favicon }}
+  <link rel="icon" type="image/png" href="{{ . }}">
+  <link rel="apple-touch-icon" href="{{ . }}">
+  {{- end }}
   <script src="{{ .page.Script }}" defer></script>
 </head>
 
@@ -22,7 +26,24 @@
   <main class="auth-page">
     <div class="panel auth-card">
       <div class="panel-body">
+        {{- if .page.Logo }}
+        {{- $alt := "" }}{{ if .page.HideAppName }}{{ $alt = .page.AppName }}{{ end }}
+        <div class="auth-logo">
+          {{- if and .page.DarkLogo (eq .page.Theme "dark") }}
+          <img src="{{ .page.DarkLogo }}" alt="{{ $alt }}">
+          {{- else if and .page.DarkLogo (not .page.Theme) }}
+          <picture>
+            <source srcset="{{ .page.DarkLogo }}" media="(prefers-color-scheme: dark)">
+            <img src="{{ .page.Logo }}" alt="{{ $alt }}">
+          </picture>
+          {{- else }}
+          <img src="{{ .page.Logo }}" alt="{{ $alt }}">
+          {{- end }}
+        </div>
+        {{- end }}
+        {{- if not .page.HideAppName }}
         <p class="auth-brand">{{ .page.AppName }}</p>
+        {{- end }}
         <form class="auth-status" method="post" action="{{ .redirectURI }}" data-auto-submit>
           {{ if .code }}<input type="hidden" name="code" value="{{ .code }}">{{ end }}
           {{ if .access_token }}<input type="hidden" name="access_token" value="{{ .access_token }}">{{ end }}

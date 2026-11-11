@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -29,6 +30,22 @@ type defaultBrandStub struct {
 	reads     int
 	clients   map[string]*record.Brand
 	clientErr error
+	// assets are the brand assets it answers by id, without their bytes, or assetErr.
+	assets   []record.BrandAsset
+	assetErr error
+}
+
+func (s *defaultBrandStub) GetBrandAssetsByIds(_ context.Context, _ *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
+	if s.assetErr != nil {
+		return nil, s.assetErr
+	}
+	var found []record.BrandAsset
+	for _, asset := range s.assets {
+		if slices.Contains(ids, asset.Id) {
+			found = append(found, asset)
+		}
+	}
+	return found, nil
 }
 
 func (s *defaultBrandStub) GetDefaultBrand(_ context.Context, _ *sql.Tx) (*record.Brand, error) {
@@ -298,4 +315,32 @@ func TestRender_APageForAClientIsDrawnInTheClientsBrand(t *testing.T) {
 			})
 		}
 	}
+}
+
+// A page links its brand's full stylesheet, the one that draws the corners and the font, and the
+// brand also names its colors-only stylesheet, which the public settings carry for the admin
+// console's admin pages (#813 decision 9). Each path names its own route and its own contents.
+func TestClientPageBrand_NamesTheFullAndTheColorsOnlyStylesheets(t *testing.T) {
+	brand := record.NewBrand("Shop", record.BrandAppearanceAuto, "avocado")
+	brand.Id = 7
+	brand.Corners = record.BrandCornersSquare
+	brand.Font = record.BrandFontSerif
+	avocado, ok := brandthemes.StylesheetOf("avocado")
+	require.True(t, ok)
+
+	page := ClientPageBrand(context.Background(), &defaultBrandStub{brand: &brand}, "")
+
+	assert.Equal(t, "/brand/7/colors.css?v="+avocado.Fingerprint, page.ColorsStylesheet)
+	assert.Regexp(t, `^/brand/7/stylesheet\.css\?v=[0-9a-f]{12}$`, page.Stylesheet)
+	assert.NotEqual(t, "/brand/7/stylesheet.css?v="+avocado.Fingerprint, page.Stylesheet,
+		"square corners and the serif family are not the colors alone")
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
+	buf, err := New(web.TemplateFS(), web.StaticFS(), &defaultBrandStub{brand: &brand}).RenderTemplateToBuffer(req,
+		"/layouts/no_menu_layout.html", "/not_found.html", map[string]interface{}{})
+	require.NoError(t, err)
+	head := readPageHead(t, buf.String())
+	require.Len(t, head.stylesheets, 2, "main.css, then the brand's stylesheet")
+	assert.Equal(t, page.Stylesheet, head.stylesheets[1], "a page links the full stylesheet")
 }

@@ -1,0 +1,34 @@
+-- Reverses migration 000091 (#813). See the sqlite migration for what is lost. SQL Server refuses
+-- dropping a column while a constraint or an index names it, so each goes first.
+ALTER TABLE [brands] DROP CONSTRAINT [fk_brands_bold_font_asset];
+ALTER TABLE [brands] DROP CONSTRAINT [fk_brands_regular_font_asset];
+ALTER TABLE [brands] DROP CONSTRAINT [fk_brands_background_asset];
+ALTER TABLE [brands] DROP CONSTRAINT [fk_brands_favicon_asset];
+ALTER TABLE [brands] DROP CONSTRAINT [fk_brands_dark_logo_asset];
+ALTER TABLE [brands] DROP CONSTRAINT [fk_brands_logo_asset];
+
+DROP INDEX [idx_brands_bold_font_asset_id] ON [brands];
+DROP INDEX [idx_brands_regular_font_asset_id] ON [brands];
+DROP INDEX [idx_brands_background_asset_id] ON [brands];
+DROP INDEX [idx_brands_favicon_asset_id] ON [brands];
+DROP INDEX [idx_brands_dark_logo_asset_id] ON [brands];
+DROP INDEX [idx_brands_logo_asset_id] ON [brands];
+
+ALTER TABLE [brands] DROP COLUMN [bold_font_asset_id];
+ALTER TABLE [brands] DROP COLUMN [regular_font_asset_id];
+ALTER TABLE [brands] DROP COLUMN [background_asset_id];
+ALTER TABLE [brands] DROP COLUMN [favicon_asset_id];
+ALTER TABLE [brands] DROP COLUMN [dark_logo_asset_id];
+ALTER TABLE [brands] DROP COLUMN [logo_asset_id];
+
+ALTER TABLE [brands] DROP CONSTRAINT [df_brands_hide_app_name];
+ALTER TABLE [brands] DROP COLUMN [hide_app_name];
+ALTER TABLE [brands] DROP CONSTRAINT [df_brands_background_fit];
+ALTER TABLE [brands] DROP COLUMN [background_fit];
+ALTER TABLE [brands] DROP CONSTRAINT [df_brands_font];
+ALTER TABLE [brands] DROP COLUMN [font];
+ALTER TABLE [brands] DROP CONSTRAINT [df_brands_corners];
+ALTER TABLE [brands] DROP COLUMN [corners];
+
+DROP INDEX [idx_brand_assets_created_at] ON [brand_assets];
+DROP TABLE [brand_assets];

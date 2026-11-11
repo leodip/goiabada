@@ -3,6 +3,7 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -77,8 +78,7 @@ func TestMigration000089_Brands(t *testing.T) {
 		require.NoErrorf(t, h.Migrator.Migrate(ctx, brands000089), "apply 000089 on %s", dbType())
 		assertBrandsTable000089(t, h, "after apply")
 		require.Equalf(t, 1, count000062(t, h, "brands"), "2. one brand for a stored %q on %s", c.stored, dbType())
-		def, err := h.DB.GetDefaultBrand(ctx, nil)
-		require.NoError(t, err)
+		def := defaultBrand000089(t, h)
 		require.NotNilf(t, def, "2. the settings row points at the brand for a stored %q on %s", c.stored, dbType())
 		assert.Equalf(t, "Default", def.Name, "2. the brand's name for a stored %q", c.stored)
 		assert.Equalf(t, record.BrandAppearance(c.appearance), def.Appearance, "2. a stored %q becomes %q on %s",
@@ -97,23 +97,21 @@ func TestMigration000089_Brands(t *testing.T) {
 	// 6. The down writes back the brand's appearance as it is at the down, not the theme the up read.
 	setUITheme000089(t, h, "light")
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, brands000089), "re-apply 000089 on %s", dbType())
-	def, err := h.DB.GetDefaultBrand(ctx, nil)
-	require.NoError(t, err)
+	def := defaultBrand000089(t, h)
 	require.NotNil(t, def)
-	def.Appearance = "dark"
-	require.NoError(t, h.DB.UpdateBrand(ctx, nil, def))
+	_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET appearance = 'dark' WHERE id = %d", def.Id))
+	require.NoErrorf(t, err, "edit the default brand's appearance on %s", dbType())
 
 	// 4.
-	other := &record.Brand{Name: "Default", Appearance: "auto", Theme: "plum"}
-	require.Errorf(t, h.DB.CreateBrand(ctx, nil, other), "4. a second brand named Default on %s", dbType())
+	_, err = h.SQL.Exec("INSERT INTO brands (name, appearance, theme) VALUES ('Default', 'auto', 'plum')")
+	require.Errorf(t, err, "4. a second brand named Default on %s", dbType())
 	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brands WHERE id = %d", def.Id))
 	require.Errorf(t, err, "4. the foreign key refuses deleting the default brand on %s", dbType())
 
 	// 5.
 	_, err = h.SQL.Exec("UPDATE settings SET app_name = 'Previous release', ui_theme = 'light' WHERE id = 1")
 	require.NoErrorf(t, err, "save the settings as the previous release does on %s", dbType())
-	after, err := h.DB.GetDefaultBrand(ctx, nil)
-	require.NoError(t, err)
+	after := defaultBrand000089(t, h)
 	require.NotNil(t, after, "5. the previous release's save leaves the pointer")
 	assert.Equal(t, def.Id, after.Id)
 	assert.Equal(t, record.BrandAppearance("dark"), after.Appearance, "5. and the brand")
@@ -168,4 +166,20 @@ func uiThemeOf000089(t *testing.T, h *isolatedDB) string {
 	require.NoErrorf(t, h.SQL.QueryRow("SELECT ui_theme FROM settings WHERE id = 1").Scan(&theme),
 		"read settings.ui_theme on %s", dbType())
 	return theme
+}
+
+// defaultBrand000089 reads the brand the settings row points at with raw SQL, naming only the
+// columns 000089 creates: the data layer's read names the columns of later migrations too, and
+// this test runs below them. It answers nil when the pointer joins to no brand.
+func defaultBrand000089(t *testing.T, h *isolatedDB) *record.Brand {
+	t.Helper()
+	var brand record.Brand
+	err := h.SQL.QueryRow("SELECT brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme "+
+		"FROM brands INNER JOIN settings ON settings.default_brand_id = brands.id WHERE settings.id = 1").
+		Scan(&brand.Id, &brand.CreatedAt, &brand.UpdatedAt, &brand.Name, &brand.Appearance, &brand.Theme)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	require.NoErrorf(t, err, "read the default brand on %s", dbType())
+	return &brand
 }

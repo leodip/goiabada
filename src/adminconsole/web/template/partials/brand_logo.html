@@ -1,0 +1,37 @@
+{{define "brand_logo"}}
+{{- /* The brand's logo beside the app name's text, one image whichever mode the page is in: the dark
+     logo on a dark page, a picture switching to it on an automatic one, and the logo otherwise. Its
+     alt is empty, so a screen reader says the name once (#813 decision 5). Called with the page's
+     data, only while it has a logo. */ -}}
+{{- if and .brandDarkLogo (eq .brandDataTheme "dark") -}}
+<img src="{{ .brandDarkLogo }}" alt="">
+{{- else if and .brandDarkLogo (not .brandDataTheme) -}}
+<picture><source srcset="{{ .brandDarkLogo }}" media="(prefers-color-scheme: dark)"><img src="{{ .brandLogo }}" alt=""></picture>
+{{- else -}}
+<img src="{{ .brandLogo }}" alt="">
+{{- end -}}
+{{end}}
+
+{{define "brand_logo_named"}}
+{{- /* brand_logo in the app name's place, while the brand's switch hides the name's text: its alt is
+     the app name (#813 decision 5). */ -}}
+{{- if and .brandDarkLogo (eq .brandDataTheme "dark") -}}
+<img src="{{ .brandDarkLogo }}" alt="{{ .appName }}">
+{{- else if and .brandDarkLogo (not .brandDataTheme) -}}
+<picture><source srcset="{{ .brandDarkLogo }}" media="(prefers-color-scheme: dark)"><img src="{{ .brandLogo }}" alt="{{ .appName }}"></picture>
+{{- else -}}
+<img src="{{ .brandLogo }}" alt="{{ .appName }}">
+{{- end -}}
+{{end}}
+
+{{define "brand_home_link"}}
+{{- /* What a link to home holds: the brand's logo before the app name, or in its place while the
+     brand's switch hides the name, when the logo's alt names the link (#813 decision 5). The switch
+     is bound only beside a logo. */ -}}
+{{- if and .brandLogo .brandHideAppName -}}
+<span class="app-brand-logo">{{ template "brand_logo_named" . }}</span>
+{{- else -}}
+{{- if .brandLogo }}<span class="app-brand-logo">{{ template "brand_logo" . }}</span>{{ end -}}
+<span class="app-brand-name">{{ .appName }}</span>
+{{- end -}}
+{{end}}

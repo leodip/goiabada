@@ -30,6 +30,7 @@ func HandleAccountProfilePicturePost(
 	baseURL string,
 	maxUploadBytes int64,
 ) http.HandlerFunc {
+	rules := imageupload.ProfilePicture(maxUploadBytes)
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, sub, ok := accountCaller(w, r)
 		if !ok {
@@ -48,12 +49,12 @@ func HandleAccountProfilePicturePost(
 			return
 		}
 
-		pictureData, ok := readUploadedImage(w, r, maxUploadBytes)
+		pictureData, ok := readUploadedImage(w, r, rules.MaxBytes())
 		if !ok {
 			return
 		}
 
-		result, err := imageupload.Validate(pictureData, maxUploadBytes)
+		result, err := imageupload.Validate(pictureData, rules)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return

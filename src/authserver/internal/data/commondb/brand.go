@@ -12,18 +12,26 @@ import (
 
 // brandColumns is the brands table as scanBrand reads it.
 var brandColumns = columnList{
-	sqlite:   "id, created_at, updated_at, name, appearance, theme",
-	mysql:    "id, created_at, updated_at, name, appearance, theme",
-	postgres: "id, created_at, updated_at, name, appearance, theme",
-	mssql:    "id, created_at, updated_at, name, appearance, theme",
+	sqlite: "id, created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
+		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id",
+	mysql: "id, created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
+		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id",
+	postgres: "id, created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
+		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id",
+	mssql: "id, created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
+		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id",
 }
 
 // qualifiedBrandColumns is brandColumns named by table, for the read joining the settings row.
 var qualifiedBrandColumns = columnList{
-	sqlite:   "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme",
-	mysql:    "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme",
-	postgres: "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme",
-	mssql:    "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme",
+	sqlite: "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme, brands.corners, brands.font, brands.background_fit, brands.hide_app_name, " +
+		"brands.logo_asset_id, brands.dark_logo_asset_id, brands.favicon_asset_id, brands.background_asset_id, brands.regular_font_asset_id, brands.bold_font_asset_id",
+	mysql: "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme, brands.corners, brands.font, brands.background_fit, brands.hide_app_name, " +
+		"brands.logo_asset_id, brands.dark_logo_asset_id, brands.favicon_asset_id, brands.background_asset_id, brands.regular_font_asset_id, brands.bold_font_asset_id",
+	postgres: "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme, brands.corners, brands.font, brands.background_fit, brands.hide_app_name, " +
+		"brands.logo_asset_id, brands.dark_logo_asset_id, brands.favicon_asset_id, brands.background_asset_id, brands.regular_font_asset_id, brands.bold_font_asset_id",
+	mssql: "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme, brands.corners, brands.font, brands.background_fit, brands.hide_app_name, " +
+		"brands.logo_asset_id, brands.dark_logo_asset_id, brands.favicon_asset_id, brands.background_asset_id, brands.regular_font_asset_id, brands.bold_font_asset_id",
 }
 
 // scanBrand reads one row selected with brandColumns or qualifiedBrandColumns.
@@ -35,22 +43,44 @@ func scanBrand(row rowScanner, brand *record.Brand) error {
 		&brand.Name,
 		&brand.Appearance,
 		&brand.Theme,
+		&brand.Corners,
+		&brand.Font,
+		&brand.BackgroundFit,
+		&brand.HideAppName,
+		&brand.LogoAssetId,
+		&brand.DarkLogoAssetId,
+		&brand.FaviconAssetId,
+		&brand.BackgroundAssetId,
+		&brand.RegularFontAssetId,
+		&brand.BoldFontAssetId,
 	)
 }
 
 var insertBrand = statement{
-	sqlite:   "INSERT INTO brands (created_at, updated_at, name, appearance, theme) VALUES (?, ?, ?, ?, ?)",
-	mysql:    "INSERT INTO brands (created_at, updated_at, name, appearance, theme) VALUES (?, ?, ?, ?, ?)",
-	postgres: "INSERT INTO brands (created_at, updated_at, name, appearance, theme) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-	mssql:    "INSERT INTO brands (created_at, updated_at, name, appearance, theme) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5)",
+	sqlite: "INSERT INTO brands (created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
+		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id) " +
+		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO brands (created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
+		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id) " +
+		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO brands (created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
+		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id",
+	mssql: "INSERT INTO brands (created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
+		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id) OUTPUT INSERTED.id " +
+		"VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15)",
 }
 
 // updateBrand writes the whole row but created_at, which is dont-update.
 var updateBrand = statement{
-	sqlite:   "UPDATE brands SET updated_at = ?, name = ?, appearance = ?, theme = ? WHERE id = ?",
-	mysql:    "UPDATE brands SET updated_at = ?, name = ?, appearance = ?, theme = ? WHERE id = ?",
-	postgres: "UPDATE brands SET updated_at = $1, name = $2, appearance = $3, theme = $4 WHERE id = $5",
-	mssql:    "UPDATE brands SET updated_at = @p1, name = @p2, appearance = @p3, theme = @p4 WHERE id = @p5",
+	sqlite: "UPDATE brands SET updated_at = ?, name = ?, appearance = ?, theme = ?, corners = ?, font = ?, background_fit = ?, " +
+		"hide_app_name = ?, logo_asset_id = ?, dark_logo_asset_id = ?, favicon_asset_id = ?, background_asset_id = ?, regular_font_asset_id = ?, bold_font_asset_id = ? WHERE id = ?",
+	mysql: "UPDATE brands SET updated_at = ?, name = ?, appearance = ?, theme = ?, corners = ?, font = ?, background_fit = ?, " +
+		"hide_app_name = ?, logo_asset_id = ?, dark_logo_asset_id = ?, favicon_asset_id = ?, background_asset_id = ?, regular_font_asset_id = ?, bold_font_asset_id = ? WHERE id = ?",
+	postgres: "UPDATE brands SET updated_at = $1, name = $2, appearance = $3, theme = $4, corners = $5, font = $6, background_fit = $7, " +
+		"hide_app_name = $8, logo_asset_id = $9, dark_logo_asset_id = $10, favicon_asset_id = $11, background_asset_id = $12, regular_font_asset_id = $13, bold_font_asset_id = $14 WHERE id = $15",
+	mssql: "UPDATE brands SET updated_at = @p1, name = @p2, appearance = @p3, theme = @p4, corners = @p5, font = @p6, background_fit = @p7, " +
+		"hide_app_name = @p8, logo_asset_id = @p9, dark_logo_asset_id = @p10, favicon_asset_id = @p11, background_asset_id = @p12, regular_font_asset_id = @p13, bold_font_asset_id = @p14 WHERE id = @p15",
 }
 
 var selectBrandById = statement{
@@ -111,7 +141,10 @@ func (d *Database) CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Br
 	brand.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertBrand, "brand",
-		brand.CreatedAt, brand.UpdatedAt, brand.Name, brand.Appearance, brand.Theme)
+		brand.CreatedAt, brand.UpdatedAt, brand.Name, brand.Appearance, brand.Theme,
+		brand.Corners, brand.Font, brand.BackgroundFit, brand.HideAppName,
+		brand.LogoAssetId, brand.DarkLogoAssetId, brand.FaviconAssetId,
+		brand.BackgroundAssetId, brand.RegularFontAssetId, brand.BoldFontAssetId)
 	if err != nil {
 		brand.CreatedAt = originalCreatedAt
 		brand.UpdatedAt = originalUpdatedAt
@@ -132,7 +165,11 @@ func (d *Database) UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Br
 	brand.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateBrand.text(d.Dialect),
-		brand.UpdatedAt, brand.Name, brand.Appearance, brand.Theme, brand.Id)
+		brand.UpdatedAt, brand.Name, brand.Appearance, brand.Theme,
+		brand.Corners, brand.Font, brand.BackgroundFit, brand.HideAppName,
+		brand.LogoAssetId, brand.DarkLogoAssetId, brand.FaviconAssetId,
+		brand.BackgroundAssetId, brand.RegularFontAssetId, brand.BoldFontAssetId,
+		brand.Id)
 	if err != nil {
 		brand.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update brand")

@@ -4,9 +4,12 @@
 // the console's own client's brand changes what the whole instance looks like, so the tests doing it
 // are *.system.ts files, and put back what they found (withDefaultBrandRestored). A brand that is not
 // the default, given to a client of a test's own, changes only that client's pages (withBrand).
-import { expect, type Locator, type Page } from "@playwright/test";
-import { confirmDialog } from "./admin-console";
+import { type APIRequestContext, expect, type Locator, type Page } from "@playwright/test";
+import { confirmDialog, grantClientPermission, readClientSecret } from "./admin-console";
 import { env } from "./environment";
+import { solidPng } from "./images";
+import type { TestClient } from "./fixtures";
+import { clientCredentialsToken } from "./oauth";
 import { uniqueIdentifier } from "./unique";
 
 export const brandingPath = "/admin/settings/branding";
@@ -19,6 +22,19 @@ export interface BrandValues {
   name: string;
   appearance: Appearance;
   theme: string;
+}
+
+// The kit's choices in the brand form (#813): the corners, the font family, the background fit and
+// the switch hiding the app name beside a logo.
+export type Corners = "square" | "rounded" | "pill";
+export type FontFamily = "system-ui" | "humanist" | "geometric" | "serif" | "neo-grotesque" | "rounded" | "uploaded";
+export type BackgroundFit = "cover" | "contain" | "tile";
+
+export interface BrandKitChoices {
+  corners: Corners;
+  font: FontFamily;
+  backgroundFit: BackgroundFit;
+  hideAppName: boolean;
 }
 
 export interface ListedBrand {
@@ -67,10 +83,24 @@ export async function brandIdFromList(page: Page, name: string): Promise<number>
 }
 
 // Fills the brand form on the page as it stands, the new one or a brand's own.
-export async function fillBrandForm(page: Page, values: Partial<BrandValues>) {
+export async function fillBrandForm(page: Page, values: Partial<BrandValues & BrandKitChoices>) {
   if (values.name !== undefined) await page.locator("#name").fill(values.name);
   if (values.appearance) await page.locator(`#appearance-${values.appearance}`).check();
   if (values.theme) await page.locator(`#theme-${values.theme}`).check();
+  if (values.corners) await page.locator(`#corners-${values.corners}`).check();
+  if (values.font) await page.locator("#font").selectOption(values.font);
+  if (values.backgroundFit) await page.locator(`#backgroundFit-${values.backgroundFit}`).check();
+  if (values.hideAppName !== undefined) await page.locator("#hideAppName").setChecked(values.hideAppName);
+}
+
+// The kit's choices the brand form holds.
+export async function readBrandKitChoices(page: Page): Promise<BrandKitChoices> {
+  return {
+    corners: (await page.locator('input[name="corners"]:checked').getAttribute("value")) as Corners,
+    font: (await page.locator("#font").inputValue()) as FontFamily,
+    backgroundFit: (await page.locator('input[name="backgroundFit"]:checked').getAttribute("value")) as BackgroundFit,
+    hideAppName: await page.locator("#hideAppName").isChecked(),
+  };
 }
 
 // The brand editor's preview (#811): a sample of a sign-in page in each mode, drawn in the theme the
@@ -130,6 +160,37 @@ export function sampleColors(sample: Locator): Promise<SampleColors> {
       colorScheme: getComputedStyle(sample).colorScheme,
     };
   });
+}
+
+// The corners and the font a sample is drawn with, as the browser computes them: the radius of the
+// card, of a field and of a button, which a corner shape sets, and of the danger notice, a box that may
+// hold several lines; and the first font of the family the sample's title asks for, unquoted. Which
+// font a device then finds is its own: the headless browser has almost none of the families' fonts.
+export interface SampleShape {
+  card: string;
+  control: string;
+  button: string;
+  notice: string;
+  firstFont: string;
+}
+
+// firstFontOf is the first font of a computed font-family list, without its quotes.
+export function firstFontOf(fontFamily: string): string {
+  return fontFamily.split(",")[0].trim().replace(/^["']|["']$/g, "");
+}
+
+export async function sampleShape(sample: Locator): Promise<SampleShape> {
+  const shape = await sample.evaluate((sample) => {
+    const radius = (selector: string) => getComputedStyle(sample.querySelector(selector)!).borderTopLeftRadius;
+    return {
+      card: radius(".auth-card"),
+      control: radius(".control"),
+      button: radius(".button-primary"),
+      notice: radius(".notice-danger"),
+      fontFamily: getComputedStyle(sample.querySelector(".auth-title")!).fontFamily,
+    };
+  });
+  return { card: shape.card, control: shape.control, button: shape.button, notice: shape.notice, firstFont: firstFontOf(shape.fontFamily) };
 }
 
 // What each Appearance card's swatch is drawn in, one entry per mode it shows, in order: the canvas
@@ -282,16 +343,134 @@ export async function pageBackgrounds(page: Page): Promise<{ onLight: string; on
   return { onLight, onDark };
 }
 
-// The brand a page of the auth server or the console names in its head: the id in the brand
-// stylesheet it links (/brand/7/stylesheet.css), or null when it links none.
-export function pageStylesheetBrand(page: Page): Promise<number | null> {
+// The brand stylesheets a page links, in order: each one's brand, and whether it is the full one
+// (/brand/7/stylesheet.css), which the auth server's pages and the console's end-user pages link, or
+// the colors-only one (/brand/7/colors.css), which the console's admin pages link (#813 decision 9).
+export interface LinkedBrandStylesheet {
+  brandId: number;
+  kind: "full" | "colors";
+}
+
+export function pageBrandStylesheets(page: Page): Promise<LinkedBrandStylesheet[]> {
   return page.evaluate(() => {
+    const linked: { brandId: number; kind: "full" | "colors" }[] = [];
     for (const link of Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))) {
-      const match = new URL(link.href, document.baseURI).pathname.match(/^\/brand\/(\d+)\/stylesheet\.css$/);
-      if (match) return Number(match[1]);
+      const match = new URL(link.href, document.baseURI).pathname.match(/^\/brand\/(\d+)\/(stylesheet|colors)\.css$/);
+      if (match) linked.push({ brandId: Number(match[1]), kind: match[2] === "colors" ? "colors" : "full" });
     }
-    return null;
+    return linked;
   });
+}
+
+// The brand a page of the auth server or the console names in its head: the brand of the one brand
+// stylesheet it links, full or colors-only, or null when it links none.
+export async function pageStylesheetBrand(page: Page): Promise<number | null> {
+  const linked = await pageBrandStylesheets(page);
+  expect(linked.length, "a page links one brand stylesheet at most").toBeLessThanOrEqual(1);
+  return linked[0]?.brandId ?? null;
+}
+
+// The icons a page links, each as "rel href" with the href absolute, in order.
+export function pageIcons(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="apple-touch-icon"], link[rel="manifest"]'),
+      (link) => `${link.rel} ${link.href}`,
+    ),
+  );
+}
+
+// Goiabada's own icons and web manifest, as a page of the origin named links them.
+export function goiabadaIcons(origin: string): string[] {
+  return [
+    `icon ${origin}/static/favicon/favicon.ico`,
+    `apple-touch-icon ${origin}/static/favicon/apple-touch-icon.png`,
+    `icon ${origin}/static/favicon/favicon-32x32.png`,
+    `icon ${origin}/static/favicon/favicon-16x16.png`,
+    `manifest ${origin}/static/favicon/site.webmanifest`,
+  ];
+}
+
+// A brand's favicon, as a page links it in place of Goiabada's icons: the one stored image, as its
+// icon and its Apple touch icon (#813 decision 4).
+export function brandFaviconIcons(faviconUrl: string): string[] {
+  return [`icon ${faviconUrl}`, `apple-touch-icon ${faviconUrl}`];
+}
+
+// A brand's kit set through the Admin API, as an application does, in two steps: a file is uploaded
+// as a brand asset of its kind, then named in the brand's slot (#813 decision 1). The editor's own
+// uploads are uploadInEditor's. The caller is a
+// client of the test's own holding authserver:manage-settings.
+export interface UploadedBrandAsset {
+  id: number;
+  url: string;
+}
+
+export interface BrandKit {
+  logo?: UploadedBrandAsset;
+  darkLogo?: UploadedBrandAsset;
+  favicon?: UploadedBrandAsset;
+  hideAppName?: boolean;
+}
+
+export async function brandKitToken(
+  page: Page,
+  request: APIRequestContext,
+  clients: { create(options: { authorizationCode: boolean; clientCredentials: boolean }): Promise<TestClient> },
+): Promise<string> {
+  const caller = await clients.create({ authorizationCode: false, clientCredentials: true });
+  await grantClientPermission(page, caller.id, "authserver", "manage-settings");
+  const token = await clientCredentialsToken(request, caller.identifier, await readClientSecret(page, caller.id), "authserver:manage-settings");
+  expect(token.status, JSON.stringify(token.body)).toBe(200);
+  return String(token.body.access_token);
+}
+
+// Uploads a PNG as a brand asset of the kind named, and answers its id and URL.
+export async function uploadBrandAsset(
+  request: APIRequestContext,
+  token: string,
+  kind: "logo" | "favicon",
+  png: Buffer,
+): Promise<UploadedBrandAsset> {
+  const response = await request.post(`${env.authUrl}/api/v1/admin/brand-assets/${kind}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    multipart: { file: { name: `${kind}.png`, mimeType: "image/png", buffer: png } },
+    failOnStatusCode: false,
+  });
+  expect(response.status(), await response.text()).toBe(201);
+  const { brandAsset } = await response.json();
+  return { id: brandAsset.id, url: brandAsset.url };
+}
+
+// Writes a brand's logo, dark logo, favicon and switch as kit has them, an absent one empty or off,
+// and keeps the rest of the brand as it is stored.
+export async function setBrandKit(request: APIRequestContext, token: string, brandId: number, kit: BrandKit) {
+  const url = `${env.authUrl}/api/v1/admin/brands/${brandId}`;
+  const headers = { Authorization: `Bearer ${token}` };
+  const read = await request.get(url, { headers, failOnStatusCode: false });
+  expect(read.status(), await read.text()).toBe(200);
+  const { brand } = await read.json();
+  const slot = (asset?: { id: number } | null) => (asset ? { id: asset.id } : null);
+  const written = await request.put(url, {
+    headers,
+    data: {
+      name: brand.name,
+      appearance: brand.appearance,
+      theme: brand.theme,
+      corners: brand.corners,
+      font: brand.font,
+      backgroundFit: brand.backgroundFit,
+      hideAppName: kit.hideAppName ?? false,
+      logo: slot(kit.logo),
+      darkLogo: slot(kit.darkLogo),
+      favicon: slot(kit.favicon),
+      background: slot(brand.background),
+      regularFont: slot(brand.regularFont),
+      boldFont: slot(brand.boldFont),
+    },
+    failOnStatusCode: false,
+  });
+  expect(written.status(), await written.text()).toBe(200);
 }
 
 // A page drawn in Plum on Dark, the brand the client tests give a client: it links that brand's
@@ -317,4 +496,101 @@ export async function expectDrawnInSeededDefault(page: Page, defaultBrandId: num
   expect(onLight, "a light device draws the default's light canvas").not.toBe(onDark);
   expect([onLight, onDark], "neither is Plum's").not.toContain(plumCanvas.dark);
   expect([onLight, onDark], "neither is Plum's").not.toContain(plumCanvas.light);
+}
+
+// The brand editor's six upload fields (#813 decision 1), by the name the form gives each slot. A file
+// picked at one is uploaded at once, through the console, as a brand asset of the slot's kind: the
+// field says so in its status region, and its two hidden fields hold the asset's id and URL, which the
+// preview draws and Save names in the slot.
+export type BrandSlot = "logo" | "darkLogo" | "favicon" | "background" | "regularFont" | "boldFont";
+
+export interface PickedFile {
+  name: string;
+  mimeType: string;
+  buffer: Buffer;
+}
+
+// What the uploads in the editor's fields answer, the sentences its status region shows.
+export const uploadSays = {
+  uploaded: "Uploaded. Save the brand to use it.",
+  removed: "Removed. Save the brand to apply it.",
+} as const;
+
+// A PNG made on the spot, as a file picked in the editor.
+export function pngFile(name: string, width: number, height: number, rgb: [number, number, number]): PickedFile {
+  return { name, mimeType: "image/png", buffer: solidPng(width, height, rgb) };
+}
+
+// A file the auth server takes as a WOFF2 font, which it tells by the signature its first four bytes
+// hold. No browser draws it, and no spec needs one to: they check the family a page asks for, not how
+// its letters look.
+export function woff2File(name: string): PickedFile {
+  return { name, mimeType: "font/woff2", buffer: Buffer.concat([Buffer.from("wOF2", "ascii"), Buffer.alloc(124)]) };
+}
+
+// Picks file at slot's field, as Upload and the file picker do, and answers what the field then says,
+// once its upload has been answered.
+export async function pickInEditor(page: Page, slot: BrandSlot, file: PickedFile): Promise<string> {
+  await page.locator(`#${slot}File`).setInputFiles(file);
+  const answer = page.locator(`#${slot}Status .notice:not(.notice-note)`);
+  await expect(answer).toBeVisible();
+  return (await answer.innerText()).trim();
+}
+
+// Uploads file at slot's field and waits for the field to say it was uploaded, answering the URL the
+// asset is served at.
+export async function uploadInEditor(page: Page, slot: BrandSlot, file: PickedFile): Promise<string> {
+  expect(await pickInEditor(page, slot, file), `the ${slot} uploaded`).toBe(uploadSays.uploaded);
+  return slotHolds(page, slot).then((held) => held.url);
+}
+
+// What a slot's hidden fields hold: the asset's id and URL, both empty for an empty slot.
+export async function slotHolds(page: Page, slot: BrandSlot): Promise<{ id: string; url: string }> {
+  return {
+    id: await page.locator(`input[type="hidden"][name="${slot}"]`).inputValue(),
+    url: await page.locator(`input[type="hidden"][name="${slot}Url"]`).inputValue(),
+  };
+}
+
+// The kit a test uploads in the editor: a logo, a dark logo of another color, a square favicon, a
+// background and the uploaded font's two files.
+export const kitFiles: Record<BrandSlot, PickedFile> = {
+  logo: pngFile("logo.png", 240, 80, [36, 86, 196]),
+  darkLogo: pngFile("dark-logo.png", 240, 80, [138, 180, 255]),
+  favicon: pngFile("favicon.png", 64, 64, [176, 32, 106]),
+  background: pngFile("background.png", 320, 200, [240, 200, 120]),
+  regularFont: woff2File("brand-regular.woff2"),
+  boldFont: woff2File("brand-bold.woff2"),
+};
+
+// Uploads each file of kitFiles in the editor's fields, answering the URL each is served at.
+export async function uploadKit(page: Page, slots: BrandSlot[] = Object.keys(kitFiles) as BrandSlot[]): Promise<Partial<Record<BrandSlot, string>>> {
+  const urls: Partial<Record<BrandSlot, string>> = {};
+  for (const slot of slots) urls[slot] = await uploadInEditor(page, slot, kitFiles[slot]);
+  return urls;
+}
+
+// What a sample of the preview draws of the kit: its logo box's image, if it shows one, whether the
+// app name shows, its background image and how it is laid out, as the browser computes them.
+export interface SampleKit {
+  logo: string | null;
+  nameShown: boolean;
+  backgroundImage: string;
+  backgroundSize: string;
+  backgroundRepeat: string;
+}
+
+export function sampleKit(sample: Locator): Promise<SampleKit> {
+  return sample.evaluate((sample) => {
+    const box = sample.querySelector<HTMLElement>(".auth-logo")!;
+    const image = box.querySelector("img");
+    const style = getComputedStyle(sample);
+    return {
+      logo: !box.hidden && image ? image.getAttribute("src") : null,
+      nameShown: !sample.querySelector<HTMLElement>(".auth-brand")!.hidden,
+      backgroundImage: style.backgroundImage,
+      backgroundSize: style.backgroundSize,
+      backgroundRepeat: style.backgroundRepeat,
+    };
+  });
 }

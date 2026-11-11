@@ -13,6 +13,24 @@
 // it is never submitted. The samples are drawn hidden, so neither shows in the console's own
 // colors before this script has styled it.
 //
+// Each sample also takes the corners and the font family the form holds (#813), from what the page
+// hands it for each in the brand-kit-styles data block, the values the auth server's stylesheet sets:
+// a shape's two radius tokens and a family's --font-sans, which ui.css reads on the sample as :root
+// reads them on a real page. Rounded and System UI, today's look, are handed nothing, so the sample
+// keeps the console's own tokens, which are ui.css's; so does a value the page hands nothing for, as a
+// refused form drawn again can hold.
+//
+// The sample draws the kit's files too (#813), as the form's slots hold them, each slot's asset id and
+// URL in two hidden fields, which brand-assets.js fills as a file is uploaded and empties as it is
+// removed, telling the page with an input event: the logo of each sample's mode above the app name,
+// the dark logo in the dark one, or the logo while there is none, and the name hidden beside a logo
+// while the switch hides it; the background image behind the card at the fit the form holds, as the
+// page hands each fit's layout, over the canvas; and the uploaded font, declared in the page under the
+// family its list names first, with the weights the page hands for two files, and none while another
+// family is chosen or no regular file is there. Its list is set whatever the files, as the other
+// families' are: without them it falls back to System UI, as the saved brand is drawn. The favicon has
+// no place on a sign-in card: its field shows it.
+//
 // The three Appearance cards' swatches are redrawn in the chosen theme too, from the same
 // palettes: each names the modes it shows, one SVG per mode in order, and each shape the token its
 // fill or border is drawn from. The colors are set as attributes, as the server draws them. The
@@ -22,6 +40,7 @@
 // pageshow.
 
 const brandPalettes = JSON.parse(document.getElementById("brand-palettes").textContent);
+const brandKitStyles = JSON.parse(document.getElementById("brand-kit-styles").textContent);
 
 // The panel shadow ui.css gives each mode, which the token palettes do not carry.
 const samplePanelShadows = {
@@ -41,6 +60,126 @@ function chosenTheme() {
 function chosenAppearance() {
   const checked = document.querySelector('input[name="appearance"]:checked');
   return checked ? checked.value : "auto";
+}
+
+// handed answers what the page hands for key in styles, or undefined when it hands nothing, a key
+// every object answers, such as constructor, included.
+function handed(styles, key) {
+  return styles && Object.prototype.hasOwnProperty.call(styles, key) ? styles[key] : undefined;
+}
+
+// chosenRadii answers the radii of the corner shape the form holds, undefined for one that sets none.
+function chosenRadii() {
+  const checked = document.querySelector('input[name="corners"]:checked');
+  return handed(brandKitStyles.corners, checked ? checked.value : "");
+}
+
+// chosenFontStack answers the font-family list of the family the form holds, undefined for one that
+// sets none.
+function chosenFontStack() {
+  const select = document.getElementById("font");
+  return handed(brandKitStyles.fonts, select ? select.value : "");
+}
+
+// slotUrl answers the URL of the file the form's slot holds, or "" for an empty slot: one whose id
+// field is empty holds nothing, whatever its URL field holds.
+function slotUrl(slot) {
+  const id = document.querySelector('input[type="hidden"][name="' + slot + '"]');
+  const url = document.querySelector('input[type="hidden"][name="' + slot + 'Url"]');
+  return id && url && id.value ? url.value : "";
+}
+
+// chosenBackground answers the layout of the fit the form holds, or cover's for a fit the page hands
+// nothing for, as the auth server lays it out.
+function chosenBackground() {
+  const checked = document.querySelector('input[name="backgroundFit"]:checked');
+  return handed(brandKitStyles.backgrounds, checked ? checked.value : "") || handed(brandKitStyles.backgrounds, "cover") || {};
+}
+
+// cssUrl is url() naming address, as a CSS string.
+function cssUrl(address) {
+  return "url(" + JSON.stringify(address) + ")";
+}
+
+// The stylesheet the uploaded font's faces are declared in, adopted by the page when a face is first
+// declared, and the files they were declared from.
+let fontSheet = null;
+let declaredFiles = "";
+
+// fontFaceRule is the @font-face rule of an uploaded font file, as the auth server's stylesheet
+// declares it: for the weights in weight, or for every weight when weight is empty. A rule with no
+// weight gives a variable font its own weight range and a static one the browser's synthesized bold,
+// as the saved brand draws them (#813 decision 7). A FontFace cannot say that: one without a weight
+// is pinned to normal, and Firefox and Safari refuse "auto".
+function fontFaceRule(family, url, weight) {
+  return "@font-face {\n" +
+    "  font-family: " + family + ";\n" +
+    "  src: " + cssUrl(url) + ' format("woff2");\n' +
+    (weight ? "  font-weight: " + weight + ";\n" : "") +
+    "  font-display: swap;\n" +
+    "}\n";
+}
+
+// declareUploadedFont declares the uploaded font's faces from its regular and bold files, or none for
+// no regular file, replacing the ones declared before. A browser loads a face once text asks for its
+// family, so a face declared costs nothing until the sample draws it.
+function declareUploadedFont(regular, bold) {
+  const files = regular ? regular + "\n" + bold : "";
+  if (files === declaredFiles || typeof CSSStyleSheet !== "function" || !("adoptedStyleSheets" in document)) {
+    return;
+  }
+  declaredFiles = files;
+  if (!fontSheet) {
+    if (!regular) {
+      return;
+    }
+    fontSheet = new CSSStyleSheet();
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, fontSheet];
+  }
+  const family = brandKitStyles.uploadedFamily;
+  const weights = brandKitStyles.fontWeights || {};
+  let rules = "";
+  if (regular && bold) {
+    rules = fontFaceRule(family, regular, weights.regular) + fontFaceRule(family, bold, weights.bold);
+  } else if (regular) {
+    rules = fontFaceRule(family, regular, "");
+  }
+  fontSheet.replaceSync(rules);
+}
+
+// drawLogo puts the logo at url in a sample's logo box above the app name, or empties the box for
+// none, and hides the name beside a logo while the switch hides it.
+function drawLogo(sample, url, hideName) {
+  const box = sample.querySelector(".auth-logo");
+  if (box) {
+    let image = box.querySelector("img");
+    if (url) {
+      if (!image) {
+        image = document.createElement("img");
+        image.setAttribute("alt", "");
+        box.appendChild(image);
+      }
+      if (image.getAttribute("src") !== url) {
+        image.setAttribute("src", url);
+      }
+    } else if (image) {
+      image.remove();
+    }
+    box.hidden = !url;
+  }
+  const name = sample.querySelector(".auth-brand");
+  if (name) {
+    name.hidden = Boolean(url) && hideName;
+  }
+}
+
+// setOrRemove sets a property on a sample's style, or takes it off when there is no value.
+function setOrRemove(style, property, value) {
+  if (typeof value === "string" && value !== "") {
+    style.setProperty(property, value);
+  } else {
+    style.removeProperty(property);
+  }
 }
 
 // previewMode answers the mode the switch is on, light unless it is on dark.
@@ -82,6 +221,16 @@ function drawPreview() {
   }
   const appearance = chosenAppearance();
   const mode = appearance === "auto" ? previewMode() : appearance;
+  const radii = chosenRadii() || {};
+  const fontStack = chosenFontStack();
+  const font = document.getElementById("font");
+  declareUploadedFont(font && font.value === "uploaded" ? slotUrl("regularFont") : "", slotUrl("boldFont"));
+  const logo = slotUrl("logo");
+  const darkLogo = slotUrl("darkLogo") || logo;
+  const switchOn = document.getElementById("hideAppName");
+  const hideName = Boolean(switchOn && switchOn.checked);
+  const background = slotUrl("background");
+  const layout = background ? chosenBackground() : {};
   for (const sample of document.querySelectorAll("[data-brand-sample]")) {
     const sampleMode = sample.dataset.brandSample === "dark" ? "dark" : "light";
     const palette = theme[sampleMode] || {};
@@ -90,6 +239,14 @@ function drawPreview() {
     }
     sample.style.setProperty("--shadow-panel", samplePanelShadows[sampleMode]);
     sample.style.setProperty("color-scheme", sampleMode);
+    setOrRemove(sample.style, "--radius-control", radii.control);
+    setOrRemove(sample.style, "--radius-panel", radii.panel);
+    setOrRemove(sample.style, "--font-sans", fontStack);
+    setOrRemove(sample.style, "background-image", background ? cssUrl(background) : undefined);
+    setOrRemove(sample.style, "background-size", layout.size);
+    setOrRemove(sample.style, "background-position", layout.position);
+    setOrRemove(sample.style, "background-repeat", layout.repeat);
+    drawLogo(sample, sampleMode === "dark" ? darkLogo : logo, hideName);
     sample.hidden = sampleMode !== mode;
   }
   const modeSwitch = document.querySelector(".brand-preview-switch");

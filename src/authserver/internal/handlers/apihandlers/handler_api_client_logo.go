@@ -33,6 +33,7 @@ func HandleClientLogoPost(
 	baseURL string,
 	maxUploadBytes int64,
 ) http.HandlerFunc {
+	rules := imageupload.ClientLogo(maxUploadBytes)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse client ID from URL
 		idStr := r.PathValue("id")
@@ -59,12 +60,12 @@ func HandleClientLogoPost(
 			return
 		}
 
-		fileData, ok := readUploadedImage(w, r, maxUploadBytes)
+		fileData, ok := readUploadedImage(w, r, rules.MaxBytes())
 		if !ok {
 			return
 		}
 
-		result, err := imageupload.Validate(fileData, maxUploadBytes)
+		result, err := imageupload.Validate(fileData, rules)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return

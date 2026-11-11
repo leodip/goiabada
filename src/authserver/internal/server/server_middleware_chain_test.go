@@ -107,7 +107,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 }
 
 // fileRoutes are the page-format routes that draw no page: the images, the brands' stylesheets and
-// the OpenAPI document.
+// assets, and the OpenAPI document.
 var fileRoutes = []string{
 	"GET /openapi.yaml",
 	"GET /userinfo/picture/{subject}",
@@ -116,6 +116,10 @@ var fileRoutes = []string{
 	"HEAD /client/logo/{clientIdentifier}",
 	"GET /brand/{id}/stylesheet.css",
 	"HEAD /brand/{id}/stylesheet.css",
+	"GET /brand/{id}/colors.css",
+	"HEAD /brand/{id}/colors.css",
+	"GET /brand-assets/{id}",
+	"HEAD /brand-assets/{id}",
 }
 
 // Every page route of the real registrations runs the page-language middleware, and the routes that

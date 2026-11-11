@@ -14,24 +14,32 @@ import (
 const multipartOverhead = 1024
 
 var (
-	// ErrUploadTooLarge is a body over the bound, or one that is not a multipart form: the two
-	// are one answer on the wire, as they were before Read held the sequence.
-	ErrUploadTooLarge = errors.New("upload too large or not a multipart form")
+	// ErrUploadTooLarge is a body over the bound, cut there rather than read whole.
+	ErrUploadTooLarge = errors.New("upload too large")
+
+	// ErrNotMultipart is a body that is not a multipart form. The released image endpoints answer
+	// it as they answer ErrUploadTooLarge; a brand asset upload answers a body too large with its
+	// kind's limit (#813 decision 3), so the two are told apart.
+	ErrNotMultipart = errors.New("upload is not a multipart form")
 
 	// ErrNoUpload is a multipart form without the named file field.
 	ErrNoUpload = errors.New("no file in the upload")
 )
 
 // Read takes the file in field from a multipart request of at most maxSize bytes of image plus the
-// multipart overhead. It answers ErrUploadTooLarge or ErrNoUpload for the two failures the client
-// caused, and a wrapped error for a read that failed on the server's side, which the caller
+// multipart overhead. It answers ErrUploadTooLarge, ErrNotMultipart or ErrNoUpload for the three
+// failures the client caused, and a wrapped error for a read that failed on the server's side, which the caller
 // answers as a 500. The bytes are not validated; Validate does that.
 func Read(w http.ResponseWriter, r *http.Request, field string, maxSize int64) ([]byte, error) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxSize+multipartOverhead)
 
 	//nolint:gosec // G120: bounded by the MaxBytesReader above and the server's request-body table; G120 flags every multipart parse
 	if err := r.ParseMultipartForm(maxSize); err != nil {
-		return nil, ErrUploadTooLarge
+		var cut *http.MaxBytesError
+		if errors.As(err, &cut) {
+			return nil, ErrUploadTooLarge
+		}
+		return nil, ErrNotMultipart
 	}
 
 	file, _, err := r.FormFile(field)

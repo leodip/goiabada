@@ -14,8 +14,21 @@ import (
 // flashSessionEnded is the one-time notice HandleSessionEndedGet leaves for HandleIndexGet.
 const flashSessionEnded = "sessionEnded"
 
-// HandleSessionEndedGet signs the administrator out after the admin API refused the console's
-// access token, and sends the browser home, where the notice says why (#427 decision 17).
+// sessionEndedQuery is the query parameter that carries that notice to the home page instead, when
+// the session it was for has no row left to hold it (see HandleSessionEndedGet).
+const sessionEndedQuery = "session-ended"
+
+// sessionEndedStore is what HandleSessionEndedGet needs of the session store: the session, and the
+// name its cookie carries, by which a request whose row is gone is told from one with no cookie.
+type sessionEndedStore interface {
+	Get(r *http.Request, name string) (*sessionstore.Session, error)
+	Save(r *http.Request, w http.ResponseWriter, s *sessionstore.Session) error
+	CookieName(logicalName string) string
+}
+
+// HandleSessionEndedGet signs the administrator out once their sign-in has ended, the admin API
+// having refused the console's access token or the session holding none any more, and sends the
+// browser home, where the notice says why (#427 decision 17).
 //
 // Only the token values go, the same two middleware.SessionHandler clears when it signs a session out, so
 // the session survives to carry the notice. The home page is the destination because it does not
@@ -41,12 +54,15 @@ const flashSessionEnded = "sessionEnded"
 // next console page they open meets the same 401 from this origin and is signed out then, with
 // the notice.
 //
-// A request that arrives with no cookie is sent home the same way without a write: no row
-// exists to end, and the row its save would create is the one an anonymous client could
-// otherwise mint per request, at no limit (#620).
+// A request whose session has no row is sent home the same way without a write: no row exists to
+// end, and the row its save would create is the one an anonymous client could otherwise mint per
+// request, at no limit (#620). One that brought the session's cookie had a session whose row has
+// gone since, as when it expired while a page stayed open, and a page script whose request met
+// the ended sign-in sent it here; the notice goes home with it in the home page's query, which
+// writes nothing. A request with no cookie at all had no sign-in to end and is told nothing.
 func HandleSessionEndedGet(
 	httpHelper HttpHelper,
-	httpSession sessionstore.Store,
+	httpSession sessionEndedStore,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -66,14 +82,19 @@ func HandleSessionEndedGet(
 		}
 
 		if sess.ID == "" {
-			// No cookie reached the route, so the store returned a fresh session and
-			// nothing has ended. Saving it would insert a row no browser can read back,
-			// one per request at no limit; and the notice is not written either, because
-			// without a cookie there is nothing to carry it to the home page (#620).
-			http.Redirect(w, r, "/", http.StatusFound)
+			// No row stands behind the request, so the store returned a fresh session. Saving
+			// it would insert a row no browser can read back, one per request at no limit
+			// (#620), so the notice, when the session's cookie says there was a sign-in to
+			// end, rides in the home page's query instead.
+			home := "/"
+			if _, cookieErr := r.Cookie(httpSession.CookieName(builtin.AdminConsoleSessionName)); cookieErr == nil {
+				home = "/?" + sessionEndedQuery
+			}
+			http.Redirect(w, r, home, http.StatusFound)
 			return
 		}
 
+		_, hadTokens := sess.Values[sessionkeys.JWT]
 		delete(sess.Values, sessionkeys.JWT)
 		delete(sess.Values, sessionkeys.JWTExpiresAt)
 		// For the home page this redirects to.
@@ -84,8 +105,12 @@ func HandleSessionEndedGet(
 		}
 
 		// Warn: a refusal met and handled. The admin API's own record says which of its checks
-		// refused the token; this one says the console signed the administrator out for it.
-		slog.WarnContext(r.Context(), "the admin api refused the access token, signing the session out")
+		// refused the token; this one says the console signed the administrator out for it. A
+		// session that held no tokens was signed out already, by the middleware that logged why,
+		// and a page script sent it here only for the notice.
+		if hadTokens {
+			slog.WarnContext(r.Context(), "the admin api refused the access token, signing the session out")
+		}
 		http.Redirect(w, r, "/", http.StatusFound)
 	}
 }

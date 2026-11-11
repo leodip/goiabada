@@ -8,8 +8,6 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
-	"maps"
-	"slices"
 	"strconv"
 	"testing"
 
@@ -57,8 +55,32 @@ func createTestGIF(width, height int) []byte {
 	return buf.Bytes()
 }
 
+// webpOfSize is the head of a WebP file in the extended format: a VP8X chunk naming a canvas of
+// width by height pixels, which is as far as a decoder reads to answer the size.
+func webpOfSize(width, height int) []byte {
+	vp8x := []byte{
+		0, 0, 0, 0,
+		byte(width - 1), byte((width - 1) >> 8), byte((width - 1) >> 16),
+		byte(height - 1), byte((height - 1) >> 8), byte((height - 1) >> 16),
+	}
+	body := append([]byte("WEBPVP8X\x0a\x00\x00\x00"), vp8x...)
+	size := len(body)
+	riff := append([]byte("RIFF"), byte(size), byte(size>>8), byte(size>>16), byte(size>>24))
+	return append(riff, body...)
+}
+
 // testMaxSize is a configured size well above every image built here.
 const testMaxSize = int64(3 << 20)
+
+// configuredKinds are the two kinds whose byte limit is the configured size, each held to the same
+// rules: a still JPEG, PNG, GIF or WebP, each side from 10 to 512 pixels.
+var configuredKinds = []struct {
+	name  string
+	rules func(maxBytes int64) Rules
+}{
+	{"profile picture", ProfilePicture},
+	{"client logo", ClientLogo},
+}
 
 func TestValidate_Accepts(t *testing.T) {
 	square := createTestPNG(100, 100)
@@ -74,22 +96,104 @@ func TestValidate_Accepts(t *testing.T) {
 		{"a PNG", square, testMaxSize, "image/png", 100, 100},
 		{"a JPEG", createTestJPEG(200, 150), testMaxSize, "image/jpeg", 200, 150},
 		{"a GIF", createTestGIF(50, 50), testMaxSize, "image/gif", 50, 50},
+		{"a WebP", webpOfSize(120, 80), testMaxSize, "image/webp", 120, 80},
 		{"a non-square image", createTestPNG(200, 100), testMaxSize, "image/png", 200, 100},
-		{"a PNG at the minimum dimensions", createTestPNG(MinDimension, MinDimension), testMaxSize, "image/png", MinDimension, MinDimension},
-		{"a PNG at the maximum dimensions", createTestPNG(MaxDimension, MaxDimension), testMaxSize, "image/png", MaxDimension, MaxDimension},
-		{"a JPEG at the minimum dimensions", createTestJPEG(MinDimension, MinDimension), testMaxSize, "image/jpeg", MinDimension, MinDimension},
-		{"a JPEG at the maximum dimensions", createTestJPEG(MaxDimension, MaxDimension), testMaxSize, "image/jpeg", MaxDimension, MaxDimension},
-		{"a GIF at the minimum dimensions", createTestGIF(MinDimension, MinDimension), testMaxSize, "image/gif", MinDimension, MinDimension},
-		{"a GIF at the maximum dimensions", createTestGIF(MaxDimension, MaxDimension), testMaxSize, "image/gif", MaxDimension, MaxDimension},
+		{"a PNG at the minimum dimensions", createTestPNG(10, 10), testMaxSize, "image/png", 10, 10},
+		{"a PNG at the maximum dimensions", createTestPNG(512, 512), testMaxSize, "image/png", 512, 512},
+		{"a JPEG at the minimum dimensions", createTestJPEG(10, 10), testMaxSize, "image/jpeg", 10, 10},
+		{"a JPEG at the maximum dimensions", createTestJPEG(512, 512), testMaxSize, "image/jpeg", 512, 512},
+		{"a GIF at the minimum dimensions", createTestGIF(10, 10), testMaxSize, "image/gif", 10, 10},
+		{"a GIF at the maximum dimensions", createTestGIF(512, 512), testMaxSize, "image/gif", 512, 512},
+		{"a WebP at the maximum dimensions", webpOfSize(512, 512), testMaxSize, "image/webp", 512, 512},
 		// The bound is inclusive: an image of exactly the configured size is stored.
 		{"an image of exactly the configured size", square, int64(len(square)), "image/png", 100, 100},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			info, err := Validate(tt.data, tt.maxSize)
+	for _, kind := range configuredKinds {
+		for _, tt := range tests {
+			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
+				info, err := Validate(tt.data, kind.rules(tt.maxSize))
+
+				require.NoError(t, err)
+				assert.Equal(t, Info{ContentType: tt.contentType, Width: tt.width, Height: tt.height}, info)
+			})
+		}
+	}
+}
+
+// gifOf is a GIF89a of the frames given, each width by height pixels in a palette of its own, so
+// every frame after the first carries a local color table; a GIF of more than one frame loops for
+// ever, which writes the NETSCAPE2.0 application extension before the first frame, and each frame
+// has a delay, which writes a graphic control extension before it.
+func gifOf(width, height, frames int) []byte {
+	animation := &gif.GIF{LoopCount: 0}
+	for i := range frames {
+		palette := color.Palette{color.RGBA{R: uint8(40 * i), G: 150, B: 200, A: 255}, color.RGBA{R: 255, G: 255, B: 255, A: 255}}
+		animation.Image = append(animation.Image, image.NewPaletted(image.Rect(0, 0, width, height), palette))
+		animation.Delay = append(animation.Delay, 10)
+	}
+	var buf bytes.Buffer
+	_ = gif.EncodeAll(&buf, animation)
+	return buf.Bytes()
+}
+
+// A profile picture and a client logo are held to the still rule a brand's images are: a client's
+// logo is drawn beside the sign-in form, where a looping animation has no pause control, and an
+// animated GIF, PNG or WebP is refused for either, whatever its size. A GIF of one frame, its
+// extensions and all, is stored.
+func TestValidate_RefusesAnAnimatedImageOfEveryType(t *testing.T) {
+	for _, kind := range configuredKinds {
+		for name, data := range map[string][]byte{
+			"an animated GIF":  gifOf(100, 100, 2),
+			"an animated PNG":  animatedPNG(100, 100),
+			"an animated WebP": animatedWebP(100, 100),
+		} {
+			t.Run(kind.name+"/"+name, func(t *testing.T) {
+				info, err := Validate(data, kind.rules(testMaxSize))
+
+				assertRefusal(t, info, err, i18n.ErrCodeImageAnimated, nil, animatedSentence)
+			})
+		}
+		t.Run(kind.name+"/a GIF of one frame with its extensions", func(t *testing.T) {
+			info, err := Validate(gifOf(100, 100, 1), kind.rules(testMaxSize))
 
 			require.NoError(t, err)
-			assert.Equal(t, Info{ContentType: tt.contentType, Width: tt.width, Height: tt.height}, info)
+			assert.Equal(t, Info{ContentType: "image/gif", Width: 100, Height: 100}, info)
+		})
+	}
+}
+
+// A GIF is animated from its second frame, told by walking the blocks' framing, past extensions
+// and local color tables, without decoding a frame. A file cut short, or a block the walk does
+// not know, reads as still: Validate has decoded the header by then, and the walk refuses nothing
+// it cannot read.
+func TestGIFAnimated_CountsFramesByTheirDescriptors(t *testing.T) {
+	two := gifOf(20, 20, 2)
+	tests := []struct {
+		name string
+		data []byte
+		want bool
+	}{
+		{"one frame", createTestGIF(20, 20), false},
+		{"one frame after its extensions", gifOf(20, 20, 1), false},
+		{"two frames, the second with a local color table", two, true},
+		{"three frames", gifOf(20, 20, 3), true},
+		{"two frames cut inside the first", two[:len(two)/3], false},
+		{"no more than a header", two[:13], false},
+		{"shorter than a header", two[:5], false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, gifAnimated(tt.data))
+		})
+	}
+}
+
+// TestRules_MaxBytes: a configured kind's byte limit is the size it was given, which is what the
+// handler bounds the request body by.
+func TestRules_MaxBytes(t *testing.T) {
+	for _, kind := range configuredKinds {
+		t.Run(kind.name, func(t *testing.T) {
+			assert.Equal(t, int64(2_000_000), kind.rules(2_000_000).MaxBytes())
 		})
 	}
 }
@@ -137,29 +241,89 @@ func TestValidate_Refuses(t *testing.T) {
 		// WebP is an allowed type, so a header that does not decode is undecodable, not unsupported.
 		{"a WebP header with no image", webpHeader, testMaxSize,
 			i18n.ErrCodeImageUndecodable, nil, "The image could not be read. The file may be damaged."},
-		{"too narrow", createTestPNG(MinDimension-1, MinDimension), testMaxSize,
-			i18n.ErrCodeImageDimensionsTooSmall, map[string]any{"min": MinDimension}, "The image must be at least 10x10 pixels."},
-		{"too short", createTestPNG(MinDimension, MinDimension-1), testMaxSize,
-			i18n.ErrCodeImageDimensionsTooSmall, map[string]any{"min": MinDimension}, "The image must be at least 10x10 pixels."},
+		{"too narrow", createTestPNG(9, 10), testMaxSize,
+			i18n.ErrCodeImageDimensionsTooSmall, map[string]any{"min": 10}, "The image must be at least 10x10 pixels."},
+		{"too short", createTestPNG(10, 9), testMaxSize,
+			i18n.ErrCodeImageDimensionsTooSmall, map[string]any{"min": 10}, "The image must be at least 10x10 pixels."},
 		{"too small both ways", createTestPNG(5, 5), testMaxSize,
-			i18n.ErrCodeImageDimensionsTooSmall, map[string]any{"min": MinDimension}, "The image must be at least 10x10 pixels."},
-		{"too wide", createTestPNG(MaxDimension+1, MaxDimension), testMaxSize,
-			i18n.ErrCodeImageDimensionsTooLarge, map[string]any{"max": MaxDimension}, "The image can be at most 512x512 pixels."},
-		{"too tall", createTestPNG(MaxDimension, MaxDimension+1), testMaxSize,
-			i18n.ErrCodeImageDimensionsTooLarge, map[string]any{"max": MaxDimension}, "The image can be at most 512x512 pixels."},
+			i18n.ErrCodeImageDimensionsTooSmall, map[string]any{"min": 10}, "The image must be at least 10x10 pixels."},
+		{"too wide", createTestPNG(513, 512), testMaxSize,
+			i18n.ErrCodeImageDimensionsTooLarge, map[string]any{"max": 512}, "The image can be at most 512x512 pixels."},
+		{"too tall", createTestPNG(512, 513), testMaxSize,
+			i18n.ErrCodeImageDimensionsTooLarge, map[string]any{"max": 512}, "The image can be at most 512x512 pixels."},
 		{"too large both ways", createTestPNG(600, 600), testMaxSize,
-			i18n.ErrCodeImageDimensionsTooLarge, map[string]any{"max": MaxDimension}, "The image can be at most 512x512 pixels."},
+			i18n.ErrCodeImageDimensionsTooLarge, map[string]any{"max": 512}, "The image can be at most 512x512 pixels."},
+		{"a WebP too wide", webpOfSize(513, 100), testMaxSize,
+			i18n.ErrCodeImageDimensionsTooLarge, map[string]any{"max": 512}, "The image can be at most 512x512 pixels."},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			info, err := Validate(tt.data, tt.maxSize)
+	for _, kind := range configuredKinds {
+		for _, tt := range tests {
+			t.Run(kind.name+"/"+tt.name, func(t *testing.T) {
+				info, err := Validate(tt.data, kind.rules(tt.maxSize))
 
-			assert.Equal(t, Info{}, info)
-			var localized *i18n.LocalizedError
-			require.ErrorAs(t, err, &localized, "want an *i18n.LocalizedError, got %T: %v", err, err)
-			assert.Equal(t, tt.code, localized.Code)
-			assert.Equal(t, tt.args, localized.Args)
-			assert.Equal(t, tt.english, localized.Localize(context.Background()))
+				assertRefusal(t, info, err, tt.code, tt.args, tt.english)
+			})
+		}
+	}
+}
+
+func assertRefusal(t *testing.T, info Info, err error, code string, args map[string]any, english string) {
+	t.Helper()
+	assert.Equal(t, Info{}, info)
+	var localized *i18n.LocalizedError
+	require.ErrorAs(t, err, &localized, "want an *i18n.LocalizedError, got %T: %v", err, err)
+	assert.Equal(t, code, localized.Code)
+	assert.Equal(t, args, localized.Args)
+	assert.Equal(t, english, localized.Localize(context.Background()))
+}
+
+// TestValidate_HoldsAnUploadToItsKindsRules: the types, pixel bounds and byte limit an upload is
+// checked against are the ones its rules name, not one fixed set. These rules take PNG alone, each
+// side from 48 to 64 pixels, up to 4000 bytes, so each check answers at a bound no configured kind
+// shares.
+func TestValidate_HoldsAnUploadToItsKindsRules(t *testing.T) {
+	rules := Rules{
+		contentTypes: map[string]bool{"image/png": true},
+		typeRefusal:  i18n.ErrCodeImageUnsupportedType,
+		minSide:      48,
+		maxSide:      64,
+		maxBytes:     4000,
+	}
+
+	t.Run("accepts at both pixel bounds", func(t *testing.T) {
+		for _, side := range []int{48, 64} {
+			info, err := Validate(createTestPNG(side, side), rules)
+
+			require.NoError(t, err)
+			assert.Equal(t, Info{ContentType: "image/png", Width: side, Height: side}, info)
+		}
+	})
+
+	refusals := []struct {
+		name    string
+		data    []byte
+		code    string
+		args    map[string]any
+		english string
+	}{
+		{"a JPEG, a type another kind takes", createTestJPEG(50, 50),
+			i18n.ErrCodeImageUnsupportedType, nil, unsupportedTypeSentence},
+		{"a GIF, a type another kind takes", createTestGIF(50, 50),
+			i18n.ErrCodeImageUnsupportedType, nil, unsupportedTypeSentence},
+		{"a WebP, a type another kind takes", webpOfSize(50, 50),
+			i18n.ErrCodeImageUnsupportedType, nil, unsupportedTypeSentence},
+		{"one pixel under the minimum", createTestPNG(47, 48),
+			i18n.ErrCodeImageDimensionsTooSmall, map[string]any{"min": 48}, "The image must be at least 48x48 pixels."},
+		{"one pixel over the maximum", createTestPNG(64, 65),
+			i18n.ErrCodeImageDimensionsTooLarge, map[string]any{"max": 64}, "The image can be at most 64x64 pixels."},
+		{"one byte over the limit", make([]byte, 4001),
+			i18n.ErrCodeImageTooLarge, map[string]any{"max": int64(4000)}, "The image can be at most 4000 bytes."},
+	}
+	for _, tt := range refusals {
+		t.Run(tt.name, func(t *testing.T) {
+			info, err := Validate(tt.data, rules)
+
+			assertRefusal(t, info, err, tt.code, tt.args, tt.english)
 		})
 	}
 }
@@ -169,16 +333,9 @@ const unsupportedTypeSentence = "The image type is not supported. Allowed types 
 // TestValidate_TheRefusalIsLocalized: the codes resolve in the second catalog too, arguments
 // included, which is what writeValidationError hands a pt-BR caller.
 func TestValidate_TheRefusalIsLocalized(t *testing.T) {
-	_, err := Validate(createTestPNG(100, 100), 64)
+	_, err := Validate(createTestPNG(100, 100), ProfilePicture(64))
 
 	var localized *i18n.LocalizedError
 	require.ErrorAs(t, err, &localized)
 	assert.Equal(t, "A imagem pode ter no máximo 64 bytes.", localized.Localize(i18n.WithLocale(context.Background(), true, "pt-BR")))
-}
-
-// TestAllowedContentTypes: the four types a decoder is registered for, and nothing else. The
-// sentence every unsupported_type refusal renders names the same four.
-func TestAllowedContentTypes(t *testing.T) {
-	assert.Equal(t, []string{"image/gif", "image/jpeg", "image/png", "image/webp"},
-		slices.Sorted(maps.Keys(allowedContentTypes)))
 }

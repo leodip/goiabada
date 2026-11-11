@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -16,12 +17,13 @@ type DefaultBrandReader interface {
 	GetDefaultBrand(ctx context.Context, tx *sql.Tx) (*record.Brand, error)
 }
 
-// PageBrandReader is what a page reads its look from when its request names the client it is drawn
-// for: that client's brand, its own or the default, beside the default brand itself. data.Database
-// satisfies it.
+// PageBrandReader is what a page reads its look from: the brand of the client its request names, its
+// own or the default, beside the default brand itself, and the assets the brand's slots name, without
+// their bytes (#813 decision 2). data.Database satisfies it.
 type PageBrandReader interface {
 	DefaultBrandReader
 	GetClientPageBrand(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Brand, error)
+	brandasset.SlotsReader
 }
 
 // RequestPageBrand answers what a page drawn in ctx takes from its brand: ClientPageBrand for the
@@ -52,15 +54,27 @@ func ClientPageBrand(ctx context.Context, brands PageBrandReader, clientIdentifi
 		// A client that is not there, or one on the default while the settings row names none.
 		return DefaultPageBrand(ctx, brands)
 	}
-	return pageBrandOf(ctx, brand)
+	return pageBrandOf(ctx, brands, brand)
 }
 
 // PageBrand is what a page takes from its brand: the data-theme its html element carries,
-// light or dark, or empty for automatic, and the path it links the brand's stylesheet by after
-// main.css, or empty for none.
+// light or dark, or empty for automatic, and the path it links the brand's full stylesheet by after
+// main.css, or empty for none. ColorsStylesheet is the path of the brand's colors-only stylesheet,
+// which no page of the auth server links: the public settings carry it for the admin console's admin
+// pages (#813 decision 9). Both are empty, or both are set.
+//
+// Logo, DarkLogo and Favicon are the paths of the assets the brand's slots name, empty for an empty
+// slot; DarkLogo is empty too while there is no Logo, which a write refuses (#813 decision 5).
+// HideAppName is whether the app name's text gives way to the logo: the brand's switch, which has no
+// effect while there is no logo, so the name never disappears with nothing in its place.
 type PageBrand struct {
-	DataTheme  string
-	Stylesheet string
+	DataTheme        string
+	Stylesheet       string
+	ColorsStylesheet string
+	Logo             string
+	DarkLogo         string
+	Favicon          string
+	HideAppName      bool
 }
 
 // DefaultPageBrand answers what a page drawn in ctx takes from the default brand brands reads: every
@@ -70,7 +84,7 @@ type PageBrand struct {
 // brand stylesheet (#810): a nil brands, an empty pointer, a failed read, and a stored theme that is
 // none of the built-in ones, which names no stylesheet. The last two are faults and are logged; the
 // page itself is not one, so it is not refused over them.
-func DefaultPageBrand(ctx context.Context, brands DefaultBrandReader) PageBrand {
+func DefaultPageBrand(ctx context.Context, brands PageBrandReader) PageBrand {
 	if brands == nil {
 		return PageBrand{}
 	}
@@ -82,19 +96,41 @@ func DefaultPageBrand(ctx context.Context, brands DefaultBrandReader) PageBrand 
 	if brand == nil {
 		return PageBrand{}
 	}
-	return pageBrandOf(ctx, brand)
+	return pageBrandOf(ctx, brands, brand)
 }
 
 // pageBrandOf is what a page drawn in brand takes from it, or nothing when its stored theme is none
 // of the built-in ones, which names no stylesheet and is logged.
-func pageBrandOf(ctx context.Context, brand *record.Brand) PageBrand {
-	stylesheet, err := brandthemes.StylesheetPath(brand.Id, brand.Theme)
+func pageBrandOf(ctx context.Context, assets brandasset.SlotsReader, brand *record.Brand) PageBrand {
+	slots, err := brandasset.ReadSlots(ctx, assets, nil, brand)
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to read the assets of the brand a page is drawn in", "brand_id", brand.Id, "error", err)
+		return PageBrand{}
+	}
+	stylesheet, err := brandthemes.StylesheetPath(brand, slots)
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to link the brand's stylesheet", "brand_id", brand.Id, "error", err)
+		return PageBrand{}
+	}
+	colorsStylesheet, err := brandthemes.ColorsStylesheetPath(brand)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to link the brand's stylesheet", "brand_id", brand.Id, "error", err)
 		return PageBrand{}
 	}
 
-	page := PageBrand{Stylesheet: stylesheet}
+	page := PageBrand{Stylesheet: stylesheet, ColorsStylesheet: colorsStylesheet}
+	// A dark logo is drawn in place of the logo in dark mode, so it is nothing without one, and the
+	// switch hides the name only where a logo takes its place (#813 decision 5).
+	if slots.Logo != nil {
+		page.Logo = brandasset.Path(slots.Logo)
+		if slots.DarkLogo != nil {
+			page.DarkLogo = brandasset.Path(slots.DarkLogo)
+		}
+		page.HideAppName = brand.HideAppName
+	}
+	if slots.Favicon != nil {
+		page.Favicon = brandasset.Path(slots.Favicon)
+	}
 	// data-theme is written for light and dark alone, as ui.css reads it: automatic is no attribute,
 	// so the device's preference decides.
 	if brand.Appearance == record.BrandAppearanceLight || brand.Appearance == record.BrandAppearanceDark {

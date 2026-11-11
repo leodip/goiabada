@@ -47,12 +47,26 @@ type PublicSettingsResponse struct {
 }
 
 // PublicBrandResponse is what a page drawn in a brand takes from it: its appearance, auto,
-// light or dark, and the absolute URL of its stylesheet, which a page links after main.css. The URL
-// is opaque to the admin console, which links it as given and never builds one (#810 decision 3).
-// The same stylesheet is served to anyone, so neither value discloses anything a page does not.
+// light or dark, and the absolute URLs of its two stylesheets, either of which a page links after
+// main.css (#813 decision 9). StylesheetURL is the full one, the colors and the kit (corners, font
+// and background), which the end-user pages link; ColorsStylesheetURL sets the colors alone, which
+// the admin pages link. The URLs are opaque to the admin console, which links them as given and
+// never builds one (#810 decision 3). Both stylesheets are served to anyone, so no value discloses
+// anything a page does not.
+//
+// LogoURL, DarkLogoURL and FaviconURL are the absolute URLs of the brand's logo, dark logo and
+// favicon, each left out when its slot is empty; DarkLogoURL is left out too while there is no logo.
+// HideAppName is whether the app name's text gives way to the logo, which it does only beside one,
+// so it is false while there is no logo (#813 decision 5). A brand's sign-in pages show all of these
+// to anyone (#813 decision 9).
 type PublicBrandResponse struct {
-	Appearance    string `json:"appearance"`
-	StylesheetURL string `json:"stylesheetUrl"`
+	Appearance          string `json:"appearance"`
+	StylesheetURL       string `json:"stylesheetUrl"`
+	ColorsStylesheetURL string `json:"colorsStylesheetUrl"`
+	LogoURL             string `json:"logoUrl,omitempty"`
+	DarkLogoURL         string `json:"darkLogoUrl,omitempty"`
+	FaviconURL          string `json:"faviconUrl,omitempty"`
+	HideAppName         bool   `json:"hideAppName"`
 }
 
 // PasswordRulesResponse is what the stored password policy asks of a new password, as data: the

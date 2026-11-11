@@ -46,10 +46,15 @@ var protocolRoutes = []string{
 // section 2.2.1 has the client assume the token still exists and retry (#676 decision 12).
 var revocationRoutes = []string{"POST /auth/revoke"}
 
-// publicRoutes are on no application branch: a brand's stylesheet is served as a static file is,
-// with neither the settings read nor the session load, so neither fault reaches it (#810).
-// TestRegisterRoutes_TheBrandStylesheetCarriesNoBrowserSession holds it to that.
-var publicRoutes = []string{"GET /brand/{id}/stylesheet.css", "HEAD /brand/{id}/stylesheet.css"}
+// publicRoutes are on no application branch: a brand's two stylesheets and its assets are served as
+// a static file is, with neither the settings read nor the session load, so neither fault reaches
+// them (#810, #813). TestRegisterRoutes_TheBrandStylesheetCarriesNoBrowserSession and
+// TestRegisterRoutes_ABrandAssetCarriesNoBrowserSessionAndGrantsAFontToTheConsole hold them to that.
+var publicRoutes = []string{
+	"GET /brand/{id}/stylesheet.css", "HEAD /brand/{id}/stylesheet.css",
+	"GET /brand/{id}/colors.css", "HEAD /brand/{id}/colors.css",
+	"GET /brand-assets/{id}", "HEAD /brand-assets/{id}",
+}
 
 // applicationRoutes is routes less publicRoutes, each of which must be among them.
 func applicationRoutes(t *testing.T, routes []string) []string {

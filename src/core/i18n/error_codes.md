@@ -161,6 +161,7 @@ key per cause, each a whole sentence.
 | `handler.administrators.last_administrator` | (none) | This change would leave no enabled user holding authserver:manage. Grant it to another user first. |
 | `handler.image_upload.too_large` | (none) | File too large or invalid form data |
 | `handler.image_upload.no_file` | (none) | No picture file provided |
+| `handler.brand_asset.no_file` | (none) | No file provided |
 | `handler.user.email_too_long` | `max` (int) | The email address cannot exceed a maximum length of {{.max}} characters |
 | `handler.user.otp_not_enabled` | (none) | User does not have OTP enabled |
 | `handler.email_verification.account_changed` | (none) | The account was changed by another request while the code was being sent. Nothing was sent: try again. |
@@ -311,6 +312,18 @@ cause, each a whole sentence.
 | `handler.brand.appearance_invalid` | (none) | Choose automatic, light or dark. |
 | `handler.brand.theme_invalid` | (none) | Choose one of the built-in themes. |
 | `handler.brand.default_delete_not_allowed` | (none) | The default brand cannot be deleted. Make another brand the default first. |
+| `handler.brand.corners_invalid` | (none) | Choose square, rounded or pill corners. |
+| `handler.brand.font_invalid` | (none) | Choose one of the system font families, or the uploaded font. |
+| `handler.brand.background_fit_invalid` | (none) | Choose cover, contain or tile for the background image. |
+| `handler.brand.uploaded_font_regular_required` | (none) | Upload a regular font file to use the uploaded font. |
+| `handler.brand.logo_asset_invalid` | (none) | The logo is not a stored logo. Upload it again. |
+| `handler.brand.dark_logo_asset_invalid` | (none) | The dark logo is not a stored logo. Upload it again. |
+| `handler.brand.favicon_asset_invalid` | (none) | The favicon is not a stored favicon. Upload it again. |
+| `handler.brand.background_asset_invalid` | (none) | The background image is not a stored background image. Upload it again. |
+| `handler.brand.regular_font_asset_invalid` | (none) | The regular font file is not a stored font. Upload it again. |
+| `handler.brand.bold_font_asset_invalid` | (none) | The bold font file is not a stored font. Upload it again. |
+| `handler.brand.dark_logo_logo_required` | (none) | Upload a logo to use a dark logo. |
+| `handler.brand.bold_font_regular_required` | (none) | Upload a regular font file to use a bold one. |
 | `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
 | `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
 | `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |
@@ -430,6 +443,13 @@ cause, each a whole sentence.
 | `validator.image.undecodable` | (none) | The image could not be read. The file may be damaged. |
 | `validator.image.dimensions_too_small` | `min` (int) | The image must be at least {{.min}}x{{.min}} pixels. |
 | `validator.image.dimensions_too_large` | `max` (int) | The image can be at most {{.max}}x{{.max}} pixels. |
+| `validator.image.unsupported_type_png_jpeg_webp` | (none) | The image type is not supported. Allowed types are PNG, JPEG and WebP. |
+| `validator.image.unsupported_type_png` | (none) | The image type is not supported. The only allowed type is PNG. |
+| `validator.image.not_square` | `width` (int), `height` (int) | The image must be square. This one is {{.width}}x{{.height}} pixels. |
+| `validator.image.animated` | (none) | Animated images are not allowed. Upload a still image. |
+| `validator.font.too_large` | `max` (int) | The font can be at most {{.max}} bytes. |
+| `validator.font.empty` | (none) | The font file is empty. |
+| `validator.font.unsupported_type` | (none) | The font type is not supported. The only allowed type is WOFF2. |
 
 ## Authorize validator
 

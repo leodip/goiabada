@@ -393,6 +393,8 @@ func TestSeed_ANewInstallationHasADefaultBrand(t *testing.T) {
 	assert.Equal(t, "Default", brands[0].Name)
 	assert.Equal(t, record.BrandAppearance("auto"), brands[0].Appearance)
 	assert.Equal(t, "blueberry", brands[0].Theme)
+	assertBrandKit(t, &record.Brand{Corners: "rounded", Font: "system-ui", BackgroundFit: "cover"}, &brands[0],
+		"the seeded brand is drawn as before the kit (#813)")
 
 	assert.Equal(t, sql.NullInt64{Int64: brands[0].Id, Valid: true}, defaultBrandIdOf(t, h),
 		"the settings row points at the seeded brand")

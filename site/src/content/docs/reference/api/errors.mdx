@@ -45,8 +45,8 @@ This is every `UPPER_SNAKE` code the two APIs answer.
 | `INVALID_REQUEST` | `400` | The `Authorization` header or the `access_token` parameter was sent twice, the token was sent two ways at once, or a form body doesn't parse. |
 | `EMAIL_TOO_LONG` | `400` | The new user's email address is longer than 254 characters. |
 | `VALUE_TOO_LONG` | `400` | A user attribute's value is longer than 250 characters. |
-| `FILE_TOO_LARGE` | `400` | The uploaded picture or logo is over the size limit, or the form doesn't parse. |
-| `NO_FILE` | `400` | The upload has no `picture` field. |
+| `FILE_TOO_LARGE` | `400` | The uploaded profile picture or client logo is over the size limit, or the form of an upload, a brand's file included, doesn't parse. |
+| `NO_FILE` | `400` | A profile picture or client logo upload has no `picture` field, or a brand's file upload has no `file` field. |
 | `AUTHENTICATION_FAILED` | `400` | The password sent to confirm a password change, an email change, turning two-factor authentication on or off, a new set of recovery codes, or deleting the account is wrong. For two-factor authentication, a new set of recovery codes and deleting the account, a missing password answers it too. |
 | `OTP_CODE_REQUIRED` | `400` | Two-factor authentication was turned on without a code, or an account with two-factor authentication on was deleted without an authenticator code or a recovery code. |
 | `INVALID_OTP_CODE` | `400` | The code isn't six digits, or it doesn't match the authenticator. |

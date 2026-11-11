@@ -51,10 +51,16 @@ const (
 	// single enormous statement.
 	auditLogDeleteBatchSize  = 1000
 	auditLogDeleteMaxBatches = 100
+
+	// brandAssetSweepAge is how old an asset no brand uses must be before the sweep deletes it
+	// (#813 decision 2). An upload is stored at once and attached only when the brand that names
+	// it is saved, so an asset not yet attached may be an editor's work in progress; a day leaves
+	// that editor all the time a session takes.
+	brandAssetSweepAge = 24 * time.Hour
 )
 
 // backgroundWorkerDatabase is what the cleanup worker needs: the claim that makes one instance
-// the sweeper, and the twelve deletes it sweeps with.
+// the sweeper, and the thirteen deletes it sweeps with.
 type backgroundWorkerDatabase interface {
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
@@ -68,6 +74,7 @@ type backgroundWorkerDatabase interface {
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
 	DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
 	DeleteDeadPreRegistrations(ctx context.Context, tx *sql.Tx, deadBefore time.Time) error
+	DeleteUnattachedBrandAssets(ctx context.Context, tx *sql.Tx, createdBefore time.Time) (int, error)
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 }
@@ -415,6 +422,22 @@ func (w *Worker) sweep(ctx context.Context) (ranEveryStep, stepFailed bool) {
 		stepFailed = true
 	} else {
 		slog.InfoContext(ctx, "deleted dead pre-registrations")
+	}
+
+	if cancelled(ctx) {
+		return false, stepFailed
+	}
+
+	// Before the settings read, as the pre-registration sweep is, since it needs nothing from
+	// settings: the brand assets no brand uses that are a day old (#813 decision 2). It is the only
+	// thing that deletes an asset. A Save that attaches an old asset while this runs makes the
+	// slot's foreign key refuse the delete; the run logs it and the next one sweeps what is left.
+	deleted, err := w.database.DeleteUnattachedBrandAssets(ctx, nil, time.Now().UTC().Add(-brandAssetSweepAge))
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to delete unattached brand assets", "error", err)
+		stepFailed = true
+	} else {
+		slog.InfoContext(ctx, "deleted unattached brand assets", "deleted", deleted)
 	}
 
 	if cancelled(ctx) {

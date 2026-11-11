@@ -32,7 +32,6 @@ func HandleIndexGet(
 				return
 			}
 		}
-		bind["SessionEnded"] = sessionEnded
 
 		bind["AuthServerBaseUrl"] = authServerBaseURL
 
@@ -53,6 +52,14 @@ func HandleIndexGet(
 		bind["IsAuthenticated"] = isAuthenticated
 		bind["LoggedInUser"] = loggedInUser
 		bind["LogoutLink"] = logoutLink
+
+		// The notice HandleSessionEndedGet sends in the query when the session's row was gone.
+		// Anyone can link to it, so a signed-in visitor, whom it would tell their sign-in had
+		// ended, is not shown it.
+		if !isAuthenticated && r.URL.Query().Has(sessionEndedQuery) {
+			sessionEnded = true
+		}
+		bind["SessionEnded"] = sessionEnded
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/index.html", bind)
 		if err != nil {

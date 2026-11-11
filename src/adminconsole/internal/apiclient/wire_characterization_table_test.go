@@ -484,6 +484,34 @@ func wireCharacterization() []wireCase {
 			reply:         `{"brandThemes":[{"key":"blueberry","light":{},"dark":{}},{"key":"plum","light":{"brand":"#7a3aa8"},"dark":{"brand":"#cda4f0"}}]}`,
 			want:          []any{"plum", "#cda4f0"},
 		},
+		{
+			name: "UploadBrandAsset",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.UploadBrandAsset(ctx, charAccessToken, "background", charPictureBytes, "beach.webp")
+				if err != nil {
+					return nil, err
+				}
+				return []any{got.Id, got.Kind, got.Url, got.Width}, nil
+			},
+			verb: "POST", path: "/api/v1/admin/brand-assets/background", contentTypePrefix: charMultipart,
+			bodyHas:       []string{`name="file"; filename="beach.webp"`, "the-picture-bytes"},
+			successStatus: 201,
+			reply:         `{"brandAsset":{"id":41,"kind":"background","url":"https://auth.example.com/brand-assets/41?v=ab","width":1600}}`,
+			want:          []any{int64(41), "background", "https://auth.example.com/brand-assets/41?v=ab", 1600},
+		},
+		{
+			name: "GetBrandAssetById",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetBrandAssetById(ctx, charAccessToken, 41)
+				if err != nil {
+					return nil, err
+				}
+				return []any{got.Id, got.ContentType, got.Height}, nil
+			},
+			verb: "GET", path: "/api/v1/admin/brand-assets/41", contentType: charJSON,
+			successStatus: 200, reply: `{"brandAsset":{"id":41,"kind":"logo","contentType":"image/png","height":60}}`,
+			want: []any{int64(41), "image/png", 60},
+		},
 
 		// --- client_introspection_resources.go --------------------------------------------
 		{

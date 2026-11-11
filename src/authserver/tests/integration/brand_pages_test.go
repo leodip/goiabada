@@ -24,9 +24,16 @@ import (
 // the pointer, so restoreSettings cannot put it back.
 func makeDefaultBrand(t *testing.T, appearance record.BrandAppearance, theme string) *record.Brand {
 	t.Helper()
+	brand := record.NewBrand("Pages "+fake.LetterN(10), appearance, theme)
+	return makeDefaultBrandOf(t, &brand)
+}
+
+// makeDefaultBrandOf stores brand and makes it the default as makeDefaultBrand does, for a brand
+// with a kit of its own.
+func makeDefaultBrandOf(t *testing.T, brand *record.Brand) *record.Brand {
+	t.Helper()
 	ctx := context.Background()
 
-	brand := &record.Brand{Name: "Pages " + fake.LetterN(10), Appearance: appearance, Theme: theme}
 	require.NoError(t, database.CreateBrand(ctx, nil, brand))
 
 	var previous int64

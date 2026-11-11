@@ -25,6 +25,14 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   client, session backend, token client and JWKS parser; by `internal/pinnedfetch`, which the
   generators download through; and by the timezones generator for the decompressed tarball (#386,
   #432)
+- `brandkit/` - What a brand's kit draws (#813): `CornerRadii`, the two radius tokens of square and
+  pill; `FontStack`, the font-family list of each system family but System UI and of the uploaded
+  font, followed by System UI; `RegularFontWeights` and `BoldFontWeights`, the weights each uploaded
+  font file draws while both are there; and `BackgroundLayout`, how a background is laid out at each
+  fit. Rounded and System UI are ui.css's and main.css's own tokens and set nothing. The auth
+  server's full brand stylesheet and the admin console's brand editor, whose sample takes them as
+  they are picked, both draw from it. It also holds each kind of brand asset's byte limit, which the
+  auth server holds an upload to and the console's request-body table sizes its upload routes from
 - `buildinfo/` - The build stamp both servers report, `Version`, `BuildDate` and `GitCommit`, which
   the release builds set with `-ldflags -X` and which read `development` in any other build. It left
   `core/constants` beside `builtin/` when that package split, because the linker writes these values
@@ -274,10 +282,21 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   uploads
 - `internal/brandthemes/` - The eight built-in themes a brand is drawn in (#810): each preset's key
   and its light and dark palettes, 23 `#rrggbb` values by token name, in display order, and the
-  stylesheet each draws, built once. `StylesheetRoute` is where a brand's stylesheet is served, and
-  `StylesheetPath` the fingerprinted path a page links it by. The brand validation, the admin API's
-  `GET /brand-themes`, the stylesheet handler and the pages read it; the console reaches it only
+  colors stylesheet each draws, built once. A brand has two stylesheets (#813): the full one, its
+  colors then the radius and font tokens its corners and family set, from `core/brandkit`, served at
+  `StylesheetRoute` and linked by `StylesheetPath`; and the colors-only one, served at
+  `ColorsStylesheetRoute` and linked by `ColorsStylesheetPath`. The brand validation, the admin API's
+  `GET /brand-themes`, the stylesheet handlers and the pages read it; the console reaches it only
   through the API and `/api/public/settings`
+- `internal/brandasset/` - A brand's kit as stored files (#813): the rules an upload of each kind
+  is held to (a logo, favicon or background by `imageupload`'s rules for it, which refuse an
+  animated image; a font by its WOFF2 signature), the fingerprint of an asset's bytes, and `Route`
+  and `Path`, where an asset is served to anyone. `Slots` and `ReadSlots` read the assets in a
+  brand's six slots without their bytes, which the admin API's brand answers, the pages' logo and
+  favicon and the full stylesheet share. The admin API's uploads, the public asset handler and the
+  request-body table's rows read it. The public asset handler grants a font's answer to the admin
+  console's origin, which `routes.go` derives from `GOIABADA_ADMINCONSOLE_BASEURL`. The cleanup
+  worker sweeps an asset no brand uses once it is a day old (see the [data guide](data.md#brand-assets))
 - `internal/clientauth/` - Client authentication from plain values, the client identifier and the
   secret presented: the lookup, the secret check and their refusals' wording and shape, shared by
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a
@@ -471,6 +490,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   fails the sign-ins in flight at the deploy. The six stay declared because they key the sealed map
   and the callback deletes the stale copies a session written before #620 can hold. It was
   `internal/constants` until the context keys left for `reqctx` (#440, #620)
+- `internal/render/` - The console's page renderer. Every page is drawn in the brand
+  `/api/public/settings` answers (`PageBrand`): an admin page, one whose `menu` template calls
+  `admin_menu`, takes the brand's colors-only stylesheet and its logo and keeps Goiabada's icons;
+  every other page takes the full stylesheet, the logo and the brand's favicon (#813)
 - `web/template/` - Admin UI templates
 
 ## Configuration

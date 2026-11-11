@@ -93,6 +93,7 @@ var machineOnlyRefusals = map[string]machineOnlyClass{
 	"User session ID is required":    classMissingOrBadID,
 	"Invalid attribute ID":           classMissingOrBadID,
 	"Invalid brand ID":               classMissingOrBadID,
+	"Invalid brand asset ID":         classMissingOrBadID,
 	"Invalid client ID":              classMissingOrBadID,
 	"Invalid client ID format":       classMissingOrBadID,
 	"Invalid consent ID format":      classMissingOrBadID,

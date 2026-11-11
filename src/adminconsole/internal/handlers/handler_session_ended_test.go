@@ -52,6 +52,25 @@ func newMemoryStore(t *testing.T) *sessionstore.ServerSideStore {
 	return store
 }
 
+// mockedSessionStore answers Get and Save from mock, which a test programs to fail, and the
+// cookie's name from the production store. It implements HandleSessionEndedGet's port directly.
+type mockedSessionStore struct {
+	mock    *sessionstoremocks.Store
+	cookies *sessionstore.ServerSideStore
+}
+
+func (s mockedSessionStore) Get(r *http.Request, name string) (*sessionstore.Session, error) {
+	return s.mock.Get(r, name)
+}
+
+func (s mockedSessionStore) Save(r *http.Request, w http.ResponseWriter, sess *sessionstore.Session) error {
+	return s.mock.Save(r, w, sess)
+}
+
+func (s mockedSessionStore) CookieName(logicalName string) string {
+	return s.cookies.CookieName(logicalName)
+}
+
 // seedSession stores values as a browser's session and returns the cookies that name it.
 func seedSession(t *testing.T, store sessionstore.Store, values map[string]any) []*http.Cookie {
 	t.Helper()
@@ -159,7 +178,7 @@ func TestHandleSessionEndedGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSa
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			w := httptest.NewRecorder()
-			HandleSessionEndedGet(httpHelper, store).ServeHTTP(w,
+			HandleSessionEndedGet(httpHelper, mockedSessionStore{store, newMemoryStore(t)}).ServeHTTP(w,
 				handlertest.Request(http.MethodGet, "/auth/session-ended"))
 
 			httpHelper.AssertExpectations(t)
@@ -272,6 +291,76 @@ func TestHandleIndexGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSaved(t *
 			httpHelper.AssertExpectations(t)
 		})
 	}
+}
+
+// A session that holds no tokens any more, as a refused refresh leaves it, reaches the route from a
+// page script told its sign-in ended. It gets the notice, and logs nothing: the middleware that
+// signed it out logged why, and the admin API refused nothing here.
+func TestHandleSessionEndedGet_ASessionWithoutTokensGetsTheNoticeAndLogsNothing(t *testing.T) {
+	store := newMemoryStore(t)
+	logs := logtest.CaptureSlog(t)
+	cookies := seedSession(t, store, map[string]any{"somethingElse": "kept"})
+
+	w := httptest.NewRecorder()
+	HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w,
+		withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies))
+
+	assert.Equal(t, http.StatusFound, w.Code)
+	assert.Equal(t, "/", w.Header().Get("Location"))
+	_, noticed := readSession(t, store, cookies).TakeFlash("/", flashSessionEnded)
+	assert.True(t, noticed, "the notice was saved for the home page's request")
+	assert.Empty(t, logs.Records())
+}
+
+// A session whose row is gone, as when it expired while a page stayed open, has no row to carry the
+// notice, and a save would create one (#620). Its cookie says there was a sign-in to end, so the
+// notice goes home in the home page's query, and nothing is written. The row is gone here because
+// the store serving the route has the same keys as the one that wrote the cookie but an empty
+// backend. A visit with no cookie at all is told nothing.
+func TestHandleSessionEndedGet_SendsTheNoticeInTheQueryWhenTheSessionsRowIsGone(t *testing.T) {
+	cookies := seedSession(t, newMemoryStore(t), signedInValues())
+	store := newMemoryStore(t)
+
+	w := httptest.NewRecorder()
+	HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w,
+		withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies))
+
+	assert.Equal(t, http.StatusFound, w.Code)
+	assert.Equal(t, "/?session-ended", w.Header().Get("Location"))
+	assert.Empty(t, w.Result().Cookies(), "nothing is written")
+	assert.Empty(t, readSession(t, store, cookies).ID, "the route created no row")
+
+	t.Run("a visit with no cookie is told nothing", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w,
+			handlertest.Request(http.MethodGet, "/auth/session-ended"))
+
+		assert.Equal(t, http.StatusFound, w.Code)
+		assert.Equal(t, "/", w.Header().Get("Location"))
+		assert.Empty(t, w.Result().Cookies())
+	})
+}
+
+// The query's notice is shown to a visitor who is not signed in, and not to a signed-in one, whom
+// it would tell their sign-in had ended: anyone can link to it.
+func TestHandleIndexGet_ShowsTheQuerysNoticeOnlyToAVisitorNotSignedIn(t *testing.T) {
+	store := sessionstoremocks.NewStore(t)
+	store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
+		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
+	authHelper := oauthclient.NewAuthHelper(nil, "", "")
+	serve := func(target string, opts ...handlertest.Option) any {
+		httpHelper := handlersmocks.NewHttpHelper(t)
+		handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
+		HandleIndexGet(authHelper, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
+			handlertest.Request(http.MethodGet, target, opts...))
+		return handlertest.Bind(t, httpHelper)["SessionEnded"]
+	}
+
+	assert.Equal(t, true, serve("/?session-ended"), "a visitor not signed in")
+	assert.Equal(t, false, serve("/?session-ended", handlertest.WithJwtInfo(oauthclient.JwtInfo{
+		IdToken: &oauth.JwtToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+	})), "a signed-in administrator")
+	assert.Equal(t, false, serve("/"), "no query")
 }
 
 // #427 decision 18: the page RequiresScope sends a signed-in administrator without the scope to is a

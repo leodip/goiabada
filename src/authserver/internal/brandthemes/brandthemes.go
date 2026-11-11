@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
+	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/brandkit"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -55,43 +58,178 @@ func Get(key string) (Preset, bool) {
 	return Preset{}, false
 }
 
-// StylesheetRoute is the route a brand's stylesheet is served at, the brand's id in {id}.
+// StylesheetRoute is the route a brand's full stylesheet is served at, the brand's id in {id}.
 const StylesheetRoute = "/brand/{id}/stylesheet.css"
 
-// Stylesheet is the stylesheet a brand on a theme is drawn with, and the fingerprint of its
-// contents a page links it by.
+// Stylesheet is a stylesheet a brand is drawn with, and the fingerprint of its contents a page
+// links it by.
 type Stylesheet struct {
 	CSS         string
 	Fingerprint string
 }
 
-// stylesheets are every theme's stylesheet, built once: they change only with a release.
+// stylesheets are every theme's colors stylesheet, built once: they change only with a release.
 var stylesheets = buildStylesheets()
 
-// StylesheetOf returns the stylesheet of the built-in theme of key, and whether there is one.
+// StylesheetOf returns the colors stylesheet of the built-in theme of key, and whether there is one.
 func StylesheetOf(key string) (Stylesheet, bool) {
 	stylesheet, ok := stylesheets[key]
 	return stylesheet, ok
 }
 
-// StylesheetPath returns the path a page links a brand's stylesheet by: the brand's id, and the
-// fingerprint of the stylesheet its theme draws, so the path changes exactly when the stylesheet
-// does and a browser may keep it for a year. A theme that is none of the built-in ones is an error.
-func StylesheetPath(brandId int64, theme string) (string, error) {
-	stylesheet, ok := stylesheets[theme]
-	if !ok {
-		return "", errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brandId, theme)
+// ColorsStylesheetRoute is the route a brand's colors-only stylesheet is served at, the brand's id
+// in {id}: the stylesheet the admin console's admin pages link, so they take a brand's colors and
+// never its kit (#813 decision 9).
+const ColorsStylesheetRoute = "/brand/{id}/colors.css"
+
+// FullStylesheet returns the stylesheet brand is drawn with on the auth server's pages and the
+// console's end-user pages: its theme's colors, as ColorsStylesheet answers them, then its kit
+// (#813 decision 9). slots are the assets brand's slots name, read without their bytes.
+//
+//   - The uploaded font, while the font is uploaded and a regular font file fills its slot: one
+//     @font-face per file, swapped in once loaded. With one file it declares no weight, so the file
+//     is used for every weight; with a bold file too, the regular one draws the weights up to 500 and
+//     the bold one the heavier ones (decision 7). Files left attached beside a system family load
+//     nothing.
+//   - One rule on the root setting the tokens the kit changes: its corners' two radii and its
+//     family's --font-sans, which every text but monospace is drawn in, the uploaded font followed
+//     by the System UI family.
+//   - The background image, on the card pages' .auth-page, over the theme's background color, so a
+//     contained image leaves that color around it and one that fails to load leaves the page as it
+//     was (decision 6): cover and contain centred on the window, tile repeated at its own size.
+//
+// A choice drawn as today sets nothing, so a brand nobody has changed is drawn exactly as before the
+// kit, and its full stylesheet is its colors-only one. The logo, the dark logo and the favicon are
+// the page's to draw. A theme that is none of the built-in ones is an error.
+func FullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, error) {
+	colors, err := ColorsStylesheet(brand)
+	if err != nil {
+		return Stylesheet{}, err
 	}
-	path := strings.Replace(StylesheetRoute, "{id}", strconv.FormatInt(brandId, 10), 1)
-	return path + "?v=" + stylesheet.Fingerprint, nil
+	var rules []string
+
+	uploadedFont := brand.Font == record.BrandFontUploaded && slots.RegularFont != nil
+	if uploadedFont {
+		if slots.BoldFont == nil {
+			rules = append(rules, fontFace(slots.RegularFont, ""))
+		} else {
+			rules = append(rules, fontFace(slots.RegularFont, brandkit.RegularFontWeights), fontFace(slots.BoldFont, brandkit.BoldFontWeights))
+		}
+	}
+
+	// The corners' radii and the family's list are brandkit's, which the console's editor draws its
+	// sample from too. The uploaded font's list is set only while a regular font file is there to
+	// draw it; without one the brand is drawn in System UI, which sets nothing.
+	var root strings.Builder
+	if radii, ok := brandkit.CornerRadii(string(brand.Corners)); ok {
+		root.WriteString("  --radius-control: " + radii.Control + ";\n")
+		root.WriteString("  --radius-panel: " + radii.Panel + ";\n")
+	}
+	if brand.Font != record.BrandFontUploaded || uploadedFont {
+		if stack, ok := brandkit.FontStack(string(brand.Font)); ok {
+			root.WriteString("  --font-sans: " + stack + ";\n")
+		}
+	}
+	if root.Len() > 0 {
+		rules = append(rules, ":root {\n"+root.String()+"}\n")
+	}
+
+	if slots.Background != nil {
+		rules = append(rules, backgroundRule(slots.Background, brand.BackgroundFit))
+	}
+
+	if len(rules) == 0 {
+		return colors, nil
+	}
+	return newStylesheet(colors.CSS + "\n" + strings.Join(rules, "\n")), nil
+}
+
+// fontFace is the @font-face rule of an uploaded font file, for the weights in weight, or for every
+// weight when weight is empty.
+func fontFace(font *record.BrandAsset, weight string) string {
+	var b strings.Builder
+	b.WriteString("@font-face {\n")
+	b.WriteString("  font-family: " + brandkit.UploadedFontFamily + ";\n")
+	b.WriteString("  src: url(\"" + brandasset.Path(font) + "\") format(\"woff2\");\n")
+	if weight != "" {
+		b.WriteString("  font-weight: " + weight + ";\n")
+	}
+	b.WriteString("  font-display: swap;\n")
+	b.WriteString("}\n")
+	return b.String()
+}
+
+// backgroundRule draws background behind the card at fit, laid out as brandkit lays it out, which
+// the console's sample of a sign-in page draws it from too. A fit that is none of the three, which no
+// write stores, draws as cover, the fit migration 000091 gives every brand. A cover or contained image
+// is fixed to the window, so it stays put behind a card taller than the screen.
+func backgroundRule(background *record.BrandAsset, fit record.BrandBackgroundFit) string {
+	layout := brandkit.BackgroundLayout(string(fit))
+	var b strings.Builder
+	b.WriteString(".auth-page {\n")
+	b.WriteString("  background-image: url(\"" + brandasset.Path(background) + "\");\n")
+	if layout.Position != "" {
+		b.WriteString("  background-position: " + layout.Position + ";\n")
+	}
+	if layout.Size != "" {
+		b.WriteString("  background-size: " + layout.Size + ";\n")
+	}
+	b.WriteString("  background-repeat: " + layout.Repeat + ";\n")
+	if layout.Size != "" {
+		b.WriteString("  background-attachment: fixed;\n")
+	}
+	b.WriteString("}\n")
+	return b.String()
+}
+
+// ColorsStylesheet returns the stylesheet that sets brand's colors alone, its theme's, whatever its
+// kit holds. A theme that is none of the built-in ones is an error.
+func ColorsStylesheet(brand *record.Brand) (Stylesheet, error) {
+	stylesheet, ok := stylesheets[brand.Theme]
+	if !ok {
+		return Stylesheet{}, errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brand.Id, brand.Theme)
+	}
+	return stylesheet, nil
+}
+
+// StylesheetPath returns the path a page links brand's full stylesheet by, slots being the assets its
+// slots name: the brand's id, and the fingerprint of the stylesheet's contents, which name each file
+// it draws by the file's own fingerprint, so the path changes exactly when the stylesheet or a file
+// it draws does and a browser may keep it for a year. A theme that is none of the built-in ones is an error.
+func StylesheetPath(brand *record.Brand, slots brandasset.Slots) (string, error) {
+	stylesheet, err := FullStylesheet(brand, slots)
+	if err != nil {
+		return "", err
+	}
+	return linkPath(StylesheetRoute, brand.Id, stylesheet), nil
+}
+
+// ColorsStylesheetPath returns the path a page links brand's colors-only stylesheet by, as
+// StylesheetPath does the full one's.
+func ColorsStylesheetPath(brand *record.Brand) (string, error) {
+	stylesheet, err := ColorsStylesheet(brand)
+	if err != nil {
+		return "", err
+	}
+	return linkPath(ColorsStylesheetRoute, brand.Id, stylesheet), nil
+}
+
+func linkPath(route string, brandId int64, stylesheet Stylesheet) string {
+	path := strings.Replace(route, "{id}", strconv.FormatInt(brandId, 10), 1)
+	return path + "?v=" + stylesheet.Fingerprint
+}
+
+// newStylesheet is css with its fingerprint: the first twelve hex digits of its SHA-256, as a static
+// file's.
+func newStylesheet(css string) Stylesheet {
+	digest := sha256.Sum256([]byte(css))
+	return Stylesheet{CSS: css, Fingerprint: hex.EncodeToString(digest[:6])}
 }
 
 func buildStylesheets() map[string]Stylesheet {
 	built := make(map[string]Stylesheet, len(presets))
 	for _, preset := range presets {
-		css := stylesheetCSS(preset)
-		digest := sha256.Sum256([]byte(css))
-		built[preset.Key] = Stylesheet{CSS: css, Fingerprint: hex.EncodeToString(digest[:6])}
+		built[preset.Key] = newStylesheet(stylesheetCSS(preset))
 	}
 	return built
 }

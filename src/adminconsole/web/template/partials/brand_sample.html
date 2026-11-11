@@ -5,12 +5,14 @@
      illustration: inert and hidden from assistive technology, with nothing in it that can be
      focused or operated, which is why its fields, buttons and link are drawn on spans. It is
      drawn hidden, and brand-preview.js shows it once it has given it the theme's colors, which it
-     sets on this element alone. */ -}}
+     sets on this element alone. The script puts the logo of the sample's mode in the logo box above
+     the app name, as a sign-in card draws it (#813), and hides the name while the switch hides it. */ -}}
 {{- $mode := index . 0 }}
 {{- $ctx := index . 1 }}
 <div class="brand-sample" data-brand-sample="{{ $mode }}" hidden inert aria-hidden="true">
   <div class="panel auth-card">
     <div class="panel-body">
+      <div class="auth-logo" hidden></div>
       <p class="auth-brand">{{ index . 2 }}</p>
       <p class="auth-title">{{ T $ctx "auth.pwd.title" }}</p>
       <p class="auth-lead">{{ T $ctx "adminconsole.admin_branding.preview.sample_lead" }}</p>

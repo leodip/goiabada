@@ -33,6 +33,7 @@ func HandleUserProfilePicturePost(
 	baseURL string,
 	maxUploadBytes int64,
 ) http.HandlerFunc {
+	rules := imageupload.ProfilePicture(maxUploadBytes)
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse user ID from URL
 		idStr := r.PathValue("id")
@@ -59,12 +60,12 @@ func HandleUserProfilePicturePost(
 			return
 		}
 
-		data, ok := readUploadedImage(w, r, maxUploadBytes)
+		data, ok := readUploadedImage(w, r, rules.MaxBytes())
 		if !ok {
 			return
 		}
 
-		result, err := imageupload.Validate(data, maxUploadBytes)
+		result, err := imageupload.Validate(data, rules)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return

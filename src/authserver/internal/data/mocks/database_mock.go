@@ -1728,6 +1728,69 @@ func (_c *Database_CreateBrand_Call) RunAndReturn(run func(ctx context.Context, 
 	return _c
 }
 
+// CreateBrandAsset provides a mock function for the type Database
+func (_mock *Database) CreateBrandAsset(ctx context.Context, tx *sql.Tx, asset *record.BrandAsset) error {
+	ret := _mock.Called(ctx, tx, asset)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBrandAsset")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.BrandAsset) error); ok {
+		r0 = returnFunc(ctx, tx, asset)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateBrandAsset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateBrandAsset'
+type Database_CreateBrandAsset_Call struct {
+	*mock.Call
+}
+
+// CreateBrandAsset is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - asset *record.BrandAsset
+func (_e *Database_Expecter) CreateBrandAsset(ctx any, tx any, asset any) *Database_CreateBrandAsset_Call {
+	return &Database_CreateBrandAsset_Call{Call: _e.mock.On("CreateBrandAsset", ctx, tx, asset)}
+}
+
+func (_c *Database_CreateBrandAsset_Call) Run(run func(ctx context.Context, tx *sql.Tx, asset *record.BrandAsset)) *Database_CreateBrandAsset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.BrandAsset
+		if args[2] != nil {
+			arg2 = args[2].(*record.BrandAsset)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateBrandAsset_Call) Return(err error) *Database_CreateBrandAsset_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateBrandAsset_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, asset *record.BrandAsset) error) *Database_CreateBrandAsset_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateBrowserSession provides a mock function for the type Database
 func (_mock *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *record.BrowserSession) error {
 	ret := _mock.Called(ctx, tx, browserSession)
@@ -5940,6 +6003,78 @@ func (_c *Database_DeleteResource_Call) RunAndReturn(run func(ctx context.Contex
 	return _c
 }
 
+// DeleteUnattachedBrandAssets provides a mock function for the type Database
+func (_mock *Database) DeleteUnattachedBrandAssets(ctx context.Context, tx *sql.Tx, createdBefore time.Time) (int, error) {
+	ret := _mock.Called(ctx, tx, createdBefore)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteUnattachedBrandAssets")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) (int, error)); ok {
+		return returnFunc(ctx, tx, createdBefore)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) int); ok {
+		r0 = returnFunc(ctx, tx, createdBefore)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, createdBefore)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_DeleteUnattachedBrandAssets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteUnattachedBrandAssets'
+type Database_DeleteUnattachedBrandAssets_Call struct {
+	*mock.Call
+}
+
+// DeleteUnattachedBrandAssets is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - createdBefore time.Time
+func (_e *Database_Expecter) DeleteUnattachedBrandAssets(ctx any, tx any, createdBefore any) *Database_DeleteUnattachedBrandAssets_Call {
+	return &Database_DeleteUnattachedBrandAssets_Call{Call: _e.mock.On("DeleteUnattachedBrandAssets", ctx, tx, createdBefore)}
+}
+
+func (_c *Database_DeleteUnattachedBrandAssets_Call) Run(run func(ctx context.Context, tx *sql.Tx, createdBefore time.Time)) *Database_DeleteUnattachedBrandAssets_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteUnattachedBrandAssets_Call) Return(n int, err error) *Database_DeleteUnattachedBrandAssets_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_DeleteUnattachedBrandAssets_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, createdBefore time.Time) (int, error)) *Database_DeleteUnattachedBrandAssets_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteUser provides a mock function for the type Database
 func (_mock *Database) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error {
 	ret := _mock.Called(ctx, tx, userId)
@@ -7374,6 +7509,154 @@ func (_c *Database_GetAuthorizeRequestByHandleHash_Call) Return(authorizeRequest
 }
 
 func (_c *Database_GetAuthorizeRequestByHandleHash_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time) (*record.AuthorizeRequest, error)) *Database_GetAuthorizeRequestByHandleHash_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetBrandAssetById provides a mock function for the type Database
+func (_mock *Database) GetBrandAssetById(ctx context.Context, tx *sql.Tx, assetId int64) (*record.BrandAsset, error) {
+	ret := _mock.Called(ctx, tx, assetId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBrandAssetById")
+	}
+
+	var r0 *record.BrandAsset
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (*record.BrandAsset, error)); ok {
+		return returnFunc(ctx, tx, assetId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) *record.BrandAsset); ok {
+		r0 = returnFunc(ctx, tx, assetId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*record.BrandAsset)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, assetId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetBrandAssetById_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBrandAssetById'
+type Database_GetBrandAssetById_Call struct {
+	*mock.Call
+}
+
+// GetBrandAssetById is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - assetId int64
+func (_e *Database_Expecter) GetBrandAssetById(ctx any, tx any, assetId any) *Database_GetBrandAssetById_Call {
+	return &Database_GetBrandAssetById_Call{Call: _e.mock.On("GetBrandAssetById", ctx, tx, assetId)}
+}
+
+func (_c *Database_GetBrandAssetById_Call) Run(run func(ctx context.Context, tx *sql.Tx, assetId int64)) *Database_GetBrandAssetById_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetBrandAssetById_Call) Return(brandAsset *record.BrandAsset, err error) *Database_GetBrandAssetById_Call {
+	_c.Call.Return(brandAsset, err)
+	return _c
+}
+
+func (_c *Database_GetBrandAssetById_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, assetId int64) (*record.BrandAsset, error)) *Database_GetBrandAssetById_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetBrandAssetsByIds provides a mock function for the type Database
+func (_mock *Database) GetBrandAssetsByIds(ctx context.Context, tx *sql.Tx, assetIds []int64) ([]record.BrandAsset, error) {
+	ret := _mock.Called(ctx, tx, assetIds)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBrandAssetsByIds")
+	}
+
+	var r0 []record.BrandAsset
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []int64) ([]record.BrandAsset, error)); ok {
+		return returnFunc(ctx, tx, assetIds)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []int64) []record.BrandAsset); ok {
+		r0 = returnFunc(ctx, tx, assetIds)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.BrandAsset)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, []int64) error); ok {
+		r1 = returnFunc(ctx, tx, assetIds)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetBrandAssetsByIds_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBrandAssetsByIds'
+type Database_GetBrandAssetsByIds_Call struct {
+	*mock.Call
+}
+
+// GetBrandAssetsByIds is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - assetIds []int64
+func (_e *Database_Expecter) GetBrandAssetsByIds(ctx any, tx any, assetIds any) *Database_GetBrandAssetsByIds_Call {
+	return &Database_GetBrandAssetsByIds_Call{Call: _e.mock.On("GetBrandAssetsByIds", ctx, tx, assetIds)}
+}
+
+func (_c *Database_GetBrandAssetsByIds_Call) Run(run func(ctx context.Context, tx *sql.Tx, assetIds []int64)) *Database_GetBrandAssetsByIds_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 []int64
+		if args[2] != nil {
+			arg2 = args[2].([]int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetBrandAssetsByIds_Call) Return(brandAssets []record.BrandAsset, err error) *Database_GetBrandAssetsByIds_Call {
+	_c.Call.Return(brandAssets, err)
+	return _c
+}
+
+func (_c *Database_GetBrandAssetsByIds_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, assetIds []int64) ([]record.BrandAsset, error)) *Database_GetBrandAssetsByIds_Call {
 	_c.Call.Return(run)
 	return _c
 }

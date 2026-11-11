@@ -92,6 +92,9 @@ func TestAdminSettingsHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 			return HandleBrandNewPost(h, c, nil, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/branding/new",
 			handlertest.WithForm(url.Values{"name": {"Spring"}, "appearance": {"dark"}, "theme": {"plum"}}))},
+		{"HandleBrandAssetPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleBrandAssetPost(h, c, "logo")
+		}, handlertest.Request(http.MethodPost, "/admin/settings/branding/assets/logo")},
 		{"HandleBrandGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleBrandGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithPathValue("brandId", "4"))},

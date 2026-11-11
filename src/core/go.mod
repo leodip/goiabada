@@ -1,6 +1,6 @@
 module github.com/leodip/goiabada/core
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/BurntSushi/toml v1.6.0
@@ -13,5 +13,5 @@ require (
 require (
 	github.com/stretchr/objx v0.8.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 )

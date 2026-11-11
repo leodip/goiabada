@@ -135,6 +135,7 @@ const (
 	ErrCodeLastAdministrator           = "handler.administrators.last_administrator"
 	ErrCodeImageUploadTooLarge         = "handler.image_upload.too_large"
 	ErrCodeImageUploadNoFile           = "handler.image_upload.no_file"
+	ErrCodeBrandAssetUploadNoFile      = "handler.brand_asset.no_file"
 
 	// Resources.
 	ErrCodeResourceIdentifierRequired          = "handler.resource.identifier_required"
@@ -174,6 +175,22 @@ const (
 	ErrCodeBrandAppearanceInvalid       = "handler.brand.appearance_invalid"
 	ErrCodeBrandThemeInvalid            = "handler.brand.theme_invalid"
 	ErrCodeBrandDefaultDeleteNotAllowed = "handler.brand.default_delete_not_allowed"
+
+	// A brand's kit (#813 decisions 7 and 10).
+	ErrCodeBrandCornersInvalid              = "handler.brand.corners_invalid"
+	ErrCodeBrandFontInvalid                 = "handler.brand.font_invalid"
+	ErrCodeBrandBackgroundFitInvalid        = "handler.brand.background_fit_invalid"
+	ErrCodeBrandUploadedFontRegularRequired = "handler.brand.uploaded_font_regular_required"
+
+	// A brand's slots (#813 decisions 5, 7 and 10): each names a stored asset of its kind.
+	ErrCodeBrandLogoAssetInvalid        = "handler.brand.logo_asset_invalid"
+	ErrCodeBrandDarkLogoAssetInvalid    = "handler.brand.dark_logo_asset_invalid"
+	ErrCodeBrandFaviconAssetInvalid     = "handler.brand.favicon_asset_invalid"
+	ErrCodeBrandBackgroundAssetInvalid  = "handler.brand.background_asset_invalid"
+	ErrCodeBrandRegularFontAssetInvalid = "handler.brand.regular_font_asset_invalid"
+	ErrCodeBrandBoldFontAssetInvalid    = "handler.brand.bold_font_asset_invalid"
+	ErrCodeBrandDarkLogoLogoRequired    = "handler.brand.dark_logo_logo_required"
+	ErrCodeBrandBoldFontRegularRequired = "handler.brand.bold_font_regular_required"
 
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
@@ -432,14 +449,25 @@ const (
 	ErrCodeProfileLocaleInvalid         = "validator.profile.locale_invalid"
 	ErrCodeProfilePageLanguageInvalid   = "validator.profile.page_language_invalid"
 
-	// Image validator — profile picture and client logo uploads, from
-	// authserver/internal/imageupload.
-	ErrCodeImageTooLarge           = "validator.image.too_large" // Args: {"max": int64}
-	ErrCodeImageEmpty              = "validator.image.empty"
-	ErrCodeImageUnsupportedType    = "validator.image.unsupported_type"
-	ErrCodeImageUndecodable        = "validator.image.undecodable"
-	ErrCodeImageDimensionsTooSmall = "validator.image.dimensions_too_small" // Args: {"min": int}
-	ErrCodeImageDimensionsTooLarge = "validator.image.dimensions_too_large" // Args: {"max": int}
+	// Image validator — profile picture, client logo and brand image uploads, from
+	// authserver/internal/imageupload. The type refusal names the types of the upload's kind:
+	// unsupported_type a profile picture's and a client logo's, unsupported_type_png_jpeg_webp a
+	// brand logo's and background's, and unsupported_type_png a favicon's (#813 decision 3).
+	ErrCodeImageTooLarge                   = "validator.image.too_large" // Args: {"max": int64}
+	ErrCodeImageEmpty                      = "validator.image.empty"
+	ErrCodeImageUnsupportedType            = "validator.image.unsupported_type"
+	ErrCodeImageUndecodable                = "validator.image.undecodable"
+	ErrCodeImageDimensionsTooSmall         = "validator.image.dimensions_too_small" // Args: {"min": int}
+	ErrCodeImageDimensionsTooLarge         = "validator.image.dimensions_too_large" // Args: {"max": int}
+	ErrCodeImageUnsupportedTypePngJpegWebp = "validator.image.unsupported_type_png_jpeg_webp"
+	ErrCodeImageUnsupportedTypePng         = "validator.image.unsupported_type_png"
+	ErrCodeImageNotSquare                  = "validator.image.not_square" // Args: {"width": int, "height": int}
+	ErrCodeImageAnimated                   = "validator.image.animated"
+
+	// Font validator — a brand's uploaded font, from authserver/internal/brandasset.
+	ErrCodeFontTooLarge        = "validator.font.too_large" // Args: {"max": int64}
+	ErrCodeFontEmpty           = "validator.font.empty"
+	ErrCodeFontUnsupportedType = "validator.font.unsupported_type"
 
 	// Authorize endpoint, client and redirect_uri validation. These seven are
 	// the only authorize-endpoint errors represented here, and the reason is

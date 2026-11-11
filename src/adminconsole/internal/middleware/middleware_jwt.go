@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
@@ -55,8 +56,12 @@ type tokenRefresher interface {
 // localizer for its text, so this middleware belongs below whatever puts those
 // there, which is where initRoutes mounts it. Mounted above them, a failure here
 // renders nothing and panics into Recoverer instead.
+//
+// JSONError answers a page script's request whose sign-in has ended, which RequiresScope cannot
+// send to sign in (see render.SessionEndedError).
 type ServerErrorRenderer interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
+	JSONError(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // refreshWaitTimeout bounds how long a request waits for another request's refresh of its
@@ -528,6 +533,12 @@ func (m *JWT) supersedingTokens(r *http.Request, presented oauth.TokenResponse, 
 }
 
 // RequiresScope is a middleware that checks if the user has the required scope to access the resource.
+//
+// A request without a signed-in user is sent to sign in, unless one of the page scripts sent it: a
+// script cannot follow the sign-in, so it is answered with the session-ended JSON, which every
+// script follows to the session-ended route, and the home page then says the sign-in has ended. A
+// page's script runs only on a page drawn while signed in, so the session it meets with no tokens
+// is one that ended since, as when the auth server refused its refresh.
 func (m *JWT) RequiresScope(
 	scopesAnyOf []string,
 ) func(http.Handler) http.Handler {
@@ -539,11 +550,15 @@ func (m *JWT) RequiresScope(
 
 			isAuthorized := m.authHelper.IsAuthorizedToAccessResource(jwtInfo, scopesAnyOf)
 			if !isAuthorized {
-				if m.authHelper.IsAuthenticated(jwtInfo) {
+				switch {
+				case m.authHelper.IsAuthenticated(jwtInfo):
 					// User is authenticated but not authorized
 					// Show the unauthorized page
 					http.Redirect(w, r, "/unauthorized", http.StatusFound)
-				} else {
+				case render.IsScriptRequest(r):
+					// Nothing is sealed: the browser signs in again from the home page.
+					m.errorRenderer.JSONError(w, r, render.SessionEndedError(r.Context()))
+				default:
 					// User is not authenticated
 					// Redirect to the authorize endpoint
 					// The caller supplies the client id; this package names no

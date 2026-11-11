@@ -1,6 +1,7 @@
 {{define "title"}}{{ if .isNew }}{{ T $.ctx "adminconsole.admin_branding.new.page_title" }}{{ else }}{{ T $.ctx "adminconsole.admin_branding.brand.page_title_prefix" }} – {{ .storedBrand.Name }}{{ end }} – {{ .appName }}{{end}}
 {{define "menu"}}{{ template "admin_menu" . }}{{end}}
-{{define "head"}}<script src="{{ asset "/static/pages/brand-preview.js" }}" defer></script>{{end}}
+{{define "head"}}<script src="{{ asset "/static/pages/brand-preview.js" }}" defer></script>
+<script src="{{ asset "/static/pages/brand-assets.js" }}" defer></script>{{end}}
 
 {{define "page"}}
 <div class="page-header">
@@ -35,7 +36,7 @@
      the palettes the auth server lists: each theme card shows its light and its dark palette,
      and the appearance cards show the form's theme in the light, the dark or both, each marked
      with the modes it shows, in order, so brand-preview.js redraws them as the theme changes. */}}
-<form class="panel" method="post" novalidate>
+<form class="panel" method="post" novalidate data-asset-uploading="{{ T $.ctx "adminconsole.admin_branding.asset.uploading" }}" data-asset-uploaded="{{ T $.ctx "adminconsole.admin_branding.asset.uploaded" }}" data-asset-removed="{{ T $.ctx "adminconsole.admin_branding.asset.removed" }}" data-asset-upload-failed="{{ T $.ctx "adminconsole.admin_branding.asset.upload_failed" }}">
   <div class="panel-body stacked">
     {{ if .error }}
     <div class="notice notice-danger" role="alert" id="brand-error">
@@ -113,6 +114,94 @@
         {{ end }}
       </div>
     </fieldset>
+
+    {{/* The kit (#813): the logo, the dark logo and the switch hiding the app name beside a logo; the
+         favicon; the corners; the font family and the uploaded font's two files; and the background
+         image with its fit. Each slot is a fieldset holding its upload (the brand_asset partial), and
+         a refusal about one is marked on it as on the theme cards; a refusal about a choice marks the
+         choice. A slot's ids are written from $slot, as the partial writes them. brand-preview.js
+         draws the sample in the choices and the files as they are picked. */}}
+    {{ $errorField := "" }}{{ if .error }}{{ $errorField = .errorField }}{{ end }}{{ $slot := "" }}
+    {{ $slot = "logo" }}
+    <fieldset aria-describedby="{{ if .error }}{{ if eq .errorField "logo" }}brand-error {{ end }}{{ end }}{{ $slot }}Hint {{ $slot }}State">
+      <legend class="field-label mb-1" id="{{ $slot }}Label">{{ T $.ctx "adminconsole.admin_branding.brand.field.logo" }}</legend>
+      <p class="field-hint mb-2" id="{{ $slot }}Hint">{{ T $.ctx "adminconsole.admin_branding.brand.logo_hint" }}</p>
+      {{ template "brand_asset" (args $.ctx $slot .brand.Logo .brandAssetUploads "logo" (eq $errorField "logo") "brand-asset-thumb") }}
+    </fieldset>
+    {{ $slot = "darkLogo" }}
+    <fieldset aria-describedby="{{ if .error }}{{ if eq .errorField "darkLogo" }}brand-error {{ end }}{{ end }}{{ $slot }}Hint {{ $slot }}State">
+      <legend class="field-label mb-1" id="{{ $slot }}Label">{{ T $.ctx "adminconsole.admin_branding.brand.field.dark_logo" }}</legend>
+      <p class="field-hint mb-2" id="{{ $slot }}Hint">{{ T $.ctx "adminconsole.admin_branding.brand.dark_logo_hint" }}</p>
+      {{ template "brand_asset" (args $.ctx $slot .brand.DarkLogo .brandAssetUploads "logo" (eq $errorField "darkLogo") "brand-asset-thumb brand-asset-thumb-dark") }}
+    </fieldset>
+
+    <div class="check-list">
+      <label class="check-row" for="hideAppName">
+        <input type="checkbox" id="hideAppName" name="hideAppName" aria-describedby="hideAppNameHint"{{ if .brand.HideAppName }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_branding.brand.field.hide_app_name" }}</span>
+          <span class="field-hint" id="hideAppNameHint">{{ T $.ctx "adminconsole.admin_branding.brand.hide_app_name_hint" }}</span>
+        </span>
+      </label>
+    </div>
+
+    {{ $slot = "favicon" }}
+    <fieldset aria-describedby="{{ if .error }}{{ if eq .errorField "favicon" }}brand-error {{ end }}{{ end }}{{ $slot }}Hint {{ $slot }}State">
+      <legend class="field-label mb-1" id="{{ $slot }}Label">{{ T $.ctx "adminconsole.admin_branding.brand.field.favicon" }}</legend>
+      <p class="field-hint mb-2" id="{{ $slot }}Hint">{{ T $.ctx "adminconsole.admin_branding.brand.favicon_hint" }}</p>
+      {{ template "brand_asset" (args $.ctx $slot .brand.Favicon .brandAssetUploads "favicon" (eq $errorField "favicon") "brand-asset-thumb") }}
+    </fieldset>
+
+    <fieldset{{ if .error }}{{ if eq .errorField "corners" }} aria-describedby="brand-error"{{ end }}{{ end }}>
+      <legend class="field-label mb-2">{{ T $.ctx "adminconsole.admin_branding.brand.field.corners" }}</legend>
+      <div class="flex flex-wrap gap-x-6 gap-y-2">
+        <label class="choice"><input type="radio" id="corners-square" name="corners" value="square"{{ if eq .brand.Corners "square" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "corners" }} aria-invalid="true" autofocus{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.corners.square" }}</span></label>
+        <label class="choice"><input type="radio" id="corners-rounded" name="corners" value="rounded"{{ if eq .brand.Corners "rounded" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "corners" }} aria-invalid="true"{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.corners.rounded" }}</span></label>
+        <label class="choice"><input type="radio" id="corners-pill" name="corners" value="pill"{{ if eq .brand.Corners "pill" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "corners" }} aria-invalid="true"{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.corners.pill" }}</span></label>
+      </div>
+    </fieldset>
+
+    <div class="field">
+      <label class="field-label" for="font">{{ T $.ctx "adminconsole.admin_branding.brand.field.font" }}</label>
+      <select class="control" id="font" name="font" aria-describedby="{{ if .error }}{{ if eq .errorField "font" }}brand-error {{ end }}{{ end }}fontHint"
+        {{- if .error }}{{ if eq .errorField "font" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <option value="system-ui"{{ if eq .brand.Font "system-ui" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.system_ui" }}</option>
+        <option value="humanist"{{ if eq .brand.Font "humanist" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.humanist" }}</option>
+        <option value="geometric"{{ if eq .brand.Font "geometric" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.geometric" }}</option>
+        <option value="serif"{{ if eq .brand.Font "serif" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.serif" }}</option>
+        <option value="neo-grotesque"{{ if eq .brand.Font "neo-grotesque" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.neo_grotesque" }}</option>
+        <option value="rounded"{{ if eq .brand.Font "rounded" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.rounded" }}</option>
+        <option value="uploaded"{{ if eq .brand.Font "uploaded" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_branding.font.uploaded" }}</option>
+      </select>
+      <p class="field-hint" id="fontHint">{{ T $.ctx "adminconsole.admin_branding.brand.font_hint" }}</p>
+    </div>
+
+    {{ $slot = "regularFont" }}
+    <fieldset aria-describedby="{{ if .error }}{{ if eq .errorField "regularFont" }}brand-error {{ end }}{{ end }}{{ $slot }}Hint {{ $slot }}State">
+      <legend class="field-label mb-1" id="{{ $slot }}Label">{{ T $.ctx "adminconsole.admin_branding.brand.field.regular_font" }}</legend>
+      <p class="field-hint mb-2" id="{{ $slot }}Hint">{{ T $.ctx "adminconsole.admin_branding.brand.regular_font_hint" }}</p>
+      {{ template "brand_asset" (args $.ctx $slot .brand.RegularFont .brandAssetUploads "font" (eq $errorField "regularFont") "") }}
+    </fieldset>
+    {{ $slot = "boldFont" }}
+    <fieldset aria-describedby="{{ if .error }}{{ if eq .errorField "boldFont" }}brand-error {{ end }}{{ end }}{{ $slot }}Hint {{ $slot }}State">
+      <legend class="field-label mb-1" id="{{ $slot }}Label">{{ T $.ctx "adminconsole.admin_branding.brand.field.bold_font" }}</legend>
+      <p class="field-hint mb-2" id="{{ $slot }}Hint">{{ T $.ctx "adminconsole.admin_branding.brand.bold_font_hint" }}</p>
+      {{ template "brand_asset" (args $.ctx $slot .brand.BoldFont .brandAssetUploads "font" (eq $errorField "boldFont") "") }}
+    </fieldset>
+
+    {{/* The background image and its fit are one group: the file, then how it fills the page. */}}
+    {{ $slot = "background" }}
+    <fieldset aria-describedby="{{ if .error }}{{ if eq .errorField "background" "backgroundFit" }}brand-error {{ end }}{{ end }}{{ $slot }}Hint {{ $slot }}State backgroundFitHint">
+      <legend class="field-label mb-1" id="{{ $slot }}Label">{{ T $.ctx "adminconsole.admin_branding.brand.field.background_fit" }}</legend>
+      <p class="field-hint mb-2" id="{{ $slot }}Hint">{{ T $.ctx "adminconsole.admin_branding.brand.background_hint" }}</p>
+      {{ template "brand_asset" (args $.ctx $slot .brand.Background .brandAssetUploads "background" (eq $errorField "background") "brand-asset-thumb") }}
+      <p class="field-hint mt-3 mb-2" id="backgroundFitHint">{{ T $.ctx "adminconsole.admin_branding.brand.background_fit_hint" }}</p>
+      <div class="flex flex-wrap gap-x-6 gap-y-2">
+        <label class="choice"><input type="radio" id="backgroundFit-cover" name="backgroundFit" value="cover"{{ if eq .brand.BackgroundFit "cover" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "backgroundFit" }} aria-invalid="true" autofocus{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.background_fit.cover" }}</span></label>
+        <label class="choice"><input type="radio" id="backgroundFit-contain" name="backgroundFit" value="contain"{{ if eq .brand.BackgroundFit "contain" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "backgroundFit" }} aria-invalid="true"{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.background_fit.contain" }}</span></label>
+        <label class="choice"><input type="radio" id="backgroundFit-tile" name="backgroundFit" value="tile"{{ if eq .brand.BackgroundFit "tile" }} checked{{ end }}{{ if .error }}{{ if eq .errorField "backgroundFit" }} aria-invalid="true"{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.background_fit.tile" }}</span></label>
+      </div>
+    </fieldset>
   </div>
   <div class="panel-footer">
     <a class="button button-quiet" href="/admin/settings/branding">{{ T $.ctx "common.button.cancel" }}</a>
@@ -153,6 +242,7 @@
 </section>
 </div>
 <script type="application/json" id="brand-palettes">{{ .brandThemes }}</script>
+<script type="application/json" id="brand-kit-styles">{{ .brandKitStyles }}</script>
 {{ if not .isNew }}{{ if not .storedBrand.IsDefault }}
 {{ template "modal_dialog" (args "makeDefault" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_branding.brand.make_default_button") (T $.ctx "adminconsole.admin_branding.brand.make_default_title")) }}
 {{ end }}{{ end }}

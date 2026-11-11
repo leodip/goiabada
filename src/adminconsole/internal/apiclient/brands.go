@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/leodip/goiabada/core/api"
 )
@@ -104,4 +105,40 @@ func (c *AuthServerClient) GetBrandThemes(ctx context.Context, accessToken strin
 		return nil, err
 	}
 	return response.BrandThemes, nil
+}
+
+// UploadBrandAsset uploads a file as a brand asset of kind (logo, favicon, background or font), in
+// the multipart field "file", and answers the stored asset, which no brand names until a brand's
+// create or update names it (#813 decision 1).
+func (c *AuthServerClient) UploadBrandAsset(ctx context.Context, accessToken string, kind string, data []byte, filename string) (*api.BrandAssetResponse, error) {
+	body, contentType, err := multipartFile("file", filename, data)
+	if err != nil {
+		return nil, err
+	}
+	response, err := execute[api.CreateBrandAssetResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           fmt.Sprintf("%s/api/v1/admin/brand-assets/%s", c.baseURL, url.PathEscape(kind)),
+		rawBody:       body,
+		contentType:   contentType,
+		successStatus: http.StatusCreated,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &response.BrandAsset, nil
+}
+
+// GetBrandAssetById retrieves a stored brand asset without its bytes, attached to a brand or not,
+// which the brand editor draws a slot's asset from when it was uploaded and not yet saved.
+func (c *AuthServerClient) GetBrandAssetById(ctx context.Context, accessToken string, assetId int64) (*api.BrandAssetResponse, error) {
+	response, err := execute[api.GetBrandAssetResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           fmt.Sprintf("%s/api/v1/admin/brand-assets/%d", c.baseURL, assetId),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &response.BrandAsset, nil
 }

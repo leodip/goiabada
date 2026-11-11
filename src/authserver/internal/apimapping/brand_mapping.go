@@ -3,21 +3,40 @@ package apimapping
 import (
 	"maps"
 
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 )
 
-// ToBrandResponse answers a brand, isDefault saying whether the settings row points at it and
-// clientCount how many clients are drawn in it.
-func ToBrandResponse(brand *record.Brand, isDefault bool, clientCount int) api.BrandResponse {
+// ToBrandResponse answers a brand with its kit's choices and its six slots, slots being the assets
+// they name, each answered as ToBrandAssetResponse answers it and null for an empty slot; isDefault
+// says whether the settings row points at the brand and clientCount how many clients are drawn in it.
+func ToBrandResponse(brand *record.Brand, slots brandasset.Slots, baseURL string, isDefault bool, clientCount int) api.BrandResponse {
+	slot := func(asset *record.BrandAsset) *api.BrandAssetResponse {
+		if asset == nil {
+			return nil
+		}
+		answer := ToBrandAssetResponse(asset, baseURL)
+		return &answer
+	}
 	resp := api.BrandResponse{
-		Id:          brand.Id,
-		Name:        brand.Name,
-		Appearance:  string(brand.Appearance),
-		Theme:       brand.Theme,
-		IsDefault:   isDefault,
-		ClientCount: clientCount,
+		Id:            brand.Id,
+		Name:          brand.Name,
+		Appearance:    string(brand.Appearance),
+		Theme:         brand.Theme,
+		Corners:       string(brand.Corners),
+		Font:          string(brand.Font),
+		BackgroundFit: string(brand.BackgroundFit),
+		HideAppName:   brand.HideAppName,
+		Logo:          slot(slots.Logo),
+		DarkLogo:      slot(slots.DarkLogo),
+		Favicon:       slot(slots.Favicon),
+		Background:    slot(slots.Background),
+		RegularFont:   slot(slots.RegularFont),
+		BoldFont:      slot(slots.BoldFont),
+		IsDefault:     isDefault,
+		ClientCount:   clientCount,
 	}
 	if brand.CreatedAt.Valid {
 		createdAt := brand.CreatedAt.Time
@@ -41,4 +60,17 @@ func ToBrandThemeResponses(presets []brandthemes.Preset) []api.BrandThemeRespons
 		})
 	}
 	return responses
+}
+
+// ToBrandAssetResponse answers an asset without its bytes, its URL the path it is served at made
+// absolute on baseURL.
+func ToBrandAssetResponse(asset *record.BrandAsset, baseURL string) api.BrandAssetResponse {
+	return api.BrandAssetResponse{
+		Id:          asset.Id,
+		Kind:        string(asset.Kind),
+		Url:         baseURL + brandasset.Path(asset),
+		ContentType: asset.ContentType,
+		Width:       asset.Width,
+		Height:      asset.Height,
+	}
 }

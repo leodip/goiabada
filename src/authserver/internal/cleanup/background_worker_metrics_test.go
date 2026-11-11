@@ -58,6 +58,7 @@ func armEveryStep(mockDB *datamocks.Database) {
 	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,

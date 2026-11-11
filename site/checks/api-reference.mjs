@@ -1,6 +1,7 @@
 // The API reference's two documents, split from openapi.yaml before the build
 // renders them: the Admin API, which holds the public client logo with the
-// clients and the public settings with the settings, and the Account API, split by resource. The Browser Sessions
+// clients, the public settings with the settings and a brand's public stylesheets
+// and assets with the brands, and the Account API, split by resource. The Browser Sessions
 // operations, which the spec itself calls the admin console's internal API and
 // not a public surface, are in neither. An operation the split cannot place
 // fails the build rather than being left out or published by accident.
@@ -16,7 +17,7 @@ import { parse } from 'yaml';
 // The tag the spec gives the internal operations.
 const internalTag = 'Browser Sessions';
 
-const adminPrefixes = ['/api/v1/admin/', '/client/logo/', '/api/public/'];
+const adminPrefixes = ['/api/v1/admin/', '/client/logo/', '/api/public/', '/brand/', '/brand-assets/'];
 const accountPrefix = '/api/v1/account/';
 
 // The Account API's resources, by the path segment after /api/v1/account/, with

@@ -39,6 +39,7 @@ func TestWorker_PerformTask_SweepsRevokedAccessTokensAtTheRunsMoment(t *testing.
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).
 		Run(recordStep("codes")).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	before := time.Now().UTC()
@@ -64,6 +65,7 @@ func TestWorker_PerformTask_ContinuesAfterTheRevokedAccessTokenSweepFails(t *tes
 		Return(errors.New("delete failed")).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,

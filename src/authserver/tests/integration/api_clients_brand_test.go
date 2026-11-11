@@ -347,7 +347,7 @@ func TestAPIClientBrand_BrandsAnswerHowManyClientsTheyDraw(t *testing.T) {
 	explicit := newOrdinaryClient(t, "brand-count-c-")
 
 	status, body, _ := brandCall(t, accessToken, http.MethodPost, brandsPath,
-		map[string]any{"name": brandName("Counted"), "appearance": "light", "theme": "coconut"})
+		brandBody(map[string]any{"name": brandName("Counted"), "appearance": "light", "theme": "coconut"}))
 	require.Equal(t, http.StatusCreated, status, body)
 	counted := int64(body["brand"].(map[string]any)["id"].(float64))
 	*created = append(*created, counted)
@@ -390,7 +390,7 @@ func TestAPIClientBrand_BrandsAnswerHowManyClientsTheyDraw(t *testing.T) {
 
 	// An update answers the count.
 	status, body, _ = brandCall(t, accessToken, http.MethodPut, brandPath(counted, ""),
-		map[string]any{"name": brandName("Recounted"), "appearance": "dark", "theme": "coconut"})
+		brandBody(map[string]any{"name": brandName("Recounted"), "appearance": "dark", "theme": "coconut"}))
 	require.Equal(t, http.StatusOK, status, body)
 	assert.InDelta(t, 2, body["brand"].(map[string]any)["clientCount"], 0)
 

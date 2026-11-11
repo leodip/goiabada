@@ -3,7 +3,7 @@
 # from this file, and compiling the arm64 binary under emulation takes minutes longer for a
 # byte-identical one (#808). TestReleaseBuilds_CrossCompile, in
 # src/core/guard/release_build_rules_test.go, holds the build to this form.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS build
 
 ARG version
 ARG buildDate
@@ -78,7 +78,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -buildvcs=false -ta
 # but the final stage's COPY of its file is cached and ships an earlier build's bundle.
 # TestReleaseBuilds_TheRealImageBuildsRerunTheRefresh, in
 # src/core/guard/release_cache_filter_test.go, holds those builds to both.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS certs
 RUN apk upgrade --no-cache ca-certificates-bundle
 
 # ------------------------------------------------------------------------------
