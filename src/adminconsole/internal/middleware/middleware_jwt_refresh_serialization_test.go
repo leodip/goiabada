@@ -38,6 +38,13 @@ import (
 
 const flashKey = "the-flash"
 
+// flashPage is the page savingAFlash leaves its flash for, and endedPage the home page the
+// /auth/session-ended route leaves its notice for.
+const (
+	flashPage = "/admin/settings/general"
+	endedPage = "/"
+)
+
 // savingAFlash is a page further down the chain that sets a flash and saves the session, as some
 // thirty of the console's handlers do: whatever token set the request's session holds then is
 // what it writes back.
@@ -48,7 +55,7 @@ func (h *sessionHarness) savingAFlash() func(w http.ResponseWriter, r *http.Requ
 			h.t.Errorf("unable to get the session: %v", err)
 			return
 		}
-		sess.SetFlash(flashKey, "saved")
+		sess.SetFlash(flashPage, flashKey, "saved")
 		if err := h.store.Save(r, w, sess); err != nil {
 			h.t.Errorf("unable to save the session: %v", err)
 		}
@@ -197,7 +204,7 @@ func TestSessionHandler_ARefusedGrantDoesNotClearATokenSetNewerThanTheOnePresent
 	assert.Same(t, verifiedRefreshed, out.jwtInfo.IdToken, "whose ID token verified")
 
 	h.assertHolds(cookies, winner, winnerExpiresAt)
-	_, flashed := h.readBack(cookies).TakeFlash(flashKey)
+	_, flashed := h.readBack(cookies).TakeFlash(flashPage, flashKey)
 	assert.True(t, flashed, "the page's save landed")
 	calls, _ := h.refresher.sent()
 	assert.Equal(t, 1, calls, "this request presented its refresh token once")
@@ -339,7 +346,7 @@ func TestSessionHandler_AWaiterCarriesTheStoredSetIntoItsOwnSession(t *testing.T
 	h.assertNoRefreshSent()
 
 	h.assertHolds(cookies, winner, winnerExpiresAt)
-	_, flashed := h.readBack(cookies).TakeFlash(flashKey)
+	_, flashed := h.readBack(cookies).TakeFlash(flashPage, flashKey)
 	assert.True(t, flashed, "the page's save landed")
 	assert.Empty(t, h.logs.Records(), h.logs.Text())
 
@@ -388,10 +395,10 @@ func TestSessionHandler_AWaiterWhoseSessionWasSignedOutMeanwhileSendsNoGrant(t *
 			assert.Empty(t, h.logs.Records(), h.logs.Text())
 			if page == nil {
 				assert.Empty(t, h.backend.recordedWrites(), "the waiter writes nothing")
-				_, kept := h.readBack(cookies).TakeFlash(endedFlash)
+				_, kept := h.readBack(cookies).TakeFlash(endedPage, endedFlash)
 				assert.True(t, kept, "the ending request's notice survives")
 			} else {
-				_, flashed := h.readBack(cookies).TakeFlash(flashKey)
+				_, flashed := h.readBack(cookies).TakeFlash(flashPage, flashKey)
 				assert.True(t, flashed, "the page's save landed, with the tokens gone")
 			}
 		})
@@ -412,7 +419,7 @@ func (h *sessionHarness) endAsAnotherRequest(cookies []*http.Cookie, flash strin
 	}
 	delete(sess.Values, sessionkeys.JWT)
 	delete(sess.Values, sessionkeys.JWTExpiresAt)
-	sess.SetFlash(flash, "true")
+	sess.SetFlash(endedPage, flash, "true")
 	if err := h.store.Save(req, httptest.NewRecorder(), sess); err != nil {
 		h.t.Errorf("unable to save the session: %v", err)
 	}
@@ -688,7 +695,7 @@ func TestSessionHandler_AShortLivedAnswerIsCarriedNotRotatedAgain(t *testing.T) 
 
 	sess := h.readBack(cookies)
 	assert.Equal(t, answer, sess.Values[sessionkeys.JWT], "the session still holds the set granted")
-	_, flashed := sess.TakeFlash(flashKey)
+	_, flashed := sess.TakeFlash(flashPage, flashKey)
 	assert.True(t, flashed, "after the first request's late save")
 
 	h.assertTheNextRequestSendsNoGrant(cookies, answer)

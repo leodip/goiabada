@@ -10,8 +10,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // resourceUsersWithPermissionAPI is what the users-with-permission page needs: the resource and
@@ -27,7 +25,6 @@ type resourceUsersWithPermissionAPI interface {
 
 func HandleUsersWithPermissionGet(
 	httpHelper HttpHelper,
-	httpSession sessionstore.Store,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -109,21 +106,6 @@ func HandleUsersWithPermissionGet(
 		}
 
 		p := pagination.New(total, pageSize, pageInt, 5)
-
-		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
-		if savedSuccessfully {
-			err = httpSession.Save(r, w, sess)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-		}
 
 		bind := map[string]interface{}{
 			"resourceId":                   resource.Id,

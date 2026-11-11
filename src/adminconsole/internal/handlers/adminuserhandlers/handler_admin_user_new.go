@@ -137,13 +137,14 @@ func HandleNewPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		sess.SetFlash("userCreated", "true")
+		pagePath := fmt.Sprintf("/admin/users/%v/details", user.Id)
+		sess.SetFlash(pagePath, "userCreated", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/details", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, pagePath, r), http.StatusFound)
 	}
 }

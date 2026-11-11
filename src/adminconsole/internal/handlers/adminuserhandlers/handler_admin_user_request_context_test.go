@@ -377,7 +377,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		{
 			name: "HandleConsentsGet",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleConsentsGet(h, nil, c)
+				return HandleConsentsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/consents",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),

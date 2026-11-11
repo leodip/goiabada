@@ -376,8 +376,8 @@ func HandleBrandGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
-		_, madeDefault := sess.TakeFlash("brandMadeDefault")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
+		_, madeDefault := sess.TakeFlash(r.URL.Path, "brandMadeDefault")
 		if savedSuccessfully || madeDefault {
 			if err := httpSession.Save(r, w, sess); err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -451,13 +451,14 @@ func redirectToBrandWithFlash(httpHelper HttpHelper, httpSession sessionstore.St
 		httpHelper.InternalServerError(w, r, err)
 		return
 	}
-	sess.SetFlash(flash, "true")
+	pagePath := fmt.Sprintf("%s/%d/edit", brandingPath, id)
+	sess.SetFlash(pagePath, flash, "true")
 	if err := httpSession.Save(r, w, sess); err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return
 	}
 	//nolint:gosec // G710: the configured base URL and a fixed path around the brand's numeric id
-	http.Redirect(w, r, fmt.Sprintf("%s%s/%d/edit", baseURL, brandingPath, id), http.StatusFound)
+	http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 }
 
 // brandMakeDefaultAPI is what Make default needs: the write.

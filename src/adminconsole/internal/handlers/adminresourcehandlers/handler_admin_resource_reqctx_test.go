@@ -62,7 +62,7 @@ func TestAdminResourceHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 			handlertest.WithBody(strings.NewReader(`{"resourceId":3,"permissions":[],"expectedPermissions":[]}`)),
 			handlertest.WithContentType("application/json"))},
 		{"HandleUsersWithPermissionGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-			return HandleUsersWithPermissionGet(h, testStore(), c)
+			return HandleUsersWithPermissionGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/users-with-permission", routed)},
 		{"HandleUsersWithPermissionAddGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleUsersWithPermissionAddGet(h, c)
@@ -79,7 +79,7 @@ func TestAdminResourceHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 			return HandleUsersWithPermissionRemovePermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/users-with-permission/remove/5/8", grant("userId")...)},
 		{"HandleGroupsWithPermissionGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-			return HandleGroupsWithPermissionGet(h, testStore(), c)
+			return HandleGroupsWithPermissionGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/groups-with-permission", routed)},
 		{"HandleGroupsWithPermissionAddPermissionPost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleGroupsWithPermissionAddPermissionPost(h, c)

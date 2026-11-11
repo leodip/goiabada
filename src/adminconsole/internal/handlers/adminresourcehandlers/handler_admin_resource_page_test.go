@@ -240,7 +240,7 @@ func TestHandleGroupsWithPermissionGet_PageQueryParameter(t *testing.T) {
 			}
 
 			httpHelper := newHelper(t)
-			handler := HandleGroupsWithPermissionGet(httpHelper, testStore(), apiClient)
+			handler := HandleGroupsWithPermissionGet(httpHelper, apiClient)
 			bind := renderPermissionPage(t, handler, "groups-with-permission", tc.raw, httpHelper)
 
 			assertAsked(t, tc.wantAsked, apiClient.asked, tc.why)
@@ -304,7 +304,7 @@ func TestHandleGroupsWithPermissionGet_TheOverflowingPageDoesNotPanic(t *testing
 			t.Run(raw+"_over_"+strconv.Itoa(total), func(t *testing.T) {
 				apiClient := &resourcePagingApiClient{total: total} // no permissions
 				httpHelper := newHelper(t)
-				handler := HandleGroupsWithPermissionGet(httpHelper, testStore(), apiClient)
+				handler := HandleGroupsWithPermissionGet(httpHelper, apiClient)
 
 				bind := renderPermissionPage(t, handler, "groups-with-permission", raw, httpHelper)
 
@@ -368,7 +368,7 @@ func TestHandleUsersWithPermissionGet_PageQueryParameter(t *testing.T) {
 			}
 
 			httpHelper := newHelper(t)
-			handler := HandleUsersWithPermissionGet(httpHelper, testStore(), apiClient)
+			handler := HandleUsersWithPermissionGet(httpHelper, apiClient)
 			bind := renderPermissionPage(t, handler, "users-with-permission", tc.raw, httpHelper)
 
 			assertAsked(t, tc.wantAsked, apiClient.asked, tc.why)

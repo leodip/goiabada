@@ -87,30 +87,46 @@ func (s *Session) Save(r *http.Request, w http.ResponseWriter) error {
 	return s.store.Save(r, w, s)
 }
 
-// SetFlash stores a one-shot message under key, to be read once by a later request.
+// SetFlash stores a one-shot message under key for the page at path, to be read once by a
+// later request for that page. path is the page's request path as its server routes it,
+// without the query.
+//
+// A flash belongs to one page because every tab of a browser shares its session. A flash
+// any page could read would be taken by whichever page of the session loaded next, so a
+// page another tab loaded between a save and the redirect after it would show the notice
+// meant for the saving tab, and the saving tab would show none.
 //
 // A flash is stored as a plain string in Values, which is the whole of what this
 // repository needs: every write here is a notice that a form saved, and every read
 // reduces it to a boolean. Storing a string also means the serialiser needs nothing
 // registered to encode it, where a slice of interfaces would (#269).
-func (s *Session) SetFlash(key, value string) {
-	s.Values[key] = value
+func (s *Session) SetFlash(path, key, value string) {
+	s.Values[flashKey(path, key)] = value
 }
 
-// TakeFlash returns the flash stored under key and removes it, so the next request does
-// not see it again. The second result reports whether one was there.
+// TakeFlash returns the flash stored under key for the page at path and removes it, so the
+// next request does not see it again. The second result reports whether one was there. A
+// flash stored for another page is left for that page.
 //
 // Absence is reported in the boolean rather than by an empty string, so a flash whose
 // value is empty is still distinguishable from no flash at all. A value some other
 // writer left under the same key is treated as absent rather than asserted, so this
 // cannot panic on it.
-func (s *Session) TakeFlash(key string) (string, bool) {
-	value, ok := s.Values[key].(string)
+func (s *Session) TakeFlash(path, key string) (string, bool) {
+	stored := flashKey(path, key)
+	value, ok := s.Values[stored].(string)
 	if !ok {
 		return "", false
 	}
-	delete(s.Values, key)
+	delete(s.Values, stored)
 	return value, true
+}
+
+// flashKey is the Values key a flash for the page at path is stored under. The key comes
+// before the path and holds no colon, and a request path starts with a slash, so no two
+// pairs of path and key share one.
+func flashKey(path, key string) string {
+	return "flash:" + key + ":" + path
 }
 
 // registryKey is the context key the per-request session cache is installed under.

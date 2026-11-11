@@ -30,7 +30,7 @@ func HandleChangePasswordGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		if savedSuccessfully {
 			if err := httpSession.Save(r, w, sess); err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -131,12 +131,13 @@ func HandleChangePasswordPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := "/account/change-password"
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		if err := httpSession.Save(r, w, sess); err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, baseURL+"/account/change-password", http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }

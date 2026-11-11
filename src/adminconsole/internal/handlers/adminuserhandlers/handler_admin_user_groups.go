@@ -79,7 +79,7 @@ func HandleGroupsGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -164,7 +164,8 @@ func HandleGroupsPost(
 			return
 		}
 
-		sess.SetFlash("savedSuccessfully", "true")
+		// For the page this was posted from, which its script reloads on success.
+		sess.SetFlash(r.URL.Path, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.JSONError(w, r, err)

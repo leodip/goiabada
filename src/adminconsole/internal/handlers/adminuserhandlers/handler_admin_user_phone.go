@@ -68,7 +68,7 @@ func HandlePhoneGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -183,13 +183,14 @@ func HandlePhonePost(
 			return
 		}
 
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := fmt.Sprintf("/admin/users/%v/phone", id)
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/phone", id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, pagePath, r), http.StatusFound)
 	}
 }

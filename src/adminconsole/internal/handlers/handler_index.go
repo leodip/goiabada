@@ -25,7 +25,7 @@ func HandleIndexGet(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		_, sessionEnded := sess.TakeFlash(flashSessionEnded)
+		_, sessionEnded := sess.TakeFlash(r.URL.Path, flashSessionEnded)
 		if sessionEnded {
 			if err = httpSession.Save(r, w, sess); err != nil {
 				httpHelper.InternalServerError(w, r, err)

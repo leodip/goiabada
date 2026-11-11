@@ -1692,7 +1692,7 @@ func TestServerSideStore_FlashSurvivesAReloadAndIsReadOnce(t *testing.T) {
 	writeRec := httptest.NewRecorder()
 	session, err := store.Get(writeReq, storeTestName)
 	require.NoError(t, err)
-	session.SetFlash("savedSuccessfully", "true")
+	session.SetFlash("/admin/settings/general", "savedSuccessfully", "true")
 	require.NoError(t, store.Save(writeReq, writeRec, session))
 
 	cookies := writeRec.Result().Cookies()
@@ -1702,7 +1702,7 @@ func TestServerSideStore_FlashSurvivesAReloadAndIsReadOnce(t *testing.T) {
 	readReq := requestWith(cookies[0])
 	reloaded, err := store.Get(readReq, storeTestName)
 	require.NoError(t, err)
-	value, ok := reloaded.TakeFlash("savedSuccessfully")
+	value, ok := reloaded.TakeFlash("/admin/settings/general", "savedSuccessfully")
 	assert.True(t, ok, "the flash must survive the round trip through the backend")
 	assert.Equal(t, "true", value)
 	require.NoError(t, store.Save(readReq, httptest.NewRecorder(), reloaded))
@@ -1711,7 +1711,7 @@ func TestServerSideStore_FlashSurvivesAReloadAndIsReadOnce(t *testing.T) {
 	// above the consumption would live only in the object request two threw away.
 	third, err := store.Get(requestWith(cookies[0]), storeTestName)
 	require.NoError(t, err)
-	_, ok = third.TakeFlash("savedSuccessfully")
+	_, ok = third.TakeFlash("/admin/settings/general", "savedSuccessfully")
 	assert.False(t, ok, "a notice must not show a second time")
 }
 

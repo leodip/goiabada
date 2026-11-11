@@ -78,6 +78,11 @@ func TestSession_SavePassesTheStoresErrorBack(t *testing.T) {
 }
 
 func TestSession_Flashes(t *testing.T) {
+	// The page a save redirects to, and two other pages of the same session.
+	const page = "/admin/groups/49/settings"
+	const otherPage = "/account/profile"
+	const sameFormOfAnotherGroup = "/admin/groups/50/settings"
+
 	tests := []struct {
 		name  string
 		drive func(t *testing.T, session *Session)
@@ -85,13 +90,13 @@ func TestSession_Flashes(t *testing.T) {
 		{
 			name: "a flash is read once and then gone",
 			drive: func(t *testing.T, session *Session) {
-				session.SetFlash("savedSuccessfully", "true")
+				session.SetFlash(page, "savedSuccessfully", "true")
 
-				value, ok := session.TakeFlash("savedSuccessfully")
+				value, ok := session.TakeFlash(page, "savedSuccessfully")
 				assert.True(t, ok)
 				assert.Equal(t, "true", value)
 
-				value, ok = session.TakeFlash("savedSuccessfully")
+				value, ok = session.TakeFlash(page, "savedSuccessfully")
 				assert.False(t, ok, "a second read must not see it")
 				assert.Empty(t, value)
 			},
@@ -99,30 +104,63 @@ func TestSession_Flashes(t *testing.T) {
 		{
 			name: "reading clears the key rather than blanking it",
 			drive: func(t *testing.T, session *Session) {
-				session.SetFlash("savedSuccessfully", "true")
-				_, _ = session.TakeFlash("savedSuccessfully")
+				session.SetFlash(page, "savedSuccessfully", "true")
+				_, _ = session.TakeFlash(page, "savedSuccessfully")
 
 				// The key itself has to go, not merely its value: what gets stored is
 				// Values, so a key left behind is a key written back on every save for
 				// the rest of the session's life.
-				assert.NotContains(t, session.Values, "savedSuccessfully")
+				assert.Empty(t, session.Values)
 			},
 		},
 		{
 			name: "a key that was never set reports absence",
 			drive: func(t *testing.T, session *Session) {
-				value, ok := session.TakeFlash("neverSet")
+				value, ok := session.TakeFlash(page, "neverSet")
 				assert.False(t, ok)
 				assert.Empty(t, value)
 			},
 		},
 		{
-			name: "two writes under one key leave the second value",
+			name: "another page, or the same form of another record, leaves the flash for its page",
 			drive: func(t *testing.T, session *Session) {
-				session.SetFlash("notice", "first")
-				session.SetFlash("notice", "second")
+				// Every tab of the browser shares the session: the page another tab loads
+				// between a save and its redirect must not take the saving tab's notice.
+				session.SetFlash(page, "savedSuccessfully", "true")
 
-				value, ok := session.TakeFlash("notice")
+				for _, other := range []string{otherPage, sameFormOfAnotherGroup} {
+					value, ok := session.TakeFlash(other, "savedSuccessfully")
+					assert.False(t, ok, other)
+					assert.Empty(t, value, other)
+				}
+
+				value, ok := session.TakeFlash(page, "savedSuccessfully")
+				assert.True(t, ok, "the page the flash is for still finds it")
+				assert.Equal(t, "true", value)
+			},
+		},
+		{
+			name: "two pages' flashes under one key are read apart",
+			drive: func(t *testing.T, session *Session) {
+				session.SetFlash(page, "savedSuccessfully", "group")
+				session.SetFlash(otherPage, "savedSuccessfully", "profile")
+
+				value, ok := session.TakeFlash(otherPage, "savedSuccessfully")
+				assert.True(t, ok)
+				assert.Equal(t, "profile", value)
+
+				value, ok = session.TakeFlash(page, "savedSuccessfully")
+				assert.True(t, ok, "taking one page's flash leaves the other's")
+				assert.Equal(t, "group", value)
+			},
+		},
+		{
+			name: "two writes under one key for one page leave the second value",
+			drive: func(t *testing.T, session *Session) {
+				session.SetFlash(page, "notice", "first")
+				session.SetFlash(page, "notice", "second")
+
+				value, ok := session.TakeFlash(page, "notice")
 				assert.True(t, ok)
 				assert.Equal(t, "second", value)
 			},
@@ -132,26 +170,27 @@ func TestSession_Flashes(t *testing.T) {
 			drive: func(t *testing.T, session *Session) {
 				// Absence is reported in the boolean, not by an empty string, so these
 				// two are distinguishable. A caller reducing the flash to a boolean, as
-				// all 35 of them do, would otherwise silently lose this one.
-				session.SetFlash("notice", "")
+				// most of them do, would otherwise silently lose this one.
+				session.SetFlash(page, "notice", "")
 
-				value, ok := session.TakeFlash("notice")
+				value, ok := session.TakeFlash(page, "notice")
 				assert.True(t, ok)
 				assert.Empty(t, value)
 			},
 		},
 		{
-			name: "a non-string value under a flash key is absence, not a panic",
+			name: "a non-string value under a flash's key is absence, not a panic",
 			drive: func(t *testing.T, session *Session) {
-				// Values is shared with everything else the session carries, so a flash
+				// Values is shared with everything else the session carries, so a flash's
 				// key can collide with a key some other writer owns. Reporting absence
 				// is what keeps that a wrong answer rather than a crashed request.
-				session.Values["notice"] = 42
+				stored := flashKey(page, "notice")
+				session.Values[stored] = 42
 
-				value, ok := session.TakeFlash("notice")
+				value, ok := session.TakeFlash(page, "notice")
 				assert.False(t, ok)
 				assert.Empty(t, value)
-				assert.Equal(t, 42, session.Values["notice"], "and the other writer's value stays")
+				assert.Equal(t, 42, session.Values[stored], "and the other writer's value stays")
 			},
 		},
 	}

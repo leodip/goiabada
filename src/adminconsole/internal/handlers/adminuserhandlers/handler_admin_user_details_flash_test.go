@@ -64,16 +64,20 @@ func newFlashTestStore() *sessionstore.ServerSideStore {
 	return store
 }
 
+// detailsPath is the page detailsRequest asks for.
+const detailsPath = "/admin/users/7/details"
+
 // detailsRequest builds the GET the handler expects: the userId path value the route would have
 // bound, and the access token it reads out of the request context.
 func detailsRequest() *http.Request {
-	return handlertest.Request(http.MethodGet, "/admin/users/7/details",
+	return handlertest.Request(http.MethodGet, detailsPath,
 		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "7"))
 }
 
-// flashInSession puts the named flashes into a stored session and returns the cookie that
-// names it, which is what the handler that redirected here would have left the browser.
-func flashInSession(t *testing.T, store *sessionstore.ServerSideStore, keys ...string) *http.Cookie {
+// flashInSession puts the named flashes for the page at pagePath into a stored session and
+// returns the cookie that names it, which is what the handler that redirected there would have
+// left the browser.
+func flashInSession(t *testing.T, store *sessionstore.ServerSideStore, pagePath string, keys ...string) *http.Cookie {
 	t.Helper()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
@@ -82,7 +86,7 @@ func flashInSession(t *testing.T, store *sessionstore.ServerSideStore, keys ...s
 	sess, err := store.Get(req, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
 	for _, key := range keys {
-		sess.SetFlash(key, "true")
+		sess.SetFlash(pagePath, key, "true")
 	}
 	require.NoError(t, store.Save(req, rec, sess))
 
@@ -146,7 +150,7 @@ func TestHandleDetailsGet_TheTwoNoticesAreIndependentAndEachShowsOnce(t *testing
 
 			var cookie *http.Cookie
 			if len(tc.flashes) > 0 {
-				cookie = flashInSession(t, store, tc.flashes...)
+				cookie = flashInSession(t, store, detailsPath, tc.flashes...)
 			}
 
 			bind, rec := renderDetails(t, store, cookie)
@@ -167,6 +171,33 @@ func TestHandleDetailsGet_TheTwoNoticesAreIndependentAndEachShowsOnce(t *testing
 			reloaded, _ := renderDetails(t, store, next)
 			assert.Equal(t, false, reloaded["savedSuccessfully"], "on reload")
 			assert.Equal(t, false, reloaded["userCreated"], "on reload")
+		})
+	}
+}
+
+// Every tab of the browser shares the session, so the page another tab loads between a save and
+// its redirect must leave the saving tab's notice for the page it was set for: neither shown here
+// nor taken from that page. The other pages are another user's details, whose saved and created
+// notices this page reads under the same keys, and a page of another kind.
+func TestHandleDetailsGet_LeavesAnotherPagesNoticesForThatPage(t *testing.T) {
+	for _, other := range []string{"/admin/users/8/details", "/account/profile"} {
+		t.Run(other, func(t *testing.T) {
+			store := newFlashTestStore()
+			cookie := flashInSession(t, store, other, "savedSuccessfully", "userCreated")
+
+			bind, rec := renderDetails(t, store, cookie)
+			assert.Equal(t, false, bind["savedSuccessfully"])
+			assert.Equal(t, false, bind["userCreated"])
+			assert.Empty(t, rec.Result().Cookies(), "nothing was taken, so nothing is saved")
+
+			req := httptest.NewRequest(http.MethodGet, other, nil)
+			req.AddCookie(cookie)
+			sess, err := store.Get(req, builtin.AdminConsoleSessionName)
+			require.NoError(t, err)
+			for _, key := range []string{"savedSuccessfully", "userCreated"} {
+				_, kept := sess.TakeFlash(other, key)
+				assert.True(t, kept, "the %s notice is still there for %s", key, other)
+			}
 		})
 	}
 }

@@ -2,7 +2,6 @@ package adminsettingshandlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -80,7 +79,7 @@ func HandleEmailGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -199,14 +198,15 @@ func HandleEmailPost(
 			return
 		}
 
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := "/admin/settings/email"
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email", baseURL), http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }
 
@@ -232,8 +232,8 @@ func HandleEmailSendTestGet(
 
 		// The address the last test email went to, which the page names in saying it was sent, and
 		// whether it went unencrypted, which the page then says too.
-		sentTo, sent := sess.TakeFlash("testEmailSentTo")
-		_, sentUnencrypted := sess.TakeFlash("testEmailSentUnencrypted")
+		sentTo, sent := sess.TakeFlash(r.URL.Path, "testEmailSentTo")
+		_, sentUnencrypted := sess.TakeFlash(r.URL.Path, "testEmailSentUnencrypted")
 		if sent || sentUnencrypted {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -320,17 +320,18 @@ func HandleEmailSendTestPost(
 			return
 		}
 
-		sess.SetFlash("testEmailSentTo", destinationEmail)
+		pagePath := "/admin/settings/email/send-test-email"
+		sess.SetFlash(pagePath, "testEmailSentTo", destinationEmail)
 		// Only this send's answer is said: an earlier send's, never shown, is dropped.
-		sess.TakeFlash("testEmailSentUnencrypted")
+		sess.TakeFlash(pagePath, "testEmailSentUnencrypted")
 		if !sendResp.Encrypted {
-			sess.SetFlash("testEmailSentUnencrypted", "true")
+			sess.SetFlash(pagePath, "testEmailSentUnencrypted", "true")
 		}
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/email/send-test-email", baseURL), http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }

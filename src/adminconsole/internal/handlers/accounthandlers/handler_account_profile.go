@@ -65,7 +65,7 @@ func HandleProfileGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		copied := copyPageLanguage(sess, user.PageLanguage)
 		if savedSuccessfully || copied {
 			err = httpSession.Save(r, w, sess)
@@ -156,7 +156,8 @@ func HandleProfilePost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := "/account/profile"
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		copyPageLanguage(sess, updatedUser.PageLanguage)
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
@@ -164,6 +165,6 @@ func HandleProfilePost(
 			return
 		}
 
-		http.Redirect(w, r, baseURL+"/account/profile", http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }

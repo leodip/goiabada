@@ -2,7 +2,6 @@ package adminsettingshandlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -58,7 +57,7 @@ func HandleTokensGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -157,13 +156,14 @@ func HandleTokensPost(
 			return
 		}
 
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := "/admin/settings/tokens"
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/tokens", baseURL), http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }

@@ -130,7 +130,7 @@ func TestAdminUserHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.
 		}, request(http.MethodPost, "/admin/users/42/attributes/21/edit", routed, attribute,
 			handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}}))},
 		{"HandleConsentsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleConsentsGet(h, nil, c)
+			return HandleConsentsGet(h, c)
 		}, request(http.MethodGet, "/admin/users/42/consents", routed)},
 		{"HandleConsentsPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleConsentsPost(h, c)

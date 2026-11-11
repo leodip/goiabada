@@ -165,9 +165,10 @@ func HandleAppsPost(
 			return
 		}
 
-		if !setFlash(httpHelper, httpSession, w, r, flashAppsSaved, "true") {
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/apps", detail.LegalDocument.Id)
+		if !setFlash(httpHelper, httpSession, w, r, pagePath, flashAppsSaved, "true") {
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/legal-documents/%v/apps", baseURL, detail.LegalDocument.Id), http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }

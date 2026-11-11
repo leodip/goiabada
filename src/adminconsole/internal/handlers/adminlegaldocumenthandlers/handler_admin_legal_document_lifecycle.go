@@ -73,9 +73,10 @@ func lifecycleAction(
 			return
 		}
 
-		if !setFlash(httpHelper, httpSession, w, r, flash, "true") {
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/versions", detail.LegalDocument.Id)
+		if !setFlash(httpHelper, httpSession, w, r, pagePath, flash, "true") {
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/legal-documents/%v/versions", baseURL, detail.LegalDocument.Id), http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }

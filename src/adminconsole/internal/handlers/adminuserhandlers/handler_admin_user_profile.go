@@ -68,7 +68,7 @@ func HandleProfileGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -177,7 +177,8 @@ func HandleProfilePost(
 			return
 		}
 
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := fmt.Sprintf("/admin/users/%v/profile", user.Id)
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		// An administrator who saved their own profile sees the page language the API stored on the
 		// next page, as a save in Account > Profile does; an edit of another user leaves the console's
 		// copy alone (#631 decision 7).
@@ -192,7 +193,7 @@ func HandleProfilePost(
 
 		// Redirect to the profile page
 		//nolint:gosec // G710: the configured base URL, a fixed path around the user's numeric id, and an encoded query
-		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/profile", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, pagePath, r), http.StatusFound)
 	}
 }
 

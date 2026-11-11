@@ -60,7 +60,7 @@ func HandleEmailVerificationGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -188,12 +188,13 @@ func HandleEmailVerificationPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := "/account/email-verification"
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		if err := httpSession.Save(r, w, sess); err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, baseURL+"/account/email-verification", http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }

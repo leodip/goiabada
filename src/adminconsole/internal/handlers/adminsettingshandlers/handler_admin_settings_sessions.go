@@ -2,7 +2,6 @@ package adminsettingshandlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -57,7 +56,7 @@ func HandleSessionsGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -157,13 +156,14 @@ func HandleSessionsPost(
 			return
 		}
 
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := "/admin/settings/sessions"
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/sessions", baseURL), http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }

@@ -72,8 +72,9 @@ test("two tabs of one console session refreshing at once both stay signed in", a
         await first.locator('input[name="description"]').fill(`round ${round}`);
         await waitIntoRefreshWindow(first, storedFrom, storedBy);
 
-        // The save sets a flash and saves the session, while the other tab and two background requests
-        // of the same session refresh beside it.
+        // The save sets a flash for the page it redirects to and saves the session, while the other tab
+        // and two background requests of the same session refresh beside it. The account profile page
+        // takes a saved notice under the same key, but only its own, so the saving tab keeps this one.
         storedFrom = Date.now();
         const [, , listed, account] = await Promise.all([
           saveAndExpectSaved(first, "Settings saved."),

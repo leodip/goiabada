@@ -9,8 +9,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // resourceGroupsWithPermissionAPI is what the groups-with-permission page needs: the resource and
@@ -26,7 +24,6 @@ type resourceGroupsWithPermissionAPI interface {
 
 func HandleGroupsWithPermissionGet(
 	httpHelper HttpHelper,
-	httpSession sessionstore.Store,
 	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
@@ -154,21 +151,6 @@ func HandleGroupsWithPermissionGet(
 
 		pageResult := GroupsWithPermissionPageResult{Page: pageInt, PageSize: pageSize, Total: total, Groups: groupInfoArr}
 		p := pagination.New(total, pageSize, pageInt, 5)
-
-		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
-
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
-		if savedSuccessfully {
-			err = httpSession.Save(r, w, sess)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-		}
 
 		bind := map[string]interface{}{
 			"resourceId":                   resource.Id,

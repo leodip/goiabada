@@ -69,7 +69,7 @@ func HandleAddressGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		if savedSuccessfully {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -191,13 +191,14 @@ func HandleAddressPost(
 			return
 		}
 
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := fmt.Sprintf("/admin/users/%v/address", user.Id)
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/address", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, pagePath, r), http.StatusFound)
 	}
 }

@@ -76,7 +76,8 @@ func HandleSessionEndedGet(
 
 		delete(sess.Values, sessionkeys.JWT)
 		delete(sess.Values, sessionkeys.JWTExpiresAt)
-		sess.SetFlash(flashSessionEnded, "true")
+		// For the home page this redirects to.
+		sess.SetFlash("/", flashSessionEnded, "true")
 		if err = httpSession.Save(r, w, sess); err != nil {
 			httpHelper.InternalServerError(w, r, errs.Wrap(err, "unable to save the session"))
 			return

@@ -62,8 +62,8 @@ func HandleDetailsGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
-		_, userCreated := sess.TakeFlash("userCreated")
+		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
+		_, userCreated := sess.TakeFlash(r.URL.Path, "userCreated")
 		if savedSuccessfully || userCreated {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -159,13 +159,14 @@ func HandleDetailsPost(
 			return
 		}
 
-		sess.SetFlash("savedSuccessfully", "true")
+		pagePath := fmt.Sprintf("/admin/users/%v/details", id)
+		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/details", id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, pagePath, r), http.StatusFound)
 	}
 }

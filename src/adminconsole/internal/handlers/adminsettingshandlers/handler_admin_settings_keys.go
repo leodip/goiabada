@@ -3,7 +3,6 @@ package adminsettingshandlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/render"
@@ -84,7 +83,7 @@ func HandleKeysGet(
 			return
 		}
 
-		_, keysRotated := sess.TakeFlash("keysRotated")
+		_, keysRotated := sess.TakeFlash(r.URL.Path, "keysRotated")
 		if keysRotated {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
@@ -135,14 +134,15 @@ func HandleKeysRotatePost(
 			return
 		}
 
-		sess.SetFlash("keysRotated", "true")
+		pagePath := "/admin/settings/keys"
+		sess.SetFlash(pagePath, "keysRotated", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/keys", baseURL), http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }
 

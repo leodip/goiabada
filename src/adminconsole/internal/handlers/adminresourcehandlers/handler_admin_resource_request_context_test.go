@@ -142,7 +142,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 			name:        "HandleUsersWithPermissionGet",
 			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
 			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleUsersWithPermissionGet(h, testStore(), c)
+				return HandleUsersWithPermissionGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/users-with-permission",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3")),
@@ -150,7 +150,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		{
 			name: "HandleGroupsWithPermissionGet, no permission to annotate",
 			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleGroupsWithPermissionGet(h, testStore(), c)
+				return HandleGroupsWithPermissionGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3")),
@@ -159,7 +159,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 			name:        "HandleGroupsWithPermissionGet, one to annotate",
 			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
 			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
-				return HandleGroupsWithPermissionGet(h, testStore(), c)
+				return HandleGroupsWithPermissionGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3")),

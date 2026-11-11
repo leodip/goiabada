@@ -138,7 +138,7 @@ func takeFlashes(httpHelper HttpHelper, httpSession sessionstore.Store, w http.R
 	}
 	taken := map[string]string{}
 	for _, key := range keys {
-		if value, ok := sess.TakeFlash(key); ok {
+		if value, ok := sess.TakeFlash(r.URL.Path, key); ok {
 			taken[key] = value
 		}
 	}
@@ -151,16 +151,16 @@ func takeFlashes(httpHelper HttpHelper, httpSession sessionstore.Store, w http.R
 	return taken, true
 }
 
-// setFlash leaves a flash for the page a write redirects to, answering the request when the
-// session cannot be saved.
+// setFlash leaves a flash for the page at pagePath, the one a write redirects to, answering the
+// request when the session cannot be saved.
 func setFlash(httpHelper HttpHelper, httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
-	key, value string) bool {
+	pagePath, key, value string) bool {
 	sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return false
 	}
-	sess.SetFlash(key, value)
+	sess.SetFlash(pagePath, key, value)
 	if err := httpSession.Save(r, w, sess); err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return false

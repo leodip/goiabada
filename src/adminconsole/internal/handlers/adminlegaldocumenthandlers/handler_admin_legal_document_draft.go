@@ -89,10 +89,11 @@ func HandleDraftPost(
 			return
 		}
 
-		if !setFlash(httpHelper, httpSession, w, r, flashDraftSaved, "true") {
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/draft", doc.Id)
+		if !setFlash(httpHelper, httpSession, w, r, pagePath, flashDraftSaved, "true") {
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/legal-documents/%v/draft", baseURL, doc.Id), http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }
 
@@ -134,9 +135,10 @@ func HandlePublishPost(
 			return
 		}
 
-		if !setFlash(httpHelper, httpSession, w, r, flashPublished, strconv.Itoa(published.LegalDocument.CurrentVersion)) {
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/versions", detail.LegalDocument.Id)
+		if !setFlash(httpHelper, httpSession, w, r, pagePath, flashPublished, strconv.Itoa(published.LegalDocument.CurrentVersion)) {
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/legal-documents/%v/versions", baseURL, detail.LegalDocument.Id), http.StatusFound)
+		http.Redirect(w, r, baseURL+pagePath, http.StatusFound)
 	}
 }

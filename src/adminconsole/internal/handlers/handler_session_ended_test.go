@@ -68,6 +68,13 @@ func seedSession(t *testing.T, store sessionstore.Store, values map[string]any) 
 	return cookies
 }
 
+// sessionEndedNotice is the values /auth/session-ended leaves for the home page: its notice.
+func sessionEndedNotice() map[string]any {
+	sess := sessionstore.NewSession(nil, builtin.AdminConsoleSessionName)
+	sess.SetFlash("/", flashSessionEnded, "true")
+	return sess.Values
+}
+
 // readSession loads the session the cookies name, as the browser's next request would.
 func readSession(t *testing.T, store sessionstore.Store, cookies []*http.Cookie) *sessionstore.Session {
 	t.Helper()
@@ -118,7 +125,7 @@ func TestHandleSessionEndedGet_ClearsTheTokensAndLeavesTheNoticeForTheNextReques
 		"the expiry goes with the token, or the next sign-in inherits a stale one")
 	assert.Equal(t, "kept", sess.Values["somethingElse"],
 		"only the tokens go: the session survives to carry the notice")
-	_, noticed := sess.TakeFlash(flashSessionEnded)
+	_, noticed := sess.TakeFlash("/", flashSessionEnded)
 	assert.True(t, noticed, "the notice was saved for the home page's request")
 
 	records := logs.Records()
@@ -214,7 +221,7 @@ func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.
 // finding 4).
 func TestHandleIndexGet_ShowsTheSessionEndedNoticeOnce(t *testing.T) {
 	store := newMemoryStore(t)
-	cookies := seedSession(t, store, map[string]any{flashSessionEnded: "true"})
+	cookies := seedSession(t, store, sessionEndedNotice())
 
 	assert.Equal(t, true, serveIndex(t, store, cookies)["SessionEnded"], "the first visit shows the notice")
 	assert.Equal(t, false, serveIndex(t, store, cookies)["SessionEnded"], "the next visit does not")
@@ -252,7 +259,7 @@ func TestHandleIndexGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSaved(t *
 		t.Run(testCase.name, func(t *testing.T) {
 			store := sessionstoremocks.NewStore(t)
 			store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
-				Return(&sessionstore.Session{Values: map[string]any{flashSessionEnded: "true"}}, testCase.getErr)
+				Return(&sessionstore.Session{Values: sessionEndedNotice()}, testCase.getErr)
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)
 			}
@@ -317,7 +324,7 @@ func TestHandleSessionEndedGet_SendsANavigationTheBrowserReportsCrossSiteHomeAnd
 				"the stored tokens survive: the navigation signed nobody out")
 			assert.Contains(t, sess.Values, sessionkeys.JWTExpiresAt)
 			assert.Equal(t, "kept", sess.Values["somethingElse"])
-			_, noticed := sess.TakeFlash(flashSessionEnded)
+			_, noticed := sess.TakeFlash("/", flashSessionEnded)
 			assert.False(t, noticed, "no notice, since nothing happened")
 
 			records := logs.Records()
@@ -362,7 +369,7 @@ func TestHandleSessionEndedGet_StillSignsOutTheNavigationsThisConsoleInitiates(t
 
 			sess := readSession(t, store, cookies)
 			assert.NotContains(t, sess.Values, sessionkeys.JWT)
-			_, noticed := sess.TakeFlash(flashSessionEnded)
+			_, noticed := sess.TakeFlash("/", flashSessionEnded)
 			assert.True(t, noticed, "the notice was saved for the home page's request")
 		})
 	}
