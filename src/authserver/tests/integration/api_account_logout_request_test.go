@@ -876,12 +876,13 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 	// be was a submit control by HTML's missing-value default, and clicking No was answering Yes
 	// (#152). The destination is the declined page, which says the End-User is still signed in, so a
 	// decline with no history to go back to — and no script to go back with — leaves them signed in
-	// and told so. It carries the End-User's language and nothing else of the request: a decline is
-	// not a logout, so it hands the RP nothing (RP-Initiated Logout 1.0 sections 2 and 3).
+	// and told so. It carries the End-User's language, and the client the form carries for the
+	// declined page's brand (#812), and nothing else of the request: a decline is not a logout, so it
+	// hands the RP nothing (RP-Initiated Logout 1.0 sections 2 and 3).
 	href, hasHref := declining.Attr("href")
 	require.True(t, hasHref,
 		"the link labelled %q needs a destination that works without script (#152)", labels.no)
-	assertDeclineHref(t, href, uiLocales)
+	assertDeclineHref(t, href, uiLocales, form.Get("client_id"))
 
 	// A named submitter is itself a successful control, so a browser would send it too.
 	if name, hasName := affirmative.Attr("name"); hasName {
@@ -911,10 +912,11 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 }
 
 // assertDeclineHref holds the consent page's declining control to its destination: the declined
-// page's path, with a query holding ui_locales when the request asked for one and nothing else.
-// Whatever else the request carried, a hint, a post-logout target, a client or a state, a decline
-// must not hand on, because it is not a logout and nothing about it may reach the RP (#152).
-func assertDeclineHref(t *testing.T, href, uiLocales string) {
+// page's path, with a query holding ui_locales when the request asked for one, client_id when the
+// consent page carries one, and nothing else. client_id is there for the declined page's brand alone
+// (#812 decision 5). Whatever else the request carried, a hint, a post-logout target or a state, a
+// decline must not hand on, because it is not a logout and nothing about it may reach the RP (#152).
+func assertDeclineHref(t *testing.T, href, uiLocales, clientId string) {
 	t.Helper()
 
 	destination, err := url.Parse(href)
@@ -927,8 +929,11 @@ func assertDeclineHref(t *testing.T, href, uiLocales string) {
 	if len(uiLocales) > 0 {
 		want.Set("ui_locales", uiLocales)
 	}
+	if len(clientId) > 0 {
+		want.Set("client_id", clientId)
+	}
 	require.Equal(t, want, destination.Query(),
-		"the declining control carries the End-User's language and nothing else of the request")
+		"the declining control carries the End-User's language and the client for its brand, and nothing else of the request")
 }
 
 // signedOutTexts is what the terminal page must render in one locale. It is a struct rather than a
@@ -1160,14 +1165,18 @@ func TestLogout_Hintless_UILocalesSurvivesTheConsentForm(t *testing.T) {
 // GETting its href. What lands is asserted whole: the declined page in the End-User's language, not
 // the consent question again and not the signed-out page, and the End-User's session row surviving
 // the click that declined to end it. The request carries every parameter the endpoint reads, so the
-// href is held to carrying the language and nothing else, with no hint and with one it rejects.
+// href is held to carrying the language, the client for the declined page's brand when there is no
+// hint (#812), and nothing else, with no hint and with one it rejects.
 func TestLogout_Hintless_TheDecliningControlDeclinesWithoutScript(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		hint string
+		// carriesClient says whether the declining link carries the request's client_id, for the
+		// declined page's brand: with no hint it does, and a rejected hint drops it (#812 decision 5).
+		carriesClient bool
 	}{
-		{"no hint", ""},
-		{"a rejected hint", "not.a.token"},
+		{"no hint", "", true},
+		{"a rejected hint", "not.a.token", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			grant := createOfflineGrant(t)
@@ -1198,7 +1207,11 @@ func TestLogout_Hintless_TheDecliningControlDeclinesWithoutScript(t *testing.T) 
 				"the consent page's declining control is a link, which cannot submit the form (#152)")
 			href, ok := declining.Attr("href")
 			require.True(t, ok, "the declining control needs a destination that works without script (#152)")
-			assertDeclineHref(t, href, "pt-BR")
+			wantClientId := ""
+			if tc.carriesClient {
+				wantClientId = grant.client.ClientIdentifier
+			}
+			assertDeclineHref(t, href, "pt-BR", wantClientId)
 
 			// A browser resolves the href against the page's own URL, and so does this.
 			base, err := url.Parse(appConfig.AuthServer.BaseURL + "/auth/logout")

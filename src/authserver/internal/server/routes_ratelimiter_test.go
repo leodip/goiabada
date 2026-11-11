@@ -187,13 +187,21 @@ func newRoutesTestServerVerifying(t *testing.T, configure func(*config.Config), 
 func newRoutesTestServerRendering(t *testing.T, configure func(*config.Config), sessionStore *sessionstore.ConditionalStore,
 	verifier handlers.ChallengeVerifier, templateFS fs.FS) *Server {
 	t.Helper()
+	return newRoutesTestServerDrawnIn(t, configure, sessionStore, verifier, templateFS, nil)
+}
+
+// newRoutesTestServerDrawnIn is newRoutesTestServerRendering with defaultBrand as the default brand,
+// or none, which leaves pages automatic in the built-in colors.
+func newRoutesTestServerDrawnIn(t *testing.T, configure func(*config.Config), sessionStore *sessionstore.ConditionalStore,
+	verifier handlers.ChallengeVerifier, templateFS fs.FS, defaultBrand *record.Brand) *Server {
+	t.Helper()
 
 	passwordHash, err := passwordhash.Hash("the account's real password")
 	require.NoError(t, err)
 
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
-	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(defaultBrand, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
 		Id:           1,

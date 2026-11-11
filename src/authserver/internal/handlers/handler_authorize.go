@@ -70,6 +70,12 @@ func HandleAuthorizeGet(
 				UserAgent:         r.UserAgent(),
 				IpAddress:         middleware.ClientIP(r),
 			})
+		// Once the address check has read the request's client it is known, and the error response, a
+		// form_post above all, and a 500, of a save or of a read from that read on, are drawn in its
+		// brand (#812). A page refusal names its own client.
+		if result.ClientId != "" {
+			reqctx.NamePageClient(r.Context(), result.ClientId)
+		}
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
@@ -139,6 +145,10 @@ func renderAuthorizeRefusal(pageRenderer PageRenderer, w http.ResponseWriter, r 
 // is the whole answer to such a request.
 func answerAuthorizePageRefusal(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
 	refusal *authflow.AuthorizePageRefusal) {
+
+	// A refusal made once the request's client is known is drawn in that client's brand, and one
+	// made before in the default (#812).
+	reqctx.NamePageClient(r.Context(), refusal.ClientId)
 
 	switch refusal.Reason {
 	case authflow.AuthorizePageRefusalUnusableHandle:

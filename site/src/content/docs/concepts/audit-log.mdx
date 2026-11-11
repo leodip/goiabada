@@ -124,11 +124,12 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
 | `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
 | `auth_state` | The step of the sign-in the browser most recently moved, when a page of a sign-in it no longer holds, or of none, was refused. |
-| `brand_id` | The brand's row id. On `updated_default_brand`, the brand that is now the default. |
-| `brand_name` | The brand's name. On `updated_default_brand`, the brand that is now the default. |
+| `brand_id` | The brand's row id. On `updated_default_brand`, the brand that is now the default. On `updated_client_brand`, the brand the client was given, left out when it went back to the default brand. |
+| `brand_name` | The brand's name. On `updated_default_brand`, the brand that is now the default. On `updated_client_brand`, the brand the client was given, left out when it went back to the default brand. |
 | `ceiling` | Which rule refused an administrator change: `grant`, `target`, `settings` or `backchannel_logout_uri`. |
 | `change` | `granted` or `revoked`. |
 | `checkpoint` | Where an administrative scope was refused: `authorize`, `issue`, or the token endpoint's `authorization_code`, `refresh_token` or `password` grant. |
+| `client_count` | How many clients a brand's deletion moved to the default brand. |
 | `client_id` | The client's row id, the id in the Admin API's client paths. |
 | `client_identifier` | The identifier the client is known by, sent as `client_id` in OAuth requests. On a refusal at the token endpoint, it's the one the request named. |
 | `code_id` | The row id of an authorization code. |
@@ -391,6 +392,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_post_logout_redirect_uris` | An administrator saved a client's sign-out redirect URIs. |
 | `updated_client_backchannel_logout` | An administrator saved a client's back-channel logout URI, or whether it requires the session identifier. |
 | `updated_client_dpop` | An administrator saved a client's **Require DPoP for token requests**, on or off. |
+| `updated_client_brand` | An administrator gave a client a brand of its own, or put it back on the default brand. |
 | `updated_web_origins` | An administrator saved a client's web origins. |
 | `updated_client_tokens` | An administrator saved a client's token settings: lifetimes, and which claims go in its tokens. |
 | `updated_client_permissions` | An administrator changed the permissions granted to a client. |
@@ -427,7 +429,7 @@ These come from the Account API, which users reach through the admin console's a
 |---|---|
 | `created_brand` | An administrator created a brand. |
 | `updated_brand` | An administrator saved a brand's name, appearance and theme. |
-| `deleted_brand` | An administrator deleted a brand. |
+| `deleted_brand` | An administrator deleted a brand. The entry says how many clients moved to the default brand. |
 | `updated_default_brand` | An administrator made another brand the default. The entry names the new and the old default. |
 
 ### Settings and keys

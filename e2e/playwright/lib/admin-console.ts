@@ -98,6 +98,29 @@ export async function submitNewClient(page: Page, client: NewClient) {
   await page.locator("#btnCreate").click();
 }
 
+// The client's brand on its Settings tab, under Sign-in and consent pages (#812): the Brand select,
+// whose first choice is Default brand (name of the default), the value "", then every brand by name.
+export function clientBrandSelect(page: Page) {
+  return page.locator("#brandId");
+}
+
+// The choice the Brand select shows on a client's Settings tab, as its label reads.
+export async function clientBrandChoice(page: Page, id: number): Promise<string> {
+  await page.goto(clientUrl(id, "settings"));
+  return (await clientBrandSelect(page).locator("option:checked").innerText()).trim();
+}
+
+// Gives a client a brand on its Settings tab, by the brand's name, or puts it back on the default
+// brand, and saves. The admin console's own client asks before every save, and is answered Save.
+export async function setClientBrand(page: Page, id: number, brand: { name: string } | "default") {
+  await page.goto(clientUrl(id, "settings"));
+  await clientBrandSelect(page).selectOption(brand === "default" ? { value: "" } : { label: brand.name });
+  const asksFirst = (await page.locator("#formClientSettings[data-confirm-always]").count()) > 0;
+  await page.locator("#btnSave").click();
+  if (asksFirst) await confirmDialog(page);
+  await expect(page.getByText("Settings saved.", { exact: true })).toBeVisible();
+}
+
 // Adds a resource, by its identifier, to the introspection resources a client's Introspection tab
 // shows, without saving.
 export async function addIntrospectionResource(page: Page, identifier: string) {

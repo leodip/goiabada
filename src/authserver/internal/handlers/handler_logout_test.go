@@ -102,9 +102,10 @@ func TestHandleLogoutGet(t *testing.T) {
 		assert.Equal(t, "abc", bound["state"])
 		assert.Equal(t, true, bound["statePresent"])
 		assert.Equal(t, "pt-BR", bound["uiLocales"])
-		// The declining control leads to the declined page in the End-User's language and carries
-		// nothing else of the request: a decline is not a logout and hands the RP nothing (#152).
-		assert.Equal(t, "/auth/logout/declined?ui_locales=pt-BR", bound["declineHref"])
+		// The declining control leads to the declined page in the End-User's language, with the
+		// client for its brand alone (#812), and carries nothing else of the request: a decline is not
+		// a logout and hands the RP nothing (#152).
+		assert.Equal(t, "/auth/logout/declined?client_id=test_client&ui_locales=pt-BR", bound["declineHref"])
 		assert.NotContains(t, bound, "idTokenHint")
 		// Exactly the seven above, asserted by count as well as by name. Naming seven keys says nothing
 		// about an eighth, so without this the sibling subtest below can drop to mock.Anything only
@@ -620,7 +621,7 @@ func TestHandleLogoutGet(t *testing.T) {
 			"the target still travels, so the signed-out page can say a return was attempted and refused")
 		assert.Equal(t, "abc", bound["state"])
 		assert.Equal(t, "/auth/logout/declined", bound["declineHref"],
-			"with no ui_locales the declining control leads to the bare declined page, carrying none of the request (#152)")
+			"with no ui_locales, and the rejected hint's client_id dropped, the declining control leads to the bare declined page, carrying none of the request (#152, #812)")
 		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
 		pageRenderer.AssertExpectations(t)
@@ -665,6 +666,37 @@ func TestHandleLogoutDeclinedGet(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rr.Code)
 		pageRenderer.AssertExpectations(t)
 	})
+
+	// client_id is read for the page's brand alone (#812 decision 5): the page is drawn for that
+	// client, and with none for no client, so in the default brand.
+	for _, tc := range []struct {
+		name   string
+		target string
+		want   string
+	}{
+		{"Is drawn for the client client_id names", "/auth/logout/declined?client_id=brand_client", "brand_client"},
+		{"Is drawn for no client without client_id", "/auth/logout/declined", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			handler := HandleLogoutDeclinedGet(pageRenderer)
+
+			req := httptest.NewRequest(http.MethodGet, tc.target, nil)
+			req = req.WithContext(reqctx.WithPageClient(req.Context(), &reqctx.PageClient{}))
+			rr := httptest.NewRecorder()
+
+			drawnFor := "unset"
+			pageRenderer.On("RenderTemplate", rr, mock.MatchedBy(func(rendered *http.Request) bool {
+				drawnFor = reqctx.PageClientIdentifier(rendered.Context())
+				return true
+			}), "/layouts/auth_layout.html", "/logout_declined.html", mock.Anything).Return(nil)
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, tc.want, drawnFor)
+			pageRenderer.AssertExpectations(t)
+		})
+	}
 
 	t.Run("A render failure is the 500 page", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)

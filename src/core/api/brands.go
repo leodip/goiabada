@@ -3,16 +3,19 @@ package api
 import "time"
 
 // BrandResponse is a brand as the admin API answers it (#810 decision 5): a name, an appearance
-// (auto, light or dark) and the key of one of the built-in themes. IsDefault marks the one brand
-// every page is drawn in.
+// (auto, light or dark) and the key of one of the built-in themes. IsDefault marks the brand a
+// client with no brand of its own is drawn in. ClientCount is how many clients are drawn in the
+// brand: those given it and, for the default brand, those with no brand of their own too, so the
+// counts of all brands add up to every client (#812 decision 3).
 type BrandResponse struct {
-	Id         int64      `json:"id"`
-	Name       string     `json:"name"`
-	Appearance string     `json:"appearance"`
-	Theme      string     `json:"theme"`
-	IsDefault  bool       `json:"isDefault"`
-	CreatedAt  *time.Time `json:"createdAt"`
-	UpdatedAt  *time.Time `json:"updatedAt"`
+	Id          int64      `json:"id"`
+	Name        string     `json:"name"`
+	Appearance  string     `json:"appearance"`
+	Theme       string     `json:"theme"`
+	IsDefault   bool       `json:"isDefault"`
+	ClientCount int        `json:"clientCount"`
+	CreatedAt   *time.Time `json:"createdAt"`
+	UpdatedAt   *time.Time `json:"updatedAt"`
 }
 
 // GetBrandsResponse is every brand, sorted by name.

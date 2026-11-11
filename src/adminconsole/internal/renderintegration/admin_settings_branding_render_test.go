@@ -34,12 +34,19 @@ var renderThemes = []adminsettingshandlers.BrandThemeOption{
 func TestRender_AdminSettingsBrandingListMarksTheDefault(t *testing.T) {
 	out := renderMenuPageAt(t, "/admin/settings/branding", "/admin_settings_branding.html", map[string]interface{}{
 		"brands": []adminsettingshandlers.BrandRow{
-			{BrandResponse: api.BrandResponse{Id: 4, Name: "<b>Autumn</b>", Appearance: "dark", Theme: "plum"},
+			{BrandResponse: api.BrandResponse{Id: 4, Name: "<b>Autumn</b>", Appearance: "dark", Theme: "plum", ClientCount: 2},
 				AppearanceName: "Escuro", ThemeName: "Ameixa"},
-			{BrandResponse: api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
+			{BrandResponse: api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 13},
 				AppearanceName: "Automático", ThemeName: "Mirtilo"},
 		},
 	})
+
+	// The lead says where a brand is used, and the Clients column how many clients each draws
+	// (#812 decision 3).
+	assert.Contains(t, out, `<p class="page-lead">As páginas de um cliente são exibidas na marca escolhida na aba Configurações dele, ou na marca padrão quando nenhuma é escolhida. Este console de administração é exibido na marca do seu próprio cliente.</p>`)
+	assert.Regexp(t, `<th scope="col">Tema</th>\s*<th scope="col">Clientes</th>`, out) //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
+	assert.Contains(t, out, `<td data-label="Clientes">2</td>`)                        //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
+	assert.Contains(t, out, `<td data-label="Clientes">13</td>`)                       //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
 
 	// The sidebar's Branding entry, under Settings, is the page the administrator is on.
 	assert.Contains(t, out, `<a class="nav-link" href="/admin/settings/branding" aria-current="page">`)
@@ -70,10 +77,11 @@ func radioTag(t *testing.T, out, id string) string {
 func TestRender_AdminSettingsBrandingFormDrawsTheSwatchesFromThePalettes(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
 		"isNew":           false,
-		"storedBrand":     api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
+		"storedBrand":     api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 1},
 		"brand":           adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum"},
 		"brandThemes":     renderThemes,
 		"appearanceTheme": renderThemes[1],
+		"clientsNote":     "1 cliente usa esta marca.",
 	})
 
 	assert.Contains(t, out, `<h1 class="page-title">Autumn</h1>`)
@@ -107,7 +115,9 @@ func TestRender_AdminSettingsBrandingFormDrawsTheSwatchesFromThePalettes(t *test
 	// A brand that is not the default can be made the default, asked first.
 	assert.Contains(t, out, `action="/admin/settings/branding/4/make-default" data-confirm-dialog="makeDefault"`)
 	assert.Contains(t, out, `id="makeDefault_modalDialog"`)
-	assert.Contains(t, out, "Nenhuma página é exibida nesta marca.")
+	assert.NotContains(t, out, "Nenhuma página é exibida")
+	assert.Contains(t, out, `<p class="page-lead">Escolha-a na aba Configurações de um cliente para exibir as páginas desse cliente nela. 1 cliente usa esta marca.</p>`)
+	assert.Contains(t, out, `data-confirm-always="As páginas de todo cliente sem marca própria, e as páginas que não pertencem a nenhum cliente, passarão a ser exibidas nesta marca imediatamente."`)
 }
 
 func TestRender_AdminSettingsBrandingFormOfTheDefaultOffersNoMakeDefault(t *testing.T) {
@@ -118,7 +128,9 @@ func TestRender_AdminSettingsBrandingFormOfTheDefaultOffersNoMakeDefault(t *test
 		"brandThemes":       renderThemes,
 		"appearanceTheme":   renderThemes[0],
 		"savedSuccessfully": true,
+		"clientsNote":       "13 clientes usam esta marca.", //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
 	})
+	assert.Contains(t, out, `<p class="page-lead">Esta é a marca padrão. As páginas de todo cliente sem marca própria são exibidas nela, assim como as páginas que não pertencem a nenhum cliente. 13 clientes usam esta marca.</p>`) //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
 
 	assert.NotContains(t, out, "make-default")
 	assert.NotContains(t, out, "makeDefault_modalDialog")
@@ -201,7 +213,12 @@ func TestRender_AdminSettingsBrandingDeletePage(t *testing.T) {
 		"brand": adminsettingshandlers.BrandRow{
 			BrandResponse:  api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
 			AppearanceName: "Escuro", ThemeName: "Ameixa"},
+		"clientsNote": "2 clientes a usam. Eles passarão para a marca padrão, Default.", //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
 	})
+	// The lead says the brand will be deleted, how many clients use it and where they will move
+	// (#812 decision 3).
+	assert.Contains(t, out, `<p class="page-lead">A marca será excluída. 2 clientes a usam. Eles passarão para a marca padrão, Default.</p>`) //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
+	assert.NotContains(t, out, "Nenhuma página")
 	assert.Contains(t, out, "<dd>Autumn</dd>")
 	assert.Contains(t, out, "<dd>Escuro</dd>")
 	assert.Contains(t, out, "<dd>Ameixa</dd>")

@@ -15,7 +15,8 @@
 </div>
 
 {{/* The default brand is marked, and is the one brand with no Delete: the auth server refuses
-     deleting it. */}}
+     deleting it. Clients is how many clients each brand draws, the default's counting every client
+     with no brand of its own (#812 decision 3). */}}
 {{ if .brands }}
 <div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
   <table class="data-table data-table-stack" id="brandsTable">
@@ -24,6 +25,7 @@
         <th scope="col">{{ T $.ctx "adminconsole.admin_branding.list.col_name" }}</th>
         <th scope="col">{{ T $.ctx "adminconsole.admin_branding.list.col_appearance" }}</th>
         <th scope="col">{{ T $.ctx "adminconsole.admin_branding.list.col_theme" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_branding.list.col_clients" }}</th>
         <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.admin_branding.list.col_actions" }}</span></th>
       </tr>
     </thead>
@@ -36,6 +38,7 @@
         </td>
         <td data-label="{{ T $.ctx "adminconsole.admin_branding.list.col_appearance" }}">{{ .AppearanceName }}</td>
         <td data-label="{{ T $.ctx "adminconsole.admin_branding.list.col_theme" }}">{{ .ThemeName }}</td>
+        <td data-label="{{ T $.ctx "adminconsole.admin_branding.list.col_clients" }}">{{ .ClientCount }}</td>
         <td class="cell-actions">
           {{ if not .IsDefault }}
           <a class="text-link text-link-danger" href="/admin/settings/branding/{{ .Id }}/delete">{{ T $.ctx "adminconsole.admin_branding.list.action_delete" }}<span class="sr-only"> {{ .Name }}</span></a>

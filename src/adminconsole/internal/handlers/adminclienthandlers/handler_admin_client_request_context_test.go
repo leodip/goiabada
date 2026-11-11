@@ -121,6 +121,14 @@ func (s *ctxRecordingApiClient) UpdateClient(ctx context.Context, _ string, _ in
 	return nil, s.recordWrite(ctx, "UpdateClient")
 }
 
+func (s *ctxRecordingApiClient) GetAllBrands(ctx context.Context, _ string) ([]api.BrandResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) UpdateClientBrand(ctx context.Context, _ string, _ int64, _ *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
+	return nil, s.recordWrite(ctx, "UpdateClientBrand")
+}
+
 func (s *ctxRecordingApiClient) UpdateClientAdministrativeScopes(ctx context.Context, _ string, _ int64, _ *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientAdministrativeScopes")
 }
@@ -296,7 +304,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		{
 			name: "HandleSettingsPost",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleSettingsPost(h, newTestSessionStore(), c, consoleBaseURL)
+				return HandleSettingsPost(h, newTestSessionStore(), c, &invalidationRecorder{}, consoleBaseURL)
 			},
 			write: "UpdateClient",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/settings",
@@ -489,7 +497,7 @@ func TestAdminClientHandlers_TheAllowanceWriteCarriesTheRequestsContext(t *testi
 		handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}, "administrativeScopesAllowed": {"on"}}))
 	marked := request.WithContext(context.WithValue(request.Context(), clientCtxMarkerKey{}, "allowance"))
 
-	HandleSettingsPost(httpHelper, newTestSessionStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), marked)
+	HandleSettingsPost(httpHelper, newTestSessionStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), marked)
 
 	assert.Equal(t, []string{"UpdateClient", "UpdateClientAdministrativeScopes"}, apiClient.writes,
 		"the save must reach both of its writes")

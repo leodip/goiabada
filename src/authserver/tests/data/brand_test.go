@@ -186,7 +186,8 @@ func makeDefault(h *isolatedDB, brandId int64) (int64, error) {
 func deleteBrand(h *isolatedDB, brandId int64) error {
 	ctx := context.Background()
 	return h.DB.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		return h.DB.DeleteBrand(ctx, tx, brandId)
+		_, err := h.DB.DeleteBrand(ctx, tx, brandId)
+		return err
 	})
 }
 
@@ -265,7 +266,8 @@ func TestBrands_TheDefaultPointer(t *testing.T) {
 	// Both writes need a transaction, as the lock they take does.
 	_, err = h.DB.MakeBrandDefault(ctx, nil, other.Id)
 	require.Error(t, err, "a move without a transaction")
-	require.Error(t, h.DB.DeleteBrand(ctx, nil, other.Id), "a deletion without a transaction")
+	_, err = h.DB.DeleteBrand(ctx, nil, other.Id)
+	require.Error(t, err, "a deletion without a transaction")
 
 	// An empty pointer reads as no default, and a move from it answers 0.
 	_, err = h.SQL.Exec("UPDATE settings SET default_brand_id = NULL WHERE id = 1")
@@ -353,7 +355,8 @@ func TestBrands_ADeletionRacingAChangeOfDefault(t *testing.T) {
 		deletion, err := h.DB.BeginTransaction(ctx)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = deletion.Rollback() })
-		require.NoError(t, h.DB.DeleteBrand(ctx, deletion, doomed.Id))
+		_, err = h.DB.DeleteBrand(ctx, deletion, doomed.Id)
+		require.NoError(t, err)
 
 		done := make(chan error, 1)
 		go func() {

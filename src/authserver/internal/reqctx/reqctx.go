@@ -1,8 +1,8 @@
-// Package reqctx holds the auth server's eight request-scoped values: the settings, the browser's
+// Package reqctx holds the auth server's nine request-scoped values: the settings, the browser's
 // session identifier and that session's user, the bearer token read off the request, the token a
 // scope guard validated, the credential reservation a failures-only rate-limit tier holds
-// (#439), the user whose token the session guard found live (#780), and the DPoP proof the token
-// was presented with (#42). Each is written by
+// (#439), the user whose token the session guard found live (#780), the DPoP proof the token
+// was presented with (#42), and the client a page is drawn for (#812). Each is written by
 // one middleware and read back through a typed accessor, over an unexported key, so nothing
 // outside this package can write one or read it under the wrong type (#433).
 package reqctx
@@ -29,6 +29,7 @@ const (
 	credentialReservationKey
 	actingUserIdKey
 	dpopProofKey
+	pageClientKey
 )
 
 // ErrNoSettings is what a reader answers its request with when the settings middleware did
@@ -166,4 +167,67 @@ func WithDPoPProof(ctx context.Context, proof *dpop.Proof) context.Context {
 func DPoPProofFrom(ctx context.Context) (*dpop.Proof, bool) {
 	proof, ok := ctx.Value(dpopProofKey).(*dpop.Proof)
 	return proof, ok && proof != nil
+}
+
+// PageClient is the client the pages of one request are drawn for, whose brand they take: the client
+// of the sign-in a step's request names, or of an authorization request once its client is known
+// (#812). Empty means none, and the page is drawn in the default brand.
+//
+// Like CredentialReservation it is what a handler marks rather than a value it writes: the page
+// middleware puts an empty one on every page request, and the client is named part way through the
+// request, by whichever code learns it, on the request every helper below it was already handed. A
+// page that by design belongs to no sign-in forgets it before it is drawn. It is read and marked on
+// the request's own goroutine.
+type PageClient struct {
+	clientIdentifier string
+}
+
+// Name says the request's pages are drawn for the client with this identifier.
+func (p *PageClient) Name(clientIdentifier string) {
+	p.clientIdentifier = clientIdentifier
+}
+
+// Forget says the request's pages are drawn for no client, so in the default brand.
+func (p *PageClient) Forget() {
+	p.clientIdentifier = ""
+}
+
+// ClientIdentifier answers the client named, or empty for none.
+func (p *PageClient) ClientIdentifier() string {
+	return p.clientIdentifier
+}
+
+func WithPageClient(ctx context.Context, p *PageClient) context.Context {
+	return context.WithValue(ctx, pageClientKey, p)
+}
+
+// PageClientFrom answers false when the page middleware did not run: an API or protocol request,
+// which draws no page, or a handler invoked outside its middleware. Like SettingsFrom it answers
+// false for a nil pointer.
+func PageClientFrom(ctx context.Context) (*PageClient, bool) {
+	p, ok := ctx.Value(pageClientKey).(*PageClient)
+	return p, ok && p != nil
+}
+
+// NamePageClient names the client ctx's pages are drawn for, when ctx carries a PageClient, and does
+// nothing otherwise.
+func NamePageClient(ctx context.Context, clientIdentifier string) {
+	if p, ok := PageClientFrom(ctx); ok {
+		p.Name(clientIdentifier)
+	}
+}
+
+// ForgetPageClient draws ctx's pages for no client, when ctx carries a PageClient.
+func ForgetPageClient(ctx context.Context) {
+	if p, ok := PageClientFrom(ctx); ok {
+		p.Forget()
+	}
+}
+
+// PageClientIdentifier answers the client ctx's pages are drawn for, or empty for none.
+func PageClientIdentifier(ctx context.Context) string {
+	if p, ok := PageClientFrom(ctx); ok {
+		return p.ClientIdentifier()
+	}
+	return ""
 }

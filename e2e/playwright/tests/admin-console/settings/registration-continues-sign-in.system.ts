@@ -2,13 +2,16 @@
 // sign-in page, through its Create an account link, is signed straight in with the new account and
 // taken on into the app, through the acceptance step, without typing the password again. With email
 // verification, the mailed link does the same when it is opened in the same browser; opened in
-// another, it activates the account and the page sends the person back to the app.
+// another, it activates the account and the page sends the person back to the app. The app has a
+// brand of its own (#812): the registration and activation pages reached from its sign-in are drawn in
+// it, and the activation pages opened in another browser, which holds no sign-in, in the default.
 //
 // Registration is a setting, so this runs alone, as a system test, and puts the settings back. The
 // app is a client of the test's own, with a must-accept document for it alone, which the fixture
-// retires; the accounts registered are deleted when the test ends.
+// retires, and a brand of the test's own, deleted when the test ends; so are the accounts registered.
 import type { Browser, Page } from "@playwright/test";
-import { deleteUser, idFromListLink, publishLegalDocument, setLegalDocumentApps } from "../../../lib/admin-console";
+import { deleteUser, idFromListLink, publishLegalDocument, setClientBrand, setLegalDocumentApps } from "../../../lib/admin-console";
+import { defaultBrand, expectDrawnInPlumDark, expectDrawnInSeededDefault, withBrand } from "../../../lib/brands";
 import { openSignIn, redirectParams, testRedirectUri } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, type TestClient, test } from "../../../lib/fixtures";
@@ -63,16 +66,23 @@ test("registering from an app's sign-in signs the new user in, and on through th
   await publishLegalDocument(page, terms.id);
   const email = `${uniqueIdentifier("u")}@example.com`;
 
-  await withSettingsRestored(page, general, async () => {
-    await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: false });
-    await saveSettings(page);
+  await withBrand(page, { appearance: "dark", theme: "plum" }, async (brand) => {
+    await setClientBrand(page, client.id, brand);
+    await withSettingsRestored(page, general, async () => {
+      await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: false });
+      await saveSettings(page);
 
-    const { context, page: user } = await createAnAccountFrom(browser, client);
-    await user.locator("#email").fill(email);
-    await choosePassword(user);
-    // No "Account created" page and no password typed again: straight on to the app's terms.
-    await acceptAndReachTheApp(user, terms.title);
-    await context.close();
+      const { context, page: user } = await createAnAccountFrom(browser, client);
+      await expectDrawnInPlumDark(user, brand.id);
+      await user.locator("#email").fill(email);
+      await choosePassword(user);
+      // No "Account created" page and no password typed again: straight on to the app's terms, in
+      // the app's brand.
+      await expect(user).toHaveURL(/\/auth\/legal-acceptance/);
+      await expectDrawnInPlumDark(user, brand.id);
+      await acceptAndReachTheApp(user, terms.title);
+      await context.close();
+    });
   });
   await deleteRegistered(page, email);
 });
@@ -90,39 +100,50 @@ test("with email verification, the mailed link carries on the sign-in in the sam
   await publishLegalDocument(page, terms.id);
   const sameBrowser = `${uniqueIdentifier("u")}@example.com`;
   const otherBrowser = `${uniqueIdentifier("u")}@example.com`;
+  const seeded = await defaultBrand(page);
 
-  await withSettingsRestored(page, general, async () => {
-    await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: true });
-    await saveSettings(page);
+  await withBrand(page, { appearance: "dark", theme: "plum" }, async (brand) => {
+    await setClientBrand(page, client.id, brand);
+    await withSettingsRestored(page, general, async () => {
+      await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: true });
+      await saveSettings(page);
 
-    // Opened in the browser that started the sign-in: on into the app.
-    const own = await createAnAccountFrom(browser, client);
-    await own.page.locator("#email").fill(sameBrowser);
-    await own.page.getByRole("button", { name: "Create account", exact: true }).click();
-    await expect(own.page.getByRole("heading", { name: "Check your email" })).toBeVisible();
-    const link = linksIn(await waitForMail(request, sameBrowser)).find((l) => l.includes("/account/activate"))!;
-    await own.page.goto(link);
-    await expect(own.page.getByRole("heading", { name: "Choose your password" })).toBeVisible();
-    await choosePassword(own.page);
-    await acceptAndReachTheApp(own.page, terms.title);
-    await own.context.close();
+      // Opened in the browser that started the sign-in: on into the app, every page in its brand.
+      const own = await createAnAccountFrom(browser, client);
+      await expectDrawnInPlumDark(own.page, brand.id);
+      await own.page.locator("#email").fill(sameBrowser);
+      await own.page.getByRole("button", { name: "Create account", exact: true }).click();
+      await expect(own.page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+      await expectDrawnInPlumDark(own.page, brand.id);
+      const link = linksIn(await waitForMail(request, sameBrowser)).find((l) => l.includes("/account/activate"))!;
+      await own.page.goto(link);
+      await expect(own.page.getByRole("heading", { name: "Choose your password" })).toBeVisible();
+      await expectDrawnInPlumDark(own.page, brand.id);
+      await choosePassword(own.page);
+      await acceptAndReachTheApp(own.page, terms.title);
+      await own.context.close();
 
-    // Opened in another browser: the account is activated, and the page sends the person back.
-    const started = await createAnAccountFrom(browser, client);
-    await started.page.locator("#email").fill(otherBrowser);
-    await started.page.getByRole("button", { name: "Create account", exact: true }).click();
-    await expect(started.page.getByRole("heading", { name: "Check your email" })).toBeVisible();
-    const otherLink = linksIn(await waitForMail(request, otherBrowser)).find((l) => l.includes("/account/activate"))!;
-    const elsewhere = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-    const other = await elsewhere.newPage();
-    await other.goto(otherLink);
-    await choosePassword(other);
-    await expect(other.getByRole("heading", { name: "Account activated" })).toBeVisible();
-    await expect(other.getByText("Go back to the application you were signing in to")).toBeVisible();
-    await expect(other.locator("code.auth-address")).toHaveText(otherBrowser);
-    await expect(other.getByRole("link", { name: "Sign in to your account" })).toHaveAttribute("href", `${env.adminUrl}/account/profile`);
-    await elsewhere.close();
-    await started.context.close();
+      // Opened in another browser: the account is activated, and the page sends the person back.
+      // That browser holds no sign-in, so its pages are drawn in the default brand.
+      const started = await createAnAccountFrom(browser, client);
+      await started.page.locator("#email").fill(otherBrowser);
+      await started.page.getByRole("button", { name: "Create account", exact: true }).click();
+      await expect(started.page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+      const otherLink = linksIn(await waitForMail(request, otherBrowser)).find((l) => l.includes("/account/activate"))!;
+      const elsewhere = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      const other = await elsewhere.newPage();
+      await other.goto(otherLink);
+      await expect(other.getByRole("heading", { name: "Choose your password" })).toBeVisible();
+      await expectDrawnInSeededDefault(other, seeded.id);
+      await choosePassword(other);
+      await expect(other.getByRole("heading", { name: "Account activated" })).toBeVisible();
+      await expectDrawnInSeededDefault(other, seeded.id);
+      await expect(other.getByText("Go back to the application you were signing in to")).toBeVisible();
+      await expect(other.locator("code.auth-address")).toHaveText(otherBrowser);
+      await expect(other.getByRole("link", { name: "Sign in to your account" })).toHaveAttribute("href", `${env.adminUrl}/account/profile`);
+      await elsewhere.close();
+      await started.context.close();
+    });
   });
   await deleteRegistered(page, sameBrowser);
   await deleteRegistered(page, otherBrowser);

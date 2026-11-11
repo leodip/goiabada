@@ -8,14 +8,16 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// ToBrandResponse answers a brand, isDefault saying whether the settings row points at it.
-func ToBrandResponse(brand *record.Brand, isDefault bool) api.BrandResponse {
+// ToBrandResponse answers a brand, isDefault saying whether the settings row points at it and
+// clientCount how many clients are drawn in it.
+func ToBrandResponse(brand *record.Brand, isDefault bool, clientCount int) api.BrandResponse {
 	resp := api.BrandResponse{
-		Id:         brand.Id,
-		Name:       brand.Name,
-		Appearance: string(brand.Appearance),
-		Theme:      brand.Theme,
-		IsDefault:  isDefault,
+		Id:          brand.Id,
+		Name:        brand.Name,
+		Appearance:  string(brand.Appearance),
+		Theme:       brand.Theme,
+		IsDefault:   isDefault,
+		ClientCount: clientCount,
 	}
 	if brand.CreatedAt.Valid {
 		createdAt := brand.CreatedAt.Time

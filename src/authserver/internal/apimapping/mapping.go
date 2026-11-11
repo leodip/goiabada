@@ -532,6 +532,11 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		WebOrigins:                              toWebOriginResponses(client.WebOrigins),
 	}
 
+	if client.BrandId.Valid {
+		brandId := client.BrandId.Int64
+		resp.BrandId = &brandId
+	}
+
 	if client.CreatedAt.Valid {
 		resp.CreatedAt = &client.CreatedAt.Time
 	}

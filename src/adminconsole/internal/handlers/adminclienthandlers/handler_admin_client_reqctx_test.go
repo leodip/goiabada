@@ -111,7 +111,7 @@ func TestAdminClientHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testin
 			return HandleSettingsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/clients/3/settings", routed)},
 		{"HandleSettingsPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleSettingsPost(h, nil, c, consoleBaseURL)
+			return HandleSettingsPost(h, nil, c, &invalidationRecorder{}, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/clients/3/settings", routed,
 			// The switch on, so the save reaches the allowance's write too.
 			handlertest.WithForm(url.Values{"administrativeScopesAllowed": {"on"}}))},

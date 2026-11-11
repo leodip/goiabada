@@ -15,11 +15,12 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// The Branding pages, under /admin/settings/branding (#810): the brands, one of them the default
-// every page is drawn in; a brand created and edited, its appearance and theme chosen on option
-// cards whose swatches are drawn from the auth server's own palettes (GET /brand-themes), made the
-// default, and deleted. Every write drops the cached public settings, since the default brand is
-// what every page reads from them.
+// The Branding pages, under /admin/settings/branding (#810): the brands, each with how many clients
+// are drawn in it, one of them the default a client with no brand of its own is drawn in (#812
+// decision 3); a brand created and edited, its appearance and theme chosen on option cards whose
+// swatches are drawn from the auth server's own palettes (GET /brand-themes), made the default, and
+// deleted, its clients moving to the default. Every write drops the cached public settings, whose
+// brand is the console's own client's, which may be the brand written or follow the default.
 
 // brandingPath is the list, which a creation and a deletion go back to.
 const brandingPath = "/admin/settings/branding"
@@ -87,6 +88,36 @@ func nameIn(ctx context.Context, names map[string]string, key string) string {
 		return i18n.T(ctx, id)
 	}
 	return key
+}
+
+// brandClientsNote says on a brand's page how many clients are drawn in it, a sentence for none,
+// one and more.
+func brandClientsNote(ctx context.Context, count int) string {
+	return countSentence(ctx, "adminconsole.admin_branding.brand.clients.", count, nil)
+}
+
+// deleteClientsNote says on the delete confirmation how many clients use the brand and that they
+// will move to the default brand, named, or that no client uses it.
+func deleteClientsNote(ctx context.Context, count int, defaultBrand string) string {
+	return countSentence(ctx, "adminconsole.admin_branding.delete.clients.", count, map[string]any{"defaultBrand": defaultBrand})
+}
+
+// countSentence is the message under prefix for count: its none form for zero, its one form for
+// one and its other form for more. The plural is chosen by count == 1, as the console's other
+// counted phrases are (render's relative times), which holds for every built-in catalog.
+func countSentence(ctx context.Context, prefix string, count int, args map[string]any) string {
+	form := "other"
+	switch count {
+	case 0:
+		form = "none"
+	case 1:
+		form = "one"
+	}
+	data := map[string]any{"count": count}
+	for key, value := range args {
+		data[key] = value
+	}
+	return i18n.T(ctx, prefix+form, data)
 }
 
 func brandRow(ctx context.Context, brand api.BrandResponse) BrandRow {
@@ -358,6 +389,7 @@ func HandleBrandGet(
 		renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
 			"isNew":             false,
 			"storedBrand":       *brand,
+			"clientsNote":       brandClientsNote(r.Context(), brand.ClientCount),
 			"savedSuccessfully": savedSuccessfully,
 			"madeDefault":       madeDefault,
 		})
@@ -397,6 +429,7 @@ func HandleBrandPost(
 				renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
 					"isNew":       false,
 					"storedBrand": *brand,
+					"clientsNote": brandClientsNote(r.Context(), brand.ClientCount),
 					"error":       message,
 					"errorField":  render.ErrorField(err, brandErrorFields),
 				})
@@ -432,7 +465,8 @@ type brandMakeDefaultAPI interface {
 	MakeBrandDefault(ctx context.Context, accessToken string, brandId int64) (*api.BrandResponse, error)
 }
 
-// HandleBrandMakeDefaultPost makes a brand the default, which draws every page in it at once.
+// HandleBrandMakeDefaultPost makes a brand the default, which draws in it at once every client with
+// no brand of its own, and the pages that belong to no client.
 func HandleBrandMakeDefaultPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -461,15 +495,38 @@ func HandleBrandMakeDefaultPost(
 	}
 }
 
-// brandDeleteAPI is what the delete page needs: the brand, and the deletion.
+// brandDeleteAPI is what the delete page needs: the brand, the brands it finds the default among,
+// and the deletion.
 type brandDeleteAPI interface {
+	GetAllBrands(ctx context.Context, accessToken string) ([]api.BrandResponse, error)
 	GetBrandById(ctx context.Context, accessToken string, brandId int64) (*api.BrandResponse, error)
 	DeleteBrand(ctx context.Context, accessToken string, brandId int64) error
 }
 
-func renderBrandDelete(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, brand api.BrandResponse, message string) {
+// renderBrandDelete draws the delete confirmation. For a brand that is not the default it says how
+// many clients use it and, when any does, names the default brand they will move to, read from the
+// brands the auth server marks it among.
+func renderBrandDelete(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient brandDeleteAPI,
+	token string, brand api.BrandResponse, message string) {
+
 	bind := map[string]interface{}{
 		"brand": brandRow(r.Context(), brand),
+	}
+	if !brand.IsDefault {
+		defaultBrand := ""
+		if brand.ClientCount > 0 {
+			brands, err := apiClient.GetAllBrands(r.Context(), token)
+			if err != nil {
+				render.HandleAPIError(httpHelper, w, r, err)
+				return
+			}
+			for _, candidate := range brands {
+				if candidate.IsDefault {
+					defaultBrand = candidate.Name
+				}
+			}
+		}
+		bind["clientsNote"] = deleteClientsNote(r.Context(), brand.ClientCount, defaultBrand)
 	}
 	if message != "" {
 		bind["error"] = message
@@ -501,13 +558,14 @@ func HandleBrandDeleteGet(
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		renderBrandDelete(httpHelper, w, r, *brand, "")
+		renderBrandDelete(httpHelper, w, r, apiClient, token, *brand, "")
 	}
 }
 
-// HandleBrandDeletePost deletes the brand whose name is typed, exactly as stored. The auth server
-// refuses deleting the default under the settings row's lock, so a brand made the default after
-// the page was drawn is refused there, and the page says so.
+// HandleBrandDeletePost deletes the brand whose name is typed, exactly as stored, and the auth
+// server moves the clients that use it to the default brand (#812 decision 1). It refuses deleting
+// the default under the settings row's lock, so a brand made the default after the page was drawn
+// is refused there, and the page says so.
 func HandleBrandDeletePost(
 	httpHelper HttpHelper,
 	apiClient brandDeleteAPI,
@@ -533,17 +591,17 @@ func HandleBrandDeletePost(
 
 		typed := r.PostFormValue("name")
 		if typed == "" {
-			renderBrandDelete(httpHelper, w, r, *brand, i18n.T(r.Context(), "adminconsole.refusal.brand_delete.name_required"))
+			renderBrandDelete(httpHelper, w, r, apiClient, token, *brand, i18n.T(r.Context(), "adminconsole.refusal.brand_delete.name_required"))
 			return
 		}
 		if typed != brand.Name {
-			renderBrandDelete(httpHelper, w, r, *brand, i18n.T(r.Context(), "adminconsole.refusal.brand_delete.name_mismatch"))
+			renderBrandDelete(httpHelper, w, r, apiClient, token, *brand, i18n.T(r.Context(), "adminconsole.refusal.brand_delete.name_mismatch"))
 			return
 		}
 
 		if err := apiClient.DeleteBrand(r.Context(), token, id); err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
-				renderBrandDelete(httpHelper, w, r, *brand, message)
+				renderBrandDelete(httpHelper, w, r, apiClient, token, *brand, message)
 			})
 			return
 		}

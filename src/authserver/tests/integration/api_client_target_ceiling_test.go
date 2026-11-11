@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -219,6 +220,22 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 			return storedClient(t, f.clientId).DPoPBoundAccessTokens
 		},
 		notOnTheConsoleClient: true,
+	},
+	{
+		// Giving the client a brand of its own (#812 decision 2): the brand is made for the test.
+		name: "PUT clients brand", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/brand",
+		prepare: func(t *testing.T, f *clientTargetFixture) {
+			f.before = strconv.FormatInt(newBrandInStore(t, "Target").Id, 10)
+		},
+		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
+			brandId, err := strconv.ParseInt(f.before, 10, 64)
+			require.NoError(t, err)
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/brand", f.clientId),
+				map[string]any{"brandId": brandId})
+		},
+		changed: func(t *testing.T, f *clientTargetFixture) bool {
+			return strconv.FormatInt(storedBrandId(t, f.clientId), 10) == f.before
+		},
 	},
 	{
 		name: "PUT clients web origins", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/web-origins",

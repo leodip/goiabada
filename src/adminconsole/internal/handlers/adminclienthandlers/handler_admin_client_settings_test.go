@@ -19,9 +19,21 @@ import (
 )
 
 // stubAdministrativeScopesApiClient implements the Settings tab's port: the client the tab is drawn
-// from, the settings' write and the allowance's, each recording what it was sent.
+// from, the brands its Brand select offers, and the settings', the allowance's and the brand's
+// writes, each recording what it was sent and in which order.
 type stubAdministrativeScopesApiClient struct {
 	client *api.ClientResponse
+	// brands is what the brands' read answers.
+	brands []api.BrandResponse
+	// brandErr is what the brand's write answers; brandAnswer the client it answers otherwise.
+	brandErr    error
+	brandAnswer *api.ClientResponse
+	sentBrand   *api.UpdateClientBrandRequest
+	sentBrandTo int64
+	sentBrandAs string
+	brandWrites int
+	// writes names each write in the order it was made.
+	writes []string
 	// updated is what the settings' write answers, the client as it then stands.
 	updated *api.ClientResponse
 	// settingsErr and updateErr are what the settings' write and the allowance's answer.
@@ -44,6 +56,7 @@ func (s *stubAdministrativeScopesApiClient) GetClientById(_ context.Context, _ s
 func (s *stubAdministrativeScopesApiClient) UpdateClient(_ context.Context, _ string, _ int64,
 	request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
 	s.settingsWrites++
+	s.writes = append(s.writes, "settings")
 	s.sentSettings = request
 	if s.settingsErr != nil {
 		return nil, s.settingsErr
@@ -57,6 +70,7 @@ func (s *stubAdministrativeScopesApiClient) UpdateClient(_ context.Context, _ st
 func (s *stubAdministrativeScopesApiClient) UpdateClientAdministrativeScopes(_ context.Context, accessToken string,
 	clientId int64, request *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
 	s.allowanceWrites++
+	s.writes = append(s.writes, "allowance")
 	s.sentAllowance = request
 	s.sentAllowanceTo = clientId
 	s.sentAllowanceAs = accessToken
@@ -66,6 +80,36 @@ func (s *stubAdministrativeScopesApiClient) UpdateClientAdministrativeScopes(_ c
 	return s.client, nil
 }
 
+func (s *stubAdministrativeScopesApiClient) GetAllBrands(_ context.Context, _ string) ([]api.BrandResponse, error) {
+	return s.brands, nil
+}
+
+func (s *stubAdministrativeScopesApiClient) UpdateClientBrand(_ context.Context, accessToken string, clientId int64,
+	request *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
+	s.brandWrites++
+	s.writes = append(s.writes, "brand")
+	s.sentBrand = request
+	s.sentBrandTo = clientId
+	s.sentBrandAs = accessToken
+	if s.brandErr != nil {
+		return nil, s.brandErr
+	}
+	if s.brandAnswer != nil {
+		return s.brandAnswer, nil
+	}
+	return s.client, nil
+}
+
+// invalidationRecorder stands in for the console's cache of the public settings, counting the
+// times it was dropped.
+type invalidationRecorder struct {
+	invalidations int
+}
+
+func (c *invalidationRecorder) Invalidate() {
+	c.invalidations++
+}
+
 // manageGrant is the scope an administrator holding authserver:manage was granted, the one scope the
 // auth server lets switch the allowance.
 const manageGrant = "openid authserver:manage"
@@ -73,6 +117,14 @@ const manageGrant = "openid authserver:manage"
 // postSettings posts the Settings tab for client 7 with form, and with query on the URL when given,
 // as an administrator granted scope.
 func postSettings(t *testing.T, apiClient clientSettingsAPI, httpHelper *stubHttpHelper, form url.Values, query string, scope ...string) *httptest.ResponseRecorder {
+	t.Helper()
+	return postSettingsDropping(t, apiClient, httpHelper, &invalidationRecorder{}, form, query, scope...)
+}
+
+// postSettingsDropping posts the Settings tab as postSettings does, with cache standing for the
+// console's cached public settings.
+func postSettingsDropping(t *testing.T, apiClient clientSettingsAPI, httpHelper *stubHttpHelper, cache *invalidationRecorder,
+	form url.Values, query string, scope ...string) *httptest.ResponseRecorder {
 	t.Helper()
 	target := "/admin/clients/7/settings"
 	if query != "" {
@@ -86,7 +138,7 @@ func postSettings(t *testing.T, apiClient clientSettingsAPI, httpHelper *stubHtt
 		handlertest.WithJwtInfo(oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken, Scope: grant}}),
 		handlertest.WithPathValue("clientId", "7"), handlertest.WithForm(form))
 	rec := httptest.NewRecorder()
-	HandleSettingsPost(httpHelper, newTestSessionStore(), apiClient, consoleBaseURL).ServeHTTP(rec, req)
+	HandleSettingsPost(httpHelper, newTestSessionStore(), apiClient, cache, consoleBaseURL).ServeHTTP(rec, req)
 	return rec
 }
 
@@ -434,4 +486,186 @@ func TestHandleSettingsPost_ARefusedSaveKeepsRememberConsentAsSubmitted(t *testi
 	require.NotNil(t, httpHelper.bind, "the refused save is drawn again")
 	assert.True(t, reflect.ValueOf(httpHelper.bind["client"]).FieldByName("RememberConsent").Bool(), "drawn as submitted")
 	assert.False(t, reflect.ValueOf(httpHelper.bind["storedClient"]).FieldByName("RememberConsent").Bool(), "compared with the stored value")
+}
+
+func brandIdPtr(id int64) *int64 { return &id }
+
+// The brands as the auth server lists them, by name, the default marked: Autumn (4), Default (5)
+// and Spring (6).
+var testBrands = []api.BrandResponse{
+	{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
+	{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
+	{Id: 6, Name: "Spring", Appearance: "light", Theme: "avocado"},
+}
+
+// The Brand select under Sign-in and consent pages (#812 decision 6): Default brand first, naming
+// the current default, then every brand by name in the auth server's order, the client's own brand
+// selected, or Default brand for a client with none of its own.
+func TestHandleSettingsGet_BindsTheBrandSelect(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		brandId *int64
+		want    int64
+	}{
+		{"a client with no brand of its own", nil, 0},
+		{"a client given a brand", brandIdPtr(6), 6},
+		{"a client given the default brand itself", brandIdPtr(5), 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := &stubHttpHelper{}
+			req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
+			apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
+				client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", BrandId: tc.brandId}}
+
+			HandleSettingsGet(httpHelper, newTestSessionStore(), apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+			require.NoError(t, httpHelper.err)
+			require.NotNil(t, httpHelper.bind, "the handler rendered nothing")
+			assert.Equal(t, "Default", httpHelper.bind["defaultBrandName"])
+			assert.Equal(t, []BrandOption{{Id: 4, Name: "Autumn"}, {Id: 5, Name: "Default"}, {Id: 6, Name: "Spring"}},
+				httpHelper.bind["brands"])
+			assert.Equal(t, tc.want, reflect.ValueOf(httpHelper.bind["client"]).FieldByName("BrandId").Int())
+			assert.Equal(t, tc.want, reflect.ValueOf(httpHelper.bind["storedClient"]).FieldByName("BrandId").Int())
+		})
+	}
+}
+
+// The brand is saved by the tab's one Save, after the settings and only when the select differs
+// from the client's stored brand (#812 decision 6): an empty value puts the client back on the
+// default brand, sent as null, and a number gives it that brand. The default brand chosen by name
+// is a brand of its own, apart from Default brand. A select that was not submitted, or a value it
+// never sends, keeps the stored brand.
+func TestHandleSettingsPost_WritesTheBrandOnlyWhenItChanged(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		stored    *int64
+		form      url.Values
+		wantWrite bool
+		wantSent  *int64
+	}{
+		{name: "left on the default", form: url.Values{"brandId": {""}}},
+		{name: "given a brand", form: url.Values{"brandId": {"6"}}, wantWrite: true, wantSent: brandIdPtr(6)},
+		{name: "given the default brand by name", form: url.Values{"brandId": {"5"}}, wantWrite: true, wantSent: brandIdPtr(5)},
+		{name: "put back on the default", stored: brandIdPtr(6), form: url.Values{"brandId": {""}}, wantWrite: true},
+		{name: "put back from the default brand by name", stored: brandIdPtr(5), form: url.Values{"brandId": {""}}, wantWrite: true},
+		{name: "moved to another brand", stored: brandIdPtr(4), form: url.Values{"brandId": {"6"}}, wantWrite: true, wantSent: brandIdPtr(6)},
+		{name: "left on its brand", stored: brandIdPtr(6), form: url.Values{"brandId": {"6"}}},
+		{name: "the select not submitted", stored: brandIdPtr(6), form: url.Values{}},
+		{name: "a value the select never sends", stored: brandIdPtr(6), form: url.Values{"brandId": {"autumn"}}},
+		{name: "a brand id that is no id", stored: brandIdPtr(6), form: url.Values{"brandId": {"0"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
+				client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", BrandId: tc.stored}}
+			httpHelper := &stubHttpHelper{}
+			cache := &invalidationRecorder{}
+
+			rec := postSettingsDropping(t, apiClient, httpHelper, cache, tc.form, "")
+
+			require.NoError(t, httpHelper.err)
+			assert.Equal(t, http.StatusFound, rec.Code)
+			assert.Equal(t, consoleBaseURL+"/admin/clients/7/settings", rec.Header().Get("Location"))
+			if !tc.wantWrite {
+				assert.Zero(t, apiClient.brandWrites, "an unchanged brand is not written")
+				assert.Equal(t, []string{"settings"}, apiClient.writes)
+				return
+			}
+			assert.Equal(t, []string{"settings", "brand"}, apiClient.writes, "the brand is written once, after the settings")
+			require.NotNil(t, apiClient.sentBrand)
+			assert.Equal(t, tc.wantSent, apiClient.sentBrand.BrandId)
+			assert.Equal(t, int64(7), apiClient.sentBrandTo)
+			assert.Equal(t, handlertest.AccessToken, apiClient.sentBrandAs)
+			assert.Zero(t, cache.invalidations, "another client's brand leaves the console's look alone")
+		})
+	}
+}
+
+// The select is read from the body alone, as the tab's other switches are: a brand in the URL is no
+// submission of the form.
+func TestHandleSettingsPost_IgnoresTheBrandInTheQuery(t *testing.T) {
+	apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
+		client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", BrandId: brandIdPtr(6)}}
+
+	postSettings(t, apiClient, &stubHttpHelper{}, url.Values{}, "brandId=")
+
+	assert.Zero(t, apiClient.brandWrites)
+}
+
+// A refused settings save writes no brand, and draws the tab again with the select as submitted,
+// beside the brands it offers.
+func TestHandleSettingsPost_ARefusedSettingsSaveWritesNoBrand(t *testing.T) {
+	apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
+		client:      &api.ClientResponse{Id: 7, ClientIdentifier: "portal"},
+		settingsErr: &apiclient.APIError{Code: "handler.client.website_url_invalid", Message: "Invalid website URL.", StatusCode: http.StatusBadRequest}}
+	httpHelper := &stubHttpHelper{}
+
+	postSettings(t, apiClient, httpHelper, url.Values{"websiteUrl": {"x"}, "brandId": {"6"}}, "")
+
+	require.NoError(t, httpHelper.err)
+	assert.Zero(t, apiClient.brandWrites)
+	require.NotNil(t, httpHelper.bind, "the refused save is drawn again")
+	assert.Equal(t, int64(6), reflect.ValueOf(httpHelper.bind["client"]).FieldByName("BrandId").Int(), "drawn as submitted")
+	assert.Equal(t, int64(0), reflect.ValueOf(httpHelper.bind["storedClient"]).FieldByName("BrandId").Int())
+	assert.Equal(t, "Default", httpHelper.bind["defaultBrandName"])
+	assert.Equal(t, []BrandOption{{Id: 4, Name: "Autumn"}, {Id: 5, Name: "Default"}, {Id: 6, Name: "Spring"}},
+		httpHelper.bind["brands"])
+}
+
+// A brand deleted between loading the tab and saving it is refused after the settings were written:
+// the tab is drawn again from the client as it now stands, saying the settings were saved, with the
+// auth server's refusal on the select, which offers the brands as they now stand. Nothing is
+// redirected and the console's look is left alone.
+func TestHandleSettingsPost_ARefusedBrandLeavesTheSettingsSaved(t *testing.T) {
+	const refusal = "The brand does not exist."
+	apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
+		client:   &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", DisplayName: "Console", IsSystemLevelClient: true},
+		updated:  &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", DisplayName: "Admin console", IsSystemLevelClient: true},
+		brandErr: &apiclient.APIError{Code: "handler.client_brand.brand_not_found", Message: refusal, StatusCode: http.StatusBadRequest},
+	}
+	httpHelper := &stubHttpHelper{}
+	cache := &invalidationRecorder{}
+
+	rec := postSettingsDropping(t, apiClient, httpHelper, cache, url.Values{"displayName": {"Admin console"}, "brandId": {"9"}}, "")
+
+	require.NoError(t, httpHelper.err)
+	assert.Equal(t, []string{"settings", "brand"}, apiClient.writes)
+	require.NotNil(t, httpHelper.bind, "the settings page is rendered again")
+	assert.Empty(t, rec.Header().Get("Location"))
+	assert.Equal(t, refusal, httpHelper.bind["brandError"])
+	assert.Equal(t, true, httpHelper.bind["savedSuccessfully"], "the settings were written before the refusal")
+	assert.Nil(t, httpHelper.bind["error"], "the settings form's own error slot stays empty")
+	bound := reflect.ValueOf(httpHelper.bind["client"])
+	assert.Equal(t, "Admin console", bound.FieldByName("DisplayName").String(), "the client as it now stands")
+	assert.Equal(t, int64(0), bound.FieldByName("BrandId").Int(), "the stored brand, not the refused one")
+	assert.Equal(t, []BrandOption{{Id: 4, Name: "Autumn"}, {Id: 5, Name: "Default"}, {Id: 6, Name: "Spring"}},
+		httpHelper.bind["brands"])
+	assert.Zero(t, cache.invalidations, "a refused brand changed nothing")
+}
+
+// Saving the brand of the admin console's own client drops the console's cached copy of the public
+// settings, so its pages take the brand at once (#812 decision 6); a save of that client that leaves
+// its brand alone does not.
+func TestHandleSettingsPost_TheConsolesOwnBrandDropsItsCachedSettings(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		form url.Values
+		want int
+	}{
+		{"given a brand", url.Values{"brandId": {"4"}}, 1},
+		{"put back on the default", url.Values{"brandId": {""}}, 1},
+		{"its brand left alone", url.Values{"brandId": {"6"}}, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
+				client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", BrandId: brandIdPtr(6),
+					AdministrativeScopesAllowed: true, IsSystemLevelClient: true}}
+			cache := &invalidationRecorder{}
+
+			rec := postSettingsDropping(t, apiClient, &stubHttpHelper{}, cache, tc.form, "")
+
+			assert.Equal(t, http.StatusFound, rec.Code)
+			assert.Equal(t, tc.want, cache.invalidations)
+		})
+	}
 }

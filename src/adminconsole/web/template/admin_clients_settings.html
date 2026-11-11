@@ -22,6 +22,12 @@
       <p>{{ T $.ctx "adminconsole.admin_clients.settings.saved_successfully" }}</p>
     </div>
     {{ end }}
+    {{ if .brandError }}
+    <div class="notice notice-danger" role="alert" id="brand-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .brandError }}</p>
+    </div>
+    {{ end }}
     {{ if .administrativeScopesError }}
     <div class="notice notice-danger" role="alert" id="administrative-scopes-error">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
@@ -77,6 +83,20 @@
     <fieldset>
       <legend class="panel-title">{{ T $.ctx "adminconsole.admin_clients.settings.screens_legend" }}</legend>
       <p class="field-hint mb-3">{{ T $.ctx "adminconsole.admin_clients.settings.screens_hint" }}</p>
+      {{/* Saved by the form's one Save: the console writes it to the auth server's own route for
+           it when it changed (#812 decision 6). The empty value is the default brand, which the
+           client then follows when the default changes; the default chosen by name stays. */}}
+      <div class="field max-w-md mb-3">
+        <label class="field-label" for="brandId">{{ T $.ctx "adminconsole.admin_clients.settings.field.brand" }}</label>
+        <select class="control" id="brandId" name="brandId" aria-describedby="{{ if .brandError }}brand-error {{ end }}brandIdHint"
+          {{- if .brandError }} aria-invalid="true" autofocus{{ end }}>
+          <option value=""{{ if eq .client.BrandId 0 }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_clients.settings.field.brand_default" "name" .defaultBrandName }}</option>
+          {{- range .brands }}
+          <option value="{{ .Id }}"{{ if eq .Id $.client.BrandId }} selected{{ end }}>{{ .Name }}</option>
+          {{- end }}
+        </select>
+        <p class="field-hint" id="brandIdHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.brand_hint" }}</p>
+      </div>
       <div class="check-list">
         <label class="check-row" for="showDisplayName">
           <input type="checkbox" id="showDisplayName" name="showDisplayName" aria-describedby="showDisplayNameHint"{{ if .client.ShowDisplayName }} checked{{ end }}>

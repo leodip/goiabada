@@ -21,13 +21,14 @@ import {
   legalDocumentUrl,
   resourceUrl,
   retireLegalDocument,
+  setClientBrand,
   userUrl,
   type ClientTab,
   type GroupTab,
   type ResourceTab,
   type UserTab,
 } from "../../lib/admin-console";
-import { brandUrl, defaultBrand, newBrandUrl, previewSample, switchPreviewTo } from "../../lib/brands";
+import { brandUrl, defaultBrand, newBrandUrl, previewSample, switchPreviewTo, withBrand } from "../../lib/brands";
 import { openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { signInToConsole } from "../../lib/console-user";
 import { env } from "../../lib/environment";
@@ -565,7 +566,9 @@ test("the clients' pages", async ({ page, clients, resources }) => {
   const system = await clientIdFromList(page, "admin-console-client");
   const tab = (name: ClientTab) => clientUrl(client.id, name);
 
-  await checkStates(page, [
+  // A brand of the test's own, given to the client (#812): its Settings tab with the brand chosen, and
+  // the brand's delete page saying the client uses it. It is not the default, so no other page changes.
+  await withBrand(page, { appearance: "dark", theme: "plum" }, (brand) => checkStates(page, [
     at(page, "the clients list", `${env.adminUrl}/admin/clients`),
     at(page, "a new client", `${env.adminUrl}/admin/clients/new`),
     refused(page, "a new client with no identifier", "clientIdentifier", async () => {
@@ -595,6 +598,17 @@ test("the clients' pages", async ({ page, clients, resources }) => {
       await page.locator("#description").fill("Checked for accessibility");
       await page.locator("#btnSave").click();
     }),
+    saved(page, "a client's settings, a brand of its own chosen and saved", async () => {
+      await setClientBrand(page, client.id, brand);
+      await expect(page.locator("#brandId")).toHaveValue(String(brand.id));
+    }),
+    {
+      name: "deleting a brand a client uses",
+      reach: async () => {
+        await page.goto(brandUrl(brand.id, "delete"));
+        await expect(page.locator(".page-lead")).toContainText("1 client uses it. It will move to the default brand,");
+      },
+    },
     asks(page, "the admin console's client's settings, whose every save asks first", async () => {
       await page.goto(clientUrl(system, "settings"));
       await page.locator("#btnSave").click();
@@ -687,7 +701,7 @@ test("the clients' pages", async ({ page, clients, resources }) => {
       await page.locator("#btnSave").click();
     }),
     at(page, "a client's legal documents", tab("legal-documents")),
-  ]);
+  ]));
 });
 
 test("a signed-in user's sessions and consent, as the administrator sees them", async ({ page, browser, clients, users }) => {

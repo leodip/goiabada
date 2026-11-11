@@ -81,16 +81,20 @@ type ClientResponse struct {
 	// whatever its row holds. Only UpdateClientAdministrativeScopesRequest, on its own route
 	// reserved to authserver:manage, changes it; the create request and the settings save carry no
 	// such field, so no caller sets or clears it by accident (#499 decisions 4 and 5).
-	AdministrativeScopesAllowed bool  `json:"administrativeScopesAllowed"`
-	ShowLogo                    bool  `json:"showLogo"`
-	ShowDisplayName             bool  `json:"showDisplayName"`
-	ShowDescription             bool  `json:"showDescription"`
-	ShowWebsiteURL              bool  `json:"showWebsiteUrl"`
-	IsPublic                    bool  `json:"isPublic"`
-	IsSystemLevelClient         bool  `json:"isSystemLevelClient"`
-	AuthorizationCodeEnabled    bool  `json:"authorizationCodeEnabled"`
-	ClientCredentialsEnabled    bool  `json:"clientCredentialsEnabled"`
-	PKCERequired                *bool `json:"pkceRequired"`
+	AdministrativeScopesAllowed bool `json:"administrativeScopesAllowed"`
+	// BrandId is the brand the client's pages are drawn in, or null when it has no brand of its
+	// own and follows whichever brand is the default. It changes only through
+	// UpdateClientBrandRequest (#812 decisions 1 and 2).
+	BrandId                  *int64 `json:"brandId"`
+	ShowLogo                 bool   `json:"showLogo"`
+	ShowDisplayName          bool   `json:"showDisplayName"`
+	ShowDescription          bool   `json:"showDescription"`
+	ShowWebsiteURL           bool   `json:"showWebsiteUrl"`
+	IsPublic                 bool   `json:"isPublic"`
+	IsSystemLevelClient      bool   `json:"isSystemLevelClient"`
+	AuthorizationCodeEnabled bool   `json:"authorizationCodeEnabled"`
+	ClientCredentialsEnabled bool   `json:"clientCredentialsEnabled"`
+	PKCERequired             *bool  `json:"pkceRequired"`
 	// ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
 	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
 	ImplicitGrantEnabled *bool `json:"implicitGrantEnabled"`
@@ -256,6 +260,14 @@ type UpdateClientAdministrativeScopesRequest struct {
 // console's own client is refused it on.
 type UpdateClientDPoPRequest struct {
 	DPoPBoundAccessTokens *bool `json:"dpopBoundAccessTokens"`
+}
+
+// UpdateClientBrandRequest gives a client a brand of its own, on PUT /clients/{id}/brand (#812
+// decision 2): the id of a brand, or null to put the client back on the default brand, which it
+// then follows when the default changes. The member is required: the auth server refuses a body
+// without it rather than read it as null, so it sees the raw body to tell the two apart.
+type UpdateClientBrandRequest struct {
+	BrandId *int64 `json:"brandId"`
 }
 
 type UpdateClientResponse struct {

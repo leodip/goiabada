@@ -570,6 +570,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 		BackchannelLogoutURI:                    "http://app.internal:3000/backchannel-logout?tenant=a",
 		BackchannelLogoutSessionRequired:        true,
 		DPoPBoundAccessTokens:                   true,
+		BrandId:                                 sql.NullInt64{Int64: 7, Valid: true},
 		ShowLogo:                                true,
 		ShowDisplayName:                         true,
 		ShowWebsiteURL:                          true,
@@ -607,8 +608,9 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 	// Split out so the nil-collection row below can reuse it with a different
 	// clientIdentifier without restating twenty-odd keys. The system-level client
 	// reads administrativeScopesAllowed true with its row's column left false: the
-	// admin console's client is always allowed (#499).
-	clientScalars := func(identifier string, systemLevel bool) string {
+	// admin console's client is always allowed (#499). brandId is the client's own brand, or null
+	// for a client that follows the default (#812).
+	clientScalars := func(identifier string, systemLevel bool, brandId string) string {
 		flag := `false`
 		if systemLevel {
 			flag = `true`
@@ -619,7 +621,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			`"consentRequired":true,"rememberConsent":true,` +
 			`"backchannelLogoutUri":"http://app.internal:3000/backchannel-logout?tenant=a",` +
 			`"backchannelLogoutSessionRequired":true,"dpopBoundAccessTokens":true,"createdViaDcr":false,"administrativeScopesAllowed":` + flag +
-			`,"showLogo":true,"showDisplayName":true,` +
+			`,"brandId":` + brandId + `,"showLogo":true,"showDisplayName":true,` +
 			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,"isSystemLevelClient":` + flag +
 			`,"authorizationCodeEnabled":true,"clientCredentialsEnabled":false,` +
 			`"pkceRequired":true,"implicitGrantEnabled":null,` +
@@ -635,6 +637,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 	systemLevel.RedirectURIs = nil
 	systemLevel.PostLogoutRedirectURIs = nil
 	systemLevel.WebOrigins = nil
+	systemLevel.BrandId = sql.NullInt64{}
 
 	runWireCases(t, []wireCase{
 		{
@@ -644,7 +647,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			name:  "populated, with the nested redirect URI and web origin DTOs",
 			value: ToClientResponse(client),
 			literal: `{"id":3,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
-				clientScalars("web-app", false) +
+				clientScalars("web-app", false, "7") +
 				`,"redirectURIs":[` + wireRedirectURIJSON + `],` +
 				`"postLogoutRedirectURIs":[` + wirePostLogoutRedirectURIJSON + `],"webOrigins":[` +
 				wireWebOriginJSON + `]}`,
@@ -653,7 +656,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			name:  "nil collections, and a system-level client",
 			value: ToClientResponse(&systemLevel),
 			literal: `{"id":3,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
-				clientScalars(builtin.AdminConsoleClientIdentifier, true) +
+				clientScalars(builtin.AdminConsoleClientIdentifier, true, "null") +
 				`,"redirectURIs":null,"postLogoutRedirectURIs":null,"webOrigins":null}`,
 		},
 	})

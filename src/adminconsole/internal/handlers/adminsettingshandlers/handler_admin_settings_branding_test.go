@@ -97,8 +97,10 @@ var (
 func newBrandingAPI() *brandingAPI {
 	return &brandingAPI{
 		brands: []api.BrandResponse{
-			{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
-			{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
+			{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2},
+			{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
+			{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
+			{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
 		},
 		themes: []api.BrandThemeResponse{testBlueberry, testPlum},
 	}
@@ -108,6 +110,7 @@ func refusal(code, message string) error {
 	return &apiclient.APIError{Code: code, Message: message, StatusCode: http.StatusBadRequest}
 }
 
+// Each row carries how many clients the brand draws, for the list's Clients column (#812 decision 3).
 func TestHandleBrandingGet_ListsTheBrandsInTheServersOrderWithTheirLookInWords(t *testing.T) {
 	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
@@ -117,10 +120,14 @@ func TestHandleBrandingGet_ListsTheBrandsInTheServersOrderWithTheirLookInWords(t
 		handlertest.Request(http.MethodGet, "/admin/settings/branding", handlertest.WithAccessToken()))
 
 	assert.Equal(t, []BrandRow{
-		{BrandResponse: api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
+		{BrandResponse: api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2},
 			AppearanceName: "Dark", ThemeName: "Plum"},
-		{BrandResponse: api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
+		{BrandResponse: api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 			AppearanceName: "Automatic", ThemeName: "Blueberry"},
+		{BrandResponse: api.BrandResponse{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
+			AppearanceName: "Light", ThemeName: "Plum"},
+		{BrandResponse: api.BrandResponse{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
+			AppearanceName: "Automatic", ThemeName: "Plum"},
 	}, handlertest.Bind(t, httpHelper)["brands"])
 }
 
@@ -234,7 +241,7 @@ func TestHandleBrandGet_DrawsTheStoredBrand(t *testing.T) {
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, false, bind["isNew"])
 	assert.Equal(t, BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum"}, bind["brand"])
-	assert.Equal(t, api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"}, bind["storedBrand"])
+	assert.Equal(t, api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2}, bind["storedBrand"])
 	assert.Equal(t, wantThemeOptions, bind["brandThemes"])
 	assert.Equal(t, wantThemeOptions[1], bind["appearanceTheme"], "the appearance cards show the brand's theme")
 	assert.Equal(t, false, bind["savedSuccessfully"])
@@ -356,9 +363,93 @@ func TestHandleBrandDeleteGet_DrawsTheBrandInWords(t *testing.T) {
 			handlertest.WithPathValue("brandId", "5")))
 
 	assert.Equal(t, BrandRow{
-		BrandResponse:  api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
+		BrandResponse:  api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 		AppearanceName: "Automatic", ThemeName: "Blueberry",
 	}, handlertest.Bind(t, httpHelper)["brand"])
+}
+
+// A brand's page says how many clients it draws, in a sentence for none, one and more (#812
+// decision 3); a refused save of the page says it too.
+func TestHandleBrandGet_SaysHowManyClientsUseTheBrand(t *testing.T) {
+	for id, want := range map[string]string{
+		"4": "2 clients use this brand.",
+		"5": "3 clients use this brand.",
+		"6": "1 client uses this brand.",
+		"7": "No client uses this brand.",
+	} {
+		t.Run(id, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
+
+			HandleBrandGet(httpHelper, newSettingsTestStore(), newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
+				handlertest.Request(http.MethodGet, "/admin/settings/branding/"+id+"/edit", handlertest.WithAccessToken(),
+					handlertest.WithPathValue("brandId", id)))
+
+			assert.Equal(t, want, handlertest.Bind(t, httpHelper)["clientsNote"])
+		})
+	}
+
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
+	apiClient := newBrandingAPI()
+	apiClient.writeErr = refusal("handler.brand.name_in_use", "Not that.")
+	HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
+		httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/6/edit",
+			handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", "6"),
+			handlertest.WithForm(url.Values{"name": {"Autumn"}, "appearance": {"auto"}, "theme": {"plum"}})))
+	assert.Equal(t, "1 client uses this brand.", handlertest.Bind(t, httpHelper)["clientsNote"], "a refused save")
+}
+
+// The delete confirmation says how many clients use the brand and that they will move to the
+// default brand, which it names, or that no client uses it (#812 decision 3). A refused deletion
+// is drawn again saying it too.
+func TestHandleBrandDeleteGet_SaysWhereTheBrandsClientsWillMove(t *testing.T) {
+	for id, want := range map[string]string{
+		"4": "2 clients use it. They will move to the default brand, Default.",
+		"6": "1 client uses it. It will move to the default brand, Default.",
+		"7": "No client uses it, so no page will change.",
+	} {
+		t.Run(id, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_delete.html").Once()
+
+			HandleBrandDeleteGet(httpHelper, newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
+				handlertest.Request(http.MethodGet, "/admin/settings/branding/"+id+"/delete", handlertest.WithAccessToken(),
+					handlertest.WithPathValue("brandId", id)))
+
+			assert.Equal(t, want, handlertest.Bind(t, httpHelper)["clientsNote"])
+		})
+	}
+
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_delete.html").Once()
+	HandleBrandDeletePost(httpHelper, newBrandingAPI(), &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+		handlertest.Request(http.MethodPost, "/admin/settings/branding/4/delete", handlertest.WithAccessToken(),
+			handlertest.WithPathValue("brandId", "4"), handlertest.WithForm(url.Values{"name": {"autumn"}})))
+	bind := handlertest.Bind(t, httpHelper)
+	assert.Equal(t, "That isn't this brand's name. Type it as shown above.", bind["error"])
+	assert.Equal(t, "2 clients use it. They will move to the default brand, Default.", bind["clientsNote"], "a refused deletion")
+}
+
+// The default brand named is the one the auth server marks, not the brand being deleted or the
+// first listed.
+func TestHandleBrandDeleteGet_NamesTheDefaultTheServerMarks(t *testing.T) {
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_delete.html").Once()
+	apiClient := newBrandingAPI()
+	apiClient.brands[1].IsDefault = false
+	apiClient.brands[3].IsDefault = true
+
+	HandleBrandDeleteGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(),
+		handlertest.Request(http.MethodGet, "/admin/settings/branding/4/delete", handlertest.WithAccessToken(),
+			handlertest.WithPathValue("brandId", "4")))
+
+	assert.Equal(t, "2 clients use it. They will move to the default brand, Unused.", handlertest.Bind(t, httpHelper)["clientsNote"])
 }
 
 func TestHandleBrandDeletePost_DeletesTheBrandWhoseNameIsTyped(t *testing.T) {

@@ -11,13 +11,29 @@ utilities for layout (#617). The file is one copy in each application's `web/tai
 regenerate both `main.css`. Every class a page names has a rule in the served `main.css`
 (`core/guard.AssertClassesAreDrawn`), so a misspelt or leftover class fails the unit tier.
 
-- **Themes**: every page is drawn in the default brand (#810): its appearance, `auto` (each
+- **Themes**: a page is drawn in a brand (#810): its appearance, `auto` (each
   visitor's device decides), `light` or `dark`, and its theme, one of the eight presets in
   `authserver/internal/brandthemes`. The layouts write `data-theme` for light and dark alone, and
   link the brand's stylesheet after `main.css`: the auth server's pages by
   `brandthemes.StylesheetPath`, the console's by the `stylesheetUrl` `/api/public/settings` answers,
-  which the console never builds. A page with no readable brand links none and is drawn automatic in
-  the built-in colors. The stylesheet sets the 23 `--color-*` tokens, the dark ones under the two
+  which the console never builds. An auth server page takes the brand of the client its request
+  names in `reqctx.PageClient`, its own or the default, and every other page the default (#812):
+  `middleware.PageClient` puts an empty one on every page request, `middleware.SignInPageClient`
+  names the client of the sign-in a step's request names on the step routes, ahead of their guards
+  and limiters, and `/auth/authorize` names its client once the request reaches the client check.
+  `middleware.LinkedSignInPageClient` does the same on forgot password, registration, activation
+  and password reset, from the well-formed `ceremony` parameter of their URL on a GET and a POST
+  alike, while the browser holds that sign-in; the password page's links to the first two carry it,
+  the activation and reset links mailed from them carry it through their first hop, and a refused
+  reset link's Request a new link carries it back to forgot password.
+  `/auth/logout` names the client of a confirmed hint or, with no hint, `client_id`, and none for a
+  rejected hint; its declining link carries that `client_id` to `/auth/logout/declined`, which
+  names it for the look alone. The no-longer-active page forgets it. `render.RequestPageBrand` reads it for both layouts and the
+  form_post page. Every console page takes the brand of the console's own client, its own or the
+  default, which `/api/public/settings` answers through `render.ClientPageBrand`. The console drops
+  its cached copy when its client's Brand select is saved and on every Branding write, so its pages
+  change at once; a change made through the admin API alone reaches them when the cache expires. A page with no readable brand links none and is drawn automatic in the built-in
+  colors. The stylesheet sets the 23 `--color-*` tokens, the dark ones under the two
   selectors `ui.css`'s dark variant uses, so a change to that variant changes `stylesheetCSS` too.
   Blueberry's declares no colors, since `ui.css` holds its values, which
   `TestThemeContrast_BlueberryIsBothCopiesOfUICSS` keeps equal to its preset; a token added to

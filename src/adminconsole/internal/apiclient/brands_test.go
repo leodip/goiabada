@@ -13,7 +13,7 @@ import (
 // admin API answers, and its swatches from the themes' palettes, so this pins each of them off the
 // bytes the auth server writes.
 
-const brandBodyFields = `"id":7,"name":"Spring","appearance":"dark","theme":"plum","isDefault":true,` +
+const brandBodyFields = `"id":7,"name":"Spring","appearance":"dark","theme":"plum","isDefault":true,"clientCount":3,` +
 	`"createdAt":"2026-11-09T10:00:00Z","updatedAt":"2026-11-09T11:30:00Z"`
 
 func TestAuthServerClient_GetBrandByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
@@ -32,6 +32,7 @@ func TestAuthServerClient_GetBrandByIdDecodesEveryFieldTheConsoleBinds(t *testin
 	assert.Equal(t, "dark", brand.Appearance)
 	assert.Equal(t, "plum", brand.Theme)
 	assert.True(t, brand.IsDefault, "the list and the delete page mark the default from the server's flag")
+	assert.Equal(t, 3, brand.ClientCount, "the list, the brand's page and the delete page say how many clients use it")
 	require.NotNil(t, brand.CreatedAt)
 	assert.Equal(t, time.Date(2026, 11, 9, 10, 0, 0, 0, time.UTC), brand.CreatedAt.UTC())
 	require.NotNil(t, brand.UpdatedAt)

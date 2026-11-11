@@ -120,16 +120,21 @@ func (s *Server) initRoutes(branches appBranches) {
 	legalDocumentPage := handlers.HandleLegalDocumentGet(httpHelper, s.database)
 	pages.Get("/legal/{shortName}", legalDocumentPage)
 	pages.Get("/legal/{shortName}/versions/{version}", legalDocumentPage)
+	// The pages a sign-in links to, forgot password, registration, activation and password reset, are
+	// drawn in the brand of the client of the sign-in their URL names, while the browser holds it, from
+	// ahead of every guard and limiter on them, so a refusal those write is drawn in it too (#812
+	// decisions 4 and 9).
+	linkedSignInPageClient := middleware.LinkedSignInPageClient(ceremonyStore)
 	// The email check runs ahead of the limiter, so a request refused for email being off spends
 	// no budget and is never answered 429 (#542).
-	pages.With(accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper))
+	pages.With(linkedSignInPageClient, accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper, adminConsoleBaseURL))
 	// The Turnstile challenge after the email check and ahead of the limiter, while it is on: a
 	// submission without a verified token is refused before any tier counts it (#642 decision 5).
-	pages.With(accounthandlers.ForgotPasswordRequiresEmail(httpHelper), accounthandlers.RequireForgotPasswordChallenge(httpHelper, s.challengeVerifier), rateLimiter.LimitForgotPwd).Post(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL))
+	pages.With(linkedSignInPageClient, accounthandlers.ForgotPasswordRequiresEmail(httpHelper), accounthandlers.RequireForgotPasswordChallenge(httpHelper, s.challengeVerifier, adminConsoleBaseURL), rateLimiter.LimitForgotPwd).Post(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordPost(httpHelper, s.database, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	// The two endpoints an emailed link points at register from the constants the links are
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
-	pages.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
-	pages.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL, notifier, logoutTokens))
+	pages.With(linkedSignInPageClient, rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
+	pages.With(linkedSignInPageClient, rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, ceremonyStore, s.database, passwordValidator, auditLogger, baseURL, adminConsoleBaseURL, notifier, logoutTokens))
 	// One discovery document at both well-known addresses, OIDC Discovery 1.0's and RFC 8414's, so
 	// the two cannot disagree: RFC 8414 section 3 allows more than one address and section 3.2 fields
 	// beyond its own. RFC 8414 section 3.1's path-suffixed form has no route; a reverse proxy serving
@@ -179,29 +184,33 @@ func (s *Server) initRoutes(branches appBranches) {
 		// own session (#246).
 		r.With(rateLimiter.LimitAuthorize).Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewAuthorization(s.database, userSessionManager, authorizeValidator, tokenParser, clientErrorResponder, auditLogger, authflow.NewSilentAuthentication(s.database, userSessionManager, permissionChecker, auditLogger, legalDocuments))))
 		r.With(rateLimiter.LimitAuthorize).Post("/authorize", handlers.HandleAuthorizePost(httpHelper, authflow.NewAuthorizationParking(authorizeValidator, s.database), baseURL))
-		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
-		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
-		r.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker, legalDocuments, logoutTokens)))
-		r.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewIssuance(s.database, codeIssuer, tokenIssuer, userSessionManager, permissionChecker, auditLogger, tokenMetrics)))
+		// The sign-in's steps are drawn in the brand of the client of the sign-in a request names,
+		// which the browser holds, from ahead of every guard and limiter on them, so a refusal those
+		// write is drawn in it too (#812).
+		steps := r.With(middleware.SignInPageClient(ceremonyStore))
+		steps.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
+		steps.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
+		steps.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))
+		steps.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker, legalDocuments, logoutTokens)))
+		steps.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewIssuance(s.database, codeIssuer, tokenIssuer, userSessionManager, permissionChecker, auditLogger, tokenMetrics)))
 		passwordPrompt := authflow.NewPasswordPrompt(s.database)
-		r.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, passwordPrompt))
+		steps.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, passwordPrompt))
 		// The Turnstile challenge ahead of the limiter, while it is on: a submission without a
 		// verified token is refused before any tier counts it and before any password is compared
 		// (#642 decision 5).
-		r.With(handlers.RequirePasswordChallenge(ceremonyBoundary, httpHelper, passwordPrompt, s.challengeVerifier), rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, passwordPrompt, authflow.NewPasswordSubmission(s.database, auditLogger)))
-		r.Get("/otp", handlers.HandleAuthOtpGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewOTPPrompt(s.database, otpSecretGenerator)))
-		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher), notifier))
+		steps.With(handlers.RequirePasswordChallenge(ceremonyBoundary, httpHelper, passwordPrompt, s.challengeVerifier), rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, passwordPrompt, authflow.NewPasswordSubmission(s.database, auditLogger)))
+		steps.Get("/otp", handlers.HandleAuthOtpGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewOTPPrompt(s.database, otpSecretGenerator)))
+		steps.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher), notifier))
 		// The set of recovery codes an authenticator set up during this sign-in came with, shown once
 		// after the accepted setup code, and the Continue that goes on to /auth/completed (#257
 		// decision 14). It checks no credential, so neither method is behind a limiter.
-		r.Get("/recovery-codes", handlers.HandleAuthRecoveryCodesGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewRecoveryCodesPrompt(s.database)))
-		r.Post("/recovery-codes", handlers.HandleAuthRecoveryCodesPost(ceremonyBoundary, ceremonyStore))
+		steps.Get("/recovery-codes", handlers.HandleAuthRecoveryCodesGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewRecoveryCodesPrompt(s.database)))
+		steps.Post("/recovery-codes", handlers.HandleAuthRecoveryCodesPost(ceremonyBoundary, ceremonyStore))
 		legalAcceptance := authflow.NewLegalAcceptance(s.database, permissionChecker, auditLogger, legalDocuments)
-		r.Get("/legal-acceptance", handlers.HandleLegalAcceptanceGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
-		r.Post("/legal-acceptance", handlers.HandleLegalAcceptancePost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
-		r.Get("/consent", handlers.HandleConsentGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewConsentPrompt(s.database)))
-		r.Post("/consent", handlers.HandleConsentPost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewConsentSubmission(s.database, permissionChecker, auditLogger)))
+		steps.Get("/legal-acceptance", handlers.HandleLegalAcceptanceGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
+		steps.Post("/legal-acceptance", handlers.HandleLegalAcceptancePost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, legalAcceptance))
+		steps.Get("/consent", handlers.HandleConsentGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewConsentPrompt(s.database)))
+		steps.Post("/consent", handlers.HandleConsentPost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewConsentSubmission(s.database, permissionChecker, auditLogger)))
 		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher, logoutTokens))
 		r.Get("/logout/declined", handlers.HandleLogoutDeclinedGet(httpHelper))
 		r.Post("/logout", handlers.HandleLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher, logoutTokens))
@@ -230,13 +239,13 @@ func (s *Server) initRoutes(branches appBranches) {
 		// submission spends no budget (#526 decision 2). The POST alone is limited: the GET renders
 		// a static form, while the POST probes whether an address already has an account, sends
 		// mail to it and writes a row.
-		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper)).Get("/register", accounthandlers.HandleRegisterGet(httpHelper, ceremonyStore, legalDocuments))
+		r.With(linkedSignInPageClient, accounthandlers.RefuseUnavailableRegistration(httpHelper)).Get("/register", accounthandlers.HandleRegisterGet(httpHelper, ceremonyStore, legalDocuments, adminConsoleBaseURL))
 		// The Turnstile challenge sits between the two, while it is on, as on forgot-password (#642).
-		r.With(accounthandlers.RefuseUnavailableRegistration(httpHelper), accounthandlers.RequireRegistrationChallenge(httpHelper, ceremonyStore, legalDocuments, s.challengeVerifier), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, ceremonyStore, legalDocuments, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
+		r.With(linkedSignInPageClient, accounthandlers.RefuseUnavailableRegistration(httpHelper), accounthandlers.RequireRegistrationChallenge(httpHelper, ceremonyStore, legalDocuments, s.challengeVerifier, adminConsoleBaseURL), rateLimiter.LimitRegister).Post("/register", accounthandlers.HandleRegisterPost(httpHelper, ceremonyStore, legalDocuments, s.database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, s.jobs, s.dataCipher, baseURL, adminConsoleBaseURL))
 	})
 	// From emaillinks.AccountActivatePath, as the reset endpoints above are.
-	pages.With(rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
-	pages.With(rateLimiter.LimitActivate).Post(emaillinks.AccountActivatePath, accounthandlers.HandleActivatePost(httpHelper, s.sessionStore, ceremonyStore, s.database, userCreator, passwordValidator, auditLogger, baseURL, adminConsoleBaseURL))
+	pages.With(linkedSignInPageClient, rateLimiter.LimitActivate).Get(emaillinks.AccountActivatePath, accounthandlers.HandleActivateGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
+	pages.With(linkedSignInPageClient, rateLimiter.LimitActivate).Post(emaillinks.AccountActivatePath, accounthandlers.HandleActivatePost(httpHelper, s.sessionStore, ceremonyStore, s.database, userCreator, passwordValidator, auditLogger, baseURL, adminConsoleBaseURL))
 
 	// Admin API routes
 	api.Route("/api/v1/admin", func(r *routing.Router) {
@@ -417,6 +426,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// Setting or changing the URI is reserved to authserver:manage by the handler (#784 decision 15).
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/backchannel-logout", apihandlers.HandleClientBackchannelLogoutPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/dpop", apihandlers.HandleClientDPoPPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/brand", apihandlers.HandleClientBrandPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/web-origins", apihandlers.HandleClientWebOriginsPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/tokens", apihandlers.HandleClientTokensPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/permissions", apihandlers.HandleClientPermissionsGet(s.database))

@@ -50,6 +50,7 @@ func ForgotPasswordRequiresEmail(pageRenderer PageRenderer) func(http.Handler) h
 
 func HandleForgotPasswordGet(
 	pageRenderer PageRenderer,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +59,7 @@ func HandleForgotPasswordGet(
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
-		renderForgotPasswordForm(w, r, pageRenderer, settings, "", "", "")
+		renderForgotPasswordForm(w, r, pageRenderer, adminConsoleBaseURL, settings, "", "", "")
 	}
 }
 
@@ -67,14 +68,17 @@ func HandleForgotPasswordGet(
 // being about the address; a refusal about anything else, the challenge's, marks nothing. Every
 // render of the form, its first and each beside a refusal, carries a
 // fresh Turnstile widget while the challenge is on (#642 decision 2); the page answering a request,
-// which has no form, carries none.
+// which has no form, carries none. adminConsoleBaseURL is for the page's sign-in link when its URL
+// names no sign-in (registrationCeremonyId).
 func renderForgotPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
-	settings *record.Settings, email, refusal, field string) {
+	adminConsoleBaseURL string, settings *record.Settings, email, refusal, field string) {
 
 	bind := map[string]interface{}{
-		"email":      email,
-		"error":      refusal,
-		"errorField": field,
+		"email":               email,
+		"error":               refusal,
+		"errorField":          field,
+		"ceremonyId":          registrationCeremonyId(r),
+		"adminConsoleBaseUrl": adminConsoleBaseURL,
 	}
 	err := turnstile.WithWidget(pageRenderer, settings).RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
 	if err != nil {
@@ -178,6 +182,7 @@ func HandleForgotPasswordPost(
 	afterResponse AfterResponse,
 	dataCipher *encryption.DataCipher,
 	baseURL string,
+	adminConsoleBaseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +201,7 @@ func HandleForgotPasswordPost(
 			}
 			// i18n surface: A — browser-flow form rerender. The address is drawn back as typed, so a
 			// typo is corrected rather than typed again.
-			renderForgotPasswordForm(w, r, pageRenderer, settings, r.FormValue("email"),
+			renderForgotPasswordForm(w, r, pageRenderer, adminConsoleBaseURL, settings, r.FormValue("email"),
 				i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()), "email")
 			return
 		}
@@ -208,7 +213,7 @@ func HandleForgotPasswordPost(
 			return
 		}
 
-		renderForgotPasswordLinkSent(pageRenderer, w, r, email)
+		renderForgotPasswordLinkSent(pageRenderer, w, r, adminConsoleBaseURL, email)
 
 		afterResponse.Go(r.Context(), afterresponse.ClassRecovery, func(ctx context.Context) {
 			finishForgotPassword(ctx, r, database, emailSender, auditLogger, pageRenderer, dataCipher, baseURL,
@@ -278,9 +283,12 @@ func finishForgotPassword(
 	}
 	auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeCodeIssued)
 
+	// The link names the sign-in this page's URL named, when the id is well formed, so a reset in
+	// the browser holding it carries it on (#812 decision 9). The id is echoed, never looked up: the
+	// answer to the request was the same whatever it named, and so is what is decided here.
 	bind := map[string]interface{}{
 		"name": user.FullName(),
-		"link": emaillinks.ResetPasswordLink(baseURL, verificationCode),
+		"link": emaillinks.ResetPasswordLink(baseURL, verificationCode, registrationCeremonyId(r)),
 	}
 	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, user.PageLanguage, user.Locale))
 	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
@@ -307,10 +315,13 @@ func finishForgotPassword(
 // renderForgotPasswordLinkSent is the one answer to a well-formed request, whatever became of it,
 // so the page itself does not tell an address with no account from one that was mailed. It names
 // the address as it was typed, which tells the person nothing they did not say.
-func renderForgotPasswordLinkSent(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, email string) {
+func renderForgotPasswordLinkSent(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
+	adminConsoleBaseURL string, email string) {
 	bind := map[string]interface{}{
-		"linkSent": true,
-		"email":    email,
+		"linkSent":            true,
+		"email":               email,
+		"ceremonyId":          registrationCeremonyId(r),
+		"adminConsoleBaseUrl": adminConsoleBaseURL,
 	}
 
 	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind); err != nil {

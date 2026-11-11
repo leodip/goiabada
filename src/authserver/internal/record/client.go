@@ -60,14 +60,21 @@ type Client struct {
 	// access token (#42 decisions 12 and 13). Tagged dont-update, so the whole-row UpdateClient never
 	// writes it: the other client saves read the row earlier in their request, and would write back a
 	// setting switched since. CreateClient and SetClientDPoPBoundAccessTokens write it.
-	DPoPBoundAccessTokens    bool `db:"dpop_bound_access_tokens" fieldtag:"dont-update"`
-	ShowLogo                 bool `db:"show_logo"`
-	ShowDisplayName          bool `db:"show_display_name"`
-	ShowDescription          bool `db:"show_description"`
-	ShowWebsiteURL           bool `db:"show_website_url"`
-	IsPublic                 bool `db:"is_public"`
-	AuthorizationCodeEnabled bool `db:"authorization_code_enabled"`
-	ClientCredentialsEnabled bool `db:"client_credentials_enabled"`
+	DPoPBoundAccessTokens bool `db:"dpop_bound_access_tokens" fieldtag:"dont-update"`
+	// BrandId is the brand this client's pages are drawn in, or NULL to follow the default brand,
+	// whichever it is at the time (#812 decision 1). Tagged dont-update, so the whole-row
+	// UpdateClient never writes it: a save made from a copy read earlier would write back a brand
+	// changed since. SetClientBrand assigns it under the settings row's lock, and a brand's deletion
+	// clears it under that lock on the clients it moves. CreateClient writes what the record carries,
+	// which every create path leaves empty: a new client starts on the default.
+	BrandId                  sql.NullInt64 `db:"brand_id" fieldtag:"dont-update"`
+	ShowLogo                 bool          `db:"show_logo"`
+	ShowDisplayName          bool          `db:"show_display_name"`
+	ShowDescription          bool          `db:"show_description"`
+	ShowWebsiteURL           bool          `db:"show_website_url"`
+	IsPublic                 bool          `db:"is_public"`
+	AuthorizationCodeEnabled bool          `db:"authorization_code_enabled"`
+	ClientCredentialsEnabled bool          `db:"client_credentials_enabled"`
 	// PKCERequired overrides global setting if set.
 	// nil = use global setting, true = PKCE required, false = PKCE optional
 	PKCERequired *bool `db:"pkce_required"`

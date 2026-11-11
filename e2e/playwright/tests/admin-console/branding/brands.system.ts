@@ -1,44 +1,37 @@
 // Settings - Branding: brands created, edited and deleted, each refusal on the field it is about, the
 // default marked and not deletable, and another brand made the default, which draws the console and
-// the sign-in pages in its theme and appearance at once. Runs alone, since the default brand is what
-// every page is drawn in, and puts back the default brand it found.
+// the sign-in pages in its theme and appearance at once. The admin console's own client given a brand
+// (#812) draws the console and its sign-in in it, while another client's sign-in keeps the default,
+// and the Branding list counts the clients each brand draws. Runs alone, since the default brand and
+// the console's own client's brand are what every page is drawn in, and puts back what it found.
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "../../../lib/fixtures";
-import { expectRefusal } from "../../../lib/admin-console";
+import { clientBrandChoice, clientIdFromList, expectRefusal, setClientBrand } from "../../../lib/admin-console";
 import {
+  brandClientCounts,
   brandUrl,
   brandingUrl,
   createBrand,
   defaultBrand,
   deleteBrand,
+  expectDrawnInPlumDark,
+  expectDrawnInSeededDefault,
   fillBrandForm,
   listBrands,
   makeBrandDefault,
+  pageBackgrounds as backgrounds,
+  plumCanvas,
   readBrand,
   saveBrand,
   submitNewBrand,
+  withBrand,
   withDefaultBrandRestored,
   type Appearance,
 } from "../../../lib/brands";
+import { openSignIn } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
+import { browserSignInClient } from "../../../lib/test-clients";
 import { uniqueIdentifier } from "../../../lib/unique";
-
-// Plum's page background in light and in dark, the canvas token of the palettes approved for #810, as
-// a browser reports a computed color.
-const plumCanvas = { light: "rgb(246, 244, 247)", dark: "rgb(18, 15, 21)" } as const;
-
-// The page's background under a device asking for light and for dark.
-async function backgrounds(page: Page) {
-  const background = async (colorScheme: "light" | "dark") => {
-    // Reduced motion, so no transition is caught half way between the two.
-    await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
-    return page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  };
-  const onLight = await background("light");
-  const onDark = await background("dark");
-  await page.emulateMedia({ colorScheme: null, reducedMotion: null });
-  return { onLight, onDark };
-}
 
 // A page drawn in Plum with this appearance: Light and Dark name themselves on the root element and
 // keep their colors whatever the device asks, and Automatic names none and follows the device, as the
@@ -122,8 +115,10 @@ test("a brand is created, edited and deleted, and each refusal is shown on its f
     await saveBrand(page, id, { name: `${name}-2`, appearance: "light", theme: "avocado" });
     expect(await readBrand(page, id)).toEqual({ name: `${name}-2`, appearance: "light", theme: "avocado" });
 
-    // Deleted by typing its name; anything else is refused at the field.
+    // Deleted by typing its name; anything else is refused at the field. No client uses it, and the
+    // page says so.
     await page.goto(brandUrl(id, "delete"));
+    await expect(page.locator(".page-lead")).toHaveText("The brand will be deleted. No client uses it, so no page will change.");
     await page.locator("#name").fill(name);
     await page.locator("#btnDelete").click();
     await expectRefusal(page, "delete-error", "name", "That isn't this brand's name. Type it as shown above.");
@@ -161,7 +156,7 @@ test("another brand made the default draws the console and the sign-in pages in 
       const previous = await defaultBrand(page);
       id = await createBrand(page, { name, appearance: "dark", theme: "plum" });
 
-      // Stored but drawn nowhere until it is the default.
+      // Stored but drawn nowhere while no client uses it and it is not the default.
       await page.goto(brandUrl(id, "edit"));
       expect((await backgrounds(page)).onDark).not.toBe(plumCanvas.dark);
 
@@ -189,4 +184,80 @@ test("another brand made the default draws the console and the sign-in pages in 
   } finally {
     if (id !== undefined) await deleteBrand(page, id);
   }
+});
+
+test("the list says how the brands are used, and the default brand's page says what it draws", async ({ page }) => {
+  await page.goto(brandingUrl);
+  await expect(page.locator(".page-lead")).toHaveText(
+    "A client's pages are drawn in the brand chosen on its Settings tab, or in the default brand when none is chosen. This admin console is drawn in the brand of its own client.",
+  );
+  await expect(page.locator("#brandsTable thead th").nth(3)).toHaveText("Clients");
+
+  const seeded = await defaultBrand(page);
+  await page.goto(brandUrl(seeded.id, "edit"));
+  await expect(page.locator(".page-lead")).toContainText(
+    "This is the default brand. The pages of every client with no brand of its own are drawn in it, and so are pages that belong to no client.",
+  );
+  // Make default's question on another brand says what will change.
+  await withBrand(page, { appearance: "light", theme: "avocado" }, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await page.locator("#btnMakeDefault").click();
+    const dialog = page.locator("dialog[open]");
+    await expect(dialog).toContainText(
+      "The pages of every client with no brand of its own, and pages that belong to no client, will be drawn in this brand at once.",
+    );
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect((await defaultBrand(page)).id).toBe(seeded.id);
+  });
+});
+
+test("the admin console's own client given a brand draws the console and its sign-in in it, another client's sign-in keeps the default, and it is put back", async ({
+  page,
+  browser,
+  clients,
+}) => {
+  const { client: other } = await browserSignInClient(page, clients);
+  const consoleClient = await clientIdFromList(page, "admin-console-client");
+  const seeded = await defaultBrand(page);
+  const onDefault = `Default brand (${seeded.name})`;
+  expect(await clientBrandChoice(page, consoleClient), "the console's client starts on the default brand").toBe(onDefault);
+  const before = await brandClientCounts(page);
+
+  await withBrand(page, { appearance: "dark", theme: "plum" }, async (brand) => {
+    try {
+      await setClientBrand(page, consoleClient, brand);
+
+      // The console takes it at once, its own pages and its sign-in.
+      await page.goto(brandingUrl);
+      await expectDrawnInPlumDark(page, brand.id);
+      const signIn = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      const consoleSignIn = await signIn.newPage();
+      await consoleSignIn.goto(`${env.adminUrl}/account/profile`);
+      await expect(consoleSignIn.locator('input[name="password"]')).toBeVisible();
+      expect(new URL(consoleSignIn.url()).origin, "the sign-in page is the auth server's").toBe(new URL(env.authUrl).origin);
+      await expectDrawnInPlumDark(consoleSignIn, brand.id);
+      await signIn.close();
+
+      // Another client's sign-in keeps the default.
+      const elsewhere = await openSignIn(browser, { clientId: other.identifier, scope: "openid" });
+      await expect(elsewhere.page).toHaveURL(/\/auth\/pwd/);
+      await expectDrawnInSeededDefault(elsewhere.page, seeded.id);
+      await elsewhere.context.close();
+
+      // The list counts the console's client under its brand, and no longer under the default.
+      const counts = await brandClientCounts(page);
+      expect(counts[brand.name]).toBe(1);
+      expect(counts[seeded.name]).toBe(before[seeded.name] - 1);
+    } finally {
+      await setClientBrand(page, consoleClient, "default");
+    }
+
+    // Put back: the console is drawn in the default again, and the brand draws no client.
+    expect(await clientBrandChoice(page, consoleClient)).toBe(onDefault);
+    await page.goto(brandingUrl);
+    await expectDrawnInSeededDefault(page, seeded.id);
+    const counts = await brandClientCounts(page);
+    expect(counts[brand.name]).toBe(0);
+    expect(counts[seeded.name]).toBe(before[seeded.name]);
+  });
 });

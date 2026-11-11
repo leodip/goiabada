@@ -60,7 +60,7 @@ func keepDefaultBrand(t *testing.T) (defaultId int64, created *[]int64) {
 				return err
 			}
 			for _, id := range *ids {
-				if err := database.DeleteBrand(ctx, tx, id); err != nil && !errors.Is(err, data.ErrBrandNotFound) {
+				if _, err := database.DeleteBrand(ctx, tx, id); err != nil && !errors.Is(err, data.ErrBrandNotFound) {
 					return err
 				}
 			}
@@ -122,6 +122,7 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	assert.Equal(t, "dark", brand["appearance"])
 	assert.Equal(t, "plum", brand["theme"])
 	assert.Equal(t, false, brand["isDefault"])
+	assert.InDelta(t, 0, brand["clientCount"], 0, "a new brand draws no client")
 	assert.NotNil(t, brand["createdAt"])
 	assert.NotNil(t, brand["updatedAt"])
 
@@ -349,7 +350,8 @@ func TestAPIBrands_ChangesAreAudited(t *testing.T) {
 	status, _, _ = brandCall(t, accessToken, http.MethodPost, brandPath(previousId, "/make-default"), nil)
 	require.Equal(t, http.StatusOK, status)
 	_, _, requestId = brandCall(t, accessToken, http.MethodDelete, brandPath(id, ""), nil)
-	assert.Equal(t, []map[string]any{{"brand_id": float64(id), "brand_name": renamed, "logged_in_user": who}},
+	assert.Equal(t, []map[string]any{{"brand_id": float64(id), "brand_name": renamed, "client_count": float64(0),
+		"logged_in_user": who}},
 		auditRows(t, accessToken, "deleted_brand", requestId))
 }
 

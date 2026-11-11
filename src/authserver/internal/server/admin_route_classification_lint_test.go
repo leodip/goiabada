@@ -143,6 +143,7 @@ var adminRouteClassification = map[string]adminRouteClass{
 	"PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris": appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/backchannel-logout":        appliesCeilings(adminCeilingTarget, adminCeilingBackchannelLogoutURI),
 	"PUT /api/v1/admin/clients/{id}/dpop":                      appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/brand":                     appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/web-origins":               appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/tokens":                    appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/permissions":               appliesCeilings(adminCeilingGrant, adminCeilingTarget),

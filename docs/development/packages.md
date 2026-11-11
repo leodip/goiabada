@@ -338,10 +338,11 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `RunInTransaction` reruns the one the engine rolls back (#301), and the audit events after the
   commit naming the command under `command`. The command in `cmd/goiabada-authserver` parses,
   refuses a schema other than its head, and prints; the data tier runs `Run` on every engine (#498)
-- `internal/reqctx/` - The eight request-scoped values (settings, session identifier and that
+- `internal/reqctx/` - The nine request-scoped values (settings, session identifier and that
   session's user, bearer token, validated token, the credential reservation a failures-only rate-limit tier holds, the
-  acting user the session guard found live, which the audit logger records, and the DPoP proof
-  the bearer guard accepted beside a token sent with the DPoP scheme), each
+  acting user the session guard found live, which the audit logger records, the DPoP proof
+  the bearer guard accepted beside a token sent with the DPoP scheme, and the client a page is
+  drawn for, which the code that learns it names), each
   written by one middleware and read through a typed accessor; services take theirs as parameters,
   and the context-value guard holds every module file to them with no exemption (#433, #439)
 - `internal/otpcredential/` - The stored TOTP credential: establish, remove, verify a stored or a

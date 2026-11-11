@@ -268,6 +268,8 @@ cause, each a whole sentence.
 | `handler.client_backchannel_logout.uri_http_self_registered` | `uri` (string) | Back-channel logout URI must use https on a client that registered itself, whatever its type. Plain http is allowed only on a confidential client an administrator created: {{.uri}} |
 | `handler.client_dpop.dpop_bound_access_tokens_required` | (none) | dpopBoundAccessTokens is required: send true or false. |
 | `handler.client_dpop.admin_console_not_allowed` | (none) | The admin console's client can't require DPoP for token requests. |
+| `handler.client_brand.brand_id_required` | (none) | brandId is required: send the id of a brand, or null for the default brand. |
+| `handler.client_brand.brand_not_found` | (none) | The brand does not exist. |
 | `handler.client_web_origins.empty` | (none) | Web origin cannot be empty |
 | `handler.client_web_origins.invalid` | `origin` (string) | Invalid web origin: {{.origin}}. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero. |
 | `handler.client_web_origins.too_long` | `length` (int), `max` (int), `origin` (string) | Web origin is too long ({{.length}} characters, the maximum is {{.max}}): {{.origin}} |

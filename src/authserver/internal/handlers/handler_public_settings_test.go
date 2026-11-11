@@ -25,8 +25,8 @@ import (
 // /api/public/settings
 //
 // This endpoint requires no authentication: it is what the login and account
-// pages read before anyone has a token. record.Settings holds 37 fields, among
-// them the legacy AES encryption key and the encrypted SMTP password, so the
+// pages read before anyone has a token. record.Settings holds every setting,
+// among them the legacy AES encryption key and the encrypted SMTP password, so the
 // narrow PublicSettingsResponse DTO is the entire boundary between an anonymous
 // caller and all of it. The two guards further down exist to fail if that
 // boundary ever widens, whether by growing the DTO or by serializing the model
@@ -37,10 +37,17 @@ import (
 // URL is built from.
 const publicSettingsBaseURL = "https://auth.example.test"
 
-// expectNoDefaultBrand has database answer an empty default brand pointer, for a case about
-// something other than the brand.
+// expectNoDefaultBrand has database answer no brand for the admin console's client and an empty
+// default brand pointer, for a case about something other than the brand.
 func expectNoDefaultBrand(database *datamocks.Database) {
+	expectConsoleClientBrand(database, nil, nil)
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
+}
+
+// expectConsoleClientBrand has database answer brand, or err, as the brand the admin console's own
+// client is drawn in: its own, or the default when it has none.
+func expectConsoleClientBrand(database *datamocks.Database, brand *record.Brand, err error) {
+	database.On("GetClientPageBrand", mock.Anything, (*sql.Tx)(nil), "admin-console-client").Return(brand, err).Once()
 }
 
 func TestPublicSettings_Success(t *testing.T) {
@@ -68,11 +75,12 @@ func TestPublicSettings_Success(t *testing.T) {
 	assert.Equal(t, "https://issuer.example", body.Issuer)
 }
 
-// The default brand rides with the public settings as brand: its appearance, and the absolute URL
-// of its stylesheet, built from the auth server's base URL as a client logo's URL is, so the admin
-// console links it after main.css and draws every page as the auth server draws its own (#810
-// decision 3). uiTheme is no longer answered.
-func TestPublicSettings_CarriesTheDefaultBrand(t *testing.T) {
+// The brand of the admin console's own client rides with the public settings as brand: its own, or
+// the default brand when it has none, which the data layer answers alike (#812 decision 7). It is the
+// brand's appearance, and the absolute URL of its stylesheet, built from the auth server's base URL as
+// a client logo's URL is, so the admin console links it after main.css and draws every page as the
+// auth server draws its own client's (#810 decision 3). uiTheme is no longer answered.
+func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		brand          *record.Brand
@@ -91,7 +99,7 @@ func TestPublicSettings_CarriesTheDefaultBrand(t *testing.T) {
 			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 				Id: 1, AppName: "Goiabada",
 			}, nil).Once()
-			database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(tc.brand, nil).Once()
+			expectConsoleClientBrand(database, tc.brand, nil)
 
 			recorder := httptest.NewRecorder()
 			HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
@@ -109,22 +117,52 @@ func TestPublicSettings_CarriesTheDefaultBrand(t *testing.T) {
 	}
 }
 
-// A default brand that cannot be read leaves brand out of the answer, which is otherwise whole: the
-// console draws its pages automatic in the built-in colors, as the auth server draws its own then,
-// rather than every console page failing over the look. That is an empty pointer, a failed read,
-// and a stored theme that is none of the built-in ones; the last two are faults, and logged.
-func TestPublicSettings_AnswersNoBrandWhenTheDefaultCannotBeRead(t *testing.T) {
+// With no brand for the admin console's client, the client not being there, the answer is the
+// default brand.
+func TestPublicSettings_CarriesTheDefaultBrandWithoutTheConsoleClient(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+		Id: 1, AppName: "Goiabada",
+	}, nil).Once()
+	expectConsoleClientBrand(database, nil, nil)
+	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(&record.Brand{
+		Id: 9, Name: "Default", Appearance: record.BrandAppearanceDark, Theme: "plum",
+	}, nil).Once()
+
+	recorder := httptest.NewRecorder()
+	HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var body api.PublicSettingsResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+	require.NotNil(t, body.Brand)
+	assert.Equal(t, "dark", body.Brand.Appearance)
+	assert.Regexp(t, `^https://auth\.example\.test/brand/9/stylesheet\.css\?v=[0-9a-f]{12}$`, body.Brand.StylesheetURL)
+}
+
+// A brand that cannot be read leaves brand out of the answer, which is otherwise whole: the console
+// draws its pages automatic in the built-in colors, as the auth server draws its own then, rather
+// than every console page failing over the look. That is no brand for the console's client and an
+// empty default pointer, a failed read of either, and a stored theme that is none of the built-in
+// ones; the last three are faults, and logged.
+func TestPublicSettings_AnswersNoBrandWhenTheBrandCannotBeRead(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		brand   *record.Brand
-		err     error
-		wantLog string
+		name         string
+		consoleBrand *record.Brand
+		consoleErr   error
+		readsDefault bool
+		defaultBrand *record.Brand
+		defaultErr   error
+		wantLog      string
 	}{
-		{name: "no default brand"},
-		{name: "a failed read", err: errors.New("the database went away"), wantLog: "unable to read the default brand"},
+		{name: "no default brand", readsDefault: true},
+		{name: "a failed read of the console client's brand", consoleErr: errors.New("the database went away"),
+			wantLog: "unable to read the brand of the client a page is drawn for"},
+		{name: "a failed read of the default brand", readsDefault: true, defaultErr: errors.New("the database went away"),
+			wantLog: "unable to read the default brand"},
 		{name: "a theme none of the built-in ones",
-			brand:   &record.Brand{Id: 3, Name: "Odd", Appearance: record.BrandAppearanceDark, Theme: "mango"},
-			wantLog: "unable to link the default brand's stylesheet"},
+			consoleBrand: &record.Brand{Id: 3, Name: "Odd", Appearance: record.BrandAppearanceDark, Theme: "mango"},
+			wantLog:      "unable to link the brand's stylesheet"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
@@ -132,7 +170,10 @@ func TestPublicSettings_AnswersNoBrandWhenTheDefaultCannotBeRead(t *testing.T) {
 			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
 				Id: 1, AppName: "Goiabada", Issuer: "https://issuer.example",
 			}, nil).Once()
-			database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(tc.brand, tc.err).Once()
+			expectConsoleClientBrand(database, tc.consoleBrand, tc.consoleErr)
+			if tc.readsDefault {
+				database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(tc.defaultBrand, tc.defaultErr).Once()
+			}
 
 			recorder := httptest.NewRecorder()
 			HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
@@ -291,9 +332,9 @@ func TestPublicSettings_EncodeFailure(t *testing.T) {
 var publicSettingsAllowedFields = map[string]string{
 	"AppName":     "appName",
 	"SMTPEnabled": "smtpEnabled",
-	// The default brand's appearance and stylesheet URL, which the admin console draws its pages in
-	// (#810 decision 3). Every page the auth server serves to anyone already carries both, as
-	// data-theme and as a stylesheet link.
+	// The appearance and stylesheet URL of the admin console's own client's brand, which the console
+	// draws its pages in (#810 decision 3, #812 decision 7). That client's sign-in pages already
+	// carry both to anyone, as data-theme and as a stylesheet link.
 	"Brand": "brand",
 	// Already world-readable: /.well-known/openid-configuration serves the same
 	// value to anonymous callers, as OIDC Discovery 1.0 section 3 requires.
@@ -386,9 +427,9 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 
 	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(settings, nil).Once()
 	// The brand's name is not one of its public fields.
-	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(&record.Brand{
+	expectConsoleClientBrand(database, &record.Brand{
 		Id: 4, Name: "SENTINEL-brand-name", Appearance: record.BrandAppearanceLight, Theme: "guava",
-	}, nil).Once()
+	}, nil)
 
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))

@@ -61,7 +61,7 @@ func TestResetPasswordLink(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := ResetPasswordLink(tc.baseURL, tc.code)
+			got := ResetPasswordLink(tc.baseURL, tc.code, "")
 
 			assert.Equal(t, tc.want, got)
 			// Section 2's checkable statement: no link Goiabada builds carries an
@@ -79,6 +79,18 @@ func TestAccountActivateLink_CarriesTheSignIn(t *testing.T) {
 		AccountActivateLink(testBaseURL, "abc123", ceremonyId))
 	assert.Equal(t, "/account/activate?ceremony="+ceremonyId, AccountActivateContinuation(ceremonyId))
 	assert.Equal(t, "/account/activate", AccountActivateContinuation(""))
+}
+
+// A reset requested on a forgot-password page that names a sign-in mails a link that names it too,
+// which the first hop keeps when it drops the code; a request naming none, and the setup link, carry
+// the code alone (#812 decision 9).
+func TestResetPasswordLink_CarriesTheSignIn(t *testing.T) {
+	const ceremonyId = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+	assert.Equal(t, "https://auth.example.com/reset-password?ceremony="+ceremonyId+"&code=abc123",
+		ResetPasswordLink(testBaseURL, "abc123", ceremonyId))
+	assert.Equal(t, "https://auth.example.com/reset-password?code=abc123", ResetPasswordLink(testBaseURL, "abc123", ""))
+	assert.Equal(t, "/reset-password?ceremony="+ceremonyId, ResetPasswordContinuation(ceremonyId))
+	assert.Equal(t, "/reset-password", ResetPasswordContinuation(""))
 }
 
 func TestAccountActivateLink(t *testing.T) {
@@ -134,7 +146,7 @@ func TestLinkPathsMatchTheSharedConstants(t *testing.T) {
 		link string
 		want string
 	}{
-		{name: "reset", link: ResetPasswordLink(testBaseURL, "abc123"), want: ResetPasswordPath},
+		{name: "reset", link: ResetPasswordLink(testBaseURL, "abc123", ""), want: ResetPasswordPath},
 		{name: "activate", link: AccountActivateLink(testBaseURL, "abc123", ""), want: AccountActivatePath},
 	}
 
@@ -184,7 +196,10 @@ func TestLinkCodeSurvivesTheRoundTrip(t *testing.T) {
 			name string
 			fn   func(baseURL, code string) string
 		}{
-			{name: "reset", fn: ResetPasswordLink},
+			{name: "reset", fn: func(baseURL, code string) string { return ResetPasswordLink(baseURL, code, "") }},
+			{name: "reset from a sign-in", fn: func(baseURL, code string) string {
+				return ResetPasswordLink(baseURL, code, "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")
+			}},
 			{name: "activate", fn: func(baseURL, code string) string { return AccountActivateLink(baseURL, code, "") }},
 			{name: "activate from a sign-in", fn: func(baseURL, code string) string {
 				return AccountActivateLink(baseURL, code, "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")

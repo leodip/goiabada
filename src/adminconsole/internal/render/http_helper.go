@@ -171,12 +171,12 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 		data = map[string]interface{}{}
 	}
 	data["appName"] = settings.AppName
-	// A page is drawn in the default brand the auth server publishes: the layouts write
-	// brandDataTheme on the html element and link brandStylesheet after main.css, as the auth
-	// server's own layouts do (#810 decision 3). The stylesheet URL is the auth server's, linked as
-	// given. Given no brand, as by an auth server older than brands, a page is drawn automatic in
-	// main.css's colors. uiTheme is no longer bound, so a layout copied from an older release draws
-	// every page automatic.
+	// A page is drawn in the brand the auth server publishes, the console's own client's or the
+	// default (#812 decision 7): the layouts write brandDataTheme on the html element and link
+	// brandStylesheet after main.css, as the auth server's own layouts do (#810 decision 3). The
+	// stylesheet URL is the auth server's, linked as given. Given no brand, as by an auth server
+	// older than brands, a page is drawn automatic in main.css's colors. uiTheme is no longer bound,
+	// so a layout copied from an older release draws every page automatic.
 	data["brandDataTheme"], data["brandStylesheet"] = pageBrand(settings.Brand)
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled

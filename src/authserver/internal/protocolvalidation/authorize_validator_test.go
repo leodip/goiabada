@@ -196,6 +196,47 @@ func TestValidateScopes_DatabaseFailurePropagates(t *testing.T) {
 	}
 }
 
+// A failed read is returned as an error and never as a refusal. One of the redirect URIs comes
+// after the client was read, so it names that client in a *ClientKnownError, its cause preserved;
+// one of the client itself names none, so its page is drawn in the default brand (#812).
+func TestValidateClientAndRedirectURI_AReadFaultNamesTheClientOnlyOnceItWasRead(t *testing.T) {
+	t.Run("the redirect URIs' read failing", func(t *testing.T) {
+		mockDB := datamocks.NewDatabase(t)
+		client := &record.Client{Id: 1, ClientIdentifier: "known-client", Enabled: true}
+		readErr := errors.New("redirect URIs read fault")
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "known-client").Return(client, nil).Once()
+		mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(readErr).Once()
+
+		err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(context.Background(),
+			&ValidateClientAndRedirectURIInput{ClientId: "known-client", RedirectURI: "https://example.com/callback",
+				ResponseType: "code"})
+
+		require.ErrorIs(t, err, readErr)
+		require.EqualError(t, err, "redirect URIs read fault")
+		var clientKnown *ClientKnownError
+		require.ErrorAs(t, err, &clientKnown)
+		assert.Equal(t, "known-client", clientKnown.ClientId)
+		var locErr *i18n.LocalizedError
+		assert.NotErrorAs(t, err, &locErr, "a read fault must not be reported as a refusal")
+	})
+
+	t.Run("the client's read failing", func(t *testing.T) {
+		mockDB := datamocks.NewDatabase(t)
+		readErr := errors.New("client read fault")
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "known-client").Return(nil, readErr).Once()
+
+		err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(context.Background(),
+			&ValidateClientAndRedirectURIInput{ClientId: "known-client", RedirectURI: "https://example.com/callback",
+				ResponseType: "code"})
+
+		require.ErrorIs(t, err, readErr)
+		var clientKnown *ClientKnownError
+		assert.NotErrorAs(t, err, &clientKnown, "no client was read, so none is known")
+		var locErr *i18n.LocalizedError
+		assert.NotErrorAs(t, err, &locErr, "a read fault must not be reported as a refusal")
+	})
+}
+
 func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)

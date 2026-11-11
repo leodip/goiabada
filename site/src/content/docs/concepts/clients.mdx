@@ -59,7 +59,8 @@ A client you create in the admin console starts:
 - enabled;
 - with **Ask users for consent** off;
 - with the default ACR level `urn:goiabada:level2_optional`;
-- not allowed to request the administrative scopes.
+- not allowed to request the administrative scopes;
+- on the default brand.
 
 The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Sign-out redirect URIs**, **Back-channel logout**, **Web origins**, **Sessions**, **Permissions**, **Introspection** for a confidential client, and **Legal documents**.
 
@@ -267,6 +268,20 @@ The **Logo** tab uploads a logo: a JPEG, PNG, GIF or WebP file of up to 3 MiB, w
 
 The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, even while that switch is off. It answers 404 when the client has no logo, and carries an `ETag` and `Cache-Control: public, max-age=300, must-revalidate`.
 
+## Brand
+
+**Brand** under **Sign-in and consent pages**, on the **Settings** tab, picks the [brand](/guides/customize-and-translate-the-pages/#brands-and-themes) the client's pages are drawn in. Every client starts on the first option, **Default brand (*name*)**, which names the current default. A client on it follows the default: when you make another brand the default, its pages change too. A brand you choose by name stays the client's whichever brand is the default.
+
+The client's brand draws:
+
+- every page of a sign-in to it, the form_post page that hands your app the answer, and the error pages the auth server shows once it knows the client;
+- registration, forgot password, password reset and activation, when the user reached them from the client's sign-in page and is still in the same browser;
+- a [sign-out](/reference/endpoints/logout/) that names the client, with an `id_token_hint` the auth server confirms or, without one, with `client_id`.
+
+Every other page is drawn in the default brand: a link from an email opened in another browser, an error shown before the auth server knows the client, a legal document, and any page that belongs to no sign-in or sign-out. A client that [registers itself](#self-registered-clients) starts on the default brand, and its registration can't choose one. Deleting a brand moves the clients that use it to the default brand.
+
+Through the Admin API, set it with [`PUT /api/v1/admin/clients/{id}/brand`](/reference/api/admin/operations/updateclientbrand/) and `brandId`, a brand's id or `null` for the default brand. Each change leaves an `updated_client_brand` entry in the [audit log](/concepts/audit-log/).
+
 ## Disabling and deleting a client
 
 Untick **Enabled** on the **Settings** tab to stop a client while keeping its settings. The authorization endpoint then shows an error page instead of signing users in, and the token endpoint answers 401 with `invalid_client`, so its refresh tokens stop working too. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and its Admin and Account APIs refuse the client's access tokens while it stays disabled, and accept them again if you turn it back on before they expire. An API that [introspects](/reference/endpoints/introspect/) them gets `{"active": false}` for as long. An API that checks tokens by their signature alone accepts them until they expire.
@@ -276,6 +291,8 @@ Untick **Enabled** on the **Settings** tab to stop a client while keeping its se
 ## The admin console's client
 
 The admin console signs administrators in through its own client, `admin-console-client`. It's a system-level client, so its identifier can't be changed, it can't be deleted, and it's always allowed to request the administrative scopes. Its other settings can be changed, by an administrator with `authserver:manage`.
+
+Its [brand](#brand) is the admin console's: every page of the admin console is drawn in it, as is the sign-in to it. A brand you save on its **Settings** tab shows on the console's next page. One set through the Admin API reaches the console within 30 seconds.
 
 ## Self-registered clients
 

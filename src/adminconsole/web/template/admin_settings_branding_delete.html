@@ -7,12 +7,14 @@
   <div>
     <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/settings/branding"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $.ctx "adminconsole.admin_menu.settings_branding" }}</a></p>
     <h1 class="page-title">{{ T $.ctx "adminconsole.admin_branding.delete.page_title" }}</h1>
-    {{ if not .brand.IsDefault }}<p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.delete.lead" }}</p>{{ end }}
+    {{ if not .brand.IsDefault }}<p class="page-lead">{{ T $.ctx "adminconsole.admin_branding.delete.lead" }} {{ .clientsNote }}</p>{{ end }}
   </div>
 </div>
 
 {{/* The default brand is never deleted, so its page says so and offers no deletion; a brand made
-     the default after the page was drawn is refused by the auth server, and the page says that. */}}
+     the default after the page was drawn is refused by the auth server, and the page says that.
+     Another brand is deleted whatever its count: the lead says how many clients use it and the
+     default brand they will move to (#812 decision 3). */}}
 {{ if .brand.IsDefault }}
 <div class="panel">
   <div class="panel-body stacked">

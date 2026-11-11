@@ -119,6 +119,8 @@ func TestBrandsGet_SortedByNameWithTheDefaultMarked(t *testing.T) {
 	}, nil).Once()
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+	// Zest draws no client, so the count leaves it out.
+	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{1: 5, 3: 2}, nil).Once()
 
 	status, body := serveBrand(HandleBrandsGet(database), brandRequest(t, http.MethodGet, nil))
 
@@ -127,14 +129,17 @@ func TestBrandsGet_SortedByNameWithTheDefaultMarked(t *testing.T) {
 	require.Len(t, brands, 3)
 	var names []any
 	var defaults []any
+	var counts []any
 	for _, b := range brands {
 		names = append(names, brandAt(b, "name"))
 		defaults = append(defaults, brandAt(b, "isDefault"))
+		counts = append(counts, brandAt(b, "clientCount"))
 	}
 	assert.Equal(t, []any{"Acme", "Default", "Zest"}, names)
 	assert.Equal(t, []any{false, true, false}, defaults)
+	assert.Equal(t, []any{float64(2), float64(5), float64(0)}, counts)
 	assert.Equal(t, map[string]any{
-		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum", "isDefault": false,
+		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum", "isDefault": false, "clientCount": float64(2),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, brands[0])
 }
@@ -145,6 +150,7 @@ func TestBrandsGet_NoDefaultMarksNone(t *testing.T) {
 		*storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"),
 	}, nil).Once()
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
+	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Once()
 
 	status, body := serveBrand(HandleBrandsGet(database), brandRequest(t, http.MethodGet, nil))
 
@@ -231,7 +237,7 @@ func TestBrandCreate_StoresTheTrimmedNameAndAudits(t *testing.T) {
 	require.Equal(t, http.StatusCreated, status)
 	assert.Equal(t, record.Brand{Name: "Acme Corp", Appearance: record.BrandAppearanceLight, Theme: "high-contrast"}, stored)
 	assert.Equal(t, map[string]any{
-		"id": float64(7), "name": "Acme Corp", "appearance": "light", "theme": "high-contrast", "isDefault": false,
+		"id": float64(7), "name": "Acme Corp", "appearance": "light", "theme": "high-contrast", "isDefault": false, "clientCount": float64(0),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, body["brand"])
 }
@@ -272,12 +278,13 @@ func TestBrandGet(t *testing.T) {
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+		database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{1: 9, 3: 4}, nil).Once()
 
 		status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "3"))
 
 		require.Equal(t, http.StatusOK, status)
 		assert.Equal(t, map[string]any{
-			"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum", "isDefault": false,
+			"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum", "isDefault": false, "clientCount": float64(4),
 			"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 		}, body["brand"])
 	})
@@ -287,11 +294,39 @@ func TestBrandGet(t *testing.T) {
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+		database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{1: 9, 3: 4}, nil).Once()
 
 		status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "1"))
 
 		require.Equal(t, http.StatusOK, status)
 		assert.Equal(t, true, brandAt(body, "brand", "isDefault"))
+		assert.InDelta(t, 9, brandAt(body, "brand", "clientCount"), 0)
+	})
+	t.Run("a brand no client is drawn in", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
+		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
+			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+		database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{1: 9}, nil).Once()
+
+		status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "3"))
+
+		require.Equal(t, http.StatusOK, status)
+		assert.InDelta(t, 0, brandAt(body, "brand", "clientCount"), 0)
+	})
+	t.Run("a count that cannot be read fails the answer", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
+		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
+			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+		database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(nil, errs.New("connection reset")).Once()
+
+		status, body := serveBrand(HandleBrandGet(database), brandRequest(t, http.MethodGet, nil, "id", "3"))
+
+		assert.Equal(t, http.StatusInternalServerError, status)
+		assert.Nil(t, body["brand"])
 	})
 	t.Run("an unknown brand", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
@@ -371,6 +406,7 @@ func TestBrandUpdate_ReplacesTheThreeFieldsAndAudits(t *testing.T) {
 	}).Return(nil).Once()
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{1: 6}, nil).Once()
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedBrand, map[string]interface{}{
 		"brand_id": int64(1), "brand_name": "House", "appearance": "light", "theme": "guava",
@@ -389,6 +425,7 @@ func TestBrandUpdate_ReplacesTheThreeFieldsAndAudits(t *testing.T) {
 	assert.Equal(t, "light", brandAt(body, "brand", "appearance"))
 	assert.Equal(t, "guava", brandAt(body, "brand", "theme"))
 	assert.Equal(t, true, brandAt(body, "brand", "isDefault"))
+	assert.InDelta(t, 6, brandAt(body, "brand", "clientCount"), 0)
 }
 
 // --- delete -------------------------------------------------------------------------------------
@@ -399,7 +436,7 @@ func TestBrandDelete_TheDefaultIsRefused(t *testing.T) {
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 	datamocks.ExpectRunInTransaction(database, brandTx)
 	database.On("DeleteBrand", mock.Anything, brandTx, int64(1)).
-		Return(errs.WithStack(data.ErrDefaultBrandNotDeletable)).Once()
+		Return(0, errs.WithStack(data.ErrDefaultBrandNotDeletable)).Once()
 
 	status, answer := serveBrand(HandleBrandDelete(database, handlersmocks.NewAuditLogger(t)),
 		brandRequest(t, http.MethodDelete, nil, "id", "1"))
@@ -425,7 +462,7 @@ func TestBrandDelete_AnUnknownBrandIsNotFound(t *testing.T) {
 		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		datamocks.ExpectRunInTransaction(database, brandTx)
-		database.On("DeleteBrand", mock.Anything, brandTx, int64(3)).Return(errs.WithStack(data.ErrBrandNotFound)).Once()
+		database.On("DeleteBrand", mock.Anything, brandTx, int64(3)).Return(0, errs.WithStack(data.ErrBrandNotFound)).Once()
 
 		status, body := serveBrand(HandleBrandDelete(database, handlersmocks.NewAuditLogger(t)),
 			brandRequest(t, http.MethodDelete, nil, "id", "3"))
@@ -440,10 +477,11 @@ func TestBrandDelete_DeletesUnderTheTransactionAndAudits(t *testing.T) {
 	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
 		Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 	datamocks.ExpectRunInTransaction(database, brandTx)
-	database.On("DeleteBrand", mock.Anything, brandTx, int64(3)).Return(nil).Once()
+	// The deletion moved three clients to the default brand.
+	database.On("DeleteBrand", mock.Anything, brandTx, int64(3)).Return(3, nil).Once()
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedBrand, map[string]interface{}{
-		"brand_id": int64(3), "brand_name": "Acme", "logged_in_user": brandCaller,
+		"brand_id": int64(3), "brand_name": "Acme", "client_count": 3, "logged_in_user": brandCaller,
 	}).Once()
 
 	status, body := serveBrand(HandleBrandDelete(database, auditLogger), brandRequest(t, http.MethodDelete, nil, "id", "3"))
@@ -462,6 +500,7 @@ func TestBrandMakeDefault_MovesTheDefaultAndAuditsBothBrands(t *testing.T) {
 		Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 	database.On("GetBrandById", mock.Anything, brandTx, int64(1)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+	database.On("CountClientsPerBrand", mock.Anything, brandTx).Return(map[int64]int{1: 1, 3: 8}, nil).Once()
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedDefaultBrand, map[string]interface{}{
 		"brand_id": int64(3), "brand_name": "Acme", "old_brand_id": int64(1), "old_brand_name": "Default",
@@ -473,7 +512,7 @@ func TestBrandMakeDefault_MovesTheDefaultAndAuditsBothBrands(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, status)
 	assert.Equal(t, map[string]any{
-		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum", "isDefault": true,
+		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum", "isDefault": true, "clientCount": float64(8),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, body["brand"])
 }
@@ -484,6 +523,7 @@ func TestBrandMakeDefault_TheDefaultAlreadyRecordsNothing(t *testing.T) {
 	database.On("MakeBrandDefault", mock.Anything, brandTx, int64(1)).Return(int64(1), nil).Once()
 	database.On("GetBrandById", mock.Anything, brandTx, int64(1)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+	database.On("CountClientsPerBrand", mock.Anything, brandTx).Return(map[int64]int{1: 4}, nil).Once()
 
 	status, body := serveBrand(HandleBrandMakeDefaultPost(database, handlersmocks.NewAuditLogger(t)),
 		brandRequest(t, http.MethodPost, nil, "id", "1"))

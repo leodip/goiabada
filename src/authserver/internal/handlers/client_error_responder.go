@@ -17,11 +17,11 @@ import (
 )
 
 // clientErrorDatabase is what the client-error responder reads: the redirect URIs a client has
-// registered now, for the registration gate, and the default brand its form_post page is drawn in.
+// registered now, for the registration gate, and the brand its form_post page is drawn in.
 // data.Database satisfies it.
 type clientErrorDatabase interface {
 	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error)
-	render.DefaultBrandReader
+	render.PageBrandReader
 }
 
 // ClientErrorResponder answers a client with an authorization error response: it decides whether

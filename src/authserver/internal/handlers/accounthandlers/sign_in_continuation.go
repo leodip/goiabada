@@ -30,11 +30,12 @@ func (b *signInBrowser) SaveAuthContext(authContext *ceremony.AuthContext) error
 	return b.ceremonies.SaveAuthContext(b.w, b.r, authContext)
 }
 
-// carryOnSignIn signs a user who has just registered, or activated their account, into the sign-in
-// that started the registration, and sends the browser on to its next step (#622 decision 9).
-// ceremonyId is the sign-in the password page's Create an account link named, from the page's URL
-// (registrationCeremonyId), or empty for a registration reached from anywhere else. user is the
-// account just created, with the password the user just chose.
+// carryOnSignIn signs a user who has just registered, activated their account, or reset their
+// password, into the sign-in that started it, and sends the browser on to its next step (#622
+// decision 9, #812 decision 10). ceremonyId is the sign-in the password page's Create an account or
+// Forgot password? link named, from the page's URL (registrationCeremonyId), or empty for a page
+// reached from anywhere else. user is the account with the password the user just chose: the one
+// just created, or the one a reset just changed (carryOnReset).
 //
 // It carries the sign-in on only while the browser holds it at the password step, the step whose
 // page has the link: the password proven is recorded on it as the password page records one

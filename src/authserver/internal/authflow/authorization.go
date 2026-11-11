@@ -146,6 +146,11 @@ type AuthorizePageRefusal struct {
 	// ImplicitFlow is whether the request asks for tokens rather than a code, for
 	// AuthorizePageRefusalFormPostUnreachable, so the page names the modes that request may use.
 	ImplicitFlow bool
+	// ClientId is the client_id of a request refused once its client is known: at or after the
+	// check of its client_id and redirect_uri. The page is drawn in that client's brand when it names
+	// one, enabled or not. It is empty for a refusal made before, whose page is drawn in the default
+	// brand (#812).
+	ClientId string
 }
 
 // AuthorizePageRefusalReason is why a request is answered on the refusal page.
@@ -189,6 +194,13 @@ type AuthorizationResult struct {
 	// AuthContext is the ceremony this request started, from which the handler builds the error
 	// response or the step redirect.
 	AuthContext *ceremony.AuthContext
+
+	// ClientId is the client_id of a request whose client is known: past the check of its client_id
+	// and redirect_uri, or failing inside it after the client was read (clientKnownBy). It is set on
+	// every answer from there on, an error beside it included, so the handler draws the error
+	// response or the 500 in that client's brand. It is empty before the client is read, whose
+	// failures are drawn in the default brand (#812).
+	ClientId string
 
 	// ClientRefusal is the error the client is answered with now. The ceremony ends with it: it was
 	// never stored, and whatever sign-in the browser holds is left as it was (#246).
@@ -323,20 +335,23 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 
 	pageRefusal, err := refuseUnaddressableAuthorizeRequest(ctx, o.validator, arrival.RequestId, params)
 	if err != nil {
-		return AuthorizationResult{}, err
+		return AuthorizationResult{ClientId: clientKnownBy(err)}, err
 	}
 	if pageRefusal != nil {
 		return AuthorizationResult{PageRefusal: pageRefusal}, nil
 	}
 
+	// From here on the client is known, and every answer names it, a failure's included (#812).
+	known := AuthorizationResult{ClientId: authContext.ClientId}
+
 	// The address check above refuses a client that does not exist or is disabled, so the only way
 	// this finds nothing is a client deleted between the two lookups.
 	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
 	if err != nil {
-		return AuthorizationResult{}, err
+		return known, err
 	}
 	if client == nil {
-		return AuthorizationResult{}, errs.Errorf("client %v not found", authContext.ClientId)
+		return known, errs.Errorf("client %v not found", authContext.ClientId)
 	}
 
 	// The client's max_age as the session predicate applies it. A malformed value is refused by
@@ -376,7 +391,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		case authorizeFactSessionValidity:
 			userSession, err = o.database.GetUserSessionBySessionIdentifier(ctx, nil, arrival.SessionIdentifier)
 			if err != nil {
-				return AuthorizationResult{}, err
+				return known, err
 			}
 			valid := o.sessions.HasValidUserSession(userSession,
 				settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, requestedMaxAge)
@@ -400,7 +415,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 					MaxAge:                   authContext.MaxAge,
 				})
 			if validationErr != nil {
-				return AuthorizationResult{}, validationErr
+				return known, validationErr
 			}
 			refusal = validation.refusal
 			refusedAdministrativeScopes = validation.refusedAdministrativeScopes
@@ -424,7 +439,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 			// session.
 			err = o.database.UserSessionLoadUser(ctx, nil, userSession)
 			if err != nil {
-				return AuthorizationResult{}, err
+				return known, err
 			}
 			facts.sessionUserLoaded = true
 			if userSession != nil {
@@ -435,7 +450,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		route, need = decideAuthorizeRoute(facts)
 	}
 
-	result := AuthorizationResult{AuthContext: authContext}
+	result := AuthorizationResult{AuthContext: authContext, ClientId: authContext.ClientId}
 
 	// answerClient answers the client with an error now, whoever is at the browser, and stores
 	// nothing: a link or redirect that is not even a valid sign-in, sent to this browser from
@@ -461,7 +476,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 			if facts.sessionValid == nil {
 				userSession, err = o.database.GetUserSessionBySessionIdentifier(ctx, nil, arrival.SessionIdentifier)
 				if err != nil {
-					return AuthorizationResult{}, err
+					return known, err
 				}
 				valid := o.sessions.HasValidUserSession(userSession,
 					settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, requestedMaxAge)
@@ -490,7 +505,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		silent, silentErr := o.silentAuthentication.Run(ctx, browser, settings, authContext, client,
 			arrival.SessionIdentifier, arrival.IpAddress)
 		if silentErr != nil {
-			return AuthorizationResult{}, silentErr
+			return known, silentErr
 		}
 		if silent.Refusal != nil {
 			result.ClientRefusal = silent.Refusal
@@ -519,7 +534,18 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		authContext.AuthState = ceremony.AuthStateLevel1ExistingSession
 		return saveFor("/auth/level1completed"), nil
 	}
-	return AuthorizationResult{}, errs.Errorf("authorization request reached no route (%v)", route)
+	return known, errs.Errorf("authorization request reached no route (%v)", route)
+}
+
+// clientKnownBy is the client_id a failure of refuseUnaddressableAuthorizeRequest names when the
+// address check had read the request's client before it failed, and "" when it failed before, so a
+// 500 is drawn in the client's brand only once the client is known (#812).
+func clientKnownBy(err error) string {
+	var clientKnown *protocolvalidation.ClientKnownError
+	if errors.As(err, &clientKnown) {
+		return clientKnown.ClientId
+	}
+	return ""
 }
 
 // refuseUnaddressableAuthorizeRequest answers the refusal page an authorization request is owed
@@ -540,17 +566,19 @@ func refuseUnaddressableAuthorizeRequest(ctx context.Context, validator authoriz
 	}
 
 	// RFC 6749 section 4.1.2.1 forbids sending a bad client_id or redirect_uri anywhere, so the page
-	// is the whole answer.
+	// is the whole answer. From here on the client is known, and every refusal names it.
+	clientId := params.Get("client_id")
 	err := validator.ValidateClientAndRedirectURI(ctx, &protocolvalidation.ValidateClientAndRedirectURIInput{
 		RequestId:    requestId,
-		ClientId:     params.Get("client_id"),
+		ClientId:     clientId,
 		RedirectURI:  params.Get("redirect_uri"),
 		ResponseType: params.Get("response_type"),
 	})
 	if err != nil {
 		var localizedErr *i18n.LocalizedError
 		if errors.As(err, &localizedErr) {
-			return &AuthorizePageRefusal{Reason: AuthorizePageRefusalClientOrRedirectURI, ClientRefusal: localizedErr}, nil
+			return &AuthorizePageRefusal{Reason: AuthorizePageRefusalClientOrRedirectURI, ClientRefusal: localizedErr,
+				ClientId: clientId}, nil
 		}
 		return nil, err
 	}
@@ -564,7 +592,7 @@ func refuseUnaddressableAuthorizeRequest(ctx context.Context, validator authoriz
 	// the query names a mode this server understands and may not use for tokens, which ValidateRequest
 	// refuses by redirect, in the fragment (#231).
 	if !protocolvalidation.IsSupportedResponseMode(params.Get("response_mode")) {
-		return &AuthorizePageRefusal{Reason: AuthorizePageRefusalUnsupportedResponseMode}, nil
+		return &AuthorizePageRefusal{Reason: AuthorizePageRefusalUnsupportedResponseMode, ClientId: clientId}, nil
 	}
 
 	// response_mode=form_post answers through an HTML form whose action is the redirect URI, and
@@ -580,7 +608,8 @@ func refuseUnaddressableAuthorizeRequest(ctx context.Context, validator authoriz
 		redirectURI, err := url.Parse(params.Get("redirect_uri"))
 		if err != nil || (redirectURI.Scheme != "http" && redirectURI.Scheme != "https") {
 			return &AuthorizePageRefusal{Reason: AuthorizePageRefusalFormPostUnreachable,
-				ImplicitFlow: protocolvalidation.ParseResponseType(params.Get("response_type")).IsImplicitFlow()}, nil
+				ImplicitFlow: protocolvalidation.ParseResponseType(params.Get("response_type")).IsImplicitFlow(),
+				ClientId:     clientId}, nil
 		}
 	}
 

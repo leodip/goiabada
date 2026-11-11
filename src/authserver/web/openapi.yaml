@@ -2325,8 +2325,9 @@ paths:
       tags: [Brands]
       summary: List brands
       description: |
-        Every brand, sorted by name. The default brand, the one every page is drawn in, has
-        `isDefault` true.
+        Every brand, sorted by name. The default brand, the one a client with no brand of its
+        own is drawn in, has `isDefault` true. Each brand's `clientCount` says how many clients
+        are drawn in it.
       operationId: getBrands
       responses:
         '200':
@@ -2444,8 +2445,8 @@ paths:
       tags: [Brands]
       summary: Delete brand
       description: |
-        Delete a brand. The default brand cannot be deleted: make another brand the default
-        first.
+        Delete a brand. The clients given the brand move to the default brand, which they then
+        follow. The default brand cannot be deleted: make another brand the default first.
       operationId: deleteBrand
       parameters:
         - $ref: '#/components/parameters/BrandIdParam'
@@ -2478,8 +2479,8 @@ paths:
       tags: [Brands]
       summary: Make brand the default
       description: |
-        Make a brand the default, which restyles every page at once. A brand that already is
-        the default is answered unchanged.
+        Make a brand the default, which restyles at once the pages of every client with no brand
+        of its own. A brand that already is the default is answered unchanged.
       operationId: makeBrandDefault
       parameters:
         - $ref: '#/components/parameters/BrandIdParam'
@@ -3276,6 +3277,58 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/clients/{id}/brand:
+    put:
+      tags: [Clients]
+      summary: Set a client's brand
+      description: |
+        Give the client a brand of its own, or with `null` put it back on the default brand.
+        The client's sign-in, sign-out and form_post pages are drawn in its brand. A client with
+        no brand of its own is drawn in the default brand, and follows it when another brand is
+        made the default. A brand given explicitly stays given, also the default brand. A new
+        client starts with none.
+
+        `brandId` is required: a body without it is refused rather than read as `null`. A brand
+        given to clients can still be deleted; its clients then move to the default brand.
+
+        The route admits `authserver:manage-clients` and `authserver:manage`; on an
+        administrator client, only `authserver:manage`. The answer is the client as it now is.
+        No other operation sets or clears `brandId`.
+      operationId: updateClientBrand
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientBrandRequest'
+      responses:
+        '200':
+          description: Brand saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateClientResponse'
+        '400':
+          description: |
+            error_code is VALIDATION_ERROR for a malformed ID, INVALID_REQUEST_BODY for a body
+            that is not a JSON object or a `brandId` that is not a whole number or null,
+            handler.client_brand.brand_id_required for a body without `brandId`, or
+            handler.client_brand.brand_not_found for a brand that does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/clients/{id}/sessions:
     get:
       tags: [Clients]
@@ -3527,8 +3580,8 @@ paths:
       summary: Get public settings
       description: |
         The settings the admin console reads before anyone holds a token: the app name, whether
-        SMTP is configured, the issuer, the default brand, the password rules, and whether users
-        can delete their own account. This is a public endpoint that does not require
+        SMTP is configured, the issuer, the brand the admin console is drawn in, the password
+        rules, and whether users can delete their own account. This is a public endpoint that does not require
         authentication.
       operationId: getPublicSettings
       security: []
@@ -7618,6 +7671,11 @@ components:
         administrativeScopesAllowed:
           type: boolean
           description: Read-only. True when the client may request the administrative authserver scopes on a user's behalf; always true for the admin console's own client. Switched through PUT /api/v1/admin/clients/{id}/administrative-scopes, with authserver:manage alone
+        brandId:
+          type: integer
+          format: int64
+          nullable: true
+          description: The brand the client's pages are drawn in, or null when the client has no brand of its own and follows the default brand. Set through PUT /api/v1/admin/clients/{id}/brand
         showLogo:
           type: boolean
           description: When true, the client logo is displayed on sign-in and consent screens
@@ -7708,6 +7766,7 @@ components:
         - dpopBoundAccessTokens
         - createdViaDcr
         - administrativeScopesAllowed
+        - brandId
         - showLogo
         - showDisplayName
         - showDescription
@@ -7974,6 +8033,17 @@ components:
           type: boolean
           description: Whether the client requires DPoP for token requests. Required; true on the admin console's own client is refused
 
+    UpdateClientBrandRequest:
+      type: object
+      required: [brandId]
+      properties:
+        brandId:
+          type: integer
+          format: int64
+          nullable: true
+          description: The id of the brand to give the client, or null to put it back on the default brand. Required; a body without it is refused
+          example: 7
+
     UpdateClientAdministrativeScopesRequest:
       type: object
       required: [allowed]
@@ -8126,9 +8196,10 @@ components:
     PublicBrandResponse:
       type: object
       description: >-
-        The default brand, which every page of the auth server and the admin console is drawn in.
-        Absent from the public settings when the auth server cannot read the default brand; pages
-        are then drawn automatic, in the built-in colors.
+        The brand the admin console is drawn in: the brand of the admin console's own client, or
+        the default brand when that client has none of its own. Absent from the public settings
+        when the auth server cannot read it; the console's pages are then drawn automatic, in the
+        built-in colors.
       properties:
         appearance:
           type: string
@@ -8508,7 +8579,10 @@ components:
           description: The key of one of the built-in themes getBrandThemes lists.
         isDefault:
           type: boolean
-          description: True for the default brand, the one every page is drawn in.
+          description: True for the default brand, the one a client with no brand of its own is drawn in.
+        clientCount:
+          type: integer
+          description: How many clients are drawn in the brand. Those given it and, for the default brand, those with no brand of their own too, so the counts of all brands add up to every client.
         createdAt:
           type: string
           format: date-time
@@ -8523,6 +8597,7 @@ components:
         - appearance
         - theme
         - isDefault
+        - clientCount
         - createdAt
         - updatedAt
 
