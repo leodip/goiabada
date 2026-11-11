@@ -122,6 +122,20 @@ introspection resources takes the client's row (`AcquireClientRow`) and refuses 
 finds public, because making a client public takes that row first and clears the list in the same
 transaction (#676)
 
+## Brand assets
+
+A brand asset's row (`brand_assets`) never changes after its upload, and nothing but the cleanup
+worker's sweep deletes one (#813 decision 2). A brand names an asset in each of its six slots by a
+nullable foreign key with no cascade, so replacing, emptying or deleting a brand only leaves the
+asset unattached; `DeleteUnattachedBrandAssets` then deletes, in one statement on the claimed run,
+every asset no slot names that is older than a day. No lock orders the sweep and a brand write. A
+Save attaching an old unattached asset while the sweep runs makes the slot's foreign key refuse the
+sweep's delete, which fails that run's step and is logged; the next run deletes the rest. A brand
+write checks its slots' assets before it writes, so a sweep deleting one in between fails the write
+on the same foreign key, as a 500 rather than the slot's refusal. Reading a brand for a page reads
+its assets with `GetBrandAssetsByIds`, which leaves out the bytes; only the public asset route reads
+them, with `GetBrandAssetById`.
+
 ## Schema golden files
 
 Each engine's fully migrated catalog is recorded in

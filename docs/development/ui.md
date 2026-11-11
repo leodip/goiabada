@@ -41,13 +41,34 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   family change, `--radius-control`, `--radius-panel` and `--font-sans`, and none for rounded and
   System UI, which are `ui.css`'s. A box that may hold more than one line is rounded by
   `--radius-box`, `--radius-control` capped at 1rem, so pill corners round a single-line control
-  fully and leave such a box's content unclipped; draw a new multi-line component with it.
+  fully and leave such a box's content unclipped; draw a new multi-line component with it. The
+  radii and family lists are `core/brandkit`'s, which the console's editor sample draws from too.
+  The full one also draws the kit's files, read from the brand's six asset slots without their
+  bytes (`brandasset.ReadSlots`): the uploaded font as `brandkit.UploadedFontFamily`, one
+  `@font-face` per file with `font-display: swap`, followed by System UI, and the background image
+  on `.auth-page`, the card pages' `<main>`, over the theme's background color at the brand's fit.
+  A card page draws the brand's logo in `.auth-logo` above the app name (the auth server's two
+  layouts and `form_post.html`, the console's `partials/brand_logo.html`), the dark logo on a
+  dark page and in a `<picture>` switching to it under `prefers-color-scheme: dark` on an automatic
+  one, and its alt is empty while the name shows as text
+  and the app name while `hideAppName` hides it, so a screen reader says the name once. A page
+  whose brand has a favicon links it as `icon` and `apple-touch-icon` and drops `favicon.ico` and
+  the manifest. The console tells an admin page, one whose `menu` template calls `admin_menu`
+  (`render.drawsAdminMenu`), from an end-user page: an admin page links `colorsStylesheetUrl` and
+  keeps Goiabada's icons, and every other console page, Account, home and every card page, links
+  `stylesheetUrl` and the brand's favicon. Both draw the logo, in the header's and the sidebar's
+  link to home on a menu page.
   Blueberry's declares no colors, since `ui.css` holds its values, which
   `TestThemeContrast_BlueberryIsBothCopiesOfUICSS` keeps equal to its preset; a token added to
   `ui.css` is added to every preset. A color is a token, `bg-surface`, `text-ink-muted`,
   `border-line`, never a raw value, and every pair a component draws text or a boundary on is in
   `TestThemeContrast_EveryPairMeetsWCAGAA`, at WCAG AA in both modes of every preset and 7:1 for
   High contrast's text.
+- **Outside the card**: the card is opaque, and the brand's background image sits behind it
+  (#813 decision 6). Anything drawn outside the card, such as #814's footer links, sits on its own
+  opaque panel in `bg-surface`, never on the image or on a translucent layer over it: an uploaded
+  image's colors are unknown, so text on it has no contrast a test can hold, while text on the
+  panel is a pair `TestThemeContrast_EveryPairMeetsWCAGAA` already checks.
 - **Brand preview**: the brand editor (`admin_settings_branding_brand.html`) is two panes (#811),
   `brand-editor`: the form, and outside it the `brand-preview`, held in view beside the form from
   75rem and below it in a narrower window. The `brand_sample` partial draws a refused sign-in, once
@@ -71,7 +92,18 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   of `ui.css`'s two panel shadows, which `TestBrandPreviewJS_ShadowsAreUICSSs` holds equal, and
   `brand_preview_script_test.go` runs it under Node against a stand-in of the editor. The samples'
   colors are the theme's, under a forced palette too; the editor's own controls are held to the
-  page's contrast requirement.
+  page's contrast requirement. The samples take the kit as the form holds it too (#813): the
+  corners' radius tokens, the family's `--font-sans`, each fit's background layout and the two
+  font files' weights from the `brand-kit-styles` data block, which the page writes from `core/brandkit`, so a sample never draws
+  a shape, family or fit the saved brand would draw otherwise; Rounded and System UI are handed
+  nothing and keep the console's tokens. `ui.css` reads `--radius-box` and the font on
+  `.brand-sample`, as `:root` does on a page. The files come from each slot's two hidden fields,
+  its asset's id and URL, which `static/pages/brand-assets.js` fills as a file is uploaded to the
+  console's route of its kind and empties on Remove; Save names the held ids in their slots. The
+  sample draws the logo of its mode, the background at its fit and the uploaded font through the
+  CSS Font Loading API; the favicon is a thumbnail beside its field. To keep the preview on a
+  1280×800 screen with a logo in it, the sample's card takes the narrow-screen padding and caps its
+  logo at 3rem.
 - **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
   `panel`, `panel-body` (several, each under a `panel-title`, for a panel in sections),
   `panel-footer`; `button`, with `-primary` for a form's one main action, `-danger`, `-quiet`,

@@ -2347,7 +2347,9 @@ paths:
       summary: Create brand
       description: |
         Create a brand. It is not the default until it is made the default. Each asset slot
-        names a file uploaded first as a brand asset of the slot's kind.
+        names a file uploaded first as a brand asset of the slot's kind: uploadBrandLogo for
+        `logo` and `darkLogo`, uploadBrandFavicon, uploadBrandBackground, and uploadBrandFont for
+        `regularFont` and `boldFont`. A slot left out or null is empty.
       operationId: createBrand
       requestBody:
         required: true
@@ -2369,8 +2371,12 @@ paths:
             handler.brand.name_angle_brackets, handler.brand.name_in_use,
             handler.brand.appearance_invalid, handler.brand.theme_invalid,
             handler.brand.corners_invalid, handler.brand.font_invalid,
-            handler.brand.background_fit_invalid and
-            handler.brand.uploaded_font_regular_required.
+            handler.brand.background_fit_invalid,
+            handler.brand.uploaded_font_regular_required, handler.brand.dark_logo_logo_required,
+            handler.brand.bold_font_regular_required, and, for a slot naming no stored asset of
+            its kind, handler.brand.logo_asset_invalid, handler.brand.dark_logo_asset_invalid,
+            handler.brand.favicon_asset_invalid, handler.brand.background_asset_invalid,
+            handler.brand.regular_font_asset_invalid and handler.brand.bold_font_asset_invalid.
           content:
             application/json:
               schema:
@@ -2540,8 +2546,9 @@ paths:
         URL. A brand's create or update then names the asset by its id. An asset no brand names is
         deleted once it is a day old.
 
-        Send it as `multipart/form-data` in the field `file`. A logo or a dark logo: a still PNG, JPEG or WebP image, each side from 10 to 512 pixels, of
-        at most 1 MiB (1048576 bytes). An animated image is refused.
+        Send it as `multipart/form-data` in the field `file`. A logo or a dark logo: a still
+        PNG, JPEG or WebP image, each side from 10 to 512 pixels, of at most 1 MiB (1048576
+        bytes). An animated image, a GIF and an SVG are refused.
       operationId: uploadBrandLogo
       requestBody:
         required: true
@@ -2586,8 +2593,10 @@ paths:
         URL. A brand's create or update then names the asset by its id. An asset no brand names is
         deleted once it is a day old.
 
-        Send it as `multipart/form-data` in the field `file`. A favicon: a still, square PNG image from 48x48 to 512x512 pixels, of at most 1 MiB
-        (1048576 bytes). An animated image is refused.
+        Send it as `multipart/form-data` in the field `file`. A favicon: a still, square PNG
+        image from 48x48 to 512x512 pixels, of at most 1 MiB (1048576 bytes). An animated image
+        is refused. A page whose brand has a favicon links it as its icon and its Apple touch
+        icon, in place of the built-in icons and web manifest.
       operationId: uploadBrandFavicon
       requestBody:
         required: true
@@ -2632,8 +2641,9 @@ paths:
         URL. A brand's create or update then names the asset by its id. An asset no brand names is
         deleted once it is a day old.
 
-        Send it as `multipart/form-data` in the field `file`. A background image: a still PNG, JPEG or WebP image, each side from 10 to 3840 pixels, of at
-        most 2 MiB (2097152 bytes). An animated image is refused.
+        Send it as `multipart/form-data` in the field `file`. A background image: a still PNG,
+        JPEG or WebP image, each side from 10 to 3840 pixels, of at most 2 MiB (2097152 bytes).
+        An animated image, a GIF and an SVG are refused.
       operationId: uploadBrandBackground
       requestBody:
         required: true
@@ -2678,7 +2688,9 @@ paths:
         URL. A brand's create or update then names the asset by its id. An asset no brand names is
         deleted once it is a day old.
 
-        Send it as `multipart/form-data` in the field `file`. A regular or bold font: a WOFF2 file of at most 2 MiB (2097152 bytes). An animated image is refused.
+        Send it as `multipart/form-data` in the field `file`. A regular or bold font: a WOFF2
+        file, told by its signature, of at most 2 MiB (2097152 bytes). Its answer at the asset's
+        URL grants the admin console's origin, so the console's pages can draw it.
       operationId: uploadBrandFont
       requestBody:
         required: true

@@ -291,9 +291,12 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 - `internal/brandasset/` - A brand's kit as stored files (#813): the rules an upload of each kind
   is held to (a logo, favicon or background by `imageupload`'s rules for it, which refuse an
   animated image; a font by its WOFF2 signature), the fingerprint of an asset's bytes, and `Route`
-  and `Path`, where an asset is served to anyone. The admin API's uploads, the public asset handler
-  and the request-body table's rows read it. The cleanup worker sweeps an asset no brand uses once
-  it is a day old
+  and `Path`, where an asset is served to anyone. `Slots` and `ReadSlots` read the assets in a
+  brand's six slots without their bytes, which the admin API's brand answers, the pages' logo and
+  favicon and the full stylesheet share. The admin API's uploads, the public asset handler and the
+  request-body table's rows read it. The public asset handler grants a font's answer to the admin
+  console's origin, which `routes.go` derives from `GOIABADA_ADMINCONSOLE_BASEURL`. The cleanup
+  worker sweeps an asset no brand uses once it is a day old (see the [data guide](data.md#brand-assets))
 - `internal/clientauth/` - Client authentication from plain values, the client identifier and the
   secret presented: the lookup, the secret check and their refusals' wording and shape, shared by
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a
@@ -487,6 +490,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   fails the sign-ins in flight at the deploy. The six stay declared because they key the sealed map
   and the callback deletes the stale copies a session written before #620 can hold. It was
   `internal/constants` until the context keys left for `reqctx` (#440, #620)
+- `internal/render/` - The console's page renderer. Every page is drawn in the brand
+  `/api/public/settings` answers (`PageBrand`): an admin page, one whose `menu` template calls
+  `admin_menu`, takes the brand's colors-only stylesheet and its logo and keeps Goiabada's icons;
+  every other page takes the full stylesheet, the logo and the brand's favicon (#813)
 - `web/template/` - Admin UI templates
 
 ## Configuration
