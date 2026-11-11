@@ -261,6 +261,50 @@ func TestBrandReads_AnswerEachFilledSlot(t *testing.T) {
 	})
 }
 
+// Making a brand with files the default answers its slots, read in the transaction that moves the
+// pointer: a read that fails rolls the move back and records nothing, rather than answer an error
+// for a default that did change.
+func TestBrandMakeDefault_ReadsTheSlotsInItsTransaction(t *testing.T) {
+	expectMove := func(database *datamocks.Database) {
+		database.On("MakeBrandDefault", mock.Anything, brandTx, int64(4)).Return(int64(1), nil).Once()
+		database.On("GetBrandById", mock.Anything, brandTx, int64(4)).Return(storedKitBrand(), nil).Once()
+		database.On("GetBrandById", mock.Anything, brandTx, int64(1)).
+			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+	}
+	t.Run("the slots answered", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		datamocks.ExpectRunInTransaction(database, brandTx)
+		expectMove(database)
+		database.On("GetBrandAssetsByIds", mock.Anything, brandTx, []int64{11, 12, 13, 14, 15, 16}).
+			Return(brandLibrary[:6], nil).Once()
+		database.On("CountClientsPerBrand", mock.Anything, brandTx).Return(map[int64]int{4: 2}, nil).Once()
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		auditLogger.On("Log", mock.Anything, audit.EventUpdatedDefaultBrand, mock.Anything).Once()
+
+		status, body := serveBrand(HandleBrandMakeDefaultPost(database, auditLogger, brandBaseURL),
+			brandRequest(t, http.MethodPost, nil, "id", "4"))
+
+		require.Equal(t, http.StatusOK, status)
+		for slot, id := range map[string]int64{"logo": 11, "darkLogo": 12, "favicon": 13, "background": 14, "regularFont": 15, "boldFont": 16} {
+			assert.Equal(t, assetAnswer(id), brandAt(body, "brand", slot), slot)
+		}
+	})
+	t.Run("a read that fails rolls the move back", func(t *testing.T) {
+		var steps []string
+		database := datamocks.NewDatabase(t)
+		datamocks.ExpectRunInTransaction(database, brandTx, func(step string) { steps = append(steps, step) })
+		expectMove(database)
+		database.On("GetBrandAssetsByIds", mock.Anything, brandTx, mock.Anything).Return(nil, errs.New("connection reset")).Once()
+
+		status, body := serveBrand(HandleBrandMakeDefaultPost(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
+			brandRequest(t, http.MethodPost, nil, "id", "4"))
+
+		assert.Equal(t, http.StatusInternalServerError, status)
+		assert.Nil(t, body["brand"])
+		assert.Equal(t, []string{"begin", "rollback"}, steps)
+	})
+}
+
 // A brand with no slot filled reads no asset: the answers of a brand nobody has given a file cost
 // what they did before the kit.
 func TestBrandReads_ABrandWithoutFilesReadsNoAsset(t *testing.T) {

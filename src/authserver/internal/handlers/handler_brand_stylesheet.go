@@ -36,7 +36,7 @@ const (
 // link it. A brand that does not exist is not found, and assets that cannot be read are a fault.
 func HandleBrandStylesheetGet(pageRenderer PageRenderer, database brandStylesheetDatabase) http.HandlerFunc {
 	return serveBrandStylesheet(pageRenderer, database, func(r *http.Request, brand *record.Brand) (brandthemes.Stylesheet, error) {
-		slots, err := brandasset.ReadSlots(r.Context(), database, brand)
+		slots, err := brandasset.ReadSlots(r.Context(), database, nil, brand)
 		if err != nil {
 			return brandthemes.Stylesheet{}, err
 		}

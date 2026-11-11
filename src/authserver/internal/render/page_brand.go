@@ -102,7 +102,7 @@ func DefaultPageBrand(ctx context.Context, brands PageBrandReader) PageBrand {
 // pageBrandOf is what a page drawn in brand takes from it, or nothing when its stored theme is none
 // of the built-in ones, which names no stylesheet and is logged.
 func pageBrandOf(ctx context.Context, assets brandasset.SlotsReader, brand *record.Brand) PageBrand {
-	slots, err := brandasset.ReadSlots(ctx, assets, brand)
+	slots, err := brandasset.ReadSlots(ctx, assets, nil, brand)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to read the assets of the brand a page is drawn in", "brand_id", brand.Id, "error", err)
 		return PageBrand{}

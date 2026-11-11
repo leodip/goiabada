@@ -189,7 +189,7 @@ func writeBrandSlotsError(w http.ResponseWriter, r *http.Request, err error) {
 // readBrandSlots reads the assets brand's slots name, answering the request when it cannot: an answer
 // without them would read back as a brand with empty slots.
 func readBrandSlots(w http.ResponseWriter, r *http.Request, assets brandasset.SlotsReader, brand *record.Brand) (brandasset.Slots, bool) {
-	slots, err := brandasset.ReadSlots(r.Context(), assets, brand)
+	slots, err := brandasset.ReadSlots(r.Context(), assets, nil, brand)
 	if err != nil {
 		writeInternalServerError(w, r, err, "brand_id", brand.Id)
 		return brandasset.Slots{}, false
@@ -521,9 +521,10 @@ func HandleBrandDelete(database brandsDatabase, auditLogger AuditLogger) http.Ha
 //
 // MakeBrandDefault moves the pointer under the settings row's lock and reads the brand under it,
 // so a brand deleted meanwhile is not found rather than made the default (decision 1). The brand,
-// the one it replaces and the count of clients each brand draws are read in the same transaction,
-// after the move, for the answer and the audit event. A brand that already is the default is answered as it is, and nothing is
-// recorded.
+// the one it replaces, the assets its slots name and the count of clients each brand draws are
+// read in the same transaction, after the move, for the answer and the audit event, so a read that
+// fails rolls the move back rather than answer an error for a change that was made. A brand that
+// already is the default is answered as it is, and nothing is recorded.
 func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, ok := brandId(w, r)
@@ -533,9 +534,10 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 
 		var brand, previous *record.Brand
 		var previousId int64
+		var slots brandasset.Slots
 		var counts map[int64]int
 		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			brand, previous, counts = nil, nil, nil
+			brand, previous, slots, counts = nil, nil, brandasset.Slots{}, nil
 			var err error
 			previousId, err = database.MakeBrandDefault(r.Context(), tx, id)
 			if err != nil {
@@ -553,6 +555,10 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 				if err != nil {
 					return errs.Wrap(err, "database error getting the previous default brand")
 				}
+			}
+			slots, err = brandasset.ReadSlots(r.Context(), database, tx, brand)
+			if err != nil {
+				return err
 			}
 			counts, err = database.CountClientsPerBrand(r.Context(), tx)
 			if err != nil {
@@ -584,10 +590,6 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 			})
 		}
 
-		slots, ok := readBrandSlots(w, r, database, brand)
-		if !ok {
-			return
-		}
 		writeJSON(w, r, http.StatusOK, api.MakeBrandDefaultResponse{Brand: apimapping.ToBrandResponse(brand, slots, baseURL, true, counts[brand.Id])})
 	}
 }

@@ -171,14 +171,14 @@ func SlotsOf(brand *record.Brand, assets []record.BrandAsset) Slots {
 	}
 }
 
-// ReadSlots reads the assets brand's slots name, without their bytes, and reads nothing when every
-// slot is empty, as a brand nobody has given a file is.
-func ReadSlots(ctx context.Context, reader SlotsReader, brand *record.Brand) (Slots, error) {
+// ReadSlots reads the assets brand's slots name, without their bytes, in tx when it is not nil, and
+// reads nothing when every slot is empty, as a brand nobody has given a file is.
+func ReadSlots(ctx context.Context, reader SlotsReader, tx *sql.Tx, brand *record.Brand) (Slots, error) {
 	ids := SlotIds(brand)
 	if len(ids) == 0 {
 		return Slots{}, nil
 	}
-	assets, err := reader.GetBrandAssetsByIds(ctx, nil, ids)
+	assets, err := reader.GetBrandAssetsByIds(ctx, tx, ids)
 	if err != nil {
 		return Slots{}, errs.Wrap(err, "unable to read the assets of the brand's slots")
 	}

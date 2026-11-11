@@ -175,15 +175,18 @@ func TestSlotsOf_EachSlotTakesTheAssetItNames(t *testing.T) {
 	assert.Nil(t, slots.Background)
 }
 
-// assetsStub answers the assets of the ids it is asked for among its own, and counts the reads.
+// assetsStub answers the assets of the ids it is asked for among its own, and records each read and
+// the transaction it was made in.
 type assetsStub struct {
 	assets []record.BrandAsset
 	err    error
 	asked  [][]int64
+	txs    []*sql.Tx
 }
 
-func (s *assetsStub) GetBrandAssetsByIds(_ context.Context, _ *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
+func (s *assetsStub) GetBrandAssetsByIds(_ context.Context, tx *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
 	s.asked = append(s.asked, ids)
+	s.txs = append(s.txs, tx)
 	return s.assets, s.err
 }
 
@@ -191,22 +194,24 @@ func TestReadSlots_ReadsTheFilledSlotsOnceAndNothingForAnEmptyBrand(t *testing.T
 	reader := &assetsStub{assets: []record.BrandAsset{{Id: 12, Kind: record.BrandAssetKindLogo, Fingerprint: "abcdefabcdef"}}}
 	brand := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
 	brand.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
+	tx := &sql.Tx{}
 
-	slots, err := ReadSlots(context.Background(), reader, &brand)
+	slots, err := ReadSlots(context.Background(), reader, tx, &brand)
 
 	require.NoError(t, err)
 	assert.Equal(t, [][]int64{{12}}, reader.asked)
+	assert.Same(t, tx, reader.txs[0], "the read is made in the caller's transaction")
 	require.NotNil(t, slots.DarkLogo)
 	assert.Equal(t, "abcdefabcdef", slots.DarkLogo.Fingerprint)
 
 	empty := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
 	none := &assetsStub{}
-	slots, err = ReadSlots(context.Background(), none, &empty)
+	slots, err = ReadSlots(context.Background(), none, nil, &empty)
 	require.NoError(t, err)
 	assert.Equal(t, Slots{}, slots)
 	assert.Empty(t, none.asked, "a brand with every slot empty reads no asset")
 
 	failing := &assetsStub{err: errs.New("connection reset")}
-	_, err = ReadSlots(context.Background(), failing, slotsBrand())
+	_, err = ReadSlots(context.Background(), failing, nil, slotsBrand())
 	assert.ErrorContains(t, err, "connection reset")
 }
