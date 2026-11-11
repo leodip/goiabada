@@ -14,6 +14,20 @@ import (
 // flashSessionEnded is the one-time notice HandleSessionEndedGet leaves for HandleIndexGet.
 const flashSessionEnded = "sessionEnded"
 
+// sessionEndedNoticeCookie is the logical name of the sealed cookie that carries that notice home
+// instead, when the session it was for has no row left to hold it (see HandleSessionEndedGet).
+const sessionEndedNoticeCookie = "adminconsole-session-ended"
+
+// sessionEndedStore is what HandleSessionEndedGet needs of the session store: the session, and
+// the sealed cookie that carries the notice when the session's row is gone.
+type sessionEndedStore interface {
+	Get(r *http.Request, name string) (*sessionstore.Session, error)
+	Save(r *http.Request, w http.ResponseWriter, s *sessionstore.Session) error
+	CookieName(logicalName string) string
+	SealCookieValues(name string, values map[string]string) (string, error)
+	ValuesCookie(name, value string) *http.Cookie
+}
+
 // HandleSessionEndedGet signs the administrator out after the admin API refused the console's
 // access token, and sends the browser home, where the notice says why (#427 decision 17).
 //
@@ -41,12 +55,16 @@ const flashSessionEnded = "sessionEnded"
 // next console page they open meets the same 401 from this origin and is signed out then, with
 // the notice.
 //
-// A request that arrives with no cookie is sent home the same way without a write: no row
-// exists to end, and the row its save would create is the one an anonymous client could
-// otherwise mint per request, at no limit (#620).
+// A request whose session has no row is sent home the same way without a write: no row exists to
+// end, and the row its save would create is the one an anonymous client could otherwise mint per
+// request, at no limit (#620). One that brought the session's cookie had a session whose row has
+// gone since, as when it expired while a page stayed open, and a page script whose request met
+// the ended sign-in sent it here; the notice goes home with it in a sealed cookie of its own,
+// which writes no row, as the sign-in handshake's does. A request with no cookie at all had no
+// sign-in to end and is told nothing.
 func HandleSessionEndedGet(
 	httpHelper HttpHelper,
-	httpSession sessionstore.Store,
+	httpSession sessionEndedStore,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -66,10 +84,18 @@ func HandleSessionEndedGet(
 		}
 
 		if sess.ID == "" {
-			// No cookie reached the route, so the store returned a fresh session and
-			// nothing has ended. Saving it would insert a row no browser can read back,
-			// one per request at no limit; and the notice is not written either, because
-			// without a cookie there is nothing to carry it to the home page (#620).
+			// No row stands behind the request, so the store returned a fresh session. Saving
+			// it would insert a row no browser can read back, one per request at no limit
+			// (#620), so the notice, when the session's cookie says there was a sign-in to
+			// end, rides in a sealed cookie instead.
+			if _, cookieErr := r.Cookie(httpSession.CookieName(builtin.AdminConsoleSessionName)); cookieErr == nil {
+				sealed, sealErr := httpSession.SealCookieValues(sessionEndedNoticeCookie, map[string]string{flashSessionEnded: "true"})
+				if sealErr != nil {
+					httpHelper.InternalServerError(w, r, errs.Wrap(sealErr, "unable to seal the session-ended notice"))
+					return
+				}
+				http.SetCookie(w, httpSession.ValuesCookie(sessionEndedNoticeCookie, sealed))
+			}
 			http.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
