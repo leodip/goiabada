@@ -1986,6 +1986,7 @@
 "handler.administrators.last_administrator" = "This change would leave no enabled user holding authserver:manage. Grant it to another user first."
 "handler.image_upload.too_large" = "File too large or invalid form data"
 "handler.image_upload.no_file" = "No picture file provided"
+"handler.brand_asset.no_file" = "No file provided"
 
 "handler.resource.identifier_required" = "Resource identifier is required"
 "handler.resource.description_too_long" = "The description cannot exceed a maximum length of {{.max}} characters"
@@ -2247,6 +2248,16 @@
 "validator.image.undecodable" = "The image could not be read. The file may be damaged."
 "validator.image.dimensions_too_small" = "The image must be at least {{.min}}x{{.min}} pixels."
 "validator.image.dimensions_too_large" = "The image can be at most {{.max}}x{{.max}} pixels."
+"validator.image.unsupported_type_png_jpeg_webp" = "The image type is not supported. Allowed types are PNG, JPEG and WebP."
+"validator.image.unsupported_type_png" = "The image type is not supported. The only allowed type is PNG."
+"validator.image.not_square" = "The image must be square. This one is {{.width}}x{{.height}} pixels."
+"validator.image.animated" = "Animated images are not allowed. Upload a still image."
+
+# --- Font validator (LocalizedError-backed) ----------------------------------
+
+"validator.font.too_large" = "The font can be at most {{.max}} bytes."
+"validator.font.empty" = "The font file is empty."
+"validator.font.unsupported_type" = "The font type is not supported. The only allowed type is WOFF2."
 
 # --- Authorize endpoint, client and redirect_uri (LocalizedError-backed) -----
 #

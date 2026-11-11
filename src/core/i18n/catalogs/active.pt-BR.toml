@@ -1896,6 +1896,7 @@
 "handler.administrators.last_administrator" = "Esta alteração não deixaria nenhum usuário habilitado com authserver:manage. Conceda essa permissão a outro usuário primeiro."
 "handler.image_upload.too_large" = "Arquivo grande demais ou dados de formulário inválidos"
 "handler.image_upload.no_file" = "Nenhum arquivo de foto foi enviado"
+"handler.brand_asset.no_file" = "Nenhum arquivo foi enviado"
 
 "handler.resource.identifier_required" = "O identificador do recurso é obrigatório"
 "handler.resource.description_too_long" = "A descrição não pode ter mais que {{.max}} caracteres"
@@ -2151,6 +2152,14 @@
 "validator.image.undecodable" = "Não foi possível ler a imagem. O arquivo pode estar danificado."
 "validator.image.dimensions_too_small" = "A imagem deve ter pelo menos {{.min}}x{{.min}} pixels."
 "validator.image.dimensions_too_large" = "A imagem pode ter no máximo {{.max}}x{{.max}} pixels."
+"validator.image.unsupported_type_png_jpeg_webp" = "Tipo de imagem não suportado. Os tipos permitidos são PNG, JPEG e WebP."
+"validator.image.unsupported_type_png" = "Tipo de imagem não suportado. O único tipo permitido é PNG."
+"validator.image.not_square" = "A imagem deve ser quadrada. Esta tem {{.width}}x{{.height}} pixels."
+"validator.image.animated" = "Imagens animadas não são permitidas. Envie uma imagem estática."
+
+"validator.font.too_large" = "A fonte pode ter no máximo {{.max}} bytes."
+"validator.font.empty" = "O arquivo de fonte está vazio."
+"validator.font.unsupported_type" = "Tipo de fonte não suportado. O único tipo permitido é WOFF2."
 
 # --- Endpoint de autorização, client e redirect_uri (LocalizedError-backed) --
 

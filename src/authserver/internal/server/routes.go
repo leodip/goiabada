@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -25,6 +26,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
+	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/builtin"
@@ -162,6 +164,10 @@ func (s *Server) initRoutes(branches appBranches) {
 	// year (#813 decision 11).
 	getAndHead(public, brandthemes.StylesheetRoute, handlers.HandleBrandStylesheetGet(httpHelper, s.database))
 	getAndHead(public, brandthemes.ColorsStylesheetRoute, handlers.HandleBrandColorsStylesheetGet(httpHelper, s.database))
+	// A brand asset is answered the same way, a font with the grant that lets the admin console's
+	// pages draw it: the console's origin, as a browser sends it in Origin (#813 decision 8).
+	consoleOrigin, _ := urlmatch.CanonicalOrigin(adminConsoleBaseURL)
+	getAndHead(public, brandasset.Route, handlers.HandleBrandAssetGet(httpHelper, s.database, consoleOrigin))
 
 	// Dynamic Client Registration endpoint (RFC 7591)
 	// Note: Already CSRF-exempt via middleware (server-to-server API)
@@ -470,6 +476,13 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/brands/{id}/make-default", apihandlers.HandleBrandMakeDefaultPost(s.database, auditLogger))
 		// The built-in themes a brand can take, reference data behind the same read scopes.
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/brand-themes", apihandlers.HandleBrandThemesGet())
+		// Brand assets (#813 decision 1): a file uploaded as an asset of a kind, one route per kind so
+		// each has its own row in the request-body table, and an asset read by its id.
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/brand-assets/logo", apihandlers.HandleBrandAssetPost(s.database, auditLogger, baseURL, record.BrandAssetKindLogo))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/brand-assets/favicon", apihandlers.HandleBrandAssetPost(s.database, auditLogger, baseURL, record.BrandAssetKindFavicon))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/brand-assets/background", apihandlers.HandleBrandAssetPost(s.database, auditLogger, baseURL, record.BrandAssetKindBackground))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/brand-assets/font", apihandlers.HandleBrandAssetPost(s.database, auditLogger, baseURL, record.BrandAssetKindFont))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/brand-assets/{id}", apihandlers.HandleBrandAssetGet(s.database, baseURL))
 
 		// Settings - Tokens
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/tokens", apihandlers.HandleSettingsTokensGet())

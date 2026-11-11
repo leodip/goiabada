@@ -25,3 +25,20 @@ func readUploadedImage(w http.ResponseWriter, r *http.Request, maxUploadBytes in
 	}
 	return nil, false
 }
+
+// readUploadedBrandAsset reads the "file" field of a brand asset upload, as readUploadedImage reads
+// a picture: a brand asset may be a font, so the field and the NO_FILE sentence name a file.
+func readUploadedBrandAsset(w http.ResponseWriter, r *http.Request, maxUploadBytes int64) (data []byte, ok bool) {
+	data, err := imageupload.Read(w, r, "file", maxUploadBytes)
+	switch {
+	case err == nil:
+		return data, true
+	case errors.Is(err, imageupload.ErrUploadTooLarge):
+		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeImageUploadTooLarge, nil), "FILE_TOO_LARGE", http.StatusBadRequest)
+	case errors.Is(err, imageupload.ErrNoUpload):
+		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeBrandAssetUploadNoFile, nil), "NO_FILE", http.StatusBadRequest)
+	default:
+		writeInternalServerError(w, r, err)
+	}
+	return nil, false
+}

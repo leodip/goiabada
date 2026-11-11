@@ -40,6 +40,7 @@ func TestWorker_PerformTask_SweepsDeadPreRegistrationsTenMinutesBack(t *testing.
 			order = append(order, "pre-registrations")
 			deadBefore = args.Get(2).(time.Time)
 		}).Return(nil).Once()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
 		Run(recordStep("settings")).Return(nil, nil).Once()
 
@@ -68,6 +69,7 @@ func TestWorker_PerformTask_ContinuesAfterThePreRegistrationSweepFails(t *testin
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("delete failed")).Once()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
@@ -94,6 +96,7 @@ func TestWorker_PerformTask_SweepsPreRegistrationsAfterTheCodeSweepFails(t *test
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("delete failed")).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	worker.performTask(context.Background())

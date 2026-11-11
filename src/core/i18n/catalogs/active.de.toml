@@ -1990,6 +1990,7 @@
 "handler.administrators.last_administrator" = "Nach dieser Änderung gäbe es kein aktiviertes Konto mit authserver:manage mehr. Erteilen Sie diese Berechtigung zuerst einem anderen Konto."
 "handler.image_upload.too_large" = "Datei zu groß oder ungültige Formulardaten."
 "handler.image_upload.no_file" = "Keine Bilddatei angegeben."
+"handler.brand_asset.no_file" = "Keine Datei angegeben."
 
 "handler.resource.identifier_required" = "Geben Sie eine Ressourcenkennung ein."
 "handler.resource.description_too_long" = "Die Beschreibung darf höchstens {{.max}} Zeichen lang sein."
@@ -2251,6 +2252,14 @@
 "validator.image.undecodable" = "Das Bild konnte nicht gelesen werden. Die Datei ist möglicherweise beschädigt."
 "validator.image.dimensions_too_small" = "Das Bild muss mindestens {{.min}} × {{.min}} Pixel groß sein."
 "validator.image.dimensions_too_large" = "Das Bild darf höchstens {{.max}} × {{.max}} Pixel groß sein."
+"validator.image.unsupported_type_png_jpeg_webp" = "Dieses Bildformat wird nicht unterstützt. Erlaubt sind PNG, JPEG und WebP."
+"validator.image.unsupported_type_png" = "Dieses Bildformat wird nicht unterstützt. Erlaubt ist nur PNG."
+"validator.image.not_square" = "Das Bild muss quadratisch sein. Dieses ist {{.width}} × {{.height}} Pixel groß."
+"validator.image.animated" = "Animierte Bilder sind nicht erlaubt. Laden Sie ein unbewegtes Bild hoch."
+
+"validator.font.too_large" = "Die Schrift darf höchstens {{.max}} Bytes groß sein."
+"validator.font.empty" = "Die Schriftdatei ist leer."
+"validator.font.unsupported_type" = "Dieses Schriftformat wird nicht unterstützt. Erlaubt ist nur WOFF2."
 
 # --- Authorize endpoint, client and redirect_uri (LocalizedError-backed) -----
 #

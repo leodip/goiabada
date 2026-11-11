@@ -216,6 +216,7 @@ func assertRefusal(t *testing.T, info Info, err error, code string, args map[str
 func TestValidate_HoldsAnUploadToItsKindsRules(t *testing.T) {
 	rules := Rules{
 		contentTypes: map[string]bool{"image/png": true},
+		typeRefusal:  i18n.ErrCodeImageUnsupportedType,
 		minSide:      48,
 		maxSide:      64,
 		maxBytes:     4000,

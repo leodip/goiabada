@@ -3,6 +3,7 @@ package apimapping
 import (
 	"maps"
 
+	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
@@ -45,4 +46,17 @@ func ToBrandThemeResponses(presets []brandthemes.Preset) []api.BrandThemeRespons
 		})
 	}
 	return responses
+}
+
+// ToBrandAssetResponse answers an asset without its bytes, its URL the path it is served at made
+// absolute on baseURL.
+func ToBrandAssetResponse(asset *record.BrandAsset, baseURL string) api.BrandAssetResponse {
+	return api.BrandAssetResponse{
+		Id:          asset.Id,
+		Kind:        string(asset.Kind),
+		Url:         baseURL + brandasset.Path(asset),
+		ContentType: asset.ContentType,
+		Width:       asset.Width,
+		Height:      asset.Height,
+	}
 }

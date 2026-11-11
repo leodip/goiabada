@@ -2529,6 +2529,223 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/brand-assets/logo:
+    post:
+      tags: [Brands]
+      summary: Upload brand logo
+      description: |
+        Store a file as a brand asset of this kind, attached to no brand, and answer its id and
+        URL. A brand's create or update then names the asset by its id. An asset no brand names is
+        deleted once it is a day old.
+
+        Send it as `multipart/form-data` in the field `file`. A logo or a dark logo: a still PNG, JPEG or WebP image, each side from 10 to 512 pixels, of
+        at most 1 MiB (1048576 bytes). An animated image is refused.
+      operationId: uploadBrandLogo
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Asset stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBrandAssetResponse'
+        '400':
+          description: |
+            The file is missing (NO_FILE), the body is too large or not a multipart form
+            (FILE_TOO_LARGE), or the file breaks a rule of its kind, named by its error_code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-assets/favicon:
+    post:
+      tags: [Brands]
+      summary: Upload brand favicon
+      description: |
+        Store a file as a brand asset of this kind, attached to no brand, and answer its id and
+        URL. A brand's create or update then names the asset by its id. An asset no brand names is
+        deleted once it is a day old.
+
+        Send it as `multipart/form-data` in the field `file`. A favicon: a still, square PNG image from 48x48 to 512x512 pixels, of at most 1 MiB
+        (1048576 bytes). An animated image is refused.
+      operationId: uploadBrandFavicon
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Asset stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBrandAssetResponse'
+        '400':
+          description: |
+            The file is missing (NO_FILE), the body is too large or not a multipart form
+            (FILE_TOO_LARGE), or the file breaks a rule of its kind, named by its error_code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-assets/background:
+    post:
+      tags: [Brands]
+      summary: Upload brand background
+      description: |
+        Store a file as a brand asset of this kind, attached to no brand, and answer its id and
+        URL. A brand's create or update then names the asset by its id. An asset no brand names is
+        deleted once it is a day old.
+
+        Send it as `multipart/form-data` in the field `file`. A background image: a still PNG, JPEG or WebP image, each side from 10 to 3840 pixels, of at
+        most 2 MiB (2097152 bytes). An animated image is refused.
+      operationId: uploadBrandBackground
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Asset stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBrandAssetResponse'
+        '400':
+          description: |
+            The file is missing (NO_FILE), the body is too large or not a multipart form
+            (FILE_TOO_LARGE), or the file breaks a rule of its kind, named by its error_code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-assets/font:
+    post:
+      tags: [Brands]
+      summary: Upload brand font
+      description: |
+        Store a file as a brand asset of this kind, attached to no brand, and answer its id and
+        URL. A brand's create or update then names the asset by its id. An asset no brand names is
+        deleted once it is a day old.
+
+        Send it as `multipart/form-data` in the field `file`. A regular or bold font: a WOFF2 file of at most 2 MiB (2097152 bytes). An animated image is refused.
+      operationId: uploadBrandFont
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Asset stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateBrandAssetResponse'
+        '400':
+          description: |
+            The file is missing (NO_FILE), the body is too large or not a multipart form
+            (FILE_TOO_LARGE), or the file breaks a rule of its kind, named by its error_code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/brand-assets/{id}:
+    get:
+      tags: [Brands]
+      summary: Get brand asset
+      description: |
+        A stored brand asset by its id, attached to a brand or not, without its bytes: its kind,
+        the URL it is served at, its type and its pixel size, zero for a font.
+      operationId: getBrandAsset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Brand asset ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Brand asset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetBrandAssetResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   # =============================================================================
   # ADMIN API - CLIENTS
   # =============================================================================
@@ -8777,6 +8994,53 @@ components:
             $ref: '#/components/schemas/BrandThemeResponse'
       required:
         - brandThemes
+
+    BrandAssetResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        kind:
+          type: string
+          enum: [logo, favicon, background, font]
+        url:
+          type: string
+          description: |
+            Where the asset is served, to anyone, its content fingerprint in `v`. Served by that
+            fingerprint, it may be cached for a year.
+        contentType:
+          type: string
+          enum: [image/png, image/jpeg, image/webp, font/woff2]
+        width:
+          type: integer
+          description: Width in pixels, 0 for a font.
+        height:
+          type: integer
+          description: Height in pixels, 0 for a font.
+      required:
+        - id
+        - kind
+        - url
+        - contentType
+        - width
+        - height
+
+    CreateBrandAssetResponse:
+      type: object
+      properties:
+        brandAsset:
+          $ref: '#/components/schemas/BrandAssetResponse'
+      required:
+        - brandAsset
+
+    GetBrandAssetResponse:
+      type: object
+      properties:
+        brandAsset:
+          $ref: '#/components/schemas/BrandAssetResponse'
+      required:
+        - brandAsset
 
     SettingsTokensResponse:
       type: object

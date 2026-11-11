@@ -1989,6 +1989,7 @@
 "handler.administrators.last_administrator" = "Cette modification ne laisserait aucun utilisateur activé disposant de authserver:manage. Accordez d’abord cette permission à un autre utilisateur."
 "handler.image_upload.too_large" = "Fichier trop volumineux ou données de formulaire invalides."
 "handler.image_upload.no_file" = "Aucun fichier photo fourni."
+"handler.brand_asset.no_file" = "Aucun fichier fourni."
 
 "handler.resource.identifier_required" = "L’identifiant de la ressource est obligatoire."
 "handler.resource.description_too_long" = "La description ne peut pas dépasser {{.max}} caractères."
@@ -2250,6 +2251,14 @@
 "validator.image.undecodable" = "Impossible de lire l’image. Le fichier est peut-être endommagé."
 "validator.image.dimensions_too_small" = "L’image doit mesurer au moins {{.min}}x{{.min}} pixels."
 "validator.image.dimensions_too_large" = "L’image ne peut pas dépasser {{.max}}x{{.max}} pixels."
+"validator.image.unsupported_type_png_jpeg_webp" = "Ce type d’image n’est pas pris en charge. Les types autorisés sont PNG, JPEG et WebP."
+"validator.image.unsupported_type_png" = "Ce type d’image n’est pas pris en charge. Seul le type PNG est autorisé."
+"validator.image.not_square" = "L’image doit être carrée. Celle-ci mesure {{.width}}x{{.height}} pixels."
+"validator.image.animated" = "Les images animées ne sont pas autorisées. Envoyez une image fixe."
+
+"validator.font.too_large" = "La police ne peut pas dépasser {{.max}} octets."
+"validator.font.empty" = "Le fichier de police est vide."
+"validator.font.unsupported_type" = "Ce type de police n’est pas pris en charge. Seul le type WOFF2 est autorisé."
 
 # --- Authorize endpoint, client and redirect_uri (LocalizedError-backed) -----
 #

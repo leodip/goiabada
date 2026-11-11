@@ -86,3 +86,26 @@ type BrandThemeResponse struct {
 type GetBrandThemesResponse struct {
 	BrandThemes []BrandThemeResponse `json:"brandThemes"`
 }
+
+// BrandAssetResponse is a stored brand asset as the admin API answers it (#813 decision 10): its id,
+// its kind (logo, favicon, background or font), the URL it is served at, which carries its content
+// fingerprint, the type it was validated as, and its pixel size, zero for a font. A brand names an
+// asset by its id.
+type BrandAssetResponse struct {
+	Id          int64  `json:"id"`
+	Kind        string `json:"kind"`
+	Url         string `json:"url"`
+	ContentType string `json:"contentType"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+}
+
+// CreateBrandAssetResponse is the asset an upload stored.
+type CreateBrandAssetResponse struct {
+	BrandAsset BrandAssetResponse `json:"brandAsset"`
+}
+
+// GetBrandAssetResponse is one stored asset, read by its id.
+type GetBrandAssetResponse struct {
+	BrandAsset BrandAssetResponse `json:"brandAsset"`
+}

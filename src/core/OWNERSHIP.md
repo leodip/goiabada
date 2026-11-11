@@ -110,6 +110,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `AccountRecoveryCodesResponse` | both-apps | — |
 | `core/api` | `AddGroupMemberRequest` | both-apps | — |
 | `core/api` | `AuditLogResponse` | both-apps | — |
+| `core/api` | `BrandAssetResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `BrandResponse` | both-apps | — |
 | `core/api` | `BrandThemeResponse` | both-apps | — |
 | `core/api` | `ClientLogoInfoResponse` | both-apps | — |
@@ -117,6 +118,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `ClientResponse` | both-apps | — |
 | `core/api` | `CreateAccountRecoveryCodesRequest` | both-apps | — |
 | `core/api` | `CreateAccountRecoveryCodesResponse` | both-apps | — |
+| `core/api` | `CreateBrandAssetResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `CreateBrandRequest` | both-apps | — |
 | `core/api` | `CreateBrandResponse` | both-apps | — |
 | `core/api` | `CreateClientRequest` | both-apps | — |
@@ -137,6 +139,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GenerateUserEmailVerificationCodeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetAuditEventTypesResponse` | both-apps | — |
 | `core/api` | `GetAuditLogsResponse` | both-apps | — |
+| `core/api` | `GetBrandAssetResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetBrandResponse` | both-apps | — |
 | `core/api` | `GetBrandThemesResponse` | both-apps | — |
 | `core/api` | `GetBrandsResponse` | both-apps | — |
@@ -427,6 +430,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeAuthorizeRedirectURINotAbsolute` | contract | Catalog key of the refusal page `/auth/authorize` renders for a `redirect_uri` that is not an absolute URI (#122). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAuthorizeRedirectURINotRegistered` | contract | Catalog key of the refusal page `/auth/authorize` renders for a `redirect_uri` that is not one of the client's redirect URIs (#213). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandAppearanceInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeBrandAssetUploadNoFile` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandBackgroundFitInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandCornersInvalid` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandDefaultDeleteNotAllowed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
@@ -511,6 +515,9 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeEmailTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodeEmailVerificationAccountChanged` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeEmailVerificationCodeInvalid` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeFontEmpty` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeFontTooLarge` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeFontUnsupportedType` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeGroupAttributeGroupIdRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeGroupDescriptionTooLong` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeGroupIdentifierInUse` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
@@ -524,12 +531,16 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeIdentifierInvalidFormat` | kernel | — |
 | `core/i18n` | `ErrCodeIdentifierTooLong` | kernel | — |
 | `core/i18n` | `ErrCodeIdentifierTooShort` | kernel | — |
+| `core/i18n` | `ErrCodeImageAnimated` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeImageDimensionsTooLarge` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeImageDimensionsTooSmall` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeImageEmpty` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeImageNotSquare` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeImageTooLarge` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeImageUndecodable` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeImageUnsupportedType` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeImageUnsupportedTypePng` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeImageUnsupportedTypePngJpegWebp` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeImageUploadNoFile` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeImageUploadTooLarge` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeLastAdministrator` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |

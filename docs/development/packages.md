@@ -280,6 +280,12 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `ColorsStylesheetRoute` and linked by `ColorsStylesheetPath`. The brand validation, the admin API's
   `GET /brand-themes`, the stylesheet handlers and the pages read it; the console reaches it only
   through the API and `/api/public/settings`
+- `internal/brandasset/` - A brand's kit as stored files (#813): the rules an upload of each kind
+  is held to (a logo, favicon or background by `imageupload`'s rules for it, which refuse an
+  animated image; a font by its WOFF2 signature), the fingerprint of an asset's bytes, and `Route`
+  and `Path`, where an asset is served to anyone. The admin API's uploads, the public asset handler
+  and the request-body table's rows read it. The cleanup worker sweeps an asset no brand uses once
+  it is a day old
 - `internal/clientauth/` - Client authentication from plain values, the client identifier and the
   secret presented: the lookup, the secret check and their refusals' wording and shape, shared by
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a

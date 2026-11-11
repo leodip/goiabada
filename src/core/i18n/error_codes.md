@@ -161,6 +161,7 @@ key per cause, each a whole sentence.
 | `handler.administrators.last_administrator` | (none) | This change would leave no enabled user holding authserver:manage. Grant it to another user first. |
 | `handler.image_upload.too_large` | (none) | File too large or invalid form data |
 | `handler.image_upload.no_file` | (none) | No picture file provided |
+| `handler.brand_asset.no_file` | (none) | No file provided |
 | `handler.user.email_too_long` | `max` (int) | The email address cannot exceed a maximum length of {{.max}} characters |
 | `handler.user.otp_not_enabled` | (none) | User does not have OTP enabled |
 | `handler.email_verification.account_changed` | (none) | The account was changed by another request while the code was being sent. Nothing was sent: try again. |
@@ -434,6 +435,13 @@ cause, each a whole sentence.
 | `validator.image.undecodable` | (none) | The image could not be read. The file may be damaged. |
 | `validator.image.dimensions_too_small` | `min` (int) | The image must be at least {{.min}}x{{.min}} pixels. |
 | `validator.image.dimensions_too_large` | `max` (int) | The image can be at most {{.max}}x{{.max}} pixels. |
+| `validator.image.unsupported_type_png_jpeg_webp` | (none) | The image type is not supported. Allowed types are PNG, JPEG and WebP. |
+| `validator.image.unsupported_type_png` | (none) | The image type is not supported. The only allowed type is PNG. |
+| `validator.image.not_square` | `width` (int), `height` (int) | The image must be square. This one is {{.width}}x{{.height}} pixels. |
+| `validator.image.animated` | (none) | Animated images are not allowed. Upload a still image. |
+| `validator.font.too_large` | `max` (int) | The font can be at most {{.max}} bytes. |
+| `validator.font.empty` | (none) | The font file is empty. |
+| `validator.font.unsupported_type` | (none) | The font type is not supported. The only allowed type is WOFF2. |
 
 ## Authorize validator
 

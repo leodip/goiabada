@@ -74,6 +74,12 @@ func TestBodyLimitPolicy_EachRowAtItsBoundary(t *testing.T) {
 		{"the admin user picture upload", http.MethodPost, "/api/v1/admin/users/{id}/profile-picture", "/api/v1/admin/users/1/profile-picture", uploadLimit},
 		{"the client logo upload", http.MethodPost, "/api/v1/admin/clients/{id}/logo", "/api/v1/admin/clients/1/logo", uploadLimit},
 		{"the account picture upload", http.MethodPost, "/api/v1/account/profile-picture", "/api/v1/account/profile-picture", uploadLimit},
+		// A brand asset's row is its kind's fixed byte limit plus the multipart allowance, whatever
+		// the configured picture size (#813 decision 3).
+		{"the brand logo upload", http.MethodPost, "/api/v1/admin/brand-assets/logo", "/api/v1/admin/brand-assets/logo", 1<<20 + 64*1024},
+		{"the brand favicon upload", http.MethodPost, "/api/v1/admin/brand-assets/favicon", "/api/v1/admin/brand-assets/favicon", 1<<20 + 64*1024},
+		{"the brand background upload", http.MethodPost, "/api/v1/admin/brand-assets/background", "/api/v1/admin/brand-assets/background", 2<<20 + 64*1024},
+		{"the brand font upload", http.MethodPost, "/api/v1/admin/brand-assets/font", "/api/v1/admin/brand-assets/font", 2<<20 + 64*1024},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -112,6 +118,16 @@ func TestBodyLimitPolicy_EachRowHoldsItsHandlersBound(t *testing.T) {
 	}
 
 	policy := bodyLimitPolicy(testProfilePictureMaxSizeBytes)
+
+	// The brand asset handlers bound theirs at their kind's fixed limit plus 1 KiB.
+	for route, limit := range map[string]int64{
+		"POST /api/v1/admin/brand-assets/logo":       1 << 20,
+		"POST /api/v1/admin/brand-assets/favicon":    1 << 20,
+		"POST /api/v1/admin/brand-assets/background": 2 << 20,
+		"POST /api/v1/admin/brand-assets/font":       2 << 20,
+	} {
+		assert.Greater(t, policy.Routes[route], limit+1024, route)
+	}
 
 	// The session handlers bound theirs at the store's wire ceiling, on purpose, and the row is
 	// that same constant rather than a wider one, so it is equal rather than greater.

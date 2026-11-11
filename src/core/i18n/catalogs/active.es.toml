@@ -1991,6 +1991,7 @@
 "handler.administrators.last_administrator" = "Este cambio dejaría el sistema sin ningún usuario activado con authserver:manage. Concede ese permiso a otro usuario primero."
 "handler.image_upload.too_large" = "El archivo es demasiado grande o los datos del formulario no son válidos"
 "handler.image_upload.no_file" = "No se ha proporcionado un archivo de imagen"
+"handler.brand_asset.no_file" = "No se ha proporcionado ningún archivo"
 
 "handler.resource.identifier_required" = "El identificador del recurso es obligatorio"
 "handler.resource.description_too_long" = "La descripción no puede superar los {{.max}} caracteres"
@@ -2252,6 +2253,14 @@
 "validator.image.undecodable" = "No se pudo leer la imagen. Puede que el archivo esté dañado."
 "validator.image.dimensions_too_small" = "La imagen debe tener al menos {{.min}} × {{.min}} píxeles."
 "validator.image.dimensions_too_large" = "La imagen no puede superar los {{.max}} × {{.max}} píxeles."
+"validator.image.unsupported_type_png_jpeg_webp" = "El tipo de imagen no es compatible. Se admiten PNG, JPEG y WebP."
+"validator.image.unsupported_type_png" = "El tipo de imagen no es compatible. Solo se admite PNG."
+"validator.image.not_square" = "La imagen debe ser cuadrada. Esta mide {{.width}} × {{.height}} píxeles."
+"validator.image.animated" = "No se admiten imágenes animadas. Sube una imagen fija."
+
+"validator.font.too_large" = "La fuente no puede superar los {{.max}} bytes."
+"validator.font.empty" = "El archivo de fuente está vacío."
+"validator.font.unsupported_type" = "El tipo de fuente no es compatible. Solo se admite WOFF2."
 
 # --- Authorize endpoint, client and redirect_uri (LocalizedError-backed) -----
 #
