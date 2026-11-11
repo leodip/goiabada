@@ -8,21 +8,10 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// indexSessionStore is what HandleIndexGet needs of the session store: the session, whose flash
-// may hold the session-ended notice, and the sealed cookie that holds it when the session's row
-// was gone (see HandleSessionEndedGet).
-type indexSessionStore interface {
-	Get(r *http.Request, name string) (*sessionstore.Session, error)
-	Save(r *http.Request, w http.ResponseWriter, s *sessionstore.Session) error
-	CookieName(logicalName string) string
-	OpenCookieValues(name, value string) (map[string]string, error)
-	DeletionCookie(name string) *http.Cookie
-}
-
 func HandleIndexGet(
 	authHelper AuthHelper,
 	httpHelper HttpHelper,
-	httpSession indexSessionStore,
+	httpSession sessionstore.Store,
 	authServerBaseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -43,16 +32,6 @@ func HandleIndexGet(
 				return
 			}
 		}
-		// The notice's own cookie is taken on sight, opened or not, so it shows once; one that
-		// does not open, from a key rotated away or a cookie not this console's, says nothing.
-		noticeName := httpSession.CookieName(sessionEndedNoticeCookie)
-		if notice, cookieErr := r.Cookie(noticeName); cookieErr == nil {
-			http.SetCookie(w, httpSession.DeletionCookie(noticeName))
-			if values, openErr := httpSession.OpenCookieValues(sessionEndedNoticeCookie, notice.Value); openErr == nil && values[flashSessionEnded] == "true" {
-				sessionEnded = true
-			}
-		}
-		bind["SessionEnded"] = sessionEnded
 
 		bind["AuthServerBaseUrl"] = authServerBaseURL
 
@@ -73,6 +52,14 @@ func HandleIndexGet(
 		bind["IsAuthenticated"] = isAuthenticated
 		bind["LoggedInUser"] = loggedInUser
 		bind["LogoutLink"] = logoutLink
+
+		// The notice HandleSessionEndedGet sends in the query when the session's row was gone.
+		// Anyone can link to it, so a signed-in visitor, whom it would tell their sign-in had
+		// ended, is not shown it.
+		if !isAuthenticated && r.URL.Query().Has(sessionEndedQuery) {
+			sessionEnded = true
+		}
+		bind["SessionEnded"] = sessionEnded
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/index.html", bind)
 		if err != nil {

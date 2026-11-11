@@ -55,10 +55,10 @@ func TestInitRoutes_AScriptsRequestAfterTheSignInEndedIsToldSo(t *testing.T) {
 
 // The same, after the session's row has gone, as when it expired while the page stayed open: the
 // browser still brings its cookie, which opens, but no row stands behind it. The script is told its
-// sign-in ended, the session-ended route carries the notice home in a sealed cookie of its own,
-// since a row it saved would be one an anonymous client could mint (#620), and the home page says
-// why. The row is gone here because the console serving the requests has the same keys as the one
-// that signed the browser in, and a store of its own.
+// sign-in ended, the session-ended route carries the notice home in the query, since a row it saved
+// would be one an anonymous client could mint (#620), and the home page says why. The row is gone
+// here because the console serving the requests has the same keys as the one that signed the
+// browser in, and a store of its own.
 func TestInitRoutes_AScriptsRequestAfterTheSessionsRowWentIsToldSoAndTheHomePageSaysWhy(t *testing.T) {
 	refuse := func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("a request with no session reached the admin API: %s", r.URL.Path)
@@ -75,15 +75,10 @@ func TestInitRoutes_AScriptsRequestAfterTheSessionsRowWentIsToldSoAndTheHomePage
 
 	ended := serveWithCookies(s, http.MethodGet, "/auth/session-ended", cookies, sameOrigin)
 	require.Equal(t, http.StatusFound, ended.Code)
-	assert.Equal(t, "/", ended.Header().Get("Location"))
-	notices := ended.Result().Cookies()
-	require.Len(t, notices, 1, "the notice's cookie alone, and no session cookie for a new row")
+	assert.Equal(t, "/?session-ended", ended.Header().Get("Location"))
+	assert.Empty(t, ended.Result().Cookies(), "nothing is written: no row, no cookie")
 
-	home := serveWithCookies(s, http.MethodGet, "/", append(append([]*http.Cookie{}, cookies...), notices[0]), sameOrigin)
+	home := serveWithCookies(s, http.MethodGet, "/?session-ended", cookies, sameOrigin)
 	assert.Equal(t, http.StatusOK, home.Code)
 	assert.Contains(t, home.Body.String(), "Your sign-in has ended. Sign in again.")
-	gone := home.Result().Cookies()
-	require.Len(t, gone, 1)
-	assert.Equal(t, notices[0].Name, gone[0].Name)
-	assert.Negative(t, gone[0].MaxAge, "the notice shows once")
 }
