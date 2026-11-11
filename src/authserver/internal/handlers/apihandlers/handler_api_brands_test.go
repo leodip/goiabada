@@ -235,7 +235,9 @@ func TestBrandCreate_StoresTheTrimmedNameAndAudits(t *testing.T) {
 		brandRequest(t, http.MethodPost, map[string]any{"name": "  Acme Corp  ", "appearance": "light", "theme": "high-contrast"}))
 
 	require.Equal(t, http.StatusCreated, status)
-	assert.Equal(t, record.Brand{Name: "Acme Corp", Appearance: record.BrandAppearanceLight, Theme: "high-contrast"}, stored)
+	// Drawn as a brand was before the kit, whose choices this request cannot name (#813).
+	assert.Equal(t, record.Brand{Name: "Acme Corp", Appearance: record.BrandAppearanceLight, Theme: "high-contrast",
+		Corners: "rounded", Font: "system-ui", BackgroundFit: "cover"}, stored)
 	assert.Equal(t, map[string]any{
 		"id": float64(7), "name": "Acme Corp", "appearance": "light", "theme": "high-contrast", "isDefault": false, "clientCount": float64(0),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
@@ -426,6 +428,44 @@ func TestBrandUpdate_ReplacesTheThreeFieldsAndAudits(t *testing.T) {
 	assert.Equal(t, "guava", brandAt(body, "brand", "theme"))
 	assert.Equal(t, true, brandAt(body, "brand", "isDefault"))
 	assert.InDelta(t, 6, brandAt(body, "brand", "clientCount"), 0)
+}
+
+// An update names no kit, so the brand's stored choices and slots are written back as they were
+// (#813).
+func TestBrandUpdate_KeepsTheStoredKit(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	stored := storedBrand(4, "Acme", record.BrandAppearanceDark, "plum")
+	stored.Corners, stored.Font, stored.BackgroundFit, stored.HideAppName = "pill", "uploaded", "tile", true
+	stored.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
+	stored.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
+	stored.FaviconAssetId = sql.NullInt64{Int64: 13, Valid: true}
+	stored.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+	stored.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
+	stored.BoldFontAssetId = sql.NullInt64{Int64: 16, Valid: true}
+	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(stored, nil).Once()
+	var written record.Brand
+	database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
+		written = *args.Get(2).(*record.Brand)
+	}).Return(nil).Once()
+	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
+		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
+	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Once()
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedBrand, mock.Anything).Once()
+
+	status, _ := serveBrand(HandleBrandUpdatePut(database, auditLogger),
+		brandRequest(t, http.MethodPut, map[string]any{"name": "Acme", "appearance": "light", "theme": "guava"}, "id", "4"))
+
+	require.Equal(t, http.StatusOK, status)
+	assert.Equal(t, record.BrandCorners("pill"), written.Corners)
+	assert.Equal(t, record.BrandFont("uploaded"), written.Font)
+	assert.Equal(t, record.BrandBackgroundFit("tile"), written.BackgroundFit)
+	assert.True(t, written.HideAppName)
+	assert.Equal(t, []sql.NullInt64{
+		{Int64: 11, Valid: true}, {Int64: 12, Valid: true}, {Int64: 13, Valid: true},
+		{Int64: 14, Valid: true}, {Int64: 15, Valid: true}, {Int64: 16, Valid: true},
+	}, []sql.NullInt64{written.LogoAssetId, written.DarkLogoAssetId, written.FaviconAssetId,
+		written.BackgroundAssetId, written.RegularFontAssetId, written.BoldFontAssetId})
 }
 
 // --- delete -------------------------------------------------------------------------------------

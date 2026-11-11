@@ -43,7 +43,7 @@ type brandsDatabase interface {
 }
 
 // validateBrand holds a create's or an update's three fields to decision 5 and answers them as
-// stored: the name trimmed, required, at most record.BrandNameMaxLength characters and without
+// stored, on a brand drawn as one was before the kit (record.NewBrand): the name trimmed, required, at most record.BrandNameMaxLength characters and without
 // angle brackets; the appearance one of the three, exactly; the theme one of the built-in keys,
 // exactly. A missing appearance or theme is refused as an unknown one.
 func validateBrand(name, appearance, theme string) (record.Brand, error) {
@@ -64,7 +64,7 @@ func validateBrand(name, appearance, theme string) (record.Brand, error) {
 	if _, ok := brandthemes.StylesheetOf(theme); !ok {
 		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandThemeInvalid, nil)
 	}
-	return record.Brand{Name: name, Appearance: record.BrandAppearance(appearance), Theme: theme}, nil
+	return record.NewBrand(name, record.BrandAppearance(appearance), theme), nil
 }
 
 // brandNameTaken answers a brand write the engine refused on the name's unique key: the name was

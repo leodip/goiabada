@@ -520,11 +520,14 @@ type Database interface {
 	// schedule on the wall clock instead of one process's uptime.
 	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 
-	// Brands (#810). A brand is a name, an appearance and a theme; one is the default, the brand the
-	// settings row's DefaultBrandId points at. CreateBrand and UpdateBrand refuse a name another
-	// brand holds with ErrUniqueViolation.
+	// Brands (#810). A brand is a name, an appearance, a theme and a kit (#813); one is the default,
+	// the brand the settings row's DefaultBrandId points at. CreateBrand and UpdateBrand refuse a
+	// name another brand holds with ErrUniqueViolation, and the engine refuses a slot naming no
+	// brand asset with its foreign key.
 	CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
-	// UpdateBrand writes a brand's name, appearance and theme.
+	// UpdateBrand writes the whole brand but its created_at: its name, appearance and theme, the
+	// four choices of its kit and its six slots. An asset a slot named before and names no longer
+	// is left as it is, unattached unless another slot names it.
 	UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
 	GetBrandById(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
 	// GetAllBrands answers every brand, in id order.
@@ -548,6 +551,18 @@ type Database interface {
 	// to every client while there is a default. A brand no client is drawn in is absent (#812
 	// decision 3).
 	CountClientsPerBrand(ctx context.Context, tx *sql.Tx) (map[int64]int, error)
+
+	// Brand assets (#813 decision 2): the files of the brands' kits, each stored once and never
+	// changed. CreateBrandAsset stamps created_at and answers the new id on the record.
+	CreateBrandAsset(ctx context.Context, tx *sql.Tx, asset *record.BrandAsset) error
+	// GetBrandAssetById answers the asset with its bytes, or nil when there is no such asset.
+	GetBrandAssetById(ctx context.Context, tx *sql.Tx, assetId int64) (*record.BrandAsset, error)
+	// GetBrandAssetsByIds answers the assets of the ids that name one, without their bytes
+	// (Content is nil), in no particular order; an id naming none is left out.
+	GetBrandAssetsByIds(ctx context.Context, tx *sql.Tx, assetIds []int64) ([]record.BrandAsset, error)
+	// DeleteUnattachedBrandAssets deletes every asset no brand's slot names that was created before
+	// createdBefore, and answers how many. It is the only thing that deletes an asset.
+	DeleteUnattachedBrandAssets(ctx context.Context, tx *sql.Tx, createdBefore time.Time) (int, error)
 
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error

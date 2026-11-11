@@ -343,13 +343,9 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 
 	// The default brand, which the settings row points at: automatic, on the built-in Blueberry
 	// theme, as migration 000089 gives an upgraded installation one on the theme it had (#810
-	// decision 1).
-	brand := &record.Brand{
-		Name:       record.SeededBrandName,
-		Appearance: record.BrandAppearanceAuto,
-		Theme:      record.BrandThemeBlueberry,
-	}
-	if err := r.db.CreateBrand(ctx, tx, brand); err != nil {
+	// decision 1), with the kit migration 000091 gives every existing brand (#813).
+	brand := record.NewBrand(record.SeededBrandName, record.BrandAppearanceAuto, record.BrandThemeBlueberry)
+	if err := r.db.CreateBrand(ctx, tx, &brand); err != nil {
 		return err
 	}
 

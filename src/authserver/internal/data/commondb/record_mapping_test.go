@@ -47,6 +47,10 @@ type mappingCase struct {
 	record reflect.Type
 	// reads each run one read answering whole records and return the first, as a pointer.
 	reads map[string]func(ctx context.Context, d *Database) (any, error)
+	// readsWithout are reads that leave the named columns out on purpose, such as an asset read
+	// without its bytes: each must select every other tagged column, must not select those, and
+	// must leave their fields at the zero value.
+	readsWithout map[string]partialRead
 	// insert and update run the record's whole-row writes on a pointer to the record. update is
 	// nil for a record that has no whole-row UPDATE, which is then not checked.
 	insert func(ctx context.Context, d *Database, rec any) error
@@ -56,6 +60,12 @@ type mappingCase struct {
 	// and this one does not, such as settings.ui_theme (#810 decision 2). A read or an update
 	// naming one is refused as for any column no field is tagged with.
 	insertLiterals map[string]string
+}
+
+// partialRead is a read that leaves the columns omits names out of what it selects.
+type partialRead struct {
+	read  func(ctx context.Context, d *Database) (any, error)
+	omits []string
 }
 
 var allDialects = []data.Dialect{data.SQLite, data.MySQL, data.Postgres, data.MSSQL}
@@ -961,6 +971,34 @@ func brandMapping() mappingCase {
 	}
 }
 
+// brandAssetMapping has no update: an asset never changes after the upload. Its list read leaves
+// the bytes out (#813 decision 2).
+func brandAssetMapping() mappingCase {
+	return mappingCase{
+		name:   "brand asset",
+		table:  "brand_assets",
+		record: reflect.TypeOf(record.BrandAsset{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetBrandAssetById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetBrandAssetById(ctx, nil, 1)
+			},
+		},
+		readsWithout: map[string]partialRead{
+			"GetBrandAssetsByIds": {
+				read: func(ctx context.Context, d *Database) (any, error) {
+					return firstOf(d.GetBrandAssetsByIds(ctx, nil, []int64{1, 2}))
+				},
+				omits: []string{"content"},
+			},
+		},
+		// CreateBrandAsset stamps created_at from the clock whatever the record held; the value
+		// written is checked against the record as it returned, which carries the stamp.
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateBrandAsset(ctx, nil, rec.(*record.BrandAsset))
+		},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
@@ -975,7 +1013,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),
 		userSessionMapping(), userSessionClientMapping(), browserSessionMapping(), userConsentMapping(),
 		settingsMapping(), keyPairMapping(), auditLogMapping(), preRegistrationMapping(),
-		brandMapping(),
+		brandMapping(), brandAssetMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
@@ -1321,7 +1359,14 @@ func checkMapping(t *testing.T, dialect data.Dialect, c mappingCase) []string {
 	for pass := 0; pass < passesFor(c.record); pass++ {
 		var found []string
 		for name, read := range c.reads {
-			found = append(found, checkRead(t, dialect, c, fields, byColumn, name, read, pass)...)
+			found = append(found, checkRead(t, dialect, c, fields, byColumn, name, read, nil, pass)...)
+		}
+		for name, partial := range c.readsWithout {
+			omitted := map[string]bool{}
+			for _, column := range partial.omits {
+				omitted[column] = true
+			}
+			found = append(found, checkRead(t, dialect, c, fields, byColumn, name, partial.read, omitted, pass)...)
 		}
 		found = append(found, checkInsert(t, dialect, c, fields, byColumn, pass)...)
 		if c.update != nil {
@@ -1339,7 +1384,8 @@ func checkMapping(t *testing.T, dialect data.Dialect, c mappingCase) []string {
 }
 
 func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []taggedField,
-	byColumn map[string]taggedField, name string, read func(context.Context, *Database) (any, error), pass int) []string {
+	byColumn map[string]taggedField, name string, read func(context.Context, *Database) (any, error),
+	omitted map[string]bool, pass int) []string {
 	t.Helper()
 	where := fmt.Sprintf("%s %s", dialect, name)
 	var problems []string
@@ -1370,6 +1416,9 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 			if selected[id.name] {
 				problems = append(problems, fmt.Sprintf("%s: selects %s twice", where, id.name))
 			}
+			if omitted[id.name] {
+				problems = append(problems, fmt.Sprintf("%s: selects %s, which it leaves out", where, id.name))
+			}
 			selected[id.name] = true
 			problems = append(problems, quoteProblems(dialect, id, field, where)...)
 			dv, _, err := distinctValue(c.record, field.index, field.column, pass)
@@ -1380,7 +1429,7 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 			row.values[0] = append(row.values[0], dv)
 		}
 		for _, f := range fields {
-			if !selected[f.column] {
+			if !selected[f.column] && !omitted[f.column] {
 				problems = append(problems, fmt.Sprintf("%s: does not select %s", where, f.column))
 			}
 		}
@@ -1396,6 +1445,13 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 	}
 	rv := reflect.ValueOf(got).Elem()
 	for _, f := range fields {
+		if omitted[f.column] {
+			if have := rv.Field(f.index); !have.IsZero() {
+				problems = append(problems, fmt.Sprintf("%s: field %s holds %v, want the zero value of a column it leaves out",
+					where, c.record.Field(f.index).Name, have.Interface()))
+			}
+			continue
+		}
 		_, want, err := distinctValue(c.record, f.index, f.column, pass)
 		if err != nil {
 			continue

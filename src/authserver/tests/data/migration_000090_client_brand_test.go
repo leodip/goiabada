@@ -3,13 +3,14 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,24 +59,29 @@ func TestMigration000090_ClientBrand(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, predating)
 	assert.Equalf(t, sql.NullInt64{}, predating.BrandId, "2. a client that predates 000090 has no brand of its own on %s", dbType())
+	// The data layer's brand reads name the columns of later migrations, so this one is read at head.
+	if upErr := h.Migrator.Up(ctx); upErr != nil && !errors.Is(upErr, migrator.ErrNoChange) {
+		require.NoErrorf(t, upErr, "migrate to head on %s", dbType())
+	}
 	drawnIn, err := h.DB.GetClientPageBrand(ctx, nil, existing)
 	require.NoError(t, err)
 	require.NotNilf(t, drawnIn, "2. a client that predates 000090 is drawn in the default on %s", dbType())
 	assert.Equal(t, def.Id, drawnIn.Id)
+	require.NoErrorf(t, h.Migrator.Migrate(ctx, clientBrand000090), "roll back to 000090 on %s", dbType())
 
-	// 3.
-	other := &record.Brand{Name: "Other", Appearance: "dark", Theme: "plum"}
-	require.NoError(t, h.DB.CreateBrand(ctx, nil, other))
-	setBrand(t, h, predating.Id, sql.NullInt64{Int64: other.Id, Valid: true})
+	// 3. The brand and the assignment in SQL, for the same reason.
+	otherId := insertBrand000091(t, h, "Other", "dark", "plum")
+	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET brand_id = %d WHERE id = %d", otherId, predating.Id))
+	require.NoErrorf(t, err, "give the client a brand on %s", dbType())
 	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET description = 'Previous release' WHERE id = %d", predating.Id))
 	require.NoErrorf(t, err, "save the client as the previous release does on %s", dbType())
-	assert.Equalf(t, sql.NullInt64{Int64: other.Id, Valid: true}, clientBrandIdOf(t, h, predating.Id),
+	assert.Equalf(t, sql.NullInt64{Int64: otherId, Valid: true}, clientBrandIdOf(t, h, predating.Id),
 		"3. the previous release's save leaves the client's brand on %s", dbType())
 
 	// 4.
-	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brands WHERE id = %d", other.Id))
+	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brands WHERE id = %d", otherId))
 	require.Errorf(t, err, "4. the foreign key refuses deleting a brand a client names on %s", dbType())
-	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET brand_id = %d WHERE id = %d", other.Id+1_000, predating.Id))
+	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET brand_id = %d WHERE id = %d", otherId+1_000, predating.Id))
 	require.Errorf(t, err, "4. the foreign key refuses a brand_id naming no brand on %s", dbType())
 
 	// 5.
