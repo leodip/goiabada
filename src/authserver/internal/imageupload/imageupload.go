@@ -55,11 +55,13 @@ type Rules struct {
 	maxBytes     int64
 }
 
-// userImage is the rules a profile picture and a client logo share: JPEG, PNG, GIF or WebP, each
-// side from 10 to 512 pixels, at most the configured size, which config holds positive.
+// userImage is the rules a profile picture and a client logo share: a still JPEG, PNG, GIF or
+// WebP, each side from 10 to 512 pixels, at most the configured size, which config holds positive.
+// Still, because a client's logo is drawn beside the sign-in form, where a looping animation has
+// no pause control, and a profile picture is held to the same rule (#840's follow-up).
 func userImage(maxBytes int64) Rules {
 	return Rules{contentTypes: userImageTypes, typeRefusal: i18n.ErrCodeImageUnsupportedType,
-		minSide: 10, maxSide: 512, maxBytes: maxBytes}
+		minSide: 10, maxSide: 512, still: true, maxBytes: maxBytes}
 }
 
 // The byte limits of a brand's image kinds, fixed so the admin API behaves alike on every

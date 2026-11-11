@@ -216,16 +216,3 @@ func TestBrandKinds_APNGIsToldByItsAnimationChunk(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, Info{ContentType: "image/png", Width: 64, Height: 64}, info)
 }
-
-// Profile pictures and client logos keep their own rules (#813 decision 3): an animated image is
-// still stored as one, as it is today.
-func TestBrandKinds_LeaveTheConfiguredKindsAsTheyAre(t *testing.T) {
-	for _, kind := range configuredKinds {
-		t.Run(kind.name, func(t *testing.T) {
-			for _, data := range [][]byte{animatedPNG(100, 100), animatedWebP(100, 100)} {
-				_, err := Validate(data, kind.rules(testMaxSize))
-				assert.NoError(t, err)
-			}
-		})
-	}
-}

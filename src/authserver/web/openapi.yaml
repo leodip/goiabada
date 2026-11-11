@@ -599,9 +599,9 @@ paths:
       description: |
         Upload or replace the user's profile picture.
 
-        Send it as `multipart/form-data` in the field `picture`: a JPEG, PNG, GIF or WebP image,
-        from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` bytes,
-        3 MiB by default.
+        Send it as `multipart/form-data` in the field `picture`: a still JPEG, PNG, GIF or WebP
+        image, from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`
+        bytes, 3 MiB by default. An animated image is refused.
       operationId: uploadUserProfilePicture
       parameters:
         - $ref: '#/components/parameters/UserIdParam'
@@ -3637,9 +3637,9 @@ paths:
       description: |
         Upload or replace the client logo image.
 
-        Send it as `multipart/form-data` in the field `picture`: a JPEG, PNG, GIF or WebP image,
-        from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` bytes,
-        3 MiB by default.
+        Send it as `multipart/form-data` in the field `picture`: a still JPEG, PNG, GIF or WebP
+        image, from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`
+        bytes, 3 MiB by default. An animated image is refused.
         The limit is the one profile pictures have.
       operationId: uploadClientLogo
       parameters:
@@ -5287,9 +5287,9 @@ paths:
       description: |
         Upload or replace the authenticated user's profile picture.
 
-        Send it as `multipart/form-data` in the field `picture`: a JPEG, PNG, GIF or WebP image,
-        from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES` bytes,
-        3 MiB by default.
+        Send it as `multipart/form-data` in the field `picture`: a still JPEG, PNG, GIF or WebP
+        image, from 10x10 to 512x512 pixels, of at most `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`
+        bytes, 3 MiB by default. An animated image is refused.
       operationId: uploadAccountProfilePicture
       requestBody:
         required: true

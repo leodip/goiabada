@@ -73,7 +73,7 @@ func webpOfSize(width, height int) []byte {
 const testMaxSize = int64(3 << 20)
 
 // configuredKinds are the two kinds whose byte limit is the configured size, each held to the same
-// rules: JPEG, PNG, GIF or WebP, each side from 10 to 512 pixels.
+// rules: a still JPEG, PNG, GIF or WebP, each side from 10 to 512 pixels.
 var configuredKinds = []struct {
 	name  string
 	rules func(maxBytes int64) Rules
@@ -117,6 +117,74 @@ func TestValidate_Accepts(t *testing.T) {
 				assert.Equal(t, Info{ContentType: tt.contentType, Width: tt.width, Height: tt.height}, info)
 			})
 		}
+	}
+}
+
+// gifOf is a GIF89a of the frames given, each width by height pixels in a palette of its own, so
+// every frame after the first carries a local color table; a GIF of more than one frame loops for
+// ever, which writes the NETSCAPE2.0 application extension before the first frame, and each frame
+// has a delay, which writes a graphic control extension before it.
+func gifOf(width, height, frames int) []byte {
+	animation := &gif.GIF{LoopCount: 0}
+	for i := range frames {
+		palette := color.Palette{color.RGBA{R: uint8(40 * i), G: 150, B: 200, A: 255}, color.RGBA{R: 255, G: 255, B: 255, A: 255}}
+		animation.Image = append(animation.Image, image.NewPaletted(image.Rect(0, 0, width, height), palette))
+		animation.Delay = append(animation.Delay, 10)
+	}
+	var buf bytes.Buffer
+	_ = gif.EncodeAll(&buf, animation)
+	return buf.Bytes()
+}
+
+// A profile picture and a client logo are held to the still rule a brand's images are: a client's
+// logo is drawn beside the sign-in form, where a looping animation has no pause control, and an
+// animated GIF, PNG or WebP is refused for either, whatever its size. A GIF of one frame, its
+// extensions and all, is stored.
+func TestValidate_RefusesAnAnimatedImageOfEveryType(t *testing.T) {
+	for _, kind := range configuredKinds {
+		for name, data := range map[string][]byte{
+			"an animated GIF":  gifOf(100, 100, 2),
+			"an animated PNG":  animatedPNG(100, 100),
+			"an animated WebP": animatedWebP(100, 100),
+		} {
+			t.Run(kind.name+"/"+name, func(t *testing.T) {
+				info, err := Validate(data, kind.rules(testMaxSize))
+
+				assertRefusal(t, info, err, i18n.ErrCodeImageAnimated, nil, animatedSentence)
+			})
+		}
+		t.Run(kind.name+"/a GIF of one frame with its extensions", func(t *testing.T) {
+			info, err := Validate(gifOf(100, 100, 1), kind.rules(testMaxSize))
+
+			require.NoError(t, err)
+			assert.Equal(t, Info{ContentType: "image/gif", Width: 100, Height: 100}, info)
+		})
+	}
+}
+
+// A GIF is animated from its second frame, told by walking the blocks' framing, past extensions
+// and local color tables, without decoding a frame. A file cut short, or a block the walk does
+// not know, reads as still: Validate has decoded the header by then, and the walk refuses nothing
+// it cannot read.
+func TestGIFAnimated_CountsFramesByTheirDescriptors(t *testing.T) {
+	two := gifOf(20, 20, 2)
+	tests := []struct {
+		name string
+		data []byte
+		want bool
+	}{
+		{"one frame", createTestGIF(20, 20), false},
+		{"one frame after its extensions", gifOf(20, 20, 1), false},
+		{"two frames, the second with a local color table", two, true},
+		{"three frames", gifOf(20, 20, 3), true},
+		{"two frames cut inside the first", two[:len(two)/3], false},
+		{"no more than a header", two[:13], false},
+		{"shorter than a header", two[:5], false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, gifAnimated(tt.data))
+		})
 	}
 }
 
