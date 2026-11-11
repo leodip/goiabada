@@ -16,10 +16,42 @@ import (
 // decision 17).
 const sessionEndedPath = "/auth/session-ended"
 
-// sessionEndedCode is the error code HandleAPIErrorJSON answers such a 401 with. The three
-// fetch sites in web/static/utils.js and web/static/image-upload.js key on this literal, not on the
-// 403 status, to navigate to sessionEndedPath; every other 403 keeps its modal and signs nobody out.
+// sessionEndedCode is the error code SessionEndedError carries. Every fetch site under web/static
+// keys on this literal, not on the 403 status, to navigate to sessionEndedPath; every other 403
+// keeps its modal and signs nobody out.
 const sessionEndedCode = "session_ended"
+
+// scriptRequestHeader and scriptRequestValue mark a request one of the console's page scripts sent:
+// utils.js's scriptRequestHeaders sets them on every fetch, and a navigation cannot carry a header
+// a page chose. The session-ended drift test holds the script's half to these.
+const (
+	scriptRequestHeader = "X-Requested-With"
+	scriptRequestValue  = "XMLHttpRequest"
+)
+
+// IsScriptRequest reports whether one of the console's page scripts sent r, rather than the browser
+// navigating to it. A script cannot follow an answer meant for a navigation: fetch follows a
+// redirect without showing it, and a redirect to the auth server's sign-in fails as a cross-origin
+// request, leaving the script with nothing it can read. Such a request is answered with JSON the
+// script acts on instead.
+func IsScriptRequest(r *http.Request) bool {
+	return r.Header.Get(scriptRequestHeader) == scriptRequestValue
+}
+
+// SessionEndedError is the JSON answer to a script's request whose sign-in has ended, for
+// ErrorWriter.JSONError: 403 with sessionEndedCode and the console's own "sign-in has ended"
+// sentence, which the script follows to sessionEndedPath. HandleAPIErrorJSON answers it when the
+// admin API refuses the console's access token, and the JWT middleware when the session holds no
+// tokens any more, as after a refused refresh, rather than sending the script to sign in.
+//
+// Not 401: RFC 9110 section 15.5.2 says a 401 "MUST send a WWW-Authenticate header field", and the
+// console signs in with a cookie and has no challenge to send; with 403 the client "MAY repeat the
+// request with new or different credentials", section 15.5.4, which is what signing in again is
+// (#427 decision 18).
+func SessionEndedError(ctx context.Context) error {
+	return oauth.NewErrorDetailWithHTTPStatus(sessionEndedCode,
+		i18n.T(ctx, "adminconsole.session_ended.message"), http.StatusForbidden)
+}
 
 // stepUpRequiredCode is the auth server's code for RFC 9470 section 3's refusal,
 // insufficient_user_authentication, which RequireRecentAuthentication answers 401 with (#782).
@@ -206,13 +238,9 @@ func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r
 // function as an *apiclient.APIError and nothing else. It answers the console's own 404 sentence
 // rather than forwarding the API's, matching what the page beside it shows (#279 decision 11).
 //
-// A 401 is answered 403 with sessionEndedCode and the console's own "sign-in has ended" sentence,
-// which the browser follows to sessionEndedPath (see IsSessionEnded). Not 401: RFC 9110 section
-// 15.5.2 says a 401 "MUST send a WWW-Authenticate header field", and the console signs in with a
-// cookie and has no challenge to send; with 403 the client "MAY repeat the request with new or
-// different credentials", section 15.5.4, which is what signing in again is (#427 decision 18).
-// The step-up refusal is not: it takes JSONError's 500 branch, the detail in the server log and a
-// request id on screen (see IsStepUpRequired).
+// A 401 is answered with SessionEndedError, which the browser follows to sessionEndedPath (see
+// IsSessionEnded). The step-up refusal is not: it takes JSONError's 500 branch, the detail in the
+// server log and a request id on screen (see IsStepUpRequired).
 //
 // A 429 opens the dialog too, answered 429 with the console's own code and RateLimitedMessage
 // rather than the API's sentence (see IsRateLimited). The status keeps JSONError silent and the
@@ -223,8 +251,7 @@ func HandleAPIErrorJSON(httpHelper ErrorWriter, w http.ResponseWriter, r *http.R
 		return
 	}
 	if IsSessionEnded(err) {
-		httpHelper.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus(sessionEndedCode,
-			i18n.T(r.Context(), "adminconsole.session_ended.message"), http.StatusForbidden))
+		httpHelper.JSONError(w, r, SessionEndedError(r.Context()))
 		return
 	}
 	if IsRateLimited(err) {

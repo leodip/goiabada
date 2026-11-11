@@ -38,6 +38,10 @@ func (rec *recordingErrorRenderer) InternalServerError(w http.ResponseWriter, r 
 	http.Error(w, i18n.T(r.Context(), "error.body"), http.StatusInternalServerError)
 }
 
+func (rec *recordingErrorRenderer) JSONError(w http.ResponseWriter, r *http.Request, err error) {
+	stubErrorRenderer{}.JSONError(w, r, err)
+}
+
 // TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse covers
 // every site in this middleware that used to answer with http.Error and the Go
 // error text.

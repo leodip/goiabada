@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -17,4 +18,10 @@ type stubErrorRenderer struct{}
 
 func (stubErrorRenderer) InternalServerError(w http.ResponseWriter, r *http.Request, _ error) {
 	http.Error(w, i18n.T(r.Context(), "error.body"), http.StatusInternalServerError)
+}
+
+// JSONError is the real writer's, which needs no template, so a test reads the JSON the wire
+// carries.
+func (stubErrorRenderer) JSONError(w http.ResponseWriter, r *http.Request, err error) {
+	render.New(nil, nil).JSONError(w, r, err)
 }

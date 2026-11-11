@@ -8,8 +8,8 @@
 //
 // A file over the kind's byte limit is refused here, with the sentence the admin API refuses it with,
 // so a file it would refuse is not sent. Any other refusal is the admin API's, about the file's type,
-// pixels, shape or animation, said at the field, in the page's language. The admin API refusing the
-// access token signs the administrator out, as every other request of the console's pages does.
+// pixels, shape or animation, said at the field, in the page's language. A sign-in that has ended
+// signs the administrator out, as every other request of the console's pages does.
 //
 // An upload under way holds the brand back, since Save sends the slot's hidden fields as they stand
 // and the answer that would fill them cannot arrive once the page has left: while any field's upload
@@ -49,12 +49,6 @@
       event.preventDefault();
     }
   });
-
-  // The CSRF header, when the page carries the token.
-  function csrfHeaders() {
-    const token = document.querySelector('input[name="gorilla.csrf.Token"]');
-    return token ? { "X-CSRF-Token": token.value } : {};
-  }
 
   // A refusal the console answered, whose sentence is shown as it came.
   class Refusal extends Error {}
@@ -144,10 +138,10 @@
       showNotice(status, "note", says.uploading);
       const body = new FormData();
       body.append("file", file, file.name);
-      fetch(withPageLanguage(field.dataset.uploadUrl), { method: "POST", body: body, headers: csrfHeaders() })
+      fetch(withPageLanguage(field.dataset.uploadUrl), { method: "POST", body: body, headers: scriptRequestHeaders() })
         .then(function (response) {
           return response.json().then(function (data) {
-            // The admin API refused the access token: sign out at once, as the home page then says
+            // The sign-in has ended: sign out at once, as the home page then says
             // why. The promise never settles, so nothing flashes while the page leaves.
             if (isSessionEnded(data)) {
               goToSessionEnded();

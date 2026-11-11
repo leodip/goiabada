@@ -238,6 +238,35 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 	}
 }
 
+// A page script's request that meets a session with no tokens, as after a refused refresh, is told
+// its sign-in has ended, in the JSON every script follows to the session-ended route, rather than
+// sent to sign in: fetch would follow that redirect to the auth server unseen and fail. Nothing is
+// sealed for a sign-in. A navigation is still sent to sign in (TestRequiresScope_Unauthenticated).
+func TestRequiresScope_AScriptsRequestWithoutASignInIsToldItEnded(t *testing.T) {
+	mockAuthHelper := new(middlewaremocks.AuthHelper)
+	middleware := NewJWT(new(sessionstoremocks.Store), nil, "test-session", new(middlewaremocks.TokenParser), nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/settings/branding/assets/logo", nil)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	rr := httptest.NewRecorder()
+
+	mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JwtInfo{}, []string{"required:scope"}).Return(false)
+	mockAuthHelper.On("IsAuthenticated", oauthclient.JwtInfo{}).Return(false)
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Next handler should not have been called")
+	})
+
+	middleware.RequiresScope([]string{"required:scope"})(next).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusForbidden, rr.Code)
+	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+	assert.JSONEq(t, `{"error":"session_ended","error_description":"Your sign-in has ended. Sign in again."}`, rr.Body.String())
+	assert.Empty(t, rr.Header().Values("Set-Cookie"), "nothing is sealed for a sign-in")
+	mockAuthHelper.AssertNotCalled(t, "RedirToAuthorize", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockAuthHelper.AssertExpectations(t)
+}
+
 // The scope a page's own sign-in asks for is the one RequiresScope's sign-in asks for (#782): for
 // the account pages, the console's five default scopes, in order.
 func TestSignInScope_IsTheSignInArmsScope(t *testing.T) {

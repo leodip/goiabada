@@ -58,8 +58,12 @@ admin console a handler answers either a page or JSON, never both:
 `JSONNotFound`/`JSONBadRequestBody`/`JSONError`/`HandleAPIErrorJSON` answer the same statuses as
 JSON. Mixing them makes the browser's `response.json()` throw on that branch alone;
 `TestHandlers_AjaxHandlersDoNotUsePageWriters` in
-`adminconsole/internal/handlers/ajax_writer_lint_test.go` refuses it. Which of the two a handler
-picks is the only decision it makes about an `apiClient` failure: `HandleAPIError`,
+`adminconsole/internal/handlers/ajax_writer_lint_test.go` refuses it. A console script sends every
+request with `utils.js`'s `scriptRequestHeaders`, whose `X-Requested-With` lets `RequiresScope`
+answer a request whose session has no tokens with `render.SessionEndedError` instead of a sign-in
+redirect `fetch` cannot follow, and follows that `session_ended` code with `goToSessionEnded`;
+`TestSessionEndedScripts_EveryFetchSiteFollowsTheCode` holds every fetch site to both. Which of the
+two a handler picks is the only decision it makes about an `apiClient` failure: `HandleAPIError`,
 `HandleAPIErrorWithCallback` and `HandleAPIErrorJSON` turn the auth server's status into the
 console's, and `TestHandlers_ApiClientErrorsReachTheClassifier` refuses a guard that answers one
 itself or catches every status as a rejected value (#279). In the auth server the type makes the

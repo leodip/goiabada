@@ -9,7 +9,7 @@
 // The brand is the test's own, given to a client of the test's own, so no other page changes, and
 // this is an ordinary parallel spec.
 import type { Browser, Page } from "@playwright/test";
-import { setClientBrand } from "../../../lib/admin-console";
+import { setClientBrand, signInAsAdmin } from "../../../lib/admin-console";
 import {
   brandFaviconIcons,
   brandIdFromList,
@@ -247,5 +247,30 @@ test("a brand is not sent while a file is uploading, and Create then attaches ev
     expect(await slotHolds(page, "favicon"), "the favicon Create attached").toEqual(favicon);
   } finally {
     await deleteBrand(page, id);
+  }
+});
+
+// A sign-in that has ended while the editor is open, its session holding no tokens any more as a
+// refused refresh leaves it, answers the next upload with the session-ended code, which the field
+// follows to the home page, saying why, rather than saying the upload failed: the console cannot
+// send a script to sign in. The administrator signs in in a browser of their own, since ending the
+// shared session would sign every other spec out.
+test("an upload after the sign-in has ended goes to the home page, which says so", async ({ browser }) => {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  try {
+    const page = await context.newPage();
+    await signInAsAdmin(page);
+    await page.goto(newBrandUrl);
+
+    const other = await context.newPage();
+    await other.goto(`${env.adminUrl}/auth/session-ended`);
+    await expect(other).toHaveURL(`${env.adminUrl}/`);
+    await other.close();
+
+    await page.locator("#logoFile").setInputFiles(kitFiles.logo);
+    await expect(page).toHaveURL(`${env.adminUrl}/`);
+    await expect(page.getByRole("status")).toHaveText("Your sign-in has ended. Sign in again.");
+  } finally {
+    await context.close();
   }
 });

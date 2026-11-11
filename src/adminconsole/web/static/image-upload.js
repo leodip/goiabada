@@ -110,12 +110,6 @@
     }
   }
 
-  // The CSRF header, when the page carries the token.
-  function csrfHeaders() {
-    const token = document.querySelector('input[name="gorilla.csrf.Token"]');
-    return token ? { "X-CSRF-Token": token.value } : {};
-  }
-
   function chooseFile() {
     const file = fileInput.files[0];
     if (!file || busy) {
@@ -474,9 +468,9 @@
   function upload(blob, name) {
     const form = new FormData();
     form.append(config.fieldName, blob, name);
-    fetch(withPageLanguage(config.uploadUrl), { method: "POST", body: form, headers: csrfHeaders() })
+    fetch(withPageLanguage(config.uploadUrl), { method: "POST", body: form, headers: scriptRequestHeaders() })
       .then((response) => response.json().then((data) => {
-        // The admin API refused the access token: sign out at once, as the home page then says
+        // The sign-in has ended: sign out at once, as the home page then says
         // why. The promise never settles, so nothing flashes while the page leaves.
         if (isSessionEnded(data)) {
           goToSessionEnded();
@@ -520,9 +514,9 @@
       return;
     }
     setBusy(true);
-    fetch(withPageLanguage(config.deleteUrl), { method: "DELETE", headers: csrfHeaders() })
+    fetch(withPageLanguage(config.deleteUrl), { method: "DELETE", headers: scriptRequestHeaders() })
       .then((response) => response.json().then((data) => {
-        // As the upload does: a refused access token signs out at once.
+        // As the upload does: a sign-in that has ended signs out at once.
         if (isSessionEnded(data)) {
           goToSessionEnded();
           return new Promise(() => {});

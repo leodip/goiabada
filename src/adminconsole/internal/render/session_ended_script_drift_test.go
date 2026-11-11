@@ -14,22 +14,26 @@ import (
 )
 
 // TestSessionEndedScripts_EveryFetchSiteFollowsTheCode holds the browser's half of #427 decision 17
-// to the Go half HandleAPIErrorJSON writes.
+// to the Go half SessionEndedError writes.
 //
-// An admin API 401 that ends the session reaches an AJAX request as a 403 carrying
-// sessionEndedCode, and the browser, not the server, has to go to sessionEndedPath: a redirect
-// answered to fetch() is followed invisibly and hands the script the home page's HTML to parse as
-// JSON. So every script that sends a request has to recognise the code, and nothing in this
-// repository executes JavaScript to check that one does. This test is therefore a drift guard and
-// no more:
+// A sign-in that has ended, the admin API refusing the access token or the session holding none any
+// more, reaches a script's request as a 403 carrying sessionEndedCode, and the browser, not the
+// server, has to go to sessionEndedPath: a redirect answered to fetch() is followed invisibly and
+// hands the script a page's HTML to parse as JSON, or fails as a cross-origin request. So every
+// script that sends a request has to recognise the code, and has to mark its request for
+// IsScriptRequest, or a session with no tokens answers it with the redirect to sign in. Nothing in
+// this repository executes JavaScript to check that one does. This test is therefore a drift guard
+// and no more:
 //
 //   - utils.js declares the code and the path with the literals the helper emits and the route is
-//     mounted at, so renaming either on one side fails here;
+//     mounted at, and scriptRequestHeaders sends the header IsScriptRequest reads, so renaming any
+//     of them on one side fails here;
 //   - the recount of request sites under web/ still finds exactly the four handled, sendAjaxRequest
 //     in utils.js, uploadImage and handleDelete in image-upload.js, and the brand editor's upload in
 //     pages/brand-assets.js (#813), so a fifth raw fetch() fails until it is handled too;
-//   - each of the four, within its own function, calls isSessionEnded and goToSessionEnded, and
-//     sends its URL through withPageLanguage, which names the page's catalog as ui_locales (#559).
+//   - each of the four, within its own function, calls isSessionEnded and goToSessionEnded, sends
+//     its URL through withPageLanguage, which names the page's catalog as ui_locales (#559), and
+//     takes its headers from scriptRequestHeaders.
 //
 // It does not prove that any of them navigates. That is read, not run.
 func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
@@ -82,6 +86,8 @@ func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
 		"utils.js must key on the code HandleAPIErrorJSON answers")
 	assert.Contains(t, utils, `const SESSION_ENDED_PATH = "`+sessionEndedPath+`";`,
 		"utils.js must navigate to the route the page helpers redirect to")
+	assert.Contains(t, utils, `Object.assign({ "`+scriptRequestHeader+`": "`+scriptRequestValue+`" }, extra)`,
+		"utils.js's scriptRequestHeaders must send the header IsScriptRequest reads")
 
 	for name, count := range sites {
 		source := sources[name]
@@ -96,6 +102,10 @@ func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
 			// in whatever language the browser or the profile names instead (#559 decisions 3 and 7).
 			assert.Truef(t, strings.HasPrefix(body, "fetch(withPageLanguage("),
 				"%s, request site %d of %d, does not send its URL through withPageLanguage", name, i+1, count)
+			// Unmarked, a request whose session holds no tokens is sent to sign in, which fetch
+			// cannot follow, rather than told the sign-in has ended.
+			assert.Containsf(t, body, "headers: scriptRequestHeaders(",
+				"%s, request site %d of %d, does not take its headers from scriptRequestHeaders", name, i+1, count)
 		}
 	}
 }
