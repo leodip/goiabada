@@ -15,42 +15,45 @@ import (
 var brandColumns = columnList{
 	sqlite: "id, created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
 		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id, " +
-		"support_email, support_url, support_phone, footer_links",
+		"support_email, support_url, support_phone, footer_links, palette",
 	mysql: "id, created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
 		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id, " +
-		"support_email, support_url, support_phone, footer_links",
+		"support_email, support_url, support_phone, footer_links, palette",
 	postgres: "id, created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
 		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id, " +
-		"support_email, support_url, support_phone, footer_links",
+		"support_email, support_url, support_phone, footer_links, palette",
 	mssql: "id, created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
 		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id, " +
-		"support_email, support_url, support_phone, footer_links",
+		"support_email, support_url, support_phone, footer_links, palette",
 }
 
 // qualifiedBrandColumns is brandColumns named by table, for the read joining the settings row.
 var qualifiedBrandColumns = columnList{
 	sqlite: "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme, brands.corners, brands.font, brands.background_fit, brands.hide_app_name, " +
 		"brands.logo_asset_id, brands.dark_logo_asset_id, brands.favicon_asset_id, brands.background_asset_id, brands.regular_font_asset_id, brands.bold_font_asset_id, " +
-		"brands.support_email, brands.support_url, brands.support_phone, brands.footer_links",
+		"brands.support_email, brands.support_url, brands.support_phone, brands.footer_links, brands.palette",
 	mysql: "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme, brands.corners, brands.font, brands.background_fit, brands.hide_app_name, " +
 		"brands.logo_asset_id, brands.dark_logo_asset_id, brands.favicon_asset_id, brands.background_asset_id, brands.regular_font_asset_id, brands.bold_font_asset_id, " +
-		"brands.support_email, brands.support_url, brands.support_phone, brands.footer_links",
+		"brands.support_email, brands.support_url, brands.support_phone, brands.footer_links, brands.palette",
 	postgres: "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme, brands.corners, brands.font, brands.background_fit, brands.hide_app_name, " +
 		"brands.logo_asset_id, brands.dark_logo_asset_id, brands.favicon_asset_id, brands.background_asset_id, brands.regular_font_asset_id, brands.bold_font_asset_id, " +
-		"brands.support_email, brands.support_url, brands.support_phone, brands.footer_links",
+		"brands.support_email, brands.support_url, brands.support_phone, brands.footer_links, brands.palette",
 	mssql: "brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme, brands.corners, brands.font, brands.background_fit, brands.hide_app_name, " +
 		"brands.logo_asset_id, brands.dark_logo_asset_id, brands.favicon_asset_id, brands.background_asset_id, brands.regular_font_asset_id, brands.bold_font_asset_id, " +
-		"brands.support_email, brands.support_url, brands.support_phone, brands.footer_links",
+		"brands.support_email, brands.support_url, brands.support_phone, brands.footer_links, brands.palette",
 }
 
 // scanBrand reads one row selected with brandColumns or qualifiedBrandColumns.
 //
 // The engine cannot check footer_links' shape (#814 decision 8), so a stored value that does not
 // parse reads as no links and is logged, and the rest of the brand is read: its pages are drawn
-// without footer links rather than not at all.
+// without footer links rather than not at all. The same holds for palette (#815 decision 3): NULL
+// is no palette, and a stored value that is not a complete palette of colors reads as none and is
+// logged, so only a palette a stylesheet can draw leaves the data layer.
 func scanBrand(ctx context.Context) func(rowScanner, *record.Brand) error {
 	return func(row rowScanner, brand *record.Brand) error {
 		var footerLinks string
+		var storedPalette sql.NullString
 		err := row.Scan(
 			&brand.Id,
 			&brand.CreatedAt,
@@ -72,6 +75,7 @@ func scanBrand(ctx context.Context) func(rowScanner, *record.Brand) error {
 			&brand.SupportURL,
 			&brand.SupportPhone,
 			&footerLinks,
+			&storedPalette,
 		)
 		if err != nil {
 			return err
@@ -82,6 +86,15 @@ func scanBrand(ctx context.Context) func(rowScanner, *record.Brand) error {
 				"brand_id", brand.Id, "error", err)
 		}
 		brand.FooterLinks = links
+		brand.Palette = nil
+		if storedPalette.Valid {
+			palette, err := parseBrandPalette(storedPalette.String)
+			if err != nil {
+				slog.WarnContext(ctx, "brand palette does not parse and is read as none",
+					"brand_id", brand.Id, "error", err)
+			}
+			brand.Palette = palette
+		}
 		return nil
 	}
 }
@@ -89,36 +102,36 @@ func scanBrand(ctx context.Context) func(rowScanner, *record.Brand) error {
 var insertBrand = statement{
 	sqlite: "INSERT INTO brands (created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
 		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id, " +
-		"support_email, support_url, support_phone, footer_links) " +
-		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"support_email, support_url, support_phone, footer_links, palette) " +
+		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	mysql: "INSERT INTO brands (created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
 		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id, " +
-		"support_email, support_url, support_phone, footer_links) " +
-		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"support_email, support_url, support_phone, footer_links, palette) " +
+		"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	postgres: "INSERT INTO brands (created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
 		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id, " +
-		"support_email, support_url, support_phone, footer_links) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) RETURNING id",
+		"support_email, support_url, support_phone, footer_links, palette) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING id",
 	mssql: "INSERT INTO brands (created_at, updated_at, name, appearance, theme, corners, font, background_fit, hide_app_name, " +
 		"logo_asset_id, dark_logo_asset_id, favicon_asset_id, background_asset_id, regular_font_asset_id, bold_font_asset_id, " +
-		"support_email, support_url, support_phone, footer_links) OUTPUT INSERTED.id " +
-		"VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19)",
+		"support_email, support_url, support_phone, footer_links, palette) OUTPUT INSERTED.id " +
+		"VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20)",
 }
 
 // updateBrand writes the whole row but created_at, which is dont-update.
 var updateBrand = statement{
 	sqlite: "UPDATE brands SET updated_at = ?, name = ?, appearance = ?, theme = ?, corners = ?, font = ?, background_fit = ?, " +
 		"hide_app_name = ?, logo_asset_id = ?, dark_logo_asset_id = ?, favicon_asset_id = ?, background_asset_id = ?, regular_font_asset_id = ?, bold_font_asset_id = ?, " +
-		"support_email = ?, support_url = ?, support_phone = ?, footer_links = ? WHERE id = ?",
+		"support_email = ?, support_url = ?, support_phone = ?, footer_links = ?, palette = ? WHERE id = ?",
 	mysql: "UPDATE brands SET updated_at = ?, name = ?, appearance = ?, theme = ?, corners = ?, font = ?, background_fit = ?, " +
 		"hide_app_name = ?, logo_asset_id = ?, dark_logo_asset_id = ?, favicon_asset_id = ?, background_asset_id = ?, regular_font_asset_id = ?, bold_font_asset_id = ?, " +
-		"support_email = ?, support_url = ?, support_phone = ?, footer_links = ? WHERE id = ?",
+		"support_email = ?, support_url = ?, support_phone = ?, footer_links = ?, palette = ? WHERE id = ?",
 	postgres: "UPDATE brands SET updated_at = $1, name = $2, appearance = $3, theme = $4, corners = $5, font = $6, background_fit = $7, " +
 		"hide_app_name = $8, logo_asset_id = $9, dark_logo_asset_id = $10, favicon_asset_id = $11, background_asset_id = $12, regular_font_asset_id = $13, bold_font_asset_id = $14, " +
-		"support_email = $15, support_url = $16, support_phone = $17, footer_links = $18 WHERE id = $19",
+		"support_email = $15, support_url = $16, support_phone = $17, footer_links = $18, palette = $19 WHERE id = $20",
 	mssql: "UPDATE brands SET updated_at = @p1, name = @p2, appearance = @p3, theme = @p4, corners = @p5, font = @p6, background_fit = @p7, " +
 		"hide_app_name = @p8, logo_asset_id = @p9, dark_logo_asset_id = @p10, favicon_asset_id = @p11, background_asset_id = @p12, regular_font_asset_id = @p13, bold_font_asset_id = @p14, " +
-		"support_email = @p15, support_url = @p16, support_phone = @p17, footer_links = @p18 WHERE id = @p19",
+		"support_email = @p15, support_url = @p16, support_phone = @p17, footer_links = @p18, palette = @p19 WHERE id = @p20",
 }
 
 var selectBrandById = statement{
@@ -171,6 +184,10 @@ var deleteBrand = statement{
 
 func (d *Database) CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error {
 
+	if err := checkBrandPaletteWrite(brand.Palette); err != nil {
+		return err
+	}
+
 	now := time.Now().UTC()
 
 	originalCreatedAt := brand.CreatedAt
@@ -183,7 +200,7 @@ func (d *Database) CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Br
 		brand.Corners, brand.Font, brand.BackgroundFit, brand.HideAppName,
 		brand.LogoAssetId, brand.DarkLogoAssetId, brand.FaviconAssetId,
 		brand.BackgroundAssetId, brand.RegularFontAssetId, brand.BoldFontAssetId,
-		brand.SupportEmail, brand.SupportURL, brand.SupportPhone, brand.FooterLinks)
+		brand.SupportEmail, brand.SupportURL, brand.SupportPhone, brand.FooterLinks, brand.Palette)
 	if err != nil {
 		brand.CreatedAt = originalCreatedAt
 		brand.UpdatedAt = originalUpdatedAt
@@ -200,6 +217,10 @@ func (d *Database) UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Br
 		return errs.New("can't update brand with id 0")
 	}
 
+	if err := checkBrandPaletteWrite(brand.Palette); err != nil {
+		return err
+	}
+
 	originalUpdatedAt := brand.UpdatedAt
 	brand.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
@@ -208,7 +229,7 @@ func (d *Database) UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Br
 		brand.Corners, brand.Font, brand.BackgroundFit, brand.HideAppName,
 		brand.LogoAssetId, brand.DarkLogoAssetId, brand.FaviconAssetId,
 		brand.BackgroundAssetId, brand.RegularFontAssetId, brand.BoldFontAssetId,
-		brand.SupportEmail, brand.SupportURL, brand.SupportPhone, brand.FooterLinks,
+		brand.SupportEmail, brand.SupportURL, brand.SupportPhone, brand.FooterLinks, brand.Palette,
 		brand.Id)
 	if err != nil {
 		brand.UpdatedAt = originalUpdatedAt

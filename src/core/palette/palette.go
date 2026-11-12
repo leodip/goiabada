@@ -166,3 +166,18 @@ func cut(ratio float64) float64 {
 	}
 	return hundredths / 100
 }
+
+// tokens are the 23 color tokens a palette sets for each mode, in the order ui.css declares them.
+var tokens = []string{
+	"canvas", "surface", "subtle", "line", "line-strong", "ink", "ink-muted",
+	"brand", "brand-strong", "on-brand", "brand-soft",
+	"danger", "danger-strong", "on-danger", "danger-soft", "danger-ink",
+	"positive-soft", "positive-ink", "caution-soft", "caution-ink", "note-soft", "note-ink",
+	"focus",
+}
+
+// Tokens answers the names of the 23 color tokens a palette sets for each mode, in the order
+// ui.css declares them, as a copy the caller may change.
+func Tokens() []string {
+	return append([]string(nil), tokens...)
+}

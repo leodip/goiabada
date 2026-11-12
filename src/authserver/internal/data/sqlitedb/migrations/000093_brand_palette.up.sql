@@ -1,0 +1,19 @@
+-- A brand's custom palette (#815 decision 3): brands gains one nullable column holding the whole
+-- palette as JSON text, the mode it was made in and the 23 colors of each of the two modes.
+--
+-- The six questions a migration answers: (1) all four engines. (2) The palette is validated JSON
+-- text the data layer writes, and a read checks it again; it is pinned case-sensitive on MySQL and
+-- SQL Server, as every string column is. (3) Nothing compares it: a palette is read and written
+-- whole with its brand and never looked up by a color, so no index. (4) No key: nothing refers to
+-- it. (5) Every existing brand keeps its built-in theme and has no palette: the column is NULL,
+-- with no default, and NULL is a brand on a built-in theme. (6) Each schema.golden gains the
+-- column.
+--
+-- The text is unbounded, as footer_links' is: the data layer bounds what it holds, 46 colors and a
+-- mode.
+--
+-- The previous release never reads brands, so a replica of it still serving during a rolling
+-- upgrade keeps working. The down migration drops the column and every palette in it, and leaves
+-- each brand's theme as it is: a brand whose theme is custom is then drawn as one with a theme the
+-- release does not know.
+ALTER TABLE brands ADD COLUMN palette TEXT NULL;

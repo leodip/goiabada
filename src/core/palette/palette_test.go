@@ -42,6 +42,23 @@ func TestPairs(t *testing.T) {
 	assert.Equal(t, want, Pairs())
 }
 
+// The 23 color tokens a palette sets for each mode are the ones ui.css declares, in its order, so
+// a stored custom palette is checked for exactly the tokens a stylesheet draws (#815 decision 3).
+func TestTokens(t *testing.T) {
+	assert.Equal(t, []string{
+		"canvas", "surface", "subtle", "line", "line-strong", "ink", "ink-muted",
+		"brand", "brand-strong", "on-brand", "brand-soft",
+		"danger", "danger-strong", "on-danger", "danger-soft", "danger-ink",
+		"positive-soft", "positive-ink", "caution-soft", "caution-ink", "note-soft", "note-ink",
+		"focus",
+	}, Tokens())
+
+	// A caller that changes its copy changes no other caller's list.
+	tokens := Tokens()
+	tokens[0] = "changed"
+	assert.Equal(t, "canvas", Tokens()[0])
+}
+
 func TestIsColor(t *testing.T) {
 	for _, tc := range []struct {
 		value string
