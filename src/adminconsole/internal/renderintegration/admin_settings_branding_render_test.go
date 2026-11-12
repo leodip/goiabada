@@ -727,7 +727,12 @@ func TestRender_AdminSettingsBrandingFormMarksTheRefusedSlot(t *testing.T) {
 // as before, and the group is described by the file's hint and the fit's.
 func TestRender_AdminSettingsBrandingFormGroupsTheBackgroundWithItsFit(t *testing.T) {
 	form := renderKitForm(t, "")
-	group := form[strings.LastIndex(form, "<fieldset"):]
+	legend := strings.Index(form, `id="backgroundLabel"`)
+	require.Positive(t, legend)
+	group := form[strings.LastIndex(form[:legend], "<fieldset"):]
+	end := strings.Index(group, "</fieldset>")
+	require.Positive(t, end)
+	group = group[:end]
 	assert.Regexp(t, `^<fieldset aria-describedby="backgroundHint backgroundState backgroundFitHint">\s*`+
 		`<legend class="field-label mb-1" id="backgroundLabel">Imagem de fundo</legend>`, group)
 	assert.Contains(t, group, `data-brand-asset="background"`)

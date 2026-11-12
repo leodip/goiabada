@@ -61,3 +61,25 @@ func TestErrorFieldOrBlank(t *testing.T) {
 	assert.Empty(t, ErrorFieldOrBlank(errors.New("connection refused"), fields, current("")),
 		"an error the API did not answer")
 }
+
+// A refusal's error_field is a JSON Pointer into the body sent, read as its reference tokens, each
+// unescaped as RFC 6901 section 4 says: "~1" is "/" and "~0" is "~", the first applied first. A
+// refusal without one, an empty one, the pointer to the whole body, and one not starting with "/",
+// which RFC 6901 section 3 does not allow, name no member.
+func TestErrorPointer(t *testing.T) {
+	refusalAt := func(field string) error {
+		return &apiclient.APIError{Code: "handler.brand.footer_link_url_invalid", Message: "refused", Field: field, StatusCode: http.StatusBadRequest}
+	}
+
+	assert.Equal(t, []string{"footerLinks", "1", "url"}, ErrorPointer(refusalAt("/footerLinks/1/url")))
+	assert.Equal(t, []string{"footerLinks", "0", "labels", "pt-BR"}, ErrorPointer(refusalAt("/footerLinks/0/labels/pt-BR")))
+	assert.Equal(t, []string{"footerLinks", "3"}, ErrorPointer(errs.Wrap(refusalAt("/footerLinks/3"), "saving the brand")),
+		"a wrapped refusal names its member too")
+	assert.Equal(t, []string{"a/b", "m~n", "~1"}, ErrorPointer(refusalAt("/a~1b/m~0n/~01")))
+	assert.Equal(t, []string{""}, ErrorPointer(refusalAt("/")), "the member named by the empty string")
+
+	assert.Nil(t, ErrorPointer(refusalAt("")))
+	assert.Nil(t, ErrorPointer(refusalAt("footerLinks/1/url")))
+	assert.Nil(t, ErrorPointer(errors.New("connection refused")))
+	assert.Nil(t, ErrorPointer(nil))
+}

@@ -397,6 +397,40 @@
     overflow-wrap: anywhere;
   }
 
+  /* A group of fields among several of its kind, such as one of the brand editor's footer link
+     rows: its fields, then what it holds under a disclosure. */
+  .footer-link {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  /* A disclosure the browser provides: the summary keeps the browser's marker and keyboard
+     handling, reads as a control, is a target of at least 24 pixels, and spaces what it opens from
+     itself. */
+  .disclosure > summary {
+    min-height: 1.5rem;
+    width: fit-content;
+    max-width: 100%;
+    cursor: pointer;
+    color: var(--color-brand);
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    font-weight: 500;
+  }
+
+  .disclosure > summary:hover {
+    color: var(--color-brand-strong);
+  }
+
+  .disclosure[open] > summary {
+    margin-bottom: 0.5rem;
+  }
+
+  .disclosure > .form-grid {
+    margin-top: 0.75rem;
+  }
+
   .control {
     display: block;
     width: 100%;

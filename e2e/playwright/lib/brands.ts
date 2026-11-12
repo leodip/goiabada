@@ -650,3 +650,97 @@ export function sampleKit(sample: Locator): Promise<SampleKit> {
     };
   });
 }
+
+// The brand editor's footer (#814 decision 11): three rows, Link 1 to Link 3, each a label, a URL and a
+// label per built-in language under a disclosure, then the support contact's three fields.
+export const footerRows = 3;
+
+// The disclosure holding a row's language labels.
+export function footerLanguageLabels(page: Page, row: number): Locator {
+  return page.locator(`#footerLinks-${row} details`);
+}
+
+// Opens a row's language labels, when they are closed.
+export async function openFooterLanguageLabels(page: Page, row: number) {
+  const disclosure = footerLanguageLabels(page, row);
+  if (!(await disclosure.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await disclosure.locator("summary").click();
+  }
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
+// Types footer into the editor: each row the link of its index, a row past the links emptied, the
+// language labels named opened and typed, and each contact value named. A value left out of a link
+// is typed empty.
+export async function fillBrandFooter(page: Page, footer: BrandFooter) {
+  const links = footer.footerLinks ?? [];
+  for (let row = 0; row < footerRows; row++) {
+    const link = links[row];
+    await page.locator(`#footerLinks-${row}-label`).fill(link?.label ?? "");
+    await page.locator(`#footerLinks-${row}-url`).fill(link?.url ?? "");
+    const labels = Object.entries(link?.labels ?? {});
+    if (labels.length > 0) await openFooterLanguageLabels(page, row);
+    for (const [tag, label] of labels) await page.locator(`#footerLinks-${row}-labels-${tag}`).fill(label);
+  }
+  if (footer.supportEmail !== undefined) await page.locator("#supportEmail").fill(footer.supportEmail);
+  if (footer.supportUrl !== undefined) await page.locator("#supportUrl").fill(footer.supportUrl);
+  if (footer.supportPhone !== undefined) await page.locator("#supportPhone").fill(footer.supportPhone);
+}
+
+// What the editor's footer fields hold: the rows that hold anything, in order, each language label
+// that is not blank, and the three contact values.
+export function readBrandFooterForm(page: Page): Promise<Required<BrandFooter>> {
+  return page.evaluate((rows) => {
+    const value = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
+    const footerLinks: BrandFooterLink[] = [];
+    for (let row = 0; row < rows; row++) {
+      const labels: Record<string, string> = {};
+      for (const input of Array.from(document.querySelectorAll<HTMLInputElement>(`input[id^="footerLinks-${row}-labels-"]`))) {
+        if (input.value !== "") labels[input.id.slice(`footerLinks-${row}-labels-`.length)] = input.value;
+      }
+      const link = { url: value(`footerLinks-${row}-url`), label: value(`footerLinks-${row}-label`), labels };
+      if (link.url !== "" || link.label !== "" || Object.keys(labels).length > 0) footerLinks.push(link);
+    }
+    return { footerLinks, supportEmail: value("supportEmail"), supportUrl: value("supportUrl"), supportPhone: value("supportPhone") };
+  }, footerRows);
+}
+
+// A link of a page's footer as it is drawn: its text, the new-tab notice its sr-only span adds
+// included, where it goes, and how it opens.
+export interface DrawnFooterLink {
+  text: string;
+  href: string;
+  target: string | null;
+  rel: string | null;
+}
+
+// A page's footer as it is drawn: none, or the links of its list, the contact line's text and its
+// links, whether it is outside main and straight after it, and whether it is on a panel in the card's
+// color rather than on the page's background.
+export interface DrawnFooter {
+  links: DrawnFooterLink[];
+  contact: string;
+  contactLinks: DrawnFooterLink[];
+  afterMain: boolean;
+  panel: boolean;
+}
+
+export function drawnFooter(page: Page): Promise<DrawnFooter | null> {
+  return page.evaluate(() => {
+    const footers = document.querySelectorAll("footer");
+    if (footers.length === 0) return null;
+    const footer = footers[0];
+    const text = (element: Element | null) => (element?.textContent ?? "").replace(/\s+/g, " ").trim();
+    const link = (a: HTMLAnchorElement) => ({ text: text(a), href: a.getAttribute("href")!, target: a.getAttribute("target"), rel: a.getAttribute("rel") });
+    const contact = footer.querySelector("p");
+    const card = document.querySelector(".auth-card");
+    const background = getComputedStyle(footer).backgroundColor;
+    return {
+      links: Array.from(footer.querySelectorAll<HTMLAnchorElement>("ul a"), link),
+      contact: text(contact),
+      contactLinks: contact ? Array.from(contact.querySelectorAll<HTMLAnchorElement>("a"), link) : [],
+      afterMain: footer.closest("main") === null && footer.previousElementSibling?.tagName === "MAIN",
+      panel: background !== "rgba(0, 0, 0, 0)" && card !== null && background === getComputedStyle(card).backgroundColor,
+    };
+  });
+}

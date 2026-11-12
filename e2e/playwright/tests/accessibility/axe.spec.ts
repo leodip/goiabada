@@ -32,7 +32,9 @@ import {
   brandUrl,
   defaultBrand,
   expectPreviewDrawn,
+  fillBrandFooter,
   fillBrandForm,
+  footerLanguageLabels,
   newBrandUrl,
   pickInEditor,
   pngFile,
@@ -221,6 +223,52 @@ test("the auth server's sign-in, two-factor, consent and sign-out pages", async 
     titled(own, "still signed in, having declined to sign out", "Still signed in", () => own.goto(`${env.authUrl}/auth/logout/declined`)),
   ]);
   await context.close();
+});
+
+// A brand's whole footer (#814): three links, the first with its own labels in two languages, and
+// the three contact values.
+const fullFooter = {
+  footerLinks: [
+    { label: "Privacy", url: "https://example.com/privacy", labels: { de: "Datenschutz", "pt-BR": "Privacidade" } },
+    { label: "Status", url: "https://status.example.com/" },
+    { label: "Company", url: "https://example.com/" },
+  ],
+  supportEmail: "help@example.com",
+  supportUrl: "https://example.com/support",
+  supportPhone: "+44 20 7946 0958",
+};
+
+// A sign-in page drawn in a brand with a footer (#814 decision 6), a brand of the test's own given to
+// a client of its own, so no other page changes: the footer on the page's background, then on a panel
+// in the card's color once the brand has a background image.
+test("the auth server's sign-in with its brand's footer, on the page's background and on a panel", async ({ page, browser, clients }) => {
+  const { client } = await browserSignInClient(page, clients);
+  await withBrand(page, { appearance: "auto", theme: "plum" }, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await fillBrandFooter(page, fullFooter);
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
+    await setClientBrand(page, client.id, brand);
+
+    const context = await browser.newContext(signedOut);
+    const own = await context.newPage();
+    await checkStates(own, [
+      titled(own, "sign-in with its brand's footer on the page's background", "Sign in", async () => {
+        await own.goto(authorizeUrl(client.identifier));
+        await expect(own.getByRole("contentinfo")).toBeVisible();
+        await expect(own.locator("footer.auth-footer-panel")).toHaveCount(0);
+      }),
+      titled(own, "sign-in with its brand's footer on a panel over a background image", "Sign in", async () => {
+        await page.goto(brandUrl(brand.id, "edit"));
+        await uploadKit(page, ["background"]);
+        await page.locator("#btnSave").click();
+        await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
+        await own.goto(authorizeUrl(client.identifier));
+        await expect(own.locator("footer.auth-footer-panel")).toBeVisible();
+      }),
+    ]);
+    await context.close();
+  });
 });
 
 // A sign-in page drawn in a brand with the kit (#813), a brand of the test's own given to a client of
@@ -1206,6 +1254,31 @@ test("the settings pages and the audit log", async ({ page }) => {
         await expectPreviewDrawn(page);
       },
     },
+    // The footer's sections (#814 decision 11): filled, a row's language labels opened, and a language
+    // label refused at its input, its disclosure drawn open. Nothing is saved.
+    {
+      name: "branding, a new brand, its footer filled and a row's language labels open",
+      reach: async () => {
+        await page.goto(newBrandUrl);
+        await fillBrandFooter(page, fullFooter);
+        await expect(footerLanguageLabels(page, 0)).toHaveAttribute("open", "");
+      },
+    },
+    refused(page, "branding, a new brand, a footer link's language label refused at its input", "footerLinks-0-labels-pt-BR", async () => {
+      await page.goto(newBrandUrl);
+      await page.locator("#name").fill(uniqueIdentifier("brand"));
+      await fillBrandFooter(page, { footerLinks: [{ label: "Privacy", url: "https://example.com/privacy", labels: { "pt-BR": "<b>Privacidade</b>" } }] });
+      await page.locator("#btnCreate").click();
+      await expect(page.locator("#brand-error")).toHaveText("The pt-BR label of link 1 cannot contain the characters < or >.");
+      await expect(footerLanguageLabels(page, 0)).toHaveAttribute("open", "");
+    }),
+    refused(page, "branding, a new brand, the support phone number refused at its input", "supportPhone", async () => {
+      await page.goto(newBrandUrl);
+      await page.locator("#name").fill(uniqueIdentifier("brand"));
+      await fillBrandFooter(page, { supportPhone: "555-0123" });
+      await page.locator("#btnCreate").click();
+      await expect(page.locator("#supportPhone")).toBeFocused();
+    }),
     withBrandPreview(page, at(page, "branding, the default brand", brandUrl(seededBrand.id, "edit"))),
     at(page, "branding, the default brand's delete page", brandUrl(seededBrand.id, "delete")),
     at(page, "session settings", settings("sessions")),

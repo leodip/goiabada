@@ -2,11 +2,14 @@ package apiclient
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/core/api"
 )
 
 // The brands' decode half (#810 decision 5): the Branding pages draw a brand from every field the
@@ -73,4 +76,27 @@ func TestAuthServerClient_GetBrandThemesDecodesBothPalettesOfEachTheme(t *testin
 	assert.Equal(t, map[string]string{"canvas": "#0f1217", "ink-muted": "#a0a8b6"}, themes[0].Dark)
 	assert.Equal(t, "high-contrast", themes[1].Key)
 	assert.Equal(t, "#000000", themes[1].Dark["canvas"])
+}
+
+// A refusal of a brand's save says which member of the body it is about in error_field, a JSON
+// Pointer such as /footerLinks/1/url (#814 decision 10), which the brand editor marks its input from;
+// a refusal without one, as every other refusal is, carries none.
+func TestAuthServerClient_ABrandRefusalCarriesTheMemberItIsAbout(t *testing.T) {
+	client, _ := servesStatus(t, http.StatusBadRequest, `{"error_code":"handler.brand.footer_link_url_invalid",`+
+		`"error_description":"Link 2's URL must be an https: address.","error_field":"/footerLinks/1/url"}`)
+
+	_, err := client.UpdateBrand(context.Background(), "an-access-token", 7, &api.UpdateBrandRequest{Name: "Spring"})
+
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, "handler.brand.footer_link_url_invalid", apiErr.Code)
+	assert.Equal(t, "Link 2's URL must be an https: address.", apiErr.Message)
+	assert.Equal(t, "/footerLinks/1/url", apiErr.Field)
+
+	client, _ = servesStatus(t, http.StatusBadRequest, `{"error_code":"handler.brand.support_phone_invalid",`+
+		`"error_description":"Enter the phone number with its country code."}`)
+	_, err = client.UpdateBrand(context.Background(), "an-access-token", 7, &api.UpdateBrandRequest{Name: "Spring"})
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, "handler.brand.support_phone_invalid", apiErr.Code)
+	assert.Empty(t, apiErr.Field)
 }
