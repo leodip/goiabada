@@ -77,7 +77,7 @@ func TestFormPost_ThePageDrawsTheBrandsFooter(t *testing.T) {
 	require.Equal(t, 1, footer.Length())
 	assert.Zero(t, doc.Find("main footer").Length(), "the footer is its own landmark, outside main")
 	assert.Equal(t, 1, doc.Find("main + footer").Length())
-	assert.True(t, footer.HasClass("auth-footer-panel"), "the brand has a background image")
+	assert.True(t, footer.HasClass("brand-footer-panel"), "the brand has a background image")
 	const notice = "(öffnet sich in einem neuen Tab)"
 	assert.Equal(t, []formPostFooterLink{
 		{"https://acme.example/privacy", "_blank", "noopener noreferrer", "Datenschutz", notice},
@@ -113,5 +113,5 @@ func TestFormPost_ABrandWithNoFooterDrawsNone(t *testing.T) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(w.Body.String()))
 	require.NoError(t, err)
 	assert.Zero(t, doc.Find("footer").Length())
-	assert.Zero(t, doc.Find(".auth-footer").Length())
+	assert.Zero(t, doc.Find(".brand-footer").Length())
 }

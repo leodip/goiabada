@@ -256,7 +256,7 @@ test("the auth server's sign-in with its brand's footer, on the page's backgroun
       titled(own, "sign-in with its brand's footer on the page's background", "Sign in", async () => {
         await own.goto(authorizeUrl(client.identifier));
         await expect(own.getByRole("contentinfo")).toBeVisible();
-        await expect(own.locator("footer.auth-footer-panel")).toHaveCount(0);
+        await expect(own.locator("footer.brand-footer-panel")).toHaveCount(0);
       }),
       titled(own, "sign-in with its brand's footer on a panel over a background image", "Sign in", async () => {
         await page.goto(brandUrl(brand.id, "edit"));
@@ -264,7 +264,7 @@ test("the auth server's sign-in with its brand's footer, on the page's backgroun
         await page.locator("#btnSave").click();
         await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
         await own.goto(authorizeUrl(client.identifier));
-        await expect(own.locator("footer.auth-footer-panel")).toBeVisible();
+        await expect(own.locator("footer.brand-footer-panel")).toBeVisible();
       }),
     ]);
     await context.close();

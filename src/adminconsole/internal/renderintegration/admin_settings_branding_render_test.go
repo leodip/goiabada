@@ -779,13 +779,13 @@ func TestRender_AdminSettingsBrandingSampleHasARoomForTheFooter(t *testing.T) {
 	for _, mode := range []string{"light", "dark"} {
 		sample := sampleOf(t, out, mode)
 		assert.Regexp(t, `</div>\s*</div>\s*`+
-			`<div class="auth-footer" data-brand-sample-footer hidden>\s*`+
-			`<ul class="auth-footer-links" hidden></ul>\s*`+
-			`<p class="auth-footer-contact" hidden>\s*`+
+			`<div class="brand-footer" data-brand-sample-footer hidden>\s*`+
+			`<ul class="brand-footer-links" hidden></ul>\s*`+
+			`<p class="brand-footer-contact" hidden>\s*`+
 			`<span>Precisa de ajuda\?</span>\s*`+
-			`<span class="auth-footer-link" data-brand-sample-contact="email" hidden></span>\s*`+
-			`<span class="auth-footer-link" data-brand-sample-contact="phone" hidden></span>\s*`+
-			`<span class="auth-footer-link" data-brand-sample-contact="url" hidden>Página de suporte</span>\s*`+
+			`<span class="brand-footer-link" data-brand-sample-contact="email" hidden></span>\s*`+
+			`<span class="brand-footer-link" data-brand-sample-contact="phone" hidden></span>\s*`+
+			`<span class="brand-footer-link" data-brand-sample-contact="url" hidden>Página de suporte</span>\s*`+
 			`</p>\s*</div>\s*</div>\s*$`, sample, "the %s sample's footer, under its card", mode)
 		assert.NotContains(t, sample, "Privacy", "the script draws the links")
 		assert.NotContains(t, sample, "help@autumn.example", "the script draws the contact")

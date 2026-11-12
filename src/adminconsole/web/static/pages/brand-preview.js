@@ -225,19 +225,19 @@ function drawFooter(sample, footer) {
   if (!box) {
     return;
   }
-  const list = box.querySelector(".auth-footer-links");
+  const list = box.querySelector(".brand-footer-links");
   if (list) {
     list.replaceChildren(...footer.labels.map(function (label) {
       const item = document.createElement("li");
       const text = document.createElement("span");
-      text.setAttribute("class", "auth-footer-link");
+      text.setAttribute("class", "brand-footer-link");
       text.textContent = label;
       item.appendChild(text);
       return item;
     }));
     list.hidden = footer.labels.length === 0;
   }
-  const contact = box.querySelector(".auth-footer-contact");
+  const contact = box.querySelector(".brand-footer-contact");
   const values = { email: footer.email, phone: footer.phone, url: footer.url };
   for (const kind of Object.keys(values)) {
     const value = box.querySelector('[data-brand-sample-contact="' + kind + '"]');
@@ -252,7 +252,7 @@ function drawFooter(sample, footer) {
   if (contact) {
     contact.hidden = !hasContact;
   }
-  box.classList.toggle("auth-footer-panel", footer.panel);
+  box.classList.toggle("brand-footer-panel", footer.panel);
   box.hidden = footer.labels.length === 0 && !hasContact;
 }
 

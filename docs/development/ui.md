@@ -69,7 +69,7 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   (#813 decision 6). What is drawn outside the card, today the brand's footer (#814), is small
   `text-ink-muted` and link text straight on the page's `bg-canvas`, and sits on its own opaque
   panel in `bg-surface` only while the brand has a background image, whatever its fit and whether
-  or not the image loads (`.auth-footer-panel`): an uploaded image's colors are unknown, so text on
+  or not the image loads (`.brand-footer-panel`): an uploaded image's colors are unknown, so text on
   it, or on a translucent layer over it, has no contrast a test can hold, while both backgrounds
   are pairs `TestThemeContrast_EveryPairMeetsWCAGAA` checks. Draw nothing else outside the card
   without one of those two backgrounds. The footer is the page's `footer` landmark after `main`
@@ -142,9 +142,9 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   a `status-icon` (`-danger`, `-positive`, `-caution`, `-note`), `auth-actions` for two answers side
   by side, `auth-steps`, `auth-qr`, `secret-key` with `secret-key-row`, `code-hint`, `auth-address`,
   `auth-section-title`, `identity-row` and `link-list` of `link-row`; the console's pages without a
-  menu (home, the error pages, sign-out) draw the same card. Under it, `auth-footer` (with
-  `-panel` over a background image, and `app-footer` on an Account page) holds `auth-footer-links`
-  and `auth-footer-contact` of `auth-footer-link`s. A form's group among several of its kind is a
+  menu (home, the error pages, sign-out) draw the same card. Under it, `brand-footer` (with
+  `-panel` over a background image, and `app-footer` on an Account page) holds `brand-footer-links`
+  and `brand-footer-contact` of `brand-footer-link`s. A form's group among several of its kind is a
   `footer-link` fieldset, and what it holds out of sight a `details` `disclosure`. An uploaded image is an `image-upload`
   with an `image-preview` (`-square` for a logo), cropped in the `crop_dialog` partial: a
   `crop-area` the cropper draws in, and `crop-controls` whose `crop-slider`s do what dragging does,

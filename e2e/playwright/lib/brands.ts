@@ -762,11 +762,11 @@ export function sampleFooter(sample: Locator): Promise<SampleFooter> {
     const footer = sample.querySelector<HTMLElement>("[data-brand-sample-footer]")!;
     const shown = (element: Element) => (element as HTMLElement).checkVisibility();
     const text = (element: Element) => (element.textContent ?? "").replace(/\s+/g, " ").trim();
-    const contact = footer.querySelector(".auth-footer-contact")!;
+    const contact = footer.querySelector(".brand-footer-contact")!;
     const background = getComputedStyle(footer).backgroundColor;
     return {
       shown: shown(footer),
-      links: Array.from(footer.querySelectorAll(".auth-footer-links li")).filter(shown).map(text),
+      links: Array.from(footer.querySelectorAll(".brand-footer-links li")).filter(shown).map(text),
       contact: shown(contact) ? Array.from(contact.children).filter(shown).map(text) : [],
       panel: background !== "rgba(0, 0, 0, 0)" && background === getComputedStyle(sample.querySelector(".auth-card")!).backgroundColor,
       operable: footer.querySelectorAll("a, button, input, [tabindex]").length,

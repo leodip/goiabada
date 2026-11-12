@@ -21,7 +21,7 @@ func shownText(s string) *string { return &s }
 // sampleLink is a footer link of the sample as the auth server's footer draws one, but as plain text:
 // a list item holding one span in the footer link's look, with nothing in it that opens anything.
 func sampleLink(text string) previewFooterLink {
-	return previewFooterLink{Text: text, Element: "li>span.auth-footer-link"}
+	return previewFooterLink{Text: text, Element: "li>span.brand-footer-link"}
 }
 
 // noFooter is a sample's footer while the form holds no link and no contact: hidden, and empty.

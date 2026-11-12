@@ -49,7 +49,7 @@
          text on the page's background, on a panel while the brand has a background image, and drawn
          only for a brand with links or a contact (#814 decisions 6 and 7). */}}
     {{- with .brandFooter }}
-    <footer class="auth-footer{{ if .Panel }} auth-footer-panel{{ end }}">
+    <footer class="brand-footer{{ if .Panel }} brand-footer-panel{{ end }}">
       {{- template "brand_footer" $ }}
     </footer>
     {{- end }}

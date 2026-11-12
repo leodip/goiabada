@@ -99,7 +99,7 @@ func readFooter(doc *goquery.Document) drawnFooter {
 	drawn.footers = footer.Length()
 	drawn.inMain = doc.Find("main footer").Length()
 	drawn.afterMain = doc.Find("main + footer").Length()
-	drawn.panel = footer.HasClass("auth-footer-panel")
+	drawn.panel = footer.HasClass("brand-footer-panel")
 	drawn.lists = footer.Find("ul").Length()
 	footer.Find("ul > li > a").Each(func(_ int, link *goquery.Selection) {
 		drawn.links = append(drawn.links, readDrawnLink(link))
@@ -197,7 +197,7 @@ func TestRender_ABrandWithNoLinksAndNoContactDrawsNoFooter(t *testing.T) {
 			doc := renderFooterPage(t, layout.layout, layout.page, "en", &defaultBrandStub{brand: footerBrand(nil, "", "", "")})
 
 			assert.Zero(t, doc.Find("footer").Length())
-			assert.Zero(t, doc.Find(".auth-footer").Length())
+			assert.Zero(t, doc.Find(".brand-footer").Length())
 		})
 		t.Run(layout.layout+" a brand that cannot be read", func(t *testing.T) {
 			doc := renderFooterPage(t, layout.layout, layout.page, "en", &defaultBrandStub{err: errs.New("the database went away")})

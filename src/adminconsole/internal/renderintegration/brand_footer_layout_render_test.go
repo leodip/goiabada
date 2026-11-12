@@ -53,15 +53,15 @@ func footersOf(out string) []string {
 // a new tab and saying so to assistive technology; then "Need help?" with the address as a mailto:
 // link, the number as a tel: link and the URL under "Support page".
 const (
-	threeLinksMarkup = `<ul class="auth-footer-links">` +
-		`<li><a class="auth-footer-link" href="https://acme.example/privacy" target="_blank" rel="noopener noreferrer">Privacy<span class="sr-only"> (opens in a new tab)</span></a></li>` +
-		`<li><a class="auth-footer-link" href="https://status.acme.example/" target="_blank" rel="noopener noreferrer">Status<span class="sr-only"> (opens in a new tab)</span></a></li>` +
-		`<li><a class="auth-footer-link" href="https://acme.example/" target="_blank" rel="noopener noreferrer">Acme<span class="sr-only"> (opens in a new tab)</span></a></li>` +
+	threeLinksMarkup = `<ul class="brand-footer-links">` +
+		`<li><a class="brand-footer-link" href="https://acme.example/privacy" target="_blank" rel="noopener noreferrer">Privacy<span class="sr-only"> (opens in a new tab)</span></a></li>` +
+		`<li><a class="brand-footer-link" href="https://status.acme.example/" target="_blank" rel="noopener noreferrer">Status<span class="sr-only"> (opens in a new tab)</span></a></li>` +
+		`<li><a class="brand-footer-link" href="https://acme.example/" target="_blank" rel="noopener noreferrer">Acme<span class="sr-only"> (opens in a new tab)</span></a></li>` +
 		`</ul>`
-	fullContactMarkup = `<p class="auth-footer-contact"><span>Need help?</span>` +
-		`<a class="auth-footer-link" href="mailto:help@acme.example">help@acme.example</a>` +
-		`<a class="auth-footer-link" href="tel:&#43;442079460958">&#43;442079460958</a>` +
-		`<a class="auth-footer-link" href="https://acme.example/support" target="_blank" rel="noopener noreferrer">Support page<span class="sr-only"> (opens in a new tab)</span></a>` +
+	fullContactMarkup = `<p class="brand-footer-contact"><span>Need help?</span>` +
+		`<a class="brand-footer-link" href="mailto:help@acme.example">help@acme.example</a>` +
+		`<a class="brand-footer-link" href="tel:&#43;442079460958">&#43;442079460958</a>` +
+		`<a class="brand-footer-link" href="https://acme.example/support" target="_blank" rel="noopener noreferrer">Support page<span class="sr-only"> (opens in a new tab)</span></a>` +
 		`</p>`
 )
 
@@ -72,7 +72,7 @@ func TestRender_TheConsolesCardPagesDrawTheFooterUnderTheCard(t *testing.T) {
 		t.Run(p.name, func(t *testing.T) {
 			out := renderConsolePage(t, p, brand)
 
-			assert.Equal(t, []string{`<footer class="auth-footer">` + threeLinksMarkup + fullContactMarkup + `</footer>`}, footersOf(out))
+			assert.Equal(t, []string{`<footer class="brand-footer">` + threeLinksMarkup + fullContactMarkup + `</footer>`}, footersOf(out))
 			assert.Regexp(t, mainThenFooter, out, "the footer sits straight after main, outside it")
 			assert.Regexp(t, `(?s)<div class="auth-page">\s*<main id="main" class="auth-main">`, out,
 				"main and the footer share the page that draws the brand's background")
@@ -88,7 +88,7 @@ func TestRender_TheConsolesAccountPagesDrawTheFooterAfterTheContent(t *testing.T
 
 	out := renderConsolePage(t, accountConsolePage, brand)
 
-	assert.Equal(t, []string{`<footer class="auth-footer app-footer">` + threeLinksMarkup + fullContactMarkup + `</footer>`}, footersOf(out))
+	assert.Equal(t, []string{`<footer class="brand-footer app-footer">` + threeLinksMarkup + fullContactMarkup + `</footer>`}, footersOf(out))
 	assert.Regexp(t, mainThenFooter, out, "the footer sits straight after main, outside it")
 }
 
@@ -100,7 +100,7 @@ func TestRender_TheConsolesAdminPagesDrawNoFooter(t *testing.T) {
 	out := renderConsolePage(t, adminConsolePage, brand)
 
 	assert.Empty(t, footersOf(out))
-	assert.NotContains(t, out, "auth-footer")
+	assert.NotContains(t, out, "brand-footer")
 }
 
 // A card page's footer is on a panel exactly while its brand has a background image (#814 decision
@@ -115,9 +115,9 @@ func TestRender_TheConsolesCardFooterIsOnAPanelOverABackgroundImage(t *testing.T
 
 			require.Len(t, footers, 1, p.name)
 			if hasBackground {
-				assert.True(t, strings.HasPrefix(footers[0], `<footer class="auth-footer auth-footer-panel">`), "%s: %s", p.name, footers[0])
+				assert.True(t, strings.HasPrefix(footers[0], `<footer class="brand-footer brand-footer-panel">`), "%s: %s", p.name, footers[0])
 			} else {
-				assert.True(t, strings.HasPrefix(footers[0], `<footer class="auth-footer">`), "%s: %s", p.name, footers[0])
+				assert.True(t, strings.HasPrefix(footers[0], `<footer class="brand-footer">`), "%s: %s", p.name, footers[0])
 			}
 		}
 	}
@@ -131,18 +131,18 @@ func TestRender_TheConsolesFooterDrawsWhatTheBrandSets(t *testing.T) {
 		brand *api.PublicBrandResponse
 		want  string
 	}{
-		{"links alone", footerBrand(footerLinks[1:2], "", "", ""), `<ul class="auth-footer-links">` +
-			`<li><a class="auth-footer-link" href="https://status.acme.example/" target="_blank" rel="noopener noreferrer">Status<span class="sr-only"> (opens in a new tab)</span></a></li></ul>`},
-		{"the address alone", footerBrand(nil, "help@acme.example", "", ""), `<p class="auth-footer-contact"><span>Need help?</span>` +
-			`<a class="auth-footer-link" href="mailto:help@acme.example">help@acme.example</a></p>`},
-		{"the number alone", footerBrand(nil, "", "", "+14155550123"), `<p class="auth-footer-contact"><span>Need help?</span>` +
-			`<a class="auth-footer-link" href="tel:&#43;14155550123">&#43;14155550123</a></p>`},
-		{"the support page alone", footerBrand(nil, "", "https://help.acme.example/", ""), `<p class="auth-footer-contact"><span>Need help?</span>` +
-			`<a class="auth-footer-link" href="https://help.acme.example/" target="_blank" rel="noopener noreferrer">Support page<span class="sr-only"> (opens in a new tab)</span></a></p>`},
+		{"links alone", footerBrand(footerLinks[1:2], "", "", ""), `<ul class="brand-footer-links">` +
+			`<li><a class="brand-footer-link" href="https://status.acme.example/" target="_blank" rel="noopener noreferrer">Status<span class="sr-only"> (opens in a new tab)</span></a></li></ul>`},
+		{"the address alone", footerBrand(nil, "help@acme.example", "", ""), `<p class="brand-footer-contact"><span>Need help?</span>` +
+			`<a class="brand-footer-link" href="mailto:help@acme.example">help@acme.example</a></p>`},
+		{"the number alone", footerBrand(nil, "", "", "+14155550123"), `<p class="brand-footer-contact"><span>Need help?</span>` +
+			`<a class="brand-footer-link" href="tel:&#43;14155550123">&#43;14155550123</a></p>`},
+		{"the support page alone", footerBrand(nil, "", "https://help.acme.example/", ""), `<p class="brand-footer-contact"><span>Need help?</span>` +
+			`<a class="brand-footer-link" href="https://help.acme.example/" target="_blank" rel="noopener noreferrer">Support page<span class="sr-only"> (opens in a new tab)</span></a></p>`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, []string{`<footer class="auth-footer">` + tc.want + `</footer>`}, footersOf(renderConsolePage(t, homeConsolePage, tc.brand)))
-			assert.Equal(t, []string{`<footer class="auth-footer app-footer">` + tc.want + `</footer>`}, footersOf(renderConsolePage(t, accountConsolePage, tc.brand)))
+			assert.Equal(t, []string{`<footer class="brand-footer">` + tc.want + `</footer>`}, footersOf(renderConsolePage(t, homeConsolePage, tc.brand)))
+			assert.Equal(t, []string{`<footer class="brand-footer app-footer">` + tc.want + `</footer>`}, footersOf(renderConsolePage(t, accountConsolePage, tc.brand)))
 		})
 	}
 }
@@ -159,7 +159,7 @@ func TestRender_TheConsoleDrawsNoFooterForABrandWithNoLinksAndNoContact(t *testi
 			out := renderConsolePage(t, p, brand)
 
 			assert.Empty(t, footersOf(out), "%s on %s", name, p.name)
-			assert.NotContains(t, out, "auth-footer", "%s on %s", name, p.name)
+			assert.NotContains(t, out, "brand-footer", "%s on %s", name, p.name)
 		}
 	}
 }
@@ -200,8 +200,8 @@ func TestRender_TheConsolesFooterIsInThePagesLanguage(t *testing.T) {
 // "50%41off" as "50Aoff".
 func TestRender_TheConsolesMailtoLinkEncodesTheAddress(t *testing.T) {
 	for _, tc := range []struct{ address, wantLink string }{
-		{"100%pure@acme.example", `<a class="auth-footer-link" href="mailto:100%25pure@acme.example">100%pure@acme.example</a>`},
-		{"50%41off@acme.example", `<a class="auth-footer-link" href="mailto:50%2541off@acme.example">50%41off@acme.example</a>`},
+		{"100%pure@acme.example", `<a class="brand-footer-link" href="mailto:100%25pure@acme.example">100%pure@acme.example</a>`},
+		{"50%41off@acme.example", `<a class="brand-footer-link" href="mailto:50%2541off@acme.example">50%41off@acme.example</a>`},
 	} {
 		footers := footersOf(renderConsolePage(t, homeConsolePage, footerBrand(nil, tc.address, "", "")))
 

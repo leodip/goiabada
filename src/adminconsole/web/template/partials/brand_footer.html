@@ -4,23 +4,23 @@
      content (#814 decisions 1 to 7). Called with the page's data, only while it binds brandFooter. */ -}}
 {{- with .brandFooter }}
 {{- if .Links }}
-<ul class="auth-footer-links">
+<ul class="brand-footer-links">
   {{- range .Links }}
-  <li><a class="auth-footer-link" href="{{ .URL }}" target="_blank" rel="noopener noreferrer">{{ .Label }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a></li>
+  <li><a class="brand-footer-link" href="{{ .URL }}" target="_blank" rel="noopener noreferrer">{{ .Label }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a></li>
   {{- end }}
 </ul>
 {{- end }}
 {{- if .HasContact }}
-<p class="auth-footer-contact">
+<p class="brand-footer-contact">
   <span>{{ T $.ctx "common.footer.need_help" }}</span>
   {{- if .SupportEmail }}
-  <a class="auth-footer-link" href="mailto:{{ .SupportMailto }}">{{ .SupportEmail }}</a>
+  <a class="brand-footer-link" href="mailto:{{ .SupportMailto }}">{{ .SupportEmail }}</a>
   {{- end }}
   {{- if .SupportPhone }}
-  <a class="auth-footer-link" href="tel:{{ .SupportPhone }}">{{ .SupportPhone }}</a>
+  <a class="brand-footer-link" href="tel:{{ .SupportPhone }}">{{ .SupportPhone }}</a>
   {{- end }}
   {{- if .SupportURL }}
-  <a class="auth-footer-link" href="{{ .SupportURL }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "common.footer.support_page" }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a>
+  <a class="brand-footer-link" href="{{ .SupportURL }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "common.footer.support_page" }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a>
   {{- end }}
 </p>
 {{- end }}

@@ -262,13 +262,13 @@ function build(request) {
           el("div", { class: "auth-actions" }, [el("span", { class: "button" }), el("span", { class: "button button-primary" })]),
         ]),
       ])]),
-      el("div", { class: "auth-footer", "data-brand-sample-footer": "", hidden: "" }, [
-        el("ul", { class: "auth-footer-links", hidden: "" }),
-        el("p", { class: "auth-footer-contact", hidden: "" }, [
+      el("div", { class: "brand-footer", "data-brand-sample-footer": "", hidden: "" }, [
+        el("ul", { class: "brand-footer-links", hidden: "" }),
+        el("p", { class: "brand-footer-contact", hidden: "" }, [
           withText(el("span"), "Need help?"),
-          el("span", { class: "auth-footer-link", "data-brand-sample-contact": "email", hidden: "" }),
-          el("span", { class: "auth-footer-link", "data-brand-sample-contact": "phone", hidden: "" }),
-          withText(el("span", { class: "auth-footer-link", "data-brand-sample-contact": "url", hidden: "" }), "Support page"),
+          el("span", { class: "brand-footer-link", "data-brand-sample-contact": "email", hidden: "" }),
+          el("span", { class: "brand-footer-link", "data-brand-sample-contact": "phone", hidden: "" }),
+          withText(el("span", { class: "brand-footer-link", "data-brand-sample-contact": "url", hidden: "" }), "Support page"),
         ]),
       ]),
     ]);
@@ -405,15 +405,15 @@ function swatchColors(span) {
 // sampleFooter answers what a sample's footer shows: whether it shows, whether on the panel, its links
 // as their text and the elements holding it, and each contact value's text, null while hidden.
 function sampleFooter(footer) {
-  const list = footer.querySelector(".auth-footer-links");
-  const contact = footer.querySelector(".auth-footer-contact");
+  const list = footer.querySelector(".brand-footer-links");
+  const contact = footer.querySelector(".brand-footer-contact");
   const shown = function (kind) {
     const value = contact.querySelector("[data-brand-sample-contact=\"" + kind + "\"]");
     return value.hidden ? null : value.textContent;
   };
   return {
     hidden: footer.hidden,
-    panel: footer.classList.contains("auth-footer-panel"),
+    panel: footer.classList.contains("brand-footer-panel"),
     linksHidden: list.hidden,
     links: list.children.map(function (item) {
       return {
@@ -596,7 +596,7 @@ type previewSample struct {
 }
 
 // previewFooterLink is a link of a sample's footer: its text, and the elements holding it, such as
-// "li>span.auth-footer-link", an item holding one span of that class with no element in it.
+// "li>span.brand-footer-link", an item holding one span of that class with no element in it.
 type previewFooterLink struct {
 	Text    string `json:"text"`
 	Element string `json:"element"`

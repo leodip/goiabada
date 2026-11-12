@@ -233,7 +233,9 @@ test("each footer refusal is said at its input, which takes the focus, and the f
       await expect(input).toBeFocused();
       await expect(input).toHaveAttribute("aria-invalid", "true");
       await expect(input).toHaveAttribute("aria-describedby", /^brand-error\b/);
-      await expect(page.locator('[aria-invalid="true"]')).toHaveCount(1);
+      // Only the refused input is marked: the preview's samples draw an inert invalid field of
+      // their own, so the count is of the form's fields alone.
+      await expect(page.locator('.brand-editor > form [aria-invalid="true"]')).toHaveCount(1);
       // What was typed is drawn again: the links in the order they were sent, empty rows last.
       expect(await readBrandFooterForm(page)).toEqual(typed);
 

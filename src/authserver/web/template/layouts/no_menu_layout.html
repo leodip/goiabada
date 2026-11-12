@@ -61,25 +61,25 @@
          straight under the card: small text on the page's background, on a panel while the brand
          has a background image, and drawn only for a brand with either (#814 decisions 1 to 6). */}}
     {{- with .brandFooter }}
-    <footer class="auth-footer{{ if .Panel }} auth-footer-panel{{ end }}">
+    <footer class="brand-footer{{ if .Panel }} brand-footer-panel{{ end }}">
       {{- if .Links }}
-      <ul class="auth-footer-links">
+      <ul class="brand-footer-links">
         {{- range .Links }}
-        <li><a class="auth-footer-link" href="{{ .URL }}" target="_blank" rel="noopener noreferrer">{{ .Label }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a></li>
+        <li><a class="brand-footer-link" href="{{ .URL }}" target="_blank" rel="noopener noreferrer">{{ .Label }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a></li>
         {{- end }}
       </ul>
       {{- end }}
       {{- if .HasContact }}
-      <p class="auth-footer-contact">
+      <p class="brand-footer-contact">
         <span>{{ T $.ctx "common.footer.need_help" }}</span>
         {{- if .SupportEmail }}
-        <a class="auth-footer-link" href="mailto:{{ .SupportMailto }}">{{ .SupportEmail }}</a>
+        <a class="brand-footer-link" href="mailto:{{ .SupportMailto }}">{{ .SupportEmail }}</a>
         {{- end }}
         {{- if .SupportPhone }}
-        <a class="auth-footer-link" href="tel:{{ .SupportPhone }}">{{ .SupportPhone }}</a>
+        <a class="brand-footer-link" href="tel:{{ .SupportPhone }}">{{ .SupportPhone }}</a>
         {{- end }}
         {{- if .SupportURL }}
-        <a class="auth-footer-link" href="{{ .SupportURL }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "common.footer.support_page" }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a>
+        <a class="brand-footer-link" href="{{ .SupportURL }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "common.footer.support_page" }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a>
         {{- end }}
       </p>
       {{- end }}
