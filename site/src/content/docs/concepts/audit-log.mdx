@@ -442,8 +442,8 @@ These come from the Account API, which users reach through the admin console's a
 
 | Event | Meaning |
 |---|---|
-| `created_brand` | An administrator created a brand. |
-| `updated_brand` | An administrator saved a brand's name, appearance, theme, corners, font, background fit, whether the app name is hidden, and the assets in its logo, dark logo, favicon, background and font slots. |
+| `created_brand` | An administrator created a brand. The entry names it, and holds its support contact and its footer links' URLs, in order. |
+| `updated_brand` | An administrator saved a brand's name, appearance, theme, corners, font, background fit, whether the app name is hidden, the assets in its logo, dark logo, favicon, background and font slots, its support contact, and its footer links' URLs, in order. |
 | `deleted_brand` | An administrator deleted a brand. The entry says how many clients moved to the default brand. |
 | `updated_default_brand` | An administrator made another brand the default. The entry names the new and the old default. |
 | `uploaded_brand_asset` | An administrator uploaded a file for a brand's logo, favicon, background or font. No brand uses it until one is saved naming it. |
