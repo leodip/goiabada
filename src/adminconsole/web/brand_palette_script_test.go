@@ -990,3 +990,105 @@ func TestBrandPaletteJS_ABuiltInThemeAsksNothing(t *testing.T) {
 	assert.Equal(t, withColor(previewPalette("e1e0"), "canvas", "#111111"), fieldsOf(looks[0], "light"))
 	assert.Equal(t, listedNone, looks[0].Warnings)
 }
+
+// fullBody is the form a check of the 23 colors as the fields hold them sends: the mode advanced, the
+// appearance, and every color of each mode, from light and dark.
+func fullBody(appearance string, light, dark map[string]string) map[string]string {
+	body := map[string]string{"paletteMode": "advanced", "appearance": appearance}
+	for _, token := range brandTokens {
+		body["palette-light-"+token] = light[token]
+		body["palette-dark-"+token] = dark[token]
+	}
+	return body
+}
+
+// savedPage is customPage drawn with its saved brand's list, which describes the form as drawn.
+func savedPage() palettePage {
+	page := customPage()
+	page.warnings = &paletteSaved{CountLine: "1 pair is below its minimum.",
+		Items: []paletteAnswerItem{{Mode: "light", Foreground: "#e1e006", Background: "#e1e010", Text: "Light: Muted text on Soft brand background, 3.91:1. Minimum 4.5:1."}}}
+	return page
+}
+
+// A saved brand's form, as its page draws it, is the one its list describes: neither the load nor a
+// pageshow restoring nothing asks, so a saved basic palette's stored worked-out colors stay as stored.
+func TestBrandPaletteJS_ASavedBrandsListIsKeptWhileTheFormIsTheOneItDescribes(t *testing.T) {
+	looks := runBrandPalette(t, savedPage(), load(), waitFor(1000), previewStep{Do: "pageshow"}, waitFor(1000), lookAt())
+
+	assert.Empty(t, looks[0].Requests)
+	assert.Len(t, looks[0].Warnings.Items, 1, "the saved list, as the page drew it")
+	assert.Equal(t, previewPalette("e1e0"), fieldsOf(looks[0], "light"))
+}
+
+// A refused custom form, whose page draws no list, is checked at once on load, with no edit: the 23
+// colors as the fields hold them are sent, and only the list is drawn, working nothing out.
+func TestBrandPaletteJS_ARefusedFormIsCheckedOnLoad(t *testing.T) {
+	looks := runBrandPalette(t, customPage(), load(), waitFor(0), lookAt(), answer(0, 200, workedOut()), lookAt())
+
+	require.Len(t, looks[0].Requests, 1)
+	assert.Equal(t, fullBody("auto", previewPalette("e1e0"), previewPalette("e1d0")), looks[0].Requests[0].Body)
+	assert.Equal(t, previewPalette("e1e0"), fieldsOf(looks[1], "light"), "the stored worked-out colors are kept")
+	assert.Equal(t, previewPalette("e1d0"), fieldsOf(looks[1], "dark"))
+	assert.Zero(t, looks[1].SectionInputs)
+	labelled := "paletteWarningsCount"
+	assert.Equal(t, paletteWarnings{Count: twoPairsSay, CountRole: "status", List: &labelled, Items: workedOutList()}, looks[1].Warnings)
+
+	// One of the 19 that is not a color cannot be sent as it is, so the basic palette is, and its
+	// answer fills them.
+	looks = runBrandPalette(t, customPage(), restoreValue("palette-dark-focus", "blue"), load(), waitFor(0),
+		answer(0, 200, workedOut()), lookAt())
+	require.Len(t, looks[0].Requests, 1)
+	assert.Equal(t, basicBody("auto", previewPalette("e1e0"), previewPalette("e1d0")), looks[0].Requests[0].Body)
+	assert.Equal(t, "#a2d022", fieldsOf(looks[0], "dark")["focus"])
+}
+
+// A browser restoring a saved brand's form to another appearance, as WebKit does on Back, before the
+// script runs or before pageshow, leaves the saved list describing another form: it is asked at once
+// for the appearance restored, and the answer replaces it.
+func TestBrandPaletteJS_ARestoredAppearanceIsChecked(t *testing.T) {
+	passing := workedOut()
+	passing.CountLine = "Every pair meets its minimum."
+	passing.Warnings = []paletteAnswerItem{}
+	for name, steps := range map[string][]previewStep{
+		"before the script runs": {restore("appearance", "dark"), load()},
+		"before pageshow":        {load(), waitFor(1000), restore("appearance", "dark"), {Do: "pageshow"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			steps := append(steps, waitFor(0), lookAt(), answer(0, 200, passing), lookAt())
+			looks := runBrandPalette(t, savedPage(), steps...)
+
+			require.Len(t, looks[0].Requests, 1)
+			assert.Equal(t, fullBody("dark", previewPalette("e1e0"), previewPalette("e1d0")), looks[0].Requests[0].Body)
+			assert.Equal(t, paletteWarnings{Count: "Every pair meets its minimum.", CountRole: "status", Items: []paletteWarningLook{}}, looks[1].Warnings)
+			assert.Equal(t, previewPalette("e1e0"), fieldsOf(looks[1], "light"))
+		})
+	}
+}
+
+// A browser restoring a basic palette's four colors to ones the page was not drawn with leaves the
+// other 19 worked out from others, so the restored form is sent as a basic palette and its answer
+// fills them.
+func TestBrandPaletteJS_RestoredBasicColorsAreWorkedOutAgain(t *testing.T) {
+	looks := runBrandPalette(t, savedPage(), restoreValue("palette-light-canvas", "#101010"), load(), waitFor(0),
+		answer(0, 200, workedOut()), lookAt())
+
+	require.Len(t, looks[0].Requests, 1)
+	assert.Equal(t, basicBody("auto", withColor(previewPalette("e1e0"), "canvas", "#101010"), previewPalette("e1d0")), looks[0].Requests[0].Body)
+	assert.Equal(t, "#a2e022", fieldsOf(looks[0], "light")["focus"])
+	assert.Equal(t, "#101010", fieldsOf(looks[0], "light")["canvas"])
+	assert.Equal(t, twoPairsSay, looks[0].Warnings.Count)
+}
+
+// A pageshow restoring another form drops the answer to a request sent for the form before it, and
+// asks for the restored one; an answer drawn makes its form the one the list describes, so a pageshow
+// restoring nothing after it asks nothing.
+func TestBrandPaletteJS_APageshowDropsTheAnswerForTheFormBeforeIt(t *testing.T) {
+	looks := runBrandPalette(t, customPage(), load(), waitFor(0),
+		restore("appearance", "light"), previewStep{Do: "pageshow"}, answer(0, 200, workedOut()), lookAt(),
+		waitFor(0), answer(1, 200, workedOut()), previewStep{Do: "pageshow"}, waitFor(1000), lookAt())
+
+	assert.Equal(t, listedNone, looks[0].Warnings, "the answer for Automatic is dropped")
+	require.Len(t, looks[1].Requests, 2)
+	assert.Equal(t, "light", looks[1].Requests[1].Body["appearance"])
+	assert.Equal(t, twoPairsSay, looks[1].Warnings.Count)
+}

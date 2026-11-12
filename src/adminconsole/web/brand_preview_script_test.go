@@ -1312,6 +1312,9 @@ class Element extends Node {
     this.style = s.style;
     this.styleProps = s.props;
     this.checked = this.attributes.has("checked");
+    // What the page was drawn with, which a person's edit and a browser's restoring leave as it is.
+    this.defaultChecked = this.checked;
+    this.defaultValue = this.attributes.has("value") ? String(this.attributes.get("value")) : "";
     const self = this;
     this.dataset = new Proxy({}, {
       get: function (_, p) { return typeof p === "string" && self.hasAttribute(dataAttr(p)) ? self.getAttribute(dataAttr(p)) : undefined; },

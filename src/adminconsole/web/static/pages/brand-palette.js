@@ -39,6 +39,16 @@
 // could not be checked and are checked when the brand is saved, and the list is emptied; the fields,
 // which the preview draws, keep what was entered, and the page stays, its form unsaved, for the save
 // to check them. A built-in theme asks nothing.
+//
+// The list is kept the answer for the form as it stands (#815 decisions 8 and 9). The script notes
+// the form the list describes: the one the page was drawn with when it drew a saved brand's list, as
+// the form's default values hold it, and after that each answer's. On load, and on pageshow, a custom
+// form that is not that one, a refused form, whose page draws no list, or one a browser restored to
+// another appearance, mode or colors, is asked at once, dropping the answer to any request before it.
+// That check works nothing out that no edit needs: it sends the 23 colors as the fields hold them, a
+// saved basic palette's stored worked-out colors among them, and draws only the list. A basic palette
+// is sent as one, and its answer fills the other 19, when its four colors are no longer the ones the
+// page was drawn with or one of the 19 is not a color.
 
 (function () {
   "use strict";
@@ -68,6 +78,8 @@
   let checkTimer = null;
   let latestChange = 0;
   let fillDue = false;
+  // The form the list describes, as formState writes it, or null when it describes none.
+  let checkedState = null;
 
   function checkedValue(name) {
     const checked = document.querySelector('input[name="' + name + '"]:checked');
@@ -76,6 +88,25 @@
 
   function textFields() {
     return section.querySelectorAll("input[data-palette-value]");
+  }
+
+  // formState writes down what a check depends on: the theme, the appearance, the palette's mode and
+  // every color field, as the form holds them, or with drawn, as the page was drawn with them.
+  function formState(drawn) {
+    const state = [];
+    for (const name of ["theme", "appearance", "paletteMode"]) {
+      let value = "";
+      for (const choice of document.querySelectorAll('input[name="' + name + '"]')) {
+        if (drawn ? choice.defaultChecked : choice.checked) {
+          value = choice.value;
+        }
+      }
+      state.push(value);
+    }
+    for (const field of textFields()) {
+      state.push(drawn ? field.defaultValue : field.value);
+    }
+    return JSON.stringify(state);
   }
 
   function isColor(value) {
@@ -239,6 +270,7 @@
     if (!region || !countLine) {
       return;
     }
+    checkedState = null;
     region.hidden = line === null;
     countLine.textContent = line || "";
     let list = region.querySelector("ul.palette-warning-list");
@@ -303,12 +335,26 @@
       tellPage();
     }
     showWarnings(String(answer.countLine || ""), Array.isArray(answer.warnings) ? answer.warnings : []);
+    checkedState = formState(false);
+  }
+
+  // allColors reports whether every field of both modes in the rows of tokens holds a color.
+  function allColors(tokens) {
+    for (const mode of modes) {
+      for (const token of tokens) {
+        const field = document.getElementById("palette-" + mode + "-" + token);
+        if (!field || !isColor(field.value)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   // check sends the palette as the form holds it, unless a color it sends is not one, and draws the
   // answer if no change came after it.
   function check(change) {
-    const basic = fillDue || basicMode();
+    const basic = fillDue || (basicMode() && !allColors(rowTokens(false)));
     const body = new URLSearchParams();
     body.append("paletteMode", basic ? "basic" : "advanced");
     body.append("appearance", checkedValue("appearance"));
@@ -351,13 +397,18 @@
   // after delay, a pause for a typed edit and none for a choice. An edit in Basic leaves the other 19
   // to be worked out again.
   function ask(delay) {
+    send(delay, basicMode());
+  }
+
+  // send is ask, with rework saying whether the other 19 of a basic palette are worked out again.
+  function send(delay, rework) {
     latestChange++;
     clearTimeout(checkTimer);
     checkTimer = null;
     if (!checkUrl || checkedValue("theme") !== "custom") {
       return;
     }
-    if (basicMode()) {
+    if (rework) {
       fillDue = true;
     }
     const change = latestChange;
@@ -374,6 +425,26 @@
     drawSection();
     drawMode();
     drawColumns(false);
+  }
+
+  // reconcile asks at once, working nothing out, when the form is not the one the list describes.
+  function reconcile() {
+    if (formState(false) !== checkedState) {
+      send(0, false);
+    }
+  }
+
+  // fourDrawnWith reports whether the four colors of each mode are the ones the page was drawn with.
+  function fourDrawnWith() {
+    for (const mode of modes) {
+      for (const token of rowTokens(true)) {
+        const field = document.getElementById("palette-" + mode + "-" + token);
+        if (field && field.value !== field.defaultValue) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   function themePicked() {
@@ -459,6 +530,14 @@
   if (checkedTheme !== "custom") {
     previousTheme = checkedTheme;
   }
+  if (region && !region.hidden) {
+    checkedState = formState(true);
+  }
+  fillDue = basicMode() && !fourDrawnWith();
   drawAll();
-  window.addEventListener("pageshow", drawAll);
+  reconcile();
+  window.addEventListener("pageshow", function () {
+    drawAll();
+    reconcile();
+  });
 })();

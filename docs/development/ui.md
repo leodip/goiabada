@@ -174,7 +174,12 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   the colors could not be checked, and the save is unaffected. The list at the section's foot
   (`palette-warnings`) is a count line, the one `role="status"` part, so an edit announces the
   count and not the list, over an item per pair with a swatch of the pair. After a save the server
-  draws it from the brand's `contrastWarnings`, and the saved notice links to it.
+  draws it from the brand's `contrastWarnings`, and the saved notice links to it. The script notes
+  the form a list describes, the one the page was drawn with (`defaultValue`, `defaultChecked`)
+  when the server drew a list, then each answer's; on load and on `pageshow` it asks at once for a
+  custom form that is not that one, a refused form or one a browser restored. That check sends the
+  23 fields as they stand and draws only the list, so a saved basic palette's stored worked-out
+  colors are not worked out again until its four colors change.
   `brand_palette_script_test.go` runs the script under Node. Page text about the check says what it
   establishes, which pairs meet the two minimums, and never that a palette or a page meets WCAG
   (decision 11).

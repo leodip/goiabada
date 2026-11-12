@@ -25,7 +25,8 @@
 // Everything here is on the New brand page and nothing is saved, or on a brand of the test's own that no
 // client uses, so this is an ordinary parallel spec.
 // A browser restores the form after Back without firing a change, each engine in its own way, so this
-// file runs in Chromium, Firefox and WebKit (playwright.config.ts, #811 decision 5).
+// file runs in Chromium, Firefox and WebKit (playwright.config.ts, #811 decision 5): the sample, and on
+// a custom brand the list of failing pairs (#815 decisions 8 and 9), follow the form as it was restored.
 import type { Page } from "@playwright/test";
 import {
   appearanceSwatchFills,
@@ -43,6 +44,8 @@ import {
   openFooterLanguageLabels,
   paletteField,
   paletteTokens,
+  paletteWarningItems,
+  paletteWarningsCount,
   pickInEditor,
   previewSample,
   previewSwitch,
@@ -58,6 +61,7 @@ import {
   switchPreviewViewTo,
   uploadInEditor,
   uploadKit,
+  withCustomBrand,
   type Appearance,
   type BrandFooter,
   type Corners,
@@ -291,6 +295,43 @@ test("after leaving the page and coming Back, the sample matches the form as the
   const mode = (restored.appearance === "auto" ? restored.mode : restored.appearance) as PreviewMode;
   await expectPreviewFor(page, restored.appearance as Appearance);
   await expectSampleShown(page, restored.theme, mode);
+});
+
+test("after leaving a custom brand's page and coming Back, its list of failing pairs is the restored appearance's", async ({ page }) => {
+  // The probe's mid-gray brand color in light (#815), failing six light pairs, and Blueberry's own dark
+  // colors, failing none.
+  const palette = {
+    mode: "basic" as const,
+    light: { canvas: "#f4f4f4", surface: "#ffffff", ink: "#222222", brand: "#777777" },
+    dark: { canvas: "#0f1217", surface: "#171b22", ink: "#e6e8ec", brand: "#8ab4ff" },
+  };
+  const sixLightPairs = "6 pairs are below their minimum. Text and boundaries drawn in them do not meet WCAG 2.2 level AA contrast.";
+  const none = "Every pair meets its minimum.";
+  await withCustomBrand(page, "auto", palette, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await expect(paletteWarningsCount(page)).toHaveText(sixLightPairs);
+    await fillBrandForm(page, { appearance: "dark" });
+    await expect(paletteWarningsCount(page)).toHaveText(none);
+
+    await page.locator(".page-eyebrow").getByRole("link", { name: "Branding", exact: true }).click();
+    await expect(page).toHaveURL(brandingUrl);
+    await page.goBack();
+    await expect(page).toHaveURL(brandUrl(brand.id, "edit"));
+
+    // Each engine restores the form its own way, or not at all: whatever appearance it holds, the
+    // list is that appearance's.
+    const appearance = await page.evaluate(
+      () => document.querySelector<HTMLInputElement>('input[name="appearance"]:checked')?.value ?? "auto",
+    );
+    test.info().annotations.push({ type: "restored appearance", description: appearance });
+    if (appearance === "dark") {
+      await expect(paletteWarningsCount(page)).toHaveText(none);
+      await expect(paletteWarningItems(page)).toHaveCount(0);
+    } else {
+      await expect(paletteWarningsCount(page)).toHaveText(sixLightPairs);
+      await expect(paletteWarningItems(page).filter({ hasText: /^Light:/ })).toHaveCount(6);
+    }
+  });
 });
 
 test("picking a theme, an appearance, a mode or a kit choice sends no request", async ({ page }) => {

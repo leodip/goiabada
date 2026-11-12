@@ -7,11 +7,12 @@
 // one created is marked on the brand list it lands on (decision 9). While the colors are edited, the
 // list is the console's live check of them, and changes as a color is typed; Advanced then holds the
 // colors a basic palette works out; and when the check cannot be reached, the list says the colors
-// could not be checked (decision 6).
+// could not be checked (decision 6). A save refused for another field keeps the list of the colors the
+// form holds.
 //
 // The brands are the test's own, given to clients of the test's own, so no other page changes, and
 // this is an ordinary parallel spec. The console drawn in a custom palette is brands.system.ts's.
-import { setClientBrand } from "../../../lib/admin-console";
+import { expectRefusal, setClientBrand } from "../../../lib/admin-console";
 import {
   brandIdFromList,
   brandingUrl,
@@ -309,6 +310,24 @@ test("the list of failing pairs changes as a color is typed, and Advanced holds 
   await expect(paletteWarningItems(page).filter({ hasText: "Light: Brand color on Background," })).toHaveText(
     "Light: Brand color on Background, 4.1:1. Minimum 4.5:1.",
   );
+});
+
+test("a save refused for its name lists the failing pairs of the colors the form keeps", async ({ page }) => {
+  await withCustomBrand(page, "light", { mode: "basic", light: midGray, dark: warmBasicPalette.dark }, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await expect(paletteWarningItems(page)).toHaveText(midGrayPairs);
+
+    await page.locator("#name").fill("");
+    await page.locator("#btnSave").click();
+    await expectRefusal(page, "brand-error", "name", "Name is required.");
+    await expect(paletteWarnings(page)).toBeVisible();
+    await expect(paletteWarningsCount(page)).toHaveText(
+      "6 pairs are below their minimum. Text and boundaries drawn in them do not meet WCAG 2.2 level AA contrast.",
+    );
+    await expect(paletteWarningItems(page)).toHaveText(midGrayPairs);
+    // Checking the form as it stands works nothing out again: the colors stored stay in the fields.
+    for (const [token, value] of Object.entries(midGrayWorkedOut)) await expect(paletteField(page, "light", token), token).toHaveValue(value);
+  });
 });
 
 test("when the colors cannot be checked the page says so, and the sample keeps the colors typed", async ({ page }) => {

@@ -61,9 +61,14 @@ JSON. Mixing them makes the browser's `response.json()` throw on that branch alo
 `adminconsole/internal/handlers/ajax_writer_lint_test.go` refuses it. A console script sends every
 request with `utils.js`'s `scriptRequestHeaders`, whose `X-Requested-With` lets `RequiresScope`
 answer a request whose session has no tokens with `render.SessionEndedError` instead of a sign-in
-redirect `fetch` cannot follow, and follows that `session_ended` code with `goToSessionEnded`;
-`TestSessionEndedScripts_EveryFetchSiteFollowsTheCode` holds every fetch site to both. Which of the
-two a handler picks is the only decision it makes about an `apiClient` failure: `HandleAPIError`,
+redirect `fetch` cannot follow, and follows that `session_ended` code with `goToSessionEnded`.
+The one exception is the brand editor's live check of a custom palette in `pages/brand-palette.js`,
+which runs in the background while the colors are edited: on `session_ended`, as on a network
+failure, it says the colors could not be checked and stays on the unsaved form, whose save then
+meets the ended sign-in (#815 decision 6). `TestSessionEndedScripts_EveryFetchSiteFollowsTheCode`
+holds every fetch site to the headers and the `isSessionEnded` test, every one but the live check to
+`goToSessionEnded`, and the live check to never calling it. Which of the two kinds of writer a
+handler picks is the only decision it makes about an `apiClient` failure: `HandleAPIError`,
 `HandleAPIErrorWithCallback` and `HandleAPIErrorJSON` turn the auth server's status into the
 console's, and `TestHandlers_ApiClientErrorsReachTheClassifier` refuses a guard that answers one
 itself or catches every status as a rejected value (#279). In the auth server the type makes the
@@ -75,16 +80,19 @@ JSON too (#435)
 
 The admin API's error answer (`core/api.ErrorResponse`) is `error_code`, `error_description` and,
 optionally, `error_field`: a JSON Pointer (RFC 6901) to the member of the request body the refusal
-is about, such as `/footerLinks/1/url` or `/footerLinks/1/labels/pt-BR` (#814 decision 10). Set it
-for a refusal about one member of a list item, where a code per kind of refusal cannot say which
-item: the validator returns `refusalAt(localizedErr, tokens...)`, which escapes each token as RFC
-6901 section 3 says (`~` as `~0`, then `/` as `~1`), and `writeValidationError` answers it through
+is about, such as `/footerLinks/1/url` or `/footerLinks/1/labels/pt-BR` (#814 decision 10), or
+`/palette/mode` and `/palette/light/brand` (#815 decision 2). Set it for a refusal about one member
+of a list item or of a nested object, where a code per kind of refusal cannot say which one: the
+validator returns `refusalAt(localizedErr, tokens...)`, which escapes each token as RFC 6901
+section 3 says (`~` as `~0`, then `/` as `~1`), and `writeValidationError` answers it through
 `apiresponse.WriteErrorAt`. The index is zero-based, as the pointer's, while the sentence names the
-item by its number from 1 for a person. Today only a brand's footer links set it; a refusal about a
-field of its own keeps its own code, which the console maps to an input through `render.ErrorField`.
-The console reads a pointer with `render.ErrorPointer`, which unescapes its tokens. The member is
-optional, so a caller ignoring it is unaffected: reuse it for the next list of items with several
-fields rather than adding a code per item and field.
+item by its number from 1 for a person. Today a brand's footer links and its custom palette's mode
+and colors set it; a refusal about a field of its own keeps its own code, which the console maps to
+an input through `render.ErrorField`. The console reads a pointer with `render.ErrorPointer`, which
+unescapes its tokens, and maps it to the input it draws for that member, as the brand editor's
+`footerLinkInput` and `paletteInput` do. The member is optional, so a caller ignoring it is
+unaffected: reuse it for the next list of items with several fields rather than adding a code per
+item and field.
 
 ## Logging
 
