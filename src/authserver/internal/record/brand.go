@@ -115,7 +115,8 @@ func (f BrandBackgroundFit) IsValid() bool {
 
 // Brand is a look an administrator gives the pages: a name, an appearance, one of the built-in
 // themes (#810), and its kit: corners, a font, a background fit, whether the app name's text is
-// hidden beside a logo, and six slots naming a stored brand asset each (#813). One brand is the
+// hidden beside a logo, and six slots naming a stored brand asset each (#813); and the footer links
+// and the support contact drawn under its card (#814). One brand is the
 // default, the one the settings row's DefaultBrandId points at, and every page is drawn in it; the
 // others are stored and editable. Name is unique among brands, compared exactly as every name in
 // the schema is.
@@ -142,6 +143,14 @@ type Brand struct {
 	BackgroundAssetId  sql.NullInt64      `db:"background_asset_id"`
 	RegularFontAssetId sql.NullInt64      `db:"regular_font_asset_id"`
 	BoldFontAssetId    sql.NullInt64      `db:"bold_font_asset_id"`
+	// SupportEmail, SupportURL and SupportPhone are the brand's support contact, each optional and
+	// empty when unset (#814 decision 1). The phone number is stored in E.164, a "+" and digits.
+	SupportEmail string `db:"support_email"`
+	SupportURL   string `db:"support_url"`
+	SupportPhone string `db:"support_phone"`
+	// FooterLinks are the links drawn under the brand's card, in order, nil for none. The whole
+	// list is one column of JSON text (#814 decision 8).
+	FooterLinks BrandFooterLinks `db:"footer_links"`
 }
 
 // NewBrand answers a brand with the given name, appearance and theme, and the kit an existing

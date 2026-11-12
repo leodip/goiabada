@@ -174,7 +174,7 @@ func (d *Database) clearBrandFromClients(ctx context.Context, tx *sql.Tx, brandI
 // settings row names no default.
 func (d *Database) GetClientPageBrand(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Brand, error) {
 	return queryOne(ctx, d, tx, selectClientPageBrand.text(d.Dialect),
-		[]any{int64(initialSettingsId), clientIdentifier}, scanBrand, "brand")
+		[]any{int64(initialSettingsId), clientIdentifier}, scanBrand(ctx), "brand")
 }
 
 // CountClientsPerBrand answers, by brand id, how many clients are drawn in each brand: those given
