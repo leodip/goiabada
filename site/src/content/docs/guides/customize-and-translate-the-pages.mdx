@@ -229,7 +229,7 @@ The admin console and its sign-in page are drawn in [the admin console's client'
 
 ### Custom palettes through the Admin API
 
-A custom palette is the theme `custom` with a `palette` member, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/) and [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/). `palette` holds `mode`, `basic` or `advanced`, and `light` and `dark`, each a map from a color's [token](#custom-palettes) to its value:
+A custom palette is the theme `custom` with a `palette` member, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/) and [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/). An update replaces the whole brand, so a member you leave out, such as a [kit](#the-brand-kit) slot or a [footer](#footer-links-and-support-contact) member, is emptied. `palette` holds `mode`, `basic` or `advanced`, and `light` and `dark`, each a map from a color's [token](#custom-palettes) to its value:
 
 ```bash
 curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
@@ -256,7 +256,7 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
 - `palette` is required with `custom`. With a built-in theme, leave it out or send `null`.
 - `custom` is reserved: [`GET /api/v1/admin/brand-themes`](/reference/api/admin/operations/getbrandthemes/) lists the built-in themes alone.
 
-An update replaces the whole brand, so a member you leave out, such as a [kit](#the-brand-kit) slot or a [footer](#footer-links-and-support-contact) member, is emptied. A brand answers `palette` as it was written, and as `null` on a built-in theme, so a brand you read and send back is saved unchanged. A basic palette is worked out again from its four colors each time it's saved.
+A brand answers `palette` as it was written, and as `null` on a built-in theme, so a brand you read and send back is saved unchanged. A basic palette is worked out again from its four colors each time it's saved.
 
 Every brand answer also carries two read-only members, which a write ignores:
 
@@ -324,6 +324,8 @@ A brand's files are public, as the pages that draw them are: anyone can download
 
 The Admin API sets the kit in two steps. Each upload leaves an `uploaded_brand_asset` entry in the [audit log](/concepts/audit-log/).
 
+An update replaces the whole brand. `corners`, `font` and `backgroundFit` are required, `hideAppName` is false when you leave it out, and a slot you leave out or set to `null` is emptied. A `brand` you read with [`GET /api/v1/admin/brands/{id}`](/reference/api/admin/operations/getbrand/) and send back as it came is saved unchanged.
+
 <Steps>
 
 1. Upload each file as a brand asset of its kind, in the multipart field `file`, with [`POST /api/v1/admin/brand-assets/logo`](/reference/api/admin/operations/uploadbrandlogo/), [`/favicon`](/reference/api/admin/operations/uploadbrandfavicon/), [`/background`](/reference/api/admin/operations/uploadbrandbackground/) or [`/font`](/reference/api/admin/operations/uploadbrandfont/). A dark logo is uploaded as a logo, and both font files as a font. The answer holds the asset's `id`:
@@ -354,8 +356,6 @@ The Admin API sets the kit in two steps. Each upload leaves an `uploaded_brand_a
    ```
 
 </Steps>
-
-An update replaces the whole brand. `corners`, `font` and `backgroundFit` are required, `hideAppName` is false when you leave it out, and a slot you leave out or set to `null` is emptied. A `brand` you read with [`GET /api/v1/admin/brands/{id}`](/reference/api/admin/operations/getbrand/) and send back as it came is saved unchanged.
 
 ## Footer links and support contact
 
@@ -403,7 +403,7 @@ The footer's contact line reads "Need help?", followed by each value you set: th
 
 ### The footer through the Admin API
 
-A brand carries the footer in four members, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/), [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) and every brand they answer: `footerLinks`, the links in the order they're drawn, and `supportEmail`, `supportUrl` and `supportPhone`. A link is an object with `url`, `label` and, optionally, `labels`, a label for each language by its tag, such as `"pt-BR"`:
+A brand carries the footer in four members, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/), [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) and every brand they answer: `footerLinks`, the links in the order they're drawn, and `supportEmail`, `supportUrl` and `supportPhone`. As with the kit, an update replaces the whole brand, so a member you leave out or set to `null` is emptied. A link is an object with `url`, `label` and, optionally, `labels`, a label for each language by its tag, such as `"pt-BR"`:
 
 ```bash
 curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
@@ -426,7 +426,7 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
   }'
 ```
 
-An answer always carries all four: `[]` for no links, `""` for a value not set, and `{}` as the `labels` of a link with none. As with the kit, an update replaces the whole brand, so a member you leave out or set to `null` is emptied. A blank language label is dropped.
+An answer always carries all four: `[]` for no links, `""` for a value not set, and `{}` as the `labels` of a link with none. A blank language label is dropped.
 
 A refusal about a footer link carries `error_field`, a JSON Pointer to the member it's about, such as `/footerLinks/1/url` for the second link's URL. The pointer's index is counted from 0, while the message counts links from 1.
 
