@@ -23,6 +23,8 @@
 "common.field.password_confirmation" = "Passwort bestätigen"
 "common.link.sign_in_to_account" = "Bei Ihrem Konto anmelden"
 "common.link.opens_in_new_tab" = "(öffnet sich in einem neuen Tab)"
+"common.footer.need_help" = "Brauchen Sie Hilfe?"
+"common.footer.support_page" = "Supportseite"
 "common.password_toggle.show" = "Anzeigen"
 "common.password_toggle.hide" = "Ausblenden"
 "common.password_toggle.shown" = "Angezeigt"

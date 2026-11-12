@@ -75,6 +75,15 @@ type PageBrand struct {
 	DarkLogo         string
 	Favicon          string
 	HideAppName      bool
+	// Background is whether the brand has a background image, whatever its fit and whether or not
+	// the image loads: the footer is then drawn on a panel (#814 decision 6).
+	Background bool
+	// FooterLinks and the support contact are the brand's own, every label included, which the
+	// footer under the card draws (#814 decisions 1 and 5). There is no fallback to another brand's.
+	FooterLinks  record.BrandFooterLinks
+	SupportEmail string
+	SupportURL   string
+	SupportPhone string
 }
 
 // DefaultPageBrand answers what a page drawn in ctx takes from the default brand brands reads: every
@@ -131,6 +140,11 @@ func pageBrandOf(ctx context.Context, assets brandasset.SlotsReader, brand *reco
 	if slots.Favicon != nil {
 		page.Favicon = brandasset.Path(slots.Favicon)
 	}
+	page.Background = slots.Background != nil
+	page.FooterLinks = brand.FooterLinks
+	page.SupportEmail = brand.SupportEmail
+	page.SupportURL = brand.SupportURL
+	page.SupportPhone = brand.SupportPhone
 	// data-theme is written for light and dark alone, as ui.css reads it: automatic is no attribute,
 	// so the device's preference decides.
 	if brand.Appearance == record.BrandAppearanceLight || brand.Appearance == record.BrandAppearanceDark {

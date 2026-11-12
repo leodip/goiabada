@@ -28,34 +28,64 @@
 </head>
 
 <body>
-  <main class="auth-page">
-    <div class="panel auth-card{{ if .layoutWide }} auth-card-wide{{ end }}">
-      <div class="panel-body">
-        {{- /* The brand's logo sits above the app name, one image whichever mode the page is in. Its
-             alt is the app name only while the name's text is hidden, so a screen reader says the
-             name once (#813 decision 5). */}}
-        {{- if .brandLogo }}
-        {{- $alt := "" }}{{ if .brandHideAppName }}{{ $alt = .appName }}{{ end }}
-        <div class="auth-logo">
-          {{- if and .brandDarkLogo (eq $theme "dark") }}
-          <img src="{{ .brandDarkLogo }}" alt="{{ $alt }}">
-          {{- else if and .brandDarkLogo (not $theme) }}
-          <picture>
-            <source srcset="{{ .brandDarkLogo }}" media="(prefers-color-scheme: dark)">
+  <div class="auth-page">
+    <main class="auth-main">
+      <div class="panel auth-card{{ if .layoutWide }} auth-card-wide{{ end }}">
+        <div class="panel-body">
+          {{- /* The brand's logo sits above the app name, one image whichever mode the page is in. Its
+               alt is the app name only while the name's text is hidden, so a screen reader says the
+               name once (#813 decision 5). */}}
+          {{- if .brandLogo }}
+          {{- $alt := "" }}{{ if .brandHideAppName }}{{ $alt = .appName }}{{ end }}
+          <div class="auth-logo">
+            {{- if and .brandDarkLogo (eq $theme "dark") }}
+            <img src="{{ .brandDarkLogo }}" alt="{{ $alt }}">
+            {{- else if and .brandDarkLogo (not $theme) }}
+            <picture>
+              <source srcset="{{ .brandDarkLogo }}" media="(prefers-color-scheme: dark)">
+              <img src="{{ .brandLogo }}" alt="{{ $alt }}">
+            </picture>
+            {{- else }}
             <img src="{{ .brandLogo }}" alt="{{ $alt }}">
-          </picture>
-          {{- else }}
-          <img src="{{ .brandLogo }}" alt="{{ $alt }}">
+            {{- end }}
+          </div>
           {{- end }}
+          {{- if not .brandHideAppName }}
+          <p class="auth-brand">{{ .appName }}</p>
+          {{- end }}
+          {{ template "body" . }}
         </div>
-        {{- end }}
-        {{- if not .brandHideAppName }}
-        <p class="auth-brand">{{ .appName }}</p>
-        {{- end }}
-        {{ template "body" . }}
       </div>
-    </div>
-  </main>
+    </main>
+    {{- /* The brand's footer links and support contact, its own footer landmark outside main,
+         straight under the card: small text on the page's background, on a panel while the brand
+         has a background image, and drawn only for a brand with either (#814 decisions 1 to 6). */}}
+    {{- with .brandFooter }}
+    <footer class="auth-footer{{ if .Panel }} auth-footer-panel{{ end }}">
+      {{- if .Links }}
+      <ul class="auth-footer-links">
+        {{- range .Links }}
+        <li><a class="auth-footer-link" href="{{ .URL }}" target="_blank" rel="noopener noreferrer">{{ .Label }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a></li>
+        {{- end }}
+      </ul>
+      {{- end }}
+      {{- if .HasContact }}
+      <p class="auth-footer-contact">
+        <span>{{ T $.ctx "common.footer.need_help" }}</span>
+        {{- if .SupportEmail }}
+        <a class="auth-footer-link" href="mailto:{{ .SupportMailto }}">{{ .SupportEmail }}</a>
+        {{- end }}
+        {{- if .SupportPhone }}
+        <a class="auth-footer-link" href="tel:{{ .SupportPhone }}">{{ .SupportPhone }}</a>
+        {{- end }}
+        {{- if .SupportURL }}
+        <a class="auth-footer-link" href="{{ .SupportURL }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "common.footer.support_page" }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a>
+        {{- end }}
+      </p>
+      {{- end }}
+    </footer>
+    {{- end }}
+  </div>
 </body>
 
 {{ versionComment }}

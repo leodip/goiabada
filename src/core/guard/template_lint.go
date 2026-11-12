@@ -216,8 +216,9 @@ var newTabTargetRe = regexp.MustCompile(`(?i)\btarget\s*=\s*["']?_blank\b`)
 var linkEndTagRe = regexp.MustCompile(`(?i)</a\s*>`)
 
 // newTabNoticeRe matches the action that renders the new-tab text, from the page's dot or a
-// partial's.
-var newTabNoticeRe = regexp.MustCompile(`\{\{-?\s*T\s+\$?\.ctx\s+"` + regexp.QuoteMeta(newTabNoticeKey) + `"\s*-?\}\}`)
+// partial's, or the field the auth server's form_post page carries it in: that page is parsed with
+// no template functions, so its text arrives translated in its data (#814).
+var newTabNoticeRe = regexp.MustCompile(`\{\{-?\s*(?:T\s+\$?\.ctx\s+"` + regexp.QuoteMeta(newTabNoticeKey) + `"|\$\.page\.NewTabNotice)\s*-?\}\}`)
 
 // AssertTemplatesNewTabLinksSaySo holds every link that opens a new tab to saying so to assistive
 // technology, in built-in text (#814 decision 13): a link whose start tag carries target="_blank"
@@ -233,8 +234,8 @@ var newTabNoticeRe = regexp.MustCompile(`\{\{-?\s*T\s+\$?\.ctx\s+"` + regexp.Quo
 //
 // The claim is lexical, like the rules above: a start tag spelling target="_blank" anywhere in it,
 // in a branch included, and the action spelled as the templates spell it between that tag and the
-// next </a>. A target computed by an action, a link a script opens in a new tab, and a form's
-// target are outside it.
+// next </a>, or, in the form_post page, its {{ $.page.NewTabNotice }} field. A target computed by
+// an action, a link a script opens in a new tab, and a form's target are outside it.
 func AssertTemplatesNewTabLinksSaySo(t *testing.T, fsys fs.FS, root string) {
 	t.Helper()
 

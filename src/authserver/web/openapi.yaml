@@ -8673,11 +8673,35 @@ components:
           description: >-
             Whether the app name's text gives way to the logo, which then carries the name as its
             alternative text. Always false while the brand has no logo.
+        footerLinks:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/BrandFooterLinkResponse'
+          description: >-
+            The links the brand's pages draw under the card, in order, each with every label it
+            has, so a page picks the label of its own language and takes the fallback label in a
+            language the link has none for. `[]` when the brand has none.
+        supportEmail:
+          type: string
+          description: The support email address the brand's pages show, or an empty string.
+        supportUrl:
+          type: string
+          description: The support page the brand's pages link to, or an empty string.
+        supportPhone:
+          type: string
+          description: |
+            The support phone number the brand's pages show, in international format: `+` and
+            the digits, with no separators, such as `+442079460958`. An empty string when unset.
       required:
         - appearance
         - stylesheetUrl
         - colorsStylesheetUrl
         - hideAppName
+        - footerLinks
+        - supportEmail
+        - supportUrl
+        - supportPhone
 
     PasswordRulesResponse:
       type: object

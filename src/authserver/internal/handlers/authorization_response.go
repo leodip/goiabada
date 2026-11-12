@@ -314,6 +314,10 @@ type formPostTemplate struct {
 // brand's data-theme, stylesheet, logo, dark logo, favicon and whether the name gives way to the
 // logo, the text in the reader's language, and the stylesheet and script by their fingerprints. The page is parsed alone, with no layout and none of the
 // renderer's template functions, so every value it shows arrives here (#617).
+//
+// Footer is the brand's footer, drawn under the card as the layouts draw it, nil for a brand with no
+// links and no contact; NeedHelp, SupportPage and NewTabNotice are its built-in text, which the
+// layouts translate themselves (#814). The template guard reads NewTabNotice as the new-tab text.
 type formPostPage struct {
 	Lang            string
 	Theme           string
@@ -328,6 +332,10 @@ type formPostPage struct {
 	HideAppName     bool
 	Favicon         string
 	Script          string
+	Footer          *render.PageFooter
+	NeedHelp        string
+	SupportPage     string
+	NewTabNotice    string
 }
 
 // formPostAssetURL names the page's stylesheet and script by the fingerprints of the built-in static
@@ -338,8 +346,9 @@ var formPostAssetURL = render.NewAssetURLs(web.StaticFS())
 // the brand brands reads as the layouts are drawn (render.RequestPageBrand): the brand of the client
 // the response goes to, which ctx names, or the default. Its data-theme for a light or dark brand
 // and none for an automatic one, the brand's stylesheet after main.css, and its logo, name and
-// favicon as the layouts draw them. A brand that cannot be read leaves the page automatic in
-// main.css's colors, and the response is still delivered.
+// favicon as the layouts draw them, and its footer (render.FooterOf). A brand that cannot be read
+// leaves the page automatic in main.css's colors, with no footer, and the response is still
+// delivered.
 func newFormPostPage(ctx context.Context, settings *record.Settings, brands render.PageBrandReader) (formPostPage, error) {
 	stylesheet, err := formPostAssetURL("/static/main.css")
 	if err != nil {
@@ -364,6 +373,10 @@ func newFormPostPage(ctx context.Context, settings *record.Settings, brands rend
 		HideAppName:     brand.HideAppName,
 		Favicon:         brand.Favicon,
 		Script:          script,
+		Footer:          render.FooterOf(ctx, brand),
+		NeedHelp:        i18n.T(ctx, "common.footer.need_help"),
+		SupportPage:     i18n.T(ctx, "common.footer.support_page"),
+		NewTabNotice:    i18n.T(ctx, "common.link.opens_in_new_tab"),
 	}, nil
 }
 

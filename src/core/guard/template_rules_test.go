@@ -165,6 +165,8 @@ func TestTemplates_TheNewTabTable(t *testing.T) {
 		"template/attr.html":     {Data: []byte(`<a href="/x" target="_blank" title="{{ T $.ctx "common.link.opens_in_new_tab" }}">X</a>`)},
 		"template/after.html":    {Data: []byte(`<a href="/x" target="_blank">X</a>` + says)},
 		"template/otherkey.html": {Data: []byte(`<a href="/x" target="_blank">X<span class="sr-only"> {{ T $.ctx "common.link.sign_in_to_account" }}</span></a>`)},
+		// Rejected: another of the form_post page's fields, which holds no new-tab text.
+		"template/otherfield.html": {Data: []byte(`<a href="/x" target="_blank">X<span class="sr-only"> {{ $.page.Title }}</span></a>`)},
 		// Rejected once per silent link, beside one that says so; the line is the start tag's.
 		"template/two.html": {Data: []byte("<a href=\"/a\" target=\"_blank\">A" + says + "</a>\n" +
 			"<a href=\"/b\" target=\"_blank\">B</a>")},
@@ -175,6 +177,9 @@ func TestTemplates_TheNewTabTable(t *testing.T) {
 		"template/inplace.html": {Data: []byte(`<a href="/x" target="_self">X</a><a href="/y">Y</a>`)},
 		"template/form.html":    {Data: []byte(`<form action="/x" target="_blank"><button type="submit">Go</button></form>`)},
 		"template/action.html":  {Data: []byte(`<a href="/x" target="_blank" data-n="{{ if gt .n 1 }}many{{ end }}">X` + says + `</a>`)},
+		// Admitted: the field the form_post page, parsed without template functions, carries the
+		// text in.
+		"template/formpost.html": {Data: []byte(`<a href="/x" target="_blank">X<span class="sr-only"> {{ $.page.NewTabNotice }}</span></a>`)},
 	}
 
 	found, n := runRule(t, fsys, findSilentNewTabLinks)
@@ -183,12 +188,13 @@ func TestTemplates_TheNewTabTable(t *testing.T) {
 		`template/after.html: line 1: <a href="/x" target="_blank">`,
 		`template/attr.html: line 1: <a href="/x" target="_blank" title="{{ T $.ctx "common.link.opens_in_new_tab" }}">`,
 		`template/branch.html: line 1: <a href="{{ .url }}"{{ if .ext }} target="_blank"{{ end }}>`,
+		`template/otherfield.html: line 1: <a href="/x" target="_blank">`,
 		`template/otherkey.html: line 1: <a href="/x" target="_blank">`,
 		`template/silent.html: line 1: <a href="https://example.com" target="_blank" rel="noopener noreferrer">`,
 		`template/two.html: line 2: <a href="/b" target="_blank">`,
 		`template/upper.html: line 1: <A HREF="/x" TARGET='_BLANK'>`,
 	}, found)
-	assert.Equal(t, 12, n)
+	assert.Equal(t, 14, n)
 }
 
 // TestTemplates_TheWalkReachesEveryHTMLFileAndNothingElse pins what the shared walk hands the rules:

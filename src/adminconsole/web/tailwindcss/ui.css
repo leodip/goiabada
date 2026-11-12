@@ -1066,6 +1066,15 @@
     padding: 1.5rem 1rem;
   }
 
+  /* The page's main landmark holds the card, and the brand's footer follows it, outside main, so
+     the two are centered together and the footer sits straight under the card. */
+  .auth-main {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+  }
+
   .auth-card {
     width: 100%;
     max-width: 26.5rem;
@@ -1103,6 +1112,71 @@
     from {
       visibility: hidden;
     }
+  }
+
+  /* The brand's footer under the card (#814 decision 6): its links, then "Need help?" with its
+     support contact, in small muted text straight on the page's background, which the theme
+     contrast test holds in every theme and mode. It wraps rather than clip at a narrow width or a
+     large text size, a long address included. The form_post page holds it back with its card. */
+  .auth-footer {
+    width: 100%;
+    max-width: 26.5rem;
+    margin-top: 1rem;
+    color: var(--color-ink-muted);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .auth-page:has(form[data-auto-submit]) .auth-footer {
+    animation: auth-card-held-back 0s 2s backwards;
+  }
+
+  /* Over a background image, whose colors are unknown, the footer is on an opaque panel in the
+     card's color. */
+  .auth-footer-panel {
+    padding: 0.5rem 1rem;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .auth-footer-links,
+  .auth-footer-contact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    column-gap: 1rem;
+  }
+
+  .auth-footer-links + .auth-footer-contact {
+    margin-top: 0.25rem;
+  }
+
+  .auth-footer-contact {
+    column-gap: 0.75rem;
+  }
+
+  /* Each link is underlined, so it reads as a link without its color, and is a target at least 24
+     pixels square (WCAG 2.2 SC 1.4.1 and 2.5.8); the focus ring is the page's own. */
+  .auth-footer-link {
+    display: inline-flex;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-brand);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  .auth-footer-link:hover {
+    text-decoration-thickness: 2px;
   }
 
   .auth-brand {
