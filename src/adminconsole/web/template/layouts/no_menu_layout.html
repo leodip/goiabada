@@ -29,21 +29,31 @@
 </head>
 
 <body>
-  <main id="main" class="auth-page">
-    <div class="panel auth-card">
-      <div class="panel-body">
-        {{- /* The brand's logo sits above the app name, or in its place while the switch hides it
-             (#813 decision 5). */}}
-        {{- if .brandLogo }}
-        <div class="auth-logo">{{ if .brandHideAppName }}{{ template "brand_logo_named" . }}{{ else }}{{ template "brand_logo" . }}{{ end }}</div>
-        {{- end }}
-        {{- if not .brandHideAppName }}
-        <p class="auth-brand">{{ .appName }}</p>
-        {{- end }}
-        {{ template "body" . }}
+  <div class="auth-page">
+    <main id="main" class="auth-main">
+      <div class="panel auth-card">
+        <div class="panel-body">
+          {{- /* The brand's logo sits above the app name, or in its place while the switch hides it
+               (#813 decision 5). */}}
+          {{- if .brandLogo }}
+          <div class="auth-logo">{{ if .brandHideAppName }}{{ template "brand_logo_named" . }}{{ else }}{{ template "brand_logo" . }}{{ end }}</div>
+          {{- end }}
+          {{- if not .brandHideAppName }}
+          <p class="auth-brand">{{ .appName }}</p>
+          {{- end }}
+          {{ template "body" . }}
+        </div>
       </div>
-    </div>
-  </main>
+    </main>
+    {{- /* The brand's footer, its own footer landmark outside main, straight under the card: small
+         text on the page's background, on a panel while the brand has a background image, and drawn
+         only for a brand with links or a contact (#814 decisions 6 and 7). */}}
+    {{- with .brandFooter }}
+    <footer class="auth-footer{{ if .Panel }} auth-footer-panel{{ end }}">
+      {{- template "brand_footer" $ }}
+    </footer>
+    {{- end }}
+  </div>
 </body>
 
 {{ versionComment }}

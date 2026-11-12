@@ -263,13 +263,22 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 	// while brandHideAppName (#813 decision 5). The URLs are the auth server's, linked as given. Given
 	// no brand, as by an auth server older than brands, a page is drawn automatic in main.css's colors.
 	// uiTheme is no longer bound, so a layout copied from an older release draws every page automatic.
-	brand := pageBrand(settings.Brand, drawsAdminMenu(templ))
+	adminPage := drawsAdminMenu(templ)
+	brand := pageBrand(settings.Brand, adminPage)
 	data["brandDataTheme"] = brand.DataTheme
 	data["brandStylesheet"] = brand.Stylesheet
 	data["brandLogo"] = brand.Logo
 	data["brandDarkLogo"] = brand.DarkLogo
 	data["brandHideAppName"] = brand.HideAppName
 	data["brandFavicon"] = brand.Favicon
+	// Every end-user page draws brandFooter, the brand's footer links and support contact: a card
+	// page under its card and an Account page after its content. It is bound only for a brand with
+	// either, and never for an admin page, which draws no footer (#814 decisions 6 and 7).
+	if !adminPage {
+		if footer := footerOf(r.Context(), settings.Brand); footer != nil {
+			data["brandFooter"] = footer
+		}
+	}
 
 	var buf bytes.Buffer
 	err = templ.Execute(&buf, data)

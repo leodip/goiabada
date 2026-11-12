@@ -79,6 +79,14 @@
         </noscript>
         {{ template "page" . }}
       </main>
+      {{- /* An Account page draws the brand's footer at the foot of its content, its own footer
+           landmark after main, in quiet text on the page's background; an admin page binds none
+           and draws none (#814 decision 7). */}}
+      {{- with .brandFooter }}
+      <footer class="auth-footer app-footer">
+        {{- template "brand_footer" $ }}
+      </footer>
+      {{- end }}
     </div>
   </div>
 </body>

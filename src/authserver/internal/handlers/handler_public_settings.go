@@ -80,7 +80,7 @@ func HandlePublicSettingsGet(database publicSettingsDatabase, baseURL string) ht
 		// Brand is here because the admin console draws its pages in its own client's brand (#810
 		// decision 3, #812 decision 7). It is its appearance, its two stylesheets' URLs, its logo's,
 		// dark logo's and favicon's URLs and whether the name gives way to the logo (#813 decision
-		// 9), and its footer links with every label and its support contact (#814 decision 9), all
+		// 9), whether it has a background image, and its footer links with every label and its support contact (#814 decision 9), all
 		// of which that client's sign-in pages already show anyone.
 		response := api.PublicSettingsResponse{
 			AppName:       settings.AppName,
@@ -114,6 +114,9 @@ func publicBrand(ctx context.Context, brands render.PageBrandReader, baseURL str
 		StylesheetURL:       baseURL + brand.Stylesheet,
 		ColorsStylesheetURL: baseURL + brand.ColorsStylesheet,
 		HideAppName:         brand.HideAppName,
+		// Whether a background image is set, whatever its fit, so the console draws its card pages'
+		// footer on a panel over it, as the auth server's own pages do (#814 decision 6, D1).
+		HasBackground: brand.Background,
 	}
 	// An empty slot is left out, as the URL of nothing.
 	absolute := func(path string) string {

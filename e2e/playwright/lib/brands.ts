@@ -467,6 +467,62 @@ export async function setBrandKit(request: APIRequestContext, token: string, bra
       background: slot(brand.background),
       regularFont: slot(brand.regularFont),
       boldFont: slot(brand.boldFont),
+      // The footer as it was read, so it is kept: a member left out would mean none (#814).
+      footerLinks: brand.footerLinks,
+      supportEmail: brand.supportEmail,
+      supportUrl: brand.supportUrl,
+      supportPhone: brand.supportPhone,
+    },
+    failOnStatusCode: false,
+  });
+  expect(written.status(), await written.text()).toBe(200);
+}
+
+// A brand's footer links and support contact, as the Admin API names them (#814): up to three
+// links, each a URL, a fallback label and a label per built-in language, and each contact value
+// optional.
+export interface BrandFooterLink {
+  url: string;
+  label: string;
+  labels?: Record<string, string>;
+}
+
+export interface BrandFooter {
+  footerLinks?: BrandFooterLink[];
+  supportEmail?: string;
+  supportUrl?: string;
+  supportPhone?: string;
+}
+
+// Writes a brand's footer links and support contact as footer has them, an absent one none, and
+// keeps the rest of the brand, its kit included, as it is stored.
+export async function setBrandFooter(request: APIRequestContext, token: string, brandId: number, footer: BrandFooter) {
+  const url = `${env.authUrl}/api/v1/admin/brands/${brandId}`;
+  const headers = { Authorization: `Bearer ${token}` };
+  const read = await request.get(url, { headers, failOnStatusCode: false });
+  expect(read.status(), await read.text()).toBe(200);
+  const { brand } = await read.json();
+  const slot = (asset?: { id: number } | null) => (asset ? { id: asset.id } : null);
+  const written = await request.put(url, {
+    headers,
+    data: {
+      name: brand.name,
+      appearance: brand.appearance,
+      theme: brand.theme,
+      corners: brand.corners,
+      font: brand.font,
+      backgroundFit: brand.backgroundFit,
+      hideAppName: brand.hideAppName,
+      logo: slot(brand.logo),
+      darkLogo: slot(brand.darkLogo),
+      favicon: slot(brand.favicon),
+      background: slot(brand.background),
+      regularFont: slot(brand.regularFont),
+      boldFont: slot(brand.boldFont),
+      footerLinks: footer.footerLinks ?? [],
+      supportEmail: footer.supportEmail ?? "",
+      supportUrl: footer.supportUrl ?? "",
+      supportPhone: footer.supportPhone ?? "",
     },
     failOnStatusCode: false,
   });

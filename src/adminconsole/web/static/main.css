@@ -1995,6 +1995,25 @@
   .app-main:focus {
     outline: none;
   }
+  .app-footer {
+    max-width: 80rem;
+    margin-top: 0;
+    padding: 0 1rem 1.5rem;
+    text-align: start;
+  }
+  .app-footer .auth-footer-links, .app-footer .auth-footer-contact {
+    justify-content: flex-start;
+  }
+  @media (min-width: 40rem) {
+    .app-footer {
+      padding: 0 1.5rem 2rem;
+    }
+  }
+  @media (min-width: 64rem) {
+    .app-footer {
+      padding: 0 2.5rem 2rem;
+    }
+  }
   @media (min-width: 40rem) {
     .app-main {
       padding: 2rem 1.5rem 3rem;

@@ -296,9 +296,9 @@ command itself and fails on a tree it changed.
 | `core/brandkit` | `FaviconMaxBytes` | both-apps | — |
 | `core/brandkit` | `FontMaxBytes` | both-apps | — |
 | `core/brandkit` | `FontStack` | both-apps | — |
-| `core/brandkit` | `FooterLinkLabel` | contract | The one rule for which label a brand's footer link is drawn with on a page: its own for the page's language, else its fallback. The admin console's end-user pages draw the same footer from the public settings, which carry every label, and are to pick by this rule, so a link reads alike on both (#814 decision 9). Only the auth server names it until the console draws its footer. |
+| `core/brandkit` | `FooterLinkLabel` | both-apps | — |
 | `core/brandkit` | `LogoMaxBytes` | both-apps | — |
-| `core/brandkit` | `MailtoAddress` | contract | The one encoding of a brand's support address in the footer's mailto: link, percent-encoded where RFC 6068 section 2 says it must be (#814 decision 1). The admin console's end-user pages draw the same footer from the public settings, so the two are to write the link alike. Only the auth server names it until the console draws its footer. |
+| `core/brandkit` | `MailtoAddress` | both-apps | — |
 | `core/brandkit` | `Radii` | own-package | — |
 | `core/brandkit` | `RegularFontWeights` | both-apps | — |
 | `core/brandkit` | `UploadedFontFamily` | both-apps | — |

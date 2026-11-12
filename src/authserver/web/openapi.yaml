@@ -8673,6 +8673,11 @@ components:
           description: >-
             Whether the app name's text gives way to the logo, which then carries the name as its
             alternative text. Always false while the brand has no logo.
+        hasBackground:
+          type: boolean
+          description: >-
+            Whether the brand has a background image, whatever its fit. The full stylesheet draws
+            the image; a page draws its footer on a panel over it.
         footerLinks:
           type: array
           maxItems: 3
@@ -8698,6 +8703,7 @@ components:
         - stylesheetUrl
         - colorsStylesheetUrl
         - hideAppName
+        - hasBackground
         - footerLinks
         - supportEmail
         - supportUrl
