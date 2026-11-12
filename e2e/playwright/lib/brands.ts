@@ -744,3 +744,32 @@ export function drawnFooter(page: Page): Promise<DrawnFooter | null> {
     };
   });
 }
+
+// What a sample of the brand editor's preview draws of the footer under its card (#814 decision 12):
+// whether it shows, the links' text in order, the contact line's parts that show, in order, "Need
+// help?" first, whether it is on a panel in the card's color rather than on the sample's background,
+// and how many elements in it could be operated, which the inert sample draws none of.
+export interface SampleFooter {
+  shown: boolean;
+  links: string[];
+  contact: string[];
+  panel: boolean;
+  operable: number;
+}
+
+export function sampleFooter(sample: Locator): Promise<SampleFooter> {
+  return sample.evaluate((sample) => {
+    const footer = sample.querySelector<HTMLElement>("[data-brand-sample-footer]")!;
+    const shown = (element: Element) => (element as HTMLElement).checkVisibility();
+    const text = (element: Element) => (element.textContent ?? "").replace(/\s+/g, " ").trim();
+    const contact = footer.querySelector(".auth-footer-contact")!;
+    const background = getComputedStyle(footer).backgroundColor;
+    return {
+      shown: shown(footer),
+      links: Array.from(footer.querySelectorAll(".auth-footer-links li")).filter(shown).map(text),
+      contact: shown(contact) ? Array.from(contact.children).filter(shown).map(text) : [],
+      panel: background !== "rgba(0, 0, 0, 0)" && background === getComputedStyle(sample.querySelector(".auth-card")!).backgroundColor,
+      operable: footer.querySelectorAll("a, button, input, [tabindex]").length,
+    };
+  });
+}

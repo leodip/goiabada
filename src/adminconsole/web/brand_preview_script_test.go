@@ -21,12 +21,16 @@ import (
 // preview's sentences on the appearance and its Light/Dark switch outside the form, drawn for the
 // appearance the form was drawn with, the two samples, light and dark, hidden until styled, and the
 // palettes data block. The swatches start in a color no theme has, so a swatch the script does not
-// draw keeps it. It
+// draw keeps it. The form ends with the footer's three rows, each a label, a URL and a label per
+// built-in language, and the support contact's three fields, and each sample ends with its footer
+// under the card, drawn hidden and empty, as the brand_sample partial draws it (#814). It
 // loads the served brand-preview.js into it, then acts as a person and a browser do: picking a
 // theme or a mode (a radio checked, then its input and change events, which bubble), a browser
 // restoring the form with no event, and pageshow. At each "look" it writes down what each sample
 // shows, every style property any element carries, which of the switch and the sentences show,
-// and the colors each card's swatch is drawn in, token by token.
+// the colors each card's swatch is drawn in, token by token, and each sample's footer: whether it
+// shows, on a panel or not, its links' text and the elements holding them, and each contact value
+// shown. A person typing is a field's value set, then its input event, which bubbles.
 //
 // The DOM is the browser's, a boundary this module does not own, so it is stood in for: only what
 // a page script reads, with radios unchecking the rest of their group, as a browser's do. A
@@ -114,6 +118,11 @@ class Node {
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
   removeChild(child) { this.children = this.children.filter(function (c) { return c !== child; }); child.parentNode = null; return child; }
+  replaceChildren() {
+    for (const c of this.children) { c.parentNode = null; }
+    this.children = [];
+    for (const c of arguments) { this.appendChild(c); }
+  }
   remove() { if (this.parentNode) { this.parentNode.removeChild(this); } }
 }
 
@@ -146,6 +155,21 @@ class Element extends Node {
     return on;
   }
   get id() { return this.getAttribute("id") || ""; }
+  get lang() { return this.getAttribute("lang") || ""; }
+  get classList() {
+    const self = this;
+    const names = function () { return (self.getAttribute("class") || "").split(/\s+/).filter(Boolean); };
+    return {
+      contains: function (c) { return names().indexOf(c) >= 0; },
+      toggle: function (c, force) {
+        const has = names().indexOf(c) >= 0;
+        const on = force === undefined ? !has : !!force;
+        if (on && !has) { self.setAttribute("class", names().concat([c]).join(" ")); }
+        if (!on && has) { self.setAttribute("class", names().filter(function (n) { return n !== c; }).join(" ")); }
+        return on;
+      },
+    };
+  }
   get name() { return this.getAttribute("name") || ""; }
   get type() { return this.getAttribute("type") || ""; }
   get value() { return this.getAttribute("value") || ""; }
@@ -220,6 +244,7 @@ function build(request) {
     for (const c of children || []) { e.appendChild(c); }
     return e;
   };
+  const withText = function (e, text) { e.textContent = text; return e; };
   const radio = function (name, value, checked) {
     const attrs = { type: "radio", id: name + "-" + value, name: name, value: value };
     if (checked) { attrs.checked = ""; }
@@ -237,8 +262,35 @@ function build(request) {
           el("div", { class: "auth-actions" }, [el("span", { class: "button" }), el("span", { class: "button button-primary" })]),
         ]),
       ])]),
+      el("div", { class: "auth-footer", "data-brand-sample-footer": "", hidden: "" }, [
+        el("ul", { class: "auth-footer-links", hidden: "" }),
+        el("p", { class: "auth-footer-contact", hidden: "" }, [
+          withText(el("span"), "Need help?"),
+          el("span", { class: "auth-footer-link", "data-brand-sample-contact": "email", hidden: "" }),
+          el("span", { class: "auth-footer-link", "data-brand-sample-contact": "phone", hidden: "" }),
+          withText(el("span", { class: "auth-footer-link", "data-brand-sample-contact": "url", hidden: "" }), "Support page"),
+        ]),
+      ]),
     ]);
   };
+  // A text field of the form, holding what the request says it holds.
+  const footer = request.footer || {};
+  const field = function (id, attrs) {
+    return el("input", Object.assign({ class: "control", id: id, name: id, value: footer[id] || "" }, attrs || {}));
+  };
+  // The footer's rows and the support contact, as the editor draws them (#814 decision 11).
+  const footerFields = [];
+  for (let row = 0; row < 3; row++) {
+    const prefix = "footerLinks-" + row + "-";
+    footerFields.push(el("fieldset", { class: "footer-link", id: "footerLinks-" + row }, [
+      field(prefix + "label", { type: "text" }),
+      field(prefix + "url", { type: "url" }),
+      el("details", { class: "disclosure" }, ["en", "pt-BR", "es", "fr", "de", "it"].map(function (tag) {
+        return field(prefix + "labels-" + tag, { type: "text", lang: tag });
+      })),
+    ]));
+  }
+  footerFields.push(field("supportEmail", { type: "email" }), field("supportUrl", { type: "url" }), field("supportPhone", { type: "tel" }));
   // A swatch as the brand_swatch partial draws it, one SVG per mode, in the stale color: each
   // shape names the token its fill, or its border, is drawn from.
   const swatch = function (attrs, modes) {
@@ -289,7 +341,7 @@ function build(request) {
   // The font select: its value is the option the form holds, as a browser answers it.
   const fontSelect = el("select", { class: "control", id: "font", name: "font", value: request.font },
     request.fonts.map(function (font) { return el("option", { value: font }); }));
-  const html = el("html", { lang: "en" }, [
+  const html = el("html", { lang: request.lang || "en" }, [
     el("head"),
     el("body", {}, [el("main", { id: "main" }, [
       el("div", { class: "brand-editor" }, [
@@ -310,7 +362,7 @@ function build(request) {
           })),
           el("label", { class: "check-row" }, [el("input", Object.assign({ type: "checkbox", id: "hideAppName", name: "hideAppName" },
             request.hideAppName ? { checked: "" } : {}))]),
-        ].concat(slotFields)),
+        ].concat(slotFields).concat(footerFields)),
         el("section", { class: "brand-preview" }, [
           el("div", { class: "brand-preview-header" }, [
             el("h2", { class: "brand-preview-title" }),
@@ -350,6 +402,35 @@ function swatchColors(span) {
   });
 }
 
+// sampleFooter answers what a sample's footer shows: whether it shows, whether on the panel, its links
+// as their text and the elements holding it, and each contact value's text, null while hidden.
+function sampleFooter(footer) {
+  const list = footer.querySelector(".auth-footer-links");
+  const contact = footer.querySelector(".auth-footer-contact");
+  const shown = function (kind) {
+    const value = contact.querySelector("[data-brand-sample-contact=\"" + kind + "\"]");
+    return value.hidden ? null : value.textContent;
+  };
+  return {
+    hidden: footer.hidden,
+    panel: footer.classList.contains("auth-footer-panel"),
+    linksHidden: list.hidden,
+    links: list.children.map(function (item) {
+      return {
+        text: item.textContent,
+        element: item.tagName.toLowerCase() + ">" + item.children.map(function (c) {
+          return c.tagName.toLowerCase() + "." + (c.getAttribute("class") || "").split(/\s+/).join(".") + (c.children.length ? ">" + c.children.length : "");
+        }).join(","),
+      };
+    }),
+    contactHidden: contact.hidden,
+    needHelp: contact.children[0].textContent,
+    email: shown("email"),
+    phone: shown("phone"),
+    url: shown("url"),
+  };
+}
+
 function look(doc) {
   const swatches = { appearance: {}, theme: {} };
   for (const card of doc.querySelectorAll("label.option-card")) {
@@ -368,6 +449,7 @@ function look(doc) {
       hidden: s.hidden, style: Object.assign({}, s.styleProps),
       logo: { hidden: box.hidden, images: images.map(function (img) { return { src: img.getAttribute("src"), alt: img.getAttribute("alt") }; }) },
       nameHidden: s.querySelector(".auth-brand").hidden,
+      footer: sampleFooter(s.querySelector("[data-brand-sample-footer]")),
     };
   }
   const styledElsewhere = [];
@@ -425,6 +507,12 @@ process.stdin.on("end", function () {
       doc.querySelector("input[name=\"" + step.name + "Url\"]").setAttribute("value", step.url || "");
       idField.setAttribute("value", step.value || "");
       if (step.do === "slot") { dispatch(idField, event("input", true), doc, win); }
+    } else if (step.do === "type" || step.do === "restoreValue") {
+      // A text field typed in, or filled by a browser restoring the form, telling nothing.
+      const target = doc.getElementById(step.name);
+      if (!target) { throw new Error("no field " + step.name); }
+      target.setAttribute("value", step.value || "");
+      if (step.do === "type") { dispatch(target, event("input", true), doc, win); }
     } else if (step.do === "check") {
       const box = doc.getElementById(step.name);
       box.checked = step.value === "on";
@@ -504,6 +592,28 @@ type previewSample struct {
 	Style      map[string]string `json:"style"`
 	Logo       previewLogo       `json:"logo"`
 	NameHidden bool              `json:"nameHidden"`
+	Footer     previewFooter     `json:"footer"`
+}
+
+// previewFooterLink is a link of a sample's footer: its text, and the elements holding it, such as
+// "li>span.auth-footer-link", an item holding one span of that class with no element in it.
+type previewFooterLink struct {
+	Text    string `json:"text"`
+	Element string `json:"element"`
+}
+
+// previewFooter is a sample's footer under its card (#814): whether it shows and on the panel, its
+// links, and the contact line, each value's text or nil while it is hidden.
+type previewFooter struct {
+	Hidden        bool                `json:"hidden"`
+	Panel         bool                `json:"panel"`
+	LinksHidden   bool                `json:"linksHidden"`
+	Links         []previewFooterLink `json:"links"`
+	ContactHidden bool                `json:"contactHidden"`
+	NeedHelp      string              `json:"needHelp"`
+	Email         *string             `json:"email"`
+	Phone         *string             `json:"phone"`
+	URL           *string             `json:"url"`
 }
 
 // previewSlot is what a slot's hidden fields hold: an asset's id and URL.
@@ -529,7 +639,8 @@ type previewLook struct {
 // previewPage is the editor the stand-in document draws: the theme cards, which are the listed
 // themes' and need not be, the theme checked (none when it is no card's), the appearance, the corner
 // shape checked (none when it is no radio's), the family the font select holds, the fit checked, the
-// switch hiding the app name, and the files the slots hold, by slot.
+// switch hiding the app name, the files the slots hold, by slot, the page's language, "en" when
+// empty, and what the footer's fields hold, by id.
 type previewPage struct {
 	themeCards    []string
 	theme         string
@@ -539,6 +650,8 @@ type previewPage struct {
 	backgroundFit string
 	hideAppName   bool
 	slots         map[string]previewSlot
+	lang          string
+	footer        map[string]string
 }
 
 // previewKitStyles is what the page hands the script for each corner shape and family, in values no
@@ -591,6 +704,8 @@ func runBrandPreview(t *testing.T, page previewPage, steps ...previewStep) []pre
 		"backgroundFit": page.backgroundFit,
 		"hideAppName":   page.hideAppName,
 		"slots":         page.slots,
+		"lang":          page.lang,
+		"footer":        page.footer,
 		"fonts":         previewFonts,
 		"kitStyles":     previewKitStyles,
 		"steps":         steps,
