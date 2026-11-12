@@ -30,6 +30,7 @@ import {
   kitFiles,
   newBrandUrl,
   openFooterLanguageLabels,
+  pickInEditor,
   previewSample,
   previewSwitch,
   readBrandKitChoices,
@@ -625,7 +626,9 @@ test("the sample draws the footer as its fields are typed, each label in the pag
   await switchPreviewTo(page, "light");
   expect(sent, "the requests sent while the footer was typed").toEqual([]);
 
-  await uploadInEditor(page, "background", kitFiles.background);
+  expect(await pickInEditor(page, "background", kitFiles.background), "the background uploaded").toBe(
+    "Hochgeladen. Speichern Sie die Marke, um die Datei zu verwenden.",
+  );
   await footerOf().toEqual({ ...full, panel: true });
   await fillBrandForm(page, { backgroundFit: "tile" });
   await footerOf().toEqual({ ...full, panel: true });
