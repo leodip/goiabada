@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/brandkit"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/palette"
 )
 
 // Palette is one mode of a theme: a #rrggbb value for each of the 23 color tokens ui.css declares,
@@ -100,7 +101,8 @@ const ColorsStylesheetRoute = "/brand/{id}/colors.css"
 //
 // A choice drawn as today sets nothing, so a brand nobody has changed is drawn exactly as before the
 // kit, and its full stylesheet is its colors-only one. The logo, the dark logo and the favicon are
-// the page's to draw. A theme that is none of the built-in ones is an error.
+// the page's to draw. A theme that is none of the built-in ones is an error, as ColorsStylesheet
+// says.
 func FullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, error) {
 	colors, err := ColorsStylesheet(brand)
 	if err != nil {
@@ -183,8 +185,12 @@ func backgroundRule(background *record.BrandAsset, fit record.BrandBackgroundFit
 }
 
 // ColorsStylesheet returns the stylesheet that sets brand's colors alone, its theme's, whatever its
-// kit holds. A theme that is none of the built-in ones is an error.
+// kit holds: a built-in theme's, or a custom brand's stored palette (#815). A theme that is none of
+// the built-in ones is an error, and so is a custom brand whose palette cannot be drawn.
 func ColorsStylesheet(brand *record.Brand) (Stylesheet, error) {
+	if brand.Theme == record.BrandThemeCustom {
+		return customStylesheet(brand)
+	}
 	stylesheet, ok := stylesheets[brand.Theme]
 	if !ok {
 		return Stylesheet{}, errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brand.Id, brand.Theme)
@@ -192,10 +198,35 @@ func ColorsStylesheet(brand *record.Brand) (Stylesheet, error) {
 	return stylesheet, nil
 }
 
+// customStylesheet is the colors stylesheet of a brand on the custom theme: its stored palette's 23
+// colors of each mode, set as a built-in theme's are, whichever mode made the palette (#815 decision
+// 1). It is built on each call, from what the brand stores, and does no color math. A custom brand
+// with no palette, or with a mode missing a token or holding a value that is not a #rrggbb color,
+// cannot be drawn, which only a hand edit of the database makes: it is an error, as an unknown theme
+// is, so a value never reaches the stylesheet unless it is a color (decision 3).
+func customStylesheet(brand *record.Brand) (Stylesheet, error) {
+	if brand.Palette == nil {
+		return Stylesheet{}, errs.Errorf("brand %d has the custom theme and no palette", brand.Id)
+	}
+	for _, mode := range []struct {
+		name   string
+		colors map[string]string
+	}{{"light", brand.Palette.Light}, {"dark", brand.Palette.Dark}} {
+		for _, token := range tokens {
+			if !palette.IsColor(mode.colors[token]) {
+				return Stylesheet{}, errs.Errorf("brand %d has a custom palette whose %s %s color is not a #rrggbb color",
+					brand.Id, mode.name, token)
+			}
+		}
+	}
+	return newStylesheet(colorsCSS(brand.Palette.Light, brand.Palette.Dark)), nil
+}
+
 // StylesheetPath returns the path a page links brand's full stylesheet by, slots being the assets its
 // slots name: the brand's id, and the fingerprint of the stylesheet's contents, which name each file
 // it draws by the file's own fingerprint, so the path changes exactly when the stylesheet or a file
-// it draws does and a browser may keep it for a year. A theme that is none of the built-in ones is an error.
+// it draws does and a browser may keep it for a year, a custom brand's changing with each stored
+// color. A brand whose colors ColorsStylesheet cannot draw is an error.
 func StylesheetPath(brand *record.Brand, slots brandasset.Slots) (string, error) {
 	stylesheet, err := FullStylesheet(brand, slots)
 	if err != nil {
@@ -246,18 +277,24 @@ func stylesheetCSS(preset Preset) string {
 	if preset.Key == blueberry {
 		return "/* Blueberry is the palette main.css is built with: this stylesheet declares no colors. */\n"
 	}
-	declarations := func(palette Palette, indent string) string {
+	return colorsCSS(preset.Light, preset.Dark)
+}
+
+// colorsCSS sets every color token to its light value on the root and to its dark value under the
+// two dark conditions, as stylesheetCSS describes. Each value must be a color.
+func colorsCSS(light, dark map[string]string) string {
+	declarations := func(colors map[string]string, indent string) string {
 		var b strings.Builder
 		for _, token := range tokens {
-			b.WriteString(indent + "--color-" + token + ": " + palette[token] + ";\n")
+			b.WriteString(indent + "--color-" + token + ": " + colors[token] + ";\n")
 		}
 		return b.String()
 	}
-	return ":root {\n" + declarations(preset.Light, "  ") + "}\n" +
+	return ":root {\n" + declarations(light, "  ") + "}\n" +
 		"\n" +
 		"@media (prefers-color-scheme: dark) {\n" +
-		"  :root:not([data-theme=\"light\"]) {\n" + declarations(preset.Dark, "    ") + "  }\n" +
+		"  :root:not([data-theme=\"light\"]) {\n" + declarations(dark, "    ") + "  }\n" +
 		"}\n" +
 		"\n" +
-		":root[data-theme=\"dark\"] {\n" + declarations(preset.Dark, "  ") + "}\n"
+		":root[data-theme=\"dark\"] {\n" + declarations(dark, "  ") + "}\n"
 }
