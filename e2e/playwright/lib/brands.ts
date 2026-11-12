@@ -670,17 +670,25 @@ export async function openFooterLanguageLabels(page: Page, row: number) {
 }
 
 // Types footer into the editor: each row the link of its index, a row past the links emptied, the
-// language labels named opened and typed, and each contact value named. A value left out of a link
-// is typed empty.
+// language labels named typed, and each contact value named. A value left out of a link is typed
+// empty, a language label included, so nothing stays from what the row held before. A row's language
+// labels are opened when one of them is typed or emptied.
 export async function fillBrandFooter(page: Page, footer: BrandFooter) {
   const links = footer.footerLinks ?? [];
   for (let row = 0; row < footerRows; row++) {
     const link = links[row];
     await page.locator(`#footerLinks-${row}-label`).fill(link?.label ?? "");
     await page.locator(`#footerLinks-${row}-url`).fill(link?.url ?? "");
-    const labels = Object.entries(link?.labels ?? {});
-    if (labels.length > 0) await openFooterLanguageLabels(page, row);
-    for (const [tag, label] of labels) await page.locator(`#footerLinks-${row}-labels-${tag}`).fill(label);
+    const labels = link?.labels ?? {};
+    const prefix = `footerLinks-${row}-labels-`;
+    for (const input of await page.locator(`input[id^="${prefix}"]`).all()) {
+      const tag = (await input.getAttribute("id"))!.slice(prefix.length);
+      if (labels[tag] !== undefined || (await input.inputValue()) === "") continue;
+      await openFooterLanguageLabels(page, row);
+      await input.fill("");
+    }
+    if (Object.keys(labels).length > 0) await openFooterLanguageLabels(page, row);
+    for (const [tag, label] of Object.entries(labels)) await page.locator(`#${prefix}${tag}`).fill(label);
   }
   if (footer.supportEmail !== undefined) await page.locator("#supportEmail").fill(footer.supportEmail);
   if (footer.supportUrl !== undefined) await page.locator("#supportUrl").fill(footer.supportUrl);

@@ -151,9 +151,10 @@ func TestTemplates_TheHtmlLangTable(t *testing.T) {
 // carry the built-in new-tab text among its contents, however it is spelled around it, and a link
 // that opens in place is not this rule's business.
 //
-// The rows that carry the text in an attribute, outside the link, or under another key are the ones
-// a careless match would admit: the text has to be inside the link, as the link's own text, for
-// assistive technology to read it as part of the link's name.
+// The rows that carry the text in the link's own attribute, outside the link, or under another key
+// are the ones a careless match would admit: the text has to be inside the link for assistive
+// technology to read it as part of the link's name. Inside the link an attribute counts too, as an
+// image's alt there is part of that name.
 func TestTemplates_TheNewTabTable(t *testing.T) {
 	says := `<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span>`
 	fsys := fstest.MapFS{
@@ -170,9 +171,11 @@ func TestTemplates_TheNewTabTable(t *testing.T) {
 		// Rejected once per silent link, beside one that says so; the line is the start tag's.
 		"template/two.html": {Data: []byte("<a href=\"/a\" target=\"_blank\">A" + says + "</a>\n" +
 			"<a href=\"/b\" target=\"_blank\">B</a>")},
-		// Admitted: the text inside the link, in a partial's dot or the page's, trimmed or not;
-		// a link that opens in place; and another element's target.
+		// Admitted: the text inside the link, in a partial's dot or the page's, trimmed or not,
+		// or in the alt of an image the link holds; a link that opens in place; and another
+		// element's target.
 		"template/says.html":    {Data: []byte(`<a class="text-link" href="/x" target="_blank" rel="noopener">X` + says + `</a>`)},
+		"template/alt.html":     {Data: []byte(`<a href="/x" target="_blank"><img src="/logo.png" alt="Example {{ T $.ctx "common.link.opens_in_new_tab" }}"></a>`)},
 		"template/dot.html":     {Data: []byte(`<a href="/x" target="_blank">X {{- T .ctx "common.link.opens_in_new_tab" -}}</a>`)},
 		"template/inplace.html": {Data: []byte(`<a href="/x" target="_self">X</a><a href="/y">Y</a>`)},
 		"template/form.html":    {Data: []byte(`<form action="/x" target="_blank"><button type="submit">Go</button></form>`)},
@@ -194,7 +197,7 @@ func TestTemplates_TheNewTabTable(t *testing.T) {
 		`template/two.html: line 2: <a href="/b" target="_blank">`,
 		`template/upper.html: line 1: <A HREF="/x" TARGET='_BLANK'>`,
 	}, found)
-	assert.Equal(t, 14, n)
+	assert.Equal(t, 15, n)
 }
 
 // TestTemplates_TheWalkReachesEveryHTMLFileAndNothingElse pins what the shared walk hands the rules:

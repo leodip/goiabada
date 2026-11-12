@@ -638,8 +638,6 @@ test("the sample draws the footer as its fields are typed, each label in the pag
   await footerOf(dark).toEqual(full);
   await switchPreviewTo(page, "light");
 
-  await page.locator("#footerLinks-0-labels-de").fill("");
-  await page.locator("#footerLinks-0-labels-fr").fill("");
   await fillBrandFooter(page, { supportEmail: "", supportUrl: "", supportPhone: "" });
   await footerOf().toEqual({ shown: false, links: [], contact: [], panel: false, operable: 0 });
 });

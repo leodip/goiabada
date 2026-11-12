@@ -234,8 +234,9 @@ var newTabNoticeRe = regexp.MustCompile(`\{\{-?\s*(?:T\s+\$?\.ctx\s+"` + regexp.
 //
 // The claim is lexical, like the rules above: a start tag spelling target="_blank" anywhere in it,
 // in a branch included, and the action spelled as the templates spell it between that tag and the
-// next </a>, or, in the form_post page, its {{ $.page.NewTabNotice }} field. A target computed by
-// an action, a link a script opens in a new tab, and a form's target are outside it.
+// next </a>, or, in the form_post page, its {{ $.page.NewTabNotice }} field. An attribute of an
+// element inside the link counts, as an image's alt there is part of the link's name. A target
+// computed by an action, a link a script opens in a new tab, and a form's target are outside it.
 func AssertTemplatesNewTabLinksSaySo(t *testing.T, fsys fs.FS, root string) {
 	t.Helper()
 
