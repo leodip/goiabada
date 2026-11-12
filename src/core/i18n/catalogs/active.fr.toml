@@ -1759,6 +1759,7 @@
 "adminconsole.admin_branding.palette.color.note_soft" = "Fond doux de note"
 "adminconsole.admin_branding.palette.color.note_ink" = "Texte de note"
 "adminconsole.admin_branding.palette.warnings.none" = "Chaque paire respecte son minimum."
+"adminconsole.admin_branding.palette.unchecked" = "Les couleurs n’ont pas pu être vérifiées. Elles le sont à l’enregistrement de la marque."
 "adminconsole.admin_branding.palette.warnings.one" = "1 paire est sous son minimum. Le texte et les contours dessinés dans ces couleurs n’atteignent pas le contraste du niveau AA des WCAG 2.2."
 "adminconsole.admin_branding.palette.warnings.other" = "{{.count}} paires sont sous leur minimum. Le texte et les contours dessinés dans ces couleurs n’atteignent pas le contraste du niveau AA des WCAG 2.2."
 "adminconsole.admin_branding.palette.warning" = "{{.mode}} : {{.foreground}} sur {{.background}}, {{.ratio}}:1. Minimum {{.minimum}}:1."

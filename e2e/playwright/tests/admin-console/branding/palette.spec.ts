@@ -4,7 +4,10 @@
 // save refused there, the field focused and keeping what was typed; and a column the appearance hides,
 // shown again while it holds a value that is not a color. A failing palette saved on an existing
 // brand lists its failing pairs on the page the save returns to, which the saved notice links to, and
-// one created is marked on the brand list it lands on (decision 9).
+// one created is marked on the brand list it lands on (decision 9). While the colors are edited, the
+// list is the console's live check of them, and changes as a color is typed; Advanced then holds the
+// colors a basic palette works out; and when the check cannot be reached, the list says the colors
+// could not be checked (decision 6).
 //
 // The brands are the test's own, given to clients of the test's own, so no other page changes, and
 // this is an ordinary parallel spec. The console drawn in a custom palette is brands.system.ts's.
@@ -27,6 +30,8 @@ import {
   paletteWarnings,
   paletteWarningsCount,
   plumCanvas,
+  previewSample,
+  sampleToken,
   warmBasicPalette,
   withCustomBrand,
 } from "../../../lib/brands";
@@ -253,4 +258,73 @@ test("a brand created with a failing palette lands on the brand list, marked the
     await expect(paletteWarningsCount(page)).toHaveText(manyPairsBelow);
     await expect(paletteWarningItems(page).nth(0)).toHaveText(textOnBackground);
   });
+});
+
+// The probe's "mid-gray brand color" palette (#815), with its six failing pairs and its worked-out
+// colors as the probe's JavaScript computed them, before any Go existed: a mid-gray brand color fails
+// as text on the page's light backgrounds, and white text fails on it.
+const midGray = { canvas: "#f4f4f4", surface: "#ffffff", ink: "#222222", brand: "#777777" };
+const midGrayPairs = [
+  "Light: Brand color on Background, 4.07:1. Minimum 4.5:1.",
+  "Light: Brand color on Card, 4.47:1. Minimum 4.5:1.",
+  "Light: Text on brand color on Brand color, 4.47:1. Minimum 4.5:1.",
+  "Light: Brand color on Subtle background, 3.82:1. Minimum 4.5:1.",
+  "Light: Brand color on Soft note background, 3.81:1. Minimum 4.5:1.",
+  "Light: Brand color on Soft caution background, 4.01:1. Minimum 4.5:1.",
+];
+const midGrayWorkedOut = { subtle: "#eeedeb", "line-strong": "#7d796c", "ink-muted": "#605e5a", "brand-strong": "#606060", danger: "#b42318" };
+// Blueberry's own four light colors, which the probe rebuilt with no failing pair.
+const blueberryFour = { canvas: "#f4f5f7", surface: "#ffffff", ink: "#1a1f29", brand: "#2456c4" };
+const uncheckedLine = "The colors could not be checked. They are checked when the brand is saved.";
+
+test("the list of failing pairs changes as a color is typed, and Advanced holds the colors worked out", async ({ page }) => {
+  await page.goto(newBrandUrl);
+  await fillBrandForm(page, { name: uniqueIdentifier("brand"), appearance: "light" });
+  await page.locator("#theme-custom").check();
+  await expect(page.locator("#paletteMode-basic")).toBeChecked();
+
+  // The four colors typed: under Light, only light pairs are listed, in the shared list's order.
+  for (const [token, value] of Object.entries(midGray)) await paletteField(page, "light", token).fill(value);
+  await expect(paletteWarnings(page)).toBeVisible();
+  await expect(paletteWarningsCount(page)).toHaveText(
+    "6 pairs are below their minimum. Text and boundaries drawn in them do not meet WCAG 2.2 level AA contrast.",
+  );
+  await expect(paletteWarningItems(page)).toHaveText(midGrayPairs);
+
+  // Advanced shows the colors the basic palette worked out, ready to adjust.
+  await page.locator("#paletteMode-advanced").check();
+  for (const [token, value] of Object.entries(midGrayWorkedOut)) await expect(paletteField(page, "light", token), token).toHaveValue(value);
+
+  // Back in Basic, a color typed changes the list: Blueberry's four pass every pair.
+  await page.locator("#paletteMode-basic").check();
+  for (const [token, value] of Object.entries(blueberryFour)) await paletteField(page, "light", token).fill(value);
+  await expect(paletteWarningsCount(page)).toHaveText("Every pair meets its minimum.");
+  await expect(paletteWarningItems(page)).toHaveCount(0);
+
+  // A value that is not a color is not checked: the list hides until it is one again.
+  await paletteField(page, "light", "brand").fill("#2456c");
+  await expect(paletteWarnings(page)).toBeHidden();
+  await paletteField(page, "light", "brand").fill("#777777");
+  // #777777 on #f4f5f7 is 4.10:1 (WCAG 2.2's relative luminance), written as the page writes a number.
+  await expect(paletteWarningItems(page).filter({ hasText: "Light: Brand color on Background," })).toHaveText(
+    "Light: Brand color on Background, 4.1:1. Minimum 4.5:1.",
+  );
+});
+
+test("when the colors cannot be checked the page says so, and the sample keeps the colors typed", async ({ page }) => {
+  await page.goto(newBrandUrl);
+  await fillBrandForm(page, { name: uniqueIdentifier("brand"), appearance: "light" });
+  await page.locator("#theme-custom").check();
+  await expect(paletteWarningsCount(page)).toHaveText("Every pair meets its minimum.");
+
+  await page.route("**/admin/settings/branding/palette-check*", (route) => route.abort("failed"));
+  await paletteField(page, "light", "brand").fill("#7a3e00");
+  await expect(paletteWarningsCount(page)).toHaveText(uncheckedLine);
+  await expect(paletteWarningItems(page)).toHaveCount(0);
+  expect(await sampleToken(previewSample(page, "light"), "brand")).toBe("#7a3e00");
+
+  // Reached again, the next edit is checked.
+  await page.unroute("**/admin/settings/branding/palette-check*");
+  await paletteField(page, "light", "brand").fill("#2456c4");
+  await expect(paletteWarningsCount(page)).toHaveText("Every pair meets its minimum.");
 });

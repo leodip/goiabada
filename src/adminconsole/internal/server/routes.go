@@ -327,6 +327,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/settings/branding/assets/favicon", adminsettingshandlers.HandleBrandAssetPost(httpHelper, apiClient, "favicon"))
 		r.Post("/settings/branding/assets/background", adminsettingshandlers.HandleBrandAssetPost(httpHelper, apiClient, "background"))
 		r.Post("/settings/branding/assets/font", adminsettingshandlers.HandleBrandAssetPost(httpHelper, apiClient, "font"))
+		r.Post("/settings/branding/palette-check", adminsettingshandlers.HandleBrandPaletteCheckPost(httpHelper))
 		r.Get("/settings/branding/{brandId}/edit", adminsettingshandlers.HandleBrandGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/settings/branding/{brandId}/edit", adminsettingshandlers.HandleBrandPost(httpHelper, s.sessionStore, apiClient, s.settingsCache, baseURL))
 		r.Post("/settings/branding/{brandId}/make-default", adminsettingshandlers.HandleBrandMakeDefaultPost(httpHelper, s.sessionStore, apiClient, s.settingsCache, baseURL))

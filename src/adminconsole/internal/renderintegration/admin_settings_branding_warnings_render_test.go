@@ -135,3 +135,15 @@ func TestRender_AdminSettingsBrandingListMarksFailingPairsAndDrawsTheColors(t *t
 	assert.NotContains(t, rows[2], "brand-list-swatch")
 	assert.Contains(t, rows[2], "Personalizado</span></td>")
 }
+
+// The page hands the live check (#815 decision 6) what its scripts read: the Colors section names the
+// console's check route, the region holds the sentence for colors that could not be checked, in the
+// page's language, and the Custom card's swatch is marked as the palette being edited.
+func TestRender_AdminSettingsBrandingHandsTheLiveCheckItsRouteAndSentence(t *testing.T) {
+	out := renderWarningsForm(t, nil, false)
+
+	assert.Contains(t, tagWith(t, out, `id="brand-palette"`), `data-palette-check-url="/admin/settings/branding/palette-check"`)
+	assert.Contains(t, tagWith(t, out, `id="palette-warnings"`),
+		`data-unchecked="The colors could not be checked. They are checked when the brand is saved."`)
+	assert.Regexp(t, `id="theme-custom"(?s).*?<span class="theme-swatch" aria-hidden="true" data-custom-swatch>`, out)
+}

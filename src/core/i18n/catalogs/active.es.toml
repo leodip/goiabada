@@ -1761,6 +1761,7 @@
 "adminconsole.admin_branding.palette.color.note_soft" = "Fondo suave de nota"
 "adminconsole.admin_branding.palette.color.note_ink" = "Texto de nota"
 "adminconsole.admin_branding.palette.warnings.none" = "Todos los pares cumplen su mínimo."
+"adminconsole.admin_branding.palette.unchecked" = "No se pudieron comprobar los colores. Se comprueban al guardar la marca."
 "adminconsole.admin_branding.palette.warnings.one" = "1 par está por debajo de su mínimo. El texto y los bordes dibujados en esos colores no cumplen el contraste del nivel AA de WCAG 2.2."
 "adminconsole.admin_branding.palette.warnings.other" = "{{.count}} pares están por debajo de su mínimo. El texto y los bordes dibujados en esos colores no cumplen el contraste del nivel AA de WCAG 2.2."
 "adminconsole.admin_branding.palette.warning" = "{{.mode}}: {{.foreground}} sobre {{.background}}, {{.ratio}}:1. Mínimo {{.minimum}}:1."

@@ -402,9 +402,11 @@ func TestRender_AdminSettingsBrandingFormMarksTheAppearanceSwatches(t *testing.T
 		`<span class="theme-swatch" aria-hidden="true" data-appearance-swatch="light">`,
 		`<span class="theme-swatch" aria-hidden="true" data-appearance-swatch="dark">`,
 	}, swatches[:3], "the Automatic, Light and Dark cards, in order")
-	for _, swatch := range swatches[3:] {
+	for _, swatch := range swatches[3 : len(swatches)-1] {
 		assert.Equal(t, `<span class="theme-swatch" aria-hidden="true">`, swatch, "a theme card's swatch keeps its theme")
 	}
+	assert.Equal(t, `<span class="theme-swatch" aria-hidden="true" data-custom-swatch>`, swatches[len(swatches)-1],
+		"Custom's shows the palette being edited (#815 decision 7)")
 
 	// Plum's light palette, on the Light card, each shape naming its token.
 	light := regexp.MustCompile(`(?s)data-appearance-swatch="light">(.*?)</span>`).FindStringSubmatch(out)

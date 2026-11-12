@@ -111,12 +111,29 @@ function build(request) {
       el("span", {}, [swatch({ "data-appearance-swatch": modes.join(" ") }, modes)]),
     ]);
   };
+  // The Custom card's swatch is marked as the palette being edited (#815 decision 7).
   const themeCard = function (key) {
     return el("label", { class: "option-card" }, [
       radio("theme", key, key === request.theme),
-      el("span", {}, [swatch({}, ["light", "dark"])]),
+      el("span", {}, [swatch(key === "custom" ? { "data-custom-swatch": "" } : {}, ["light", "dark"])]),
     ]);
   };
+  // The Colors section (#815 decision 7), when the page has one: a row per color, each with a Light
+  // and a Dark cell holding a color well and the text field the form sends, as the template draws
+  // them, each holding what the request says.
+  const paletteSection = [];
+  if (request.palette) {
+    const cell = function (mode, token) {
+      const id = "palette-" + mode + "-" + token;
+      return el("div", { class: "palette-cell", "data-palette-column": mode }, [
+        el("input", { type: "color", class: "palette-well", id: id + "-well", value: "#000000", "data-palette-well": "" }),
+        el("input", { class: "control palette-value", type: "text", id: id, name: id, value: request.palette[mode][token] || "", "data-palette-value": "" }),
+      ]);
+    };
+    paletteSection.push(el("fieldset", { id: "brand-palette" }, Object.keys(request.palette.light).map(function (token) {
+      return el("div", { class: "palette-row", "data-palette-row": token }, [cell("light", token), cell("dark", token)]);
+    })));
+  }
   // The appearance the page was drawn with, as the template reads it: Light or Dark, else
   // Automatic.
   const drawnAppearance = request.appearance === "light" || request.appearance === "dark" ? request.appearance : "auto";
@@ -163,7 +180,7 @@ function build(request) {
           })),
           el("label", { class: "check-row" }, [el("input", Object.assign({ type: "checkbox", id: "hideAppName", name: "hideAppName" },
             request.hideAppName ? { checked: "" } : {}))]),
-        ].concat(slotFields).concat(footerFields)),
+        ].concat(paletteSection).concat(slotFields).concat(footerFields)),
         el("section", { class: "brand-preview" }, [
           el("div", { class: "brand-preview-header" }, [
             el("h2", { class: "brand-preview-title" }),
@@ -188,6 +205,7 @@ function build(request) {
   ]);
   doc.appendChild(html);
   doc.documentElement = html;
+  doc.defaultView = win;
   return { doc: doc, win: win };
 }
 
@@ -264,6 +282,7 @@ function look(doc) {
     fontSheets: doc.adoptedStyleSheets.map(function (sheet) { return sheet.cssText; }),
     styledElsewhere: styledElsewhere,
     switchHidden: doc.querySelector(".brand-preview-switch").hidden,
+    previewMode: (doc.querySelector("input[name=\"brandPreviewMode\"]:checked") || { value: "" }).value,
     notesHidden: notes,
     swatches: swatches,
   };
@@ -321,6 +340,9 @@ process.stdin.on("end", function () {
       dispatch(box, event("change", true), doc, win);
     } else if (step.do === "pageshow") {
       dispatch(win, event("pageshow", false, { persisted: step.persisted }), doc, win);
+    } else if (step.do === "input") {
+      // An input event on an element, as a page script that wrote fields dispatches one to say so.
+      dispatch(doc.getElementById(step.name), event("input", true), doc, win);
     } else if (step.do === "look") {
       looks.push(look(doc));
     } else {
@@ -374,6 +396,12 @@ type previewStep struct {
 	Value     string `json:"value,omitempty"`
 	URL       string `json:"url,omitempty"`
 	Persisted bool   `json:"persisted,omitempty"`
+	// Ms is how far a "wait" moves the clock; Index, Status and Body name the request an "answer" or
+	// a "fail" settles, and what an answer hands it.
+	Ms     int `json:"ms,omitempty"`
+	Index  int `json:"index"`
+	Status int `json:"status,omitempty"`
+	Body   any `json:"body,omitempty"`
 }
 
 // previewImage is an image the sample's logo box holds.
@@ -431,6 +459,7 @@ type previewLook struct {
 	FontSheets      []string                 `json:"fontSheets"`
 	StyledElsewhere []string                 `json:"styledElsewhere"`
 	SwitchHidden    bool                     `json:"switchHidden"`
+	PreviewMode     string                   `json:"previewMode"`
 	NotesHidden     map[string]bool          `json:"notesHidden"`
 	// Swatches holds, for the appearance cards and the theme cards, each card's swatch by the
 	// card's value: one previewSwatch per mode it shows.
@@ -438,10 +467,10 @@ type previewLook struct {
 }
 
 // previewPage is the editor the stand-in document draws: the theme cards, which are the listed
-// themes' and need not be, the theme checked (none when it is no card's), the appearance, the corner
+// themes' and need not be, "custom" the Custom card, the theme checked (none when it is no card's), the appearance, the corner
 // shape checked (none when it is no radio's), the family the font select holds, the fit checked, the
 // switch hiding the app name, the files the slots hold, by slot, the page's language, "en" when
-// empty, and what the footer's fields hold, by id.
+// empty, what the footer's fields hold, by id, and the Colors section's fields, nil for no section.
 type previewPage struct {
 	themeCards    []string
 	theme         string
@@ -453,6 +482,13 @@ type previewPage struct {
 	slots         map[string]previewSlot
 	lang          string
 	footer        map[string]string
+	palette       *previewColors
+}
+
+// previewColors is what the Colors section's fields hold, by mode and token, when the page has one.
+type previewColors struct {
+	Light map[string]string `json:"light"`
+	Dark  map[string]string `json:"dark"`
 }
 
 // previewKitStyles is what the page hands the script for each corner shape and family, in values no
@@ -507,6 +543,7 @@ func runBrandPreview(t *testing.T, page previewPage, steps ...previewStep) []pre
 		"slots":         page.slots,
 		"lang":          page.lang,
 		"footer":        page.footer,
+		"palette":       page.palette,
 		"fonts":         previewFonts,
 		"kitStyles":     previewKitStyles,
 		"steps":         steps,
@@ -1144,7 +1181,8 @@ func TestBrandPreviewJS_ASlotWithoutAnIdHoldsNothing(t *testing.T) {
 
 // standInDOM is the document a page script is run in under Node, shared by the brand editor's script
 // tests: vm, the elements, the document and the window, a constructed stylesheet, and events
-// dispatched as a browser bubbles them. Only what the scripts read is stood in for.
+// dispatched as a browser bubbles them, a script's own included. Only what the scripts read is stood
+// in for.
 const standInDOM = `const vm = require("vm");
 
 // The color the page's swatches start in, which no palette holds.
@@ -1233,6 +1271,12 @@ class Node {
     for (const c of arguments) { this.appendChild(c); }
   }
   remove() { if (this.parentNode) { this.parentNode.removeChild(this); } }
+  // An event a script dispatches itself, bubbling as a browser's does, up to the window.
+  dispatchEvent(e) {
+    const doc = this.ownerDocument || this;
+    dispatch(this, e, doc, doc.defaultView);
+    return !e.defaultPrevented;
+  }
 }
 
 class Element extends Node {
@@ -1313,6 +1357,7 @@ class Document extends Node {
   get body() { return this.documentElement.children[1]; }
   getElementById(id) { return this.querySelector("#" + id); }
   createElement(tag) { return new Element(this, tag); }
+  createElementNS(namespace, tag) { const e = new Element(this, tag); e.namespaceURI = namespace; return e; }
 }
 
 class Window extends Node {}
@@ -1331,12 +1376,17 @@ function event(type, bubbles, extra) {
   return e;
 }
 
+// Event, as a script constructs one to dispatch: its type, and whether it bubbles.
+class Event {
+  constructor(type, init) { return event(type, Boolean(init && init.bubbles)); }
+}
+
 function dispatch(target, e, doc, win) {
   e.target = target;
   const path = [target];
   if (e.bubbles) {
     for (let n = target.parentNode; n; n = n.parentNode) { path.push(n); }
-    if (path[path.length - 1] === doc) { path.push(win); }
+    if (path[path.length - 1] === doc && win) { path.push(win); }
   }
   for (const n of path) {
     e.currentTarget = n;

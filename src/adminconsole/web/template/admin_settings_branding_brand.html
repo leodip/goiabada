@@ -114,12 +114,13 @@
         </label>
         {{ end }}
         {{/* Custom (#815 decision 7), after the built-in themes: the brand drawn in its own palette,
-             set in the Colors section under the cards. Its swatch shows the palette being edited. */}}
+             set in the Colors section under the cards. Its swatch shows the palette being edited,
+             which brand-preview.js redraws as it is edited. */}}
         <label class="option-card">
           <input type="radio" id="theme-custom" name="theme" value="custom"{{ if eq .brand.Theme "custom" }} checked{{ end }} aria-labelledby="theme-name-custom"
             {{- if $.error }}{{ if eq $.errorField "theme" }} aria-invalid="true"{{ end }}{{ end }}>
           <span class="grid min-w-0 flex-1 gap-1">
-            <span class="theme-swatch" aria-hidden="true">{{ with .palette }}{{ template "brand_swatch" .Swatch.Light }}{{ template "brand_swatch" .Swatch.Dark }}{{ end }}</span>
+            <span class="theme-swatch" aria-hidden="true" data-custom-swatch>{{ with .palette }}{{ template "brand_swatch" .Swatch.Light }}{{ template "brand_swatch" .Swatch.Dark }}{{ end }}</span>
             <span class="choice-label" id="theme-name-custom">{{ T $.ctx "adminconsole.admin_branding.theme.custom" }}</span>
           </span>
         </label>
@@ -137,7 +138,7 @@
          A value that is not a color is marked at its field with its message, and a refusal at a
          field is marked as every refused field is. */}}
     {{ with .palette }}{{ $p := . }}
-    <fieldset id="brand-palette" aria-describedby="paletteStanding" data-palette-stored-mode="{{ .StoredMode }}"{{ if ne $.brand.Theme "custom" }} hidden{{ end }}>
+    <fieldset id="brand-palette" aria-describedby="paletteStanding" data-palette-stored-mode="{{ .StoredMode }}" data-palette-check-url="{{ .CheckURL }}"{{ if ne $.brand.Theme "custom" }} hidden{{ end }}>
       <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_branding.palette.title" }}</legend>
       <p class="field-hint" id="paletteStanding">{{ T $.ctx "adminconsole.admin_branding.palette.standing" }}</p>
       <input type="hidden" name="paletteFresh" value="{{ if .Fresh }}true{{ end }}">
@@ -214,8 +215,10 @@
            an item per pair, its sentence beside a swatch of the pair, the foreground drawn on the
            background, since in basic mode a worked-out color has no field on screen. A form whose
            colors are not the stored brand's, a new brand's or a refused one, holds the region hidden
-           and empty. The saved notice links here. */}}
-      <div class="palette-warnings mt-4" id="palette-warnings"{{ if not $.paletteWarnings }} hidden{{ end }}>
+           and empty. The saved notice links here. While the colors are edited, brand-palette.js draws
+           the live check's answer here (#815 decision 6), or data-unchecked's sentence in the count
+           line when the colors could not be checked. */}}
+      <div class="palette-warnings mt-4" id="palette-warnings" data-unchecked="{{ T $.ctx "adminconsole.admin_branding.palette.unchecked" }}"{{ if not $.paletteWarnings }} hidden{{ end }}>
         <p class="palette-warnings-count" id="paletteWarningsCount" role="status">{{ with $.paletteWarnings }}{{ .CountLine }}{{ end }}</p>
         {{- with $.paletteWarnings }}{{ if .Items }}
         <ul class="palette-warning-list" aria-labelledby="paletteWarningsCount">

@@ -62,11 +62,13 @@ type BrandPaletteForm struct {
 	Dark       map[string]string
 }
 
-// BrandPaletteView is the Colors section as the editor draws it: the form, whether Basic hides the
-// rows other than the four, whether the note on going back to Basic shows, the two columns, the four
-// groups of rows, and the colors the Custom card's swatch is drawn in.
+// BrandPaletteView is the Colors section as the editor draws it: the form, the route its script asks
+// for the live check, whether Basic hides the rows other than the four, whether the note on going
+// back to Basic shows, the two columns, the four groups of rows, and the colors the Custom card's
+// swatch is drawn in.
 type BrandPaletteView struct {
 	BrandPaletteForm
+	CheckURL  string
 	Basic     bool
 	BasicNote bool
 	Columns   []BrandPaletteColumn
@@ -142,6 +144,7 @@ func drawnModes(appearance string) map[string]bool {
 func NewBrandPaletteView(form BrandPaletteForm, appearance, refusedField string) BrandPaletteView {
 	view := BrandPaletteView{
 		BrandPaletteForm: form,
+		CheckURL:         brandPaletteCheckPath,
 		Basic:            form.Mode != paletteModeAdvanced,
 		Swatch:           BrandPaletteSwatch{Light: swatchOf(form.Light), Dark: swatchOf(form.Dark)},
 	}

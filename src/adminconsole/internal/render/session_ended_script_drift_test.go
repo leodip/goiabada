@@ -28,15 +28,24 @@ import (
 //   - utils.js declares the code and the path with the literals the helper emits and the route is
 //     mounted at, and scriptRequestHeaders sends the header IsScriptRequest reads, so renaming any
 //     of them on one side fails here;
-//   - the recount of request sites under web/ still finds exactly the four handled, sendAjaxRequest
-//     in utils.js, uploadImage and handleDelete in image-upload.js, and the brand editor's upload in
-//     pages/brand-assets.js (#813), so a fifth raw fetch() fails until it is handled too;
-//   - each of the four, within its own function, calls isSessionEnded and goToSessionEnded, sends
-//     its URL through withPageLanguage, which names the page's catalog as ui_locales (#559), and
-//     takes its headers from scriptRequestHeaders.
+//   - the recount of request sites under web/ still finds exactly the five handled, sendAjaxRequest
+//     in utils.js, uploadImage and handleDelete in image-upload.js, the brand editor's upload in
+//     pages/brand-assets.js (#813), and its live check of a custom palette in pages/brand-palette.js
+//     (#815), so a sixth raw fetch() fails until it is handled too;
+//   - each of the five, within its own function, calls isSessionEnded, sends its URL through
+//     withPageLanguage, which names the page's catalog as ui_locales (#559), and takes its headers
+//     from scriptRequestHeaders; and each but the live check calls goToSessionEnded. The live check
+//     runs in the background while a palette is edited, and #815 decision 6 has it say the colors
+//     could not be checked when the sign-in has ended, as when the network fails, rather than leave
+//     the page and the unsaved form: the save then meets the ended sign-in. It is held to calling no
+//     goToSessionEnded, so that choice is not undone by accident.
 //
 // It does not prove that any of them navigates. That is read, not run.
 func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
+	// The one request site that says the colors could not be checked rather than going to the
+	// session-ended route (#815 decision 6).
+	const staysOnThePage = "static/pages/brand-palette.js"
+
 	// go test runs with the package directory as the working directory, so this is
 	// src/adminconsole/web.
 	const webRoot = "../../web"
@@ -75,10 +84,11 @@ func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
 		found = append(found, name)
 	}
 	sort.Strings(found)
-	assert.Equal(t, map[string]int{"static/utils.js": 1, "static/image-upload.js": 2, "static/pages/brand-assets.js": 1}, sites,
+	assert.Equal(t, map[string]int{"static/utils.js": 1, "static/image-upload.js": 2, "static/pages/brand-assets.js": 1,
+		"static/pages/brand-palette.js": 1}, sites,
 		"a request site was added or removed under web/ (%v): one that can receive an admin API 401 "+
 			"that ends the session "+
-			"must follow %q to %s the way the four handled here do, and then this count moves", found,
+			"must follow %q to %s the way the five handled here do, and then this count moves", found,
 		sessionEndedCode, sessionEndedPath)
 
 	utils := sources["static/utils.js"]
@@ -97,7 +107,11 @@ func TestSessionEndedScripts_EveryFetchSiteFollowsTheCode(t *testing.T) {
 				body = body[:end[0]]
 			}
 			assert.Containsf(t, body, "isSessionEnded(", "%s, request site %d of %d, does not check for the session-ended code", name, i+1, count)
-			assert.Containsf(t, body, "goToSessionEnded", "%s, request site %d of %d, does not go to the session-ended route", name, i+1, count)
+			if name == staysOnThePage {
+				assert.NotContainsf(t, body, "goToSessionEnded", "%s, request site %d of %d, leaves the form being edited", name, i+1, count)
+			} else {
+				assert.Containsf(t, body, "goToSessionEnded", "%s, request site %d of %d, does not go to the session-ended route", name, i+1, count)
+			}
 			// The page's language rides on every request it sends, or a refusal in its dialog is
 			// in whatever language the browser or the profile names instead (#559 decisions 3 and 7).
 			assert.Truef(t, strings.HasPrefix(body, "fetch(withPageLanguage("),

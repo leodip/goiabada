@@ -11,6 +11,11 @@
 // families' fonts. The sample draws the brand's footer under its card as its fields are typed (#814),
 // and the whole preview still fits those desktop sizes with three links and the whole contact in it.
 //
+// On Custom (#815 decision 6) the sample is drawn in the Colors section's fields, each color at once as
+// it is typed, the preview switching to the edited field's mode, and the colors a basic palette works
+// out once the console's check route answers; a built-in theme still asks nothing. The whole preview
+// fits those desktop sizes with the Colors section open, in Basic and in Advanced.
+//
 // Everything here is on the New brand page and nothing is saved, or on a brand of the test's own that no
 // client uses, so this is an ordinary parallel spec.
 // A browser restores the form after Back without firing a change, each engine in its own way, so this
@@ -30,6 +35,8 @@ import {
   kitFiles,
   newBrandUrl,
   openFooterLanguageLabels,
+  paletteField,
+  paletteTokens,
   pickInEditor,
   previewSample,
   previewSwitch,
@@ -38,6 +45,7 @@ import {
   sampleFooter,
   sampleKit,
   sampleShape,
+  sampleToken,
   switchPreviewTo,
   uploadInEditor,
   uploadKit,
@@ -294,6 +302,65 @@ test("picking a theme, an appearance, a mode or a kit choice sends no request", 
   expect(sent, "the requests sent while the form changed").toEqual([]);
 });
 
+// The console's route a custom palette is checked at (#815 decision 6).
+const paletteCheckPath = "/admin/settings/branding/palette-check";
+
+test("on Custom the sample follows each color field as it is typed, in the field's mode", async ({ page }) => {
+  await openNewBrand(page, "light");
+  await page.locator("#theme-custom").check();
+  await page.locator("#paletteMode-advanced").check();
+  for (const [index, token] of paletteTokens.entries()) {
+    for (const mode of ["dark", "light"] as const) {
+      // A color no theme has, and a different one for each field.
+      const value = `#${mode === "light" ? "a1" : "b2"}${index.toString(16).padStart(2, "0")}3c`;
+      await paletteField(page, mode, token).fill(value);
+      // Editing a field switches the preview to its mode, and the sample takes the color at once.
+      await expect(previewSample(page, mode), `the ${mode} sample after ${token}`).toBeVisible();
+      await expect.poll(() => sampleToken(previewSample(page, mode), token), `the ${mode} sample's ${token}`).toBe(value);
+    }
+  }
+  await expect(previewSwitch(page).getByRole("radio", { name: "Light", exact: true })).toBeChecked();
+});
+
+test("on Custom a basic palette's sample takes the four colors at once, and the colors worked out from them once the console answers", async ({ page }) => {
+  await openNewBrand(page, "light");
+  await page.locator("#theme-custom").check();
+  await expect(page.locator("#paletteMode-basic")).toBeChecked();
+  // The probe's "mid-gray brand color" palette (#815), whose muted text is worked out to #605e5a.
+  const four = { canvas: "#f4f4f4", surface: "#ffffff", ink: "#222222", brand: "#777777" };
+  const answered = page.waitForResponse((response) => new URL(response.url()).pathname === paletteCheckPath && response.request().method() === "POST");
+  for (const [token, value] of Object.entries(four)) await paletteField(page, "light", token).fill(value);
+  for (const [token, value] of Object.entries(four)) expect(await sampleToken(previewSample(page, "light"), token), token).toBe(value);
+  expect((await answered).ok()).toBe(true);
+  await expect.poll(() => sampleToken(previewSample(page, "light"), "ink-muted")).toBe("#605e5a");
+  await expect.poll(() => sampleToken(previewSample(page, "light"), "line-strong")).toBe("#7d796c");
+});
+
+test("Custom asks the console to check its colors, and a built-in theme still asks nothing", async ({ page }) => {
+  await openNewBrand(page, "light");
+  await page.waitForLoadState("load");
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    if (!new URL(request.url()).pathname.startsWith("/static/favicon/")) sent.push(`${request.method()} ${new URL(request.url()).pathname}`);
+  });
+
+  await fillBrandForm(page, { theme: "plum", appearance: "dark" });
+  await fillBrandForm(page, { appearance: "auto", corners: "pill" });
+  expect(sent, "the requests sent on a built-in theme").toEqual([]);
+
+  const checked = page.waitForRequest((request) => new URL(request.url()).pathname === paletteCheckPath);
+  await page.locator("#theme-custom").check();
+  await checked;
+  await expect.poll(() => sent.every((request) => request === `POST ${paletteCheckPath}`), "only the check route is asked").toBe(true);
+
+  sent.length = 0;
+  await fillBrandForm(page, { theme: "blueberry" });
+  await fillBrandForm(page, { appearance: "light" });
+  // Longer than the pause a typed edit waits for before the check is asked.
+  await page.waitForTimeout(1000);
+  expect(sent, "the requests sent once a built-in theme is picked again").toEqual([]);
+});
+
 test("the sample cannot be reached by Tab, is hidden from assistive technology, and the page says in text what it shows", async ({ page }) => {
   await openNewBrand(page, "light");
   const preview = brandPreview(page);
@@ -473,6 +540,21 @@ for (const viewport of desktops) {
   // A footer of three links, each with a label in every built-in language, and the whole contact
   // (#814 decision 12): the footer is the last thing in the sample, the part that would otherwise
   // fall off the screen.
+  // The Colors section makes the form far longer, the preview staying beside it (#815).
+  test(`at ${viewport.width}×${viewport.height} the whole preview stays on screen beside the form on Custom, in Basic and Advanced, in every language`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    for (const locale of locales) {
+      await page.goto(`${newBrandUrl}?${new URLSearchParams({ ui_locales: locale })}`);
+      await page.locator("#theme-custom").check();
+      for (const mode of ["basic", "advanced"] as const) {
+        await page.locator(`#paletteMode-${mode}`).check();
+        await expect(page.locator("#brand-palette")).toBeVisible();
+        await expectWholePreviewOnScreen(page, viewport, `${locale}`);
+      }
+    }
+  });
+
   test(`at ${viewport.width}×${viewport.height} the whole preview with three footer links and the whole support contact stays on screen beside the form, in every language`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.emulateMedia({ reducedMotion: "reduce" });

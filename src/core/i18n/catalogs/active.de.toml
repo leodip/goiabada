@@ -1760,6 +1760,7 @@
 "adminconsole.admin_branding.palette.color.note_soft" = "Zarter Hinweishintergrund"
 "adminconsole.admin_branding.palette.color.note_ink" = "Hinweistext"
 "adminconsole.admin_branding.palette.warnings.none" = "Jedes Paar erreicht seinen Mindestwert."
+"adminconsole.admin_branding.palette.unchecked" = "Die Farben konnten nicht geprüft werden. Sie werden beim Speichern der Marke geprüft."
 "adminconsole.admin_branding.palette.warnings.one" = "1 Paar liegt unter seinem Mindestwert. Text und Begrenzungen in diesen Farben erreichen den Kontrast der WCAG 2.2, Stufe AA, nicht."
 "adminconsole.admin_branding.palette.warnings.other" = "{{.count}} Paare liegen unter ihrem Mindestwert. Text und Begrenzungen in diesen Farben erreichen den Kontrast der WCAG 2.2, Stufe AA, nicht."
 "adminconsole.admin_branding.palette.warning" = "{{.mode}}: {{.foreground}} auf {{.background}}, {{.ratio}}:1. Mindestwert {{.minimum}}:1."

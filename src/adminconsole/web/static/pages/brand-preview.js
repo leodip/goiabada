@@ -45,6 +45,16 @@
 // fill or border is drawn from. The colors are set as attributes, as the server draws them. The
 // theme cards' swatches each show their own theme and are left alone.
 //
+// The Custom card (#815 decisions 6 and 7) is drawn from the Colors section's fields, each mode's
+// from its column, read as the form holds them: an entered color is drawn at once as it is typed or
+// picked in its well, with no request, since each is a token itself. A basic palette's other 19 fields
+// hold the worked-out colors brand-palette.js writes there from the console's answer, telling the page
+// with an input event, so they are drawn the same way. A value that is not # and six hexadecimal
+// digits is never set on a sample: the sample keeps the color it was drawn in. Editing a field
+// switches the preview to that field's mode under Automatic, so the change is seen; under Light or
+// Dark the appearance decides the one sample. The Custom card's swatch shows the palette being
+// edited, whichever theme is picked.
+//
 // A browser restoring the form, as on Back, fires no input, so all of it is drawn again on every
 // pageshow.
 
@@ -57,10 +67,32 @@ const samplePanelShadows = {
   dark: "0 1px 2px rgb(0 0 0 / 0.4)",
 };
 
-// chosenTheme answers the palettes of the theme the form holds, or of the first listed theme.
-function chosenTheme() {
+// customColors answers the palettes the Colors section's fields hold, each field by the mode and
+// the token its id names, each value that is a color in lower case, and nothing for any other; or
+// null for a page with no Colors section.
+function customColors() {
+  if (!document.getElementById("brand-palette")) {
+    return null;
+  }
+  const colors = { key: "custom", light: {}, dark: {} };
+  for (const field of document.querySelectorAll("input[data-palette-value]")) {
+    const named = /^palette-(light|dark)-([a-z-]+)$/.exec(field.id);
+    const value = field.value.trim();
+    if (named && /^#[0-9a-fA-F]{6}$/.test(value)) {
+      colors[named[1]][named[2]] = value.toLowerCase();
+    }
+  }
+  return colors;
+}
+
+// chosenTheme answers the palettes of the theme the form holds: Custom's from the Colors section,
+// and a built-in theme's from the list, or the first listed theme's for a theme the list lacks.
+function chosenTheme(custom) {
   const checked = document.querySelector('input[name="theme"]:checked');
   const key = checked ? checked.value : "";
+  if (key === "custom" && custom) {
+    return custom;
+  }
   return brandPalettes.find(function (theme) { return theme.key === key; }) || brandPalettes[0];
 }
 
@@ -288,8 +320,38 @@ function drawAppearanceSwatches(theme) {
   }
 }
 
+// drawCustomSwatch draws the Custom card's swatch, its light SVG then its dark one, in the palette
+// being edited.
+function drawCustomSwatch(custom) {
+  for (const swatch of document.querySelectorAll("[data-custom-swatch]")) {
+    const svgs = swatch.querySelectorAll("svg");
+    if (svgs[0]) {
+      drawSwatch(svgs[0], custom.light);
+    }
+    if (svgs[1]) {
+      drawSwatch(svgs[1], custom.dark);
+    }
+  }
+}
+
+// followEditedMode puts the switch on the mode of the Colors section's field an edit was made in,
+// typed or picked in its well, under Automatic, the one appearance the switch decides for.
+function followEditedMode(target) {
+  if (!target || !target.hasAttribute || !(target.hasAttribute("data-palette-value") || target.hasAttribute("data-palette-well"))) {
+    return;
+  }
+  const named = /^palette-(light|dark)-/.exec(target.id);
+  const choice = named && chosenAppearance() === "auto"
+    ? document.querySelector('input[name="brandPreviewMode"][value="' + named[1] + '"]')
+    : null;
+  if (choice) {
+    choice.checked = true;
+  }
+}
+
 function drawPreview() {
-  const theme = chosenTheme();
+  const custom = customColors();
+  const theme = chosenTheme(custom);
   if (!theme) {
     return;
   }
@@ -339,8 +401,14 @@ function drawPreview() {
     note.hidden = note.dataset.brandPreviewNote !== appearance;
   }
   drawAppearanceSwatches(theme);
+  if (custom) {
+    drawCustomSwatch(custom);
+  }
 }
 
 drawPreview();
-document.addEventListener("input", drawPreview);
+document.addEventListener("input", function (event) {
+  followEditedMode(event.target);
+  drawPreview();
+});
 window.addEventListener("pageshow", drawPreview);

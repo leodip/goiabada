@@ -31,12 +31,13 @@ type BrandContrastWarnings struct {
 }
 
 // BrandContrastWarningItem is one failing pair: its mode, the foreground and background colors its
-// swatch is drawn in, each "" when the brand's colors hold no color for it, and its sentence.
+// swatch is drawn in, each "" when the brand's colors hold no color for it, and its sentence. The live
+// preview's route answers them under these names, for brand-palette.js to draw.
 type BrandContrastWarningItem struct {
-	Mode       string
-	Foreground string
-	Background string
-	Text       string
+	Mode       string `json:"mode"`
+	Foreground string `json:"foreground"`
+	Background string `json:"background"`
+	Text       string `json:"text"`
 }
 
 // NewBrandContrastWarnings is the list of brand's failing pairs, or nil for a brand with no stored

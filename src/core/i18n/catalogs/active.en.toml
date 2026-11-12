@@ -1756,6 +1756,7 @@
 "adminconsole.admin_branding.palette.color.note_soft" = "Soft note background"
 "adminconsole.admin_branding.palette.color.note_ink" = "Note text"
 "adminconsole.admin_branding.palette.warnings.none" = "Every pair meets its minimum."
+"adminconsole.admin_branding.palette.unchecked" = "The colors could not be checked. They are checked when the brand is saved."
 "adminconsole.admin_branding.palette.warnings.one" = "1 pair is below its minimum. Text and boundaries drawn in it do not meet WCAG 2.2 level AA contrast."
 "adminconsole.admin_branding.palette.warnings.other" = "{{.count}} pairs are below their minimum. Text and boundaries drawn in them do not meet WCAG 2.2 level AA contrast."
 "adminconsole.admin_branding.palette.warning" = "{{.mode}}: {{.foreground}} on {{.background}}, {{.ratio}}:1. Minimum {{.minimum}}:1."

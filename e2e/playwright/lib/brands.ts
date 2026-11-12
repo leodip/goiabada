@@ -795,6 +795,21 @@ export interface PaletteValues {
   dark: Record<string, string>;
 }
 
+// The 23 color tokens a palette sets for each mode, in the order ui.css declares them and the Colors
+// section's Advanced rows name them.
+export const paletteTokens = [
+  "canvas", "surface", "subtle", "line", "line-strong", "ink", "ink-muted",
+  "brand", "brand-strong", "on-brand", "brand-soft",
+  "danger", "danger-strong", "on-danger", "danger-soft", "danger-ink",
+  "positive-soft", "positive-ink", "caution-soft", "caution-ink", "note-soft", "note-ink",
+  "focus",
+];
+
+// What a preview sample resolves a color token to, as the preview set it on the sample, in lower case.
+export function sampleToken(sample: Locator, token: string): Promise<string> {
+  return sample.evaluate((sample, token) => getComputedStyle(sample).getPropertyValue(`--color-${token}`).trim().toLowerCase(), token);
+}
+
 // A color's text field in the Colors section, by the mode of its column and its token.
 export function paletteField(page: Page, mode: PreviewMode, token: string): Locator {
   return page.locator(`#palette-${mode}-${token}`);
