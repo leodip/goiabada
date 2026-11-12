@@ -1,7 +1,8 @@
 {{define "title"}}{{ if .isNew }}{{ T $.ctx "adminconsole.admin_branding.new.page_title" }}{{ else }}{{ T $.ctx "adminconsole.admin_branding.brand.page_title_prefix" }} – {{ .storedBrand.Name }}{{ end }} – {{ .appName }}{{end}}
 {{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}<script src="{{ asset "/static/pages/brand-preview.js" }}" defer></script>
-<script src="{{ asset "/static/pages/brand-assets.js" }}" defer></script>{{end}}
+<script src="{{ asset "/static/pages/brand-assets.js" }}" defer></script>
+<script src="{{ asset "/static/pages/brand-palette.js" }}" defer></script>{{end}}
 
 {{define "page"}}
 <div class="page-header">
@@ -112,12 +113,103 @@
           </span>
         </label>
         {{ end }}
+        {{/* Custom (#815 decision 7), after the built-in themes: the brand drawn in its own palette,
+             set in the Colors section under the cards. Its swatch shows the palette being edited. */}}
+        <label class="option-card">
+          <input type="radio" id="theme-custom" name="theme" value="custom"{{ if eq .brand.Theme "custom" }} checked{{ end }} aria-labelledby="theme-name-custom"
+            {{- if $.error }}{{ if eq $.errorField "theme" }} aria-invalid="true"{{ end }}{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="theme-swatch" aria-hidden="true">{{ with .palette }}{{ template "brand_swatch" .Swatch.Light }}{{ template "brand_swatch" .Swatch.Dark }}{{ end }}</span>
+            <span class="choice-label" id="theme-name-custom">{{ T $.ctx "adminconsole.admin_branding.theme.custom" }}</span>
+          </span>
+        </label>
       </div>
-      {{/* A brand on a custom palette (#815) keeps its theme until the editor has its Colors
-           section: the form sends custom after the cards, so a card picked in its place is sent
-           first and the palette is dropped. */}}
-      {{ if eq .brand.Theme "custom" }}<input type="hidden" name="theme" value="custom">{{ end }}
     </fieldset>
+
+    {{/* The Colors section (#815 decisions 7, 8 and 11), shown while Custom is picked and drawn hidden
+         otherwise, holding its values either way, so looking at another theme loses nothing until
+         the save. Basic shows the four rows a basic palette is entered with, and Advanced all 23 in
+         their groups, each with its token's name. Each row has a Light and a Dark cell: a color well,
+         drawn hidden since only brand-palette.js keeps it in step, beside the #rrggbb text field the
+         form sends, named palette-<mode>-<token>. Both columns are always sent; the one the
+         appearance does not draw is hidden, with a line saying its colors are kept, unless it holds a
+         value that is not a color, when it is shown with a line saying so (decision 8's exception).
+         A value that is not a color is marked at its field with its message, and a refusal at a
+         field is marked as every refused field is. */}}
+    {{ with .palette }}{{ $p := . }}
+    <fieldset id="brand-palette" aria-describedby="paletteStanding" data-palette-stored-mode="{{ .StoredMode }}"{{ if ne $.brand.Theme "custom" }} hidden{{ end }}>
+      <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_branding.palette.title" }}</legend>
+      <p class="field-hint" id="paletteStanding">{{ T $.ctx "adminconsole.admin_branding.palette.standing" }}</p>
+      <input type="hidden" name="paletteFresh" value="{{ if .Fresh }}true{{ end }}">
+
+      <fieldset class="mt-4" aria-describedby="{{ if $.error }}{{ if eq $.errorField "paletteMode" }}brand-error {{ end }}{{ end }}paletteModeHint">
+        <legend class="field-label mb-2">{{ T $.ctx "adminconsole.admin_branding.palette.mode_legend" }}</legend>
+        <div class="flex flex-wrap gap-x-6 gap-y-2">
+          <label class="choice"><input type="radio" id="paletteMode-basic" name="paletteMode" value="basic"{{ if eq .Mode "basic" }} checked{{ end }}{{ if $.error }}{{ if eq $.errorField "paletteMode" }} aria-invalid="true" autofocus{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.palette.mode.basic" }}</span></label>
+          <label class="choice"><input type="radio" id="paletteMode-advanced" name="paletteMode" value="advanced"{{ if eq .Mode "advanced" }} checked{{ end }}{{ if $.error }}{{ if eq $.errorField "paletteMode" }} aria-invalid="true"{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_branding.palette.mode.advanced" }}</span></label>
+        </div>
+        <p class="field-hint mt-2" id="paletteModeHint">{{ T $.ctx "adminconsole.admin_branding.palette.mode_hint" }}</p>
+      </fieldset>
+      <div class="notice notice-note mt-3" data-palette-basic-note{{ if not .BasicNote }} hidden{{ end }}>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+        <p>{{ T $.ctx "adminconsole.admin_branding.palette.basic_note" }}</p>
+      </div>
+
+      {{/* Copy colors from replaces every field of both modes with a built-in theme's colors and asks
+           nothing, since nothing is stored until the save. It needs the script, so it is drawn
+           hidden. The select is not sent. */}}
+      <div class="field mt-4" data-palette-copy hidden>
+        <label class="field-label" for="paletteCopyFrom">{{ T $.ctx "adminconsole.admin_branding.palette.copy_label" }}</label>
+        <div class="input-row">
+          <select class="control" id="paletteCopyFrom" aria-describedby="paletteCopyHint">
+            {{- range $.brandThemes }}
+            <option value="{{ .Key }}">{{ .Name }}</option>
+            {{- end }}
+          </select>
+          <button class="button" type="button" id="paletteCopy">{{ T $.ctx "adminconsole.admin_branding.palette.copy_button" }}</button>
+        </div>
+        <p class="field-hint" id="paletteCopyHint">{{ T $.ctx "adminconsole.admin_branding.palette.copy_hint" }}</p>
+        <p class="field-hint" id="paletteCopyStatus" role="status" data-copied="{{ T $.ctx "adminconsole.admin_branding.palette.copied" }}"></p>
+      </div>
+
+      {{ range .Columns }}
+      <p class="field-hint mt-3" data-palette-note="unused-{{ .Mode }}"{{ if .Shown }} hidden{{ end }}>{{ T $.ctx (printf "adminconsole.admin_branding.palette.unused_%s" .Mode) }}</p>
+      <p class="field-hint mt-3" data-palette-note="invalid-{{ .Mode }}"{{ if not .Shown }} hidden{{ else if .Drawn }} hidden{{ end }}>{{ T $.ctx (printf "adminconsole.admin_branding.palette.invalid_%s" .Mode) }}</p>
+      {{ end }}
+
+      <div class="palette-grid mt-4">
+        <div class="palette-row palette-head">
+          <span class="palette-label"></span>
+          {{- range .Columns }}
+          <span class="palette-cell field-label" id="palette-head-{{ .Mode }}" data-palette-column="{{ .Mode }}"{{ if not .Shown }} hidden{{ end }}>{{ T $.ctx (printf "adminconsole.admin_branding.appearance.%s" .Mode) }}</span>
+          {{- end }}
+        </div>
+        {{ range .Groups }}
+        <div class="palette-group" role="group" aria-labelledby="palette-group-{{ .Key }}">
+          <p class="palette-group-name" id="palette-group-{{ .Key }}" data-palette-advanced{{ if $p.Basic }} hidden{{ end }}>{{ T $.ctx .NameID }}</p>
+          {{ range $row := .Rows }}
+          <div class="palette-row" data-palette-row="{{ .Token }}"{{ if .Basic }} data-palette-basic{{ else }} data-palette-advanced{{ if $p.Basic }} hidden{{ end }}{{ end }}>
+            <span class="palette-label" id="palette-label-{{ .Token }}">{{ T $.ctx .LabelID }} <code class="palette-token" data-palette-advanced{{ if $p.Basic }} hidden{{ end }}>{{ .Token }}</code></span>
+            {{- range .Fields }}
+            <div class="palette-cell" data-palette-column="{{ .Mode }}"{{ if not .Shown }} hidden{{ end }}>
+              <div class="palette-control">
+                {{- $name := T $.ctx "adminconsole.admin_branding.palette.field_name" "color" (T $.ctx $row.LabelID) "mode" (T $.ctx (printf "adminconsole.admin_branding.appearance.%s" .Mode)) }}
+                <label class="sr-only" for="{{ .Id }}-well">{{ T $.ctx "adminconsole.admin_branding.palette.well_name" "field" $name }}</label>
+                <input type="color" class="palette-well" id="{{ .Id }}-well" value="{{ .Well }}" data-palette-well hidden>
+                <label class="sr-only" for="{{ .Id }}">{{ $name }}</label>
+                <input class="control palette-value" type="text" id="{{ .Id }}" name="{{ .Id }}" value="{{ .Value }}" autocomplete="off" spellcheck="false" autocapitalize="none" data-palette-value
+                  {{- if $.error }}{{ if .Refused }} aria-describedby="brand-error{{ if .Invalid }} {{ .Id }}-error{{ end }}" aria-invalid="true" autofocus{{ else if .Invalid }} aria-describedby="{{ .Id }}-error" aria-invalid="true"{{ end }}{{ else if .Invalid }} aria-describedby="{{ .Id }}-error" aria-invalid="true"{{ end }}>
+              </div>
+              <p class="field-error" id="{{ .Id }}-error"{{ if not .Invalid }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_branding.palette.value_invalid" }}</p>
+            </div>
+            {{- end }}
+          </div>
+          {{ end }}
+        </div>
+        {{ end }}
+      </div>
+    </fieldset>
+    {{ end }}
 
     {{/* The kit (#813): the logo, the dark logo and the switch hiding the app name beside a logo; the
          favicon; the corners; the font family and the uploaded font's two files; and the background

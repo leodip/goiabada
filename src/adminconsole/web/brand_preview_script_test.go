@@ -36,206 +36,7 @@ import (
 // a page script reads, with radios unchecking the rest of their group, as a browser's do. A
 // selector it cannot read fails the run rather than matching nothing.
 const brandPreviewRun = `"use strict";
-const vm = require("vm");
-
-// The color the page's swatches start in, which no palette holds.
-const staleColor = "#5e7a1e";
-
-function dataAttr(prop) { return "data-" + prop.replace(/[A-Z]/g, function (c) { return "-" + c.toLowerCase(); }); }
-
-function compileCompound(text) {
-  const tests = [];
-  let rest = text;
-  const tag = /^[a-zA-Z][\w-]*/.exec(rest);
-  if (tag) {
-    const name = tag[0].toUpperCase();
-    tests.push(function (el) { return el.tagName === name; });
-    rest = rest.slice(tag[0].length);
-  }
-  while (rest) {
-    let m;
-    if ((m = /^#([\w-]+)/.exec(rest))) {
-      const id = m[1];
-      tests.push(function (el) { return el.getAttribute("id") === id; });
-    } else if ((m = /^\.([\w-]+)/.exec(rest))) {
-      const c = m[1];
-      tests.push(function (el) { return (el.getAttribute("class") || "").split(/\s+/).indexOf(c) >= 0; });
-    } else if ((m = /^\[([\w-]+)(?:=(?:"([^"]*)"|'([^']*)'))?\]/.exec(rest))) {
-      const n = m[1];
-      const v = m[2] !== undefined ? m[2] : m[3];
-      tests.push(v === undefined
-        ? function (el) { return el.hasAttribute(n); }
-        : function (el) { return el.getAttribute(n) === v; });
-    } else if ((m = /^:checked/.exec(rest))) {
-      tests.push(function (el) { return el.checked === true; });
-    } else {
-      throw new Error("the stand-in document cannot read the selector " + JSON.stringify(text));
-    }
-    rest = rest.slice(m[0].length);
-  }
-  return function (el) { return tests.every(function (t) { return t(el); }); };
-}
-
-function compile(selector) {
-  const alternatives = selector.split(",").map(function (s) { return s.trim().split(/\s+/).map(compileCompound); });
-  return function (el) {
-    return alternatives.some(function (chain) {
-      if (!chain[chain.length - 1](el)) { return false; }
-      let i = chain.length - 2;
-      for (let a = el.parentNode; i >= 0 && a && a.isElement; a = a.parentNode) {
-        if (chain[i](a)) { i--; }
-      }
-      return i < 0;
-    });
-  };
-}
-
-function makeStyle() {
-  const props = {};
-  const api = {
-    setProperty: function (n, v) { props[n] = String(v); },
-    getPropertyValue: function (n) { return props[n] || ""; },
-    removeProperty: function (n) { const v = props[n] || ""; delete props[n]; return v; },
-  };
-  const style = new Proxy(api, {
-    get: function (t, p) { return p in t ? t[p] : (props[p] || ""); },
-    set: function (t, p, v) { props[String(p)] = String(v); return true; },
-  });
-  return { style: style, props: props };
-}
-
-class Node {
-  constructor() { this.listeners = {}; this.parentNode = null; this.children = []; }
-  addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
-  removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] || []).filter(function (f) { return f !== fn; }); }
-  descendants() {
-    const out = [];
-    const walk = function (n) { for (const c of n.children) { out.push(c); walk(c); } };
-    walk(this);
-    return out;
-  }
-  querySelectorAll(selector) { return this.descendants().filter(compile(selector)); }
-  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
-  appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
-  removeChild(child) { this.children = this.children.filter(function (c) { return c !== child; }); child.parentNode = null; return child; }
-  replaceChildren() {
-    for (const c of this.children) { c.parentNode = null; }
-    this.children = [];
-    for (const c of arguments) { this.appendChild(c); }
-  }
-  remove() { if (this.parentNode) { this.parentNode.removeChild(this); } }
-}
-
-class Element extends Node {
-  constructor(doc, tag, attrs) {
-    super();
-    this.isElement = true;
-    this.ownerDocument = doc;
-    this.tagName = tag.toUpperCase();
-    this.attributes = new Map(Object.entries(attrs || {}));
-    this.ownText = "";
-    const s = makeStyle();
-    this.style = s.style;
-    this.styleProps = s.props;
-    this.checked = this.attributes.has("checked");
-    const self = this;
-    this.dataset = new Proxy({}, {
-      get: function (_, p) { return typeof p === "string" && self.hasAttribute(dataAttr(p)) ? self.getAttribute(dataAttr(p)) : undefined; },
-      set: function (_, p, v) { self.setAttribute(dataAttr(p), String(v)); return true; },
-      has: function (_, p) { return self.hasAttribute(dataAttr(p)); },
-    });
-  }
-  getAttribute(n) { return this.attributes.has(n) ? this.attributes.get(n) : null; }
-  setAttribute(n, v) { this.attributes.set(n, String(v)); }
-  hasAttribute(n) { return this.attributes.has(n); }
-  removeAttribute(n) { this.attributes.delete(n); }
-  toggleAttribute(n, force) {
-    const on = force === undefined ? !this.hasAttribute(n) : !!force;
-    if (on) { this.setAttribute(n, ""); } else { this.removeAttribute(n); }
-    return on;
-  }
-  get id() { return this.getAttribute("id") || ""; }
-  get lang() { return this.getAttribute("lang") || ""; }
-  get classList() {
-    const self = this;
-    const names = function () { return (self.getAttribute("class") || "").split(/\s+/).filter(Boolean); };
-    return {
-      contains: function (c) { return names().indexOf(c) >= 0; },
-      toggle: function (c, force) {
-        const has = names().indexOf(c) >= 0;
-        const on = force === undefined ? !has : !!force;
-        if (on && !has) { self.setAttribute("class", names().concat([c]).join(" ")); }
-        if (!on && has) { self.setAttribute("class", names().filter(function (n) { return n !== c; }).join(" ")); }
-        return on;
-      },
-    };
-  }
-  get name() { return this.getAttribute("name") || ""; }
-  get type() { return this.getAttribute("type") || ""; }
-  get value() { return this.getAttribute("value") || ""; }
-  set value(v) { this.setAttribute("value", v); }
-  get hidden() { return this.hasAttribute("hidden"); }
-  set hidden(v) { this.toggleAttribute("hidden", !!v); }
-  get textContent() { return this.ownText + this.children.map(function (c) { return c.textContent; }).join(""); }
-  set textContent(v) { this.children = []; this.ownText = String(v); }
-  get checked() { return this._checked; }
-  set checked(v) {
-    this._checked = !!v;
-    if (this._checked && this.type === "radio" && this.ownerDocument.documentElement) {
-      for (const other of this.ownerDocument.querySelectorAll("input")) {
-        if (other !== this && other.type === "radio" && other.name === this.name) { other._checked = false; }
-      }
-    }
-  }
-  matches(selector) { return compile(selector)(this); }
-  closest(selector) {
-    const test = compile(selector);
-    for (let n = this; n && n.isElement; n = n.parentNode) { if (test(n)) { return n; } }
-    return null;
-  }
-  get describe() {
-    return this.tagName.toLowerCase() + (this.id ? "#" + this.id : "") +
-      (this.hasAttribute("data-brand-sample") ? "[data-brand-sample=" + this.getAttribute("data-brand-sample") + "]" : "");
-  }
-}
-
-class Document extends Node {
-  constructor() { super(); this.readyState = "interactive"; this.documentElement = null; this.adoptedStyleSheets = []; }
-  get body() { return this.documentElement.children[1]; }
-  getElementById(id) { return this.querySelector("#" + id); }
-  createElement(tag) { return new Element(this, tag); }
-}
-
-class Window extends Node {}
-
-// A constructed stylesheet and document.adoptedStyleSheets, as far as a page script uses them: a
-// sheet is the CSS text it was last given.
-class CSSStyleSheet {
-  constructor() { this.cssText = ""; }
-  replaceSync(text) { this.cssText = String(text); }
-}
-
-function event(type, bubbles, extra) {
-  const e = Object.assign({ type: type, bubbles: bubbles, defaultPrevented: false, stopped: false, target: null, currentTarget: null }, extra || {});
-  e.preventDefault = function () { e.defaultPrevented = true; };
-  e.stopPropagation = function () { e.stopped = true; };
-  return e;
-}
-
-function dispatch(target, e, doc, win) {
-  e.target = target;
-  const path = [target];
-  if (e.bubbles) {
-    for (let n = target.parentNode; n; n = n.parentNode) { path.push(n); }
-    if (path[path.length - 1] === doc) { path.push(win); }
-  }
-  for (const n of path) {
-    e.currentTarget = n;
-    for (const fn of (n.listeners[e.type] || []).slice()) { fn.call(n, e); }
-    if (e.stopped) { break; }
-  }
-}
-
+` + standInDOM + `
 function build(request) {
   const doc = new Document();
   const win = new Window();
@@ -1340,3 +1141,207 @@ func TestBrandPreviewJS_ASlotWithoutAnIdHoldsNothing(t *testing.T) {
 	assert.Empty(t, looks[0].Samples["light"].Style["background-image"])
 	assert.Empty(t, looks[0].FontSheets)
 }
+
+// standInDOM is the document a page script is run in under Node, shared by the brand editor's script
+// tests: vm, the elements, the document and the window, a constructed stylesheet, and events
+// dispatched as a browser bubbles them. Only what the scripts read is stood in for.
+const standInDOM = `const vm = require("vm");
+
+// The color the page's swatches start in, which no palette holds.
+const staleColor = "#5e7a1e";
+
+function dataAttr(prop) { return "data-" + prop.replace(/[A-Z]/g, function (c) { return "-" + c.toLowerCase(); }); }
+
+function compileCompound(text) {
+  const tests = [];
+  let rest = text;
+  const tag = /^[a-zA-Z][\w-]*/.exec(rest);
+  if (tag) {
+    const name = tag[0].toUpperCase();
+    tests.push(function (el) { return el.tagName === name; });
+    rest = rest.slice(tag[0].length);
+  }
+  while (rest) {
+    let m;
+    if ((m = /^#([\w-]+)/.exec(rest))) {
+      const id = m[1];
+      tests.push(function (el) { return el.getAttribute("id") === id; });
+    } else if ((m = /^\.([\w-]+)/.exec(rest))) {
+      const c = m[1];
+      tests.push(function (el) { return (el.getAttribute("class") || "").split(/\s+/).indexOf(c) >= 0; });
+    } else if ((m = /^\[([\w-]+)(?:=(?:"([^"]*)"|'([^']*)'))?\]/.exec(rest))) {
+      const n = m[1];
+      const v = m[2] !== undefined ? m[2] : m[3];
+      tests.push(v === undefined
+        ? function (el) { return el.hasAttribute(n); }
+        : function (el) { return el.getAttribute(n) === v; });
+    } else if ((m = /^:checked/.exec(rest))) {
+      tests.push(function (el) { return el.checked === true; });
+    } else {
+      throw new Error("the stand-in document cannot read the selector " + JSON.stringify(text));
+    }
+    rest = rest.slice(m[0].length);
+  }
+  return function (el) { return tests.every(function (t) { return t(el); }); };
+}
+
+function compile(selector) {
+  const alternatives = selector.split(",").map(function (s) { return s.trim().split(/\s+/).map(compileCompound); });
+  return function (el) {
+    return alternatives.some(function (chain) {
+      if (!chain[chain.length - 1](el)) { return false; }
+      let i = chain.length - 2;
+      for (let a = el.parentNode; i >= 0 && a && a.isElement; a = a.parentNode) {
+        if (chain[i](a)) { i--; }
+      }
+      return i < 0;
+    });
+  };
+}
+
+function makeStyle() {
+  const props = {};
+  const api = {
+    setProperty: function (n, v) { props[n] = String(v); },
+    getPropertyValue: function (n) { return props[n] || ""; },
+    removeProperty: function (n) { const v = props[n] || ""; delete props[n]; return v; },
+  };
+  const style = new Proxy(api, {
+    get: function (t, p) { return p in t ? t[p] : (props[p] || ""); },
+    set: function (t, p, v) { props[String(p)] = String(v); return true; },
+  });
+  return { style: style, props: props };
+}
+
+class Node {
+  constructor() { this.listeners = {}; this.parentNode = null; this.children = []; }
+  addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
+  removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] || []).filter(function (f) { return f !== fn; }); }
+  descendants() {
+    const out = [];
+    const walk = function (n) { for (const c of n.children) { out.push(c); walk(c); } };
+    walk(this);
+    return out;
+  }
+  querySelectorAll(selector) { return this.descendants().filter(compile(selector)); }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+  appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
+  removeChild(child) { this.children = this.children.filter(function (c) { return c !== child; }); child.parentNode = null; return child; }
+  replaceChildren() {
+    for (const c of this.children) { c.parentNode = null; }
+    this.children = [];
+    for (const c of arguments) { this.appendChild(c); }
+  }
+  remove() { if (this.parentNode) { this.parentNode.removeChild(this); } }
+}
+
+class Element extends Node {
+  constructor(doc, tag, attrs) {
+    super();
+    this.isElement = true;
+    this.ownerDocument = doc;
+    this.tagName = tag.toUpperCase();
+    this.attributes = new Map(Object.entries(attrs || {}));
+    this.ownText = "";
+    const s = makeStyle();
+    this.style = s.style;
+    this.styleProps = s.props;
+    this.checked = this.attributes.has("checked");
+    const self = this;
+    this.dataset = new Proxy({}, {
+      get: function (_, p) { return typeof p === "string" && self.hasAttribute(dataAttr(p)) ? self.getAttribute(dataAttr(p)) : undefined; },
+      set: function (_, p, v) { self.setAttribute(dataAttr(p), String(v)); return true; },
+      has: function (_, p) { return self.hasAttribute(dataAttr(p)); },
+    });
+  }
+  getAttribute(n) { return this.attributes.has(n) ? this.attributes.get(n) : null; }
+  setAttribute(n, v) { this.attributes.set(n, String(v)); }
+  hasAttribute(n) { return this.attributes.has(n); }
+  removeAttribute(n) { this.attributes.delete(n); }
+  toggleAttribute(n, force) {
+    const on = force === undefined ? !this.hasAttribute(n) : !!force;
+    if (on) { this.setAttribute(n, ""); } else { this.removeAttribute(n); }
+    return on;
+  }
+  get id() { return this.getAttribute("id") || ""; }
+  get lang() { return this.getAttribute("lang") || ""; }
+  get classList() {
+    const self = this;
+    const names = function () { return (self.getAttribute("class") || "").split(/\s+/).filter(Boolean); };
+    return {
+      contains: function (c) { return names().indexOf(c) >= 0; },
+      toggle: function (c, force) {
+        const has = names().indexOf(c) >= 0;
+        const on = force === undefined ? !has : !!force;
+        if (on && !has) { self.setAttribute("class", names().concat([c]).join(" ")); }
+        if (!on && has) { self.setAttribute("class", names().filter(function (n) { return n !== c; }).join(" ")); }
+        return on;
+      },
+    };
+  }
+  get name() { return this.getAttribute("name") || ""; }
+  get type() { return this.getAttribute("type") || ""; }
+  get value() { return this.getAttribute("value") || ""; }
+  set value(v) { this.setAttribute("value", v); }
+  get hidden() { return this.hasAttribute("hidden"); }
+  set hidden(v) { this.toggleAttribute("hidden", !!v); }
+  get textContent() { return this.ownText + this.children.map(function (c) { return c.textContent; }).join(""); }
+  set textContent(v) { this.children = []; this.ownText = String(v); }
+  get checked() { return this._checked; }
+  set checked(v) {
+    this._checked = !!v;
+    if (this._checked && this.type === "radio" && this.ownerDocument.documentElement) {
+      for (const other of this.ownerDocument.querySelectorAll("input")) {
+        if (other !== this && other.type === "radio" && other.name === this.name) { other._checked = false; }
+      }
+    }
+  }
+  matches(selector) { return compile(selector)(this); }
+  closest(selector) {
+    const test = compile(selector);
+    for (let n = this; n && n.isElement; n = n.parentNode) { if (test(n)) { return n; } }
+    return null;
+  }
+  get describe() {
+    return this.tagName.toLowerCase() + (this.id ? "#" + this.id : "") +
+      (this.hasAttribute("data-brand-sample") ? "[data-brand-sample=" + this.getAttribute("data-brand-sample") + "]" : "");
+  }
+}
+
+class Document extends Node {
+  constructor() { super(); this.readyState = "interactive"; this.documentElement = null; this.adoptedStyleSheets = []; }
+  get body() { return this.documentElement.children[1]; }
+  getElementById(id) { return this.querySelector("#" + id); }
+  createElement(tag) { return new Element(this, tag); }
+}
+
+class Window extends Node {}
+
+// A constructed stylesheet and document.adoptedStyleSheets, as far as a page script uses them: a
+// sheet is the CSS text it was last given.
+class CSSStyleSheet {
+  constructor() { this.cssText = ""; }
+  replaceSync(text) { this.cssText = String(text); }
+}
+
+function event(type, bubbles, extra) {
+  const e = Object.assign({ type: type, bubbles: bubbles, defaultPrevented: false, stopped: false, target: null, currentTarget: null }, extra || {});
+  e.preventDefault = function () { e.defaultPrevented = true; };
+  e.stopPropagation = function () { e.stopped = true; };
+  return e;
+}
+
+function dispatch(target, e, doc, win) {
+  e.target = target;
+  const path = [target];
+  if (e.bubbles) {
+    for (let n = target.parentNode; n; n = n.parentNode) { path.push(n); }
+    if (path[path.length - 1] === doc) { path.push(win); }
+  }
+  for (const n of path) {
+    e.currentTarget = n;
+    for (const fn of (n.listeners[e.type] || []).slice()) { fn.call(n, e); }
+    if (e.stopped) { break; }
+  }
+}
+`

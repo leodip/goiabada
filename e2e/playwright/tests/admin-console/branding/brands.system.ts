@@ -2,7 +2,9 @@
 // default marked and not deletable, and another brand made the default, which draws the console and
 // the sign-in pages in its theme and appearance at once. The admin console's own client given a brand
 // (#812) draws the console and its sign-in in it, while another client's sign-in keeps the default,
-// and the Branding list counts the clients each brand draws. Runs alone, since the default brand and
+// and the Branding list counts the clients each brand draws; given a brand in a custom palette (#815),
+// it draws its admin pages, its Account pages and its sign-in in the palette's colors. Runs alone,
+// since the default brand and
 // the console's own client's brand are what every page is drawn in, and puts back what it found.
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "../../../lib/fixtures";
@@ -14,17 +16,21 @@ import {
   createBrand,
   defaultBrand,
   deleteBrand,
+  expectDrawnInPalette,
   expectDrawnInPlumDark,
   expectDrawnInSeededDefault,
   fillBrandForm,
   listBrands,
   makeBrandDefault,
   pageBackgrounds as backgrounds,
+  pageBrandStylesheets,
   plumCanvas,
   readBrand,
   saveBrand,
   submitNewBrand,
+  warmBasicPalette,
   withBrand,
+  withCustomBrand,
   withDefaultBrandRestored,
   type Appearance,
 } from "../../../lib/brands";
@@ -259,5 +265,46 @@ test("the admin console's own client given a brand draws the console and its sig
     const counts = await brandClientCounts(page);
     expect(counts[brand.name]).toBe(0);
     expect(counts[seeded.name]).toBe(before[seeded.name]);
+  });
+});
+
+test("the admin console's own client given a brand in a custom palette draws the console's admin and Account pages and its sign-in in the palette's colors, and it is put back", async ({
+  page,
+  browser,
+}) => {
+  const consoleClient = await clientIdFromList(page, "admin-console-client");
+  const seeded = await defaultBrand(page);
+
+  // Automatic, so each scheme a device asks for draws its mode of the palette.
+  await withCustomBrand(page, "auto", warmBasicPalette, async (brand) => {
+    try {
+      await setClientBrand(page, consoleClient, brand);
+
+      // An admin page links the brand's colors-only stylesheet, an Account page its full one, and
+      // both are drawn in the palette.
+      await page.goto(brandingUrl);
+      expect(await pageBrandStylesheets(page)).toEqual([{ brandId: brand.id, kind: "colors" }]);
+      await expectDrawnInPalette(page, "light", warmBasicPalette.light);
+      await expectDrawnInPalette(page, "dark", warmBasicPalette.dark);
+      await page.goto(`${env.adminUrl}/account/profile`);
+      expect(await pageBrandStylesheets(page)).toEqual([{ brandId: brand.id, kind: "full" }]);
+      await expectDrawnInPalette(page, "light", warmBasicPalette.light);
+      await expectDrawnInPalette(page, "dark", warmBasicPalette.dark);
+
+      // The console's sign-in, the auth server's page, too.
+      const signIn = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      const consoleSignIn = await signIn.newPage();
+      await consoleSignIn.goto(`${env.adminUrl}/account/profile`);
+      await expect(consoleSignIn.locator('input[name="password"]')).toBeVisible();
+      await expectDrawnInPalette(consoleSignIn, "light", warmBasicPalette.light);
+      await expectDrawnInPalette(consoleSignIn, "dark", warmBasicPalette.dark);
+      await signIn.close();
+    } finally {
+      await setClientBrand(page, consoleClient, "default");
+    }
+
+    // Put back: the console is drawn in the default again.
+    await page.goto(brandingUrl);
+    await expectDrawnInSeededDefault(page, seeded.id);
   });
 });

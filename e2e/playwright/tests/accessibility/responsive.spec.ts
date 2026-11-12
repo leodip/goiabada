@@ -5,7 +5,7 @@
 // sideways. Only the test's own tab is resized, so the fixtures work at the default size.
 import type { Locator, Page } from "@playwright/test";
 import { addRedirectUri, addSignOutRedirectUri, cancelDialog, clientUrl, setClientBrand, userUrl } from "../../lib/admin-console";
-import { brandUrl, fillBrandFooter, newBrandUrl, withBrand } from "../../lib/brands";
+import { brandUrl, fillBrandFooter, newBrandUrl, paletteField, withBrand } from "../../lib/brands";
 import { openSignIn } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
@@ -301,4 +301,37 @@ test("a sign-in page's footer wraps within a phone's screen", async ({ page, bro
       }
     }
   });
+});
+
+// The brand editor's Colors section (#815 decision 7) at a phone's widths, in Advanced, with all 23
+// rows: each color's label takes its own line and its Light and Dark fields stay side by side under
+// it, within the screen, each showing its whole #rrggbb value, and the page does not scroll sideways.
+test("the Colors section keeps each color's two fields side by side at a phone's widths", async ({ page }) => {
+  for (const width of [320, 390]) {
+    await test.step(`${width}px`, async () => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(newBrandUrl);
+      await page.locator("#theme-custom").check();
+      await page.locator("#paletteMode-advanced").check();
+      await expect(page.locator("[data-palette-row]:visible")).toHaveCount(23);
+      expect(await sidewaysScroll(page), `${width}px: no sideways scroll`).toBeLessThanOrEqual(0);
+      expect(await controlsPastTheEdge(page.locator("#brand-palette")), `${width}px: controls past the edge`).toEqual([]);
+
+      for (const token of ["canvas", "brand-strong", "positive-soft"]) {
+        const label = (await page.locator(`#palette-label-${token}`).boundingBox())!;
+        const light = paletteField(page, "light", token);
+        const dark = paletteField(page, "dark", token);
+        const lightBox = (await light.boundingBox())!;
+        const darkBox = (await dark.boundingBox())!;
+        expect(lightBox.y, `${token}: the fields under the label`).toBeGreaterThanOrEqual(label.y + label.height - 1);
+        expect(Math.abs(lightBox.y - darkBox.y), `${token}: Light and Dark on one line`).toBeLessThanOrEqual(1);
+        expect(darkBox.x, `${token}: Dark after Light`).toBeGreaterThan(lightBox.x + lightBox.width);
+        await expectWithinScreen(page, dark);
+        for (const field of [light, dark]) {
+          const clipped = await field.evaluate((input) => input.scrollWidth > input.clientWidth);
+          expect(clipped, `${width}px: ${token}'s whole value shows`).toBe(false);
+        }
+      }
+    });
+  }
 });

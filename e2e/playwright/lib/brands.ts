@@ -781,3 +781,94 @@ export function sampleFooter(sample: Locator): Promise<SampleFooter> {
     };
   });
 }
+
+// A brand's custom palette in the editor's Colors section (#815 decision 7): Custom picked among the
+// theme cards, Basic or Advanced, and a #rrggbb field for each color of each mode, named by its mode
+// and its color token. Basic sets four colors a mode and the save works out the rest; Advanced sets
+// all 23.
+export type PaletteMode = "basic" | "advanced";
+
+export interface PaletteValues {
+  mode: PaletteMode;
+  light: Record<string, string>;
+  dark: Record<string, string>;
+}
+
+// A color's text field in the Colors section, by the mode of its column and its token.
+export function paletteField(page: Page, mode: PreviewMode, token: string): Locator {
+  return page.locator(`#palette-${mode}-${token}`);
+}
+
+// The heading of the Light or the Dark column, shown while the column is.
+export function paletteColumnHead(page: Page, mode: PreviewMode): Locator {
+  return page.locator(`#palette-head-${mode}`);
+}
+
+// The line under the Colors section's choices: a column's colors kept and not used ("unused"), or not
+// drawn but required to be colors ("invalid").
+export function paletteNote(page: Page, note: "unused" | "invalid", mode: PreviewMode): Locator {
+  return page.locator(`[data-palette-note="${note}-${mode}"]`);
+}
+
+// Picks Custom and fills the Colors section: the mode, then each color typed in its field.
+export async function fillPalette(page: Page, palette: PaletteValues) {
+  await page.locator("#theme-custom").check();
+  await page.locator(`#paletteMode-${palette.mode}`).check();
+  for (const mode of ["light", "dark"] as const) {
+    for (const [token, value] of Object.entries(palette[mode])) await paletteField(page, mode, token).fill(value);
+  }
+}
+
+// What a page's root resolves a color token to, as the brand's stylesheet declares it, in lower case.
+export function pageToken(page: Page, token: string): Promise<string> {
+  return page.evaluate((token) => getComputedStyle(document.documentElement).getPropertyValue(`--color-${token}`).trim().toLowerCase(), token);
+}
+
+// A #rrggbb color as a browser reports a computed color.
+export function rgbOf(color: string): string {
+  const channel = (at: number) => parseInt(color.slice(at, at + 2), 16);
+  return `rgb(${channel(1)}, ${channel(3)}, ${channel(5)})`;
+}
+
+// Expects a page drawn in a mode of a palette under each color scheme a device can ask for: each color
+// named resolves on the root to its value, and the page's background is the canvas color.
+export async function expectDrawnInPalette(page: Page, colorScheme: PreviewMode, colors: Record<string, string>) {
+  // Reduced motion, so no transition is caught half way between the two schemes.
+  await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+  for (const [token, value] of Object.entries(colors)) {
+    expect(await pageToken(page, token), `${colorScheme}: --color-${token}`).toBe(value.toLowerCase());
+  }
+  if (colors.canvas) {
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), `${colorScheme}: the page's background`).toBe(rgbOf(colors.canvas));
+  }
+  await page.emulateMedia({ colorScheme: null, reducedMotion: null });
+}
+
+// A basic palette in warm colors no built-in theme has, whose own pairs pass.
+export const warmBasicPalette: PaletteValues = {
+  mode: "basic",
+  light: { canvas: "#fbf7f0", surface: "#ffffff", ink: "#1d1a16", brand: "#7a3e00" },
+  dark: { canvas: "#14110d", surface: "#1e1a15", ink: "#f2ede6", brand: "#f0a050" },
+};
+
+// Creates a brand under a fresh name in the editor, with this appearance and custom palette, runs body
+// with it, and deletes it afterwards, pass or fail, unless body deleted it.
+export async function withCustomBrand(
+  page: Page,
+  appearance: Appearance,
+  palette: PaletteValues,
+  body: (brand: { id: number; name: string }) => Promise<void>,
+) {
+  const name = uniqueIdentifier("brand");
+  await page.goto(newBrandUrl);
+  await fillBrandForm(page, { name, appearance });
+  await fillPalette(page, palette);
+  await page.locator("#btnCreate").click();
+  await expect(page).toHaveURL(brandingUrl);
+  const id = await brandIdFromList(page, name);
+  try {
+    await body({ id, name });
+  } finally {
+    if ((await listBrands(page)).some((brand) => brand.id === id)) await deleteBrand(page, id);
+  }
+}

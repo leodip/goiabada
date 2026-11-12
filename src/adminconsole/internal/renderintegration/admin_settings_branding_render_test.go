@@ -385,7 +385,8 @@ func TestRender_AdminSettingsBrandingFormDrawsThePreviewForTheAppearance(t *test
 
 // The three Appearance cards' swatches are marked for the preview's script, which redraws them in
 // the theme the form holds (#811 decision 4): each names the modes it shows, in order, and each
-// shape names the token its color is drawn from. The theme cards' swatches are not marked.
+// shape names the token its color is drawn from. The theme cards' swatches, Custom's among them
+// (#815), are not marked.
 func TestRender_AdminSettingsBrandingFormMarksTheAppearanceSwatches(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
 		"isNew":           true,
@@ -395,7 +396,7 @@ func TestRender_AdminSettingsBrandingFormMarksTheAppearanceSwatches(t *testing.T
 	})
 
 	swatches := regexp.MustCompile(`<span class="theme-swatch" aria-hidden="true"[^>]*>`).FindAllString(out, -1)
-	require.Len(t, swatches, 3+len(renderThemes))
+	require.Len(t, swatches, 3+len(renderThemes)+1, "the appearance cards, the built-in themes and Custom")
 	assert.Equal(t, []string{
 		`<span class="theme-swatch" aria-hidden="true" data-appearance-swatch="light dark">`,
 		`<span class="theme-swatch" aria-hidden="true" data-appearance-swatch="light">`,
@@ -790,36 +791,4 @@ func TestRender_AdminSettingsBrandingSampleHasARoomForTheFooter(t *testing.T) {
 		assert.NotContains(t, sample, "Privacy", "the script draws the links")
 		assert.NotContains(t, sample, "help@autumn.example", "the script draws the contact")
 	}
-}
-
-// A brand on a custom palette, before the editor has its Colors section (#815 slice 4): no theme
-// card is checked, and the form carries the theme custom after the cards, so a save sends it back
-// unless a card is picked, which the browser sends first.
-func TestRender_AdminSettingsBrandingFormKeepsACustomTheme(t *testing.T) {
-	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
-		"isNew":           false,
-		"storedBrand":     api.BrandResponse{Id: 8, Name: "Custom", Appearance: "auto", Theme: "custom"},
-		"brand":           adminsettingshandlers.BrandForm{Name: "Custom", Appearance: "auto", Theme: "custom"},
-		"brandThemes":     renderThemes,
-		"appearanceTheme": adminsettingshandlers.BrandThemeOption{},
-	})
-
-	assert.NotContains(t, radioTag(t, out, "theme-blueberry"), " checked")
-	assert.NotContains(t, radioTag(t, out, "theme-plum"), " checked")
-	hidden := strings.Index(out, `<input type="hidden" name="theme" value="custom">`)
-	require.GreaterOrEqual(t, hidden, 0, "the form carries the theme custom")
-	assert.Greater(t, hidden, strings.Index(out, `id="theme-plum"`), "after the theme cards")
-}
-
-// A brand on a built-in theme carries no custom theme.
-func TestRender_AdminSettingsBrandingFormOfABuiltInThemeCarriesNoCustomTheme(t *testing.T) {
-	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
-		"isNew":           false,
-		"storedBrand":     api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
-		"brand":           adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum"},
-		"brandThemes":     renderThemes,
-		"appearanceTheme": renderThemes[1],
-	})
-
-	assert.NotContains(t, out, `value="custom"`)
 }

@@ -219,6 +219,9 @@ func brandRefusedField(err error) string {
 	if field := footerLinkInput(render.ErrorPointer(err)); field != "" {
 		return field
 	}
+	if field := paletteInput(render.ErrorPointer(err)); field != "" {
+		return field
+	}
 	return render.ErrorField(err, brandErrorFields)
 }
 
@@ -244,7 +247,8 @@ func footerLinkInput(tokens []string) string {
 	return ""
 }
 
-// brandThemeNames are the message IDs of the built-in themes' names, by key. A theme missing here,
+// brandThemeNames are the message IDs of the built-in themes' names, and of Custom, a brand drawn in
+// its own palette (#815), by key. A theme missing here,
 // as a newer auth server's could be, is named by its key.
 var brandThemeNames = map[string]string{
 	"blueberry":     "adminconsole.admin_branding.theme.blueberry",
@@ -255,6 +259,7 @@ var brandThemeNames = map[string]string{
 	"guava":         "adminconsole.admin_branding.theme.guava",
 	"coconut":       "adminconsole.admin_branding.theme.coconut",
 	"high-contrast": "adminconsole.admin_branding.theme.high_contrast",
+	customTheme:     "adminconsole.admin_branding.theme.custom",
 }
 
 // brandAppearanceNames are the message IDs of the three appearances' names.
@@ -527,9 +532,10 @@ func accessTokenFrom(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 // renderBrandForm draws the brand form, new or of a stored brand, with the theme cards and the kit's
 // upload fields, and hands the preview what each theme, corner shape, font family and fit draws.
 func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, form BrandForm,
-	themes []api.BrandThemeResponse, extra map[string]interface{}) {
+	palette BrandPaletteForm, themes []api.BrandThemeResponse, extra map[string]interface{}) {
 
 	options := brandThemeOptions(r.Context(), themes)
+	refusedField, _ := extra["errorField"].(string)
 	bind := map[string]interface{}{
 		"brand":           form,
 		"brandThemes":     options,
@@ -539,6 +545,8 @@ func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 		"brandAssetUploads": brandAssetUploads(r.Context()),
 		// The languages a footer link has a label of its own in (#814 decision 11).
 		"footerLanguages": brandFooterLanguages(),
+		// The Colors section of a custom palette (#815 decision 7).
+		"palette": NewBrandPaletteView(palette, form.Appearance, refusedField),
 	}
 	for key, value := range extra {
 		bind[key] = value
@@ -620,7 +628,7 @@ func HandleBrandNewGet(
 		if len(themes) > 0 {
 			form.Theme = themes[0].Key
 		}
-		renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{"isNew": true})
+		renderBrandForm(httpHelper, w, r, form, brandPaletteFormOf(nil, themes, form.Theme), themes, map[string]interface{}{"isNew": true})
 	}
 }
 
@@ -645,6 +653,7 @@ func HandleBrandNewPost(
 
 		// The slots name the files uploaded in this form, which Create attaches (#813 decision 1).
 		form := brandFormFrom(r)
+		palette := brandPaletteFormFrom(r, nil)
 		ids := brandSlotIdsFrom(r)
 		_, err = apiClient.CreateBrand(r.Context(), token, &api.CreateBrandRequest{
 			Name:          form.Name,
@@ -664,13 +673,14 @@ func HandleBrandNewPost(
 			SupportEmail:  form.SupportEmail,
 			SupportUrl:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
+			Palette:       palette.request(form.Theme),
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				if !readFormSlots(httpHelper, w, r, apiClient, token, ids, &form) {
 					return
 				}
-				renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
+				renderBrandForm(httpHelper, w, r, form, palette, themes, map[string]interface{}{
 					"isNew":      true,
 					"error":      message,
 					"errorField": brandRefusedField(err),
@@ -758,7 +768,7 @@ func HandleBrandGet(
 			RegularFont: brand.RegularFont, BoldFont: brand.BoldFont,
 			FooterLinks: footerRowsOf(brand.FooterLinks), SupportEmail: brand.SupportEmail,
 			SupportUrl: brand.SupportUrl, SupportPhone: brand.SupportPhone}
-		renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
+		renderBrandForm(httpHelper, w, r, form, brandPaletteFormOf(brand, themes, brand.Theme), themes, map[string]interface{}{
 			"isNew":             false,
 			"storedBrand":       *brand,
 			"clientsNote":       brandClientsNote(r.Context(), brand.ClientCount),
@@ -794,6 +804,7 @@ func HandleBrandPost(
 		// the stored asset, a file uploaded in place of it, or none once removed, which Save attaches,
 		// and the footer links and the support contact as the form holds them (#814 decision 11).
 		form := brandFormFrom(r)
+		palette := brandPaletteFormFrom(r, brand)
 		ids := brandSlotIdsFrom(r)
 		_, err := apiClient.UpdateBrand(r.Context(), token, id, &api.UpdateBrandRequest{
 			Name:          form.Name,
@@ -813,14 +824,14 @@ func HandleBrandPost(
 			SupportEmail:  form.SupportEmail,
 			SupportUrl:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
-			Palette:       keptPalette(form.Theme, brand),
+			Palette:       palette.request(form.Theme),
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				if !readFormSlots(httpHelper, w, r, apiClient, token, ids, &form) {
 					return
 				}
-				renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
+				renderBrandForm(httpHelper, w, r, form, palette, themes, map[string]interface{}{
 					"isNew":       false,
 					"storedBrand": *brand,
 					"clientsNote": brandClientsNote(r.Context(), brand.ClientCount),
@@ -835,20 +846,6 @@ func HandleBrandPost(
 		redirectToBrandWithFlash(httpHelper, httpSession, w, r, baseURL, id, "savedSuccessfully")
 	}
 }
-
-// keptPalette is the custom palette a save of a stored brand sends: while the form keeps the theme
-// custom, the palette the admin API answered for the brand, unchanged, so a change to anything else
-// keeps it; with a built-in theme, none, which the admin API takes as dropping it (#815 decision 2).
-// The editor does not edit a palette yet.
-func keptPalette(theme string, stored *api.BrandResponse) *api.BrandPalette {
-	if theme != customTheme || stored.Palette == nil {
-		return nil
-	}
-	return &api.BrandPalette{Mode: stored.Palette.Mode, Light: stored.Palette.Light, Dark: stored.Palette.Dark}
-}
-
-// customTheme is the admin API's reserved theme key of a brand drawn in its own custom palette.
-const customTheme = "custom"
 
 // redirectToBrandWithFlash goes back to the brand's page, which says once what flash names.
 func redirectToBrandWithFlash(httpHelper HttpHelper, httpSession sessionstore.Store, w http.ResponseWriter,
