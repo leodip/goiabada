@@ -374,9 +374,12 @@ test("the view switch shows the Messages card in place of the sign-in card, unde
   await expect(previewView(page, "light", "messages")).toBeVisible();
   await expect(previewView(page, "light", "signin")).toBeHidden();
   await expect(sample.locator("[data-brand-sample-footer]"), "no footer under the Messages card").toBeHidden();
-  for (const text of ["Your changes were saved.", "Your password expires soon.", "Change it", "The terms of service have changed.", "Read them", "Your account", "Profile, email and password", "Sessions", "alex@example.com"]) {
+  for (const text of ["Your changes were saved.", "Change it", "Read them", "Your account", "Profile, email and password", "Sessions", "alex@example.com"]) {
     await expect(previewView(page, "light", "messages").getByText(text, { exact: true }), text).toBeVisible();
   }
+  // The caution and the note each end in a link, in the same line as their sentence.
+  await expect(previewView(page, "light", "messages").locator(".notice-caution p")).toHaveText("Your password expires soon. Change it");
+  await expect(previewView(page, "light", "messages").locator(".notice-note p")).toHaveText("The terms of service have changed. Read them");
   await expect(previewView(page, "light", "messages").getByText("Save", { exact: true })).toHaveCount(2);
   await expect(previewView(page, "light", "messages").getByText("Delete", { exact: true })).toHaveCount(2);
 
@@ -550,9 +553,9 @@ test("the sample cannot be reached by Tab, is hidden from assistive technology, 
     await expect(previewSample(page, mode)).toHaveAttribute("aria-hidden", "true");
   }
   // On screen, as a refused sign-in reads, and absent from what assistive technology is given.
-  const sample = previewSample(page, "light");
+  const signinView = previewView(page, "light", "signin");
   for (const text of ["Enter your email and password to continue.", "Password is required.", "alex@example.com", "Forgot your password?"]) {
-    await expect(sample.getByText(text, { exact: true })).toBeVisible();
+    await expect(signinView.getByText(text, { exact: true })).toBeVisible();
   }
   const tree = await preview.ariaSnapshot();
   expect(tree, "the preview as assistive technology reads it").toContain("Preview in");
@@ -694,7 +697,7 @@ async function expectWholePreviewOnScreen(page: Page, viewport: { width: number;
   await expect(page.locator("#appearance-auto")).toBeChecked();
   await expectPreviewDrawn(page);
   await expect(preview.locator(".brand-preview-switch")).toBeVisible();
-  await expect(previewViewSwitch(page)).toBeVisible();
+  await expect(preview.locator(".brand-preview-views")).toBeVisible();
   // The Messages view is no taller than the sign-in view it replaces (#815 decision 10).
   const sampleHeight = async (view: PreviewView) => {
     await switchPreviewViewTo(page, view);

@@ -92,13 +92,14 @@ export function refused(page: Page, name: string, field: string, act: () => Prom
   };
 }
 
-// A save answered with the page's notice that it worked.
+// A save answered with the page's notice that it worked. The brand editor's preview samples draw the
+// same notice in their Messages view (#815 decision 10), which is not the page's.
 export function saved(page: Page, name: string, act: () => Promise<unknown>): State {
   return {
     name,
     reach: async () => {
       await act();
-      await expect(page.locator(".panel-body > .notice-positive")).toBeVisible();
+      await expect(page.locator(".panel-body > .notice-positive:not(.brand-sample *)")).toBeVisible();
     },
   };
 }

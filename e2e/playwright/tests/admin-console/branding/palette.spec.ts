@@ -219,13 +219,17 @@ const textOnCard = "Light: Text on Card, 4.47:1. Minimum 4.5:1.";
 test("a failing palette saved on an existing brand lists its failing pairs after the save, linked from the saved notice", async ({ page }) => {
   await withCustomBrand(page, "light", warmBasicPalette, async (brand) => {
     await page.goto(brandUrl(brand.id, "edit"));
+    // The failing palette's white background and gray text, on the warm palette's white card.
+    await paletteField(page, "light", "canvas").fill(failingBasicPalette.light.canvas);
     await paletteField(page, "light", "ink").fill(failingBasicPalette.light.ink);
     await page.locator("#btnSave").click();
     await expect(page).toHaveURL(brandUrl(brand.id, "edit"));
 
     // The saved notice says pairs fail, and links to the list.
     const notice = savedNotice(page);
-    await expect(notice).toContainText(/^Brand saved\. \d+ pairs of its colors are below their contrast minimum\. See the pairs$/);
+    // Its sentence, on the paragraph: a pattern is matched against the text as drawn, the notice's
+    // indentation included.
+    await expect(notice.locator("p")).toHaveText(/^Brand saved\. \d+ pairs of its colors are below their contrast minimum\. See the pairs$/);
     await notice.getByRole("link", { name: "See the pairs" }).click();
     await expect(page).toHaveURL(`${brandUrl(brand.id, "edit")}#palette-warnings`);
 

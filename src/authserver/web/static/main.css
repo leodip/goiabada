@@ -2191,14 +2191,18 @@
     line-height: 1.5rem;
     font-weight: 600;
   }
-  .brand-preview-switch, .brand-preview-views {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 1rem;
-  }
   .brand-preview-switch > legend, .brand-preview-views > legend {
     float: left;
+    margin-inline-end: 1rem;
+    line-height: 1.5rem;
+  }
+  .brand-preview-switch > .choice, .brand-preview-views > .choice {
+    display: inline-flex;
+    vertical-align: top;
+    margin-inline-end: 1rem;
+  }
+  .brand-preview-switch > .choice:last-child, .brand-preview-views > .choice:last-child {
+    margin-inline-end: 0;
   }
   .brand-sample {
     --radius-box: min(var(--radius-control), 1rem);

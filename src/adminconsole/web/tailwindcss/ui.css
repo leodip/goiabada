@@ -2559,20 +2559,28 @@
   }
 
   /* Each switch's name sits on the line of its two choices: a floated legend is laid out as any
-     other child of the fieldset. The Sign-in/Messages switch (#815 decision 10) and the Light/Dark
-     one are drawn alike. */
-
-  .brand-preview-switch,
-  .brand-preview-views {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 1rem;
-  }
+     other child of the fieldset, and the choices flow inline beside it. The fieldset is a block, not
+     a flex container, since WebKit draws a flex fieldset's legend above its content, floated or not,
+     which gives each switch a second line. The Sign-in/Messages switch (#815 decision 10) and the
+     Light/Dark one are drawn alike. */
 
   .brand-preview-switch > legend,
   .brand-preview-views > legend {
     float: left;
+    margin-inline-end: 1rem;
+    line-height: 1.5rem;
+  }
+
+  .brand-preview-switch > .choice,
+  .brand-preview-views > .choice {
+    display: inline-flex;
+    vertical-align: top;
+    margin-inline-end: 1rem;
+  }
+
+  .brand-preview-switch > .choice:last-child,
+  .brand-preview-views > .choice:last-child {
+    margin-inline-end: 0;
   }
 
   /* A sample of a sign-in page in the brand being edited: the auth server's card on its canvas, and

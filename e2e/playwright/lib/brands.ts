@@ -885,7 +885,9 @@ export const warmBasicPalette: PaletteValues = {
 };
 
 // Creates a brand under a fresh name in the editor, with this appearance and custom palette, runs body
-// with it, and deletes it afterwards, pass or fail, unless body deleted it.
+// with it, and deletes it afterwards, pass or fail, unless body deleted it. The palette is typed while
+// the new form is on Automatic, which shows both columns; the appearance picked after it hides a column
+// it does not draw, whose colors are kept and sent.
 export async function withCustomBrand(
   page: Page,
   appearance: Appearance,
@@ -894,8 +896,9 @@ export async function withCustomBrand(
 ) {
   const name = uniqueIdentifier("brand");
   await page.goto(newBrandUrl);
-  await fillBrandForm(page, { name, appearance });
+  await fillBrandForm(page, { name });
   await fillPalette(page, palette);
+  await fillBrandForm(page, { appearance });
   await page.locator("#btnCreate").click();
   await expect(page).toHaveURL(brandingUrl);
   const id = await brandIdFromList(page, name);
