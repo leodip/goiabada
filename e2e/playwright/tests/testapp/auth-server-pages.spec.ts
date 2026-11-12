@@ -1,6 +1,6 @@
 // The auth server's own pages a user of the test app meets beyond the steps the other files drive:
-// the two-factor setup page's key, for an authenticator app that cannot scan the QR code, and its
-// Copy key; the page after it showing the new authenticator's recovery codes once, and its Copy
+// the two-factor setup page's links to authenticator apps, and its key, for an authenticator app that
+// cannot scan the QR code, and its Copy key; the page after it showing the new authenticator's recovery codes once, and its Copy
 // codes, and the notice the setup sends; two tabs signing in side by side, and the page a sign-in
 // pushed out meets; and the not found page.
 import type { Browser, BrowserContextOptions } from "@playwright/test";
@@ -24,6 +24,26 @@ async function openTwoFactorSetup(browser: Browser, user: TestUser, options: Bro
   expect(key, "a base32 key").toMatch(/^[A-Z2-7]+=*$/);
   return { context, page, key };
 }
+
+// The authenticator apps the two-factor setup page links, each opening its site in a new tab and saying
+// so in its name (#814 decision 13).
+const authenticatorApps = [
+  { name: "Microsoft Authenticator (opens in a new tab)", href: "https://www.microsoft.com/en/security/mobile-authenticator-app" },
+  { name: "Google Authenticator (opens in a new tab)", href: "https://support.google.com/accounts/answer/1066447" },
+  { name: "FreeOTP (opens in a new tab)", href: "https://freeotp.github.io/" },
+];
+
+test("the two-factor setup page links each authenticator app in a new tab, and says so", async ({ browser, users }) => {
+  const user = await users.create();
+  const { context, page } = await openTwoFactorSetup(browser, user);
+  for (const app of authenticatorApps) {
+    const link = page.getByRole("link", { name: app.name, exact: true });
+    await expect(link).toHaveAttribute("href", app.href);
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  }
+  await context.close();
+});
 
 test("Copy key on the two-factor setup page copies the key it shows", async ({ browser, users }) => {
   const user = await users.create();

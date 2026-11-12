@@ -23,16 +23,24 @@ const (
 	consentTermsOfServiceLinkText = "This application's terms of service"
 )
 
+// newTabNoticeText is the English text of common.link.opens_in_new_tab, which a link that opens a
+// new tab carries after its own text, for assistive technology (#814 decision 13).
+const newTabNoticeText = "(opens in a new tab)"
+
 // consentDocumentLink returns the consent screen's link with this text, and whether there is one.
+// The text is the link's own, the new-tab text it carries for assistive technology left out.
 func consentDocumentLink(doc *goquery.Document, text string) (*goquery.Selection, bool) {
 	link := doc.Find("a").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return strings.TrimSpace(s.Text()) == text
+		own := s.Clone()
+		own.Find(".sr-only").Remove()
+		return strings.TrimSpace(own.Text()) == text
 	})
 	return link, link.Length() > 0
 }
 
 // assertConsentDocumentLink holds the consent screen to one link with this text and address, opened
-// in a new tab with no opener or referrer, as the website link is; or to none when href is empty.
+// in a new tab with no opener or referrer and saying so, as the website link is; or to none when
+// href is empty.
 func assertConsentDocumentLink(t *testing.T, doc *goquery.Document, text, href string) {
 	t.Helper()
 	link, found := consentDocumentLink(doc, text)
@@ -48,6 +56,8 @@ func assertConsentDocumentLink(t *testing.T, doc *goquery.Document, text, href s
 	assert.Equal(t, "_blank", target)
 	rel, _ := link.Attr("rel")
 	assert.Equal(t, "noopener noreferrer", rel)
+	assert.Equal(t, text+" "+newTabNoticeText, strings.TrimSpace(link.Text()))
+	assert.Equal(t, newTabNoticeText, strings.TrimSpace(link.Find("span.sr-only").Text()))
 }
 
 // consentScreenOfClient signs a new user in to the client and returns the consent screen it reaches.

@@ -88,7 +88,9 @@ test("the step lists what is owed; an unticked box is refused; Accept goes on, a
   const box = own.getByRole("checkbox");
   await expect(box).toHaveCount(1);
   await expect(box).not.toBeChecked();
-  await expect(own.locator("form").getByRole("link", { name: doc.title })).toHaveAttribute("href", `/legal/${doc.shortName}`);
+  const docLink = own.locator("form").getByRole("link", { name: `${doc.title} (opens in a new tab)`, exact: true });
+  await expect(docLink).toHaveAttribute("href", `/legal/${doc.shortName}`);
+  await expect(docLink).toHaveAttribute("target", "_blank");
 
   await accept(own);
   await expect(own.locator("#legal-acceptance-error")).toContainText("Tick the box beside every document");

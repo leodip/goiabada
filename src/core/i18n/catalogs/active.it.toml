@@ -25,6 +25,7 @@
 "common.field.password" = "Password"
 "common.field.password_confirmation" = "Conferma password"
 "common.link.sign_in_to_account" = "Accedi al tuo account"
+"common.link.opens_in_new_tab" = "(si apre in una nuova scheda)"
 "common.password_toggle.show" = "Mostra"
 "common.password_toggle.hide" = "Nascondi"
 "common.password_toggle.shown" = "Visibile"

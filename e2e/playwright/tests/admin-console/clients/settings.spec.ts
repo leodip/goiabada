@@ -47,8 +47,8 @@ test("the privacy policy and terms of service URLs are saved, and linked from th
 }) => {
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients, { consentRequired: true });
-  const privacyLink = (consent: Page) => consent.getByRole("link", { name: "This application's privacy policy" });
-  const termsLink = (consent: Page) => consent.getByRole("link", { name: "This application's terms of service" });
+  const privacyLink = (consent: Page) => consent.getByRole("link", { name: "This application's privacy policy (opens in a new tab)", exact: true });
+  const termsLink = (consent: Page) => consent.getByRole("link", { name: "This application's terms of service (opens in a new tab)", exact: true });
   const consentPage = async () => {
     const attempt = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
     await submitPassword(attempt.page, user.email, user.password);

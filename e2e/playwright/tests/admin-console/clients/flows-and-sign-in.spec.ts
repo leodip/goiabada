@@ -103,7 +103,7 @@ test("the consent screen shows the client's logo, name, description and website 
   await expect(attempt.page.locator("img.auth-client-logo")).toBeVisible();
   await expect(attempt.page.getByText("Acme Reports")).toBeVisible();
   await expect(attempt.page.getByText("Monthly sales reports")).toBeVisible();
-  await expect(attempt.page.getByRole("link", { name: "https://reports.example.com" })).toBeVisible();
+  await expect(attempt.page.getByRole("link", { name: "https://reports.example.com (opens in a new tab)", exact: true })).toBeVisible();
   await attempt.context.close();
 
   await saveClientSettings(page, client.id, async () => {
@@ -113,7 +113,7 @@ test("the consent screen shows the client's logo, name, description and website 
   await expect(attempt.page.locator("img.auth-client-logo")).toHaveCount(0);
   await expect(attempt.page.getByText("Acme Reports")).toHaveCount(0);
   await expect(attempt.page.getByText("Monthly sales reports")).toHaveCount(0);
-  await expect(attempt.page.getByRole("link", { name: "https://reports.example.com" })).toHaveCount(0);
+  await expect(attempt.page.getByRole("link", { name: /^https:\/\/reports\.example\.com/ })).toHaveCount(0);
   await attempt.context.close();
 });
 

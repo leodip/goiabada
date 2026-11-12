@@ -1,7 +1,7 @@
 package guard
 
-// Seam 3: the rule table the three shared template guards enforce, over fstest.MapFS fixtures walked
-// through the same functions the six real callers reach, three in each server.
+// Seam 3: the rule table the four shared template guards enforce, over fstest.MapFS fixtures walked
+// through the same functions the eight real callers reach, four in each server.
 //
 // The synthetic half exists because the real half cannot fail informatively. Both servers' templates
 // are green on arrival and have been for releases, so the real callers would pass identically
@@ -147,13 +147,57 @@ func TestTemplates_TheHtmlLangTable(t *testing.T) {
 	assert.Equal(t, 8, n)
 }
 
+// TestTemplates_TheNewTabTable holds the new-tab rule: a link whose start tag opens a new tab must
+// carry the built-in new-tab text among its contents, however it is spelled around it, and a link
+// that opens in place is not this rule's business.
+//
+// The rows that carry the text in an attribute, outside the link, or under another key are the ones
+// a careless match would admit: the text has to be inside the link, as the link's own text, for
+// assistive technology to read it as part of the link's name.
+func TestTemplates_TheNewTabTable(t *testing.T) {
+	says := `<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span>`
+	fsys := fstest.MapFS{
+		// Rejected: a new-tab link with no text saying so, however its target is spelled.
+		"template/silent.html": {Data: []byte(`<p>See <a href="https://example.com" target="_blank" rel="noopener noreferrer">Example</a>.</p>`)},
+		"template/upper.html":  {Data: []byte(`<A HREF="/x" TARGET='_BLANK'>X</A>`)},
+		"template/branch.html": {Data: []byte(`<a href="{{ .url }}"{{ if .ext }} target="_blank"{{ end }}>{{ .url }}</a>`)},
+		// Rejected: the text in an attribute, after the link, or under another key.
+		"template/attr.html":     {Data: []byte(`<a href="/x" target="_blank" title="{{ T $.ctx "common.link.opens_in_new_tab" }}">X</a>`)},
+		"template/after.html":    {Data: []byte(`<a href="/x" target="_blank">X</a>` + says)},
+		"template/otherkey.html": {Data: []byte(`<a href="/x" target="_blank">X<span class="sr-only"> {{ T $.ctx "common.link.sign_in_to_account" }}</span></a>`)},
+		// Rejected once per silent link, beside one that says so; the line is the start tag's.
+		"template/two.html": {Data: []byte("<a href=\"/a\" target=\"_blank\">A" + says + "</a>\n" +
+			"<a href=\"/b\" target=\"_blank\">B</a>")},
+		// Admitted: the text inside the link, in a partial's dot or the page's, trimmed or not;
+		// a link that opens in place; and another element's target.
+		"template/says.html":    {Data: []byte(`<a class="text-link" href="/x" target="_blank" rel="noopener">X` + says + `</a>`)},
+		"template/dot.html":     {Data: []byte(`<a href="/x" target="_blank">X {{- T .ctx "common.link.opens_in_new_tab" -}}</a>`)},
+		"template/inplace.html": {Data: []byte(`<a href="/x" target="_self">X</a><a href="/y">Y</a>`)},
+		"template/form.html":    {Data: []byte(`<form action="/x" target="_blank"><button type="submit">Go</button></form>`)},
+		"template/action.html":  {Data: []byte(`<a href="/x" target="_blank" data-n="{{ if gt .n 1 }}many{{ end }}">X` + says + `</a>`)},
+	}
+
+	found, n := runRule(t, fsys, findSilentNewTabLinks)
+
+	assert.Equal(t, []string{
+		`template/after.html: line 1: <a href="/x" target="_blank">`,
+		`template/attr.html: line 1: <a href="/x" target="_blank" title="{{ T $.ctx "common.link.opens_in_new_tab" }}">`,
+		`template/branch.html: line 1: <a href="{{ .url }}"{{ if .ext }} target="_blank"{{ end }}>`,
+		`template/otherkey.html: line 1: <a href="/x" target="_blank">`,
+		`template/silent.html: line 1: <a href="https://example.com" target="_blank" rel="noopener noreferrer">`,
+		`template/two.html: line 2: <a href="/b" target="_blank">`,
+		`template/upper.html: line 1: <A HREF="/x" TARGET='_BLANK'>`,
+	}, found)
+	assert.Equal(t, 12, n)
+}
+
 // TestTemplates_TheWalkReachesEveryHTMLFileAndNothingElse pins what the shared walk hands the rules:
 // every .html file under the root at any depth, with its own path and its own contents, and no other
 // file whatever it contains.
 //
 // The non-.html rows matter because each rule is a substring scan. A .txt or .go file carrying the
 // banned spelling is not a page and must never be a finding, and asserting that here is what lets
-// the three tables above stay about their own rule.
+// the four tables above stay about their own rule.
 func TestTemplates_TheWalkReachesEveryHTMLFileAndNothingElse(t *testing.T) {
 	fsys := fstest.MapFS{
 		"template/index.html":             {Data: []byte("a")},
@@ -180,7 +224,7 @@ func TestTemplates_TheWalkReachesEveryHTMLFileAndNothingElse(t *testing.T) {
 // TestTemplates_AWalkThatReachesNothingIsVisible pins the count walkOrFail turns into a
 // t.Fatalf. A directory that exists and holds no .html file is not an error from fs.WalkDir, so
 // zero is the only signal there is, and every rule here passes vacuously over it: a //go:embed
-// pattern narrowed by a rename would otherwise leave three guards reporting nothing and reading as
+// pattern narrowed by a rename would otherwise leave four guards reporting nothing and reading as
 // green.
 func TestTemplates_AWalkThatReachesNothingIsVisible(t *testing.T) {
 	fsys := fstest.MapFS{"template/readme.txt": {Data: []byte("no pages here")}}
@@ -203,21 +247,22 @@ func TestTemplates_AMissingRootIsAnError(t *testing.T) {
 	assert.Equal(t, 0, n)
 }
 
-// Seam 4: the reporting halves. Everything above asserts on what the three matchers returned and on
+// Seam 4: the reporting halves. Everything above asserts on what the four matchers returned and on
 // the count the walk reached, which leaves the lines that turn those into a failure untested across
 // four real call sites -- both servers' template tiers.
 
-// TestTemplates_TheGuardsFailOnATreeThatBreaksEachRule drives all three reporting halves over one
-// fixture that violates all three, so a guard whose report loop has been blinded is caught here
+// TestTemplates_TheGuardsFailOnATreeThatBreaksEachRule drives all four reporting halves over one
+// fixture that violates all four, so a guard whose report loop has been blinded is caught here
 // rather than trusted. They are one test because the failure they share is the interesting one: the
-// walk is common to all three, and a rule silently reporting through the wrong one of them would
-// otherwise still look like three passes.
+// walk is common to all four, and a rule silently reporting through the wrong one of them would
+// otherwise still look like four passes.
 func TestTemplates_TheGuardsFailOnATreeThatBreaksEachRule(t *testing.T) {
 	fsys := fstest.MapFS{
 		"template/page.html": {Data: []byte(`{{define "title"}}<b>Users</b>{{end}}` + "\n" +
 			`<form>{{ csrfField }}</form>`)},
 		"template/layouts/base.html":         {Data: []byte(`<html lang="en">`)},
 		"template/layouts/email_layout.html": {Data: []byte(`<html lang="en">`)},
+		"template/otp.html":                  {Data: []byte("<p>\n<a href=\"https://freeotp.github.io/\" target=\"_blank\">FreeOTP</a></p>")},
 	}
 
 	title := Run(func(r Reporter) { assertTemplatesNoHTMLInTitle(r, fsys, "template") })
@@ -236,6 +281,12 @@ func TestTemplates_TheGuardsFailOnATreeThatBreaksEachRule(t *testing.T) {
 	assert.Contains(t, lang.Text(), "template/layouts/base.html")
 	assert.Contains(t, lang.Text(), "template/layouts/email_layout.html")
 	assert.Contains(t, lang.Text(), "{{ Lang $.ctx }}")
+
+	newTab := Run(func(r Reporter) { assertTemplatesNewTabLinksSaySo(r, fsys, "template") })
+	require.True(t, newTab.Failed(), "a new-tab link that does not say so passed the guard")
+	assert.Contains(t, newTab.Text(), `template/otp.html: line 2: <a href="https://freeotp.github.io/" target="_blank">`)
+	assert.Contains(t, newTab.Text(), `common.link.opens_in_new_tab`)
+	assert.NotContains(t, newTab.Text(), "template/page.html")
 }
 
 // TestTemplates_TheGuardsPassACleanTree is the other direction, over a fixture carrying the admitted
@@ -244,6 +295,8 @@ func TestTemplates_TheGuardsPassACleanTree(t *testing.T) {
 	fsys := fstest.MapFS{
 		"template/page.html":         {Data: []byte(`{{define "title"}}Users{{end}}`)},
 		"template/layouts/base.html": {Data: []byte(`<html lang="{{ Lang $.ctx }}">`)},
+		"template/otp.html": {Data: []byte(`<a href="https://freeotp.github.io/" target="_blank">FreeOTP` +
+			`<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a>`)},
 	}
 
 	for name, guard := range map[string]func(Reporter, fstest.MapFS, string){
@@ -251,6 +304,9 @@ func TestTemplates_TheGuardsPassACleanTree(t *testing.T) {
 		"csrf":  func(r Reporter, f fstest.MapFS, root string) { assertTemplatesNoCsrfField(r, f, root) },
 		"lang": func(r Reporter, f fstest.MapFS, root string) {
 			assertTemplatesHtmlLangNotHardcoded(r, f, root)
+		},
+		"newTab": func(r Reporter, f fstest.MapFS, root string) {
+			assertTemplatesNewTabLinksSaySo(r, f, root)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -267,11 +323,18 @@ func TestTemplates_TheGuardsPassACleanTree(t *testing.T) {
 func TestTemplates_AWalkThatReachesNothingFailsEveryGuard(t *testing.T) {
 	fsys := fstest.MapFS{"template/readme.txt": {Data: []byte("no pages here")}}
 
-	report := Run(func(r Reporter) { assertTemplatesNoHTMLInTitle(r, fsys, "template") })
+	for name, guard := range map[string]func(Reporter){
+		"title":  func(r Reporter) { assertTemplatesNoHTMLInTitle(r, fsys, "template") },
+		"newTab": func(r Reporter) { assertTemplatesNewTabLinksSaySo(r, fsys, "template") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			report := Run(guard)
 
-	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
-	assert.Contains(t, report.Fatal, "walked no .html files under template")
-	assert.Contains(t, report.Fatal, "checking nothing")
+			require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+			assert.Contains(t, report.Fatal, "walked no .html files under template")
+			assert.Contains(t, report.Fatal, "checking nothing")
+		})
+	}
 }
 
 // TestTemplates_AMissingRootIsFatalRatherThanEmpty separates the two ways a walk covers nothing, so

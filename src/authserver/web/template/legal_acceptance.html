@@ -31,7 +31,7 @@
       <label class="check-row" for="legalDocument{{ $i }}">
         <input type="checkbox" id="legalDocument{{ $i }}" name="legalDocument" value="{{ $d.VersionId }}"{{ if $d.Ticked }} checked{{ end }}{{ if $.unticked }}{{ if not $d.Ticked }} aria-invalid="true" aria-describedby="legal-acceptance-error"{{ end }}{{ end }}>
         <span class="grid min-w-0 flex-1 gap-0.5">
-          <span class="choice-label"><a class="text-link" href="/legal/{{ $d.ShortName }}" target="_blank" rel="noopener">{{ $d.Title }}</a></span>
+          <span class="choice-label"><a class="text-link" href="/legal/{{ $d.ShortName }}" target="_blank" rel="noopener">{{ $d.Title }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a></span>
           <span class="code-hint">{{ T $.ctx "legal_acceptance.version" "version" $d.VersionNumber }}</span>
         </span>
       </label>

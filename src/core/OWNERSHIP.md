@@ -359,6 +359,7 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertSlogConvention` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSymbolOwnership` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertTemplatesNewTabLinksSaySo` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesNoCsrfField` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesNoHTMLInTitle` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertWellFormedTemplates` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |

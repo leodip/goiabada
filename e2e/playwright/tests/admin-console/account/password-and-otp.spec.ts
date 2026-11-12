@@ -112,11 +112,24 @@ test("a password of bcrypt's whole bound, 72 bytes, is set and signs in, and not
   await again.context.close();
 });
 
+// The authenticator apps the Account pages' two-factor setup page links, each opening its site in a new tab and saying
+// so in its name (#814 decision 13).
+const authenticatorApps = [
+  { name: "Microsoft Authenticator (opens in a new tab)", href: "https://www.microsoft.com/en/security/mobile-authenticator-app" },
+  { name: "Google Authenticator (opens in a new tab)", href: "https://support.google.com/accounts/answer/1066447" },
+  { name: "FreeOTP (opens in a new tab)", href: "https://freeotp.github.io/" },
+];
+
 test("the user enrols an authenticator, is asked for its code at sign-in, and turns it off", async ({ page, browser, users }) => {
   const user = await users.create();
   const own = await signInToConsole(browser, user, "/account/otp");
   await expect(own.page.getByText("Two-factor authentication is off.")).toBeVisible();
   await expect(own.page.getByRole("img", { name: "QR code to scan with your authenticator app" })).toBeVisible();
+  for (const app of authenticatorApps) {
+    const link = own.page.getByRole("link", { name: app.name, exact: true });
+    await expect(link).toHaveAttribute("href", app.href);
+    await expect(link).toHaveAttribute("target", "_blank");
+  }
   const scanned = (await own.page.locator("#otp-secret").innerText()).trim();
   const enable = own.page.getByRole("button", { name: "Turn on two-factor authentication" });
 

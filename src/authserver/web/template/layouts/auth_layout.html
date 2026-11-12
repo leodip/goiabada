@@ -62,7 +62,7 @@
           <p class="auth-client-description">{{ .layoutClientDescription }}</p>
           {{ end }}
           {{ if .layoutClientWebsiteUrl }}
-          <a class="text-link text-sm" href="{{ .layoutClientWebsiteUrl }}" target="_blank" rel="noopener noreferrer">{{ .layoutClientWebsiteUrl }}</a>
+          <a class="text-link text-sm" href="{{ .layoutClientWebsiteUrl }}" target="_blank" rel="noopener noreferrer">{{ .layoutClientWebsiteUrl }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a>
           {{ end }}
         </div>
         {{ end }}
