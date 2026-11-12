@@ -40,7 +40,9 @@ import {
   pickInEditor,
   pngFile,
   previewSample,
+  previewView,
   switchPreviewTo,
+  switchPreviewViewTo,
   uploadKit,
   warmBasicPalette,
   withBrand,
@@ -1252,6 +1254,16 @@ test("the settings pages and the audit log", async ({ page }) => {
         await expect(previewSample(page, "light")).toBeHidden();
       },
     },
+    {
+      // The preview's second view (#815 decision 10), switched to and never saved: the Messages card
+      // in the dark sample, its notices, row link, selected item, focused field and buttons drawn.
+      name: "branding, a new brand, the preview's Messages view",
+      reach: async () => {
+        await switchPreviewViewTo(page, "messages");
+        await expect(previewView(page, "dark", "messages")).toBeVisible();
+        await expect(previewView(page, "dark", "signin")).toBeHidden();
+      },
+    },
     // The kit's fields (#813): each file uploaded and drawn in the sample, a file refused at its field,
     // and a dark logo without a logo refused at the logo's field. Nothing is saved.
     says(page, "branding, a new brand, its files uploaded", "boldFontStatus", async () => {
@@ -1315,6 +1327,13 @@ test("the settings pages and the audit log", async ({ page }) => {
       reach: async () => {
         await page.locator("#paletteMode-advanced").check();
         await expect(page.locator("[data-palette-row]:visible")).toHaveCount(23);
+      },
+    },
+    {
+      name: "branding, a new brand on Custom, in Advanced, the preview's Messages view",
+      reach: async () => {
+        await switchPreviewViewTo(page, "messages");
+        await expect(previewView(page, "light", "messages")).toBeVisible();
       },
     },
     refused(page, "branding, a new brand on Custom, a dark color refused at its field under Light", "palette-dark-brand", async () => {

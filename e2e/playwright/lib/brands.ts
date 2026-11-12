@@ -126,6 +126,23 @@ export async function switchPreviewTo(page: Page, mode: PreviewMode) {
   await page.locator(`#brand-preview-mode-${mode}`).check();
 }
 
+// The preview's two views (#815 decision 10): each sample holds the sign-in card and the Messages card,
+// and the Sign-in/Messages switch named "Show", on the preview's heading line, picks which shows.
+export type PreviewView = "signin" | "messages";
+
+export function previewView(page: Page, mode: PreviewMode, view: PreviewView): Locator {
+  return previewSample(page, mode).locator(`[data-brand-sample-view="${view}"]`);
+}
+
+export function previewViewSwitch(page: Page): Locator {
+  return brandPreview(page).getByRole("group", { name: "Show", exact: true });
+}
+
+// Puts the view switch on a view, as a click on its choice does.
+export async function switchPreviewViewTo(page: Page, view: PreviewView) {
+  await page.locator(`#brand-preview-view-${view}`).check();
+}
+
 // Waits for the preview to be drawn: the script has styled the samples and shown one of them.
 export async function expectPreviewDrawn(page: Page) {
   await expect(page.locator("[data-brand-sample]:visible")).toHaveCount(1);

@@ -53,7 +53,7 @@ function build(request) {
   };
   const sample = function (mode) {
     return el("div", { class: "brand-sample", "data-brand-sample": mode, hidden: "", inert: "", "aria-hidden": "true" }, [
-      el("div", { class: "panel auth-card" }, [el("div", { class: "panel-body" }, [
+      el("div", { class: "panel auth-card", "data-brand-sample-view": "signin" }, [el("div", { class: "panel-body" }, [
         el("div", { class: "auth-logo", hidden: "" }),
         el("p", { class: "auth-brand" }), el("p", { class: "auth-title" }), el("p", { class: "auth-lead" }),
         el("div", { class: "stacked" }, [
@@ -62,6 +62,10 @@ function build(request) {
           el("div", { class: "field" }, [el("span", { class: "control", "aria-invalid": "true" })]),
           el("div", { class: "auth-actions" }, [el("span", { class: "button" }), el("span", { class: "button button-primary" })]),
         ]),
+      ])]),
+      // The Messages view (#815 decision 10), drawn hidden.
+      el("div", { class: "panel brand-sample-messages", "data-brand-sample-view": "messages", hidden: "" }, [el("div", { class: "panel-body" }, [
+        el("div", { class: "notice notice-positive" }), el("div", { class: "notice notice-caution" }), el("div", { class: "notice notice-note" }),
       ])]),
       el("div", { class: "brand-footer", "data-brand-sample-footer": "", hidden: "" }, [
         el("ul", { class: "brand-footer-links", hidden: "" }),
@@ -184,6 +188,10 @@ function build(request) {
         el("section", { class: "brand-preview" }, [
           el("div", { class: "brand-preview-header" }, [
             el("h2", { class: "brand-preview-title" }),
+            el("fieldset", { class: "brand-preview-views" }, [
+              radio("brandPreviewView", "signin", true),
+              radio("brandPreviewView", "messages", false),
+            ]),
             el("fieldset", switchAttrs, [
               radio("brandPreviewMode", "light", true),
               radio("brandPreviewMode", "dark", false),
@@ -269,6 +277,10 @@ function look(doc) {
       logo: { hidden: box.hidden, images: images.map(function (img) { return { src: img.getAttribute("src"), alt: img.getAttribute("alt") }; }) },
       nameHidden: s.querySelector(".auth-brand").hidden,
       footer: sampleFooter(s.querySelector("[data-brand-sample-footer]")),
+      views: s.querySelectorAll("[data-brand-sample-view]").reduce(function (views, v) {
+        views[v.getAttribute("data-brand-sample-view")] = v.hidden;
+        return views;
+      }, {}),
     };
   }
   const styledElsewhere = [];
@@ -283,6 +295,8 @@ function look(doc) {
     styledElsewhere: styledElsewhere,
     switchHidden: doc.querySelector(".brand-preview-switch").hidden,
     previewMode: (doc.querySelector("input[name=\"brandPreviewMode\"]:checked") || { value: "" }).value,
+    viewSwitchHidden: doc.querySelector(".brand-preview-views").hidden,
+    previewView: (doc.querySelector("input[name=\"brandPreviewView\"]:checked") || { value: "" }).value,
     notesHidden: notes,
     swatches: swatches,
   };
@@ -422,6 +436,9 @@ type previewSample struct {
 	Logo       previewLogo       `json:"logo"`
 	NameHidden bool              `json:"nameHidden"`
 	Footer     previewFooter     `json:"footer"`
+	// Views holds, for each view of the sample (#815 decision 10), signin and messages, whether it
+	// is hidden.
+	Views map[string]bool `json:"views"`
 }
 
 // previewFooterLink is a link of a sample's footer: its text, and the elements holding it, such as
@@ -460,7 +477,11 @@ type previewLook struct {
 	StyledElsewhere []string                 `json:"styledElsewhere"`
 	SwitchHidden    bool                     `json:"switchHidden"`
 	PreviewMode     string                   `json:"previewMode"`
-	NotesHidden     map[string]bool          `json:"notesHidden"`
+	// ViewSwitchHidden and PreviewView are the Sign-in/Messages switch: whether it is hidden, and
+	// the view it is on.
+	ViewSwitchHidden bool            `json:"viewSwitchHidden"`
+	PreviewView      string          `json:"previewView"`
+	NotesHidden      map[string]bool `json:"notesHidden"`
 	// Swatches holds, for the appearance cards and the theme cards, each card's swatch by the
 	// card's value: one previewSwatch per mode it shows.
 	Swatches map[string]map[string][]previewSwatch `json:"swatches"`

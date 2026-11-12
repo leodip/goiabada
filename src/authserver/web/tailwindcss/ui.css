@@ -2558,17 +2558,20 @@
     font-weight: 600;
   }
 
-  /* The switch's name sits on the line of its two choices: a floated legend is laid out as any
-     other child of the fieldset. */
+  /* Each switch's name sits on the line of its two choices: a floated legend is laid out as any
+     other child of the fieldset. The Sign-in/Messages switch (#815 decision 10) and the Light/Dark
+     one are drawn alike. */
 
-  .brand-preview-switch {
+  .brand-preview-switch,
+  .brand-preview-views {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem 1rem;
   }
 
-  .brand-preview-switch > legend {
+  .brand-preview-switch > legend,
+  .brand-preview-views > legend {
     float: left;
   }
 
@@ -2625,6 +2628,46 @@
 
   .brand-sample .brand-footer {
     margin-top: 0.75rem;
+  }
+
+  /* The Messages card (#815 decision 10), the sample's second view, drawn as closely as the sign-in
+     card so it is no taller: the notices, a row link, a selected item, a field and the buttons, one
+     under the other, and the four small buttons on one line. */
+
+  .brand-sample-messages > .panel-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .brand-sample-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* The states an inert sample cannot take, marked on the element that shows them and drawn as the
+     component's own :hover and :focus-visible draw them. */
+
+  .brand-sample .link-row.brand-sample-hover {
+    border-color: var(--color-line-strong);
+    background-color: var(--color-subtle);
+  }
+
+  .brand-sample .button-primary.brand-sample-hover {
+    border-color: var(--color-brand-strong);
+    background-color: var(--color-brand-strong);
+  }
+
+  .brand-sample .button-danger.brand-sample-hover {
+    border-color: var(--color-danger-strong);
+    background-color: var(--color-danger-strong);
+  }
+
+  .brand-sample .control.brand-sample-focus {
+    border-color: var(--color-focus);
+    outline: 2px solid var(--color-focus);
+    outline-offset: 0;
   }
 
   /* An upload field of the brand editor (#813 decision 1): an image's thumbnail, the sentence saying

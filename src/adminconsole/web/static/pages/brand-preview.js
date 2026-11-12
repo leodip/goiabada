@@ -55,6 +55,12 @@
 // Dark the appearance decides the one sample. The Custom card's swatch shows the palette being
 // edited, whichever theme is picked.
 //
+// Each sample holds two views (#815 decision 10), and the Sign-in/Messages switch on the preview's
+// heading line decides which shows in the sample shown, whatever the theme and the appearance: the
+// sign-in card with the brand's footer under it, or the Messages card, which draws the tones and
+// states the sign-in card does not, and no footer. The switch starts on the sign-in view and sits
+// outside the form, so it is never submitted. Picking a view, or a mode, keeps the other.
+//
 // A browser restoring the form, as on Back, fires no input, so all of it is drawn again on every
 // pageshow.
 
@@ -251,8 +257,9 @@ function storedPhone(typed) {
 }
 
 // drawFooter draws a sample's footer from the form's footer fields: the links' labels, the contact
-// values, and the panel while the brand has a background image.
-function drawFooter(sample, footer) {
+// values, and the panel while the brand has a background image; and hides it while the view it
+// belongs to, the sign-in card's, is not shown.
+function drawFooter(sample, footer, shown) {
   const box = sample.querySelector("[data-brand-sample-footer]");
   if (!box) {
     return;
@@ -285,13 +292,19 @@ function drawFooter(sample, footer) {
     contact.hidden = !hasContact;
   }
   box.classList.toggle("brand-footer-panel", footer.panel);
-  box.hidden = footer.labels.length === 0 && !hasContact;
+  box.hidden = !shown || (footer.labels.length === 0 && !hasContact);
 }
 
 // previewMode answers the mode the switch is on, light unless it is on dark.
 function previewMode() {
   const checked = document.querySelector('input[name="brandPreviewMode"]:checked');
   return checked && checked.value === "dark" ? "dark" : "light";
+}
+
+// previewView answers the view the Sign-in/Messages switch is on, signin unless it is on messages.
+function previewView() {
+  const checked = document.querySelector('input[name="brandPreviewView"]:checked');
+  return checked && checked.value === "messages" ? "messages" : "signin";
 }
 
 // drawSwatch gives each shape of one swatch SVG its token's color in palette.
@@ -357,6 +370,7 @@ function drawPreview() {
   }
   const appearance = chosenAppearance();
   const mode = appearance === "auto" ? previewMode() : appearance;
+  const view = previewView();
   const radii = chosenRadii() || {};
   const fontStack = chosenFontStack();
   const font = document.getElementById("font");
@@ -390,7 +404,10 @@ function drawPreview() {
     setOrRemove(sample.style, "background-position", layout.position);
     setOrRemove(sample.style, "background-repeat", layout.repeat);
     drawLogo(sample, sampleMode === "dark" ? darkLogo : logo, hideName);
-    drawFooter(sample, footer);
+    for (const card of sample.querySelectorAll("[data-brand-sample-view]")) {
+      card.hidden = card.dataset.brandSampleView !== view;
+    }
+    drawFooter(sample, footer, view === "signin");
     sample.hidden = sampleMode !== mode;
   }
   const modeSwitch = document.querySelector(".brand-preview-switch");

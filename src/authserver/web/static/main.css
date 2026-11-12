@@ -2191,13 +2191,13 @@
     line-height: 1.5rem;
     font-weight: 600;
   }
-  .brand-preview-switch {
+  .brand-preview-switch, .brand-preview-views {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem 1rem;
   }
-  .brand-preview-switch > legend {
+  .brand-preview-switch > legend, .brand-preview-views > legend {
     float: left;
   }
   .brand-sample {
@@ -2233,6 +2233,33 @@
   }
   .brand-sample .brand-footer {
     margin-top: 0.75rem;
+  }
+  .brand-sample-messages > .panel-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+  .brand-sample-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .brand-sample .link-row.brand-sample-hover {
+    border-color: var(--color-line-strong);
+    background-color: var(--color-subtle);
+  }
+  .brand-sample .button-primary.brand-sample-hover {
+    border-color: var(--color-brand-strong);
+    background-color: var(--color-brand-strong);
+  }
+  .brand-sample .button-danger.brand-sample-hover {
+    border-color: var(--color-danger-strong);
+    background-color: var(--color-danger-strong);
+  }
+  .brand-sample .control.brand-sample-focus {
+    border-color: var(--color-focus);
+    outline: 2px solid var(--color-focus);
+    outline-offset: 0;
   }
   .brand-asset {
     min-width: 0;

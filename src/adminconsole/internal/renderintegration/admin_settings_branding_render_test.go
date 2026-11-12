@@ -291,7 +291,15 @@ func TestRender_AdminSettingsBrandingFormDrawsThePreview(t *testing.T) {
 			assert.Contains(t, editor, `<h2 class="brand-preview-title" id="brand-preview-title">Pré-visualização</h2>`)
 			// One paragraph holds what it shows and the sentence saying which modes apply, so the
 			// preview fits a 1280×800 screen beside the form in every language.
-			assert.Regexp(t, `<p class="field-hint"><span>Uma amostra de uma página de entrada nesta marca, como o formulário está agora\. A marca só muda quando você salva\.</span>\s*<span data-brand-preview-note="auto" hidden>`, editor)
+			assert.Regexp(t, `<p class="field-hint"><span>Amostras de páginas nesta marca, como o formulário está agora\. A marca só muda quando você salva\.</span>\s*<span data-brand-preview-note="auto" hidden>`, editor)
+
+			// The view switch (#815 decision 10), on the heading's line, before the Light/Dark
+			// switch, shown whatever the appearance and the theme, on the sign-in view.
+			assert.Regexp(t, `<h2 class="brand-preview-title" id="brand-preview-title">Pré-visualização</h2>\s*`+
+				`<fieldset class="brand-preview-views">\s*<legend class="field-label">Mostrar</legend>\s*`+
+				`<label class="choice"><input type="radio" id="brand-preview-view-signin" name="brandPreviewView" value="signin" checked>\s*<span>Entrada</span></label>\s*`+
+				`<label class="choice"><input type="radio" id="brand-preview-view-messages" name="brandPreviewView" value="messages">\s*<span>Mensagens</span></label>\s*`+
+				`</fieldset>\s*<fieldset class="brand-preview-switch"`, editor)
 
 			// The switch, named, its two choices the appearances' names, on Light; a Dark brand
 			// draws it hidden, and says it is always dark.
@@ -319,6 +327,33 @@ func TestRender_AdminSettingsBrandingFormDrawsThePreview(t *testing.T) {
 				assert.Contains(t, sample, `<span class="text-link">Esqueceu sua senha?</span>`)
 				assert.NotContains(t, sample, "field-error", "a sign-in page draws no error line under a field")
 				assert.Regexp(t, `<div class="auth-actions">\s*<span class="button">Cancelar</span>\s*<span class="button button-primary">Entrar</span>\s*</div>`, sample)
+
+				// Each sample holds both views: the sign-in card shown, and the Messages card
+				// (#815 decision 10) drawn hidden, the pages' own components in the states a sample
+				// that cannot be hovered or focused marks: the positive notice, the caution and the
+				// note notices each with a link, a row link hovered, a selected item, a focused
+				// field, and the primary and the danger buttons at rest and hovered.
+				assert.Contains(t, sample, `<div class="panel auth-card" data-brand-sample-view="signin">`)
+				messagesStart := strings.Index(sample, `<div class="panel auth-card brand-sample-messages" data-brand-sample-view="messages" hidden>`)
+				require.Positive(t, messagesStart, "the Messages card, drawn hidden")
+				footerStart := strings.Index(sample, `<div class="brand-footer"`)
+				require.Greater(t, footerStart, messagesStart, "the footer follows both cards")
+				messages := sample[messagesStart:footerStart]
+				for _, want := range []string{
+					`(?s)<div class="notice notice-positive">\s*<svg[^>]*>.*?</svg>\s*<p>Suas alterações foram salvas\.</p>\s*</div>`,
+					`(?s)<div class="notice notice-caution">\s*<svg[^>]*>.*?</svg>\s*<p>Sua senha expira em breve\. <span class="text-link">Alterar</span></p>\s*</div>`,
+					`(?s)<div class="notice notice-note">\s*<svg[^>]*>.*?</svg>\s*<p>Os termos de serviço mudaram\. <span class="text-link">Ler</span></p>\s*</div>`,
+					`(?s)<span class="link-row brand-sample-hover">\s*<svg[^>]*>.*?</svg>\s*<span class="link-row-text">\s*` +
+						`<span class="link-row-title">Sua conta</span>\s*<span class="link-row-hint">Perfil, e-mail e senha</span>\s*</span>\s*<svg[^>]*>.*?</svg>\s*</span>`,
+					`<span class="nav-link" aria-current="page">Sessões</span>`,
+					`<span class="control brand-sample-focus">alex@example\.com</span>`,
+					`<div class="brand-sample-buttons">\s*<span class="button button-sm button-primary">Salvar</span>\s*` +
+						`<span class="button button-sm button-primary brand-sample-hover">Salvar</span>\s*` +
+						`<span class="button button-sm button-danger">Excluir</span>\s*` +
+						`<span class="button button-sm button-danger brand-sample-hover">Excluir</span>\s*</div>`,
+				} {
+					assert.Regexp(t, want, messages)
+				}
 			}
 
 			// The palettes the script draws the samples in: every listed theme's light and dark one.
@@ -373,6 +408,8 @@ func TestRender_AdminSettingsBrandingFormDrawsThePreviewForTheAppearance(t *test
 					assert.Contains(t, preview, strings.Replace(note, `">`, `" hidden>`, 1), "the sentence for %s is hidden", appearance)
 				}
 			}
+			// The view switch shows whatever the appearance (#815 decision 10).
+			assert.Contains(t, preview, `<fieldset class="brand-preview-views">`)
 			switchTag := regexp.MustCompile(`<fieldset class="brand-preview-switch"[^>]*>`).FindString(preview)
 			if tc.switchHidden {
 				assert.Equal(t, `<fieldset class="brand-preview-switch" hidden>`, switchTag)

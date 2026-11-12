@@ -408,11 +408,23 @@
      One sentence says which applies. The switch on the heading's line, and the sentence in the
      paragraph saying what the preview shows, keep the whole preview on a 1280×800 screen beside
      the form. The page is drawn for the form's appearance, a form holding none it knows as
-     Automatic, and the script follows the appearance as it changes. */}}
+     Automatic, and the script follows the appearance as it changes.
+     Each sample holds two views (#815 decision 10): the sign-in card, and the Messages card, which
+     draws the colors the sign-in card does not. The Sign-in/Messages switch, first on the heading's
+     line, picks which, in the sample shown. It is there whatever the theme and the appearance, so the
+     pane has one layout, and starts on the sign-in view. The sentence saying what the preview shows
+     is true of either view. */}}
 {{ $previewAppearance := "auto" }}{{ if eq .brand.Appearance "light" "dark" }}{{ $previewAppearance = .brand.Appearance }}{{ end }}
 <section class="brand-preview" aria-labelledby="brand-preview-title">
   <div class="brand-preview-header">
     <h2 class="brand-preview-title" id="brand-preview-title">{{ T $.ctx "adminconsole.admin_branding.preview.title" }}</h2>
+    <fieldset class="brand-preview-views">
+      <legend class="field-label">{{ T $.ctx "adminconsole.admin_branding.preview.view_legend" }}</legend>
+      <label class="choice"><input type="radio" id="brand-preview-view-signin" name="brandPreviewView" value="signin" checked>
+        <span>{{ T $.ctx "adminconsole.admin_branding.preview.view_signin" }}</span></label>
+      <label class="choice"><input type="radio" id="brand-preview-view-messages" name="brandPreviewView" value="messages">
+        <span>{{ T $.ctx "adminconsole.admin_branding.preview.view_messages" }}</span></label>
+    </fieldset>
     <fieldset class="brand-preview-switch"{{ if ne $previewAppearance "auto" }} hidden{{ end }}>
       <legend class="field-label">{{ T $.ctx "adminconsole.admin_branding.preview.mode_legend" }}</legend>
       <label class="choice"><input type="radio" id="brand-preview-mode-light" name="brandPreviewMode" value="light" checked>
