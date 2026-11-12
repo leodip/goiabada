@@ -2,7 +2,8 @@
 // pairs of color tokens the pages draw text, a boundary or a focus ring in, each at its minimum
 // contrast, WCAG 2.2's contrast ratio, and the check that answers a palette's failing pairs. The
 // built-in themes are held to the list by the auth server's web tests, and a custom palette is
-// checked against the same list, so a warning names a pair the built-in themes are held to.
+// checked against the same list, so a warning names a pair the built-in themes are held to. It also
+// works out a basic palette's colors from the four entered for a mode (Derive), in OKLCH.
 //
 // A color is `#` and six hexadecimal digits, in either case; nothing else is one.
 package palette

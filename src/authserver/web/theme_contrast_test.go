@@ -2,6 +2,7 @@ package web
 
 import (
 	"maps"
+	"math"
 	"os"
 	"regexp"
 	"slices"
@@ -134,4 +135,87 @@ func TestThemeContrast_BlueberryIsBothCopiesOfUICSS(t *testing.T) {
 			t.Errorf("%s: the dark palette is %v, and Blueberry's dark is %v", path, dark, blueberry.Dark)
 		}
 	}
+}
+
+// A basic palette's colors are worked out from four (#815 decision 4). Each built-in theme but High
+// contrast, rebuilt that way from its own background, card, text and brand color in each mode, has no
+// failing pair, and every color worked out is within 0.05 in OKLab of the theme's hand-made one,
+// where 0.02 is barely visible. The status colors are Blueberry's, which the six other themes share.
+func TestThemeContrast_BasicPaletteRebuildsTheBuiltInThemes(t *testing.T) {
+	for _, preset := range brandthemes.All() {
+		if preset.Key == "high-contrast" {
+			continue
+		}
+		for mode, handMade := range map[string]map[string]string{"light": preset.Light, "dark": preset.Dark} {
+			got, err := palette.Derive(map[string]string{
+				"canvas": handMade["canvas"], "surface": handMade["surface"], "ink": handMade["ink"], "brand": handMade["brand"],
+			})
+			if err != nil {
+				t.Errorf("%s %s: %v", preset.Key, mode, err)
+				continue
+			}
+			failures, err := palette.Check(got)
+			if err != nil {
+				t.Errorf("%s %s: %v", preset.Key, mode, err)
+				continue
+			}
+			for _, f := range failures {
+				t.Errorf("%s %s rebuilt: %s (%s) on %s (%s) is %.2f:1, below %.1f:1", preset.Key, mode,
+					f.Foreground, got[f.Foreground], f.Background, got[f.Background], f.Ratio, f.Minimum)
+			}
+			for _, token := range slices.Sorted(maps.Keys(handMade)) {
+				if d := oklabDistance(t, got[token], handMade[token]); d > 0.05 {
+					t.Errorf("%s %s rebuilt: %s is %s, %.3f in OKLab from the hand-made %s", preset.Key, mode, token, got[token], d, handMade[token])
+				}
+			}
+		}
+	}
+}
+
+// A basic palette takes Blueberry's eleven status colors (#815 decision 13), which core/palette
+// declares, since core cannot read the auth server's themes: they are held here to the Blueberry
+// theme itself, the light set for a mode whose text is darker than its card and the dark set
+// otherwise, whichever column the colors are typed in.
+func TestThemeContrast_BasicPaletteStatusColorsAreBlueberrys(t *testing.T) {
+	blueberry, ok := brandthemes.Get("blueberry")
+	if !ok {
+		t.Fatal("there is no blueberry theme")
+	}
+	status := []string{"danger", "danger-strong", "on-danger", "danger-soft", "danger-ink", "positive-soft",
+		"positive-ink", "caution-soft", "caution-ink", "note-soft", "note-ink"}
+	for _, tc := range []struct {
+		what    string
+		entered map[string]string
+		want    brandthemes.Palette
+	}{
+		{"Blueberry's light colors", map[string]string{"canvas": "#f4f5f7", "surface": "#ffffff", "ink": "#1a1f29", "brand": "#2456c4"}, blueberry.Light},
+		{"Blueberry's dark colors", map[string]string{"canvas": "#0f1217", "surface": "#171b22", "ink": "#e6e8ec", "brand": "#8ab4ff"}, blueberry.Dark},
+		{"a dark design, typed in the Light column", map[string]string{"canvas": "#101418", "surface": "#1a2026", "ink": "#eef2f5", "brand": "#6cb6ff"}, blueberry.Dark},
+		{"white text on a navy card", map[string]string{"canvas": "#eef1f6", "surface": "#1f3a68", "ink": "#ffffff", "brand": "#ffd166"}, blueberry.Dark},
+	} {
+		got, err := palette.Derive(tc.entered)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.what, err)
+		}
+		for _, token := range status {
+			if got[token] != tc.want[token] {
+				t.Errorf("%s: %s is %s, and Blueberry's is %s", tc.what, token, got[token], tc.want[token])
+			}
+		}
+	}
+}
+
+// oklabDistance is the Euclidean distance of two colors in OKLab.
+func oklabDistance(t *testing.T, x, y string) float64 {
+	t.Helper()
+	a, err := palette.ToOKLCH(x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := palette.ToOKLCH(y)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ha, hb := a.H*math.Pi/180, b.H*math.Pi/180
+	return math.Hypot(a.L-b.L, math.Hypot(a.C*math.Cos(ha)-b.C*math.Cos(hb), a.C*math.Sin(ha)-b.C*math.Sin(hb)))
 }
