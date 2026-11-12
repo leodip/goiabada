@@ -13,7 +13,7 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
 
 - **Themes**: a page is drawn in a brand (#810): its appearance, `auto` (each
   visitor's device decides), `light` or `dark`, and its theme, one of the eight presets in
-  `authserver/internal/brandthemes`. The layouts write `data-theme` for light and dark alone, and
+  `authserver/internal/brandthemes` or `custom`, the brand's own palette (#815). The layouts write `data-theme` for light and dark alone, and
   link the brand's stylesheet after `main.css`: the auth server's pages by
   `brandthemes.StylesheetPath`, the console's by the `stylesheetUrl` `/api/public/settings` answers,
   which the console never builds. An auth server page takes the brand of the client its request
@@ -37,7 +37,12 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   link, and the colors-only one at `brandthemes.ColorsStylesheetRoute`, which
   `/api/public/settings` names as `colorsStylesheetUrl`. Both set the 23 `--color-*` tokens, the
   dark ones under the two selectors `ui.css`'s dark variant uses, so a change to that variant
-  changes `stylesheetCSS` too. The full one then sets the tokens the brand's corners and system
+  changes `stylesheetCSS` too. A custom brand's two stylesheets set its stored palette's 23 colors
+  of each mode as a preset's are (`brandthemes.ColorsStylesheet`), built on each request with no
+  color math: a basic palette's other 19 are worked out once, at the save, and stored, so a page
+  draws exactly what the warnings describe (#815 decision 1). A stored palette missing a token or
+  holding a value that is not `#rrggbb` names no stylesheet and is logged, as an unknown theme is,
+  so no value reaches a stylesheet unless it is a color. The full one then sets the tokens the brand's corners and system
   family change, `--radius-control`, `--radius-panel` and `--font-sans`, and none for rounded and
   System UI, which are `ui.css`'s. A box that may hold more than one line is rounded by
   `--radius-box`, `--radius-control` capped at 1rem, so pill corners round a single-line control
@@ -61,10 +66,18 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   link to home on a menu page.
   Blueberry's declares no colors, since `ui.css` holds its values, which
   `TestThemeContrast_BlueberryIsBothCopiesOfUICSS` keeps equal to its preset; a token added to
-  `ui.css` is added to every preset. A color is a token, `bg-surface`, `text-ink-muted`,
-  `border-line`, never a raw value, and every pair a component draws text or a boundary on is in
-  `TestThemeContrast_EveryPairMeetsWCAGAA`, at WCAG AA in both modes of every preset and 7:1 for
-  High contrast's text.
+  `ui.css` is added to every preset, to `core/palette`'s `Tokens` and `Derive`, and to the brand
+  editor's Colors groups and their catalog labels. A color is a token, `bg-surface`,
+  `text-ink-muted`, `border-line`, never a raw value, and every pair a component draws text, a
+  boundary or the focus ring in is in `core/palette`'s shared list (`palette.Pairs`), once, at its
+  minimum: 4.5:1 for text (WCAG 2.2 SC 1.4.3) and 3:1 for a boundary or the focus ring (SC 1.4.11).
+  `TestThemeContrast_EveryPairMeetsWCAGAA` holds every preset to the list in both modes, and High
+  contrast's text to 7:1 besides. A custom brand's `contrastWarnings` and the editor's live list are
+  `palette.Check` against the same list, for the modes the appearance draws, so a pair added for a
+  new component reaches every saved brand's warnings without a save.
+  `TestThemeContrast_BasicPaletteRebuildsTheBuiltInThemes` rebuilds each preset but High contrast
+  from its four colors with `palette.Derive` and holds the result to no failing pair and to within
+  0.05 in OKLab of the hand-made colors, so a change to the derivation is measured against them.
 - **Outside the card**: the card is opaque, and the brand's background image sits behind it
   (#813 decision 6). What is drawn outside the card, today the brand's footer (#814), is small
   `text-ink-muted` and link text straight on the page's `bg-canvas`, and sits on its own opaque
@@ -89,7 +102,16 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   75rem and below it in a narrower window. The `brand_sample` partial draws a refused sign-in, once
   per mode, with the auth server's card components and, wherever the sign-in page has one, its own
   message; its fields, buttons and link are spans, and each sample is `inert`, `aria-hidden` and
-  drawn `hidden`. `static/pages/brand-preview.js` reads every theme's palettes from the
+  drawn `hidden`. Each sample holds two views (#815 decision 10), named by `data-brand-sample-view`:
+  the sign-in card with the footer under it, and the Messages card (`brand-sample-messages`), which
+  draws the positive, caution and note notices with a link in the last two, a hovered link row, a
+  selected item, a focused field, and the primary and danger buttons at rest and hovered, so
+  between them the two views draw all 23 colors. Nothing in an inert sample can be hovered or
+  focused, so `brand-sample-hover` and `brand-sample-focus` mark those states and `ui.css` draws
+  them as the components' `:hover` and `:focus-visible`; a change to either rule changes both. The
+  Sign-in/Messages switch (`brandPreviewView`) sits on the heading's line, outside the form, for
+  every theme and appearance, and the Messages card is no taller than the sign-in one.
+  `static/pages/brand-preview.js` reads every theme's palettes from the
   `brand-palettes` data block, sets the chosen theme's 23 tokens, the mode's `--shadow-panel` and
   `color-scheme` on each sample alone through the CSSOM (never a `style` attribute or the page's
   root), on every input and `pageshow`. The appearance decides what shows: Light or Dark its one
@@ -103,7 +125,11 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   three Appearance cards' swatches in the chosen theme: each `data-appearance-swatch` names its
   modes, one SVG each in order, and `brand_swatch`'s shapes name their tokens in `data-fill` and
   `data-stroke`; the theme cards' swatches keep their own theme. A form holding a theme the list
-  lacks is previewed in the first listed one. The script keeps its own copy
+  lacks is previewed in the first listed one. Custom is drawn from the Colors section's fields, each
+  a token itself, so an entered color shows at once with no request; a value that is not `#rrggbb`
+  is never set on a sample, which keeps the color it was drawn in. Editing a Colors field puts the
+  switch on that field's mode under Automatic, and the Custom card's swatch draws the palette being
+  edited. The script keeps its own copy
   of `ui.css`'s two panel shadows, which `TestBrandPreviewJS_ShadowsAreUICSSs` holds equal, and
   `brand_preview_script_test.go` runs it under Node against a stand-in of the editor. The samples'
   colors are the theme's, under a forced palette too; the editor's own controls are held to the
@@ -128,6 +154,30 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   length the brand sets in proportion; none of the parts #811 lists is left out to make room. A
   footer with very long values may still wrap past the screen. The footer fields are the form's
   last and the footer the sample's last, so the part being edited is the part kept in view.
+- **Colors section**: picking the Custom card shows `brand-palette` under the theme cards (#815
+  decisions 7 and 8): Basic and Advanced (`paletteMode`), and a row per color with a Light and a
+  Dark cell, each a color well beside the text field the form submits, `palette-<mode>-<token>`.
+  The wells and Copy colors from need the script and are drawn hidden; everything else works with
+  scripts off. Basic shows the four rows of `palette.BasicTokens`, Advanced all 23 in four groups
+  with their token names. Both columns are always submitted, and the one the appearance does not
+  draw is hidden with a line saying its colors are kept, except while one of its fields holds a
+  value that is not a color: it then stays shown with a line saying its colors must be valid, and
+  the server applies the same rule when it redraws a refused form, so a refusal is never on a
+  hidden field. `static/pages/brand-palette.js` keeps the section in step with the form, and posts
+  it to the console's `/admin/settings/branding/palette-check` (`HandleBrandPaletteCheckPost`),
+  which answers each mode's 23 colors and the failing pairs from `core/palette`, the code the auth
+  server saves with (#815 decision 6). Never copy the color math into a script: two languages'
+  floating point need not agree at a contrast threshold, and the preview would list pairs the save
+  does not. A typed edit waits for a pause, a choice asks at once, and only the answer to the
+  latest request is drawn; a basic palette's answer fills the other 19 fields and fires `input` on
+  the section, which `brand-preview.js` draws. When the route cannot be reached the count line says
+  the colors could not be checked, and the save is unaffected. The list at the section's foot
+  (`palette-warnings`) is a count line, the one `role="status"` part, so an edit announces the
+  count and not the list, over an item per pair with a swatch of the pair. After a save the server
+  draws it from the brand's `contrastWarnings`, and the saved notice links to it.
+  `brand_palette_script_test.go` runs the script under Node. Page text about the check says what it
+  establishes, which pairs meet the two minimums, and never that a palette or a page meets WCAG
+  (decision 11).
 - **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
   `panel`, `panel-body` (several, each under a `panel-title`, for a panel in sections),
   `panel-footer`; `button`, with `-primary` for a form's one main action, `-danger`, `-quiet`,
