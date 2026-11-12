@@ -110,7 +110,7 @@ Every key is snake_case, and a key means the same thing in every event that carr
 
 Events are about people and clients, so details carry ids, not secrets. A refresh token appears only as its `jti`, and an authenticator code only as its time step.
 
-No entry records an email address. An entry about one records `email_digest` instead, the SHA-256 hex digest of the address in lowercase, and an entry about an account also names it by `user_id`. To find the entries about an address you know, compute its digest with `printf '%s' 'ana@example.com' | sha256sum`. Anyone holding a candidate address can do the same, so treat the digest as a pseudonym, not a secret.
+No entry records a user's email address. An entry about one records `email_digest` instead, the SHA-256 hex digest of the address in lowercase, and an entry about an account also names it by `user_id`. To find the entries about an address you know, compute its digest with `printf '%s' 'ana@example.com' | sha256sum`. Anyone holding a candidate address can do the same, so treat the digest as a pseudonym, not a secret.
 
 | Key | Meaning |
 |---|---|
@@ -147,6 +147,7 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
 | `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
 | `font` | A brand's font family after the save, such as `system-ui`, or `uploaded` for its uploaded font. |
+| `footer_link_urls` | The URL of each of a brand's footer links after the save, in the order they are drawn, left out when the brand has none. |
 | `grant_id` | The grant a client revoked: the `jti` of its first refresh token, which its access tokens carry as `grant_id`. |
 | `grant_type` | The `grant_type` of a token request. |
 | `grant_types` | The grant types a client asked for when it registered itself. |
@@ -210,6 +211,9 @@ No entry records an email address. An entry about one records `email_digest` ins
 | `session_identifier` | The identifier of a user's session. |
 | `short_name` | A legal document's short name, the address of its public page. |
 | `step` | The time step of an authenticator code that was sent again. |
+| `support_email` | The support email address a brand shows on its pages after the save, left out when unset. It is the brand's published address, not a user's. |
+| `support_phone` | The support phone number a brand shows on its pages after the save, in international format, such as `+442079460958`, left out when unset. |
+| `support_url` | The support page URL a brand links to after the save, left out when unset. |
 | `target_id` | The row id of the user, group, client or resource a request acted on. |
 | `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
 | `terminated_session_identifiers` | The identifier of each session ended. |

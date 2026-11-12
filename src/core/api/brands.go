@@ -11,28 +11,58 @@ import "time"
 // it and, for the default brand, those with no brand of their own too, so the counts of all brands
 // add up to every client (#812 decision 3).
 //
+// FooterLinks are the links drawn under the brand's card, in order, [] for none, and SupportEmail,
+// SupportUrl and SupportPhone its support contact, each "" when unset, the phone number in E.164: a
+// "+" and digits (#814 decisions 1 and 9). The four are always answered.
+//
 // Logo, DarkLogo, Favicon, Background, RegularFont and BoldFont are the brand's six slots, each the
 // stored asset it holds, null when empty. A slot answers the asset's id, which is what a write names
 // it by, so a brand read and written back is unchanged (#813 decision 10).
 type BrandResponse struct {
-	Id            int64               `json:"id"`
-	Name          string              `json:"name"`
-	Appearance    string              `json:"appearance"`
-	Theme         string              `json:"theme"`
-	Corners       string              `json:"corners"`
-	Font          string              `json:"font"`
-	BackgroundFit string              `json:"backgroundFit"`
-	HideAppName   bool                `json:"hideAppName"`
-	Logo          *BrandAssetResponse `json:"logo"`
-	DarkLogo      *BrandAssetResponse `json:"darkLogo"`
-	Favicon       *BrandAssetResponse `json:"favicon"`
-	Background    *BrandAssetResponse `json:"background"`
-	RegularFont   *BrandAssetResponse `json:"regularFont"`
-	BoldFont      *BrandAssetResponse `json:"boldFont"`
-	IsDefault     bool                `json:"isDefault"`
-	ClientCount   int                 `json:"clientCount"`
-	CreatedAt     *time.Time          `json:"createdAt"`
-	UpdatedAt     *time.Time          `json:"updatedAt"`
+	Id            int64                     `json:"id"`
+	Name          string                    `json:"name"`
+	Appearance    string                    `json:"appearance"`
+	Theme         string                    `json:"theme"`
+	Corners       string                    `json:"corners"`
+	Font          string                    `json:"font"`
+	BackgroundFit string                    `json:"backgroundFit"`
+	HideAppName   bool                      `json:"hideAppName"`
+	Logo          *BrandAssetResponse       `json:"logo"`
+	DarkLogo      *BrandAssetResponse       `json:"darkLogo"`
+	Favicon       *BrandAssetResponse       `json:"favicon"`
+	Background    *BrandAssetResponse       `json:"background"`
+	RegularFont   *BrandAssetResponse       `json:"regularFont"`
+	BoldFont      *BrandAssetResponse       `json:"boldFont"`
+	FooterLinks   []BrandFooterLinkResponse `json:"footerLinks"`
+	SupportEmail  string                    `json:"supportEmail"`
+	SupportUrl    string                    `json:"supportUrl"`
+	SupportPhone  string                    `json:"supportPhone"`
+	IsDefault     bool                      `json:"isDefault"`
+	ClientCount   int                       `json:"clientCount"`
+	CreatedAt     *time.Time                `json:"createdAt"`
+	UpdatedAt     *time.Time                `json:"updatedAt"`
+}
+
+// BrandFooterLinkResponse is one of a brand's footer links as the admin API answers it: the URL it
+// opens, the fallback label, and the label of each built-in language that has its own, by language
+// tag, {} when none has (#814 decision 9).
+type BrandFooterLinkResponse struct {
+	Url    string            `json:"url"`
+	Label  string            `json:"label"`
+	Labels map[string]string `json:"labels"`
+}
+
+// BrandFooterLink is one footer link as a brand's create and update name it (#814 decisions 5 and
+// 9): an https: URL with a host and no user name or password, at most 256 characters, and a label,
+// both required. The label, trimmed, is at most 40 characters, without angle brackets, and is drawn
+// in a language the link has no label of its own for. Labels is optional, left out, null or {}, and
+// holds a label by the tag of one of the six built-in languages, under the same bounds; a blank one
+// is dropped and any other tag is refused. A BrandFooterLinkResponse sent back as it came is the
+// same link.
+type BrandFooterLink struct {
+	Url    string            `json:"url"`
+	Label  string            `json:"label"`
+	Labels map[string]string `json:"labels"`
 }
 
 // BrandAssetRef names a stored brand asset by its id, as a brand's create and update name the asset
@@ -59,20 +89,32 @@ type GetBrandsResponse struct {
 // that slot, an asset since swept included, and so are a dark logo without a logo, a bold font file
 // without a regular one, and the uploaded font without a regular font file (#813 decisions 5, 7 and
 // 10).
+//
+// FooterLinks are at most three, saved in the order sent, each held to BrandFooterLink's rules, and
+// a refusal about one names it in the error answer's error_field, a JSON Pointer such as
+// /footerLinks/1/url. SupportEmail is an address of the shape and the 254-character bound an
+// account's is, SupportUrl a URL held to a footer link's rules, and SupportPhone a number in E.164, a
+// "+" and up to 15 digits, the first not zero, which may be written with spaces, hyphens, dots and
+// parentheses and is stored without them. Each is trimmed. A member left out or null is no
+// links, or an unset contact value, as [] and "" are (#814 decisions 1, 5, 9 and 10).
 type CreateBrandRequest struct {
-	Name          string         `json:"name"`
-	Appearance    string         `json:"appearance"`
-	Theme         string         `json:"theme"`
-	Corners       string         `json:"corners"`
-	Font          string         `json:"font"`
-	BackgroundFit string         `json:"backgroundFit"`
-	HideAppName   bool           `json:"hideAppName"`
-	Logo          *BrandAssetRef `json:"logo"`
-	DarkLogo      *BrandAssetRef `json:"darkLogo"`
-	Favicon       *BrandAssetRef `json:"favicon"`
-	Background    *BrandAssetRef `json:"background"`
-	RegularFont   *BrandAssetRef `json:"regularFont"`
-	BoldFont      *BrandAssetRef `json:"boldFont"`
+	Name          string            `json:"name"`
+	Appearance    string            `json:"appearance"`
+	Theme         string            `json:"theme"`
+	Corners       string            `json:"corners"`
+	Font          string            `json:"font"`
+	BackgroundFit string            `json:"backgroundFit"`
+	HideAppName   bool              `json:"hideAppName"`
+	Logo          *BrandAssetRef    `json:"logo"`
+	DarkLogo      *BrandAssetRef    `json:"darkLogo"`
+	Favicon       *BrandAssetRef    `json:"favicon"`
+	Background    *BrandAssetRef    `json:"background"`
+	RegularFont   *BrandAssetRef    `json:"regularFont"`
+	BoldFont      *BrandAssetRef    `json:"boldFont"`
+	FooterLinks   []BrandFooterLink `json:"footerLinks"`
+	SupportEmail  string            `json:"supportEmail"`
+	SupportUrl    string            `json:"supportUrl"`
+	SupportPhone  string            `json:"supportPhone"`
 }
 
 type CreateBrandResponse struct {
@@ -85,21 +127,25 @@ type GetBrandResponse struct {
 
 // UpdateBrandRequest replaces a brand's fields, validated as CreateBrandRequest's are: every field
 // is written, so a field left out is refused, or, for HideAppName, false, or, for a slot, empty
-// (#813 decision 10).
+// (#813 decision 10), or, for the footer links and the support contact, none (#814 decision 9).
 type UpdateBrandRequest struct {
-	Name          string         `json:"name"`
-	Appearance    string         `json:"appearance"`
-	Theme         string         `json:"theme"`
-	Corners       string         `json:"corners"`
-	Font          string         `json:"font"`
-	BackgroundFit string         `json:"backgroundFit"`
-	HideAppName   bool           `json:"hideAppName"`
-	Logo          *BrandAssetRef `json:"logo"`
-	DarkLogo      *BrandAssetRef `json:"darkLogo"`
-	Favicon       *BrandAssetRef `json:"favicon"`
-	Background    *BrandAssetRef `json:"background"`
-	RegularFont   *BrandAssetRef `json:"regularFont"`
-	BoldFont      *BrandAssetRef `json:"boldFont"`
+	Name          string            `json:"name"`
+	Appearance    string            `json:"appearance"`
+	Theme         string            `json:"theme"`
+	Corners       string            `json:"corners"`
+	Font          string            `json:"font"`
+	BackgroundFit string            `json:"backgroundFit"`
+	HideAppName   bool              `json:"hideAppName"`
+	Logo          *BrandAssetRef    `json:"logo"`
+	DarkLogo      *BrandAssetRef    `json:"darkLogo"`
+	Favicon       *BrandAssetRef    `json:"favicon"`
+	Background    *BrandAssetRef    `json:"background"`
+	RegularFont   *BrandAssetRef    `json:"regularFont"`
+	BoldFont      *BrandAssetRef    `json:"boldFont"`
+	FooterLinks   []BrandFooterLink `json:"footerLinks"`
+	SupportEmail  string            `json:"supportEmail"`
+	SupportUrl    string            `json:"supportUrl"`
+	SupportPhone  string            `json:"supportPhone"`
 }
 
 type UpdateBrandResponse struct {

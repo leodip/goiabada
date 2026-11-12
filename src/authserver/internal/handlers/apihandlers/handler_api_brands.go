@@ -46,12 +46,13 @@ type brandsDatabase interface {
 }
 
 // brandFields are what a create and an update name: every field of a brand, each slot by the id of
-// the asset it holds, nil for an empty slot.
+// the asset it holds, nil for an empty slot, and the footer links and the support contact.
 type brandFields struct {
 	name, appearance, theme, corners, font, backgroundFit string
 	hideAppName                                           bool
 	logo, darkLogo, favicon, background, regularFont      *api.BrandAssetRef
 	boldFont                                              *api.BrandAssetRef
+	footer                                                brandFooterFields
 }
 
 func createBrandFields(req api.CreateBrandRequest) brandFields {
@@ -60,6 +61,8 @@ func createBrandFields(req api.CreateBrandRequest) brandFields {
 		corners: req.Corners, font: req.Font, backgroundFit: req.BackgroundFit, hideAppName: req.HideAppName,
 		logo: req.Logo, darkLogo: req.DarkLogo, favicon: req.Favicon, background: req.Background,
 		regularFont: req.RegularFont, boldFont: req.BoldFont,
+		footer: brandFooterFields{footerLinks: req.FooterLinks, supportEmail: req.SupportEmail,
+			supportURL: req.SupportUrl, supportPhone: req.SupportPhone},
 	}
 }
 
@@ -80,7 +83,8 @@ func slotOf(ref *api.BrandAssetRef) sql.NullInt64 {
 // record.BrandNameMaxLength characters and without angle brackets; the appearance, the theme, the
 // corners, the font and the background fit each one of their keys, exactly. A missing choice is
 // refused as an unknown one, so a misspelt field name is reported and never becomes a default. The
-// hide-app-name switch is taken as sent, false when absent.
+// hide-app-name switch is taken as sent, false when absent. Then the footer links and the support
+// contact are held to validateBrandFooter's rules (#814).
 func validateBrand(fields brandFields) (record.Brand, error) {
 	name := strings.TrimSpace(fields.name)
 	if name == "" {
@@ -119,6 +123,9 @@ func validateBrand(fields brandFields) (record.Brand, error) {
 	brand.BackgroundAssetId = slotOf(fields.background)
 	brand.RegularFontAssetId = slotOf(fields.regularFont)
 	brand.BoldFontAssetId = slotOf(fields.boldFont)
+	if err := validateBrandFooter(fields.footer, &brand); err != nil {
+		return record.Brand{}, err
+	}
 	return brand, nil
 }
 
@@ -357,11 +364,13 @@ func HandleBrandCreatePost(database brandsDatabase, auditLogger AuditLogger, bas
 			return
 		}
 
-		auditLogger.Log(r.Context(), audit.EventCreatedBrand, map[string]interface{}{
+		details := map[string]interface{}{
 			"brand_id":       brand.Id,
 			"brand_name":     brand.Name,
 			"logged_in_user": callerSubject(r),
-		})
+		}
+		brandFooterAudit(&brand, details)
+		auditLogger.Log(r.Context(), audit.EventCreatedBrand, details)
 
 		// A brand just created is never the default, the pointer names a brand that existed, and no
 		// client can have been given it yet: it draws no client.
@@ -460,6 +469,7 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger, base
 		if brand.BoldFontAssetId.Valid {
 			details["bold_font_asset_id"] = brand.BoldFontAssetId.Int64
 		}
+		brandFooterAudit(brand, details)
 		auditLogger.Log(r.Context(), audit.EventUpdatedBrand, details)
 
 		defaultId, ok := defaultBrandId(w, r, database)

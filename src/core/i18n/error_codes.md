@@ -324,6 +324,21 @@ cause, each a whole sentence.
 | `handler.brand.bold_font_asset_invalid` | (none) | The bold font file is not a stored font. Upload it again. |
 | `handler.brand.dark_logo_logo_required` | (none) | Upload a logo to use a dark logo. |
 | `handler.brand.bold_font_regular_required` | (none) | Upload a regular font file to use a bold one. |
+| `handler.brand.footer_links_too_many` | `max` (int) | A brand has at most {{.max}} footer links. |
+| `handler.brand.footer_link_label_required` | `link` (int) | Link {{.link}} needs a label. |
+| `handler.brand.footer_link_label_too_long` | `link` (int), `max` (int) | The label of link {{.link}} cannot exceed {{.max}} characters. |
+| `handler.brand.footer_link_label_angle_brackets` | `link` (int) | The label of link {{.link}} cannot contain the characters < or >. |
+| `handler.brand.footer_link_language_invalid` | `link` (int), `language` (string) | Link {{.link}} has a label for {{.language}}, which is not a built-in language. |
+| `handler.brand.footer_link_language_label_too_long` | `link` (int), `language` (string), `max` (int) | The {{.language}} label of link {{.link}} cannot exceed {{.max}} characters. |
+| `handler.brand.footer_link_language_label_angle_brackets` | `link` (int), `language` (string) | The {{.language}} label of link {{.link}} cannot contain the characters < or >. |
+| `handler.brand.footer_link_url_required` | `link` (int) | Link {{.link}} needs a URL. |
+| `handler.brand.footer_link_url_too_long` | `link` (int), `max` (int) | The URL of link {{.link}} cannot exceed {{.max}} characters. |
+| `handler.brand.footer_link_url_invalid` | `link` (int) | The URL of link {{.link}} must start with https:// and name a site, with no user name or password. |
+| `handler.brand.support_email_invalid` | (none) | Enter a valid support email address. |
+| `handler.brand.support_email_too_long` | `max` (int) | The support email address cannot exceed {{.max}} characters. |
+| `handler.brand.support_url_invalid` | (none) | The support page URL must start with https:// and name a site, with no user name or password. |
+| `handler.brand.support_url_too_long` | `max` (int) | The support page URL cannot exceed {{.max}} characters. |
+| `handler.brand.support_phone_invalid` | (none) | Enter the support phone number in international format: + and the country code, then the number, at most 15 digits in all, such as +44 20 7946 0958. |
 | `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
 | `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
 | `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |

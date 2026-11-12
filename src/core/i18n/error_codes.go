@@ -192,6 +192,25 @@ const (
 	ErrCodeBrandDarkLogoLogoRequired    = "handler.brand.dark_logo_logo_required"
 	ErrCodeBrandBoldFontRegularRequired = "handler.brand.bold_font_regular_required"
 
+	// A brand's footer links and support contact (#814 decisions 1, 5 and 10). A footer link's
+	// refusal names the link by its number, counted from 1, and the error answer's error_field
+	// points at the member it is about; language is the tag of the label refused.
+	ErrCodeBrandFooterLinksTooMany                   = "handler.brand.footer_links_too_many"                     // Args: {"max": int}
+	ErrCodeBrandFooterLinkLabelRequired              = "handler.brand.footer_link_label_required"                // Args: {"link": int}
+	ErrCodeBrandFooterLinkLabelTooLong               = "handler.brand.footer_link_label_too_long"                // Args: {"link": int, "max": int}
+	ErrCodeBrandFooterLinkLabelAngleBrackets         = "handler.brand.footer_link_label_angle_brackets"          // Args: {"link": int}
+	ErrCodeBrandFooterLinkLanguageInvalid            = "handler.brand.footer_link_language_invalid"              // Args: {"link": int, "language": string}
+	ErrCodeBrandFooterLinkLanguageLabelTooLong       = "handler.brand.footer_link_language_label_too_long"       // Args: {"link": int, "language": string, "max": int}
+	ErrCodeBrandFooterLinkLanguageLabelAngleBrackets = "handler.brand.footer_link_language_label_angle_brackets" // Args: {"link": int, "language": string}
+	ErrCodeBrandFooterLinkURLRequired                = "handler.brand.footer_link_url_required"                  // Args: {"link": int}
+	ErrCodeBrandFooterLinkURLTooLong                 = "handler.brand.footer_link_url_too_long"                  // Args: {"link": int, "max": int}
+	ErrCodeBrandFooterLinkURLInvalid                 = "handler.brand.footer_link_url_invalid"                   // Args: {"link": int}
+	ErrCodeBrandSupportEmailInvalid                  = "handler.brand.support_email_invalid"
+	ErrCodeBrandSupportEmailTooLong                  = "handler.brand.support_email_too_long" // Args: {"max": int}
+	ErrCodeBrandSupportURLInvalid                    = "handler.brand.support_url_invalid"
+	ErrCodeBrandSupportURLTooLong                    = "handler.brand.support_url_too_long" // Args: {"max": int}
+	ErrCodeBrandSupportPhoneInvalid                  = "handler.brand.support_phone_invalid"
+
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"

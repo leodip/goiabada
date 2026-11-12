@@ -208,6 +208,25 @@ func TestCatalogTags_ReturnsACopy(t *testing.T) {
 	assert.Equal(t, "en", CatalogTags()[0])
 }
 
+// The built-in catalogs are the six compiled in, whichever catalogs an override directory adds or
+// overrides, and a tag names one only when it is spelt exactly as its catalog is.
+func TestIsBuiltInCatalogTag(t *testing.T) {
+	saved := installed.Load()
+	t.Cleanup(func() { installed.Store(saved) })
+	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
+		"active.nl.toml":    "\"auth.pwd.title\" = \"Aanmelden\"\n",
+		"active.pt-BR.toml": "\"auth.pwd.title\" = \"Acessar\"\n",
+	})))
+	require.True(t, IsCatalogTag("nl"), "the override directory adds nl")
+
+	for _, tag := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
+		assert.True(t, IsBuiltInCatalogTag(tag), "%q is a built-in catalog", tag)
+	}
+	for _, tag := range []string{"", "nl", "ja", "pt", "pt-br", "PT-BR", " pt-BR", "en-US", "EN"} {
+		assert.False(t, IsBuiltInCatalogTag(tag), "%q is not a built-in catalog's tag", tag)
+	}
+}
+
 func TestIsCatalogTag(t *testing.T) {
 	for _, tag := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
 		assert.True(t, IsCatalogTag(tag), "%q is a built-in catalog", tag)

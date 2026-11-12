@@ -630,6 +630,8 @@ func HandleBrandPost(
 
 		// An update replaces every field (#813 decision 10): each slot is sent as the form holds it,
 		// the stored asset, a file uploaded in place of it, or none once removed, which Save attaches.
+		// The form does not edit the footer links and the support contact, so they are sent back as
+		// the brand holds them, which keeps them (#814 decision 9).
 		form := brandFormFrom(r)
 		ids := brandSlotIdsFrom(r)
 		_, err := apiClient.UpdateBrand(r.Context(), token, id, &api.UpdateBrandRequest{
@@ -646,6 +648,10 @@ func HandleBrandPost(
 			Background:    ids.ref("background"),
 			RegularFont:   ids.ref("regularFont"),
 			BoldFont:      ids.ref("boldFont"),
+			FooterLinks:   storedFooterLinks(brand.FooterLinks),
+			SupportEmail:  brand.SupportEmail,
+			SupportUrl:    brand.SupportUrl,
+			SupportPhone:  brand.SupportPhone,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -666,6 +672,19 @@ func HandleBrandPost(
 		settingsCache.Invalidate()
 		redirectToBrandWithFlash(httpHelper, httpSession, w, r, baseURL, id, "savedSuccessfully")
 	}
+}
+
+// storedFooterLinks are a brand's footer links as its answer holds them, named as an update names
+// them, so a save sends them back unchanged; nil, sent as null, for none.
+func storedFooterLinks(links []api.BrandFooterLinkResponse) []api.BrandFooterLink {
+	if len(links) == 0 {
+		return nil
+	}
+	sent := make([]api.BrandFooterLink, 0, len(links))
+	for _, link := range links {
+		sent = append(sent, api.BrandFooterLink(link))
+	}
+	return sent
 }
 
 // redirectToBrandWithFlash goes back to the brand's page, which says once what flash names.

@@ -135,6 +135,9 @@ var apiErrorCodeDirs = []string{
 var apiErrorCodeArg = map[string]int{
 	"writeJSONError": 2,
 	"WriteError":     2,
+	// (w, message, code, field, status): WriteError for a refusal about one member of the body,
+	// which writeValidationError forwards a localized refusal's code to (#814 decision 10).
+	"WriteErrorAt": 2,
 	// (w, r, code, description): the bearer guards' 403, whose code says why the token does not
 	// reach the route. The API surface's writer forwards it to WriteError.
 	"forbidden": 2,
@@ -156,6 +159,7 @@ var apiErrorCodeForwarders = map[string]bool{
 	"writeLocalizedError":              true,
 	"writeInternalServerErrorWithCode": true,
 	"WriteError":                       true,
+	"WriteErrorAt":                     true,
 	"WriteInternalServerError":         true,
 	"forbidden":                        true,
 }

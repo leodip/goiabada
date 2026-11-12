@@ -142,6 +142,7 @@ const englishRefusalFileFloor = 80
 var englishRefusalWriters = map[string]struct{ message, status int }{
 	"writeJSONError": {message: 1, status: 3},
 	"WriteError":     {message: 1, status: 3},
+	"WriteErrorAt":   {message: 1, status: 4},
 }
 
 // englishRefusalForwarders are the functions whose message and status are their caller's, so a
