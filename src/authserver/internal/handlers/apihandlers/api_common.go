@@ -160,8 +160,8 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 
 // fieldRefusal is a validator's refusal about one member of the request body, which
 // writeValidationError answers with that member as error_field: a JSON Pointer into the body, as a
-// script applies it to the body it sent (#814 decision 10). Only a brand's footer links are refused
-// this way.
+// script applies it to the body it sent (#814 decision 10). Only a brand's footer links and its
+// palette (#815 decision 2) are refused this way.
 type fieldRefusal struct {
 	refusal *i18n.LocalizedError
 	pointer string

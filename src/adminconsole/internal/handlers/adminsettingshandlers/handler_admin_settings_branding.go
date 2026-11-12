@@ -40,11 +40,13 @@ const (
 )
 
 // BrandRow is a brand as the list and the delete page draw it: the brand, with its appearance and
-// its theme in words.
+// its theme in words, and the list's marker of its failing contrast pairs, "" for none (#815
+// decision 9). The list's swatches are drawn from its colors.
 type BrandRow struct {
 	api.BrandResponse
 	AppearanceName string
 	ThemeName      string
+	WarningsMarker string
 }
 
 // BrandForm is what the brand form holds: the stored brand, the defaults of a new one, or what was
@@ -219,6 +221,9 @@ func brandRefusedField(err error) string {
 	if field := footerLinkInput(render.ErrorPointer(err)); field != "" {
 		return field
 	}
+	if field := paletteInput(render.ErrorPointer(err)); field != "" {
+		return field
+	}
 	return render.ErrorField(err, brandErrorFields)
 }
 
@@ -244,7 +249,8 @@ func footerLinkInput(tokens []string) string {
 	return ""
 }
 
-// brandThemeNames are the message IDs of the built-in themes' names, by key. A theme missing here,
+// brandThemeNames are the message IDs of the built-in themes' names, and of Custom, a brand drawn in
+// its own palette (#815), by key. A theme missing here,
 // as a newer auth server's could be, is named by its key.
 var brandThemeNames = map[string]string{
 	"blueberry":     "adminconsole.admin_branding.theme.blueberry",
@@ -255,6 +261,7 @@ var brandThemeNames = map[string]string{
 	"guava":         "adminconsole.admin_branding.theme.guava",
 	"coconut":       "adminconsole.admin_branding.theme.coconut",
 	"high-contrast": "adminconsole.admin_branding.theme.high_contrast",
+	customTheme:     "adminconsole.admin_branding.theme.custom",
 }
 
 // brandAppearanceNames are the message IDs of the three appearances' names.
@@ -306,6 +313,7 @@ func brandRow(ctx context.Context, brand api.BrandResponse) BrandRow {
 		BrandResponse:  brand,
 		AppearanceName: nameIn(ctx, brandAppearanceNames, brand.Appearance),
 		ThemeName:      nameIn(ctx, brandThemeNames, brand.Theme),
+		WarningsMarker: brandWarningsMarker(ctx, brand),
 	}
 }
 
@@ -527,9 +535,10 @@ func accessTokenFrom(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 // renderBrandForm draws the brand form, new or of a stored brand, with the theme cards and the kit's
 // upload fields, and hands the preview what each theme, corner shape, font family and fit draws.
 func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, form BrandForm,
-	themes []api.BrandThemeResponse, extra map[string]interface{}) {
+	palette BrandPaletteForm, themes []api.BrandThemeResponse, extra map[string]interface{}) {
 
 	options := brandThemeOptions(r.Context(), themes)
+	refusedField, _ := extra["errorField"].(string)
 	bind := map[string]interface{}{
 		"brand":           form,
 		"brandThemes":     options,
@@ -539,6 +548,8 @@ func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 		"brandAssetUploads": brandAssetUploads(r.Context()),
 		// The languages a footer link has a label of its own in (#814 decision 11).
 		"footerLanguages": brandFooterLanguages(),
+		// The Colors section of a custom palette (#815 decision 7).
+		"palette": NewBrandPaletteView(palette, form.Appearance, refusedField),
 	}
 	for key, value := range extra {
 		bind[key] = value
@@ -620,7 +631,7 @@ func HandleBrandNewGet(
 		if len(themes) > 0 {
 			form.Theme = themes[0].Key
 		}
-		renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{"isNew": true})
+		renderBrandForm(httpHelper, w, r, form, brandPaletteFormOf(nil, themes, form.Theme), themes, map[string]interface{}{"isNew": true})
 	}
 }
 
@@ -645,6 +656,7 @@ func HandleBrandNewPost(
 
 		// The slots name the files uploaded in this form, which Create attaches (#813 decision 1).
 		form := brandFormFrom(r)
+		palette := brandPaletteFormFrom(r, nil)
 		ids := brandSlotIdsFrom(r)
 		_, err = apiClient.CreateBrand(r.Context(), token, &api.CreateBrandRequest{
 			Name:          form.Name,
@@ -664,13 +676,14 @@ func HandleBrandNewPost(
 			SupportEmail:  form.SupportEmail,
 			SupportUrl:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
+			Palette:       palette.request(form.Theme),
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				if !readFormSlots(httpHelper, w, r, apiClient, token, ids, &form) {
 					return
 				}
-				renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
+				renderBrandForm(httpHelper, w, r, form, palette, themes, map[string]interface{}{
 					"isNew":      true,
 					"error":      message,
 					"errorField": brandRefusedField(err),
@@ -717,7 +730,9 @@ func readBrandPage(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request
 }
 
 // HandleBrandGet draws a brand's page: the form with what is stored, and Make default for a
-// brand that is not the default. It says once that the brand was saved or made the default.
+// brand that is not the default. It says once that the brand was saved or made the default. A custom
+// brand's page lists its failing contrast pairs, as the read answers them (#815 decision 9), which
+// is how a save's warnings are shown after the redirect back here.
 func HandleBrandGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -758,12 +773,13 @@ func HandleBrandGet(
 			RegularFont: brand.RegularFont, BoldFont: brand.BoldFont,
 			FooterLinks: footerRowsOf(brand.FooterLinks), SupportEmail: brand.SupportEmail,
 			SupportUrl: brand.SupportUrl, SupportPhone: brand.SupportPhone}
-		renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
+		renderBrandForm(httpHelper, w, r, form, brandPaletteFormOf(brand, themes, brand.Theme), themes, map[string]interface{}{
 			"isNew":             false,
 			"storedBrand":       *brand,
 			"clientsNote":       brandClientsNote(r.Context(), brand.ClientCount),
 			"savedSuccessfully": savedSuccessfully,
 			"madeDefault":       madeDefault,
+			"paletteWarnings":   NewBrandContrastWarnings(r.Context(), *brand),
 		})
 	}
 }
@@ -794,6 +810,7 @@ func HandleBrandPost(
 		// the stored asset, a file uploaded in place of it, or none once removed, which Save attaches,
 		// and the footer links and the support contact as the form holds them (#814 decision 11).
 		form := brandFormFrom(r)
+		palette := brandPaletteFormFrom(r, brand)
 		ids := brandSlotIdsFrom(r)
 		_, err := apiClient.UpdateBrand(r.Context(), token, id, &api.UpdateBrandRequest{
 			Name:          form.Name,
@@ -813,13 +830,14 @@ func HandleBrandPost(
 			SupportEmail:  form.SupportEmail,
 			SupportUrl:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
+			Palette:       palette.request(form.Theme),
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				if !readFormSlots(httpHelper, w, r, apiClient, token, ids, &form) {
 					return
 				}
-				renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
+				renderBrandForm(httpHelper, w, r, form, palette, themes, map[string]interface{}{
 					"isNew":       false,
 					"storedBrand": *brand,
 					"clientsNote": brandClientsNote(r.Context(), brand.ClientCount),

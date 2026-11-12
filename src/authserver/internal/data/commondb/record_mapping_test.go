@@ -1241,6 +1241,10 @@ func distinctValue(rt reflect.Type, i int, column string, pass int) (driver.Valu
 		dv = `[{"url":"https://example.com/` + column + `","label":"` + label + `","labels":{"de":"` + label + `"}}]`
 		gv = record.BrandFooterLinks{{URL: "https://example.com/" + column, Label: label,
 			Labels: map[string]string{"de": label}}}
+	case reflect.TypeOf((*record.BrandPalette)(nil)):
+		// Stored as its JSON text, the mode then each mode's 23 colors by token name in sorted
+		// order, read back as the palette it holds.
+		dv, gv = mappingPaletteText(), mappingPalette()
 	default:
 		// A named string type, such as record.AcrLevel, is stored and scanned as its string, and a
 		// named int type, such as record.PasswordPolicy, as its number.
@@ -1933,4 +1937,39 @@ func TestRecordMapping_TheCheckerRefusesAnInsertLiteralOtherThanDeclared(t *test
 func TestRecordMapping_TheCheckerRefusesAnInsertLeavingOutALiteral(t *testing.T) {
 	problems := checkMapping(t, data.MSSQL, legacyWidgetMapping(rightWidgetSQL().insert))
 	assert.Contains(t, strings.Join(problems, "\n"), "mssql insert: does not write legacy")
+}
+
+// mappingTokens are the 23 color tokens in sorted order, the order a JSON object's keys are
+// written in.
+var mappingTokens = []string{
+	"brand", "brand-soft", "brand-strong", "canvas", "caution-ink", "caution-soft",
+	"danger", "danger-ink", "danger-soft", "danger-strong", "focus", "ink", "ink-muted",
+	"line", "line-strong", "note-ink", "note-soft", "on-brand", "on-danger",
+	"positive-ink", "positive-soft", "subtle", "surface",
+}
+
+// mappingColor is a distinct color for each token and mode: the light mode's in the #1000xx range,
+// the dark mode's in the #2000xx one.
+func mappingColor(mode, i int) string {
+	return fmt.Sprintf("#%d000%02d", mode, i)
+}
+
+func mappingPalette() *record.BrandPalette {
+	light, dark := map[string]string{}, map[string]string{}
+	for i, token := range mappingTokens {
+		light[token] = mappingColor(1, i)
+		dark[token] = mappingColor(2, i)
+	}
+	return &record.BrandPalette{Mode: record.BrandPaletteModeAdvanced, Light: light, Dark: dark}
+}
+
+func mappingPaletteText() string {
+	mode := func(m int) string {
+		var members []string
+		for i, token := range mappingTokens {
+			members = append(members, `"`+token+`":"`+mappingColor(m, i)+`"`)
+		}
+		return "{" + strings.Join(members, ",") + "}"
+	}
+	return `{"mode":"advanced","light":` + mode(1) + `,"dark":` + mode(2) + `}`
 }

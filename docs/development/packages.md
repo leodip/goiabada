@@ -174,6 +174,18 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `SplitSpaceDelimited`, the one grammar and the one splitter of the five space-delimited request
   parameters (exactly one space between values, none at either end, and no other separator), are
   here because `core/i18n` reads `ui_locales` with them in a middleware both processes mount (#244)
+- `palette/` - What a brand's colors are checked against and worked out with (#815): `Tokens`, the
+  23 color tokens of a palette's mode in `ui.css`'s order; `Pairs`, the shared list of the pairs
+  the pages draw text, a boundary or the focus ring in, each once at its minimum, `TextMinimum`
+  4.5:1 or `NonTextMinimum` 3:1; `ContrastRatio`, WCAG 2.2's; `Check`, a mode's failing pairs in the
+  list's order, each ratio cut to two decimals and never rounded up; `IsColor`, the one test of a
+  `#rrggbb` value; and `Derive`, which works a basic palette's mode out from its four entered colors
+  (`BasicTokens`) in OKLCH (`ToOKLCH`). They are pure functions of colors. The auth server's web
+  tests hold the built-in themes to the list, its brand writes derive and its brand answers check
+  with it, and the admin console's live preview route does both with the same code, so the preview
+  never lists a pair the save does not. Blueberry's eleven status colors are copied here, since core
+  cannot read the auth server's themes, and `TestThemeContrast_BasicPaletteStatusColorsAreBlueberrys`
+  holds them equal
 - `passwordblocklist/` - The two whole-password checks the `nist` password policy is written to
   apply: `IsCommon`, whether a password, lowercased, is an entry of the built-in list of commonly
   used passwords, compared whole and never as a substring, and `IsTooClose`, whether it is one of
@@ -282,7 +294,9 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   uploads
 - `internal/brandthemes/` - The eight built-in themes a brand is drawn in (#810): each preset's key
   and its light and dark palettes, 23 `#rrggbb` values by token name, in display order, and the
-  colors stylesheet each draws, built once. A brand has two stylesheets (#813): the full one, its
+  colors stylesheet each draws, built once. A custom brand's colors stylesheet is built from its
+  stored palette on each call (#815), and one whose palette cannot be drawn is an error, as an
+  unknown theme is. A brand has two stylesheets (#813): the full one, its
   colors then the radius and font tokens its corners and family set, from `core/brandkit`, served at
   `StylesheetRoute` and linked by `StylesheetPath`; and the colors-only one, served at
   `ColorsStylesheetRoute` and linked by `ColorsStylesheetPath`. The brand validation, the admin API's

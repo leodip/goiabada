@@ -405,6 +405,169 @@
     min-width: 0;
   }
 
+  /* The brand editor's Colors section (#815): a row per color, its label beside a Light and a Dark
+     cell, each a color well and a #rrggbb field. Where the form is narrow, a phone among them, the
+     label takes its own line and the two cells stay side by side under it. A column the appearance
+     hides leaves its track empty. */
+  .palette-grid {
+    container-type: inline-size;
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .palette-group {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .palette-group-name {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  .palette-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem 0.75rem;
+    align-items: start;
+  }
+
+  .palette-row > .palette-label {
+    grid-column: 1 / -1;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--color-ink);
+    overflow-wrap: anywhere;
+  }
+
+  .palette-head > .palette-label:empty {
+    display: none;
+  }
+
+  .palette-token {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--color-ink-muted);
+    white-space: nowrap;
+  }
+
+  .palette-cell {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  /* A cell too narrow for the well beside a whole #rrggbb, at the smallest phones, puts the field
+     under the well. */
+  .palette-control {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .palette-well {
+    flex: none;
+    width: 2.25rem;
+    height: 2.5rem;
+    padding: 0.125rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-box);
+    background-color: var(--color-surface);
+    cursor: pointer;
+  }
+
+  .palette-well:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Narrow padding keeps a whole #rrggbb in view in a cell at phone width. */
+  .palette-value {
+    flex: 1 1 5.5rem;
+    min-width: 0;
+    padding-inline: 0.5rem;
+    font-family: var(--font-mono);
+  }
+
+  @container (min-width: 30rem) {
+    .palette-row {
+      grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 10.5rem));
+    }
+
+    .palette-row > .palette-label {
+      grid-column: auto;
+      padding-top: 0.625rem;
+    }
+
+    .palette-head > .palette-label:empty {
+      display: block;
+    }
+
+    .palette-row > .palette-cell[data-palette-column="dark"] {
+      grid-column: 3;
+    }
+  }
+
+  /* The failing pairs of a saved custom palette (#815 decision 9), at the foot of the Colors
+     section: the count line, then a line per pair, its sentence beside a swatch of the pair. The
+     swatch's colors are attributes of its SVG, the pair's own; the frame is the page's. */
+
+  .palette-warnings {
+    display: grid;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .palette-warnings-count {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--color-ink);
+  }
+
+  .palette-warning-list {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .palette-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--color-ink);
+  }
+
+  .palette-warning > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .palette-warning-swatch {
+    flex: none;
+    width: 2.5rem;
+    height: 1.5rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 0.25rem;
+  }
+
+  /* A link in a success notice, such as the saved notice's link to the failing pairs, is drawn in
+     the notice's own text color, a pair every palette is checked on, and keeps its underline. */
+  .notice-positive .text-link,
+  .notice-positive .text-link:hover {
+    color: inherit;
+  }
+
   /* A disclosure the browser provides: the summary keeps the browser's marker and keyboard
      handling, reads as a control, is a target of at least 24 pixels, and spaces what it opens from
      itself. */
@@ -2312,6 +2475,31 @@
     height: 100%;
   }
 
+  /* The brand list's Theme column: a brand's light and dark colors beside its theme's name. */
+
+  .brand-list-theme {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    vertical-align: middle;
+  }
+
+  .brand-list-swatch {
+    display: flex;
+    flex: none;
+    width: 4rem;
+    height: 1.5rem;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: 0.25rem;
+  }
+
+  .brand-list-swatch > svg {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+  }
+
   /* A grid of option cards that reflows to the width it is given, rather than to the window's, as
      in the brand editor's narrower column of fields. */
 
@@ -2370,18 +2558,29 @@
     font-weight: 600;
   }
 
-  /* The switch's name sits on the line of its two choices: a floated legend is laid out as any
-     other child of the fieldset. */
+  /* Each switch's name sits on the line of its two choices: a floated legend is laid out as any
+     other child of the fieldset, and the choices flow inline beside it. The fieldset is a block, not
+     a flex container, since WebKit draws a flex fieldset's legend above its content, floated or not,
+     which gives each switch a second line. The Sign-in/Messages switch (#815 decision 10) and the
+     Light/Dark one are drawn alike. */
 
-  .brand-preview-switch {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 1rem;
+  .brand-preview-switch > legend,
+  .brand-preview-views > legend {
+    float: left;
+    margin-inline-end: 1rem;
+    line-height: 1.5rem;
   }
 
-  .brand-preview-switch > legend {
-    float: left;
+  .brand-preview-switch > .choice,
+  .brand-preview-views > .choice {
+    display: inline-flex;
+    vertical-align: top;
+    margin-inline-end: 1rem;
+  }
+
+  .brand-preview-switch > .choice:last-child,
+  .brand-preview-views > .choice:last-child {
+    margin-inline-end: 0;
   }
 
   /* A sample of a sign-in page in the brand being edited: the auth server's card on its canvas, and
@@ -2437,6 +2636,46 @@
 
   .brand-sample .brand-footer {
     margin-top: 0.75rem;
+  }
+
+  /* The Messages card (#815 decision 10), the sample's second view, drawn as closely as the sign-in
+     card so it is no taller: the notices, a row link, a selected item, a field and the buttons, one
+     under the other, and the four small buttons on one line. */
+
+  .brand-sample-messages > .panel-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .brand-sample-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* The states an inert sample cannot take, marked on the element that shows them and drawn as the
+     component's own :hover and :focus-visible draw them. */
+
+  .brand-sample .link-row.brand-sample-hover {
+    border-color: var(--color-line-strong);
+    background-color: var(--color-subtle);
+  }
+
+  .brand-sample .button-primary.brand-sample-hover {
+    border-color: var(--color-brand-strong);
+    background-color: var(--color-brand-strong);
+  }
+
+  .brand-sample .button-danger.brand-sample-hover {
+    border-color: var(--color-danger-strong);
+    background-color: var(--color-danger-strong);
+  }
+
+  .brand-sample .control.brand-sample-focus {
+    border-color: var(--color-focus);
+    outline: 2px solid var(--color-focus);
+    outline-offset: 0;
   }
 
   /* An upload field of the brand editor (#813 decision 1): an image's thumbnail, the sentence saying

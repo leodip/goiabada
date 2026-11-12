@@ -211,6 +211,18 @@ const (
 	ErrCodeBrandSupportURLTooLong                    = "handler.brand.support_url_too_long" // Args: {"max": int}
 	ErrCodeBrandSupportPhoneInvalid                  = "handler.brand.support_phone_invalid"
 
+	// A brand's custom palette (#815 decision 2). A refusal points at the member it is about in the
+	// error answer's error_field; mode is the palette's light or dark, and token the name refused or
+	// missing, each as the request spells it.
+	ErrCodeBrandPaletteRequired       = "handler.brand.palette_required"
+	ErrCodeBrandPaletteNotCustom      = "handler.brand.palette_not_custom"
+	ErrCodeBrandPaletteModeInvalid    = "handler.brand.palette_mode_invalid"
+	ErrCodeBrandPaletteColorsRequired = "handler.brand.palette_colors_required" // Args: {"mode": string}
+	ErrCodeBrandPaletteColorRequired  = "handler.brand.palette_color_required"  // Args: {"mode": string, "token": string}
+	ErrCodeBrandPaletteColorUnknown   = "handler.brand.palette_color_unknown"   // Args: {"mode": string, "token": string}
+	ErrCodeBrandPaletteColorNotBasic  = "handler.brand.palette_color_not_basic" // Args: {"mode": string, "token": string}
+	ErrCodeBrandPaletteColorInvalid   = "handler.brand.palette_color_invalid"   // Args: {"mode": string, "token": string}
+
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"

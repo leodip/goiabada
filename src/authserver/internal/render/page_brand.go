@@ -91,8 +91,9 @@ type PageBrand struct {
 //
 // A page whose brand cannot be read is still drawn, automatic and in main.css's colors, with no
 // brand stylesheet (#810): a nil brands, an empty pointer, a failed read, and a stored theme that is
-// none of the built-in ones, which names no stylesheet. The last two are faults and are logged; the
-// page itself is not one, so it is not refused over them.
+// none of the built-in ones, which names no stylesheet, as does a custom brand whose palette cannot
+// be drawn (#815). The last ones are faults and are logged; the page itself is not one, so it is not
+// refused over them.
 func DefaultPageBrand(ctx context.Context, brands PageBrandReader) PageBrand {
 	if brands == nil {
 		return PageBrand{}
@@ -108,8 +109,9 @@ func DefaultPageBrand(ctx context.Context, brands PageBrandReader) PageBrand {
 	return pageBrandOf(ctx, brands, brand)
 }
 
-// pageBrandOf is what a page drawn in brand takes from it, or nothing when its stored theme is none
-// of the built-in ones, which names no stylesheet and is logged.
+// pageBrandOf is what a page drawn in brand takes from it, or nothing when brandthemes cannot draw
+// its colors: a stored theme that is none of the built-in ones, or a custom brand whose palette is
+// missing or not whole. That names no stylesheet and is logged.
 func pageBrandOf(ctx context.Context, assets brandasset.SlotsReader, brand *record.Brand) PageBrand {
 	slots, err := brandasset.ReadSlots(ctx, assets, nil, brand)
 	if err != nil {

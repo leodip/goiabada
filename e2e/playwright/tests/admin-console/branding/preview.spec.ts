@@ -11,10 +11,22 @@
 // families' fonts. The sample draws the brand's footer under its card as its fields are typed (#814),
 // and the whole preview still fits those desktop sizes with three links and the whole contact in it.
 //
+// On Custom (#815 decision 6) the sample is drawn in the Colors section's fields, each color at once as
+// it is typed, the preview switching to the edited field's mode, and the colors a basic palette works
+// out once the console's check route answers; a built-in theme still asks nothing. The whole preview
+// fits those desktop sizes with the Colors section open, in Basic and in Advanced.
+//
+// The preview's second view, Messages (#815 decision 10), is picked by the switch named "Show" on the
+// heading line, under every appearance and for every theme: in the sample shown it replaces the sign-in
+// card, and is no taller. It draws the positive, caution and note notices, a row link hovered, a selected
+// item, a focused field and the buttons at rest and hovered, each status color as it is typed on Custom,
+// and between them the two views draw all 23 colors of a mode. Every fit above holds in either view.
+//
 // Everything here is on the New brand page and nothing is saved, or on a brand of the test's own that no
 // client uses, so this is an ordinary parallel spec.
 // A browser restores the form after Back without firing a change, each engine in its own way, so this
-// file runs in Chromium, Firefox and WebKit (playwright.config.ts, #811 decision 5).
+// file runs in Chromium, Firefox and WebKit (playwright.config.ts, #811 decision 5): the sample, and on
+// a custom brand the list of failing pairs (#815 decisions 8 and 9), follow the form as it was restored.
 import type { Page } from "@playwright/test";
 import {
   appearanceSwatchFills,
@@ -30,22 +42,32 @@ import {
   kitFiles,
   newBrandUrl,
   openFooterLanguageLabels,
+  paletteField,
+  paletteTokens,
+  paletteWarningItems,
+  paletteWarningsCount,
   pickInEditor,
   previewSample,
   previewSwitch,
+  previewView,
+  previewViewSwitch,
   readBrandKitChoices,
   sampleColors,
   sampleFooter,
   sampleKit,
   sampleShape,
+  sampleToken,
   switchPreviewTo,
+  switchPreviewViewTo,
   uploadInEditor,
   uploadKit,
+  withCustomBrand,
   type Appearance,
   type BrandFooter,
   type Corners,
   type FontFamily,
   type PreviewMode,
+  type PreviewView,
   type SampleColors,
 } from "../../../lib/brands";
 import { expect, test } from "../../../lib/fixtures";
@@ -275,6 +297,43 @@ test("after leaving the page and coming Back, the sample matches the form as the
   await expectSampleShown(page, restored.theme, mode);
 });
 
+test("after leaving a custom brand's page and coming Back, its list of failing pairs is the restored appearance's", async ({ page }) => {
+  // The probe's mid-gray brand color in light (#815), failing six light pairs, and Blueberry's own dark
+  // colors, failing none.
+  const palette = {
+    mode: "basic" as const,
+    light: { canvas: "#f4f4f4", surface: "#ffffff", ink: "#222222", brand: "#777777" },
+    dark: { canvas: "#0f1217", surface: "#171b22", ink: "#e6e8ec", brand: "#8ab4ff" },
+  };
+  const sixLightPairs = "6 pairs are below their minimum. Text and boundaries drawn in them do not meet WCAG 2.2 level AA contrast.";
+  const none = "Every pair meets its minimum.";
+  await withCustomBrand(page, "auto", palette, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await expect(paletteWarningsCount(page)).toHaveText(sixLightPairs);
+    await fillBrandForm(page, { appearance: "dark" });
+    await expect(paletteWarningsCount(page)).toHaveText(none);
+
+    await page.locator(".page-eyebrow").getByRole("link", { name: "Branding", exact: true }).click();
+    await expect(page).toHaveURL(brandingUrl);
+    await page.goBack();
+    await expect(page).toHaveURL(brandUrl(brand.id, "edit"));
+
+    // Each engine restores the form its own way, or not at all: whatever appearance it holds, the
+    // list is that appearance's.
+    const appearance = await page.evaluate(
+      () => document.querySelector<HTMLInputElement>('input[name="appearance"]:checked')?.value ?? "auto",
+    );
+    test.info().annotations.push({ type: "restored appearance", description: appearance });
+    if (appearance === "dark") {
+      await expect(paletteWarningsCount(page)).toHaveText(none);
+      await expect(paletteWarningItems(page)).toHaveCount(0);
+    } else {
+      await expect(paletteWarningsCount(page)).toHaveText(sixLightPairs);
+      await expect(paletteWarningItems(page).filter({ hasText: /^Light:/ })).toHaveCount(6);
+    }
+  });
+});
+
 test("picking a theme, an appearance, a mode or a kit choice sends no request", async ({ page }) => {
   await openNewBrand(page, "light");
   await page.waitForLoadState("load");
@@ -294,11 +353,199 @@ test("picking a theme, an appearance, a mode or a kit choice sends no request", 
   expect(sent, "the requests sent while the form changed").toEqual([]);
 });
 
+// The view switch (#815 decision 10): there under every appearance, on a built-in theme and on Custom,
+// starting on Sign-in; Messages shows the Messages card in place of the sign-in card and its footer, in
+// the sample of the mode shown; and its arrow keys move it, as any radio group's do.
+test("the view switch shows the Messages card in place of the sign-in card, under every appearance and theme, operable by keyboard", async ({ page }) => {
+  await openNewBrand(page, "light");
+  await fillBrandFooter(page, { supportEmail: "help@example.com" });
+  const signin = previewViewSwitch(page).getByRole("radio", { name: "Sign-in", exact: true });
+  const messages = previewViewSwitch(page).getByRole("radio", { name: "Messages", exact: true });
+  await expect(signin).toBeChecked();
+  await expect(previewView(page, "light", "signin")).toBeVisible();
+  await expect(previewView(page, "light", "messages")).toBeHidden();
+  await expect(previewSample(page, "light").locator("[data-brand-sample-footer]")).toBeVisible();
+
+  await signin.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(messages).toBeFocused();
+  await expect(messages).toBeChecked();
+  const sample = previewSample(page, "light");
+  await expect(previewView(page, "light", "messages")).toBeVisible();
+  await expect(previewView(page, "light", "signin")).toBeHidden();
+  await expect(sample.locator("[data-brand-sample-footer]"), "no footer under the Messages card").toBeHidden();
+  for (const text of ["Your changes were saved.", "Change it", "Read them", "Your account", "Profile, email and password", "Sessions", "alex@example.com"]) {
+    await expect(previewView(page, "light", "messages").getByText(text, { exact: true }), text).toBeVisible();
+  }
+  // The caution and the note each end in a link, in the same line as their sentence.
+  await expect(previewView(page, "light", "messages").locator(".notice-caution p")).toHaveText("Your password expires soon. Change it");
+  await expect(previewView(page, "light", "messages").locator(".notice-note p")).toHaveText("The terms of service have changed. Read them");
+  await expect(previewView(page, "light", "messages").getByText("Save", { exact: true })).toHaveCount(2);
+  await expect(previewView(page, "light", "messages").getByText("Delete", { exact: true })).toHaveCount(2);
+
+  for (const [values, mode] of [
+    [{ appearance: "dark", theme: "plum" }, "dark"],
+    [{ appearance: "light" }, "light"],
+    [{ appearance: "auto", theme: "custom" }, "light"],
+  ] as const) {
+    await fillBrandForm(page, values);
+    await expect(previewViewSwitch(page), `the view switch under ${JSON.stringify(values)}`).toBeVisible();
+    await expect(previewView(page, mode, "messages")).toBeVisible();
+    await expect(previewView(page, mode, "signin")).toBeHidden();
+  }
+  await switchPreviewTo(page, "dark");
+  await expect(previewView(page, "dark", "messages"), "a mode picked keeps the view").toBeVisible();
+
+  await messages.focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(signin).toBeChecked();
+  await expect(previewView(page, "dark", "signin")).toBeVisible();
+  await expect(previewView(page, "dark", "messages")).toBeHidden();
+});
+
+// Where each status color is drawn: the Messages card's notices and danger buttons, at rest and hovered,
+// and the sign-in card's danger notice, as the browser reports the property.
+const statusComponents: Record<string, { view: PreviewView; selector: string; property: "background-color" | "color" }> = {
+  danger: { view: "messages", selector: ".button-danger:not(.brand-sample-hover)", property: "background-color" },
+  "danger-strong": { view: "messages", selector: ".button-danger.brand-sample-hover", property: "background-color" },
+  "on-danger": { view: "messages", selector: ".button-danger", property: "color" },
+  "danger-soft": { view: "signin", selector: ".notice-danger", property: "background-color" },
+  "danger-ink": { view: "signin", selector: ".notice-danger", property: "color" },
+  "positive-soft": { view: "messages", selector: ".notice-positive", property: "background-color" },
+  "positive-ink": { view: "messages", selector: ".notice-positive", property: "color" },
+  "caution-soft": { view: "messages", selector: ".notice-caution", property: "background-color" },
+  "caution-ink": { view: "messages", selector: ".notice-caution", property: "color" },
+  "note-soft": { view: "messages", selector: ".notice-note", property: "background-color" },
+  "note-ink": { view: "messages", selector: ".notice-note", property: "color" },
+};
+
+// rgbOf is a #rrggbb color as a browser reports a computed one.
+function rgbOf(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+test("on Custom each status color is drawn by its component as it is typed, in the view that shows it", async ({ page }) => {
+  await openNewBrand(page, "light");
+  await page.locator("#theme-custom").check();
+  await page.locator("#paletteMode-advanced").check();
+  for (const mode of ["light", "dark"] as const) {
+    for (const [index, [token, where]] of Object.entries(statusComponents).entries()) {
+      const value = `#${mode === "light" ? "5a" : "6b"}${(index * 16 + 7).toString(16).padStart(2, "0")}${mode === "light" ? "3c" : "4d"}`;
+      await switchPreviewViewTo(page, where.view);
+      await paletteField(page, mode, token).fill(value);
+      await expect(previewView(page, mode, where.view), `the ${mode} sample's ${where.view} view after ${token}`).toBeVisible();
+      await expect(previewView(page, mode, where.view).locator(where.selector).first(), `${mode} ${token}`).toHaveCSS(where.property, rgbOf(value));
+    }
+  }
+});
+
+// Between them the two views draw every one of a mode's 23 colors on a page component (#815 decision 10):
+// each token given a color no other has, every color the shown view's visible elements are drawn in is
+// gathered, text in its color, a box in its background, its borders and its outline where it has one.
+test("between them the sign-in and the Messages views draw all 23 colors of each mode", async ({ page }) => {
+  await openNewBrand(page, "light");
+  await page.locator("#theme-custom").check();
+  await page.locator("#paletteMode-advanced").check();
+  for (const mode of ["light", "dark"] as const) {
+    const values = Object.fromEntries(paletteTokens.map((token, index) => [token, `#${mode === "light" ? "a1" : "b2"}${index.toString(16).padStart(2, "0")}3c`]));
+    for (const [token, value] of Object.entries(values)) await paletteField(page, mode, token).fill(value);
+    await expect.poll(() => sampleToken(previewSample(page, mode), "focus")).toBe(values.focus);
+    const drawn = new Set<string>();
+    for (const view of ["signin", "messages"] as const) {
+      await switchPreviewViewTo(page, view);
+      await expect(previewView(page, mode, view)).toBeVisible();
+      for (const color of await previewSample(page, mode).evaluate((sample) => {
+        const colors: string[] = [];
+        for (const element of [sample, ...Array.from(sample.querySelectorAll<HTMLElement>("*"))]) {
+          if (element.getClientRects().length === 0) continue;
+          const style = getComputedStyle(element);
+          const hasText = Array.from(element.childNodes).some((node) => node.nodeType === Node.TEXT_NODE && node.textContent!.trim() !== "");
+          if (hasText || element.tagName.toLowerCase() === "svg") colors.push(style.color);
+          colors.push(style.backgroundColor);
+          for (const side of ["Top", "Right", "Bottom", "Left"] as const) {
+            if (style.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none" && parseFloat(style.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0) {
+              colors.push(style.getPropertyValue(`border-${side.toLowerCase()}-color`));
+            }
+          }
+          if (style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0) colors.push(style.outlineColor);
+        }
+        return colors;
+      })) {
+        drawn.add(color);
+      }
+    }
+    for (const [token, value] of Object.entries(values)) {
+      expect(drawn.has(rgbOf(value)), `the ${mode} ${token}, ${value}, drawn in one of the two views`).toBe(true);
+    }
+    await switchPreviewViewTo(page, "signin");
+  }
+});
+
+// The console's route a custom palette is checked at (#815 decision 6).
+const paletteCheckPath = "/admin/settings/branding/palette-check";
+
+test("on Custom the sample follows each color field as it is typed, in the field's mode", async ({ page }) => {
+  await openNewBrand(page, "light");
+  await page.locator("#theme-custom").check();
+  await page.locator("#paletteMode-advanced").check();
+  for (const [index, token] of paletteTokens.entries()) {
+    for (const mode of ["dark", "light"] as const) {
+      // A color no theme has, and a different one for each field.
+      const value = `#${mode === "light" ? "a1" : "b2"}${index.toString(16).padStart(2, "0")}3c`;
+      await paletteField(page, mode, token).fill(value);
+      // Editing a field switches the preview to its mode, and the sample takes the color at once.
+      await expect(previewSample(page, mode), `the ${mode} sample after ${token}`).toBeVisible();
+      await expect.poll(() => sampleToken(previewSample(page, mode), token), `the ${mode} sample's ${token}`).toBe(value);
+    }
+  }
+  await expect(previewSwitch(page).getByRole("radio", { name: "Light", exact: true })).toBeChecked();
+});
+
+test("on Custom a basic palette's sample takes the four colors at once, and the colors worked out from them once the console answers", async ({ page }) => {
+  await openNewBrand(page, "light");
+  await page.locator("#theme-custom").check();
+  await expect(page.locator("#paletteMode-basic")).toBeChecked();
+  // The probe's "mid-gray brand color" palette (#815), whose muted text is worked out to #605e5a.
+  const four = { canvas: "#f4f4f4", surface: "#ffffff", ink: "#222222", brand: "#777777" };
+  const answered = page.waitForResponse((response) => new URL(response.url()).pathname === paletteCheckPath && response.request().method() === "POST");
+  for (const [token, value] of Object.entries(four)) await paletteField(page, "light", token).fill(value);
+  for (const [token, value] of Object.entries(four)) expect(await sampleToken(previewSample(page, "light"), token), token).toBe(value);
+  expect((await answered).ok()).toBe(true);
+  await expect.poll(() => sampleToken(previewSample(page, "light"), "ink-muted")).toBe("#605e5a");
+  await expect.poll(() => sampleToken(previewSample(page, "light"), "line-strong")).toBe("#7d796c");
+});
+
+test("Custom asks the console to check its colors, and a built-in theme still asks nothing", async ({ page }) => {
+  await openNewBrand(page, "light");
+  await page.waitForLoadState("load");
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    if (!new URL(request.url()).pathname.startsWith("/static/favicon/")) sent.push(`${request.method()} ${new URL(request.url()).pathname}`);
+  });
+
+  await fillBrandForm(page, { theme: "plum", appearance: "dark" });
+  await fillBrandForm(page, { appearance: "auto", corners: "pill" });
+  expect(sent, "the requests sent on a built-in theme").toEqual([]);
+
+  const checked = page.waitForRequest((request) => new URL(request.url()).pathname === paletteCheckPath);
+  await page.locator("#theme-custom").check();
+  await checked;
+  await expect.poll(() => sent.every((request) => request === `POST ${paletteCheckPath}`), "only the check route is asked").toBe(true);
+
+  sent.length = 0;
+  await fillBrandForm(page, { theme: "blueberry" });
+  await fillBrandForm(page, { appearance: "light" });
+  // Longer than the pause a typed edit waits for before the check is asked.
+  await page.waitForTimeout(1000);
+  expect(sent, "the requests sent once a built-in theme is picked again").toEqual([]);
+});
+
 test("the sample cannot be reached by Tab, is hidden from assistive technology, and the page says in text what it shows", async ({ page }) => {
   await openNewBrand(page, "light");
   const preview = brandPreview(page);
   await expect(preview.getByRole("heading", { level: 2, name: "Preview", exact: true })).toBeVisible();
-  await expect(preview.getByText("A sample of a sign-in page in this brand, as the form stands now. The brand changes only when you save.", { exact: true })).toBeVisible();
+  await expect(preview.getByText("Samples of pages in this brand, as the form stands now. The brand changes only when you save.", { exact: true })).toBeVisible();
   await expect(preview.getByText(notes.auto, { exact: true })).toBeVisible();
 
   for (const mode of ["light", "dark"] as const) {
@@ -306,13 +553,14 @@ test("the sample cannot be reached by Tab, is hidden from assistive technology, 
     await expect(previewSample(page, mode)).toHaveAttribute("aria-hidden", "true");
   }
   // On screen, as a refused sign-in reads, and absent from what assistive technology is given.
-  const sample = previewSample(page, "light");
+  const signinView = previewView(page, "light", "signin");
   for (const text of ["Enter your email and password to continue.", "Password is required.", "alex@example.com", "Forgot your password?"]) {
-    await expect(sample.getByText(text, { exact: true })).toBeVisible();
+    await expect(signinView.getByText(text, { exact: true })).toBeVisible();
   }
   const tree = await preview.ariaSnapshot();
   expect(tree, "the preview as assistive technology reads it").toContain("Preview in");
-  for (const text of ["Password is required.", "alex@example.com", "Forgot your password?"]) {
+  expect(tree, "the preview as assistive technology reads it").toContain("Show");
+  for (const text of ["Password is required.", "alex@example.com", "Forgot your password?", "Your changes were saved.", "Your account"]) {
     expect(tree, "the preview as assistive technology reads it").not.toContain(text);
   }
 
@@ -322,8 +570,10 @@ test("the sample cannot be reached by Tab, is hidden from assistive technology, 
   await switchLight.focus();
   await page.keyboard.press("Tab");
   expect(await page.evaluate(() => document.activeElement?.closest(".brand-sample") ?? null), "the focus after the switch").toBeNull();
-  for (const mode of ["light", "dark"] as const) {
+  for (const [mode, view] of [["light", "signin"], ["dark", "signin"], ["dark", "messages"], ["light", "messages"]] as const) {
     await switchPreviewTo(page, mode);
+    await switchPreviewViewTo(page, view);
+    await expect(previewView(page, mode, view)).toBeVisible();
     expect(
       await previewSample(page, mode).evaluate((sample) => {
         for (const element of Array.from(sample.querySelectorAll<HTMLElement>("*"))) {
@@ -332,7 +582,7 @@ test("the sample cannot be reached by Tab, is hidden from assistive technology, 
         }
         return null;
       }),
-      `an element of the ${mode} sample that takes the focus`,
+      `an element of the ${mode} sample's ${view} view that takes the focus`,
     ).toBeNull();
   }
 });
@@ -447,9 +697,20 @@ async function expectWholePreviewOnScreen(page: Page, viewport: { width: number;
   await expect(page.locator("#appearance-auto")).toBeChecked();
   await expectPreviewDrawn(page);
   await expect(preview.locator(".brand-preview-switch")).toBeVisible();
-  for (const scroll of ["scrolled", "at the end"] as const) {
+  await expect(preview.locator(".brand-preview-views")).toBeVisible();
+  // The Messages view is no taller than the sign-in view it replaces (#815 decision 10).
+  const sampleHeight = async (view: PreviewView) => {
+    await switchPreviewViewTo(page, view);
+    await expect(previewView(page, "light", view)).toBeVisible();
+    return (await previewSample(page, "light").boundingBox())!.height;
+  };
+  const signinHeight = await sampleHeight("signin");
+  expect(await sampleHeight("messages"), `the Messages view no taller than the sign-in view (${locale})`).toBeLessThanOrEqual(signinHeight);
+  for (const [scroll, view] of [["scrolled", "messages"], ["at the end", "messages"], ["scrolled", "signin"], ["at the end", "signin"]] as const) {
+    await switchPreviewViewTo(page, view);
+    await expect(previewView(page, "light", view)).toBeVisible();
     await page.evaluate((toEnd) => window.scrollTo(0, toEnd ? document.documentElement.scrollHeight : 400), scroll === "at the end");
-    const where = `${locale}, ${scroll}`;
+    const where = `${locale}, ${view}, ${scroll}`;
     const header = await page.locator(".app-header").boundingBox();
     const form = await page.locator(".brand-editor > form").boundingBox();
     const box = await preview.boundingBox();
@@ -473,6 +734,21 @@ for (const viewport of desktops) {
   // A footer of three links, each with a label in every built-in language, and the whole contact
   // (#814 decision 12): the footer is the last thing in the sample, the part that would otherwise
   // fall off the screen.
+  // The Colors section makes the form far longer, the preview staying beside it (#815).
+  test(`at ${viewport.width}×${viewport.height} the whole preview stays on screen beside the form on Custom, in Basic and Advanced, in every language`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    for (const locale of locales) {
+      await page.goto(`${newBrandUrl}?${new URLSearchParams({ ui_locales: locale })}`);
+      await page.locator("#theme-custom").check();
+      for (const mode of ["basic", "advanced"] as const) {
+        await page.locator(`#paletteMode-${mode}`).check();
+        await expect(page.locator("#brand-palette")).toBeVisible();
+        await expectWholePreviewOnScreen(page, viewport, `${locale}`);
+      }
+    }
+  });
+
   test(`at ${viewport.width}×${viewport.height} the whole preview with three footer links and the whole support contact stays on screen beside the form, in every language`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.emulateMedia({ reducedMotion: "reduce" });

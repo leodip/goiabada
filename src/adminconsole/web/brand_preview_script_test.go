@@ -36,206 +36,7 @@ import (
 // a page script reads, with radios unchecking the rest of their group, as a browser's do. A
 // selector it cannot read fails the run rather than matching nothing.
 const brandPreviewRun = `"use strict";
-const vm = require("vm");
-
-// The color the page's swatches start in, which no palette holds.
-const staleColor = "#5e7a1e";
-
-function dataAttr(prop) { return "data-" + prop.replace(/[A-Z]/g, function (c) { return "-" + c.toLowerCase(); }); }
-
-function compileCompound(text) {
-  const tests = [];
-  let rest = text;
-  const tag = /^[a-zA-Z][\w-]*/.exec(rest);
-  if (tag) {
-    const name = tag[0].toUpperCase();
-    tests.push(function (el) { return el.tagName === name; });
-    rest = rest.slice(tag[0].length);
-  }
-  while (rest) {
-    let m;
-    if ((m = /^#([\w-]+)/.exec(rest))) {
-      const id = m[1];
-      tests.push(function (el) { return el.getAttribute("id") === id; });
-    } else if ((m = /^\.([\w-]+)/.exec(rest))) {
-      const c = m[1];
-      tests.push(function (el) { return (el.getAttribute("class") || "").split(/\s+/).indexOf(c) >= 0; });
-    } else if ((m = /^\[([\w-]+)(?:=(?:"([^"]*)"|'([^']*)'))?\]/.exec(rest))) {
-      const n = m[1];
-      const v = m[2] !== undefined ? m[2] : m[3];
-      tests.push(v === undefined
-        ? function (el) { return el.hasAttribute(n); }
-        : function (el) { return el.getAttribute(n) === v; });
-    } else if ((m = /^:checked/.exec(rest))) {
-      tests.push(function (el) { return el.checked === true; });
-    } else {
-      throw new Error("the stand-in document cannot read the selector " + JSON.stringify(text));
-    }
-    rest = rest.slice(m[0].length);
-  }
-  return function (el) { return tests.every(function (t) { return t(el); }); };
-}
-
-function compile(selector) {
-  const alternatives = selector.split(",").map(function (s) { return s.trim().split(/\s+/).map(compileCompound); });
-  return function (el) {
-    return alternatives.some(function (chain) {
-      if (!chain[chain.length - 1](el)) { return false; }
-      let i = chain.length - 2;
-      for (let a = el.parentNode; i >= 0 && a && a.isElement; a = a.parentNode) {
-        if (chain[i](a)) { i--; }
-      }
-      return i < 0;
-    });
-  };
-}
-
-function makeStyle() {
-  const props = {};
-  const api = {
-    setProperty: function (n, v) { props[n] = String(v); },
-    getPropertyValue: function (n) { return props[n] || ""; },
-    removeProperty: function (n) { const v = props[n] || ""; delete props[n]; return v; },
-  };
-  const style = new Proxy(api, {
-    get: function (t, p) { return p in t ? t[p] : (props[p] || ""); },
-    set: function (t, p, v) { props[String(p)] = String(v); return true; },
-  });
-  return { style: style, props: props };
-}
-
-class Node {
-  constructor() { this.listeners = {}; this.parentNode = null; this.children = []; }
-  addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
-  removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] || []).filter(function (f) { return f !== fn; }); }
-  descendants() {
-    const out = [];
-    const walk = function (n) { for (const c of n.children) { out.push(c); walk(c); } };
-    walk(this);
-    return out;
-  }
-  querySelectorAll(selector) { return this.descendants().filter(compile(selector)); }
-  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
-  appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
-  removeChild(child) { this.children = this.children.filter(function (c) { return c !== child; }); child.parentNode = null; return child; }
-  replaceChildren() {
-    for (const c of this.children) { c.parentNode = null; }
-    this.children = [];
-    for (const c of arguments) { this.appendChild(c); }
-  }
-  remove() { if (this.parentNode) { this.parentNode.removeChild(this); } }
-}
-
-class Element extends Node {
-  constructor(doc, tag, attrs) {
-    super();
-    this.isElement = true;
-    this.ownerDocument = doc;
-    this.tagName = tag.toUpperCase();
-    this.attributes = new Map(Object.entries(attrs || {}));
-    this.ownText = "";
-    const s = makeStyle();
-    this.style = s.style;
-    this.styleProps = s.props;
-    this.checked = this.attributes.has("checked");
-    const self = this;
-    this.dataset = new Proxy({}, {
-      get: function (_, p) { return typeof p === "string" && self.hasAttribute(dataAttr(p)) ? self.getAttribute(dataAttr(p)) : undefined; },
-      set: function (_, p, v) { self.setAttribute(dataAttr(p), String(v)); return true; },
-      has: function (_, p) { return self.hasAttribute(dataAttr(p)); },
-    });
-  }
-  getAttribute(n) { return this.attributes.has(n) ? this.attributes.get(n) : null; }
-  setAttribute(n, v) { this.attributes.set(n, String(v)); }
-  hasAttribute(n) { return this.attributes.has(n); }
-  removeAttribute(n) { this.attributes.delete(n); }
-  toggleAttribute(n, force) {
-    const on = force === undefined ? !this.hasAttribute(n) : !!force;
-    if (on) { this.setAttribute(n, ""); } else { this.removeAttribute(n); }
-    return on;
-  }
-  get id() { return this.getAttribute("id") || ""; }
-  get lang() { return this.getAttribute("lang") || ""; }
-  get classList() {
-    const self = this;
-    const names = function () { return (self.getAttribute("class") || "").split(/\s+/).filter(Boolean); };
-    return {
-      contains: function (c) { return names().indexOf(c) >= 0; },
-      toggle: function (c, force) {
-        const has = names().indexOf(c) >= 0;
-        const on = force === undefined ? !has : !!force;
-        if (on && !has) { self.setAttribute("class", names().concat([c]).join(" ")); }
-        if (!on && has) { self.setAttribute("class", names().filter(function (n) { return n !== c; }).join(" ")); }
-        return on;
-      },
-    };
-  }
-  get name() { return this.getAttribute("name") || ""; }
-  get type() { return this.getAttribute("type") || ""; }
-  get value() { return this.getAttribute("value") || ""; }
-  set value(v) { this.setAttribute("value", v); }
-  get hidden() { return this.hasAttribute("hidden"); }
-  set hidden(v) { this.toggleAttribute("hidden", !!v); }
-  get textContent() { return this.ownText + this.children.map(function (c) { return c.textContent; }).join(""); }
-  set textContent(v) { this.children = []; this.ownText = String(v); }
-  get checked() { return this._checked; }
-  set checked(v) {
-    this._checked = !!v;
-    if (this._checked && this.type === "radio" && this.ownerDocument.documentElement) {
-      for (const other of this.ownerDocument.querySelectorAll("input")) {
-        if (other !== this && other.type === "radio" && other.name === this.name) { other._checked = false; }
-      }
-    }
-  }
-  matches(selector) { return compile(selector)(this); }
-  closest(selector) {
-    const test = compile(selector);
-    for (let n = this; n && n.isElement; n = n.parentNode) { if (test(n)) { return n; } }
-    return null;
-  }
-  get describe() {
-    return this.tagName.toLowerCase() + (this.id ? "#" + this.id : "") +
-      (this.hasAttribute("data-brand-sample") ? "[data-brand-sample=" + this.getAttribute("data-brand-sample") + "]" : "");
-  }
-}
-
-class Document extends Node {
-  constructor() { super(); this.readyState = "interactive"; this.documentElement = null; this.adoptedStyleSheets = []; }
-  get body() { return this.documentElement.children[1]; }
-  getElementById(id) { return this.querySelector("#" + id); }
-  createElement(tag) { return new Element(this, tag); }
-}
-
-class Window extends Node {}
-
-// A constructed stylesheet and document.adoptedStyleSheets, as far as a page script uses them: a
-// sheet is the CSS text it was last given.
-class CSSStyleSheet {
-  constructor() { this.cssText = ""; }
-  replaceSync(text) { this.cssText = String(text); }
-}
-
-function event(type, bubbles, extra) {
-  const e = Object.assign({ type: type, bubbles: bubbles, defaultPrevented: false, stopped: false, target: null, currentTarget: null }, extra || {});
-  e.preventDefault = function () { e.defaultPrevented = true; };
-  e.stopPropagation = function () { e.stopped = true; };
-  return e;
-}
-
-function dispatch(target, e, doc, win) {
-  e.target = target;
-  const path = [target];
-  if (e.bubbles) {
-    for (let n = target.parentNode; n; n = n.parentNode) { path.push(n); }
-    if (path[path.length - 1] === doc) { path.push(win); }
-  }
-  for (const n of path) {
-    e.currentTarget = n;
-    for (const fn of (n.listeners[e.type] || []).slice()) { fn.call(n, e); }
-    if (e.stopped) { break; }
-  }
-}
-
+` + standInDOM + `
 function build(request) {
   const doc = new Document();
   const win = new Window();
@@ -252,7 +53,7 @@ function build(request) {
   };
   const sample = function (mode) {
     return el("div", { class: "brand-sample", "data-brand-sample": mode, hidden: "", inert: "", "aria-hidden": "true" }, [
-      el("div", { class: "panel auth-card" }, [el("div", { class: "panel-body" }, [
+      el("div", { class: "panel auth-card", "data-brand-sample-view": "signin" }, [el("div", { class: "panel-body" }, [
         el("div", { class: "auth-logo", hidden: "" }),
         el("p", { class: "auth-brand" }), el("p", { class: "auth-title" }), el("p", { class: "auth-lead" }),
         el("div", { class: "stacked" }, [
@@ -261,6 +62,10 @@ function build(request) {
           el("div", { class: "field" }, [el("span", { class: "control", "aria-invalid": "true" })]),
           el("div", { class: "auth-actions" }, [el("span", { class: "button" }), el("span", { class: "button button-primary" })]),
         ]),
+      ])]),
+      // The Messages view (#815 decision 10), drawn hidden.
+      el("div", { class: "panel brand-sample-messages", "data-brand-sample-view": "messages", hidden: "" }, [el("div", { class: "panel-body" }, [
+        el("div", { class: "notice notice-positive" }), el("div", { class: "notice notice-caution" }), el("div", { class: "notice notice-note" }),
       ])]),
       el("div", { class: "brand-footer", "data-brand-sample-footer": "", hidden: "" }, [
         el("ul", { class: "brand-footer-links", hidden: "" }),
@@ -310,12 +115,29 @@ function build(request) {
       el("span", {}, [swatch({ "data-appearance-swatch": modes.join(" ") }, modes)]),
     ]);
   };
+  // The Custom card's swatch is marked as the palette being edited (#815 decision 7).
   const themeCard = function (key) {
     return el("label", { class: "option-card" }, [
       radio("theme", key, key === request.theme),
-      el("span", {}, [swatch({}, ["light", "dark"])]),
+      el("span", {}, [swatch(key === "custom" ? { "data-custom-swatch": "" } : {}, ["light", "dark"])]),
     ]);
   };
+  // The Colors section (#815 decision 7), when the page has one: a row per color, each with a Light
+  // and a Dark cell holding a color well and the text field the form sends, as the template draws
+  // them, each holding what the request says.
+  const paletteSection = [];
+  if (request.palette) {
+    const cell = function (mode, token) {
+      const id = "palette-" + mode + "-" + token;
+      return el("div", { class: "palette-cell", "data-palette-column": mode }, [
+        el("input", { type: "color", class: "palette-well", id: id + "-well", value: "#000000", "data-palette-well": "" }),
+        el("input", { class: "control palette-value", type: "text", id: id, name: id, value: request.palette[mode][token] || "", "data-palette-value": "" }),
+      ]);
+    };
+    paletteSection.push(el("fieldset", { id: "brand-palette" }, Object.keys(request.palette.light).map(function (token) {
+      return el("div", { class: "palette-row", "data-palette-row": token }, [cell("light", token), cell("dark", token)]);
+    })));
+  }
   // The appearance the page was drawn with, as the template reads it: Light or Dark, else
   // Automatic.
   const drawnAppearance = request.appearance === "light" || request.appearance === "dark" ? request.appearance : "auto";
@@ -362,10 +184,14 @@ function build(request) {
           })),
           el("label", { class: "check-row" }, [el("input", Object.assign({ type: "checkbox", id: "hideAppName", name: "hideAppName" },
             request.hideAppName ? { checked: "" } : {}))]),
-        ].concat(slotFields).concat(footerFields)),
+        ].concat(paletteSection).concat(slotFields).concat(footerFields)),
         el("section", { class: "brand-preview" }, [
           el("div", { class: "brand-preview-header" }, [
             el("h2", { class: "brand-preview-title" }),
+            el("fieldset", { class: "brand-preview-views" }, [
+              radio("brandPreviewView", "signin", true),
+              radio("brandPreviewView", "messages", false),
+            ]),
             el("fieldset", switchAttrs, [
               radio("brandPreviewMode", "light", true),
               radio("brandPreviewMode", "dark", false),
@@ -387,6 +213,7 @@ function build(request) {
   ]);
   doc.appendChild(html);
   doc.documentElement = html;
+  doc.defaultView = win;
   return { doc: doc, win: win };
 }
 
@@ -450,6 +277,10 @@ function look(doc) {
       logo: { hidden: box.hidden, images: images.map(function (img) { return { src: img.getAttribute("src"), alt: img.getAttribute("alt") }; }) },
       nameHidden: s.querySelector(".auth-brand").hidden,
       footer: sampleFooter(s.querySelector("[data-brand-sample-footer]")),
+      views: s.querySelectorAll("[data-brand-sample-view]").reduce(function (views, v) {
+        views[v.getAttribute("data-brand-sample-view")] = v.hidden;
+        return views;
+      }, {}),
     };
   }
   const styledElsewhere = [];
@@ -463,6 +294,9 @@ function look(doc) {
     fontSheets: doc.adoptedStyleSheets.map(function (sheet) { return sheet.cssText; }),
     styledElsewhere: styledElsewhere,
     switchHidden: doc.querySelector(".brand-preview-switch").hidden,
+    previewMode: (doc.querySelector("input[name=\"brandPreviewMode\"]:checked") || { value: "" }).value,
+    viewSwitchHidden: doc.querySelector(".brand-preview-views").hidden,
+    previewView: (doc.querySelector("input[name=\"brandPreviewView\"]:checked") || { value: "" }).value,
     notesHidden: notes,
     swatches: swatches,
   };
@@ -520,6 +354,9 @@ process.stdin.on("end", function () {
       dispatch(box, event("change", true), doc, win);
     } else if (step.do === "pageshow") {
       dispatch(win, event("pageshow", false, { persisted: step.persisted }), doc, win);
+    } else if (step.do === "input") {
+      // An input event on an element, as a page script that wrote fields dispatches one to say so.
+      dispatch(doc.getElementById(step.name), event("input", true), doc, win);
     } else if (step.do === "look") {
       looks.push(look(doc));
     } else {
@@ -573,6 +410,12 @@ type previewStep struct {
 	Value     string `json:"value,omitempty"`
 	URL       string `json:"url,omitempty"`
 	Persisted bool   `json:"persisted,omitempty"`
+	// Ms is how far a "wait" moves the clock; Index, Status and Body name the request an "answer" or
+	// a "fail" settles, and what an answer hands it.
+	Ms     int `json:"ms,omitempty"`
+	Index  int `json:"index"`
+	Status int `json:"status,omitempty"`
+	Body   any `json:"body,omitempty"`
 }
 
 // previewImage is an image the sample's logo box holds.
@@ -593,6 +436,9 @@ type previewSample struct {
 	Logo       previewLogo       `json:"logo"`
 	NameHidden bool              `json:"nameHidden"`
 	Footer     previewFooter     `json:"footer"`
+	// Views holds, for each view of the sample (#815 decision 10), signin and messages, whether it
+	// is hidden.
+	Views map[string]bool `json:"views"`
 }
 
 // previewFooterLink is a link of a sample's footer: its text, and the elements holding it, such as
@@ -630,17 +476,22 @@ type previewLook struct {
 	FontSheets      []string                 `json:"fontSheets"`
 	StyledElsewhere []string                 `json:"styledElsewhere"`
 	SwitchHidden    bool                     `json:"switchHidden"`
-	NotesHidden     map[string]bool          `json:"notesHidden"`
+	PreviewMode     string                   `json:"previewMode"`
+	// ViewSwitchHidden and PreviewView are the Sign-in/Messages switch: whether it is hidden, and
+	// the view it is on.
+	ViewSwitchHidden bool            `json:"viewSwitchHidden"`
+	PreviewView      string          `json:"previewView"`
+	NotesHidden      map[string]bool `json:"notesHidden"`
 	// Swatches holds, for the appearance cards and the theme cards, each card's swatch by the
 	// card's value: one previewSwatch per mode it shows.
 	Swatches map[string]map[string][]previewSwatch `json:"swatches"`
 }
 
 // previewPage is the editor the stand-in document draws: the theme cards, which are the listed
-// themes' and need not be, the theme checked (none when it is no card's), the appearance, the corner
+// themes' and need not be, "custom" the Custom card, the theme checked (none when it is no card's), the appearance, the corner
 // shape checked (none when it is no radio's), the family the font select holds, the fit checked, the
 // switch hiding the app name, the files the slots hold, by slot, the page's language, "en" when
-// empty, and what the footer's fields hold, by id.
+// empty, what the footer's fields hold, by id, and the Colors section's fields, nil for no section.
 type previewPage struct {
 	themeCards    []string
 	theme         string
@@ -652,6 +503,13 @@ type previewPage struct {
 	slots         map[string]previewSlot
 	lang          string
 	footer        map[string]string
+	palette       *previewColors
+}
+
+// previewColors is what the Colors section's fields hold, by mode and token, when the page has one.
+type previewColors struct {
+	Light map[string]string `json:"light"`
+	Dark  map[string]string `json:"dark"`
 }
 
 // previewKitStyles is what the page hands the script for each corner shape and family, in values no
@@ -706,6 +564,7 @@ func runBrandPreview(t *testing.T, page previewPage, steps ...previewStep) []pre
 		"slots":         page.slots,
 		"lang":          page.lang,
 		"footer":        page.footer,
+		"palette":       page.palette,
 		"fonts":         previewFonts,
 		"kitStyles":     previewKitStyles,
 		"steps":         steps,
@@ -1340,3 +1199,223 @@ func TestBrandPreviewJS_ASlotWithoutAnIdHoldsNothing(t *testing.T) {
 	assert.Empty(t, looks[0].Samples["light"].Style["background-image"])
 	assert.Empty(t, looks[0].FontSheets)
 }
+
+// standInDOM is the document a page script is run in under Node, shared by the brand editor's script
+// tests: vm, the elements, the document and the window, a constructed stylesheet, and events
+// dispatched as a browser bubbles them, a script's own included. Only what the scripts read is stood
+// in for.
+const standInDOM = `const vm = require("vm");
+
+// The color the page's swatches start in, which no palette holds.
+const staleColor = "#5e7a1e";
+
+function dataAttr(prop) { return "data-" + prop.replace(/[A-Z]/g, function (c) { return "-" + c.toLowerCase(); }); }
+
+function compileCompound(text) {
+  const tests = [];
+  let rest = text;
+  const tag = /^[a-zA-Z][\w-]*/.exec(rest);
+  if (tag) {
+    const name = tag[0].toUpperCase();
+    tests.push(function (el) { return el.tagName === name; });
+    rest = rest.slice(tag[0].length);
+  }
+  while (rest) {
+    let m;
+    if ((m = /^#([\w-]+)/.exec(rest))) {
+      const id = m[1];
+      tests.push(function (el) { return el.getAttribute("id") === id; });
+    } else if ((m = /^\.([\w-]+)/.exec(rest))) {
+      const c = m[1];
+      tests.push(function (el) { return (el.getAttribute("class") || "").split(/\s+/).indexOf(c) >= 0; });
+    } else if ((m = /^\[([\w-]+)(?:=(?:"([^"]*)"|'([^']*)'))?\]/.exec(rest))) {
+      const n = m[1];
+      const v = m[2] !== undefined ? m[2] : m[3];
+      tests.push(v === undefined
+        ? function (el) { return el.hasAttribute(n); }
+        : function (el) { return el.getAttribute(n) === v; });
+    } else if ((m = /^:checked/.exec(rest))) {
+      tests.push(function (el) { return el.checked === true; });
+    } else {
+      throw new Error("the stand-in document cannot read the selector " + JSON.stringify(text));
+    }
+    rest = rest.slice(m[0].length);
+  }
+  return function (el) { return tests.every(function (t) { return t(el); }); };
+}
+
+function compile(selector) {
+  const alternatives = selector.split(",").map(function (s) { return s.trim().split(/\s+/).map(compileCompound); });
+  return function (el) {
+    return alternatives.some(function (chain) {
+      if (!chain[chain.length - 1](el)) { return false; }
+      let i = chain.length - 2;
+      for (let a = el.parentNode; i >= 0 && a && a.isElement; a = a.parentNode) {
+        if (chain[i](a)) { i--; }
+      }
+      return i < 0;
+    });
+  };
+}
+
+function makeStyle() {
+  const props = {};
+  const api = {
+    setProperty: function (n, v) { props[n] = String(v); },
+    getPropertyValue: function (n) { return props[n] || ""; },
+    removeProperty: function (n) { const v = props[n] || ""; delete props[n]; return v; },
+  };
+  const style = new Proxy(api, {
+    get: function (t, p) { return p in t ? t[p] : (props[p] || ""); },
+    set: function (t, p, v) { props[String(p)] = String(v); return true; },
+  });
+  return { style: style, props: props };
+}
+
+class Node {
+  constructor() { this.listeners = {}; this.parentNode = null; this.children = []; }
+  addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
+  removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] || []).filter(function (f) { return f !== fn; }); }
+  descendants() {
+    const out = [];
+    const walk = function (n) { for (const c of n.children) { out.push(c); walk(c); } };
+    walk(this);
+    return out;
+  }
+  querySelectorAll(selector) { return this.descendants().filter(compile(selector)); }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+  appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
+  removeChild(child) { this.children = this.children.filter(function (c) { return c !== child; }); child.parentNode = null; return child; }
+  replaceChildren() {
+    for (const c of this.children) { c.parentNode = null; }
+    this.children = [];
+    for (const c of arguments) { this.appendChild(c); }
+  }
+  remove() { if (this.parentNode) { this.parentNode.removeChild(this); } }
+  // An event a script dispatches itself, bubbling as a browser's does, up to the window.
+  dispatchEvent(e) {
+    const doc = this.ownerDocument || this;
+    dispatch(this, e, doc, doc.defaultView);
+    return !e.defaultPrevented;
+  }
+}
+
+class Element extends Node {
+  constructor(doc, tag, attrs) {
+    super();
+    this.isElement = true;
+    this.ownerDocument = doc;
+    this.tagName = tag.toUpperCase();
+    this.attributes = new Map(Object.entries(attrs || {}));
+    this.ownText = "";
+    const s = makeStyle();
+    this.style = s.style;
+    this.styleProps = s.props;
+    this.checked = this.attributes.has("checked");
+    // What the page was drawn with, which a person's edit and a browser's restoring leave as it is.
+    this.defaultChecked = this.checked;
+    this.defaultValue = this.attributes.has("value") ? String(this.attributes.get("value")) : "";
+    const self = this;
+    this.dataset = new Proxy({}, {
+      get: function (_, p) { return typeof p === "string" && self.hasAttribute(dataAttr(p)) ? self.getAttribute(dataAttr(p)) : undefined; },
+      set: function (_, p, v) { self.setAttribute(dataAttr(p), String(v)); return true; },
+      has: function (_, p) { return self.hasAttribute(dataAttr(p)); },
+    });
+  }
+  getAttribute(n) { return this.attributes.has(n) ? this.attributes.get(n) : null; }
+  setAttribute(n, v) { this.attributes.set(n, String(v)); }
+  hasAttribute(n) { return this.attributes.has(n); }
+  removeAttribute(n) { this.attributes.delete(n); }
+  toggleAttribute(n, force) {
+    const on = force === undefined ? !this.hasAttribute(n) : !!force;
+    if (on) { this.setAttribute(n, ""); } else { this.removeAttribute(n); }
+    return on;
+  }
+  get id() { return this.getAttribute("id") || ""; }
+  get lang() { return this.getAttribute("lang") || ""; }
+  get classList() {
+    const self = this;
+    const names = function () { return (self.getAttribute("class") || "").split(/\s+/).filter(Boolean); };
+    return {
+      contains: function (c) { return names().indexOf(c) >= 0; },
+      toggle: function (c, force) {
+        const has = names().indexOf(c) >= 0;
+        const on = force === undefined ? !has : !!force;
+        if (on && !has) { self.setAttribute("class", names().concat([c]).join(" ")); }
+        if (!on && has) { self.setAttribute("class", names().filter(function (n) { return n !== c; }).join(" ")); }
+        return on;
+      },
+    };
+  }
+  get name() { return this.getAttribute("name") || ""; }
+  get type() { return this.getAttribute("type") || ""; }
+  get value() { return this.getAttribute("value") || ""; }
+  set value(v) { this.setAttribute("value", v); }
+  get hidden() { return this.hasAttribute("hidden"); }
+  set hidden(v) { this.toggleAttribute("hidden", !!v); }
+  get textContent() { return this.ownText + this.children.map(function (c) { return c.textContent; }).join(""); }
+  set textContent(v) { this.children = []; this.ownText = String(v); }
+  get checked() { return this._checked; }
+  set checked(v) {
+    this._checked = !!v;
+    if (this._checked && this.type === "radio" && this.ownerDocument.documentElement) {
+      for (const other of this.ownerDocument.querySelectorAll("input")) {
+        if (other !== this && other.type === "radio" && other.name === this.name) { other._checked = false; }
+      }
+    }
+  }
+  matches(selector) { return compile(selector)(this); }
+  closest(selector) {
+    const test = compile(selector);
+    for (let n = this; n && n.isElement; n = n.parentNode) { if (test(n)) { return n; } }
+    return null;
+  }
+  get describe() {
+    return this.tagName.toLowerCase() + (this.id ? "#" + this.id : "") +
+      (this.hasAttribute("data-brand-sample") ? "[data-brand-sample=" + this.getAttribute("data-brand-sample") + "]" : "");
+  }
+}
+
+class Document extends Node {
+  constructor() { super(); this.readyState = "interactive"; this.documentElement = null; this.adoptedStyleSheets = []; }
+  get body() { return this.documentElement.children[1]; }
+  getElementById(id) { return this.querySelector("#" + id); }
+  createElement(tag) { return new Element(this, tag); }
+  createElementNS(namespace, tag) { const e = new Element(this, tag); e.namespaceURI = namespace; return e; }
+}
+
+class Window extends Node {}
+
+// A constructed stylesheet and document.adoptedStyleSheets, as far as a page script uses them: a
+// sheet is the CSS text it was last given.
+class CSSStyleSheet {
+  constructor() { this.cssText = ""; }
+  replaceSync(text) { this.cssText = String(text); }
+}
+
+function event(type, bubbles, extra) {
+  const e = Object.assign({ type: type, bubbles: bubbles, defaultPrevented: false, stopped: false, target: null, currentTarget: null }, extra || {});
+  e.preventDefault = function () { e.defaultPrevented = true; };
+  e.stopPropagation = function () { e.stopped = true; };
+  return e;
+}
+
+// Event, as a script constructs one to dispatch: its type, and whether it bubbles.
+class Event {
+  constructor(type, init) { return event(type, Boolean(init && init.bubbles)); }
+}
+
+function dispatch(target, e, doc, win) {
+  e.target = target;
+  const path = [target];
+  if (e.bubbles) {
+    for (let n = target.parentNode; n; n = n.parentNode) { path.push(n); }
+    if (path[path.length - 1] === doc && win) { path.push(win); }
+  }
+  for (const n of path) {
+    e.currentTarget = n;
+    for (const fn of (n.listeners[e.type] || []).slice()) { fn.call(n, e); }
+    if (e.stopped) { break; }
+  }
+}
+`

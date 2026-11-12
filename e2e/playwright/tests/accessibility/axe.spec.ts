@@ -36,12 +36,17 @@ import {
   fillBrandForm,
   footerLanguageLabels,
   newBrandUrl,
+  paletteField,
   pickInEditor,
   pngFile,
   previewSample,
+  previewView,
   switchPreviewTo,
+  switchPreviewViewTo,
   uploadKit,
+  warmBasicPalette,
   withBrand,
+  withCustomBrand,
 } from "../../lib/brands";
 import { openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { signInToConsole } from "../../lib/console-user";
@@ -301,6 +306,23 @@ test("the auth server's sign-in in a brand with the kit", async ({ page, browser
         await own.goto(authorizeUrl(client.identifier));
         await expect(own.locator(".auth-logo img")).not.toHaveAttribute("alt", "");
         await expect(own.locator(".auth-card .auth-brand")).toHaveCount(0);
+      }),
+    ]);
+    await context.close();
+  });
+});
+
+// A sign-in page drawn in a custom palette made in basic mode (#815), a brand of the test's own given to
+// a client of its own, so no other page changes. The brand is automatic, so each scheme draws its mode.
+test("the auth server's sign-in in a custom palette", async ({ page, browser, clients }) => {
+  const { client } = await browserSignInClient(page, clients);
+  await withCustomBrand(page, "auto", warmBasicPalette, async (brand) => {
+    await setClientBrand(page, client.id, brand);
+    const context = await browser.newContext(signedOut);
+    const own = await context.newPage();
+    await checkStates(own, [
+      titled(own, "sign-in in a custom palette", "Sign in", async () => {
+        await own.goto(authorizeUrl(client.identifier));
       }),
     ]);
     await context.close();
@@ -1232,6 +1254,16 @@ test("the settings pages and the audit log", async ({ page }) => {
         await expect(previewSample(page, "light")).toBeHidden();
       },
     },
+    {
+      // The preview's second view (#815 decision 10), switched to and never saved: the Messages card
+      // in the dark sample, its notices, row link, selected item, focused field and buttons drawn.
+      name: "branding, a new brand, the preview's Messages view",
+      reach: async () => {
+        await switchPreviewViewTo(page, "messages");
+        await expect(previewView(page, "dark", "messages")).toBeVisible();
+        await expect(previewView(page, "dark", "signin")).toBeHidden();
+      },
+    },
     // The kit's fields (#813): each file uploaded and drawn in the sample, a file refused at its field,
     // and a dark logo without a logo refused at the logo's field. Nothing is saved.
     says(page, "branding, a new brand, its files uploaded", "boldFontStatus", async () => {
@@ -1278,6 +1310,41 @@ test("the settings pages and the audit log", async ({ page }) => {
       await fillBrandFooter(page, { supportPhone: "555-0123" });
       await page.locator("#btnCreate").click();
       await expect(page.locator("#supportPhone")).toBeFocused();
+    }),
+    // The Colors section (#815 decisions 7 and 8): Custom picked, in Basic and in Advanced, and a value
+    // that is not a color refused at its field in the column the appearance hides, drawn for it.
+    // Nothing is saved.
+    withBrandPreview(page, {
+      name: "branding, a new brand on Custom, in Basic",
+      reach: async () => {
+        await page.goto(newBrandUrl);
+        await page.locator("#theme-custom").check();
+        await expect(page.locator("#brand-palette")).toBeVisible();
+      },
+    }),
+    {
+      name: "branding, a new brand on Custom, in Advanced",
+      reach: async () => {
+        await page.locator("#paletteMode-advanced").check();
+        await expect(page.locator("[data-palette-row]:visible")).toHaveCount(23);
+      },
+    },
+    {
+      name: "branding, a new brand on Custom, in Advanced, the preview's Messages view",
+      reach: async () => {
+        await switchPreviewViewTo(page, "messages");
+        await expect(previewView(page, "light", "messages")).toBeVisible();
+      },
+    },
+    refused(page, "branding, a new brand on Custom, a dark color refused at its field under Light", "palette-dark-brand", async () => {
+      await page.goto(newBrandUrl);
+      await fillBrandForm(page, { name: uniqueIdentifier("brand"), appearance: "auto" });
+      await page.locator("#theme-custom").check();
+      await paletteField(page, "dark", "brand").fill("navy");
+      await fillBrandForm(page, { appearance: "light" });
+      await page.locator("#btnCreate").click();
+      await expect(page.locator("#brand-error")).toBeVisible();
+      await expect(paletteField(page, "dark", "brand")).toBeFocused();
     }),
     withBrandPreview(page, at(page, "branding, the default brand", brandUrl(seededBrand.id, "edit"))),
     at(page, "branding, the default brand's delete page", brandUrl(seededBrand.id, "delete")),

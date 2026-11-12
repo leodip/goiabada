@@ -30,6 +30,7 @@ func TestInitRoutes_AScriptsRequestAfterTheSignInEndedIsToldSo(t *testing.T) {
 		{http.MethodPost, "/admin/settings/branding/assets/favicon"},
 		{http.MethodPost, "/admin/settings/branding/assets/background"},
 		{http.MethodPost, "/admin/settings/branding/assets/font"},
+		{http.MethodPost, "/admin/settings/branding/palette-check"},
 		{http.MethodPost, "/admin/clients/7/logo"},
 		{http.MethodDelete, "/admin/clients/7/logo"},
 		{http.MethodPost, "/admin/users/7/picture"},

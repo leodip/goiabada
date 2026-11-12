@@ -31,9 +31,11 @@ const (
 
 // HandleBrandStylesheetGet answers a brand's full stylesheet, at brandthemes.StylesheetRoute, to
 // anyone, as a static file is answered: the colors of the brand's theme, or none for Blueberry,
-// whose are main.css's, and its corners, font and background (#813 decision 9), the last two drawn
-// from the assets its slots name. The auth server's pages and the admin console's end-user pages
-// link it. A brand that does not exist is not found, and assets that cannot be read are a fault.
+// whose are main.css's, or a custom brand's stored palette (#815), and its corners, font and
+// background (#813 decision 9), the last two drawn from the assets its slots name. The auth server's
+// pages and the admin console's end-user pages link it. A brand that does not exist is not found,
+// and assets that cannot be read are a fault, as are colors brandthemes cannot draw: an unknown
+// theme, or a custom brand whose palette is missing or not whole.
 func HandleBrandStylesheetGet(pageRenderer PageRenderer, database brandStylesheetDatabase) http.HandlerFunc {
 	return serveBrandStylesheet(pageRenderer, database, func(r *http.Request, brand *record.Brand) (brandthemes.Stylesheet, error) {
 		slots, err := brandasset.ReadSlots(r.Context(), database, nil, brand)

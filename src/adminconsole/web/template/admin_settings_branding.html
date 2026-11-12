@@ -15,8 +15,10 @@
 </div>
 
 {{/* The default brand is marked, and is the one brand with no Delete: the auth server refuses
-     deleting it. Clients is how many clients each brand draws, the default's counting every client
-     with no brand of its own (#812 decision 3). */}}
+     deleting it. A brand with contrast pairs below their minimum is marked with how many (#815
+     decision 9). The Theme column draws each brand's light and dark colors, as the admin API answers
+     them, beside the theme's name. Clients is how many clients each brand draws, the default's
+     counting every client with no brand of its own (#812 decision 3). */}}
 {{ if .brands }}
 <div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
   <table class="data-table data-table-stack" id="brandsTable">
@@ -35,9 +37,10 @@
         <td class="cell-wrap">
           <a class="text-link" href="/admin/settings/branding/{{ .Id }}/edit">{{ .Name }}</a>
           {{ if .IsDefault }}<span class="tag tag-note ml-1">{{ T $.ctx "adminconsole.admin_branding.list.default_tag" }}</span>{{ end }}
+          {{ if .WarningsMarker }}<span class="tag tag-caution ml-1">{{ .WarningsMarker }}</span>{{ end }}
         </td>
         <td data-label="{{ T $.ctx "adminconsole.admin_branding.list.col_appearance" }}">{{ .AppearanceName }}</td>
-        <td data-label="{{ T $.ctx "adminconsole.admin_branding.list.col_theme" }}">{{ .ThemeName }}</td>
+        <td data-label="{{ T $.ctx "adminconsole.admin_branding.list.col_theme" }}"><span class="brand-list-theme">{{ with .Colors }}<span class="brand-list-swatch" aria-hidden="true">{{ template "brand_swatch" .Light }}{{ template "brand_swatch" .Dark }}</span>{{ end }}{{ .ThemeName }}</span></td>
         <td data-label="{{ T $.ctx "adminconsole.admin_branding.list.col_clients" }}">{{ .ClientCount }}</td>
         <td class="cell-actions">
           {{ if not .IsDefault }}

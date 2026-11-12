@@ -10,11 +10,19 @@
      Under the card is the brand's footer (#814 decision 12), drawn hidden and empty: the script fills
      it from the form's footer fields as they are typed, each link's label as plain text in the
      auth server's footer look, and shows it on the panel while the brand has a background image. It
-     is not a footer landmark: the console's admin pages draw none. */ -}}
+     is not a footer landmark: the console's admin pages draw none.
+     The sample holds two views (#815 decision 10), and the preview's switch decides which shows: the
+     sign-in card with the footer under it, and the Messages card, drawn hidden, which draws the tones
+     and states the sign-in card does not, with the pages' own components: the positive notice, the
+     caution and the note notices each with a link in it, a row link hovered, a selected item, a
+     focused field, and the primary and the danger buttons at rest and hovered. Nothing in an inert
+     sample can be hovered or focused, so those states are marked with brand-sample-hover and
+     brand-sample-focus, which ui.css draws as the components' :hover and :focus-visible. Between
+     them the two views draw all 23 colors of the mode. */ -}}
 {{- $mode := index . 0 }}
 {{- $ctx := index . 1 }}
 <div class="brand-sample" data-brand-sample="{{ $mode }}" hidden inert aria-hidden="true">
-  <div class="panel auth-card">
+  <div class="panel auth-card" data-brand-sample-view="signin">
     <div class="panel-body">
       <div class="auth-logo" hidden></div>
       <p class="auth-brand">{{ index . 2 }}</p>
@@ -38,6 +46,38 @@
           <span class="button">{{ T $ctx "common.button.cancel" }}</span>
           <span class="button button-primary">{{ T $ctx "auth.pwd.button" }}</span>
         </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel auth-card brand-sample-messages" data-brand-sample-view="messages" hidden>
+    <div class="panel-body">
+      <div class="notice notice-positive">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+        <p>{{ T $ctx "adminconsole.admin_branding.preview.sample_positive" }}</p>
+      </div>
+      <div class="notice notice-caution">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+        <p>{{ T $ctx "adminconsole.admin_branding.preview.sample_caution" }} <span class="text-link">{{ T $ctx "adminconsole.admin_branding.preview.sample_caution_link" }}</span></p>
+      </div>
+      <div class="notice notice-note">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+        <p>{{ T $ctx "adminconsole.admin_branding.preview.sample_note" }} <span class="text-link">{{ T $ctx "adminconsole.admin_branding.preview.sample_note_link" }}</span></p>
+      </div>
+      <span class="link-row brand-sample-hover">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-5.5-2.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM10 12a5.99 5.99 0 0 0-4.793 2.39A6.483 6.483 0 0 0 10 16.5a6.483 6.483 0 0 0 4.793-2.11A5.99 5.99 0 0 0 10 12Z" clip-rule="evenodd"/></svg>
+        <span class="link-row-text">
+          <span class="link-row-title">{{ T $ctx "adminconsole.admin_branding.preview.sample_row_title" }}</span>
+          <span class="link-row-hint">{{ T $ctx "adminconsole.admin_branding.preview.sample_row_hint" }}</span>
+        </span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+      </span>
+      <span class="nav-link" aria-current="page">{{ T $ctx "adminconsole.admin_branding.preview.sample_selected" }}</span>
+      <span class="control brand-sample-focus">alex@example.com</span>
+      <div class="brand-sample-buttons">
+        <span class="button button-sm button-primary">{{ T $ctx "adminconsole.admin_branding.preview.sample_save" }}</span>
+        <span class="button button-sm button-primary brand-sample-hover">{{ T $ctx "adminconsole.admin_branding.preview.sample_save" }}</span>
+        <span class="button button-sm button-danger">{{ T $ctx "adminconsole.admin_branding.preview.sample_delete" }}</span>
+        <span class="button button-sm button-danger brand-sample-hover">{{ T $ctx "adminconsole.admin_branding.preview.sample_delete" }}</span>
       </div>
     </div>
   </div>

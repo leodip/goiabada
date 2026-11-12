@@ -182,8 +182,9 @@ func assertErrorField(t *testing.T, want string, answer map[string]any) {
 	assert.Equal(t, want, got)
 }
 
-// A refusal that is not about a footer link sets no error_field (decision 10).
-func TestBrandFooter_OtherRefusalsSetNoErrorField(t *testing.T) {
+// A refusal of a member with a code of its own, such as the name, sets no error_field beside a
+// footer link (decision 10).
+func TestBrandFooter_TheNamesRefusalSetsNoErrorField(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	body := withFooterLinks(privacyLink)
 	body["name"] = ""

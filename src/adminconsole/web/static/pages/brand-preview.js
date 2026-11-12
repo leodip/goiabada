@@ -45,6 +45,22 @@
 // fill or border is drawn from. The colors are set as attributes, as the server draws them. The
 // theme cards' swatches each show their own theme and are left alone.
 //
+// The Custom card (#815 decisions 6 and 7) is drawn from the Colors section's fields, each mode's
+// from its column, read as the form holds them: an entered color is drawn at once as it is typed or
+// picked in its well, with no request, since each is a token itself. A basic palette's other 19 fields
+// hold the worked-out colors brand-palette.js writes there from the console's answer, telling the page
+// with an input event, so they are drawn the same way. A value that is not # and six hexadecimal
+// digits is never set on a sample: the sample keeps the color it was drawn in. Editing a field
+// switches the preview to that field's mode under Automatic, so the change is seen; under Light or
+// Dark the appearance decides the one sample. The Custom card's swatch shows the palette being
+// edited, whichever theme is picked.
+//
+// Each sample holds two views (#815 decision 10), and the Sign-in/Messages switch on the preview's
+// heading line decides which shows in the sample shown, whatever the theme and the appearance: the
+// sign-in card with the brand's footer under it, or the Messages card, which draws the tones and
+// states the sign-in card does not, and no footer. The switch starts on the sign-in view and sits
+// outside the form, so it is never submitted. Picking a view, or a mode, keeps the other.
+//
 // A browser restoring the form, as on Back, fires no input, so all of it is drawn again on every
 // pageshow.
 
@@ -57,10 +73,32 @@ const samplePanelShadows = {
   dark: "0 1px 2px rgb(0 0 0 / 0.4)",
 };
 
-// chosenTheme answers the palettes of the theme the form holds, or of the first listed theme.
-function chosenTheme() {
+// customColors answers the palettes the Colors section's fields hold, each field by the mode and
+// the token its id names, each value that is a color in lower case, and nothing for any other; or
+// null for a page with no Colors section.
+function customColors() {
+  if (!document.getElementById("brand-palette")) {
+    return null;
+  }
+  const colors = { key: "custom", light: {}, dark: {} };
+  for (const field of document.querySelectorAll("input[data-palette-value]")) {
+    const named = /^palette-(light|dark)-([a-z-]+)$/.exec(field.id);
+    const value = field.value.trim();
+    if (named && /^#[0-9a-fA-F]{6}$/.test(value)) {
+      colors[named[1]][named[2]] = value.toLowerCase();
+    }
+  }
+  return colors;
+}
+
+// chosenTheme answers the palettes of the theme the form holds: Custom's from the Colors section,
+// and a built-in theme's from the list, or the first listed theme's for a theme the list lacks.
+function chosenTheme(custom) {
   const checked = document.querySelector('input[name="theme"]:checked');
   const key = checked ? checked.value : "";
+  if (key === "custom" && custom) {
+    return custom;
+  }
   return brandPalettes.find(function (theme) { return theme.key === key; }) || brandPalettes[0];
 }
 
@@ -219,8 +257,9 @@ function storedPhone(typed) {
 }
 
 // drawFooter draws a sample's footer from the form's footer fields: the links' labels, the contact
-// values, and the panel while the brand has a background image.
-function drawFooter(sample, footer) {
+// values, and the panel while the brand has a background image; and hides it while the view it
+// belongs to, the sign-in card's, is not shown.
+function drawFooter(sample, footer, shown) {
   const box = sample.querySelector("[data-brand-sample-footer]");
   if (!box) {
     return;
@@ -253,13 +292,19 @@ function drawFooter(sample, footer) {
     contact.hidden = !hasContact;
   }
   box.classList.toggle("brand-footer-panel", footer.panel);
-  box.hidden = footer.labels.length === 0 && !hasContact;
+  box.hidden = !shown || (footer.labels.length === 0 && !hasContact);
 }
 
 // previewMode answers the mode the switch is on, light unless it is on dark.
 function previewMode() {
   const checked = document.querySelector('input[name="brandPreviewMode"]:checked');
   return checked && checked.value === "dark" ? "dark" : "light";
+}
+
+// previewView answers the view the Sign-in/Messages switch is on, signin unless it is on messages.
+function previewView() {
+  const checked = document.querySelector('input[name="brandPreviewView"]:checked');
+  return checked && checked.value === "messages" ? "messages" : "signin";
 }
 
 // drawSwatch gives each shape of one swatch SVG its token's color in palette.
@@ -288,13 +333,44 @@ function drawAppearanceSwatches(theme) {
   }
 }
 
+// drawCustomSwatch draws the Custom card's swatch, its light SVG then its dark one, in the palette
+// being edited.
+function drawCustomSwatch(custom) {
+  for (const swatch of document.querySelectorAll("[data-custom-swatch]")) {
+    const svgs = swatch.querySelectorAll("svg");
+    if (svgs[0]) {
+      drawSwatch(svgs[0], custom.light);
+    }
+    if (svgs[1]) {
+      drawSwatch(svgs[1], custom.dark);
+    }
+  }
+}
+
+// followEditedMode puts the switch on the mode of the Colors section's field an edit was made in,
+// typed or picked in its well, under Automatic, the one appearance the switch decides for.
+function followEditedMode(target) {
+  if (!target || !target.hasAttribute || !(target.hasAttribute("data-palette-value") || target.hasAttribute("data-palette-well"))) {
+    return;
+  }
+  const named = /^palette-(light|dark)-/.exec(target.id);
+  const choice = named && chosenAppearance() === "auto"
+    ? document.querySelector('input[name="brandPreviewMode"][value="' + named[1] + '"]')
+    : null;
+  if (choice) {
+    choice.checked = true;
+  }
+}
+
 function drawPreview() {
-  const theme = chosenTheme();
+  const custom = customColors();
+  const theme = chosenTheme(custom);
   if (!theme) {
     return;
   }
   const appearance = chosenAppearance();
   const mode = appearance === "auto" ? previewMode() : appearance;
+  const view = previewView();
   const radii = chosenRadii() || {};
   const fontStack = chosenFontStack();
   const font = document.getElementById("font");
@@ -328,7 +404,10 @@ function drawPreview() {
     setOrRemove(sample.style, "background-position", layout.position);
     setOrRemove(sample.style, "background-repeat", layout.repeat);
     drawLogo(sample, sampleMode === "dark" ? darkLogo : logo, hideName);
-    drawFooter(sample, footer);
+    for (const card of sample.querySelectorAll("[data-brand-sample-view]")) {
+      card.hidden = card.dataset.brandSampleView !== view;
+    }
+    drawFooter(sample, footer, view === "signin");
     sample.hidden = sampleMode !== mode;
   }
   const modeSwitch = document.querySelector(".brand-preview-switch");
@@ -339,8 +418,14 @@ function drawPreview() {
     note.hidden = note.dataset.brandPreviewNote !== appearance;
   }
   drawAppearanceSwatches(theme);
+  if (custom) {
+    drawCustomSwatch(custom);
+  }
 }
 
 drawPreview();
-document.addEventListener("input", drawPreview);
+document.addEventListener("input", function (event) {
+  followEditedMode(event.target);
+  drawPreview();
+});
 window.addEventListener("pageshow", drawPreview);

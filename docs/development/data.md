@@ -151,6 +151,21 @@ reads as no links and is logged at Warn, and the page is still drawn. The suppor
 plain columns, `support_email`, `support_url` and `support_phone`, `''` when unset. A list matched
 item by item, as redirect URIs are on every sign-in, takes its own table and a list save instead.
 
+## A brand's custom palette
+
+A brand on the theme `custom` holds its palette in one nullable `palette` text column, as JSON
+(`record.BrandPalette`): its mode, `basic` or `advanced`, and the 23 colors of each of the two
+modes, `NULL` for a brand on a built-in theme (#815 decision 3). It is stored whole for the footer
+links' reasons: read and written with its brand, never looked up by a color, so a page's brand read
+stays one row. Both modes' 23 colors are stored whatever the mode, a basic palette's other 19 as
+`palette.Derive` worked them out at the save, so what a page draws and what a warning describes is
+what the row holds, and a later change to the derivation reaches a brand only when it is saved
+again (decision 1). The engine cannot check the text, so `CreateBrand` and `UpdateBrand` refuse a
+palette that is not exactly the 23 tokens of each mode, each `#rrggbb`, and a read holds the stored
+text to the same shape: a value that does not parse reads as no palette and is logged at Warn, and
+the brand is then drawn as one with an unknown theme. A palette is held to its shape, never to its
+contrast: a failing pair never stops a write.
+
 ## Schema golden files
 
 Each engine's fully migrated catalog is recorded in

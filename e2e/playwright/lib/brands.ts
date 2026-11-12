@@ -54,7 +54,8 @@ function brandIdFrom(href: string | null): number {
   return Number(match[1]);
 }
 
-// Every brand on the list, in its order, the default marked by its tag.
+// Every brand on the list, in its order, the default marked by its tag, which is a note's; a brand
+// with failing contrast pairs carries a caution tag too (#815 decision 9).
 export async function listBrands(page: Page): Promise<ListedBrand[]> {
   await page.goto(brandingUrl);
   const rows = page.locator("#brandsTable tbody tr");
@@ -64,7 +65,7 @@ export async function listBrands(page: Page): Promise<ListedBrand[]> {
     brands.push({
       id: brandIdFrom(await link.getAttribute("href")),
       name: (await link.innerText()).trim(),
-      isDefault: (await row.locator(".tag").count()) > 0,
+      isDefault: (await row.locator(".tag-note").count()) > 0,
     });
   }
   return brands;
@@ -123,6 +124,23 @@ export function previewSwitch(page: Page): Locator {
 // Puts the switch on a mode, as a click on its choice does.
 export async function switchPreviewTo(page: Page, mode: PreviewMode) {
   await page.locator(`#brand-preview-mode-${mode}`).check();
+}
+
+// The preview's two views (#815 decision 10): each sample holds the sign-in card and the Messages card,
+// and the Sign-in/Messages switch named "Show", on the preview's heading line, picks which shows.
+export type PreviewView = "signin" | "messages";
+
+export function previewView(page: Page, mode: PreviewMode, view: PreviewView): Locator {
+  return previewSample(page, mode).locator(`[data-brand-sample-view="${view}"]`);
+}
+
+export function previewViewSwitch(page: Page): Locator {
+  return brandPreview(page).getByRole("group", { name: "Show", exact: true });
+}
+
+// Puts the view switch on a view, as a click on its choice does.
+export async function switchPreviewViewTo(page: Page, view: PreviewView) {
+  await page.locator(`#brand-preview-view-${view}`).check();
 }
 
 // Waits for the preview to be drawn: the script has styled the samples and shown one of them.
@@ -781,3 +799,146 @@ export function sampleFooter(sample: Locator): Promise<SampleFooter> {
     };
   });
 }
+
+// A brand's custom palette in the editor's Colors section (#815 decision 7): Custom picked among the
+// theme cards, Basic or Advanced, and a #rrggbb field for each color of each mode, named by its mode
+// and its color token. Basic sets four colors a mode and the save works out the rest; Advanced sets
+// all 23.
+export type PaletteMode = "basic" | "advanced";
+
+export interface PaletteValues {
+  mode: PaletteMode;
+  light: Record<string, string>;
+  dark: Record<string, string>;
+}
+
+// The 23 color tokens a palette sets for each mode, in the order ui.css declares them and the Colors
+// section's Advanced rows name them.
+export const paletteTokens = [
+  "canvas", "surface", "subtle", "line", "line-strong", "ink", "ink-muted",
+  "brand", "brand-strong", "on-brand", "brand-soft",
+  "danger", "danger-strong", "on-danger", "danger-soft", "danger-ink",
+  "positive-soft", "positive-ink", "caution-soft", "caution-ink", "note-soft", "note-ink",
+  "focus",
+];
+
+// What a preview sample resolves a color token to, as the preview set it on the sample, in lower case.
+export function sampleToken(sample: Locator, token: string): Promise<string> {
+  return sample.evaluate((sample, token) => getComputedStyle(sample).getPropertyValue(`--color-${token}`).trim().toLowerCase(), token);
+}
+
+// A color's text field in the Colors section, by the mode of its column and its token.
+export function paletteField(page: Page, mode: PreviewMode, token: string): Locator {
+  return page.locator(`#palette-${mode}-${token}`);
+}
+
+// The heading of the Light or the Dark column, shown while the column is.
+export function paletteColumnHead(page: Page, mode: PreviewMode): Locator {
+  return page.locator(`#palette-head-${mode}`);
+}
+
+// The line under the Colors section's choices: a column's colors kept and not used ("unused"), or not
+// drawn but required to be colors ("invalid").
+export function paletteNote(page: Page, note: "unused" | "invalid", mode: PreviewMode): Locator {
+  return page.locator(`[data-palette-note="${note}-${mode}"]`);
+}
+
+// Picks Custom and fills the Colors section: the mode, then each color typed in its field.
+export async function fillPalette(page: Page, palette: PaletteValues) {
+  await page.locator("#theme-custom").check();
+  await page.locator(`#paletteMode-${palette.mode}`).check();
+  for (const mode of ["light", "dark"] as const) {
+    for (const [token, value] of Object.entries(palette[mode])) await paletteField(page, mode, token).fill(value);
+  }
+}
+
+// What a page's root resolves a color token to, as the brand's stylesheet declares it, in lower case.
+export function pageToken(page: Page, token: string): Promise<string> {
+  return page.evaluate((token) => getComputedStyle(document.documentElement).getPropertyValue(`--color-${token}`).trim().toLowerCase(), token);
+}
+
+// A #rrggbb color as a browser reports a computed color.
+export function rgbOf(color: string): string {
+  const channel = (at: number) => parseInt(color.slice(at, at + 2), 16);
+  return `rgb(${channel(1)}, ${channel(3)}, ${channel(5)})`;
+}
+
+// Expects a page drawn in a mode of a palette under each color scheme a device can ask for: each color
+// named resolves on the root to its value, and the page's background is the canvas color.
+export async function expectDrawnInPalette(page: Page, colorScheme: PreviewMode, colors: Record<string, string>) {
+  // Reduced motion, so no transition is caught half way between the two schemes.
+  await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+  for (const [token, value] of Object.entries(colors)) {
+    expect(await pageToken(page, token), `${colorScheme}: --color-${token}`).toBe(value.toLowerCase());
+  }
+  if (colors.canvas) {
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), `${colorScheme}: the page's background`).toBe(rgbOf(colors.canvas));
+  }
+  await page.emulateMedia({ colorScheme: null, reducedMotion: null });
+}
+
+// A basic palette in warm colors no built-in theme has, whose own pairs pass.
+export const warmBasicPalette: PaletteValues = {
+  mode: "basic",
+  light: { canvas: "#fbf7f0", surface: "#ffffff", ink: "#1d1a16", brand: "#7a3e00" },
+  dark: { canvas: "#14110d", surface: "#1e1a15", ink: "#f2ede6", brand: "#f0a050" },
+};
+
+// Creates a brand under a fresh name in the editor, with this appearance and custom palette, runs body
+// with it, and deletes it afterwards, pass or fail, unless body deleted it. The palette is typed while
+// the new form is on Automatic, which shows both columns; the appearance picked after it hides a column
+// it does not draw, whose colors are kept and sent.
+export async function withCustomBrand(
+  page: Page,
+  appearance: Appearance,
+  palette: PaletteValues,
+  body: (brand: { id: number; name: string }) => Promise<void>,
+) {
+  const name = uniqueIdentifier("brand");
+  await page.goto(newBrandUrl);
+  await fillBrandForm(page, { name });
+  await fillPalette(page, palette);
+  await fillBrandForm(page, { appearance });
+  await page.locator("#btnCreate").click();
+  await expect(page).toHaveURL(brandingUrl);
+  const id = await brandIdFromList(page, name);
+  try {
+    await body({ id, name });
+  } finally {
+    if ((await listBrands(page)).some((brand) => brand.id === id)) await deleteBrand(page, id);
+  }
+}
+
+// The editor form's saved notice. The preview's Messages samples hold a positive notice each, hidden
+// until that view is chosen, so a bare .notice-positive matches them too.
+export function savedNotice(page: Page): Locator {
+  return page.locator('.brand-editor > form .notice-positive[role="status"]');
+}
+
+// The failing pairs of a saved custom palette, at the foot of the Colors section (#815 decision 9):
+// the region the saved notice links to, its count line, and an item per pair, each a sentence beside a
+// swatch of the pair.
+export function paletteWarnings(page: Page): Locator {
+  return page.locator("#palette-warnings");
+}
+
+export function paletteWarningsCount(page: Page): Locator {
+  return page.locator("#paletteWarningsCount");
+}
+
+export function paletteWarningItems(page: Page): Locator {
+  return paletteWarnings(page).locator("li.palette-warning");
+}
+
+// The brand list's marker of a brand with failing contrast pairs, in its row.
+export function brandWarningsMarker(page: Page, name: string): Locator {
+  return brandRow(page, name).locator(".tag-caution");
+}
+
+// A basic palette whose light text fails on its background and its card: #777777 on white is 4.47:1
+// when cut, below text's 4.5:1 (WCAG 2.2 SC 1.4.3). Its dark colors are warmBasicPalette's.
+export const failingBasicPalette: PaletteValues = {
+  mode: "basic",
+  light: { canvas: "#ffffff", surface: "#ffffff", ink: "#777777", brand: "#1f4fa8" },
+  dark: warmBasicPalette.dark,
+};

@@ -37,6 +37,11 @@ const SeededBrandName = "Default"
 // brand and the brand migration 000089 creates are both drawn in (#810 decision 6).
 const BrandThemeBlueberry = "blueberry"
 
+// BrandThemeCustom is the theme key of a brand drawn in its own custom palette, which the brand's
+// Palette holds (#815 decision 2). It is reserved: no built-in theme has it, and the admin API's list
+// of built-in themes does not name it.
+const BrandThemeCustom = "custom"
+
 // BrandNameMaxLength is the bound of a brand's name, in inputvalidation.TextLength's unit. The
 // column is as wide.
 const BrandNameMaxLength = 60
@@ -116,7 +121,7 @@ func (f BrandBackgroundFit) IsValid() bool {
 // Brand is a look an administrator gives the pages: a name, an appearance, one of the built-in
 // themes (#810), and its kit: corners, a font, a background fit, whether the app name's text is
 // hidden beside a logo, and six slots naming a stored brand asset each (#813); and the footer links
-// and the support contact drawn under its card (#814). One brand is the
+// and the support contact drawn under its card (#814); and a custom palette (#815). One brand is the
 // default, the one the settings row's DefaultBrandId points at, and every page is drawn in it; the
 // others are stored and editable. Name is unique among brands, compared exactly as every name in
 // the schema is.
@@ -151,6 +156,9 @@ type Brand struct {
 	// FooterLinks are the links drawn under the brand's card, in order, nil for none. The whole
 	// list is one column of JSON text (#814 decision 8).
 	FooterLinks BrandFooterLinks `db:"footer_links"`
+	// Palette is the brand's custom palette, nil for a brand on a built-in theme. It is stored
+	// whole as JSON text on a nullable column, NULL for none (#815 decision 3).
+	Palette *BrandPalette `db:"palette"`
 }
 
 // NewBrand answers a brand with the given name, appearance and theme, and the kit an existing
