@@ -2352,7 +2352,10 @@ paths:
         names a file uploaded first as a brand asset of the slot's kind: uploadBrandLogo for
         `logo` and `darkLogo`, uploadBrandFavicon, uploadBrandBackground, and uploadBrandFont for
         `regularFont` and `boldFont`. A slot left out or null is empty. The footer links and the
-        support contact are optional: each left out or null is none.
+        support contact are optional: each left out or null is none. The theme `custom` takes a
+        palette: a basic one's other colors are worked out when the brand is saved, and every
+        answer carries the colors the brand is drawn in and the pairs of them below their minimum
+        contrast, which never stop a save.
       operationId: createBrand
       requestBody:
         required: true
@@ -2391,7 +2394,12 @@ paths:
             `/footerLinks/1/url`; error_description names the link by its number, counted from
             1. For the support contact, one of handler.brand.support_email_invalid,
             handler.brand.support_email_too_long, handler.brand.support_url_invalid,
-            handler.brand.support_url_too_long and handler.brand.support_phone_invalid.
+            handler.brand.support_url_too_long and handler.brand.support_phone_invalid. For the
+            palette, one of handler.brand.palette_required, handler.brand.palette_not_custom,
+            handler.brand.palette_mode_invalid, handler.brand.palette_colors_required,
+            handler.brand.palette_color_required, handler.brand.palette_color_unknown,
+            handler.brand.palette_color_not_basic and handler.brand.palette_color_invalid, with
+            error_field naming the member, such as `/palette/light/brand`.
           content:
             application/json:
               schema:
@@ -2432,10 +2440,10 @@ paths:
       tags: [Brands]
       summary: Update brand
       description: |
-        Replace a brand's name, appearance, theme, kit choices, asset slots, footer links and
-        support contact. Every field is written: a choice left out is refused, hideAppName left
-        out is false, a slot left out or null is emptied, and footer links or a contact value left
-        out or null are removed. A brand read and sent back is unchanged. A change to the default brand
+        Replace a brand's name, appearance, theme, kit choices, asset slots, footer links,
+        support contact and palette. Every field is written: a choice left out is refused,
+        hideAppName left out is false, a slot left out or null is emptied, footer links or a
+        contact value left out or null are removed, and a built-in theme drops the palette. A brand read and sent back is unchanged. A change to the default brand
         restyles every page at once.
       operationId: updateBrand
       parameters:
@@ -9070,7 +9078,9 @@ components:
           description: Light or dark, or auto to follow each visitor's device.
         theme:
           type: string
-          description: The key of one of the built-in themes getBrandThemes lists.
+          description: |
+            The key of one of the built-in themes getBrandThemes lists, or `custom` for a brand
+            drawn in its own palette.
         corners:
           type: string
           enum: [square, rounded, pill]
@@ -9132,6 +9142,30 @@ components:
           description: |
             The support phone number the brand's pages show, in international format: `+` and
             the digits, with no separators, such as `+442079460958`. An empty string when unset.
+        palette:
+          description: |
+            The custom palette as it was written, null for a brand on a built-in theme. Sent back
+            unchanged, it is the same palette.
+          allOf:
+            - $ref: '#/components/schemas/BrandPaletteResponse'
+          nullable: true
+        colors:
+          description: |
+            Read only: the 23 colors of each mode the brand is drawn in, a custom brand's stored
+            colors or a built-in theme's own. A write ignores it. Null for a custom brand whose
+            stored palette cannot be read.
+          allOf:
+            - $ref: '#/components/schemas/BrandColors'
+          nullable: true
+        contrastWarnings:
+          type: array
+          description: |
+            Read only: each pair of the brand's colors below its minimum contrast, in the modes
+            the appearance draws (both under `auto`), light before dark. Empty when no pair
+            fails, as for every built-in theme. Computed on each answer from the stored colors,
+            so a write ignores it.
+          items:
+            $ref: '#/components/schemas/BrandContrastWarning'
         isDefault:
           type: boolean
           description: True for the default brand, the one a client with no brand of its own is drawn in.
@@ -9165,6 +9199,9 @@ components:
         - supportEmail
         - supportUrl
         - supportPhone
+        - palette
+        - colors
+        - contrastWarnings
         - isDefault
         - clientCount
         - createdAt
@@ -9194,7 +9231,9 @@ components:
           enum: [auto, light, dark]
         theme:
           type: string
-          description: The key of one of the built-in themes getBrandThemes lists.
+          description: |
+            The key of one of the built-in themes getBrandThemes lists, or `custom` for a brand
+            drawn in its own palette, which `palette` then holds.
         corners:
           type: string
           enum: [square, rounded, pill]
@@ -9270,6 +9309,15 @@ components:
             number, at most 15 digits in all, the first not zero. Spaces, hyphens, dots and
             parentheses are accepted and removed, so `+44 20 7946 0958` is stored as
             `+442079460958`. Left out, null or empty for none.
+        palette:
+          description: |
+            The brand's custom palette: required when `theme` is `custom`, and refused with a
+            built-in theme, where it is left out or null. Saving a built-in theme drops a stored
+            palette. A refusal about the palette names the member it is about in error_field,
+            such as `/palette/light/brand`.
+          allOf:
+            - $ref: '#/components/schemas/BrandPalette'
+          nullable: true
       required:
         - name
         - appearance
@@ -9308,7 +9356,9 @@ components:
           enum: [auto, light, dark]
         theme:
           type: string
-          description: The key of one of the built-in themes getBrandThemes lists.
+          description: |
+            The key of one of the built-in themes getBrandThemes lists, or `custom` for a brand
+            drawn in its own palette, which `palette` then holds.
         corners:
           type: string
           enum: [square, rounded, pill]
@@ -9384,6 +9434,15 @@ components:
             number, at most 15 digits in all, the first not zero. Spaces, hyphens, dots and
             parentheses are accepted and removed, so `+44 20 7946 0958` is stored as
             `+442079460958`. Left out, null or empty for none.
+        palette:
+          description: |
+            The brand's custom palette: required when `theme` is `custom`, and refused with a
+            built-in theme, where it is left out or null. Saving a built-in theme drops a stored
+            palette. A refusal about the palette names the member it is about in error_field,
+            such as `/palette/light/brand`.
+          allOf:
+            - $ref: '#/components/schemas/BrandPalette'
+          nullable: true
       required:
         - name
         - appearance
@@ -9489,6 +9548,107 @@ components:
         - url
         - label
         - labels
+
+    BrandPalette:
+      type: object
+      description: |
+        A custom palette: how it was made, and the colors of each mode by color token name. A color
+        is `#` and six hexadecimal digits, in either case, answered in lower case; no other form is
+        taken. Both modes are always sent, whatever the brand's appearance. The token names are
+        those getBrandThemes answers for each theme.
+      properties:
+        mode:
+          type: string
+          enum: [basic, advanced]
+          description: |
+            `basic`: each mode holds exactly `canvas`, `surface`, `ink` and `brand`, and the other
+            19 colors are worked out when the brand is saved, again at each save. `advanced`:
+            each mode holds all 23 colors.
+        light:
+          type: object
+          description: The light mode's colors. Any other name, or a missing one, is refused at that member.
+          additionalProperties:
+            type: string
+            pattern: '^#[0-9A-Fa-f]{6}$'
+        dark:
+          type: object
+          description: The dark mode's colors, named as `light` is.
+          additionalProperties:
+            type: string
+            pattern: '^#[0-9A-Fa-f]{6}$'
+      required:
+        - mode
+        - light
+        - dark
+
+    BrandPaletteResponse:
+      type: object
+      description: |
+        A custom palette as it was written, its colors in lower case: in `basic` mode the four
+        colors of each mode it was entered with, in `advanced` mode all 23.
+      properties:
+        mode:
+          type: string
+          enum: [basic, advanced]
+        light:
+          type: object
+          additionalProperties:
+            type: string
+            pattern: '^#[0-9a-f]{6}$'
+        dark:
+          type: object
+          additionalProperties:
+            type: string
+            pattern: '^#[0-9a-f]{6}$'
+      required:
+        - mode
+        - light
+        - dark
+
+    BrandColors:
+      type: object
+      description: The 23 colors of each mode a brand is drawn in, a `#rrggbb` value for each color token by its name.
+      properties:
+        light:
+          type: object
+          additionalProperties:
+            type: string
+            pattern: '^#[0-9a-f]{6}$'
+        dark:
+          type: object
+          additionalProperties:
+            type: string
+            pattern: '^#[0-9a-f]{6}$'
+      required:
+        - light
+        - dark
+
+    BrandContrastWarning:
+      type: object
+      description: |
+        A pair of a brand's colors below its minimum: the foreground token drawn on the background
+        token. The minimums are WCAG 2.2's level AA contrast ratios, 4.5 for text (SC 1.4.3) and 3
+        for a boundary or the focus ring (SC 1.4.11). A pair below its minimum never stops a save.
+      properties:
+        mode:
+          type: string
+          enum: [light, dark]
+        foreground:
+          type: string
+        background:
+          type: string
+        ratio:
+          type: number
+          description: The contrast ratio, cut to two decimals and never rounded up, so 4.496 reads 4.49.
+        minimum:
+          type: number
+          enum: [4.5, 3]
+      required:
+        - mode
+        - foreground
+        - background
+        - ratio
+        - minimum
 
     BrandAssetRef:
       type: object

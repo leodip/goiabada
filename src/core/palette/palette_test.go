@@ -59,6 +59,14 @@ func TestTokens(t *testing.T) {
 	assert.Equal(t, "canvas", Tokens()[0])
 }
 
+func TestBasicTokens(t *testing.T) {
+	assert.Equal(t, []string{"canvas", "surface", "ink", "brand"}, BasicTokens())
+
+	tokens := BasicTokens()
+	tokens[0] = "changed"
+	assert.Equal(t, "canvas", BasicTokens()[0])
+}
+
 func TestIsColor(t *testing.T) {
 	for _, tc := range []struct {
 		value string

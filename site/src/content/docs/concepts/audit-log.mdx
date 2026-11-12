@@ -181,6 +181,7 @@ No entry records a user's email address. An entry about one records `email_diges
 | `old_brand_name` | The name of the brand that was the default before `updated_default_brand`. |
 | `old_generation` | The user's authentication generation before their sessions and tokens were revoked. |
 | `outcome` | What a registration or forgot-password request led to, such as `link_issued`, `code_issued` or `unknown_address`. For a logout token, how its delivery ended: see `goiabada_backchannel_logout_deliveries_total` on [Monitoring](/deploy/monitoring/#metrics-catalog). |
+| `palette_mode` | How a brand's custom palette was made after the save: `basic` or `advanced`. Left out for a brand on a built-in theme. No color is recorded. |
 | `permission_id` | The row id of a permission. |
 | `permission_identifiers` | The administrative permissions changed, such as `authserver:manage`. |
 | `permission_ids` | The row ids of the administrative permissions a refused request would have changed. |
@@ -217,7 +218,7 @@ No entry records a user's email address. An entry about one records `email_diges
 | `target_id` | The row id of the user, group, client or resource a request acted on. |
 | `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
 | `terminated_session_identifiers` | The identifier of each session ended. |
-| `theme` | The key of a brand's theme after the save, such as `blueberry`. |
+| `theme` | The key of a brand's theme after the save, such as `blueberry`, or `custom` for a brand on its own palette. |
 | `token_client_id` | The row id of the client a token sent to the revocation endpoint was issued to. |
 | `token_expiration_in_seconds` | Under `old` and `new`: the default access token lifetime, in seconds. |
 | `token_type` | The type of token a client sent to the revocation endpoint: `access_token` or `refresh_token`. |

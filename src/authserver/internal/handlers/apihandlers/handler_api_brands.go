@@ -46,13 +46,15 @@ type brandsDatabase interface {
 }
 
 // brandFields are what a create and an update name: every field of a brand, each slot by the id of
-// the asset it holds, nil for an empty slot, and the footer links and the support contact.
+// the asset it holds, nil for an empty slot, the footer links and the support contact, and the custom
+// palette, nil for none.
 type brandFields struct {
 	name, appearance, theme, corners, font, backgroundFit string
 	hideAppName                                           bool
 	logo, darkLogo, favicon, background, regularFont      *api.BrandAssetRef
 	boldFont                                              *api.BrandAssetRef
 	footer                                                brandFooterFields
+	palette                                               *api.BrandPalette
 }
 
 func createBrandFields(req api.CreateBrandRequest) brandFields {
@@ -63,6 +65,7 @@ func createBrandFields(req api.CreateBrandRequest) brandFields {
 		regularFont: req.RegularFont, boldFont: req.BoldFont,
 		footer: brandFooterFields{footerLinks: req.FooterLinks, supportEmail: req.SupportEmail,
 			supportURL: req.SupportUrl, supportPhone: req.SupportPhone},
+		palette: req.Palette,
 	}
 }
 
@@ -83,8 +86,9 @@ func slotOf(ref *api.BrandAssetRef) sql.NullInt64 {
 // record.BrandNameMaxLength characters and without angle brackets; the appearance, the theme, the
 // corners, the font and the background fit each one of their keys, exactly. A missing choice is
 // refused as an unknown one, so a misspelt field name is reported and never becomes a default. The
-// hide-app-name switch is taken as sent, false when absent. Then the footer links and the support
-// contact are held to validateBrandFooter's rules (#814).
+// hide-app-name switch is taken as sent, false when absent. The theme may also be custom, whose
+// palette validateBrandPalette holds to #815 decision 2 and works out. Then the footer links and the
+// support contact are held to validateBrandFooter's rules (#814).
 func validateBrand(fields brandFields) (record.Brand, error) {
 	name := strings.TrimSpace(fields.name)
 	if name == "" {
@@ -100,7 +104,7 @@ func validateBrand(fields brandFields) (record.Brand, error) {
 	if !record.BrandAppearance(fields.appearance).IsValid() {
 		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandAppearanceInvalid, nil)
 	}
-	if _, ok := brandthemes.StylesheetOf(fields.theme); !ok {
+	if _, ok := brandthemes.StylesheetOf(fields.theme); !ok && fields.theme != record.BrandThemeCustom {
 		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandThemeInvalid, nil)
 	}
 	if !record.BrandCorners(fields.corners).IsValid() {
@@ -111,6 +115,10 @@ func validateBrand(fields brandFields) (record.Brand, error) {
 	}
 	if !record.BrandBackgroundFit(fields.backgroundFit).IsValid() {
 		return record.Brand{}, i18n.NewLocalizedError(i18n.ErrCodeBrandBackgroundFitInvalid, nil)
+	}
+	storedPalette, err := validateBrandPalette(fields.theme, fields.palette)
+	if err != nil {
+		return record.Brand{}, err
 	}
 	brand := record.NewBrand(name, record.BrandAppearance(fields.appearance), fields.theme)
 	brand.Corners = record.BrandCorners(fields.corners)
@@ -123,6 +131,7 @@ func validateBrand(fields brandFields) (record.Brand, error) {
 	brand.BackgroundAssetId = slotOf(fields.background)
 	brand.RegularFontAssetId = slotOf(fields.regularFont)
 	brand.BoldFontAssetId = slotOf(fields.boldFont)
+	brand.Palette = storedPalette
 	if err := validateBrandFooter(fields.footer, &brand); err != nil {
 		return record.Brand{}, err
 	}
@@ -331,7 +340,7 @@ func HandleBrandsGet(database brandsDatabase, baseURL string) http.HandlerFunc {
 
 		response := api.GetBrandsResponse{Brands: make([]api.BrandResponse, 0, len(brands))}
 		for i := range brands {
-			response.Brands = append(response.Brands, apimapping.ToBrandResponse(&brands[i], brandasset.SlotsOf(&brands[i], assets), baseURL,
+			response.Brands = append(response.Brands, brandResponse(r.Context(), &brands[i], brandasset.SlotsOf(&brands[i], assets), baseURL,
 				brands[i].Id == defaultId, counts[brands[i].Id]))
 		}
 		writeJSON(w, r, http.StatusOK, response)
@@ -370,11 +379,12 @@ func HandleBrandCreatePost(database brandsDatabase, auditLogger AuditLogger, bas
 			"logged_in_user": callerSubject(r),
 		}
 		brandFooterAudit(&brand, details)
+		brandPaletteAudit(&brand, details)
 		auditLogger.Log(r.Context(), audit.EventCreatedBrand, details)
 
 		// A brand just created is never the default, the pointer names a brand that existed, and no
 		// client can have been given it yet: it draws no client.
-		writeJSON(w, r, http.StatusCreated, api.CreateBrandResponse{Brand: apimapping.ToBrandResponse(&brand, slots, baseURL, false, 0)})
+		writeJSON(w, r, http.StatusCreated, api.CreateBrandResponse{Brand: brandResponse(r.Context(), &brand, slots, baseURL, false, 0)})
 	}
 }
 
@@ -397,7 +407,7 @@ func HandleBrandGet(database brandsDatabase, baseURL string) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.GetBrandResponse{Brand: apimapping.ToBrandResponse(brand, slots, baseURL, brand.Id == defaultId, counts[brand.Id])})
+		writeJSON(w, r, http.StatusOK, api.GetBrandResponse{Brand: brandResponse(r.Context(), brand, slots, baseURL, brand.Id == defaultId, counts[brand.Id])})
 	}
 }
 
@@ -470,6 +480,7 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger, base
 			details["bold_font_asset_id"] = brand.BoldFontAssetId.Int64
 		}
 		brandFooterAudit(brand, details)
+		brandPaletteAudit(brand, details)
 		auditLogger.Log(r.Context(), audit.EventUpdatedBrand, details)
 
 		defaultId, ok := defaultBrandId(w, r, database)
@@ -480,7 +491,7 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger, base
 		if !ok {
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.UpdateBrandResponse{Brand: apimapping.ToBrandResponse(brand, slots, baseURL, brand.Id == defaultId, counts[brand.Id])})
+		writeJSON(w, r, http.StatusOK, api.UpdateBrandResponse{Brand: brandResponse(r.Context(), brand, slots, baseURL, brand.Id == defaultId, counts[brand.Id])})
 	}
 }
 
@@ -600,7 +611,7 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 			})
 		}
 
-		writeJSON(w, r, http.StatusOK, api.MakeBrandDefaultResponse{Brand: apimapping.ToBrandResponse(brand, slots, baseURL, true, counts[brand.Id])})
+		writeJSON(w, r, http.StatusOK, api.MakeBrandDefaultResponse{Brand: brandResponse(r.Context(), brand, slots, baseURL, true, counts[brand.Id])})
 	}
 }
 

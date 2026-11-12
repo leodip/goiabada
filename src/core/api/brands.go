@@ -18,29 +18,39 @@ import "time"
 // Logo, DarkLogo, Favicon, Background, RegularFont and BoldFont are the brand's six slots, each the
 // stored asset it holds, null when empty. A slot answers the asset's id, which is what a write names
 // it by, so a brand read and written back is unchanged (#813 decision 10).
+//
+// Palette is a brand's custom palette as it was written, null for a brand on a built-in theme, and
+// Colors the 23 colors of each mode the brand is drawn in: a custom brand's stored colors, a built-in
+// theme's own. ContrastWarnings are the pairs of those colors below their minimum, of the modes the
+// appearance draws, [] for none (#815 decisions 2, 5 and 8). Colors and ContrastWarnings are read
+// only: a write ignores them. A custom brand whose stored palette cannot be read answers Palette and
+// Colors as null and no warnings (#815 decision 3).
 type BrandResponse struct {
-	Id            int64                     `json:"id"`
-	Name          string                    `json:"name"`
-	Appearance    string                    `json:"appearance"`
-	Theme         string                    `json:"theme"`
-	Corners       string                    `json:"corners"`
-	Font          string                    `json:"font"`
-	BackgroundFit string                    `json:"backgroundFit"`
-	HideAppName   bool                      `json:"hideAppName"`
-	Logo          *BrandAssetResponse       `json:"logo"`
-	DarkLogo      *BrandAssetResponse       `json:"darkLogo"`
-	Favicon       *BrandAssetResponse       `json:"favicon"`
-	Background    *BrandAssetResponse       `json:"background"`
-	RegularFont   *BrandAssetResponse       `json:"regularFont"`
-	BoldFont      *BrandAssetResponse       `json:"boldFont"`
-	FooterLinks   []BrandFooterLinkResponse `json:"footerLinks"`
-	SupportEmail  string                    `json:"supportEmail"`
-	SupportUrl    string                    `json:"supportUrl"`
-	SupportPhone  string                    `json:"supportPhone"`
-	IsDefault     bool                      `json:"isDefault"`
-	ClientCount   int                       `json:"clientCount"`
-	CreatedAt     *time.Time                `json:"createdAt"`
-	UpdatedAt     *time.Time                `json:"updatedAt"`
+	Id               int64                     `json:"id"`
+	Name             string                    `json:"name"`
+	Appearance       string                    `json:"appearance"`
+	Theme            string                    `json:"theme"`
+	Corners          string                    `json:"corners"`
+	Font             string                    `json:"font"`
+	BackgroundFit    string                    `json:"backgroundFit"`
+	HideAppName      bool                      `json:"hideAppName"`
+	Logo             *BrandAssetResponse       `json:"logo"`
+	DarkLogo         *BrandAssetResponse       `json:"darkLogo"`
+	Favicon          *BrandAssetResponse       `json:"favicon"`
+	Background       *BrandAssetResponse       `json:"background"`
+	RegularFont      *BrandAssetResponse       `json:"regularFont"`
+	BoldFont         *BrandAssetResponse       `json:"boldFont"`
+	FooterLinks      []BrandFooterLinkResponse `json:"footerLinks"`
+	SupportEmail     string                    `json:"supportEmail"`
+	SupportUrl       string                    `json:"supportUrl"`
+	SupportPhone     string                    `json:"supportPhone"`
+	Palette          *BrandPaletteResponse     `json:"palette"`
+	Colors           *BrandColors              `json:"colors"`
+	ContrastWarnings []BrandContrastWarning    `json:"contrastWarnings"`
+	IsDefault        bool                      `json:"isDefault"`
+	ClientCount      int                       `json:"clientCount"`
+	CreatedAt        *time.Time                `json:"createdAt"`
+	UpdatedAt        *time.Time                `json:"updatedAt"`
 }
 
 // BrandFooterLinkResponse is one of a brand's footer links as the admin API answers it: the URL it
@@ -63,6 +73,43 @@ type BrandFooterLink struct {
 	Url    string            `json:"url"`
 	Label  string            `json:"label"`
 	Labels map[string]string `json:"labels"`
+}
+
+// BrandPalette is a brand's custom palette as a create and an update write it (#815 decision 2):
+// Mode, basic or advanced, and Light and Dark, each a map from a color token's name to a color, `#`
+// and six hexadecimal digits in either case. In basic mode each map holds exactly canvas, surface,
+// ink and brand, and the other 19 colors are worked out when the brand is saved; in advanced mode
+// each holds all 23. Both modes are always sent, whatever the brand's appearance. A
+// BrandPaletteResponse sent back as it came is the same palette.
+type BrandPalette struct {
+	Mode  string            `json:"mode"`
+	Light map[string]string `json:"light"`
+	Dark  map[string]string `json:"dark"`
+}
+
+// BrandPaletteResponse is a brand's custom palette as a brand answers it: as it was written, its
+// colors in lower case, the four of each mode in basic mode and the 23 in advanced mode.
+type BrandPaletteResponse struct {
+	Mode  string            `json:"mode"`
+	Light map[string]string `json:"light"`
+	Dark  map[string]string `json:"dark"`
+}
+
+// BrandColors are the 23 colors of each mode a brand is drawn in, by color token name.
+type BrandColors struct {
+	Light map[string]string `json:"light"`
+	Dark  map[string]string `json:"dark"`
+}
+
+// BrandContrastWarning is a pair of a brand's colors below its minimum contrast (#815 decision 5):
+// the mode, light or dark, the foreground and background tokens, the ratio cut to two decimals and
+// never rounded up, and the minimum, 4.5 for text and 3 for a boundary or the focus ring.
+type BrandContrastWarning struct {
+	Mode       string  `json:"mode"`
+	Foreground string  `json:"foreground"`
+	Background string  `json:"background"`
+	Ratio      float64 `json:"ratio"`
+	Minimum    float64 `json:"minimum"`
 }
 
 // BrandAssetRef names a stored brand asset by its id, as a brand's create and update name the asset
@@ -97,6 +144,11 @@ type GetBrandsResponse struct {
 // "+" and up to 15 digits, the first not zero, which may be written with spaces, hyphens, dots and
 // parentheses and is stored without them. Each is trimmed. A member left out or null is no
 // links, or an unset contact value, as [] and "" are (#814 decisions 1, 5, 9 and 10).
+//
+// Theme is a built-in theme's key or custom, the reserved key of a custom palette. Palette is required
+// with custom and refused with a built-in theme, where left out and null are both fine, so saving a
+// built-in theme drops a stored palette. A refusal about the palette names the member it is about in
+// error_field, such as /palette/light/brand (#815 decision 2).
 type CreateBrandRequest struct {
 	Name          string            `json:"name"`
 	Appearance    string            `json:"appearance"`
@@ -115,6 +167,7 @@ type CreateBrandRequest struct {
 	SupportEmail  string            `json:"supportEmail"`
 	SupportUrl    string            `json:"supportUrl"`
 	SupportPhone  string            `json:"supportPhone"`
+	Palette       *BrandPalette     `json:"palette"`
 }
 
 type CreateBrandResponse struct {
@@ -146,6 +199,7 @@ type UpdateBrandRequest struct {
 	SupportEmail  string            `json:"supportEmail"`
 	SupportUrl    string            `json:"supportUrl"`
 	SupportPhone  string            `json:"supportPhone"`
+	Palette       *BrandPalette     `json:"palette"`
 }
 
 type UpdateBrandResponse struct {

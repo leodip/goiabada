@@ -2297,6 +2297,9 @@ var publishedRequestEnums = map[string]string{
 	"UpdateBrandRequest.backgroundFit": "enforced: handler_api_brands.go refuses any background fit but " +
 		"[cover, contain, tile], an absent one included, with 400 before writing. Covered by " +
 		"TestBrandUpdate_Refusals' background fit cases. Published in #813",
+	"BrandPalette.mode": "enforced: brand_palette.go refuses any palette mode but [basic, advanced], " +
+		"an absent one included, with 400 before writing. Covered by TestBrandPalette_CreateRefusals' and " +
+		"TestBrandPalette_UpdateRefusals' mode cases. Published in #815",
 	"CreateLegalDocumentRequest.kind": "enforced: handler_api_legal_documents.go refuses any kind but " +
 		"[must_accept, for_information], an absent one included, with 400 before writing. Covered by " +
 		"TestLegalDocumentCreate_Refusals' unknown and missing kind cases. Published in #622",

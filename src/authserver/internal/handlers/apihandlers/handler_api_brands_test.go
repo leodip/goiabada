@@ -160,11 +160,14 @@ func TestBrandsGet_SortedByNameWithTheDefaultMarked(t *testing.T) {
 	assert.Equal(t, []any{"Acme", "Default", "Zest"}, names)
 	assert.Equal(t, []any{false, true, false}, defaults)
 	assert.Equal(t, []any{float64(2), float64(5), float64(0)}, counts)
+	assert.Equal(t, "#f6f4f7", brandAt(brands[0], "colors", "light", "canvas"), "Plum's own colors")
+	delete(brands[0].(map[string]any), "colors")
 	assert.Equal(t, map[string]any{
 		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum",
 		"corners": "rounded", "font": "system-ui", "backgroundFit": "cover", "hideAppName": false,
 		"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
 		"footerLinks": []any{}, "supportEmail": "", "supportUrl": "", "supportPhone": "",
+		"palette": nil, "contrastWarnings": []any{},
 		"isDefault": false, "clientCount": float64(2),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, brands[0])
@@ -262,6 +265,9 @@ func TestBrandCreate_StoresTheTrimmedNameAndAudits(t *testing.T) {
 			"corners": "square", "font": "neo-grotesque", "backgroundFit": "tile", "hideAppName": true}))
 
 	require.Equal(t, http.StatusCreated, status)
+	// colors is a built-in theme's own, which TestBrandPalette_NoFailingPairAndABuiltInTheme holds.
+	assert.Len(t, brandAt(body, "brand", "colors", "light"), 23)
+	delete(body["brand"].(map[string]any), "colors")
 	// The choices as sent, and every slot empty: a create names no asset yet.
 	assert.Equal(t, record.Brand{Name: "Acme Corp", Appearance: record.BrandAppearanceLight, Theme: "high-contrast",
 		Corners: "square", Font: "neo-grotesque", BackgroundFit: "tile", HideAppName: true}, stored)
@@ -270,6 +276,7 @@ func TestBrandCreate_StoresTheTrimmedNameAndAudits(t *testing.T) {
 		"corners": "square", "font": "neo-grotesque", "backgroundFit": "tile", "hideAppName": true,
 		"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
 		"footerLinks": []any{}, "supportEmail": "", "supportUrl": "", "supportPhone": "",
+		"palette": nil, "contrastWarnings": []any{},
 		"isDefault": false, "clientCount": float64(0),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, body["brand"])
@@ -364,11 +371,14 @@ func TestBrandGet(t *testing.T) {
 		status, body := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", "3"))
 
 		require.Equal(t, http.StatusOK, status)
+		assert.Len(t, brandAt(body, "brand", "colors", "dark"), 23)
+		delete(body["brand"].(map[string]any), "colors")
 		assert.Equal(t, map[string]any{
 			"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum",
 			"corners": "rounded", "font": "system-ui", "backgroundFit": "cover", "hideAppName": false,
 			"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
 			"footerLinks": []any{}, "supportEmail": "", "supportUrl": "", "supportPhone": "",
+			"palette": nil, "contrastWarnings": []any{},
 			"isDefault": false, "clientCount": float64(4),
 			"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 		}, body["brand"])
@@ -712,11 +722,14 @@ func TestBrandMakeDefault_MovesTheDefaultAndAuditsBothBrands(t *testing.T) {
 		brandRequest(t, http.MethodPost, nil, "id", "3"))
 
 	require.Equal(t, http.StatusOK, status)
+	assert.Equal(t, "#120f15", brandAt(body, "brand", "colors", "dark", "canvas"), "Plum's own colors")
+	delete(body["brand"].(map[string]any), "colors")
 	assert.Equal(t, map[string]any{
 		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum",
 		"corners": "rounded", "font": "system-ui", "backgroundFit": "cover", "hideAppName": false,
 		"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
 		"footerLinks": []any{}, "supportEmail": "", "supportUrl": "", "supportPhone": "",
+		"palette": nil, "contrastWarnings": []any{},
 		"isDefault": true, "clientCount": float64(8),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, body["brand"])

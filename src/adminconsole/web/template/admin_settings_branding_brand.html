@@ -113,6 +113,10 @@
         </label>
         {{ end }}
       </div>
+      {{/* A brand on a custom palette (#815) keeps its theme until the editor has its Colors
+           section: the form sends custom after the cards, so a card picked in its place is sent
+           first and the palette is dropped. */}}
+      {{ if eq .brand.Theme "custom" }}<input type="hidden" name="theme" value="custom">{{ end }}
     </fieldset>
 
     {{/* The kit (#813): the logo, the dark logo and the switch hiding the app name beside a logo; the

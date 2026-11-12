@@ -813,6 +813,7 @@ func HandleBrandPost(
 			SupportEmail:  form.SupportEmail,
 			SupportUrl:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
+			Palette:       keptPalette(form.Theme, brand),
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -834,6 +835,20 @@ func HandleBrandPost(
 		redirectToBrandWithFlash(httpHelper, httpSession, w, r, baseURL, id, "savedSuccessfully")
 	}
 }
+
+// keptPalette is the custom palette a save of a stored brand sends: while the form keeps the theme
+// custom, the palette the admin API answered for the brand, unchanged, so a change to anything else
+// keeps it; with a built-in theme, none, which the admin API takes as dropping it (#815 decision 2).
+// The editor does not edit a palette yet.
+func keptPalette(theme string, stored *api.BrandResponse) *api.BrandPalette {
+	if theme != customTheme || stored.Palette == nil {
+		return nil
+	}
+	return &api.BrandPalette{Mode: stored.Palette.Mode, Light: stored.Palette.Light, Dark: stored.Palette.Dark}
+}
+
+// customTheme is the admin API's reserved theme key of a brand drawn in its own custom palette.
+const customTheme = "custom"
 
 // redirectToBrandWithFlash goes back to the brand's page, which says once what flash names.
 func redirectToBrandWithFlash(httpHelper HttpHelper, httpSession sessionstore.Store, w http.ResponseWriter,

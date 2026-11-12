@@ -339,6 +339,14 @@ cause, each a whole sentence.
 | `handler.brand.support_url_invalid` | (none) | The support page URL must start with https:// and name a site, with no user name or password. |
 | `handler.brand.support_url_too_long` | `max` (int) | The support page URL cannot exceed {{.max}} characters. |
 | `handler.brand.support_phone_invalid` | (none) | Enter the support phone number in international format: + and the country code, then the number, at most 15 digits in all, such as +44 20 7946 0958. |
+| `handler.brand.palette_required` | (none) | The custom theme needs a palette. |
+| `handler.brand.palette_not_custom` | (none) | A palette can be set only with the custom theme. |
+| `handler.brand.palette_mode_invalid` | (none) | The palette's mode must be basic or advanced. |
+| `handler.brand.palette_colors_required` | `mode` (string) | The palette needs its {{.mode}} colors. |
+| `handler.brand.palette_color_required` | `mode` (string), `token` (string) | The palette's {{.mode}} colors need a {{.token}} color. |
+| `handler.brand.palette_color_unknown` | `mode` (string), `token` (string) | The palette's {{.mode}} colors name {{.token}}, which is not a color token. |
+| `handler.brand.palette_color_not_basic` | `mode` (string), `token` (string) | A basic palette sets only canvas, surface, ink and brand, and its {{.mode}} colors name {{.token}}. |
+| `handler.brand.palette_color_invalid` | `mode` (string), `token` (string) | The palette's {{.mode}} {{.token}} color must be # and six hexadecimal digits, such as #2456c4. |
 | `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
 | `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
 | `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |

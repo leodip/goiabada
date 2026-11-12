@@ -12,6 +12,12 @@ import (
 // the card (surface), the text (ink) and the brand color.
 var basicTokens = []string{"canvas", "surface", "ink", "brand"}
 
+// BasicTokens answers the names of the four colors a basic palette is entered with for each mode,
+// canvas, surface, ink and brand, as a copy the caller may change. Derive works out the other 19.
+func BasicTokens() []string {
+	return append([]string(nil), basicTokens...)
+}
+
 // Blueberry's eleven status colors, which a basic palette takes unchanged: the light set for a mode
 // whose text is darker than its card, the dark set otherwise (#815 decision 13). The auth server's
 // web tests hold them to the Blueberry theme itself.

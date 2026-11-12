@@ -37,6 +37,11 @@ const SeededBrandName = "Default"
 // brand and the brand migration 000089 creates are both drawn in (#810 decision 6).
 const BrandThemeBlueberry = "blueberry"
 
+// BrandThemeCustom is the theme key of a brand drawn in its own custom palette, which the brand's
+// Palette holds (#815 decision 2). It is reserved: no built-in theme has it, and the admin API's list
+// of built-in themes does not name it.
+const BrandThemeCustom = "custom"
+
 // BrandNameMaxLength is the bound of a brand's name, in inputvalidation.TextLength's unit. The
 // column is as wide.
 const BrandNameMaxLength = 60
