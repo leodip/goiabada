@@ -727,7 +727,12 @@ func TestRender_AdminSettingsBrandingFormMarksTheRefusedSlot(t *testing.T) {
 // as before, and the group is described by the file's hint and the fit's.
 func TestRender_AdminSettingsBrandingFormGroupsTheBackgroundWithItsFit(t *testing.T) {
 	form := renderKitForm(t, "")
-	group := form[strings.LastIndex(form, "<fieldset"):]
+	legend := strings.Index(form, `id="backgroundLabel"`)
+	require.Positive(t, legend)
+	group := form[strings.LastIndex(form[:legend], "<fieldset"):]
+	end := strings.Index(group, "</fieldset>")
+	require.Positive(t, end)
+	group = group[:end]
 	assert.Regexp(t, `^<fieldset aria-describedby="backgroundHint backgroundState backgroundFitHint">\s*`+
 		`<legend class="field-label mb-1" id="backgroundLabel">Imagem de fundo</legend>`, group)
 	assert.Contains(t, group, `data-brand-asset="background"`)
@@ -751,5 +756,38 @@ func TestRender_AdminSettingsBrandingSampleHasARoomForTheLogo(t *testing.T) {
 	})
 	for _, mode := range []string{"light", "dark"} {
 		assert.Regexp(t, `<div class="panel-body">\s*<div class="auth-logo" hidden></div>\s*<p class="auth-brand">`, sampleOf(t, out, mode))
+	}
+}
+
+// The sample draws a room for the brand's footer under its card (#814 decision 12), the last thing in
+// it, which the preview script fills from the form's footer fields: hidden and empty until it holds a
+// link or a contact value, its links' list, then the "Need help?" line with a place for the address,
+// the number and the "Support page" link, in the page's language. It is not the page's footer
+// landmark, which the console's admin pages never draw, and nothing in it can be operated: the links
+// are drawn as text.
+func TestRender_AdminSettingsBrandingSampleHasARoomForTheFooter(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
+		"isNew": false,
+		"brand": adminsettingshandlers.BrandForm{Appearance: "auto", Theme: "plum", Corners: "rounded", Font: "system-ui", BackgroundFit: "cover",
+			FooterLinks:  [3]adminsettingshandlers.BrandFooterLinkRow{{Label: "Privacy", Url: "https://autumn.example/privacy"}},
+			SupportEmail: "help@autumn.example"},
+		"storedBrand":     api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "auto", Theme: "plum"},
+		"brandThemes":     renderThemes,
+		"appearanceTheme": renderThemes[1],
+	})
+	assert.NotContains(t, out, "<footer", "the console's admin pages draw no footer landmark")
+	for _, mode := range []string{"light", "dark"} {
+		sample := sampleOf(t, out, mode)
+		assert.Regexp(t, `</div>\s*</div>\s*`+
+			`<div class="brand-footer" data-brand-sample-footer hidden>\s*`+
+			`<ul class="brand-footer-links" hidden></ul>\s*`+
+			`<p class="brand-footer-contact" hidden>\s*`+
+			`<span>Precisa de ajuda\?</span>\s*`+
+			`<span class="brand-footer-link" data-brand-sample-contact="email" hidden></span>\s*`+
+			`<span class="brand-footer-link" data-brand-sample-contact="phone" hidden></span>\s*`+
+			`<span class="brand-footer-link" data-brand-sample-contact="url" hidden>Página de suporte</span>\s*`+
+			`</p>\s*</div>\s*</div>\s*$`, sample, "the %s sample's footer, under its card", mode)
+		assert.NotContains(t, sample, "Privacy", "the script draws the links")
+		assert.NotContains(t, sample, "help@autumn.example", "the script draws the contact")
 	}
 }

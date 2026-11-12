@@ -203,6 +203,78 @@
       </div>
     </fieldset>
   </div>
+
+  {{/* The footer (#814 decision 11): Link 1, Link 2 and Link 3, each a label and a URL with its
+       label in each built-in language under it, in a disclosure drawn closed, and open while it holds
+       the refused label; then the support contact's three fields. A row left empty is no link, and
+       the links are saved in the rows' order with the empty ones skipped, the order a refused form is
+       drawn again in. errorField names an input by its id, read off the error_field of a link's
+       refusal or the code of a contact value's. No input asks the browser to autofill it: the values
+       are not the administrator's own. */}}
+  <div class="panel-body stacked">
+    <div>
+      <h2 class="panel-title" id="footerLinksTitle">{{ T $.ctx "adminconsole.admin_branding.brand.footer_links.title" }}</h2>
+      <p class="field-hint mt-1" id="footerLinksHint">{{ T $.ctx "adminconsole.admin_branding.brand.footer_links.hint" }}</p>
+    </div>
+    {{ range $i, $link := .brand.FooterLinks }}
+    {{ $prefix := printf "footerLinks-%d-" $i }}
+    {{ $open := false }}{{ range $.footerLanguages }}{{ if eq $errorField (printf "%slabels-%s" $prefix .Tag) }}{{ $open = true }}{{ end }}{{ end }}
+    <fieldset class="footer-link" id="footerLinks-{{ $i }}">
+      <legend class="field-label mb-2">{{ T $.ctx "adminconsole.admin_branding.brand.footer_links.link" "number" (add $i 1) }}</legend>
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label" for="footerLinks-{{ $i }}-label">{{ T $.ctx "adminconsole.admin_branding.brand.footer_links.label" }}</label>
+          <input class="control" id="footerLinks-{{ $i }}-label" type="text" name="footerLinks-{{ $i }}-label" value="{{ $link.Label }}" autocomplete="off"
+            {{- if $.error }}{{ if eq $.errorField (printf "%slabel" $prefix) }} aria-describedby="brand-error" aria-invalid="true" autofocus{{ end }}{{ end }}>
+        </div>
+        <div class="field">
+          <label class="field-label" for="footerLinks-{{ $i }}-url">{{ T $.ctx "adminconsole.admin_branding.brand.footer_links.url" }}</label>
+          <input class="control" id="footerLinks-{{ $i }}-url" type="url" name="footerLinks-{{ $i }}-url" value="{{ $link.Url }}" autocomplete="off"
+            {{- if $.error }}{{ if eq $.errorField (printf "%surl" $prefix) }} aria-describedby="brand-error" aria-invalid="true" autofocus{{ end }}{{ end }}>
+        </div>
+      </div>
+      <details class="disclosure"{{ if $open }} open{{ end }}>
+        <summary>{{ T $.ctx "adminconsole.admin_branding.brand.footer_links.languages" }}</summary>
+        <p class="field-hint" id="footerLinks-{{ $i }}-labelsHint">{{ T $.ctx "adminconsole.admin_branding.brand.footer_links.languages_hint" }}</p>
+        <div class="form-grid">
+          {{ range $.footerLanguages }}
+          <div class="field">
+            <label class="field-label" for="footerLinks-{{ $i }}-labels-{{ .Tag }}">{{ LocaleLabel .Tag .Name }}</label>
+            <input class="control" id="footerLinks-{{ $i }}-labels-{{ .Tag }}" type="text" name="footerLinks-{{ $i }}-labels-{{ .Tag }}" value="{{ index $link.Labels .Tag }}" lang="{{ .Tag }}" autocomplete="off" aria-describedby="{{ if $.error }}{{ if eq $.errorField (printf "%slabels-%s" $prefix .Tag) }}brand-error {{ end }}{{ end }}footerLinks-{{ $i }}-labelsHint"
+              {{- if $.error }}{{ if eq $.errorField (printf "%slabels-%s" $prefix .Tag) }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+          </div>
+          {{ end }}
+        </div>
+      </details>
+    </fieldset>
+    {{ end }}
+  </div>
+
+  <div class="panel-body stacked">
+    <div>
+      <h2 class="panel-title" id="supportContactTitle">{{ T $.ctx "adminconsole.admin_branding.brand.support.title" }}</h2>
+      <p class="field-hint mt-1" id="supportContactHint">{{ T $.ctx "adminconsole.admin_branding.brand.support.hint" }}</p>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="supportEmail">{{ T $.ctx "adminconsole.admin_branding.brand.support.email" }}</label>
+        <input class="control" id="supportEmail" type="email" name="supportEmail" value="{{ .brand.SupportEmail }}" autocomplete="off"
+          {{- if .error }}{{ if eq .errorField "supportEmail" }} aria-describedby="brand-error" aria-invalid="true" autofocus{{ end }}{{ end }}>
+      </div>
+      <div class="field">
+        <label class="field-label" for="supportUrl">{{ T $.ctx "adminconsole.admin_branding.brand.support.url" }}</label>
+        <input class="control" id="supportUrl" type="url" name="supportUrl" value="{{ .brand.SupportUrl }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "supportUrl" }}brand-error {{ end }}{{ end }}supportUrlHint"
+          {{- if .error }}{{ if eq .errorField "supportUrl" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="supportUrlHint">{{ T $.ctx "adminconsole.admin_branding.brand.support.url_hint" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="supportPhone">{{ T $.ctx "adminconsole.admin_branding.brand.support.phone" }}</label>
+        <input class="control" id="supportPhone" type="tel" name="supportPhone" value="{{ .brand.SupportPhone }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "supportPhone" }}brand-error {{ end }}{{ end }}supportPhoneHint"
+          {{- if .error }}{{ if eq .errorField "supportPhone" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="supportPhoneHint">{{ T $.ctx "adminconsole.admin_branding.brand.support.phone_hint" }}</p>
+      </div>
+    </div>
+  </div>
   <div class="panel-footer">
     <a class="button button-quiet" href="/admin/settings/branding">{{ T $.ctx "common.button.cancel" }}</a>
     {{ if .isNew }}

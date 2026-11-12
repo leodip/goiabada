@@ -467,6 +467,62 @@ export async function setBrandKit(request: APIRequestContext, token: string, bra
       background: slot(brand.background),
       regularFont: slot(brand.regularFont),
       boldFont: slot(brand.boldFont),
+      // The footer as it was read, so it is kept: a member left out would mean none (#814).
+      footerLinks: brand.footerLinks,
+      supportEmail: brand.supportEmail,
+      supportUrl: brand.supportUrl,
+      supportPhone: brand.supportPhone,
+    },
+    failOnStatusCode: false,
+  });
+  expect(written.status(), await written.text()).toBe(200);
+}
+
+// A brand's footer links and support contact, as the Admin API names them (#814): up to three
+// links, each a URL, a fallback label and a label per built-in language, and each contact value
+// optional.
+export interface BrandFooterLink {
+  url: string;
+  label: string;
+  labels?: Record<string, string>;
+}
+
+export interface BrandFooter {
+  footerLinks?: BrandFooterLink[];
+  supportEmail?: string;
+  supportUrl?: string;
+  supportPhone?: string;
+}
+
+// Writes a brand's footer links and support contact as footer has them, an absent one none, and
+// keeps the rest of the brand, its kit included, as it is stored.
+export async function setBrandFooter(request: APIRequestContext, token: string, brandId: number, footer: BrandFooter) {
+  const url = `${env.authUrl}/api/v1/admin/brands/${brandId}`;
+  const headers = { Authorization: `Bearer ${token}` };
+  const read = await request.get(url, { headers, failOnStatusCode: false });
+  expect(read.status(), await read.text()).toBe(200);
+  const { brand } = await read.json();
+  const slot = (asset?: { id: number } | null) => (asset ? { id: asset.id } : null);
+  const written = await request.put(url, {
+    headers,
+    data: {
+      name: brand.name,
+      appearance: brand.appearance,
+      theme: brand.theme,
+      corners: brand.corners,
+      font: brand.font,
+      backgroundFit: brand.backgroundFit,
+      hideAppName: brand.hideAppName,
+      logo: slot(brand.logo),
+      darkLogo: slot(brand.darkLogo),
+      favicon: slot(brand.favicon),
+      background: slot(brand.background),
+      regularFont: slot(brand.regularFont),
+      boldFont: slot(brand.boldFont),
+      footerLinks: footer.footerLinks ?? [],
+      supportEmail: footer.supportEmail ?? "",
+      supportUrl: footer.supportUrl ?? "",
+      supportPhone: footer.supportPhone ?? "",
     },
     failOnStatusCode: false,
   });
@@ -591,6 +647,137 @@ export function sampleKit(sample: Locator): Promise<SampleKit> {
       backgroundImage: style.backgroundImage,
       backgroundSize: style.backgroundSize,
       backgroundRepeat: style.backgroundRepeat,
+    };
+  });
+}
+
+// The brand editor's footer (#814 decision 11): three rows, Link 1 to Link 3, each a label, a URL and a
+// label per built-in language under a disclosure, then the support contact's three fields.
+export const footerRows = 3;
+
+// The disclosure holding a row's language labels.
+export function footerLanguageLabels(page: Page, row: number): Locator {
+  return page.locator(`#footerLinks-${row} details`);
+}
+
+// Opens a row's language labels, when they are closed.
+export async function openFooterLanguageLabels(page: Page, row: number) {
+  const disclosure = footerLanguageLabels(page, row);
+  if (!(await disclosure.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await disclosure.locator("summary").click();
+  }
+  await expect(disclosure).toHaveAttribute("open", "");
+}
+
+// Types footer into the editor: each row the link of its index, a row past the links emptied, the
+// language labels named typed, and each contact value named. A value left out of a link is typed
+// empty, a language label included, so nothing stays from what the row held before. A row's language
+// labels are opened when one of them is typed or emptied.
+export async function fillBrandFooter(page: Page, footer: BrandFooter) {
+  const links = footer.footerLinks ?? [];
+  for (let row = 0; row < footerRows; row++) {
+    const link = links[row];
+    await page.locator(`#footerLinks-${row}-label`).fill(link?.label ?? "");
+    await page.locator(`#footerLinks-${row}-url`).fill(link?.url ?? "");
+    const labels = link?.labels ?? {};
+    const prefix = `footerLinks-${row}-labels-`;
+    for (const input of await page.locator(`input[id^="${prefix}"]`).all()) {
+      const tag = (await input.getAttribute("id"))!.slice(prefix.length);
+      if (labels[tag] !== undefined || (await input.inputValue()) === "") continue;
+      await openFooterLanguageLabels(page, row);
+      await input.fill("");
+    }
+    if (Object.keys(labels).length > 0) await openFooterLanguageLabels(page, row);
+    for (const [tag, label] of Object.entries(labels)) await page.locator(`#${prefix}${tag}`).fill(label);
+  }
+  if (footer.supportEmail !== undefined) await page.locator("#supportEmail").fill(footer.supportEmail);
+  if (footer.supportUrl !== undefined) await page.locator("#supportUrl").fill(footer.supportUrl);
+  if (footer.supportPhone !== undefined) await page.locator("#supportPhone").fill(footer.supportPhone);
+}
+
+// What the editor's footer fields hold: the rows that hold anything, in order, each language label
+// that is not blank, and the three contact values.
+export function readBrandFooterForm(page: Page): Promise<Required<BrandFooter>> {
+  return page.evaluate((rows) => {
+    const value = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
+    const footerLinks: BrandFooterLink[] = [];
+    for (let row = 0; row < rows; row++) {
+      const labels: Record<string, string> = {};
+      for (const input of Array.from(document.querySelectorAll<HTMLInputElement>(`input[id^="footerLinks-${row}-labels-"]`))) {
+        if (input.value !== "") labels[input.id.slice(`footerLinks-${row}-labels-`.length)] = input.value;
+      }
+      const link = { url: value(`footerLinks-${row}-url`), label: value(`footerLinks-${row}-label`), labels };
+      if (link.url !== "" || link.label !== "" || Object.keys(labels).length > 0) footerLinks.push(link);
+    }
+    return { footerLinks, supportEmail: value("supportEmail"), supportUrl: value("supportUrl"), supportPhone: value("supportPhone") };
+  }, footerRows);
+}
+
+// A link of a page's footer as it is drawn: its text, the new-tab notice its sr-only span adds
+// included, where it goes, and how it opens.
+export interface DrawnFooterLink {
+  text: string;
+  href: string;
+  target: string | null;
+  rel: string | null;
+}
+
+// A page's footer as it is drawn: none, or the links of its list, the contact line's text and its
+// links, whether it is outside main and straight after it, and whether it is on a panel in the card's
+// color rather than on the page's background.
+export interface DrawnFooter {
+  links: DrawnFooterLink[];
+  contact: string;
+  contactLinks: DrawnFooterLink[];
+  afterMain: boolean;
+  panel: boolean;
+}
+
+export function drawnFooter(page: Page): Promise<DrawnFooter | null> {
+  return page.evaluate(() => {
+    const footers = document.querySelectorAll("footer");
+    if (footers.length === 0) return null;
+    const footer = footers[0];
+    const text = (element: Element | null) => (element?.textContent ?? "").replace(/\s+/g, " ").trim();
+    const link = (a: HTMLAnchorElement) => ({ text: text(a), href: a.getAttribute("href")!, target: a.getAttribute("target"), rel: a.getAttribute("rel") });
+    const contact = footer.querySelector("p");
+    const card = document.querySelector(".auth-card");
+    const background = getComputedStyle(footer).backgroundColor;
+    return {
+      links: Array.from(footer.querySelectorAll<HTMLAnchorElement>("ul a"), link),
+      contact: text(contact),
+      contactLinks: contact ? Array.from(contact.querySelectorAll<HTMLAnchorElement>("a"), link) : [],
+      afterMain: footer.closest("main") === null && footer.previousElementSibling?.tagName === "MAIN",
+      panel: background !== "rgba(0, 0, 0, 0)" && card !== null && background === getComputedStyle(card).backgroundColor,
+    };
+  });
+}
+
+// What a sample of the brand editor's preview draws of the footer under its card (#814 decision 12):
+// whether it shows, the links' text in order, the contact line's parts that show, in order, "Need
+// help?" first, whether it is on a panel in the card's color rather than on the sample's background,
+// and how many elements in it could be operated, which the inert sample draws none of.
+export interface SampleFooter {
+  shown: boolean;
+  links: string[];
+  contact: string[];
+  panel: boolean;
+  operable: number;
+}
+
+export function sampleFooter(sample: Locator): Promise<SampleFooter> {
+  return sample.evaluate((sample) => {
+    const footer = sample.querySelector<HTMLElement>("[data-brand-sample-footer]")!;
+    const shown = (element: Element) => (element as HTMLElement).checkVisibility();
+    const text = (element: Element) => (element.textContent ?? "").replace(/\s+/g, " ").trim();
+    const contact = footer.querySelector(".brand-footer-contact")!;
+    const background = getComputedStyle(footer).backgroundColor;
+    return {
+      shown: shown(footer),
+      links: Array.from(footer.querySelectorAll(".brand-footer-links li")).filter(shown).map(text),
+      contact: shown(contact) ? Array.from(contact.children).filter(shown).map(text) : [],
+      panel: background !== "rgba(0, 0, 0, 0)" && background === getComputedStyle(sample.querySelector(".auth-card")!).backgroundColor,
+      operable: footer.querySelectorAll("a, button, input, [tabindex]").length,
     };
   });
 }

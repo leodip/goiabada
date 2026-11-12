@@ -4,10 +4,12 @@
 // inside its own region; dialogs, menus and forms stay within the screen, and no page scrolls
 // sideways. Only the test's own tab is resized, so the fixtures work at the default size.
 import type { Locator, Page } from "@playwright/test";
-import { addRedirectUri, addSignOutRedirectUri, cancelDialog, clientUrl, userUrl } from "../../lib/admin-console";
-import { newBrandUrl } from "../../lib/brands";
+import { addRedirectUri, addSignOutRedirectUri, cancelDialog, clientUrl, setClientBrand, userUrl } from "../../lib/admin-console";
+import { brandUrl, fillBrandFooter, newBrandUrl, withBrand } from "../../lib/brands";
+import { openSignIn } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
+import { browserSignInClient } from "../../lib/test-clients";
 
 // A test visits a dozen pages at its size.
 test.describe.configure({ timeout: 120_000 });
@@ -255,3 +257,48 @@ for (const viewport of viewports) {
     });
   });
 }
+
+// A brand's whole footer (#814 decision 6), a long address among it, under a client's sign-in card at
+// a phone's widths: it wraps within the screen, the page does not scroll sideways, and each of its
+// links stays a target of at least 24 pixels. The brand is the test's own, given to a client of its
+// own, so no other page changes.
+test("a sign-in page's footer wraps within a phone's screen", async ({ page, browser, clients }) => {
+  const { client } = await browserSignInClient(page, clients);
+  await withBrand(page, { appearance: "light", theme: "plum" }, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await fillBrandFooter(page, {
+      footerLinks: [
+        { label: "Privacy and cookie policy", url: "https://example.com/privacy" },
+        { label: "Service status", url: "https://status.example.com/" },
+        { label: "Terms of service", url: "https://example.com/terms" },
+      ],
+      supportEmail: "customer-support-and-account-recovery@a-rather-long-domain.example.com",
+      supportUrl: "https://example.com/support",
+      supportPhone: "+44 20 7946 0958",
+    });
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
+    await setClientBrand(page, client.id, brand);
+
+    for (const width of [320, 390]) {
+      const signIn = await openSignIn(browser, { clientId: client.identifier, scope: "openid", viewport: { width, height: 640 } });
+      try {
+        await expect(signIn.page).toHaveURL(/\/auth\/pwd/);
+        const footer = signIn.page.getByRole("contentinfo");
+        await expect(footer).toBeVisible();
+        expect(await sidewaysScroll(signIn.page), `${width}px: no sideways scroll`).toBeLessThanOrEqual(0);
+        await expectWithinScreen(signIn.page, footer);
+        const links = await footer.getByRole("link").all();
+        expect(links, `${width}px: three links, the address, the number and the support page`).toHaveLength(6);
+        for (const link of links) {
+          await expectWithinScreen(signIn.page, link);
+          const box = (await link.boundingBox())!;
+          expect(box.height, `${width}px: ${await link.textContent()}`).toBeGreaterThanOrEqual(24);
+          expect(box.width, `${width}px: ${await link.textContent()}`).toBeGreaterThanOrEqual(24);
+        }
+      } finally {
+        await signIn.context.close();
+      }
+    }
+  });
+});

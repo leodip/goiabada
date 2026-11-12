@@ -3,6 +3,7 @@ package guard
 import (
 	"io/fs"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -20,7 +21,7 @@ type templateFinding struct {
 }
 
 // walkOrFail calls fn for every .html file under root in fsys, with the file's path as fsys spells
-// it and its whole contents as a string. The three rules below are the ones both servers run, and
+// it and its whole contents as a string. The four rules below are the ones both servers run, and
 // this walk is what they share.
 //
 // Callers pass their //go:embed FS rather than a directory on disk, deliberately. That FS is what
@@ -33,7 +34,7 @@ type templateFinding struct {
 // empty set, and both callers are green on arrival and have been for releases, so nothing else in
 // any tier can tell a guard that covers every page from one that covers none.
 //
-// It fails through a Reporter so a rule test can drive it and the three assertions built on it
+// It fails through a Reporter so a rule test can drive it and the four assertions built on it
 // against a fixture FS. See Reporter in guard.go.
 func walkOrFail(r Reporter, fsys fs.FS, root string, fn func(path, content string)) {
 	r.Helper()
@@ -197,4 +198,82 @@ func findHardcodedHTMLLang(path, content string) []templateFinding {
 		return nil
 	}
 	return []templateFinding{{path: path}}
+}
+
+// newTabNoticeKey is the catalog key of the built-in text a link that opens a new tab carries for
+// assistive technology, "(opens in a new tab)" in English.
+const newTabNoticeKey = "common.link.opens_in_new_tab"
+
+// linkStartTagRe matches a link's start tag, <a ...>, an action inside it read whole so a ">" in
+// one does not end the tag.
+var linkStartTagRe = regexp.MustCompile(`(?is)<a\b(?:[^>{]|\{\{.*?\}\}|\{)*>`)
+
+// newTabTargetRe matches a target attribute naming a new browsing context, _blank, however it is
+// quoted or cased.
+var newTabTargetRe = regexp.MustCompile(`(?i)\btarget\s*=\s*["']?_blank\b`)
+
+// linkEndTagRe matches a link's end tag.
+var linkEndTagRe = regexp.MustCompile(`(?i)</a\s*>`)
+
+// newTabNoticeRe matches the action that renders the new-tab text, from the page's dot or a
+// partial's, or the field the auth server's form_post page carries it in: that page is parsed with
+// no template functions, so its text arrives translated in its data (#814).
+var newTabNoticeRe = regexp.MustCompile(`\{\{-?\s*(?:T\s+\$?\.ctx\s+"` + regexp.QuoteMeta(newTabNoticeKey) + `"|\$\.page\.NewTabNotice)\s*-?\}\}`)
+
+// AssertTemplatesNewTabLinksSaySo holds every link that opens a new tab to saying so to assistive
+// technology, in built-in text (#814 decision 13): a link whose start tag carries target="_blank"
+// renders the common.link.opens_in_new_tab text among its contents, before its end tag, so the
+// text is part of the link's name. The templates draw it in a sr-only span after the link's own
+// text, so nothing visible moves:
+//
+//	<a href="..." target="_blank" rel="noopener noreferrer">Label<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a>
+//
+// A new tab moves a screen reader's user to another page with no Back to return by, which WCAG
+// 2.2's technique G201 says to announce; without a guard the next such link is written without it,
+// as eleven were.
+//
+// The claim is lexical, like the rules above: a start tag spelling target="_blank" anywhere in it,
+// in a branch included, and the action spelled as the templates spell it between that tag and the
+// next </a>, or, in the form_post page, its {{ $.page.NewTabNotice }} field. An attribute of an
+// element inside the link counts, as an image's alt there is part of the link's name. A target
+// computed by an action, a link a script opens in a new tab, and a form's target are outside it.
+func AssertTemplatesNewTabLinksSaySo(t *testing.T, fsys fs.FS, root string) {
+	t.Helper()
+
+	assertTemplatesNewTabLinksSaySo(t, fsys, root)
+}
+
+// assertTemplatesNewTabLinksSaySo is the reporting half, failing through a Reporter so a rule test
+// can drive it against a fixture FS. See Reporter in guard.go.
+func assertTemplatesNewTabLinksSaySo(r Reporter, fsys fs.FS, root string) {
+	r.Helper()
+
+	walkOrFail(r, fsys, root, func(path, content string) {
+		for _, f := range findSilentNewTabLinks(path, content) {
+			r.Errorf(`%s: %s opens a new tab without saying so; put <span class="sr-only"> `+
+				`{{ T $.ctx "%s" }}</span> after the link's text`, f.path, f.detail, newTabNoticeKey)
+		}
+	})
+}
+
+// findSilentNewTabLinks returns one finding per link in content that opens a new tab and carries no
+// new-tab text, its detail the line and the start tag.
+func findSilentNewTabLinks(path, content string) []templateFinding {
+	var found []templateFinding
+	for _, loc := range linkStartTagRe.FindAllStringIndex(content, -1) {
+		tag := content[loc[0]:loc[1]]
+		if !newTabTargetRe.MatchString(tag) {
+			continue
+		}
+		body := content[loc[1]:]
+		if end := linkEndTagRe.FindStringIndex(body); end != nil {
+			body = body[:end[0]]
+		}
+		if newTabNoticeRe.MatchString(body) {
+			continue
+		}
+		line := strings.Count(content[:loc[0]], "\n") + 1
+		found = append(found, templateFinding{path: path, detail: "line " + strconv.Itoa(line) + ": " + tag})
+	}
+	return found
 }

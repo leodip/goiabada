@@ -138,6 +138,19 @@ asset is gone with that slot's refusal; a write that fails while every asset is 
 its assets with `GetBrandAssetsByIds`, which leaves out the bytes; only the public asset route reads
 them, with `GetBrandAssetById`.
 
+## A brand's footer links and contact
+
+A brand's footer links are one `footer_links` text column holding the whole list as JSON
+(`record.BrandFooterLinks`, `[]` for none), not a table (#814 decision 8): at most three, always
+read and written whole with their brand and in order, and never looked up by a URL or a label, so
+a brand save stays one statement, a page's brand read adds no query, and a brand's deletion or a
+new built-in language needs nothing more. The engine cannot check the text, so every value is
+validated before it is written (`apihandlers.validateBrandFooter`), and a read holds the stored text
+to `record.ParseBrandFooterLinks`: a value that does not parse, or a link with no URL or no label,
+reads as no links and is logged at Warn, and the page is still drawn. The support contact is three
+plain columns, `support_email`, `support_url` and `support_phone`, `''` when unset. A list matched
+item by item, as redirect URIs are on every sign-in, takes its own table and a list save instead.
+
 ## Schema golden files
 
 Each engine's fully migrated catalog is recorded in

@@ -6,7 +6,7 @@ import (
 	"github.com/leodip/goiabada/core/guard"
 )
 
-// The three rules below run in both servers and live once, in core/guard/template_lint.go, which
+// The four rules below run in both servers and live once, in core/guard/template_lint.go, which
 // carries each one's reasoning and the shared walk (#333). What stays here is this module's own
 // evidence for them and the FS they are held against: templateFS, the //go:embed set this binary
 // renders from. #105's check on the redirect URI and web origin cells was here too, until #120's
@@ -32,6 +32,12 @@ func TestTemplates_NoCsrfField(t *testing.T) {
 // lang attribute from the active locale. This module sends no email, so it has no email layout.
 func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
 	guard.AssertTemplatesHtmlLangNotHardcoded(t, templateFS, "template")
+}
+
+// TestTemplates_NewTabLinksSaySo holds every link on this server's pages that opens a new tab to
+// saying so to assistive technology, in built-in text: today the authenticator apps on the Account pages' two-factor setup page (#814 decision 13).
+func TestTemplates_NewTabLinksSaySo(t *testing.T) {
+	guard.AssertTemplatesNewTabLinksSaySo(t, templateFS, "template")
 }
 
 // TestTemplates_AreWellFormed holds this server's pages to well-formed HTML and to the

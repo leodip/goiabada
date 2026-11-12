@@ -15,7 +15,7 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's shown at the top of the sign-in pages and ends their titles, as in "Sign in – Acme". It also signs every email, and it's the name authenticator apps list your users' accounts under.
 
-2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and [Regenerate the CSS](#regenerate-the-css) to use your own colors.
+2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and [Regenerate the CSS](#regenerate-the-css) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card.
 
 3. To give one client a look of its own, click **New brand** and create one, then choose it under **Brand** on the client's **Settings** tab. See [Clients](/concepts/clients/#brand) for the pages it draws.
 
@@ -79,7 +79,7 @@ To change the layout of a page, or an email's body, you give a server its own co
 
    `tailwindcss` isn't served: it's what [regenerating the CSS](#regenerate-the-css) reads.
 
-2. Edit the templates. They're Go [`html/template`](https://pkg.go.dev/html/template) files. Keep the element IDs and the scripts the pages use, or the forms stop working. In the layouts, keep the `data-theme` attribute, the brand's stylesheet link after `main.css`, its icon links and its logo, or the pages lose their brand's look. The servers' [`Content-Security-Policy`](/reference/security/#response-headers) makes the browser refuse an inline `<script>`, an `on…` attribute such as `onclick`, a `javascript:` URL and a `<base>` element. A `<script type="application/json">` data block is fine. Put a script of your own in a file in the `static` directory, and load it with `<script src="{{ asset "/static/your-file.js" }}" defer></script>`. Anything your templates load needs its own consent: see [Personal data](/deploy/personal-data/#whats-yours-to-decide).
+2. Edit the templates. They're Go [`html/template`](https://pkg.go.dev/html/template) files. Keep the element IDs and the scripts the pages use, or the forms stop working. In the layouts, keep the `data-theme` attribute, the brand's stylesheet link after `main.css`, its icon links, its logo and its footer after `main`, or the pages lose their brand's look. The servers' [`Content-Security-Policy`](/reference/security/#response-headers) makes the browser refuse an inline `<script>`, an `on…` attribute such as `onclick`, a `javascript:` URL and a `<base>` element. A `<script type="application/json">` data block is fine. Put a script of your own in a file in the `static` directory, and load it with `<script src="{{ asset "/static/your-file.js" }}" defer></script>`. Anything your templates load needs its own consent: see [Personal data](/deploy/personal-data/#whats-yours-to-decide).
 
 3. Make the files readable by the containers. Both images run as uid 10001 and gid 10001 (see [the user the images run as](/deploy/docker-compose/#the-user-the-images-run-as)), and a page whose template the server can't read fails with a 500:
 
@@ -245,6 +245,79 @@ The Admin API sets the kit in two steps. Each upload leaves an `uploaded_brand_a
 </Steps>
 
 An update replaces the whole brand. `corners`, `font` and `backgroundFit` are required, `hideAppName` is false when you leave it out, and a slot you leave out or set to `null` is emptied. A `brand` you read with [`GET /api/v1/admin/brands/{id}`](/reference/api/admin/operations/getbrand/) and send back as it came is saved unchanged.
+
+## Footer links and support contact
+
+A brand can show up to three links under the card, such as your privacy policy, a status page or your company's site, and a way for a stuck user to reach your support. Both are optional.
+
+<Steps>
+
+1. Open **Admin**, **Branding**, and open the brand.
+
+2. Under **Footer links**, give **Link 1** a **Label** and a **URL**, and fill in **Link 2** and **Link 3** if you want more. A row left empty is no link.
+
+3. Open **Label in each language** under a link to give it a label in each language your users read.
+
+4. Under **Support contact**, fill in any of **Email address**, **Support page URL** and **Phone number**.
+
+5. Click **Save**.
+
+</Steps>
+
+The preview beside the form draws the footer as you type.
+
+The footer is drawn under the card on every page of the auth server, and on the admin console's home and its other card pages. On the console's **Account** pages it follows the page's content. The console's admin pages draw no footer. It's small text on the page's background color, and on a brand with a [background image](#background-image) it sits on a panel in the card's color, so it stays readable whatever the image.
+
+A brand shows only its own links and contact. A client whose brand has none shows no footer, even when the default brand's has one.
+
+Everything in the footer is public, as the pages that draw it are.
+
+### Footer links
+
+The links are drawn in the order of their rows, and each one opens in a new tab, so a click during a sign-in leaves the sign-in page open.
+
+- **Label** is required, up to 40 characters, without `<` or `>`.
+- **URL** is required, up to 256 characters. It starts with `https:` and names a site, with no user name or password in it.
+- **Label in each language** holds one optional label for each built-in language, with the same limits as **Label**.
+
+A page shows each link's label in the language the page is written in. Where the link has none for that language, a language you [added](#add-a-language) included, it shows **Label**. Goiabada can't tell a screen reader which language that label is in, so fill in a label for each language your users read.
+
+### Support contact
+
+The footer's contact line reads "Need help?", followed by each value you set: the email address and the phone number as themselves, so they can be copied, and the URL as a link named "Support page", which opens in a new tab.
+
+- **Email address** is up to 254 characters, in the shape any account's address takes.
+- **Support page URL** follows the rule of a footer link's **URL**.
+- **Phone number** is a `+`, the country code and the number, up to 15 digits in all, the first not 0. You can type it with spaces, hyphens, dots and parentheses, and they're removed when you save, so the page shows the digits alone, such as `+442079460958`.
+
+### The footer through the Admin API
+
+A brand carries the footer in four members, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/), [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) and every brand they answer: `footerLinks`, the links in the order they're drawn, and `supportEmail`, `supportUrl` and `supportPhone`. A link is an object with `url`, `label` and, optionally, `labels`, a label for each language by its tag, such as `"pt-BR"`:
+
+```bash
+curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme",
+    "appearance": "auto",
+    "theme": "blueberry",
+    "corners": "rounded",
+    "font": "system-ui",
+    "backgroundFit": "cover",
+    "footerLinks": [
+      {"url": "https://acme.example/privacy", "label": "Privacy", "labels": {"pt-BR": "Privacidade", "de": "Datenschutz"}},
+      {"url": "https://status.acme.example", "label": "Status"}
+    ],
+    "supportEmail": "help@acme.example",
+    "supportUrl": "https://acme.example/help",
+    "supportPhone": "+44 20 7946 0958"
+  }'
+```
+
+An answer always carries all four: `[]` for no links, `""` for a value not set, and `{}` as the `labels` of a link with none. As with the kit, an update replaces the whole brand, so a member you leave out or set to `null` is emptied. A blank language label is dropped.
+
+A refusal about a footer link carries `error_field`, a JSON Pointer to the member it's about, such as `/footerLinks/1/url` for the second link's URL. The pointer's index is counted from 0, while the message counts links from 1.
 
 ## How the language is chosen
 

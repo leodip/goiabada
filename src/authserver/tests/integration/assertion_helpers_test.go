@@ -111,6 +111,11 @@ func assertClientWebsiteUrlInHTML(t *testing.T, doc *goquery.Document, expectedU
 
 				rel, _ := s.Attr("rel")
 				assert.Equal(t, "noopener noreferrer", rel, "Website link should have security attributes")
+
+				assert.Equal(t, expectedURL+" "+newTabNoticeText, strings.TrimSpace(s.Text()),
+					"Website link should say it opens a new tab")
+				assert.Equal(t, newTabNoticeText, strings.TrimSpace(s.Find("span.sr-only").Text()),
+					"Website link should say it opens a new tab to assistive technology alone")
 			}
 		}
 	})

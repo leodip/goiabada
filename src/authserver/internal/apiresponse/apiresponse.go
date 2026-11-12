@@ -52,9 +52,17 @@ func WriteJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
 // api.ErrorResponse is two strings, which encoding/json cannot fail on. Keeping the
 // request out of the signature is what lets the ~700 4xx call sites stay as they are.
 func WriteError(w http.ResponseWriter, message, code string, statusCode int) {
+	WriteErrorAt(w, message, code, "", statusCode)
+}
+
+// WriteErrorAt is WriteError for a refusal about one member of the request body, which field names
+// as a JSON Pointer into it (RFC 6901), such as /footerLinks/1/url, and the envelope carries as
+// error_field. An empty field writes no error_field, as WriteError does (#814 decision 10).
+func WriteErrorAt(w http.ResponseWriter, message, code, field string, statusCode int) {
 	buf, err := encode(api.ErrorResponse{
 		ErrorCode:        code,
 		ErrorDescription: message,
+		ErrorField:       field,
 	})
 	if err != nil {
 		// Unreachable, per the comment above. Answer bare rather than pretend.

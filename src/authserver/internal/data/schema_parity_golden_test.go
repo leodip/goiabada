@@ -104,8 +104,8 @@ func parityAllowlist() []parityRule {
 				"so a width there would be documentation the engine ignores. The other three " +
 				"enforce theirs, which is why this is recorded as a difference rather than " +
 				"folded onto unbounded: SQLite really does store a value SQL Server would refuse.",
-			Count:  125,
-			Digest: "7ffff1708e701eac",
+			Count:  129,
+			Digest: "23ef4bc21bed6b47",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "string(no declared length)" &&
@@ -234,6 +234,21 @@ func parityAllowlist() []parityRule {
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisDefault && oddOneOut(d, data.MySQL) &&
 					d.Table == "audit_logs" && d.Object == "details" &&
+					strings.Contains(d.Says[data.MySQL], "_utf8mb4")
+			},
+		},
+		{
+			Name: "mysql: brands.footer_links records its default with a charset introducer",
+			Why: "The rule above, for the second LONGTEXT column with a default: 000092 writes " +
+				"the empty list of links as the expression ('[]') for the same reason, and the " +
+				"catalog reads _utf8mb4'[]' where the other three read '[]'. Kept apart from it so " +
+				"the two counts move independently. The default only fills the brands that " +
+				"predate the column; every insert supplies a value.",
+			Count:  1,
+			Digest: "61b79fb0ba77e180",
+			Excuses: func(d parityDivergence) bool {
+				return d.Axis == parityAxisDefault && oddOneOut(d, data.MySQL) &&
+					d.Table == "brands" && d.Object == "footer_links" &&
 					strings.Contains(d.Says[data.MySQL], "_utf8mb4")
 			},
 		},

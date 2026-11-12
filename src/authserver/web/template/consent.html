@@ -14,7 +14,7 @@
   <p class="auth-client-description">{{ .clientDescription }}</p>
   {{ end }}
   {{ if .clientWebsiteUrl }}
-  <a class="text-link text-sm" href="{{ .clientWebsiteUrl }}" target="_blank" rel="noopener noreferrer">{{ .clientWebsiteUrl }}</a>
+  <a class="text-link text-sm" href="{{ .clientWebsiteUrl }}" target="_blank" rel="noopener noreferrer">{{ .clientWebsiteUrl }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a>
   {{ end }}
 </div>
 {{ end }}
@@ -52,10 +52,10 @@
   {{ if or .clientPrivacyPolicyUrl .clientTermsOfServiceUrl }}
   <ul class="legal-links text-sm">
     {{ if .clientPrivacyPolicyUrl }}
-    <li><a class="text-link" href="{{ .clientPrivacyPolicyUrl }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "consent.client_privacy_policy" }}</a></li>
+    <li><a class="text-link" href="{{ .clientPrivacyPolicyUrl }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "consent.client_privacy_policy" }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a></li>
     {{ end }}
     {{ if .clientTermsOfServiceUrl }}
-    <li><a class="text-link" href="{{ .clientTermsOfServiceUrl }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "consent.client_terms_of_service" }}</a></li>
+    <li><a class="text-link" href="{{ .clientTermsOfServiceUrl }}" target="_blank" rel="noopener noreferrer">{{ T $.ctx "consent.client_terms_of_service" }}<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span></a></li>
     {{ end }}
   </ul>
   {{ end }}

@@ -6,7 +6,11 @@
      focused or operated, which is why its fields, buttons and link are drawn on spans. It is
      drawn hidden, and brand-preview.js shows it once it has given it the theme's colors, which it
      sets on this element alone. The script puts the logo of the sample's mode in the logo box above
-     the app name, as a sign-in card draws it (#813), and hides the name while the switch hides it. */ -}}
+     the app name, as a sign-in card draws it (#813), and hides the name while the switch hides it.
+     Under the card is the brand's footer (#814 decision 12), drawn hidden and empty: the script fills
+     it from the form's footer fields as they are typed, each link's label as plain text in the
+     auth server's footer look, and shows it on the panel while the brand has a background image. It
+     is not a footer landmark: the console's admin pages draw none. */ -}}
 {{- $mode := index . 0 }}
 {{- $ctx := index . 1 }}
 <div class="brand-sample" data-brand-sample="{{ $mode }}" hidden inert aria-hidden="true">
@@ -36,6 +40,15 @@
         </div>
       </div>
     </div>
+  </div>
+  <div class="brand-footer" data-brand-sample-footer hidden>
+    <ul class="brand-footer-links" hidden></ul>
+    <p class="brand-footer-contact" hidden>
+      <span>{{ T $ctx "common.footer.need_help" }}</span>
+      <span class="brand-footer-link" data-brand-sample-contact="email" hidden></span>
+      <span class="brand-footer-link" data-brand-sample-contact="phone" hidden></span>
+      <span class="brand-footer-link" data-brand-sample-contact="url" hidden>{{ T $ctx "common.footer.support_page" }}</span>
+    </p>
   </div>
 </div>
 {{- end}}

@@ -3,10 +3,12 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
@@ -80,6 +82,13 @@ func TestMigration000091_BrandKit(t *testing.T) {
 	// 3.
 	assertDrawnAsBefore000091 := func(phase string) {
 		t.Helper()
+		// The data layer's brand reads name the columns of later migrations, so these are read at head.
+		if upErr := h.Migrator.Up(ctx); upErr != nil && !errors.Is(upErr, migrator.ErrNoChange) {
+			require.NoErrorf(t, upErr, "migrate to head on %s", dbType())
+		}
+		defer func() {
+			require.NoErrorf(t, h.Migrator.Migrate(ctx, brandKit000091), "roll back to 000091 on %s", dbType())
+		}()
 		for _, p := range predating {
 			brand, err := h.DB.GetBrandById(ctx, nil, p.id)
 			require.NoError(t, err)

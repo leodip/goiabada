@@ -73,6 +73,19 @@ writer there does not compile; `routes.go` registers them, registration and the 
 of `initMiddleware` whose settings and session middleware answer their own faults, and a panic, as
 JSON too (#435)
 
+The admin API's error answer (`core/api.ErrorResponse`) is `error_code`, `error_description` and,
+optionally, `error_field`: a JSON Pointer (RFC 6901) to the member of the request body the refusal
+is about, such as `/footerLinks/1/url` or `/footerLinks/1/labels/pt-BR` (#814 decision 10). Set it
+for a refusal about one member of a list item, where a code per kind of refusal cannot say which
+item: the validator returns `refusalAt(localizedErr, tokens...)`, which escapes each token as RFC
+6901 section 3 says (`~` as `~0`, then `/` as `~1`), and `writeValidationError` answers it through
+`apiresponse.WriteErrorAt`. The index is zero-based, as the pointer's, while the sentence names the
+item by its number from 1 for a person. Today only a brand's footer links set it; a refusal about a
+field of its own keeps its own code, which the console maps to an input through `render.ErrorField`.
+The console reads a pointer with `render.ErrorPointer`, which unescapes its tokens. The member is
+optional, so a caller ignoring it is unaffected: reuse it for the next list of items with several
+fields rather than adding a code per item and field.
+
 ## Logging
 
 `core/logging` owns the one `slog` handler, installed by both servers at startup. Every message is a

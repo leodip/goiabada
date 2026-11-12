@@ -59,6 +59,16 @@ type PublicSettingsResponse struct {
 // HideAppName is whether the app name's text gives way to the logo, which it does only beside one,
 // so it is false while there is no logo (#813 decision 5). A brand's sign-in pages show all of these
 // to anyone (#813 decision 9).
+//
+// HasBackground is whether the brand has a background image, whatever its fit, which the console's
+// card pages then draw the footer on a panel over (#814 decision 6 and D1); the full stylesheet
+// draws the image itself, and the brand's sign-in pages show it to anyone.
+//
+// FooterLinks are the brand's footer links in order, each with its fallback label and every label
+// it has per language, so the console picks one by each page's language (brandkit.FooterLinkLabel),
+// and SupportEmail, SupportURL and SupportPhone are its support contact. They are always carried,
+// [] for no links and "" for an unset value, as a brand's answer carries them, and the brand's
+// sign-in pages draw all of them under the card for anyone (#814 decision 9).
 type PublicBrandResponse struct {
 	Appearance          string `json:"appearance"`
 	StylesheetURL       string `json:"stylesheetUrl"`
@@ -67,6 +77,12 @@ type PublicBrandResponse struct {
 	DarkLogoURL         string `json:"darkLogoUrl,omitempty"`
 	FaviconURL          string `json:"faviconUrl,omitempty"`
 	HideAppName         bool   `json:"hideAppName"`
+	HasBackground       bool   `json:"hasBackground"`
+
+	FooterLinks  []BrandFooterLinkResponse `json:"footerLinks"`
+	SupportEmail string                    `json:"supportEmail"`
+	SupportURL   string                    `json:"supportUrl"`
+	SupportPhone string                    `json:"supportPhone"`
 }
 
 // PasswordRulesResponse is what the stored password policy asks of a new password, as data: the

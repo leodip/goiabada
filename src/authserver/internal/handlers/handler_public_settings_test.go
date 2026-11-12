@@ -122,7 +122,7 @@ func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 			assert.JSONEq(t, `{"appearance":"`+tc.wantAppearance+`",`+
 				`"stylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`stylesheet.css?v=`+full.Fingerprint+`",`+
 				`"colorsStylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`colors.css?v=`+colors.Fingerprint+`",`+
-				`"hideAppName":false}`,
+				`"hideAppName":false,"hasBackground":false,"footerLinks":[],"supportEmail":"","supportUrl":"","supportPhone":""}`,
 				string(body["brand"]))
 			assert.NotContains(t, body, "uiTheme")
 		})
@@ -131,7 +131,8 @@ func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 
 // The brand also carries the absolute URLs of its logo, dark logo and favicon, each with its asset's
 // fingerprint, and whether the app name's text gives way to the logo, which it does only beside one
-// (#813 decisions 5 and 9). An empty slot is left out. The full stylesheet's URL names the
+// (#813 decisions 5 and 9). An empty slot is left out. hasBackground says whether the brand has a
+// background image, so the console draws its card pages' footer on a panel (#814 D1). The full stylesheet's URL names the
 // stylesheet the brand's files draw.
 func TestPublicSettings_CarriesTheBrandsLogosFaviconAndSwitch(t *testing.T) {
 	brand := record.NewBrand("Night", record.BrandAppearanceDark, "plum")
@@ -164,6 +165,7 @@ func TestPublicSettings_CarriesTheBrandsLogosFaviconAndSwitch(t *testing.T) {
 	assert.Equal(t, publicSettingsBaseURL+"/brand-assets/12?v=222222222222", body.Brand["darkLogoUrl"])
 	assert.Equal(t, publicSettingsBaseURL+"/brand-assets/13?v=333333333333", body.Brand["faviconUrl"])
 	assert.Equal(t, true, body.Brand["hideAppName"])
+	assert.Equal(t, true, body.Brand["hasBackground"], "the brand has a background image")
 	full, err := brandthemes.FullStylesheet(&brand, brandasset.Slots{Background: &assets[0]})
 	require.NoError(t, err)
 	assert.Equal(t, publicSettingsBaseURL+"/brand/7/stylesheet.css?v="+full.Fingerprint, body.Brand["stylesheetUrl"])
@@ -185,6 +187,39 @@ func TestPublicSettings_CarriesTheBrandsLogosFaviconAndSwitch(t *testing.T) {
 	assert.NotContains(t, body.Brand, "darkLogoUrl")
 	assert.Equal(t, publicSettingsBaseURL+"/brand-assets/13?v=333333333333", body.Brand["faviconUrl"])
 	assert.Equal(t, false, body.Brand["hideAppName"])
+	assert.Equal(t, false, body.Brand["hasBackground"], "the background slot is empty")
+}
+
+// The brand carries its footer links in order, each with every label it has, so the admin console
+// picks one by the language of each page it draws, and its support contact; an answer always carries
+// all four, [] for no links, {} for a link with no labels and "" for an unset value (#814 decision 9).
+func TestPublicSettings_CarriesTheBrandsFooterLinksAndContact(t *testing.T) {
+	brand := record.NewBrand("Night", record.BrandAppearanceDark, "plum")
+	brand.Id = 7
+	brand.FooterLinks = record.BrandFooterLinks{
+		{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
+		{URL: "https://status.acme.example/", Label: "Status"},
+	}
+	brand.SupportEmail = "help@acme.example"
+	brand.SupportPhone = "+442079460958"
+	database := datamocks.NewDatabase(t)
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Once()
+	expectConsoleClientBrand(database, &brand, nil)
+
+	recorder := httptest.NewRecorder()
+	HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var body struct {
+		Brand map[string]json.RawMessage `json:"brand"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+	assert.JSONEq(t, `[`+
+		`{"url":"https://acme.example/privacy","label":"Privacy","labels":{"de":"Datenschutz","pt-BR":"Privacidade"}},`+
+		`{"url":"https://status.acme.example/","label":"Status","labels":{}}]`, string(body.Brand["footerLinks"]))
+	assert.JSONEq(t, `"help@acme.example"`, string(body.Brand["supportEmail"]))
+	assert.JSONEq(t, `""`, string(body.Brand["supportUrl"]))
+	assert.JSONEq(t, `"+442079460958"`, string(body.Brand["supportPhone"]))
 }
 
 // With no brand for the admin console's client, the client not being there, the answer is the
@@ -445,6 +480,23 @@ var publicBrandAllowedFields = map[string]string{
 	"DarkLogoURL": "darkLogoUrl",
 	"FaviconURL":  "faviconUrl",
 	"HideAppName": "hideAppName",
+	// Whether the brand has a background image, which its sign-in pages show anyone, so the console
+	// draws its card pages' footer on a panel over it (#814 decision 6, D1).
+	"HasBackground": "hasBackground",
+	// The brand's footer links, every label included, and its support contact, which its sign-in
+	// pages draw under the card for anyone (#814 decision 9).
+	"FooterLinks":  "footerLinks",
+	"SupportEmail": "supportEmail",
+	"SupportURL":   "supportUrl",
+	"SupportPhone": "supportPhone",
+}
+
+// publicBrandFooterLinkAllowedFields is the complete set of fields a footer link carries: its URL,
+// its fallback label and its label per language, all of which its sign-in pages draw.
+var publicBrandFooterLinkAllowedFields = map[string]string{
+	"Url":    "url",
+	"Label":  "label",
+	"Labels": "labels",
 }
 
 // This fails if a field is added to PublicSettingsResponse without being added to
@@ -454,6 +506,7 @@ func TestPublicSettingsResponse_ExposesOnlyAllowlistedFields(t *testing.T) {
 	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PublicSettingsResponse{}), publicSettingsAllowedFields)
 	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PasswordRulesResponse{}), publicPasswordRulesAllowedFields)
 	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PublicBrandResponse{}), publicBrandAllowedFields)
+	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.BrandFooterLinkResponse{}), publicBrandFooterLinkAllowedFields)
 }
 
 // assertOnlyAllowlistedFields holds responseType to the fields allowed, each under its JSON name.

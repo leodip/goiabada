@@ -164,6 +164,7 @@ func TestBrandsGet_SortedByNameWithTheDefaultMarked(t *testing.T) {
 		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum",
 		"corners": "rounded", "font": "system-ui", "backgroundFit": "cover", "hideAppName": false,
 		"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
+		"footerLinks": []any{}, "supportEmail": "", "supportUrl": "", "supportPhone": "",
 		"isDefault": false, "clientCount": float64(2),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, brands[0])
@@ -268,6 +269,7 @@ func TestBrandCreate_StoresTheTrimmedNameAndAudits(t *testing.T) {
 		"id": float64(7), "name": "Acme Corp", "appearance": "light", "theme": "high-contrast",
 		"corners": "square", "font": "neo-grotesque", "backgroundFit": "tile", "hideAppName": true,
 		"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
+		"footerLinks": []any{}, "supportEmail": "", "supportUrl": "", "supportPhone": "",
 		"isDefault": false, "clientCount": float64(0),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, body["brand"])
@@ -366,6 +368,7 @@ func TestBrandGet(t *testing.T) {
 			"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum",
 			"corners": "rounded", "font": "system-ui", "backgroundFit": "cover", "hideAppName": false,
 			"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
+			"footerLinks": []any{}, "supportEmail": "", "supportUrl": "", "supportPhone": "",
 			"isDefault": false, "clientCount": float64(4),
 			"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 		}, body["brand"])
@@ -713,6 +716,7 @@ func TestBrandMakeDefault_MovesTheDefaultAndAuditsBothBrands(t *testing.T) {
 		"id": float64(3), "name": "Acme", "appearance": "dark", "theme": "plum",
 		"corners": "rounded", "font": "system-ui", "backgroundFit": "cover", "hideAppName": false,
 		"logo": nil, "darkLogo": nil, "favicon": nil, "background": nil, "regularFont": nil, "boldFont": nil,
+		"footerLinks": []any{}, "supportEmail": "", "supportUrl": "", "supportPhone": "",
 		"isDefault": true, "clientCount": float64(8),
 		"createdAt": "2026-11-09T12:00:00Z", "updatedAt": "2026-11-09T12:00:00Z",
 	}, body["brand"])

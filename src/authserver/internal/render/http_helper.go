@@ -202,9 +202,10 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		// A page is drawn in its brand: the layouts write brandDataTheme on the html element
 		// and link brandStylesheet after main.css, draw brandLogo and brandDarkLogo above the app
 		// name on the card, or in its place while brandHideAppName, and link brandFavicon in place
-		// of Goiabada's icons (#813 decisions 4 and 5). An email links no stylesheet, so it reads no
-		// brand. ui_theme is no longer bound, so a layout copied from an older release, which reads
-		// it, draws every page automatic in the built-in colors.
+		// of Goiabada's icons (#813 decisions 4 and 5), and draw brandFooter under the card, bound
+		// only for a brand with links or a contact (#814). An email links no stylesheet, so it reads
+		// no brand. ui_theme is no longer bound, so a layout copied from an older release, which
+		// reads it, draws every page automatic in the built-in colors.
 		brand := RequestPageBrand(r.Context(), h.brands)
 		data["brandDataTheme"] = brand.DataTheme
 		data["brandStylesheet"] = brand.Stylesheet
@@ -212,6 +213,9 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		data["brandDarkLogo"] = brand.DarkLogo
 		data["brandHideAppName"] = brand.HideAppName
 		data["brandFavicon"] = brand.Favicon
+		if footer := FooterOf(r.Context(), brand); footer != nil {
+			data["brandFooter"] = footer
+		}
 	}
 
 	templateFiles := []string{

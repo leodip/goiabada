@@ -22,8 +22,8 @@ import (
 // are drawn in it, one of them the default a client with no brand of its own is drawn in (#812
 // decision 3); a brand created and edited, its appearance and theme chosen on option cards whose
 // swatches are drawn from the auth server's own palettes (GET /brand-themes), its corners, font
-// family, background fit and the switch hiding the app name chosen beside them (#813), made the
-// default, and deleted, its clients moving to the default. Every write drops the cached public
+// family, background fit and the switch hiding the app name chosen beside them (#813), its footer
+// links and support contact typed in after them (#814), made the default, and deleted, its clients moving to the default. Every write drops the cached public
 // settings, whose brand is the console's own client's, which may be the brand written or follow the
 // default.
 
@@ -52,6 +52,11 @@ type BrandRow struct {
 // value a brand stores, and HideAppName the switch hiding the app name beside a logo (#813). The six
 // slots hold the asset each names, nil for an empty one: the stored brand's, or the ones a refused
 // form sent, uploaded and not yet saved, read again by their ids (#813 decisions 1 and 10).
+//
+// FooterLinks are the form's three rows (#814 decision 11): the links in their order, then the empty
+// rows, so a refusal naming a link by its index, and its sentence by its number, names the row of that
+// number. SupportEmail, SupportUrl and SupportPhone are the contact's three fields, as stored or as
+// sent.
 type BrandForm struct {
 	Name          string
 	Appearance    string
@@ -67,6 +72,50 @@ type BrandForm struct {
 	Background  *api.BrandAssetResponse
 	RegularFont *api.BrandAssetResponse
 	BoldFont    *api.BrandAssetResponse
+
+	FooterLinks  [brandFooterRows]BrandFooterLinkRow
+	SupportEmail string
+	SupportUrl   string
+	SupportPhone string
+}
+
+// brandFooterRows is how many footer link rows the form draws: as many as a brand has links at most
+// (#814 decision 5), so the whole list is on screen at once.
+const brandFooterRows = 3
+
+// BrandFooterLinkRow is one footer link row of the form: the fallback label, the URL, and the label of
+// each built-in language that has one, by language tag, nil when none has. A row whose fields are all
+// empty is no link.
+type BrandFooterLinkRow struct {
+	Label  string
+	Url    string
+	Labels map[string]string
+}
+
+// empty reports whether the row holds nothing: no label, no URL and no language label.
+func (row BrandFooterLinkRow) empty() bool {
+	return row.Label == "" && row.Url == "" && len(row.Labels) == 0
+}
+
+// FooterLanguage is one of the built-in languages a footer link has a label of its own in: its tag,
+// which the label's input is named by, and its English name, which the template labels the input with
+// as the Page language select labels a language (LocaleLabel).
+type FooterLanguage struct {
+	Tag  string
+	Name string
+}
+
+// brandFooterLanguages are the six built-in languages, in the order the console lists its catalogs,
+// English first. A language only an operator's override directory adds has no label of its own (#814
+// decision 5).
+func brandFooterLanguages() []FooterLanguage {
+	var languages []FooterLanguage
+	for _, option := range render.PageLanguageOptions() {
+		if i18n.IsBuiltInCatalogTag(option.Tag) {
+			languages = append(languages, FooterLanguage(option))
+		}
+	}
+	return languages
 }
 
 // brandSlots are the brand form's six slots, by the name of the field holding the asset's id, which
@@ -154,6 +203,45 @@ var brandErrorFields = map[string]string{
 	i18n.ErrCodeBrandBoldFontAssetInvalid:        "boldFont",
 	i18n.ErrCodeBrandDarkLogoLogoRequired:        "logo",
 	i18n.ErrCodeBrandBoldFontRegularRequired:     "regularFont",
+	i18n.ErrCodeBrandSupportEmailInvalid:         "supportEmail",
+	i18n.ErrCodeBrandSupportEmailTooLong:         "supportEmail",
+	i18n.ErrCodeBrandSupportURLInvalid:           "supportUrl",
+	i18n.ErrCodeBrandSupportURLTooLong:           "supportUrl",
+	i18n.ErrCodeBrandSupportPhoneInvalid:         "supportPhone",
+}
+
+// brandRefusedField answers the form field a refusal of a brand's save is about. A footer link's
+// refusal points at the member of the body it is about in error_field (#814 decision 10), which names
+// the input: the label, the URL or one language's label of the row of the link's index, the rows
+// drawn in the order the links were sent. Any other refusal names its field by its code
+// (brandErrorFields), as before; the contact's three fields keep one code each.
+func brandRefusedField(err error) string {
+	if field := footerLinkInput(render.ErrorPointer(err)); field != "" {
+		return field
+	}
+	return render.ErrorField(err, brandErrorFields)
+}
+
+// footerLinkInput answers the id of the footer link input tokens point at, "footerLinks-1-url" for
+// /footerLinks/1/url and "footerLinks-0-labels-pt-BR" for /footerLinks/0/labels/pt-BR, or "" when
+// they point at no input the form draws: a fourth link, a language it offers no label in, or a
+// member a link does not have. An index is a decimal number with no leading zero (RFC 6901 section
+// 4).
+func footerLinkInput(tokens []string) string {
+	if len(tokens) < 3 || tokens[0] != "footerLinks" {
+		return ""
+	}
+	index, err := strconv.Atoi(tokens[1])
+	if err != nil || index < 0 || index >= brandFooterRows || strconv.Itoa(index) != tokens[1] {
+		return ""
+	}
+	switch {
+	case len(tokens) == 3 && (tokens[2] == "label" || tokens[2] == "url"):
+		return fmt.Sprintf("footerLinks-%d-%s", index, tokens[2])
+	case len(tokens) == 4 && tokens[2] == "labels" && i18n.IsBuiltInCatalogTag(tokens[3]):
+		return fmt.Sprintf("footerLinks-%d-labels-%s", index, tokens[3])
+	}
+	return ""
 }
 
 // brandThemeNames are the message IDs of the built-in themes' names, by key. A theme missing here,
@@ -275,7 +363,9 @@ func brandKitStyles() BrandKitStyles {
 
 // brandFormFrom reads the brand form: the name trimmed, as the auth server stores it, and the
 // appearance, theme and kit choices as sent, which the auth server compares exactly. The switch is a
-// checkbox, which a browser sends only while it is on.
+// checkbox, which a browser sends only while it is on. The footer link rows and the contact are read
+// trimmed, as the auth server stores them, the phone number with the separators typed, which the auth
+// server strips (#814 decision 11).
 func brandFormFrom(r *http.Request) BrandForm {
 	return BrandForm{
 		Name:          strings.TrimSpace(r.PostFormValue("name")),
@@ -285,7 +375,71 @@ func brandFormFrom(r *http.Request) BrandForm {
 		Font:          r.PostFormValue("font"),
 		BackgroundFit: r.PostFormValue("backgroundFit"),
 		HideAppName:   r.PostFormValue("hideAppName") == "on",
+		FooterLinks:   footerRowsFrom(r),
+		SupportEmail:  strings.TrimSpace(r.PostFormValue("supportEmail")),
+		SupportUrl:    strings.TrimSpace(r.PostFormValue("supportUrl")),
+		SupportPhone:  strings.TrimSpace(r.PostFormValue("supportPhone")),
 	}
+}
+
+// footerRowsFrom reads the three footer link rows, each value trimmed and each blank language label
+// left out, and answers them with the empty rows skipped and put last, which is the order the links
+// are sent in and saved (#814 decision 11).
+func footerRowsFrom(r *http.Request) [brandFooterRows]BrandFooterLinkRow {
+	var rows [brandFooterRows]BrandFooterLinkRow
+	next := 0
+	for i := range brandFooterRows {
+		prefix := "footerLinks-" + strconv.Itoa(i) + "-"
+		row := BrandFooterLinkRow{
+			Label: strings.TrimSpace(r.PostFormValue(prefix + "label")),
+			Url:   strings.TrimSpace(r.PostFormValue(prefix + "url")),
+		}
+		for _, language := range brandFooterLanguages() {
+			if label := strings.TrimSpace(r.PostFormValue(prefix + "labels-" + language.Tag)); label != "" {
+				if row.Labels == nil {
+					row.Labels = map[string]string{}
+				}
+				row.Labels[language.Tag] = label
+			}
+		}
+		if row.empty() {
+			continue
+		}
+		rows[next] = row
+		next++
+	}
+	return rows
+}
+
+// footerLinks are the links the rows hold, as a create or an update names them, in order: every row
+// that is not empty, a row with a label and no URL, or the reverse, included, for the admin API to
+// refuse at the empty field. nil, sent as null, for none.
+func (f *BrandForm) footerLinks() []api.BrandFooterLink {
+	var links []api.BrandFooterLink
+	for _, row := range f.FooterLinks {
+		if row.empty() {
+			continue
+		}
+		links = append(links, api.BrandFooterLink{Url: row.Url, Label: row.Label, Labels: row.Labels})
+	}
+	return links
+}
+
+// footerRowsOf fills the rows with a stored brand's links, in their order, each language label kept
+// as stored, the rest of the rows empty.
+func footerRowsOf(links []api.BrandFooterLinkResponse) [brandFooterRows]BrandFooterLinkRow {
+	var rows [brandFooterRows]BrandFooterLinkRow
+	for i, link := range links {
+		if i == brandFooterRows {
+			break
+		}
+		row := BrandFooterLinkRow{Label: link.Label, Url: link.Url}
+		if len(link.Labels) > 0 {
+			row.Labels = link.Labels
+		}
+		rows[i] = row
+	}
+	return rows
 }
 
 // brandSlotIds are the asset ids the form's slots hold, by slot, nil for an empty one.
@@ -383,6 +537,8 @@ func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 		"brandKitStyles":  brandKitStyles(),
 		// The upload field of each kind (#813 decision 1).
 		"brandAssetUploads": brandAssetUploads(r.Context()),
+		// The languages a footer link has a label of its own in (#814 decision 11).
+		"footerLanguages": brandFooterLanguages(),
 	}
 	for key, value := range extra {
 		bind[key] = value
@@ -504,6 +660,10 @@ func HandleBrandNewPost(
 			Background:    ids.ref("background"),
 			RegularFont:   ids.ref("regularFont"),
 			BoldFont:      ids.ref("boldFont"),
+			FooterLinks:   form.footerLinks(),
+			SupportEmail:  form.SupportEmail,
+			SupportUrl:    form.SupportUrl,
+			SupportPhone:  form.SupportPhone,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -513,7 +673,7 @@ func HandleBrandNewPost(
 				renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
 					"isNew":      true,
 					"error":      message,
-					"errorField": render.ErrorField(err, brandErrorFields),
+					"errorField": brandRefusedField(err),
 				})
 			})
 			return
@@ -595,7 +755,9 @@ func HandleBrandGet(
 		form := BrandForm{Name: brand.Name, Appearance: brand.Appearance, Theme: brand.Theme, Corners: brand.Corners,
 			Font: brand.Font, BackgroundFit: brand.BackgroundFit, HideAppName: brand.HideAppName,
 			Logo: brand.Logo, DarkLogo: brand.DarkLogo, Favicon: brand.Favicon, Background: brand.Background,
-			RegularFont: brand.RegularFont, BoldFont: brand.BoldFont}
+			RegularFont: brand.RegularFont, BoldFont: brand.BoldFont,
+			FooterLinks: footerRowsOf(brand.FooterLinks), SupportEmail: brand.SupportEmail,
+			SupportUrl: brand.SupportUrl, SupportPhone: brand.SupportPhone}
 		renderBrandForm(httpHelper, w, r, form, themes, map[string]interface{}{
 			"isNew":             false,
 			"storedBrand":       *brand,
@@ -629,7 +791,8 @@ func HandleBrandPost(
 		}
 
 		// An update replaces every field (#813 decision 10): each slot is sent as the form holds it,
-		// the stored asset, a file uploaded in place of it, or none once removed, which Save attaches.
+		// the stored asset, a file uploaded in place of it, or none once removed, which Save attaches,
+		// and the footer links and the support contact as the form holds them (#814 decision 11).
 		form := brandFormFrom(r)
 		ids := brandSlotIdsFrom(r)
 		_, err := apiClient.UpdateBrand(r.Context(), token, id, &api.UpdateBrandRequest{
@@ -646,6 +809,10 @@ func HandleBrandPost(
 			Background:    ids.ref("background"),
 			RegularFont:   ids.ref("regularFont"),
 			BoldFont:      ids.ref("boldFont"),
+			FooterLinks:   form.footerLinks(),
+			SupportEmail:  form.SupportEmail,
+			SupportUrl:    form.SupportUrl,
+			SupportPhone:  form.SupportPhone,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -657,7 +824,7 @@ func HandleBrandPost(
 					"storedBrand": *brand,
 					"clientsNote": brandClientsNote(r.Context(), brand.ClientCount),
 					"error":       message,
-					"errorField":  render.ErrorField(err, brandErrorFields),
+					"errorField":  brandRefusedField(err),
 				})
 			})
 			return

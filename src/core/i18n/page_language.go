@@ -97,6 +97,15 @@ func IsCatalogTag(tag string) bool {
 	return ok
 }
 
+// IsBuiltInCatalogTag reports whether tag is exactly the tag of one of the six catalogs built into
+// Goiabada, English included, whatever an operator's override directory adds. A brand's footer link
+// has a label of its own only in those languages (#814 decision 5). A tag that only matches one, as
+// "pt-br" matches pt-BR, is not one.
+func IsBuiltInCatalogTag(tag string) bool {
+	_, ok := embedded().catalogTag(tag)
+	return ok
+}
+
 // catalogTag finds the loaded catalog whose tag is exactly s.
 func (b *bundle) catalogTag(s string) (language.Tag, bool) {
 	if s == "" {

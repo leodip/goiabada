@@ -19,6 +19,7 @@ import {
   createBrand,
   defaultBrand,
   deleteBrand,
+  fillBrandFooter,
   newBrandUrl,
   saveBrand,
   setBrandKit,
@@ -216,6 +217,44 @@ test("the console's header and cards with its brand's logo", async ({ page, requ
       } finally {
         if (viewport) await page.setViewportSize(viewport);
       }
+    } finally {
+      await setClientBrand(page, consoleClient, "default");
+    }
+  });
+});
+
+// The console's own client given a brand with footer links and a support contact (#814 decision 7):
+// an Account page, the footer after its content, and home, the footer under its card. The client is
+// put back on the default brand.
+test("the console's Account page and home with its brand's footer", async ({ page }) => {
+  const consoleClient = await clientIdFromList(page, "admin-console-client");
+  await withBrand(page, { appearance: "auto", theme: "blueberry" }, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await fillBrandFooter(page, {
+      footerLinks: [
+        { label: "Privacy", url: "https://example.com/privacy" },
+        { label: "Status", url: "https://status.example.com/" },
+        { label: "Company", url: "https://example.com/" },
+      ],
+      supportEmail: "help@example.com",
+      supportUrl: "https://example.com/support",
+      supportPhone: "+44 20 7946 0958",
+    });
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
+    try {
+      await setClientBrand(page, consoleClient, brand);
+      const withFooter = (name: string, url: string): State => ({
+        name,
+        reach: async () => {
+          await page.goto(url);
+          await expect(page.getByRole("contentinfo")).toBeVisible();
+        },
+      });
+      await checkStates(page, [
+        withFooter("an Account page with its brand's footer", `${env.adminUrl}/account/profile`),
+        withFooter("the console's home with its brand's footer", `${env.adminUrl}/`),
+      ]);
     } finally {
       await setClientBrand(page, consoleClient, "default");
     }

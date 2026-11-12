@@ -31,6 +31,15 @@
 // families' are: without them it falls back to System UI, as the saved brand is drawn. The favicon has
 // no place on a sign-in card: its field shows it.
 //
+// Under its card the sample draws the brand's footer (#814 decision 12) as the form's footer fields
+// hold it, each value trimmed as the form sends it: the rows' links in order, an empty row none, each
+// label in the language of the console page being viewed, the one its html element's lang names, where
+// the row has one, else the row's label, by the rule the auth server's pages pick a label by; then
+// "Need help?" with the address and the number as themselves, the number without the separators the
+// auth server stores it without, and "Support page" for the URL. Links are plain text, since the sample
+// is inert, and every value is set as text. A form with no link and no contact draws no footer, and the
+// footer is on the panel while the brand has a background image.
+//
 // The three Appearance cards' swatches are redrawn in the chosen theme too, from the same
 // palettes: each names the modes it shows, one SVG per mode in order, and each shape the token its
 // fill or border is drawn from. The colors are set as attributes, as the server draws them. The
@@ -182,6 +191,71 @@ function setOrRemove(style, property, value) {
   }
 }
 
+// fieldValue answers what the form's field with that id holds, trimmed, or "" for a field it lacks.
+function fieldValue(id) {
+  const field = document.getElementById(id);
+  return field ? field.value.trim() : "";
+}
+
+// footerLabels answers the label each footer row is drawn with on a page written in lang, in the rows'
+// order, a row with no label to draw left out: the row's label in lang where it has one, else its own
+// label, as the auth server's FooterLinkLabel picks it.
+function footerLabels(lang) {
+  const labels = [];
+  for (let row = 0; document.getElementById("footerLinks-" + row + "-label"); row++) {
+    const prefix = "footerLinks-" + row + "-";
+    const label = (lang && fieldValue(prefix + "labels-" + lang)) || fieldValue(prefix + "label");
+    if (label) {
+      labels.push(label);
+    }
+  }
+  return labels;
+}
+
+// storedPhone answers a phone number as the auth server stores it: without the spaces, hyphens, dots
+// and parentheses it is typed with.
+function storedPhone(typed) {
+  return typed.replace(/[ .()-]/g, "");
+}
+
+// drawFooter draws a sample's footer from the form's footer fields: the links' labels, the contact
+// values, and the panel while the brand has a background image.
+function drawFooter(sample, footer) {
+  const box = sample.querySelector("[data-brand-sample-footer]");
+  if (!box) {
+    return;
+  }
+  const list = box.querySelector(".brand-footer-links");
+  if (list) {
+    list.replaceChildren(...footer.labels.map(function (label) {
+      const item = document.createElement("li");
+      const text = document.createElement("span");
+      text.setAttribute("class", "brand-footer-link");
+      text.textContent = label;
+      item.appendChild(text);
+      return item;
+    }));
+    list.hidden = footer.labels.length === 0;
+  }
+  const contact = box.querySelector(".brand-footer-contact");
+  const values = { email: footer.email, phone: footer.phone, url: footer.url };
+  for (const kind of Object.keys(values)) {
+    const value = box.querySelector('[data-brand-sample-contact="' + kind + '"]');
+    if (value) {
+      if (kind !== "url") {
+        value.textContent = values[kind];
+      }
+      value.hidden = !values[kind];
+    }
+  }
+  const hasContact = Boolean(footer.email || footer.phone || footer.url);
+  if (contact) {
+    contact.hidden = !hasContact;
+  }
+  box.classList.toggle("brand-footer-panel", footer.panel);
+  box.hidden = footer.labels.length === 0 && !hasContact;
+}
+
 // previewMode answers the mode the switch is on, light unless it is on dark.
 function previewMode() {
   const checked = document.querySelector('input[name="brandPreviewMode"]:checked');
@@ -231,6 +305,13 @@ function drawPreview() {
   const hideName = Boolean(switchOn && switchOn.checked);
   const background = slotUrl("background");
   const layout = background ? chosenBackground() : {};
+  const footer = {
+    labels: footerLabels(document.documentElement.lang),
+    email: fieldValue("supportEmail"),
+    phone: storedPhone(fieldValue("supportPhone")),
+    url: fieldValue("supportUrl"),
+    panel: Boolean(background),
+  };
   for (const sample of document.querySelectorAll("[data-brand-sample]")) {
     const sampleMode = sample.dataset.brandSample === "dark" ? "dark" : "light";
     const palette = theme[sampleMode] || {};
@@ -247,6 +328,7 @@ function drawPreview() {
     setOrRemove(sample.style, "background-position", layout.position);
     setOrRemove(sample.style, "background-repeat", layout.repeat);
     drawLogo(sample, sampleMode === "dark" ? darkLogo : logo, hideName);
+    drawFooter(sample, footer);
     sample.hidden = sampleMode !== mode;
   }
   const modeSwitch = document.querySelector(".brand-preview-switch");

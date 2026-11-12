@@ -36,6 +36,7 @@ type AuthServerClient struct {
 type APIError struct {
 	Code       string // "error_code" — stable identifier (UPPER_SNAKE for legacy, dotted lowercase for catalog-keyed)
 	Message    string // "error_description" — the sentence for people to read, localized when Code is a catalog key
+	Field      string // "error_field" — a JSON Pointer to the member of the request body refused, "" when the answer names none
 	StatusCode int
 }
 
@@ -50,6 +51,7 @@ func parseAPIError(resp *http.Response, body []byte) *APIError {
 		return &APIError{
 			Code:       errorResp.ErrorCode,
 			Message:    errorResp.ErrorDescription,
+			Field:      errorResp.ErrorField,
 			StatusCode: resp.StatusCode,
 		}
 	}

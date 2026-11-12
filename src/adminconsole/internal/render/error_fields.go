@@ -102,3 +102,20 @@ var AttributeErrorFields = map[string]string{
 	"VALUE_TOO_LONG":                        "attributeValue",
 	i18n.ErrCodeAttributeValueAngleBrackets: "attributeValue",
 }
+
+// ErrorPointer answers the reference tokens of a refusal's error_field, the JSON Pointer to the
+// member of the request body it is about, such as ["footerLinks", "1", "url"] for
+// /footerLinks/1/url (#814 decision 10), each unescaped as RFC 6901 section 4 says, "~1" to "/" first
+// and then "~0" to "~". It answers nil for a refusal that names no member, the whole body included,
+// for a pointer that does not start with "/", and for an error the API did not answer.
+func ErrorPointer(err error) []string {
+	var apiErr *apiclient.APIError
+	if !errors.As(err, &apiErr) || !strings.HasPrefix(apiErr.Field, "/") {
+		return nil
+	}
+	tokens := strings.Split(apiErr.Field[1:], "/")
+	for i, token := range tokens {
+		tokens[i] = strings.ReplaceAll(strings.ReplaceAll(token, "~1", "/"), "~0", "~")
+	}
+	return tokens
+}

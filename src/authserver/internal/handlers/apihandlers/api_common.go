@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -135,10 +136,18 @@ func writeListSaveFailure(w http.ResponseWriter, r *http.Request, err error, att
 // reads only the outermost value, so a single wrap sent the whole thing to the default arm, where
 // the code flattens to VALIDATION_ERROR and the description becomes the wrapped Error() string
 // with the wrapper's prefix on it (#279 decision 6).
+//
+// A refusal made with refusalAt also names the member of the request body it is about, as
+// error_field (#814 decision 10).
 func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 	var localizedErr *i18n.LocalizedError
 	if errors.As(err, &localizedErr) {
-		writeJSONError(w, localizedErr.Localize(r.Context()), localizedErr.Code, http.StatusBadRequest)
+		var at *fieldRefusal
+		field := ""
+		if errors.As(err, &at) {
+			field = at.pointer
+		}
+		apiresponse.WriteErrorAt(w, localizedErr.Localize(r.Context()), localizedErr.Code, field, http.StatusBadRequest)
 		return
 	}
 	var errorDetail *oauth.ErrorDetail
@@ -147,6 +156,32 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 	writeJSONError(w, err.Error(), "VALIDATION_ERROR", http.StatusBadRequest)
+}
+
+// fieldRefusal is a validator's refusal about one member of the request body, which
+// writeValidationError answers with that member as error_field: a JSON Pointer into the body, as a
+// script applies it to the body it sent (#814 decision 10). Only a brand's footer links are refused
+// this way.
+type fieldRefusal struct {
+	refusal *i18n.LocalizedError
+	pointer string
+}
+
+func (e *fieldRefusal) Error() string { return e.refusal.Error() }
+
+func (e *fieldRefusal) Unwrap() error { return e.refusal }
+
+// refusalAt is refusal about the member the reference tokens name, from the body's root down, such
+// as "footerLinks", "1", "url" for /footerLinks/1/url. Each token is escaped as RFC 6901 section 3
+// says: "~" as "~0" and "/" as "~1", in that order, so a language tag holding either still points
+// at its member.
+func refusalAt(refusal *i18n.LocalizedError, tokens ...string) error {
+	var pointer strings.Builder
+	for _, token := range tokens {
+		pointer.WriteString("/")
+		pointer.WriteString(strings.ReplaceAll(strings.ReplaceAll(token, "~", "~0"), "/", "~1"))
+	}
+	return &fieldRefusal{refusal: refusal, pointer: pointer.String()}
 }
 
 // callerSubject is the `sub` of the access token this request authenticated with, and it is

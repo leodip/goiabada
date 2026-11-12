@@ -217,7 +217,9 @@ type stepDocument struct {
 	ticked               bool
 }
 
-// readStep answers the documents a step page lists, in its order, and re-buffers the body.
+// readStep answers the documents a step page lists, in its order, and re-buffers the body. A
+// document's title is its link's own text: the new-tab text each link carries for assistive
+// technology is checked here and left out (#814 decision 13).
 func readStep(t *testing.T, page *http.Response) (*goquery.Document, []stepDocument) {
 	t.Helper()
 	body, err := io.ReadAll(page.Body)
@@ -232,8 +234,12 @@ func readStep(t *testing.T, page *http.Response) (*goquery.Document, []stepDocum
 		href, _ := link.Attr("href")
 		value, _ := box.Attr("value")
 		_, ticked := box.Attr("checked")
+		assert.Equal(t, newTabNoticeText, strings.TrimSpace(link.Find("span.sr-only").Text()),
+			"the link to %s says it opens a new tab to assistive technology", href)
+		own := link.Clone()
+		own.Find(".sr-only").Remove()
 		documents = append(documents, stepDocument{
-			title: strings.TrimSpace(link.Text()), href: href, version: value, ticked: ticked,
+			title: strings.TrimSpace(own.Text()), href: href, version: value, ticked: ticked,
 		})
 	})
 	return doc, documents

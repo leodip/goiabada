@@ -2351,7 +2351,8 @@ paths:
         Create a brand. It is not the default until it is made the default. Each asset slot
         names a file uploaded first as a brand asset of the slot's kind: uploadBrandLogo for
         `logo` and `darkLogo`, uploadBrandFavicon, uploadBrandBackground, and uploadBrandFont for
-        `regularFont` and `boldFont`. A slot left out or null is empty.
+        `regularFont` and `boldFont`. A slot left out or null is empty. The footer links and the
+        support contact are optional: each left out or null is none.
       operationId: createBrand
       requestBody:
         required: true
@@ -2379,6 +2380,18 @@ paths:
             its kind, handler.brand.logo_asset_invalid, handler.brand.dark_logo_asset_invalid,
             handler.brand.favicon_asset_invalid, handler.brand.background_asset_invalid,
             handler.brand.regular_font_asset_invalid and handler.brand.bold_font_asset_invalid.
+            For the footer links, one of handler.brand.footer_links_too_many,
+            handler.brand.footer_link_label_required, handler.brand.footer_link_label_too_long,
+            handler.brand.footer_link_label_angle_brackets,
+            handler.brand.footer_link_language_invalid,
+            handler.brand.footer_link_language_label_too_long,
+            handler.brand.footer_link_language_label_angle_brackets,
+            handler.brand.footer_link_url_required, handler.brand.footer_link_url_too_long and
+            handler.brand.footer_link_url_invalid, with error_field naming the member, such as
+            `/footerLinks/1/url`; error_description names the link by its number, counted from
+            1. For the support contact, one of handler.brand.support_email_invalid,
+            handler.brand.support_email_too_long, handler.brand.support_url_invalid,
+            handler.brand.support_url_too_long and handler.brand.support_phone_invalid.
           content:
             application/json:
               schema:
@@ -2419,9 +2432,10 @@ paths:
       tags: [Brands]
       summary: Update brand
       description: |
-        Replace a brand's name, appearance, theme, kit choices and asset slots. Every field is
-        written: a choice left out is refused, hideAppName left out is false, and a slot left out
-        or null is emptied. A brand read and sent back is unchanged. A change to the default brand
+        Replace a brand's name, appearance, theme, kit choices, asset slots, footer links and
+        support contact. Every field is written: a choice left out is refused, hideAppName left
+        out is false, a slot left out or null is emptied, and footer links or a contact value left
+        out or null are removed. A brand read and sent back is unchanged. A change to the default brand
         restyles every page at once.
       operationId: updateBrand
       parameters:
@@ -6081,6 +6095,12 @@ components:
             query parameter or else the Accept-Language header, when the server has the
             sentence in that language, and in English otherwise. Route on error_code, not on
             this text.
+        error_field:
+          type: string
+          description: |
+            A JSON Pointer (RFC 6901) to the member of the request body the refusal is about,
+            such as `/footerLinks/1/url` or `/footerLinks/0/labels/pt-BR`. Left out when the
+            refusal names no member. Only the refusals of a brand's footer links set it.
       required:
         - error_description
 
@@ -8653,11 +8673,41 @@ components:
           description: >-
             Whether the app name's text gives way to the logo, which then carries the name as its
             alternative text. Always false while the brand has no logo.
+        hasBackground:
+          type: boolean
+          description: >-
+            Whether the brand has a background image, whatever its fit. The full stylesheet draws
+            the image; a page draws its footer on a panel over it.
+        footerLinks:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/BrandFooterLinkResponse'
+          description: >-
+            The links the brand's pages draw under the card, in order, each with every label it
+            has, so a page picks the label of its own language and takes the fallback label in a
+            language the link has none for. `[]` when the brand has none.
+        supportEmail:
+          type: string
+          description: The support email address the brand's pages show, or an empty string.
+        supportUrl:
+          type: string
+          description: The support page the brand's pages link to, or an empty string.
+        supportPhone:
+          type: string
+          description: |
+            The support phone number the brand's pages show, in international format: `+` and
+            the digits, with no separators, such as `+442079460958`. An empty string when unset.
       required:
         - appearance
         - stylesheetUrl
         - colorsStylesheetUrl
         - hideAppName
+        - hasBackground
+        - footerLinks
+        - supportEmail
+        - supportUrl
+        - supportPhone
 
     PasswordRulesResponse:
       type: object
@@ -9066,6 +9116,22 @@ components:
           allOf:
             - $ref: '#/components/schemas/BrandAssetResponse'
           nullable: true
+        footerLinks:
+          type: array
+          description: The links drawn under the brand's card, in the order they are drawn. Empty when the brand has none.
+          items:
+            $ref: '#/components/schemas/BrandFooterLinkResponse'
+        supportEmail:
+          type: string
+          description: The support email address the brand's pages show, or an empty string.
+        supportUrl:
+          type: string
+          description: The support page the brand's pages link to, or an empty string.
+        supportPhone:
+          type: string
+          description: |
+            The support phone number the brand's pages show, in international format: `+` and
+            the digits, with no separators, such as `+442079460958`. An empty string when unset.
         isDefault:
           type: boolean
           description: True for the default brand, the one a client with no brand of its own is drawn in.
@@ -9095,6 +9161,10 @@ components:
         - background
         - regularFont
         - boldFont
+        - footerLinks
+        - supportEmail
+        - supportUrl
+        - supportPhone
         - isDefault
         - clientCount
         - createdAt
@@ -9168,6 +9238,38 @@ components:
           allOf:
             - $ref: '#/components/schemas/BrandAssetRef'
           nullable: true
+        footerLinks:
+          type: array
+          maxItems: 3
+          nullable: true
+          description: |
+            Up to three links drawn under the brand's card, in the order given. Left out, null or
+            empty for none; a fourth link is refused. A refusal about a link names the member it
+            is about in error_field, such as `/footerLinks/1/url`.
+          items:
+            $ref: '#/components/schemas/BrandFooterLink'
+        supportEmail:
+          type: string
+          maxLength: 254
+          nullable: true
+          description: |
+            A support email address, of the shape an account's address takes, at most 254
+            characters. Left out, null or empty for none.
+        supportUrl:
+          type: string
+          maxLength: 256
+          nullable: true
+          description: |
+            A support page: an `https:` URL with a host and no user name or password, at most
+            256 characters. Left out, null or empty for none.
+        supportPhone:
+          type: string
+          nullable: true
+          description: |
+            A support phone number in international format: `+` and the country code, then the
+            number, at most 15 digits in all, the first not zero. Spaces, hyphens, dots and
+            parentheses are accepted and removed, so `+44 20 7946 0958` is stored as
+            `+442079460958`. Left out, null or empty for none.
       required:
         - name
         - appearance
@@ -9250,6 +9352,38 @@ components:
           allOf:
             - $ref: '#/components/schemas/BrandAssetRef'
           nullable: true
+        footerLinks:
+          type: array
+          maxItems: 3
+          nullable: true
+          description: |
+            Up to three links drawn under the brand's card, in the order given. Left out, null or
+            empty for none; a fourth link is refused. A refusal about a link names the member it
+            is about in error_field, such as `/footerLinks/1/url`.
+          items:
+            $ref: '#/components/schemas/BrandFooterLink'
+        supportEmail:
+          type: string
+          maxLength: 254
+          nullable: true
+          description: |
+            A support email address, of the shape an account's address takes, at most 254
+            characters. Left out, null or empty for none.
+        supportUrl:
+          type: string
+          maxLength: 256
+          nullable: true
+          description: |
+            A support page: an `https:` URL with a host and no user name or password, at most
+            256 characters. Left out, null or empty for none.
+        supportPhone:
+          type: string
+          nullable: true
+          description: |
+            A support phone number in international format: `+` and the country code, then the
+            number, at most 15 digits in all, the first not zero. Spaces, hyphens, dots and
+            parentheses are accepted and removed, so `+44 20 7946 0958` is stored as
+            `+442079460958`. Left out, null or empty for none.
       required:
         - name
         - appearance
@@ -9306,6 +9440,55 @@ components:
             $ref: '#/components/schemas/BrandThemeResponse'
       required:
         - brandThemes
+
+    BrandFooterLink:
+      type: object
+      description: |
+        One of a brand's footer links, as a create or an update names it. The URL and the labels
+        are trimmed.
+      properties:
+        url:
+          type: string
+          maxLength: 256
+          description: An `https:` URL with a host and no user name or password, at most 256 characters.
+        label:
+          type: string
+          maxLength: 40
+          description: |
+            The label drawn in a language the link has no label of its own for: at most 40
+            characters, without `<` or `>`.
+        labels:
+          type: object
+          nullable: true
+          description: |
+            The label of each built-in language the link has its own label in, by language tag:
+            `en`, `de`, `es`, `fr`, `it` or `pt-BR`, each with the bounds of `label`. Left out,
+            null or `{}` for none. A blank label is dropped, and any other tag is refused.
+          additionalProperties:
+            type: string
+            maxLength: 40
+      required:
+        - url
+        - label
+
+    BrandFooterLinkResponse:
+      type: object
+      description: One of a brand's footer links. Sent back as it came, it is the same link.
+      properties:
+        url:
+          type: string
+        label:
+          type: string
+          description: The label drawn in a language the link has no label of its own for.
+        labels:
+          type: object
+          description: The label of each built-in language that has its own, by language tag. `{}` when none has.
+          additionalProperties:
+            type: string
+      required:
+        - url
+        - label
+        - labels
 
     BrandAssetRef:
       type: object

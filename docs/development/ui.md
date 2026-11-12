@@ -46,7 +46,8 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   The full one also draws the kit's files, read from the brand's six asset slots without their
   bytes (`brandasset.ReadSlots`): the uploaded font as `brandkit.UploadedFontFamily`, one
   `@font-face` per file with `font-display: swap`, followed by System UI, and the background image
-  on `.auth-page`, the card pages' `<main>`, over the theme's background color at the brand's fit.
+  on `.auth-page`, the card pages' box around their `<main>` (`.auth-main`) and their footer, over
+  the theme's background color at the brand's fit.
   A card page draws the brand's logo in `.auth-logo` above the app name (the auth server's two
   layouts and `form_post.html`, the console's `partials/brand_logo.html`), the dark logo on a
   dark page and in a `<picture>` switching to it under `prefers-color-scheme: dark` on an automatic
@@ -65,10 +66,24 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `TestThemeContrast_EveryPairMeetsWCAGAA`, at WCAG AA in both modes of every preset and 7:1 for
   High contrast's text.
 - **Outside the card**: the card is opaque, and the brand's background image sits behind it
-  (#813 decision 6). Anything drawn outside the card, such as #814's footer links, sits on its own
-  opaque panel in `bg-surface`, never on the image or on a translucent layer over it: an uploaded
-  image's colors are unknown, so text on it has no contrast a test can hold, while text on the
-  panel is a pair `TestThemeContrast_EveryPairMeetsWCAGAA` already checks.
+  (#813 decision 6). What is drawn outside the card, today the brand's footer (#814), is small
+  `text-ink-muted` and link text straight on the page's `bg-canvas`, and sits on its own opaque
+  panel in `bg-surface` only while the brand has a background image, whatever its fit and whether
+  or not the image loads (`.brand-footer-panel`): an uploaded image's colors are unknown, so text on
+  it, or on a translucent layer over it, has no contrast a test can hold, while both backgrounds
+  are pairs `TestThemeContrast_EveryPairMeetsWCAGAA` checks. Draw nothing else outside the card
+  without one of those two backgrounds. The footer is the page's `footer` landmark after `main`
+  (`.auth-main`), straight under the card: the links in a `ul`, then "Need help?" and the contact
+  in a `p`, each link underlined and a 24-pixel target, wrapping rather than clipping. The auth
+  server's two layouts and `form_post.html` draw it from `render.FooterOf`, bound as `brandFooter`
+  only for a brand with links or a contact, so a brand with neither is drawn as it was;
+  `form_post.html`, parsed without template functions, takes its words in its data. The console
+  draws it from the public settings' brand on every end-user page through the `brand_footer`
+  partial: under the card on a card page, panel included from `hasBackground`, and on an Account
+  page after `main` as `.app-footer`, in the content column's gutters and never on a panel; an
+  admin page binds no `brandFooter`. Each link's label is picked by `brandkit.FooterLinkLabel`
+  for the catalog the page's `lang` names, the support address linked through
+  `brandkit.MailtoAddress`.
 - **Brand preview**: the brand editor (`admin_settings_branding_brand.html`) is two panes (#811),
   `brand-editor`: the form, and outside it the `brand-preview`, held in view beside the form from
   75rem and below it in a narrower window. The `brand_sample` partial draws a refused sign-in, once
@@ -103,9 +118,16 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   sample draws the logo of its mode, the background at its fit and the uploaded font, whose
   `@font-face` rules the script writes as the auth server's stylesheet does into a stylesheet the
   page adopts: a `FontFace` cannot leave the weight automatic, so a variable font would be pinned to
-  400. The favicon is a thumbnail beside its field. To keep the preview on a 1280×800 screen with a
-  logo and the app name in it, in WebKit too, the sample's card takes closer padding and spacing and
-  caps its logo at 2rem.
+  400. The favicon is a thumbnail beside its field. Under its card the sample draws the footer from
+  the form's footer fields (#814 decision 12), as `FooterOf` would: each row's label in the
+  language of the console page, the phone number without its separators, "Support page" for the
+  URL and the panel while a background is held, with the links as spans since the sample is inert.
+  To keep the preview on a 1280×800 screen with a logo, the app name and a footer of three links
+  and the whole contact in it, in WebKit too, the sample's card takes closer padding and spacing
+  and caps its logo at 2rem, and then the whole sample is drawn at `zoom: 0.9`, which keeps every
+  length the brand sets in proportion; none of the parts #811 lists is left out to make room. A
+  footer with very long values may still wrap past the screen. The footer fields are the form's
+  last and the footer the sample's last, so the part being edited is the part kept in view.
 - **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
   `panel`, `panel-body` (several, each under a `panel-title`, for a panel in sections),
   `panel-footer`; `button`, with `-primary` for a form's one main action, `-danger`, `-quiet`,
@@ -120,7 +142,10 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   a `status-icon` (`-danger`, `-positive`, `-caution`, `-note`), `auth-actions` for two answers side
   by side, `auth-steps`, `auth-qr`, `secret-key` with `secret-key-row`, `code-hint`, `auth-address`,
   `auth-section-title`, `identity-row` and `link-list` of `link-row`; the console's pages without a
-  menu (home, the error pages, sign-out) draw the same card. An uploaded image is an `image-upload`
+  menu (home, the error pages, sign-out) draw the same card. Under it, `brand-footer` (with
+  `-panel` over a background image, and `app-footer` on an Account page) holds `brand-footer-links`
+  and `brand-footer-contact` of `brand-footer-link`s. A form's group among several of its kind is a
+  `footer-link` fieldset, and what it holds out of sight a `details` `disclosure`. An uploaded image is an `image-upload`
   with an `image-preview` (`-square` for a logo), cropped in the `crop_dialog` partial: a
   `crop-area` the cropper draws in, and `crop-controls` whose `crop-slider`s do what dragging does,
   so a crop needs neither a pointer nor a drag.
@@ -128,7 +153,12 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   accessibility rules readable from a template: every element closed explicitly and in order, what a
   branch opens closed in it, quoted attributes, no nesting a browser repairs, a label for every
   control, alt on every image, a name on every link and button, one `<h1>`, no skipped heading
-  level.
+  level. A link that opens a new tab says so to assistive technology (WCAG technique G201, #814
+  decision 13): `target="_blank"` with `rel="noopener noreferrer"`, and
+  `<span class="sr-only"> {{ T $.ctx "common.link.opens_in_new_tab" }}</span>` after its text,
+  inside the link, so it is part of the link's name and nothing visible moves;
+  `core/guard.AssertTemplatesNewTabLinksSaySo` refuses a template whose `target="_blank"` link
+  lacks it. `form_post.html` carries the text in its data, as `$.page.NewTabNotice`.
 - **Scripts**: no executable script in a template, no `on…` attribute, no `javascript:` URL. The
   browser enforces it: both servers send `Content-Security-Policy: script-src 'self'; object-src
   'none'; base-uri 'none'; frame-ancestors 'none'` (`core/httpmw.SecurityHeaders`), which refuses
@@ -206,7 +236,9 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   reads as one branch; a handler whose form has several fields says which in `errorField`, and in
   the console reads it off the admin API's error code through `render.ErrorField`, or, for the API's
   `VALIDATION_ERROR`, which names no field, the first required field sent blank through
-  `render.ErrorFieldOrBlank`. No template rebinds `$`, which the guard refuses, since it reads `$`
+  `render.ErrorFieldOrBlank`. A refusal about one member of a list item carries the admin API's
+  `error_field` (see the conventions guide), which `render.ErrorPointer` reads into reference
+  tokens and the handler maps to the input's id, such as `footerLinks-1-url`. No template rebinds `$`, which the guard refuses, since it reads `$`
   as the data the template was called with.
 - **Page patterns**: every page is one of a few shapes, built the same way each time, and the first
   page of each shape is its reference. A list (`admin_users.html`): the page header with the main
@@ -246,7 +278,14 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   the rows drawn as stored, each with a Remove naming its row, a change announced, and Save sending
   the list beside the list as drawn; where a row's Edit loads it into those fields
   (`admin_resources_permissions.html`), the row is marked `data-editing` while the edit lasts, its
-  Edit giving way to a `tag` saying so. A new shape gets its reference page and a line here when its
+  Edit giving way to a `tag` saying so. A short list of items with several fields each, saved
+  with its form (the brand editor's footer links, #814 decision 11): as many fixed rows as the
+  list's cap, each a `footer-link` fieldset whose legend numbers it, its fields named
+  `<list>-<index>-<field>`, and what most rows leave empty, such as a label per language, in a
+  closed `disclosure` drawn open while it holds the refused field. An empty row is no item, the
+  items keep the rows' order with the empty ones skipped, and a refused form is drawn again in
+  that order. It needs no script or focus handling, and is restored by
+  the browser on Back; use Add and Remove only for a list too long to draw whole. A new shape gets its reference page and a line here when its
   first page is built.
 - **Wording**: the glossary's terms (`site/src/content/docs/concepts/glossary.mdx`): sign in and
   sign out, client, one-time code, two-factor authentication, auth server. Client and application

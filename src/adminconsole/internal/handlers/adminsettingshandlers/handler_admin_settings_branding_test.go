@@ -115,7 +115,12 @@ func newBrandingAPI() *brandingAPI {
 				Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true,
 				Logo:        &api.BrandAssetResponse{Id: 11, Kind: "logo", Url: "https://auth.example.test/brand-assets/11?v=a", ContentType: "image/png", Width: 200, Height: 60},
 				Favicon:     &api.BrandAssetResponse{Id: 13, Kind: "favicon", Url: "https://auth.example.test/brand-assets/13?v=c", ContentType: "image/png", Width: 64, Height: 64},
-				RegularFont: &api.BrandAssetResponse{Id: 15, Kind: "font", Url: "https://auth.example.test/brand-assets/15?v=e", ContentType: "font/woff2"}},
+				RegularFont: &api.BrandAssetResponse{Id: 15, Kind: "font", Url: "https://auth.example.test/brand-assets/15?v=e", ContentType: "font/woff2"},
+				FooterLinks: []api.BrandFooterLinkResponse{
+					{Url: "https://autumn.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
+					{Url: "https://status.autumn.example", Label: "Status", Labels: map[string]string{}},
+				},
+				SupportEmail: "help@autumn.example", SupportUrl: "https://help.autumn.example", SupportPhone: "+15550100199"},
 			{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 			{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
 			{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
@@ -329,8 +334,13 @@ func TestHandleBrandGet_DrawsTheStoredBrand(t *testing.T) {
 	assert.Equal(t, false, bind["isNew"])
 	stored := newBrandingAPI().brands[0]
 	assert.Equal(t, BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum", Corners: "pill", Font: "serif",
-		BackgroundFit: "tile", HideAppName: true, Logo: stored.Logo, Favicon: stored.Favicon, RegularFont: stored.RegularFont},
-		bind["brand"], "the stored choices and slots")
+		BackgroundFit: "tile", HideAppName: true, Logo: stored.Logo, Favicon: stored.Favicon, RegularFont: stored.RegularFont,
+		FooterLinks: [3]BrandFooterLinkRow{
+			{Label: "Privacy", Url: "https://autumn.example/privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
+			{Label: "Status", Url: "https://status.autumn.example"},
+		},
+		SupportEmail: "help@autumn.example", SupportUrl: "https://help.autumn.example", SupportPhone: "+15550100199"},
+		bind["brand"], "the stored choices, slots and footer")
 	assert.Equal(t, newBrandingAPI().brands[0], bind["storedBrand"])
 	assert.Equal(t, wantThemeOptions, bind["brandThemes"])
 	assert.Equal(t, wantThemeOptions[1], bind["appearanceTheme"], "the appearance cards show the brand's theme")
@@ -356,7 +366,8 @@ func TestHandleBrandGet_AnUnknownOrMalformedBrandIsNotFound(t *testing.T) {
 // four choices are sent as the form holds them, the switch off as the form leaves it out, and each
 // slot as the form holds it, by its asset's id (#813 decision 1): one kept from the stored brand, one
 // replaced by an upload, one added and one removed, which the form sends empty, as an update replaces
-// every field (#813 decision 10).
+// every field (#813 decision 10). The footer links and the support contact are sent as the form
+// holds them, here a link in the second row and a phone number (#814 decision 11).
 func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	store := newSettingsTestStore()
 	apiClient := newBrandingAPI()
@@ -371,12 +382,16 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 			handlertest.WithForm(withValues(slotsForm("11", "", "", "24", "25", ""), url.Values{
 				"name": {" Winter "}, "appearance": {"light"}, "theme": {"blueberry"},
 				"corners": {"square"}, "font": {"uploaded"}, "backgroundFit": {"contain"},
-				"logoUrl": {"https://elsewhere.example/a.png"}}))))
+				"logoUrl":             {"https://elsewhere.example/a.png"},
+				"footerLinks-1-label": {"Status"}, "footerLinks-1-url": {"https://status.winter.example"},
+				"supportPhone": {"+15550100100"}}))))
 
 	assert.Equal(t, int64(4), apiClient.updatedId)
 	assert.Equal(t, &api.UpdateBrandRequest{Name: "Winter", Appearance: "light", Theme: "blueberry",
 		Corners: "square", Font: "uploaded", BackgroundFit: "contain", HideAppName: false,
-		Logo: &api.BrandAssetRef{Id: 11}, Background: &api.BrandAssetRef{Id: 24}, RegularFont: &api.BrandAssetRef{Id: 25}},
+		Logo: &api.BrandAssetRef{Id: 11}, Background: &api.BrandAssetRef{Id: 24}, RegularFont: &api.BrandAssetRef{Id: 25},
+		FooterLinks:  []api.BrandFooterLink{{Url: "https://status.winter.example", Label: "Status"}},
+		SupportPhone: "+15550100100"},
 		apiClient.updated)
 	assert.Equal(t, http.StatusFound, w.Code)
 	assert.Equal(t, "https://console.example.test/admin/settings/branding/4/edit", w.Header().Get("Location"))

@@ -23,45 +23,75 @@
 </head>
 
 <body>
-  <main class="auth-page">
-    <div class="panel auth-card">
-      <div class="panel-body">
-        {{- if .page.Logo }}
-        {{- $alt := "" }}{{ if .page.HideAppName }}{{ $alt = .page.AppName }}{{ end }}
-        <div class="auth-logo">
-          {{- if and .page.DarkLogo (eq .page.Theme "dark") }}
-          <img src="{{ .page.DarkLogo }}" alt="{{ $alt }}">
-          {{- else if and .page.DarkLogo (not .page.Theme) }}
-          <picture>
-            <source srcset="{{ .page.DarkLogo }}" media="(prefers-color-scheme: dark)">
+  <div class="auth-page">
+    <main class="auth-main">
+      <div class="panel auth-card">
+        <div class="panel-body">
+          {{- if .page.Logo }}
+          {{- $alt := "" }}{{ if .page.HideAppName }}{{ $alt = .page.AppName }}{{ end }}
+          <div class="auth-logo">
+            {{- if and .page.DarkLogo (eq .page.Theme "dark") }}
+            <img src="{{ .page.DarkLogo }}" alt="{{ $alt }}">
+            {{- else if and .page.DarkLogo (not .page.Theme) }}
+            <picture>
+              <source srcset="{{ .page.DarkLogo }}" media="(prefers-color-scheme: dark)">
+              <img src="{{ .page.Logo }}" alt="{{ $alt }}">
+            </picture>
+            {{- else }}
             <img src="{{ .page.Logo }}" alt="{{ $alt }}">
-          </picture>
-          {{- else }}
-          <img src="{{ .page.Logo }}" alt="{{ $alt }}">
+            {{- end }}
+          </div>
           {{- end }}
+          {{- if not .page.HideAppName }}
+          <p class="auth-brand">{{ .page.AppName }}</p>
+          {{- end }}
+          <form class="auth-status" method="post" action="{{ .redirectURI }}" data-auto-submit>
+            {{ if .code }}<input type="hidden" name="code" value="{{ .code }}">{{ end }}
+            {{ if .access_token }}<input type="hidden" name="access_token" value="{{ .access_token }}">{{ end }}
+            {{ if .token_type }}<input type="hidden" name="token_type" value="{{ .token_type }}">{{ end }}
+            {{ if .expires_in }}<input type="hidden" name="expires_in" value="{{ .expires_in }}">{{ end }}
+            {{ if .id_token }}<input type="hidden" name="id_token" value="{{ .id_token }}">{{ end }}
+            {{ if .scope }}<input type="hidden" name="scope" value="{{ .scope }}">{{ end }}
+            {{ if .error }}<input type="hidden" name="error" value="{{ .error }}">{{ end }}
+            {{ if .error_description }}<input type="hidden" name="error_description" value="{{ .error_description }}">{{ end }}
+            {{ if .state }}<input type="hidden" name="state" value="{{ .state }}">{{ end }}
+            {{ if .iss }}<input type="hidden" name="iss" value="{{ .iss }}">{{ end }}
+            <h1 class="auth-title">{{ .page.Title }}</h1>
+            <p>{{ .page.Message }}</p>
+            <button class="button button-primary button-block" type="submit">{{ .page.Button }}</button>
+          </form>
         </div>
-        {{- end }}
-        {{- if not .page.HideAppName }}
-        <p class="auth-brand">{{ .page.AppName }}</p>
-        {{- end }}
-        <form class="auth-status" method="post" action="{{ .redirectURI }}" data-auto-submit>
-          {{ if .code }}<input type="hidden" name="code" value="{{ .code }}">{{ end }}
-          {{ if .access_token }}<input type="hidden" name="access_token" value="{{ .access_token }}">{{ end }}
-          {{ if .token_type }}<input type="hidden" name="token_type" value="{{ .token_type }}">{{ end }}
-          {{ if .expires_in }}<input type="hidden" name="expires_in" value="{{ .expires_in }}">{{ end }}
-          {{ if .id_token }}<input type="hidden" name="id_token" value="{{ .id_token }}">{{ end }}
-          {{ if .scope }}<input type="hidden" name="scope" value="{{ .scope }}">{{ end }}
-          {{ if .error }}<input type="hidden" name="error" value="{{ .error }}">{{ end }}
-          {{ if .error_description }}<input type="hidden" name="error_description" value="{{ .error_description }}">{{ end }}
-          {{ if .state }}<input type="hidden" name="state" value="{{ .state }}">{{ end }}
-          {{ if .iss }}<input type="hidden" name="iss" value="{{ .iss }}">{{ end }}
-          <h1 class="auth-title">{{ .page.Title }}</h1>
-          <p>{{ .page.Message }}</p>
-          <button class="button button-primary button-block" type="submit">{{ .page.Button }}</button>
-        </form>
       </div>
-    </div>
-  </main>
+    </main>
+    {{- /* The brand's footer links and support contact, its own footer landmark outside main,
+         straight under the card: small text on the page's background, on a panel while the brand
+         has a background image, and drawn only for a brand with either (#814 decisions 1 to 6). */}}
+    {{- with .page.Footer }}
+    <footer class="brand-footer{{ if .Panel }} brand-footer-panel{{ end }}">
+      {{- if .Links }}
+      <ul class="brand-footer-links">
+        {{- range .Links }}
+        <li><a class="brand-footer-link" href="{{ .URL }}" target="_blank" rel="noopener noreferrer">{{ .Label }}<span class="sr-only"> {{ $.page.NewTabNotice }}</span></a></li>
+        {{- end }}
+      </ul>
+      {{- end }}
+      {{- if .HasContact }}
+      <p class="brand-footer-contact">
+        <span>{{ $.page.NeedHelp }}</span>
+        {{- if .SupportEmail }}
+        <a class="brand-footer-link" href="mailto:{{ .SupportMailto }}">{{ .SupportEmail }}</a>
+        {{- end }}
+        {{- if .SupportPhone }}
+        <a class="brand-footer-link" href="tel:{{ .SupportPhone }}">{{ .SupportPhone }}</a>
+        {{- end }}
+        {{- if .SupportURL }}
+        <a class="brand-footer-link" href="{{ .SupportURL }}" target="_blank" rel="noopener noreferrer">{{ $.page.SupportPage }}<span class="sr-only"> {{ $.page.NewTabNotice }}</span></a>
+        {{- end }}
+      </p>
+      {{- end }}
+    </footer>
+    {{- end }}
+  </div>
 </body>
 
 </html>

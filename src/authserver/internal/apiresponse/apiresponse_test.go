@@ -106,6 +106,25 @@ func TestWriteError_WritesTheEnvelope(t *testing.T) {
 	assert.Empty(t, records, "a 4xx envelope is not a server fault and logs nothing")
 }
 
+// A refusal about one member of the body names it in error_field, and one about none writes no
+// error_field at all, so a caller that predates it reads the same envelope (#814 decision 10).
+func TestWriteErrorAt_NamesTheMemberOnlyWhenGiven(t *testing.T) {
+	rr := httptest.NewRecorder()
+	WriteErrorAt(rr, "Link 2 needs a URL.", "handler.brand.footer_link_url_required", "/footerLinks/1/url", http.StatusBadRequest)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.JSONEq(t, `{"error_code": "handler.brand.footer_link_url_required", "error_description": "Link 2 needs a URL.",
+		"error_field": "/footerLinks/1/url"}`, rr.Body.String())
+
+	rr = httptest.NewRecorder()
+	WriteErrorAt(rr, "Name is required.", "handler.brand.name_required", "", http.StatusBadRequest)
+	assert.JSONEq(t, `{"error_code": "handler.brand.name_required", "error_description": "Name is required."}`, rr.Body.String())
+
+	rr = httptest.NewRecorder()
+	WriteError(rr, "Name is required.", "handler.brand.name_required", http.StatusBadRequest)
+	assert.JSONEq(t, `{"error_code": "handler.brand.name_required", "error_description": "Name is required."}`, rr.Body.String())
+}
+
 // The whole of decision 7 in one case: one code, one sentence, the request id on the wire, and
 // exactly one structured record carrying the error, the request id and the caller's attributes.
 func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {

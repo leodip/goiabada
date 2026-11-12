@@ -1235,6 +1235,12 @@ func distinctValue(rt reflect.Type, i int, column string, pass int) (driver.Valu
 		dv, gv = n, sql.NullInt32{Int32: int32(n), Valid: true}
 	case reflect.TypeOf(sql.NullBool{}):
 		dv, gv = b, sql.NullBool{Bool: b, Valid: true}
+	case reflect.TypeOf(record.BrandFooterLinks(nil)):
+		// Stored as its JSON text, read back as the list it holds.
+		label := distinctString(column)
+		dv = `[{"url":"https://example.com/` + column + `","label":"` + label + `","labels":{"de":"` + label + `"}}]`
+		gv = record.BrandFooterLinks{{URL: "https://example.com/" + column, Label: label,
+			Labels: map[string]string{"de": label}}}
 	default:
 		// A named string type, such as record.AcrLevel, is stored and scanned as its string, and a
 		// named int type, such as record.PasswordPolicy, as its number.

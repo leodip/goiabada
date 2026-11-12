@@ -8,7 +8,8 @@
 // choice is marked at its field; and the kit's files as they are uploaded, the whole preview fitting
 // those desktop sizes with a logo, a background and a font in it. The font is checked by the family the
 // sample asks for, not by how its letters look: the headless browsers have almost none of the
-// families' fonts.
+// families' fonts. The sample draws the brand's footer under its card as its fields are typed (#814),
+// and the whole preview still fits those desktop sizes with three links and the whole contact in it.
 //
 // Everything here is on the New brand page and nothing is saved, or on a brand of the test's own that no
 // client uses, so this is an ordinary parallel spec.
@@ -23,20 +24,25 @@ import {
   brandingUrl,
   deleteBrand,
   expectPreviewDrawn,
+  fillBrandFooter,
   fillBrandForm,
   firstFontOf,
   kitFiles,
   newBrandUrl,
+  openFooterLanguageLabels,
+  pickInEditor,
   previewSample,
   previewSwitch,
   readBrandKitChoices,
   sampleColors,
+  sampleFooter,
   sampleKit,
   sampleShape,
   switchPreviewTo,
   uploadInEditor,
   uploadKit,
   type Appearance,
+  type BrandFooter,
   type Corners,
   type FontFamily,
   type PreviewMode,
@@ -409,6 +415,30 @@ test("the uploaded font without a regular font file is refused at the font field
 // in the languages whose words run longer. A brand with a logo, a background and an uploaded font in
 // its sample fits too (#813).
 const locales = ["en", "pt-BR", "de", "es", "fr", "it"];
+
+// Three footer links, each labelled in every built-in language, and every contact value.
+const fullFooter: BrandFooter = {
+  footerLinks: [
+    {
+      url: "https://example.com/privacy",
+      label: "Privacy policy",
+      labels: { en: "Privacy policy", "pt-BR": "Política de privacidade", de: "Datenschutzerklärung", es: "Política de privacidad", fr: "Politique de confidentialité", it: "Informativa sulla privacy" },
+    },
+    {
+      url: "https://example.com/terms",
+      label: "Terms of service",
+      labels: { en: "Terms of service", "pt-BR": "Termos de serviço", de: "Nutzungsbedingungen", es: "Términos del servicio", fr: "Conditions d'utilisation", it: "Termini di servizio" },
+    },
+    {
+      url: "https://status.example.com",
+      label: "System status",
+      labels: { en: "System status", "pt-BR": "Status do sistema", de: "Systemstatus", es: "Estado del sistema", fr: "État du système", it: "Stato del sistema" },
+    },
+  ],
+  supportEmail: "support@example.com",
+  supportUrl: "https://help.example.com",
+  supportPhone: "+1 (555) 010-0199",
+};
 const desktops = [{ width: 1440, height: 900 }, { width: 1280, height: 800 }];
 
 async function expectWholePreviewOnScreen(page: Page, viewport: { width: number; height: number }, locale: string) {
@@ -436,6 +466,23 @@ for (const viewport of desktops) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     for (const locale of locales) {
       await page.goto(`${newBrandUrl}?${new URLSearchParams({ ui_locales: locale })}`);
+      await expectWholePreviewOnScreen(page, viewport, locale);
+    }
+  });
+
+  // A footer of three links, each with a label in every built-in language, and the whole contact
+  // (#814 decision 12): the footer is the last thing in the sample, the part that would otherwise
+  // fall off the screen.
+  test(`at ${viewport.width}×${viewport.height} the whole preview with three footer links and the whole support contact stays on screen beside the form, in every language`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    for (const locale of locales) {
+      await page.goto(`${newBrandUrl}?${new URLSearchParams({ ui_locales: locale })}`);
+      await fillBrandFooter(page, fullFooter);
+      await expect
+        .poll(async () => (await sampleFooter(previewSample(page, "light"))).links, `the sample's links (${locale})`)
+        .toEqual(fullFooter.footerLinks!.map((link) => link.labels![locale]));
+      expect((await sampleFooter(previewSample(page, "light"))).contact, `the sample's contact (${locale})`).toHaveLength(4);
       await expectWholePreviewOnScreen(page, viewport, locale);
     }
   });
@@ -532,4 +579,65 @@ test("the sample draws each mode's logo, the background at each fit and the uplo
   await expect(thumbnail).toBeVisible();
   await expect(thumbnail).toHaveAttribute("src", urls.favicon!);
   await expect(previewSample(page, "light").locator(`img[src="${urls.favicon}"]`)).toHaveCount(0);
+});
+
+// The sample draws the footer under its card as its fields are typed, before anything is saved and with
+// no request (#814 decision 12): each row a link in order, an empty row none, each label in the console
+// page's language where the row has one, else its own label; then "Need help?" with the address and the
+// number as themselves, the number as the auth server stores it, and "Support page" for the URL. The
+// links are plain text, since the sample is inert. The footer is on a panel in the card's color while the
+// brand has a background image, whatever its fit, and gone again once nothing is left in it.
+test("the sample draws the footer as its fields are typed, each label in the page's language, on a panel over a background image", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await page.goto(`${newBrandUrl}?${new URLSearchParams({ ui_locales: "de" })}`);
+  await expectPreviewDrawn(page);
+  await page.waitForLoadState("load");
+  const light = previewSample(page, "light");
+  const dark = previewSample(page, "dark");
+  const drawn = (links: string[], contact: string[], panel = false) => ({ shown: true, links, contact, panel, operable: 0 });
+  expect(await sampleFooter(light), "no link and no contact: no footer").toEqual({ shown: false, links: [], contact: [], panel: false, operable: 0 });
+
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    if (!new URL(request.url()).pathname.startsWith("/static/favicon/")) sent.push(`${request.method()} ${request.url()}`);
+  });
+  const footerOf = (sample = light) => expect.poll(() => sampleFooter(sample));
+
+  await page.locator("#footerLinks-0-label").fill("  Privacy  ");
+  await footerOf().toEqual(drawn(["Privacy"], []));
+  await page.locator("#footerLinks-2-label").fill("Status");
+  await page.locator("#footerLinks-2-url").fill("https://status.example.com");
+  await footerOf().toEqual(drawn(["Privacy", "Status"], []));
+  await openFooterLanguageLabels(page, 0);
+  await page.locator("#footerLinks-0-labels-de").fill("Datenschutz");
+  await page.locator("#footerLinks-0-labels-fr").fill("Confidentialité");
+  await footerOf().toEqual(drawn(["Datenschutz", "Status"], []));
+  await page.locator("#footerLinks-1-label").fill("Terms");
+  await footerOf().toEqual(drawn(["Datenschutz", "Terms", "Status"], []));
+
+  await page.locator("#supportPhone").fill("+49 (30) 1234-567");
+  await footerOf().toEqual(drawn(["Datenschutz", "Terms", "Status"], ["Brauchen Sie Hilfe?", "+49301234567"]));
+  await page.locator("#supportEmail").fill("hilfe@example.com");
+  await page.locator("#supportUrl").fill("https://help.example.com");
+  const full = drawn(["Datenschutz", "Terms", "Status"], ["Brauchen Sie Hilfe?", "hilfe@example.com", "+49301234567", "Supportseite"]);
+  await footerOf().toEqual(full);
+  await switchPreviewTo(page, "dark");
+  await footerOf(dark).toEqual(full);
+  await switchPreviewTo(page, "light");
+  expect(sent, "the requests sent while the footer was typed").toEqual([]);
+
+  expect(await pickInEditor(page, "background", kitFiles.background), "the background uploaded").toBe(
+    "Hochgeladen. Speichern Sie die Marke, um die Datei zu verwenden.",
+  );
+  await footerOf().toEqual({ ...full, panel: true });
+  await fillBrandForm(page, { backgroundFit: "tile" });
+  await footerOf().toEqual({ ...full, panel: true });
+  await switchPreviewTo(page, "dark");
+  await footerOf(dark).toEqual({ ...full, panel: true });
+  await page.locator("#backgroundRemove").click();
+  await footerOf(dark).toEqual(full);
+  await switchPreviewTo(page, "light");
+
+  await fillBrandFooter(page, { supportEmail: "", supportUrl: "", supportPhone: "" });
+  await footerOf().toEqual({ shown: false, links: [], contact: [], panel: false, operable: 0 });
 });
