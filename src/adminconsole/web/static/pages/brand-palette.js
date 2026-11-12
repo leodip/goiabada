@@ -45,10 +45,13 @@
 // the form's default values hold it, and after that each answer's. On load, and on pageshow, a custom
 // form that is not that one, a refused form, whose page draws no list, or one a browser restored to
 // another appearance, mode or colors, is asked at once, dropping the answer to any request before it.
-// That check works nothing out that no edit needs: it sends the 23 colors as the fields hold them, a
-// saved basic palette's stored worked-out colors among them, and draws only the list. A basic palette
-// is sent as one, and its answer fills the other 19, when its four colors are no longer the ones the
-// page was drawn with or one of the 19 is not a color.
+// A basic palette is sent as one, and its answer fills the other 19, as its save works them out,
+// unless the other 19 are known to be worked out from its four colors as they stand: a saved basic
+// palette's stored ones while its four are the ones the page was drawn with, or the ones an answer
+// filled. Only then is the check of the 23 as the fields hold them, which works nothing out and draws
+// only the list, so a saved palette's stored worked-out colors are kept. A refused form's other 19
+// are never known: they may be worked out from four colors edited since, as when the check could not
+// be reached.
 
 (function () {
   "use strict";
@@ -80,6 +83,9 @@
   let fillDue = false;
   // The form the list describes, as formState writes it, or null when it describes none.
   let checkedState = null;
+  // The four colors of each mode, as fourState writes them, the other 19 are worked out from, or null
+  // when they are not known to be worked out from any.
+  let derivedFor = null;
 
   function checkedValue(name) {
     const checked = document.querySelector('input[name="' + name + '"]:checked');
@@ -105,6 +111,19 @@
     }
     for (const field of textFields()) {
       state.push(drawn ? field.defaultValue : field.value);
+    }
+    return JSON.stringify(state);
+  }
+
+  // fourState writes down the four colors of each mode, as the form holds them, or with drawn, as the
+  // page was drawn with them.
+  function fourState(drawn) {
+    const state = [];
+    for (const mode of modes) {
+      for (const token of rowTokens(true)) {
+        const field = document.getElementById("palette-" + mode + "-" + token);
+        state.push(field ? (drawn ? field.defaultValue : field.value) : "");
+      }
     }
     return JSON.stringify(state);
   }
@@ -235,6 +254,7 @@
         }
       }
     }
+    derivedFor = null;
     endFresh();
     tellPage();
     return true;
@@ -332,6 +352,7 @@
         }
       }
       fillDue = false;
+      derivedFor = fourState(false);
       tellPage();
     }
     showWarnings(String(answer.countLine || ""), Array.isArray(answer.warnings) ? answer.warnings : []);
@@ -427,24 +448,12 @@
     drawColumns(false);
   }
 
-  // reconcile asks at once, working nothing out, when the form is not the one the list describes.
+  // reconcile asks at once when the form is not the one the list describes, working the other 19 of a
+  // basic palette out again unless they are known to be worked out from its four colors as they stand.
   function reconcile() {
     if (formState(false) !== checkedState) {
-      send(0, false);
+      send(0, basicMode() && derivedFor !== fourState(false));
     }
-  }
-
-  // fourDrawnWith reports whether the four colors of each mode are the ones the page was drawn with.
-  function fourDrawnWith() {
-    for (const mode of modes) {
-      for (const token of rowTokens(true)) {
-        const field = document.getElementById("palette-" + mode + "-" + token);
-        if (field && field.value !== field.defaultValue) {
-          return false;
-        }
-      }
-    }
-    return true;
   }
 
   function themePicked() {
@@ -485,6 +494,7 @@
     endFresh();
     if (!basicMode() && rowTokens(true).indexOf(field.id.replace(/^palette-(light|dark)-/, "")) < 0) {
       fillDue = false;
+      derivedFor = null;
     }
     ask(checkPause);
   }
@@ -532,8 +542,10 @@
   }
   if (region && !region.hidden) {
     checkedState = formState(true);
+    if (section.dataset.paletteStoredMode !== "advanced") {
+      derivedFor = fourState(true);
+    }
   }
-  fillDue = basicMode() && !fourDrawnWith();
   drawAll();
   reconcile();
   window.addEventListener("pageshow", function () {

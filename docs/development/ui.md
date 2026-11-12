@@ -177,9 +177,12 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   draws it from the brand's `contrastWarnings`, and the saved notice links to it. The script notes
   the form a list describes, the one the page was drawn with (`defaultValue`, `defaultChecked`)
   when the server drew a list, then each answer's; on load and on `pageshow` it asks at once for a
-  custom form that is not that one, a refused form or one a browser restored. That check sends the
-  23 fields as they stand and draws only the list, so a saved basic palette's stored worked-out
-  colors are not worked out again until its four colors change.
+  custom form that is not that one, a refused form or one a browser restored. A basic palette is
+  sent as one, as its save works it out, unless its other 19 are known to be worked out from its
+  four as they stand: a saved basic palette's while its four are the ones drawn, or an answer's.
+  Then the check sends the 23 fields as they stand and draws only the list, so a saved basic
+  palette's stored worked-out colors are kept. A refused form's other 19 are never known, since
+  an edit the check could not reach leaves them worked out from earlier colors.
   `brand_palette_script_test.go` runs the script under Node. Page text about the check says what it
   establishes, which pairs meet the two minimums, and never that a palette or a page meets WCAG
   (decision 11).

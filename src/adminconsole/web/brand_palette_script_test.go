@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1020,26 +1021,62 @@ func TestBrandPaletteJS_ASavedBrandsListIsKeptWhileTheFormIsTheOneItDescribes(t 
 	assert.Equal(t, previewPalette("e1e0"), fieldsOf(looks[0], "light"))
 }
 
-// A refused custom form, whose page draws no list, is checked at once on load, with no edit: the 23
-// colors as the fields hold them are sent, and only the list is drawn, working nothing out.
+// A refused custom form, whose page draws no list, is checked at once on load, with no edit. A basic
+// palette's other 19 may be worked out from four colors edited since, as when the check could not be
+// reached before the save, and its save works them out again from the four, so the four are sent as a
+// basic palette and the answer fills the other 19: the list is the one the save answers.
 func TestBrandPaletteJS_ARefusedFormIsCheckedOnLoad(t *testing.T) {
-	looks := runBrandPalette(t, customPage(), load(), waitFor(0), lookAt(), answer(0, 200, workedOut()), lookAt())
+	page := customPage()
+	page.light["ink"] = "#777777"
+	page.light["ink-muted"] = "#605e5a"
+	looks := runBrandPalette(t, page, load(), waitFor(0), lookAt(), answer(0, 200, workedOut()), lookAt())
 
 	require.Len(t, looks[0].Requests, 1)
-	assert.Equal(t, fullBody("auto", previewPalette("e1e0"), previewPalette("e1d0")), looks[0].Requests[0].Body)
-	assert.Equal(t, previewPalette("e1e0"), fieldsOf(looks[1], "light"), "the stored worked-out colors are kept")
-	assert.Equal(t, previewPalette("e1d0"), fieldsOf(looks[1], "dark"))
-	assert.Zero(t, looks[1].SectionInputs)
+	assert.Equal(t, basicBody("auto", withColor(previewPalette("e1e0"), "ink", "#777777"), previewPalette("e1d0")),
+		looks[0].Requests[0].Body)
+	light := previewPalette("a2e0")
+	for _, token := range basicRowTokens {
+		light[token] = page.light[token]
+	}
+	assert.Equal(t, light, fieldsOf(looks[1], "light"), "the four kept, the stale 19 replaced by the answer's")
+	assert.Equal(t, "#a2d006", fieldsOf(looks[1], "dark")["ink-muted"])
 	labelled := "paletteWarningsCount"
 	assert.Equal(t, paletteWarnings{Count: twoPairsSay, CountRole: "status", List: &labelled, Items: workedOutList()}, looks[1].Warnings)
 
-	// One of the 19 that is not a color cannot be sent as it is, so the basic palette is, and its
-	// answer fills them.
-	looks = runBrandPalette(t, customPage(), restoreValue("palette-dark-focus", "blue"), load(), waitFor(0),
-		answer(0, 200, workedOut()), lookAt())
+	// A refused advanced palette is saved as its 23 fields hold them, so they are checked as they are,
+	// and only the list is drawn.
+	page = customPage()
+	page.mode = "advanced"
+	page.storedMode = "advanced"
+	looks = runBrandPalette(t, page, load(), waitFor(0), lookAt(), answer(0, 200, workedOut()), lookAt())
 	require.Len(t, looks[0].Requests, 1)
-	assert.Equal(t, basicBody("auto", previewPalette("e1e0"), previewPalette("e1d0")), looks[0].Requests[0].Body)
-	assert.Equal(t, "#a2d022", fieldsOf(looks[0], "dark")["focus"])
+	assert.Equal(t, fullBody("auto", previewPalette("e1e0"), previewPalette("e1d0")), looks[0].Requests[0].Body)
+	assert.Equal(t, previewPalette("e1e0"), fieldsOf(looks[1], "light"), "an advanced palette's colors are kept")
+	assert.Zero(t, looks[1].SectionInputs)
+	assert.Equal(t, twoPairsSay, looks[1].Warnings.Count)
+}
+
+// A refused basic form after an edit of its four colors the check could not answer: the save works
+// the other 19 out from the four as edited, and so does the check on load, whatever the stale 19 hold.
+func TestBrandPaletteJS_ARefusedFormAfterAnUncheckedEditIsWorkedOut(t *testing.T) {
+	saved := savedPage()
+	looks := runBrandPalette(t, saved, load(), typeIn("palette-light-ink", "#777777"), waitFor(1000),
+		failRequest(0), lookAt())
+	require.Len(t, looks[0].Requests, 1)
+	assert.Equal(t, uncheckedSay, looks[0].Warnings.Count)
+	assert.Equal(t, "#e1e006", fieldsOf(looks[0], "light")["ink-muted"], "the 19 still hold the saved palette's")
+
+	// The save is refused for another field, and the page drawn again with the form as sent.
+	refused := customPage()
+	refused.light = fieldsOf(looks[0], "light")
+	refused.dark = fieldsOf(looks[0], "dark")
+	reply := workedOut()
+	reply.Light["ink-muted"] = "#777777"
+	looks = runBrandPalette(t, refused, load(), waitFor(0), lookAt(), answer(0, 200, reply), lookAt())
+	require.Len(t, looks[0].Requests, 1)
+	assert.Equal(t, basicBody("auto", withColor(previewPalette("e1e0"), "ink", "#777777"), previewPalette("e1d0")),
+		looks[0].Requests[0].Body)
+	assert.Equal(t, "#777777", fieldsOf(looks[1], "light")["ink-muted"])
 }
 
 // A browser restoring a saved brand's form to another appearance, as WebKit does on Back, before the
@@ -1054,8 +1091,8 @@ func TestBrandPaletteJS_ARestoredAppearanceIsChecked(t *testing.T) {
 		"before pageshow":        {load(), waitFor(1000), restore("appearance", "dark"), {Do: "pageshow"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			steps := append(steps, waitFor(0), lookAt(), answer(0, 200, passing), lookAt())
-			looks := runBrandPalette(t, savedPage(), steps...)
+			run := slices.Concat(steps, []previewStep{waitFor(0), lookAt(), answer(0, 200, passing), lookAt()})
+			looks := runBrandPalette(t, savedPage(), run...)
 
 			require.Len(t, looks[0].Requests, 1)
 			assert.Equal(t, fullBody("dark", previewPalette("e1e0"), previewPalette("e1d0")), looks[0].Requests[0].Body)
@@ -1065,18 +1102,34 @@ func TestBrandPaletteJS_ARestoredAppearanceIsChecked(t *testing.T) {
 	}
 }
 
-// A browser restoring a basic palette's four colors to ones the page was not drawn with leaves the
-// other 19 worked out from others, so the restored form is sent as a basic palette and its answer
-// fills them.
+// A browser restoring a basic palette's four colors to ones the page was not drawn with, before the
+// script runs or before pageshow, leaves the other 19 worked out from others, so the restored form is
+// sent as a basic palette and its answer fills them.
 func TestBrandPaletteJS_RestoredBasicColorsAreWorkedOutAgain(t *testing.T) {
-	looks := runBrandPalette(t, savedPage(), restoreValue("palette-light-canvas", "#101010"), load(), waitFor(0),
-		answer(0, 200, workedOut()), lookAt())
+	for name, steps := range map[string][]previewStep{
+		"before the script runs": {restoreValue("palette-light-canvas", "#101010"), load()},
+		"before pageshow": {load(), waitFor(1000), restoreValue("palette-light-canvas", "#101010"),
+			{Do: "pageshow"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			run := slices.Concat(steps, []previewStep{waitFor(0), answer(0, 200, workedOut()), lookAt()})
+			looks := runBrandPalette(t, savedPage(), run...)
 
+			require.Len(t, looks[0].Requests, 1)
+			assert.Equal(t, basicBody("auto", withColor(previewPalette("e1e0"), "canvas", "#101010"), previewPalette("e1d0")), looks[0].Requests[0].Body)
+			assert.Equal(t, "#a2e022", fieldsOf(looks[0], "light")["focus"])
+			assert.Equal(t, "#101010", fieldsOf(looks[0], "light")["canvas"])
+			assert.Equal(t, twoPairsSay, looks[0].Warnings.Count)
+		})
+	}
+
+	// A stored advanced palette restored to Basic is worked out from its four as the save would.
+	page := savedPage()
+	page.mode = "advanced"
+	page.storedMode = "advanced"
+	looks := runBrandPalette(t, page, restore("paletteMode", "basic"), load(), waitFor(0), lookAt())
 	require.Len(t, looks[0].Requests, 1)
-	assert.Equal(t, basicBody("auto", withColor(previewPalette("e1e0"), "canvas", "#101010"), previewPalette("e1d0")), looks[0].Requests[0].Body)
-	assert.Equal(t, "#a2e022", fieldsOf(looks[0], "light")["focus"])
-	assert.Equal(t, "#101010", fieldsOf(looks[0], "light")["canvas"])
-	assert.Equal(t, twoPairsSay, looks[0].Warnings.Count)
+	assert.Equal(t, "basic", looks[0].Requests[0].Body["paletteMode"])
 }
 
 // A pageshow restoring another form drops the answer to a request sent for the form before it, and
