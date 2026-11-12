@@ -238,7 +238,8 @@
     section.hidden = checkedValue("theme") !== "custom";
   }
 
-  // fill writes a built-in theme's colors in every field of both modes.
+  // fill writes a built-in theme's colors in every field of both modes, which leaves none to be
+  // worked out from the four.
   function fill(key) {
     const theme = palettes.find(function (candidate) { return candidate.key === key; });
     if (!theme) {
@@ -254,6 +255,7 @@
         }
       }
     }
+    fillDue = false;
     derivedFor = null;
     endFresh();
     tellPage();

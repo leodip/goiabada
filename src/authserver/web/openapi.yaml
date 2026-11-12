@@ -6107,8 +6107,9 @@ components:
           type: string
           description: |
             A JSON Pointer (RFC 6901) to the member of the request body the refusal is about,
-            such as `/footerLinks/1/url` or `/footerLinks/0/labels/pt-BR`. Left out when the
-            refusal names no member. Only the refusals of a brand's footer links set it.
+            such as `/footerLinks/1/url`, `/footerLinks/0/labels/pt-BR` or `/palette/light/brand`.
+            Left out when the refusal names no member. Only the refusals of a brand's footer links
+            and of its palette set it.
       required:
         - error_description
 

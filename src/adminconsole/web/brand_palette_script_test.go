@@ -646,6 +646,24 @@ func TestBrandPaletteJS_CopyColorsFromReplacesEveryField(t *testing.T) {
 	assert.Equal(t, "Colors copied.", looks[2].Status)
 }
 
+// Copy colors from fills all 23 colors of both modes, so nothing is left to be worked out from the
+// four: in Advanced, after the check of an edit of the four could not be reached, it asks as an
+// advanced palette, and the copied colors stay.
+func TestBrandPaletteJS_CopyColorsFromInAdvancedLeavesNothingToWorkOut(t *testing.T) {
+	looks := runBrandPalette(t, customPage(), load(),
+		typeIn("palette-light-canvas", "#101010"), pick("paletteMode", "advanced"), waitFor(0), failRequest(0),
+		choose("paletteCopyFrom", "plum"), click("paletteCopy"), waitFor(0), answer(1, 200, workedOut()), lookAt())
+
+	look := looks[0]
+	require.Len(t, look.Requests, 2)
+	assert.Equal(t, "basic", look.Requests[0].Body["paletteMode"], "the edit of the four, asked as a basic palette")
+	assert.Equal(t, "advanced", look.Requests[1].Body["paletteMode"])
+	assert.Equal(t, previewPlum.Light["note-ink"], look.Requests[1].Body["palette-light-note-ink"])
+	assert.Equal(t, previewPlum.Light, fieldsOf(look, "light"), "the copied colors stay")
+	assert.Equal(t, previewPlum.Dark, fieldsOf(look, "dark"))
+	assert.Equal(t, workedOutList(), look.Warnings.Items)
+}
+
 // A browser restoring the form fires no event, so pageshow draws it again: the section, the rows and
 // the columns for what the form holds, and each field's mark.
 func TestBrandPaletteJS_PageshowDrawsTheRestoredForm(t *testing.T) {

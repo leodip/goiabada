@@ -224,7 +224,7 @@ Only the modes the brand's appearance draws are checked: both under **Automatic*
 Passing every pair doesn't make your pages meet WCAG 2.2 AA. That's a claim about whole pages, against every one of its criteria, and your logo and background image aren't checked.
 
 <Aside type="caution">
-The admin console and its sign-in page are drawn in [the admin console's client's](/concepts/clients/#the-admin-consoles-client) brand. If that brand's palette can't be read, neither can the console, the brand editor included. Check the preview before you save it. To get back, put the brand on a built-in theme with [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/).
+The admin console and its sign-in page are drawn in [the admin console's client's](/concepts/clients/#the-admin-consoles-client) brand. If that brand's colors make text unreadable, the console's text is unreadable too, the brand editor included. Check the preview before you save it. To get back, send the `brand` that [`GET /api/v1/admin/brands/{id}`](/reference/api/admin/operations/getbrand/) answers to [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/), with a built-in `theme` and `palette` set to `null`.
 </Aside>
 
 ### Custom palettes through the Admin API
@@ -256,7 +256,7 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
 - `palette` is required with `custom`. With a built-in theme, leave it out or send `null`.
 - `custom` is reserved: [`GET /api/v1/admin/brand-themes`](/reference/api/admin/operations/getbrandthemes/) lists the built-in themes alone.
 
-A brand answers `palette` as it was written, and as `null` on a built-in theme, so a brand you read and send back is saved unchanged. A basic palette is worked out again from its four colors each time it's saved.
+An update replaces the whole brand, so a member you leave out, such as a [kit](#the-brand-kit) slot or a [footer](#footer-links-and-support-contact) member, is emptied. A brand answers `palette` as it was written, and as `null` on a built-in theme, so a brand you read and send back is saved unchanged. A basic palette is worked out again from its four colors each time it's saved.
 
 Every brand answer also carries two read-only members, which a write ignores:
 

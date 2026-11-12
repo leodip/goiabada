@@ -13,8 +13,9 @@ package api
 //   - error_description: a sentence for people to read, in the request's
 //     language when error_code is a catalog key and in English otherwise.
 //   - error_field: when set, a JSON Pointer (RFC 6901) to the member of the
-//     request body the refusal is about, such as /footerLinks/1/url. Only
-//     the refusals of a brand's footer links set it (#814 decision 10).
+//     request body the refusal is about, such as /footerLinks/1/url or
+//     /palette/light/brand. Only the refusals of a brand's footer links
+//     (#814 decision 10) and of its palette (#815 decision 2) set it.
 //
 // Consumers route by HTTP status code (4xx vs 5xx), not by an in-body
 // category string.
