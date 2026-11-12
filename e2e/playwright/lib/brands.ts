@@ -906,6 +906,12 @@ export async function withCustomBrand(
   }
 }
 
+// The editor form's saved notice. The preview's Messages samples hold a positive notice each, hidden
+// until that view is chosen, so a bare .notice-positive matches them too.
+export function savedNotice(page: Page): Locator {
+  return page.locator('.brand-editor > form .notice-positive[role="status"]');
+}
+
 // The failing pairs of a saved custom palette, at the foot of the Colors section (#815 decision 9):
 // the region the saved notice links to, its count line, and an item per pair, each a sentence beside a
 // swatch of the pair.

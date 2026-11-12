@@ -33,6 +33,7 @@ import {
   plumCanvas,
   previewSample,
   sampleToken,
+  savedNotice,
   warmBasicPalette,
   withCustomBrand,
 } from "../../../lib/brands";
@@ -223,7 +224,7 @@ test("a failing palette saved on an existing brand lists its failing pairs after
     await expect(page).toHaveURL(brandUrl(brand.id, "edit"));
 
     // The saved notice says pairs fail, and links to the list.
-    const notice = page.locator(".notice-positive");
+    const notice = savedNotice(page);
     await expect(notice).toContainText(/^Brand saved\. \d+ pairs of its colors are below their contrast minimum\. See the pairs$/);
     await notice.getByRole("link", { name: "See the pairs" }).click();
     await expect(page).toHaveURL(`${brandUrl(brand.id, "edit")}#palette-warnings`);
@@ -353,7 +354,7 @@ test("a basic form refused after an edit the check could not reach lists the pai
     // Saved, the brand's list is the one the refused form showed.
     await page.locator("#name").fill(brand.name);
     await page.locator("#btnSave").click();
-    await expect(page.locator(".notice-positive")).toBeVisible();
+    await expect(savedNotice(page)).toBeVisible();
     await expect(paletteWarningsCount(page)).toHaveText(count);
     await expect(paletteWarningItems(page)).toHaveText(items);
     await expect(paletteField(page, "light", "ink-muted")).toHaveValue("#777777");
