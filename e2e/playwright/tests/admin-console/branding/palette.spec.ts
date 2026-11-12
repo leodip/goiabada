@@ -2,22 +2,30 @@
 // and an advanced palette saved, then seen on the sign-in page of a client given the brand, under a
 // device asking for light and for dark; each value that is not a color marked at its field and the
 // save refused there, the field focused and keeping what was typed; and a column the appearance hides,
-// shown again while it holds a value that is not a color.
+// shown again while it holds a value that is not a color. A failing palette saved on an existing
+// brand lists its failing pairs on the page the save returns to, which the saved notice links to, and
+// one created is marked on the brand list it lands on (decision 9).
 //
 // The brands are the test's own, given to clients of the test's own, so no other page changes, and
 // this is an ordinary parallel spec. The console drawn in a custom palette is brands.system.ts's.
 import { setClientBrand } from "../../../lib/admin-console";
 import {
   brandIdFromList,
+  brandingUrl,
   brandRow,
   brandUrl,
+  brandWarningsMarker,
   deleteBrand,
   expectDrawnInPalette,
+  failingBasicPalette,
   fillBrandForm,
   newBrandUrl,
   paletteColumnHead,
   paletteField,
   paletteNote,
+  paletteWarningItems,
+  paletteWarnings,
+  paletteWarningsCount,
   plumCanvas,
   warmBasicPalette,
   withCustomBrand,
@@ -190,4 +198,59 @@ test("a column the appearance hides comes back while it holds a value that is no
   await expect(paletteNote(page, "unused", "dark")).toBeVisible();
   // The hidden column keeps its colors, which are sent unchanged.
   await expect(paletteField(page, "dark", "brand")).toHaveValue("#8ab4ff");
+});
+
+// The count line of more than one failing pair, and the brand list's marker of them; how many there
+// are depends on the colors the save works out, so the number is any.
+const manyPairsBelow = /^\d+ pairs are below their minimum\. Text and boundaries drawn in them do not meet WCAG 2\.2 level AA contrast\.$/;
+const manyPairsMarker = /^\d+ pairs below contrast minimum$/;
+
+// Text at #777777 on white is 4.47:1 when cut, below 4.5:1, on the background and on the card.
+const textOnBackground = "Light: Text on Background, 4.47:1. Minimum 4.5:1.";
+const textOnCard = "Light: Text on Card, 4.47:1. Minimum 4.5:1.";
+
+test("a failing palette saved on an existing brand lists its failing pairs after the save, linked from the saved notice", async ({ page }) => {
+  await withCustomBrand(page, "light", warmBasicPalette, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await paletteField(page, "light", "ink").fill(failingBasicPalette.light.ink);
+    await page.locator("#btnSave").click();
+    await expect(page).toHaveURL(brandUrl(brand.id, "edit"));
+
+    // The saved notice says pairs fail, and links to the list.
+    const notice = page.locator(".notice-positive");
+    await expect(notice).toContainText(/^Brand saved\. \d+ pairs of its colors are below their contrast minimum\. See the pairs$/);
+    await notice.getByRole("link", { name: "See the pairs" }).click();
+    await expect(page).toHaveURL(`${brandUrl(brand.id, "edit")}#palette-warnings`);
+
+    // The list, at the foot of the Colors section, in the shared list's order: text on the background
+    // first, then on the card, each beside a swatch of the pair. Under Light no dark pair is listed.
+    await expect(paletteWarnings(page)).toBeVisible();
+    await expect(paletteWarningsCount(page)).toHaveText(manyPairsBelow);
+    await expect(paletteWarningsCount(page)).toHaveAttribute("role", "status");
+    const items = paletteWarningItems(page);
+    await expect(items.nth(0)).toHaveText(textOnBackground);
+    await expect(items.nth(1)).toHaveText(textOnCard);
+    await expect(items.filter({ hasText: /^Dark:/ })).toHaveCount(0);
+    const fills = await items.nth(0).locator("svg rect").evaluateAll((rects) => rects.map((rect) => rect.getAttribute("fill")));
+    expect(fills, "the background, then the text on it").toEqual(["#ffffff", "#777777"]);
+
+    // The brand list marks the brand, and draws its swatch in the colors it is drawn in.
+    await page.goto(brandingUrl);
+    await expect(brandWarningsMarker(page, brand.name)).toHaveText(manyPairsMarker);
+    await expect(brandRow(page, brand.name).locator('.brand-list-swatch svg').first().locator('[data-fill="ink"]')).toHaveAttribute("fill", "#777777");
+  });
+});
+
+test("a brand created with a failing palette lands on the brand list, marked there, and its editor lists the pairs", async ({ page }) => {
+  await withCustomBrand(page, "light", failingBasicPalette, async (brand) => {
+    // withCustomBrand creates the brand and lands on the list, as any creation does, with no notice.
+    await expect(page).toHaveURL(brandingUrl);
+    await expect(page.locator(".notice-positive")).toHaveCount(0);
+    await expect(brandWarningsMarker(page, brand.name)).toHaveText(manyPairsMarker);
+    await expect(brandRow(page, brand.name).locator(".tag-note"), "it is not the default").toHaveCount(0);
+
+    await page.goto(brandUrl(brand.id, "edit"));
+    await expect(paletteWarningsCount(page)).toHaveText(manyPairsBelow);
+    await expect(paletteWarningItems(page).nth(0)).toHaveText(textOnBackground);
+  });
 });

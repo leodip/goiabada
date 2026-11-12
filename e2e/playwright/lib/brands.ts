@@ -54,7 +54,8 @@ function brandIdFrom(href: string | null): number {
   return Number(match[1]);
 }
 
-// Every brand on the list, in its order, the default marked by its tag.
+// Every brand on the list, in its order, the default marked by its tag, which is a note's; a brand
+// with failing contrast pairs carries a caution tag too (#815 decision 9).
 export async function listBrands(page: Page): Promise<ListedBrand[]> {
   await page.goto(brandingUrl);
   const rows = page.locator("#brandsTable tbody tr");
@@ -64,7 +65,7 @@ export async function listBrands(page: Page): Promise<ListedBrand[]> {
     brands.push({
       id: brandIdFrom(await link.getAttribute("href")),
       name: (await link.innerText()).trim(),
-      isDefault: (await row.locator(".tag").count()) > 0,
+      isDefault: (await row.locator(".tag-note").count()) > 0,
     });
   }
   return brands;
@@ -872,3 +873,31 @@ export async function withCustomBrand(
     if ((await listBrands(page)).some((brand) => brand.id === id)) await deleteBrand(page, id);
   }
 }
+
+// The failing pairs of a saved custom palette, at the foot of the Colors section (#815 decision 9):
+// the region the saved notice links to, its count line, and an item per pair, each a sentence beside a
+// swatch of the pair.
+export function paletteWarnings(page: Page): Locator {
+  return page.locator("#palette-warnings");
+}
+
+export function paletteWarningsCount(page: Page): Locator {
+  return page.locator("#paletteWarningsCount");
+}
+
+export function paletteWarningItems(page: Page): Locator {
+  return paletteWarnings(page).locator("li.palette-warning");
+}
+
+// The brand list's marker of a brand with failing contrast pairs, in its row.
+export function brandWarningsMarker(page: Page, name: string): Locator {
+  return brandRow(page, name).locator(".tag-caution");
+}
+
+// A basic palette whose light text fails on its background and its card: #777777 on white is 4.47:1
+// when cut, below text's 4.5:1 (WCAG 2.2 SC 1.4.3). Its dark colors are warmBasicPalette's.
+export const failingBasicPalette: PaletteValues = {
+  mode: "basic",
+  light: { canvas: "#ffffff", surface: "#ffffff", ink: "#777777", brand: "#1f4fa8" },
+  dark: warmBasicPalette.dark,
+};

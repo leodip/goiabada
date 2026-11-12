@@ -48,7 +48,7 @@
     {{ if .savedSuccessfully }}
     <div class="notice notice-positive" role="status">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
-      <p>{{ T $.ctx "adminconsole.admin_branding.brand.saved" }}</p>
+      <p>{{ T $.ctx "adminconsole.admin_branding.brand.saved" }}{{ with .paletteWarnings }}{{ if .Items }} {{ .Notice }} <a class="text-link" href="#palette-warnings">{{ T $.ctx "adminconsole.admin_branding.brand.saved_warnings_link" }}</a>{{ end }}{{ end }}</p>
     </div>
     {{ end }}
     {{ if .madeDefault }}
@@ -207,6 +207,23 @@
           {{ end }}
         </div>
         {{ end }}
+      </div>
+
+      {{/* The failing pairs of a saved brand (#815 decision 9), from its contrastWarnings, drawn by the
+           server so they show with scripts off: the count line, the part announced as it changes, and
+           an item per pair, its sentence beside a swatch of the pair, the foreground drawn on the
+           background, since in basic mode a worked-out color has no field on screen. A form whose
+           colors are not the stored brand's, a new brand's or a refused one, holds the region hidden
+           and empty. The saved notice links here. */}}
+      <div class="palette-warnings mt-4" id="palette-warnings"{{ if not $.paletteWarnings }} hidden{{ end }}>
+        <p class="palette-warnings-count" id="paletteWarningsCount" role="status">{{ with $.paletteWarnings }}{{ .CountLine }}{{ end }}</p>
+        {{- with $.paletteWarnings }}{{ if .Items }}
+        <ul class="palette-warning-list" aria-labelledby="paletteWarningsCount">
+          {{- range .Items }}
+          <li class="palette-warning" data-palette-warning-mode="{{ .Mode }}"><svg xmlns="http://www.w3.org/2000/svg" class="palette-warning-swatch" viewBox="0 0 40 24" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect width="40" height="24" fill="{{ .Background }}"/><rect x="9" y="9" width="22" height="6" rx="1" fill="{{ .Foreground }}"/></svg><span>{{ .Text }}</span></li>
+          {{- end }}
+        </ul>
+        {{- end }}{{ end }}
       </div>
     </fieldset>
     {{ end }}

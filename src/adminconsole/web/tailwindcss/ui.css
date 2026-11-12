@@ -517,6 +517,57 @@
     }
   }
 
+  /* The failing pairs of a saved custom palette (#815 decision 9), at the foot of the Colors
+     section: the count line, then a line per pair, its sentence beside a swatch of the pair. The
+     swatch's colors are attributes of its SVG, the pair's own; the frame is the page's. */
+
+  .palette-warnings {
+    display: grid;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .palette-warnings-count {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--color-ink);
+  }
+
+  .palette-warning-list {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .palette-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--color-ink);
+  }
+
+  .palette-warning > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .palette-warning-swatch {
+    flex: none;
+    width: 2.5rem;
+    height: 1.5rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 0.25rem;
+  }
+
+  /* A link in a success notice, such as the saved notice's link to the failing pairs, is drawn in
+     the notice's own text color, a pair every palette is checked on, and keeps its underline. */
+  .notice-positive .text-link,
+  .notice-positive .text-link:hover {
+    color: inherit;
+  }
+
   /* A disclosure the browser provides: the summary keeps the browser's marker and keyboard
      handling, reads as a control, is a target of at least 24 pixels, and spaces what it opens from
      itself. */
@@ -2419,6 +2470,31 @@
   }
 
   .theme-swatch > svg {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+  }
+
+  /* The brand list's Theme column: a brand's light and dark colors beside its theme's name. */
+
+  .brand-list-theme {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    vertical-align: middle;
+  }
+
+  .brand-list-swatch {
+    display: flex;
+    flex: none;
+    width: 4rem;
+    height: 1.5rem;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: 0.25rem;
+  }
+
+  .brand-list-swatch > svg {
     flex: 1;
     min-width: 0;
     height: 100%;

@@ -40,11 +40,13 @@ const (
 )
 
 // BrandRow is a brand as the list and the delete page draw it: the brand, with its appearance and
-// its theme in words.
+// its theme in words, and the list's marker of its failing contrast pairs, "" for none (#815
+// decision 9). The list's swatches are drawn from its colors.
 type BrandRow struct {
 	api.BrandResponse
 	AppearanceName string
 	ThemeName      string
+	WarningsMarker string
 }
 
 // BrandForm is what the brand form holds: the stored brand, the defaults of a new one, or what was
@@ -311,6 +313,7 @@ func brandRow(ctx context.Context, brand api.BrandResponse) BrandRow {
 		BrandResponse:  brand,
 		AppearanceName: nameIn(ctx, brandAppearanceNames, brand.Appearance),
 		ThemeName:      nameIn(ctx, brandThemeNames, brand.Theme),
+		WarningsMarker: brandWarningsMarker(ctx, brand),
 	}
 }
 
@@ -727,7 +730,9 @@ func readBrandPage(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request
 }
 
 // HandleBrandGet draws a brand's page: the form with what is stored, and Make default for a
-// brand that is not the default. It says once that the brand was saved or made the default.
+// brand that is not the default. It says once that the brand was saved or made the default. A custom
+// brand's page lists its failing contrast pairs, as the read answers them (#815 decision 9), which
+// is how a save's warnings are shown after the redirect back here.
 func HandleBrandGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -774,6 +779,7 @@ func HandleBrandGet(
 			"clientsNote":       brandClientsNote(r.Context(), brand.ClientCount),
 			"savedSuccessfully": savedSuccessfully,
 			"madeDefault":       madeDefault,
+			"paletteWarnings":   NewBrandContrastWarnings(r.Context(), *brand),
 		})
 	}
 }

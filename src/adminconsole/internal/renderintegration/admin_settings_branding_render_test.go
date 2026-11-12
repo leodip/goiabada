@@ -60,7 +60,7 @@ func TestRender_AdminSettingsBrandingListMarksTheDefault(t *testing.T) {
 	assert.Contains(t, out, `<a class="text-link" href="/admin/settings/branding/5/edit">Default</a>`)
 	assert.NotContains(t, out, "<b>Autumn</b>", "a brand's name is text")
 	assert.Contains(t, out, ">Escuro</td>")
-	assert.Contains(t, out, ">Ameixa</td>")
+	assert.Contains(t, out, ">Ameixa</span></td>")
 
 	// The default is marked, once, and is the one brand with no Delete.
 	assert.Equal(t, 1, strings.Count(out, `<span class="tag tag-note ml-1">Padrão</span>`))
