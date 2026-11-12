@@ -120,6 +120,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/loopback` | kernel | — |
 | `core/metrics` | kernel | — |
 | `core/oauth` | kernel | — |
+| `core/palette` | kernel | — |
 | `core/passwordblocklist` | kernel | — |
 | `core/passwordrules` | kernel | — |
 | `core/phonecountries` | kernel | — |
@@ -235,6 +236,13 @@ Notes on rows that are not self-evident:
   (#813). Both also size a brand asset's upload from its byte limits. It is a package of its own
   rather than part of `core/api`, which declares and does nothing, and the console reaches no auth
   server package.
+- `core/palette` is kernel because a brand's colors are checked against one list of contrast pairs
+  wherever they are checked: the auth server's tests hold the built-in themes to it, and a custom
+  palette's warnings are to come from the same check, both on the auth server's brand answers and
+  in the admin console's live preview, so the preview cannot list a pair the save does not (#815
+  decision 6). It is a package of its own rather than part of `core/brandkit`, which holds what a
+  brand draws rather than what its colors are held to, and the console reaches no auth server
+  package.
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are
