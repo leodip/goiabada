@@ -169,6 +169,18 @@ func TestAuthorize_RepeatedParameters_OtherParameterIsInvalidRequest(t *testing.
 		assert.Equal(t, "The 'scope' parameter was included more than once.", location.Query().Get("error_description"))
 	})
 
+	// Goiabada's own parameter is refused like every other request parameter (#816 decision 3).
+	t.Run("two copies of goiabada_safe_mode are refused", func(t *testing.T) {
+		query := repeatedParametersQuery(client, redirectUri)
+		query.Add("goiabada_safe_mode", "true")
+		query.Add("goiabada_safe_mode", "true")
+
+		location := answer(t, query)
+
+		assert.Equal(t, "invalid_request", location.Query().Get("error"))
+		assert.Equal(t, "The 'goiabada_safe_mode' parameter was included more than once.", location.Query().Get("error_description"))
+	})
+
 	t.Run("one copy of each goes on", func(t *testing.T) {
 		location := answer(t, repeatedParametersQuery(client, redirectUri))
 

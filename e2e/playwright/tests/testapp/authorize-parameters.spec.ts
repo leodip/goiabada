@@ -1,10 +1,15 @@
 // The authorization parameters a client sends to ask for more than single sign-on gives by default,
 // from the test app's web app sign-in form: prompt, max_age, id_token_hint and acr_values (Require
 // two-factor authentication). The consent screen prompt=consent shows is answered every way a user
-// can: allowed, not allowed, and allowed with a scope unticked.
-import { continuePastRecoveryCodes } from "../../lib/browser-sign-in";
+// can: allowed, not allowed, and allowed with a scope unticked. Last, Goiabada's own
+// goiabada_safe_mode on a test client's sign-in, which the test app's form does not send.
+import type { Page } from "@playwright/test";
+import { setClientBrand } from "../../lib/admin-console";
+import { pageToken, saveCustomCss, warmBasicPalette, withCustomBrand } from "../../lib/brands";
+import { continuePastRecoveryCodes, openSignIn, submitPassword } from "../../lib/browser-sign-in";
 import { enterRecoveryCode, turnOnTwoFactor } from "../../lib/console-user";
 import { expect, test } from "../../lib/fixtures";
+import { browserSignInClient } from "../../lib/test-clients";
 import { freshTotp } from "../../lib/totp";
 import { expectResult, resultBody, shownClaims, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
 
@@ -157,4 +162,48 @@ test("a level 2 mandatory sign-in with a recovery code says so in amr, at the le
     expect(claims.amr).toEqual(["pwd", "recovery_code"]);
   }
   await context.close();
+});
+
+// goiabada_safe_mode=true draws a sign-in without what an administrator authors freely (#816): the
+// brand's custom CSS is not drawn and Blueberry's colors take its custom palette's place, on every
+// page of that sign-in, the password page answering a wrong password included. The same client's
+// sign-in without it is drawn in the brand as saved.
+test("goiabada_safe_mode=true draws a sign-in without the brand's custom CSS and custom palette, and no other sign-in", async ({
+  page,
+  browser,
+  clients,
+}) => {
+  const outlined = "rgb(18, 52, 86)";
+  const cardOutline = (signIn: Page) =>
+    signIn.locator(".auth-card").first().evaluate((card) => getComputedStyle(card).outlineColor);
+  const { client } = await browserSignInClient(page, clients);
+  await withCustomBrand(page, "light", warmBasicPalette, async (brand) => {
+    await saveCustomCss(page, brand.id, `.auth-card {\n  outline: 6px solid ${outlined};\n}\n`);
+    await setClientBrand(page, client.id, brand);
+
+    const safe = await openSignIn(browser, { clientId: client.identifier, scope: "openid", params: { goiabada_safe_mode: "true" } });
+    try {
+      await expect(safe.page).toHaveURL(/\/auth\/pwd/);
+      await expect(safe.page.locator('link[rel="stylesheet"][href*="/safe-stylesheet.css"]')).toHaveCount(1);
+      expect(await cardOutline(safe.page)).not.toBe(outlined);
+      expect(await pageToken(safe.page, "canvas"), "Blueberry's canvas").toBe("#f4f5f7");
+
+      await submitPassword(safe.page, "nobody@example.com", "not-the-password");
+      await expect(safe.page).toHaveURL(/\/auth\/pwd/);
+      await expect(safe.page.locator('link[rel="stylesheet"][href*="/safe-stylesheet.css"]')).toHaveCount(1);
+      expect(await cardOutline(safe.page)).not.toBe(outlined);
+    } finally {
+      await safe.context.close();
+    }
+
+    const usual = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
+    try {
+      await expect(usual.page).toHaveURL(/\/auth\/pwd/);
+      await expect(usual.page.locator('link[rel="stylesheet"][href*="/safe-stylesheet.css"]')).toHaveCount(0);
+      expect(await cardOutline(usual.page)).toBe(outlined);
+      expect(await pageToken(usual.page, "canvas")).toBe(warmBasicPalette.light.canvas);
+    } finally {
+      await usual.context.close();
+    }
+  });
 });

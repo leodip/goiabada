@@ -57,6 +57,10 @@ type AuthServerConfig struct {
 	SessionAuthenticationKeyPrevious string
 	SessionEncryptionKeyPrevious     string
 	RateLimiterEnabled               bool
+	// BrandSafeMode draws every page in safe mode, without what an administrator authors freely in a
+	// brand: its custom CSS, a custom palette and an uploaded font (#816 decision 3). Off unless an
+	// operator turns it on to get back into pages a brand made unusable.
+	BrandSafeMode bool
 	// The metrics listener: a listener of its own serving GET /metrics and nothing else, off
 	// unless enabled, so no route the gateway publishes reaches it (#400 decision 3).
 	MetricsEnabled             bool
@@ -258,6 +262,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			SessionAuthenticationKeyPrevious: getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS", ""),
 			SessionEncryptionKeyPrevious:     getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", ""),
 			RateLimiterEnabled:               getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", &malformed),
+			BrandSafeMode:                    getEnvAsBool("GOIABADA_AUTHSERVER_BRAND_SAFE_MODE", &malformed),
 			MetricsEnabled:                   getEnvAsBool("GOIABADA_AUTHSERVER_METRICS_ENABLED", &malformed),
 			ListenHostMetrics:                getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS", "0.0.0.0"),
 			ListenPortMetrics:                getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS", 9190, &malformed),
@@ -400,6 +405,7 @@ func registerFlags(fs *flag.FlagSet, c *Config, trustedProxies *string) {
 	fs.BoolVar(&c.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", c.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
 	fs.StringVar(&c.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", c.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
 	fs.BoolVar(&c.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", c.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")
+	fs.BoolVar(&c.AuthServer.BrandSafeMode, "authserver-brand-safe-mode", c.AuthServer.BrandSafeMode, "Draw every page in safe mode, without any brand's custom CSS, custom palette or uploaded font")
 	fs.BoolVar(&c.AuthServer.MetricsEnabled, "authserver-metrics-enabled", c.AuthServer.MetricsEnabled, "Serve Prometheus metrics on the auth server's metrics listener")
 	fs.StringVar(&c.AuthServer.ListenHostMetrics, "authserver-listen-host-metrics", c.AuthServer.ListenHostMetrics, "Auth server metrics host")
 	fs.IntVar(&c.AuthServer.ListenPortMetrics, "authserver-listen-port-metrics", c.AuthServer.ListenPortMetrics, "Auth server metrics port")

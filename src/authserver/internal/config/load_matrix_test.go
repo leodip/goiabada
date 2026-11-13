@@ -130,8 +130,8 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 	}
 }
 
-// configVariables is every live GOIABADA_* variable this process loads: 29 auth server, the 2
-// admin console values it reads, 14 database and 5 top-level, of which 42 have a flag. The one
+// configVariables is every live GOIABADA_* variable this process loads: 30 auth server, the 2
+// admin console values it reads, 14 database and 5 top-level, of which 43 have a flag. The one
 // name Load mentions that is not live configuration is in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Auth server
@@ -201,6 +201,10 @@ var configVariables = []configVar{
 	boolVar("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", "authserver-ratelimiter-enabled", false,
 		true, false,
 		func(c *Config) any { return c.AuthServer.RateLimiterEnabled }),
+	// Safe mode for every brand, off unless an operator turns it on (#816 decision 3).
+	boolVar("GOIABADA_AUTHSERVER_BRAND_SAFE_MODE", "authserver-brand-safe-mode", false,
+		true, false,
+		func(c *Config) any { return c.AuthServer.BrandSafeMode }),
 	// The metrics listener, off unless enabled, on the host the other listeners default to and a
 	// port of its own (#400 decision 3).
 	boolVar("GOIABADA_AUTHSERVER_METRICS_ENABLED", "authserver-metrics-enabled", false,
@@ -429,6 +433,8 @@ var malformedVariableRows = []struct {
 		`GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS is "Y", not a boolean (true or false)`},
 	{"GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", "no", "-authserver-ratelimiter-enabled=false",
 		`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED is "no", not a boolean (true or false)`},
+	{"GOIABADA_AUTHSERVER_BRAND_SAFE_MODE", "on", "-authserver-brand-safe-mode=true",
+		`GOIABADA_AUTHSERVER_BRAND_SAFE_MODE is "on", not a boolean (true or false)`},
 	{"GOIABADA_AUTHSERVER_METRICS_ENABLED", "1x", "-authserver-metrics-enabled=true",
 		`GOIABADA_AUTHSERVER_METRICS_ENABLED is "1x", not a boolean (true or false)`},
 	{"GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS", "9190/tcp", "-authserver-listen-port-metrics=9190",
@@ -760,6 +766,7 @@ var authServerFlags = []string{
 	"appname",
 	"authserver-baseurl",
 	"authserver-bootstrap-env-outfile",
+	"authserver-brand-safe-mode",
 	"authserver-certfile",
 	"authserver-debug-api-requests",
 	"authserver-internalbaseurl",
@@ -803,6 +810,7 @@ var authServerFlags = []string{
 // flagsAddedAfterTheSplit are the auth server's flags that no binary registered before #351, so
 // they are outside the partition TestFlagLists_AgreeWithTheTable counts.
 var flagsAddedAfterTheSplit = []string{
+	"authserver-brand-safe-mode",
 	"authserver-listen-host-metrics",
 	"authserver-listen-port-metrics",
 	"authserver-metrics-enabled",

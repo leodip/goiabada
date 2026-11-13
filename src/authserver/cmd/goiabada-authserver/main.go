@@ -316,6 +316,8 @@ func run() int {
 	}
 	slog.Info("session keys validated")
 
+	logBrandSafeMode(cfg.AuthServer.BrandSafeMode)
+
 	slog.Info("cookie security derived from the base URL",
 		"cookie_secure", cfg.AuthServer.IsCookieSecure())
 
@@ -568,4 +570,18 @@ func logStoredIssuer(issuer, baseURL string) {
 		"issuer", issuer,
 		"auth_server_base_url", baseURL,
 		"remedy", "in the admin console's general settings, change the issuer to an https URL with no query, fragment or user info, or to the base URL, once the relying parties that check iss can be reconfigured with it")
+}
+
+// logBrandSafeMode writes the record a start carries while the brand safe mode switch is on, and
+// nothing otherwise. Every page is then drawn without any brand's custom CSS, custom palette or
+// uploaded font until the variable is unset and the server restarts, which an operator who turned it
+// on to fix a brand must not forget (#816). The record is a Warn, as the stored issuer's is: the
+// server runs, and somebody should still change a setting.
+func logBrandSafeMode(enabled bool) {
+	if !enabled {
+		return
+	}
+	slog.Warn("brand safe mode is on, so every page is drawn without any brand's custom css, custom palette or uploaded font",
+		"setting", "GOIABADA_AUTHSERVER_BRAND_SAFE_MODE",
+		"remedy", "once the brand is fixed, unset the setting and restart the auth server")
 }

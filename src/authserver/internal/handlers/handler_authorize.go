@@ -25,8 +25,9 @@ import (
 //     (Authorization.ResolveParked). This request's cookie is the browser's own, which is why the
 //     POST answered with a redirect here (#246).
 //  3. Refines the request's localizer to the ui_locales hint (withUILocales), so the refusal page and
-//     every page this ceremony renders are in the relying party's stated language. The browser
-//     adapter holds the request as this step left it.
+//     every page this ceremony renders are in the relying party's stated language, and draws them in
+//     safe mode when the request asks for it (authflow.AuthorizeSafeMode). The browser adapter holds
+//     the request as this step left it.
 //  4. Runs the ceremony's start (Authorization.Run) and writes the answer its result names: the
 //     refusal page, the error response to the client, the step redirect, or a 500.
 func HandleAuthorizeGet(
@@ -61,6 +62,11 @@ func HandleAuthorizeGet(
 		}
 
 		r = withUILocales(r, authflow.AuthorizeUILocales(params))
+		// A request asking for safe mode is drawn safe from its first page, a refusal page included
+		// (#816 decision 3).
+		if authflow.AuthorizeSafeMode(params) {
+			reqctx.KeepPageSafeMode(r.Context())
+		}
 
 		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 		result, err := authorization.Run(r.Context(), newBrowserSession(w, r, ceremonyStore), settings, params,

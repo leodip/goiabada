@@ -127,3 +127,61 @@ func TestLinkedSignInPageClient_NamesTheClientOfTheSignInTheURLNames(t *testing.
 		})
 	}
 }
+
+// A sign-in that asked for safe mode draws every page of its steps in safe mode, and one that did not
+// draws them as usual (#816 decision 3). A request naming no sign-in the browser holds is drawn as
+// usual.
+func TestSignInPageClient_KeepsTheSafeModeOfTheSignInTheRequestNames(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		ceremonies heldSignIn
+		want       bool
+	}{
+		{"a sign-in in safe mode", heldSignIn{authContext: &ceremony.AuthContext{ClientId: "app-1", SafeMode: true}}, true},
+		{"a sign-in drawn as usual", heldSignIn{authContext: &ceremony.AuthContext{ClientId: "app-1"}}, false},
+		{"a sign-in the browser does not hold", heldSignIn{err: errs.WithStack(ceremony.ErrCeremonyNotHeld)}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var safe bool
+			handler := PageClient()(SignInPageClient(tc.ceremonies)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				safe = reqctx.PageSafeMode(r.Context())
+			})))
+
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony=x", nil))
+
+			assert.Equal(t, tc.want, safe)
+		})
+	}
+}
+
+// A page a sign-in links to is drawn in safe mode while its URL names a sign-in in safe mode the
+// browser holds, and as usual otherwise.
+func TestLinkedSignInPageClient_KeepsTheSafeModeOfTheSignInTheURLNames(t *testing.T) {
+	const heldId = "abcdefghijklmnopqrstuvwxyz012345"
+	for _, tc := range []struct {
+		name     string
+		held     *ceremony.AuthContext
+		target   string
+		wantSafe bool
+	}{
+		{"a sign-in in safe mode", &ceremony.AuthContext{CeremonyId: heldId, ClientId: "app-1", SafeMode: true},
+			"/forgot-password?ceremony=" + heldId, true},
+		{"a sign-in drawn as usual", &ceremony.AuthContext{CeremonyId: heldId, ClientId: "app-1"},
+			"/forgot-password?ceremony=" + heldId, false},
+		{"a URL naming no sign-in", &ceremony.AuthContext{CeremonyId: heldId, ClientId: "app-1", SafeMode: true},
+			"/forgot-password", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var askedFor []string
+			var safe bool
+			handler := PageClient()(LinkedSignInPageClient(heldSignInNamed{authContext: tc.held, askedFor: &askedFor})(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					safe = reqctx.PageSafeMode(r.Context())
+				})))
+
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, tc.target, nil))
+
+			assert.Equal(t, tc.wantSafe, safe)
+		})
+	}
+}

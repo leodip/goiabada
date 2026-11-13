@@ -261,6 +261,13 @@ type AuthContext struct {
 	// whatever steps the sign-in takes. Absent from a context written by an older binary it
 	// unmarshals as "", a code bound to no key, which is what that ceremony asked for.
 	DPoPJkt string
+	// SafeMode is whether the authorization request asked for safe mode, goiabada_safe_mode=true
+	// (#816 decision 3): every page of this sign-in is then drawn without what an administrator
+	// authors freely. A request field, written at /auth/authorize and kept by Restart.
+	//
+	// Absent from a context written by an older binary it unmarshals as false, a sign-in drawn as
+	// usual.
+	SafeMode bool
 }
 
 func (ac *AuthContext) SetScope(scope string) {

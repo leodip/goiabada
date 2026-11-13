@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
@@ -122,9 +123,62 @@ func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 			assert.JSONEq(t, `{"appearance":"`+tc.wantAppearance+`",`+
 				`"stylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`stylesheet.css?v=`+full.Fingerprint+`",`+
 				`"colorsStylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`colors.css?v=`+colors.Fingerprint+`",`+
+				// A built-in brand with none of what safe mode sets aside is drawn the same in safe
+				// mode: its safe stylesheets hold what its own do (#816 decision 1).
+				`"safeStylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`safe-stylesheet.css?v=`+full.Fingerprint+`",`+
+				`"safeColorsStylesheetUrl":"`+publicSettingsBaseURL+tc.wantPath+`safe-colors.css?v=`+colors.Fingerprint+`",`+
+				`"safeMode":false,`+
 				`"hideAppName":false,"hasBackground":false,"footerLinks":[],"supportEmail":"","supportUrl":"","supportPhone":""}`,
 				string(body["brand"]))
 			assert.NotContains(t, body, "uiTheme")
+		})
+	}
+}
+
+// The brand carries its two safe stylesheets' URLs beside its own (#816 decision 3), and safeMode
+// says whether the operator's switch is on. While it is, the brand's own URLs are its safe ones, so
+// the admin console follows the switch with no state of its own.
+func TestPublicSettings_CarriesTheSafeStylesheetsAndTheSwitch(t *testing.T) {
+	brand := record.NewBrand("Night", record.BrandAppearanceDark, record.BrandThemeCustom)
+	brand.Id = 7
+	brand.Palette = &record.BrandPalette{Mode: record.BrandPaletteModeAdvanced, Light: customLight, Dark: customDark}
+	brand.CustomCSS = cardCSS
+	safeFull := "/brand/7/safe-stylesheet.css?v=" + fingerprintOf(blueberryStylesheet)
+	safeColors := "/brand/7/safe-colors.css?v=" + fingerprintOf(blueberryStylesheet)
+
+	for _, tc := range []struct {
+		name                 string
+		switchOn             bool
+		wantFull, wantColors string
+		wantSafeMode         bool
+	}{
+		{"the switch off", false,
+			"/brand/7/stylesheet.css?v=" + fingerprintOf(customStylesheet+"\n"+cardCSS),
+			"/brand/7/colors.css?v=" + fingerprintOf(customStylesheet), false},
+		{"the switch on", true, safeFull, safeColors, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Once()
+			expectConsoleClientBrand(database, &brand, nil)
+			req := httptest.NewRequest("GET", "/api/public/settings", nil)
+			if tc.switchOn {
+				req = req.WithContext(reqctx.WithBrandSafeMode(req.Context()))
+			}
+
+			recorder := httptest.NewRecorder()
+			HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, req)
+
+			require.Equal(t, http.StatusOK, recorder.Code)
+			var body struct {
+				Brand map[string]any `json:"brand"`
+			}
+			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+			assert.Equal(t, publicSettingsBaseURL+tc.wantFull, body.Brand["stylesheetUrl"])
+			assert.Equal(t, publicSettingsBaseURL+tc.wantColors, body.Brand["colorsStylesheetUrl"])
+			assert.Equal(t, publicSettingsBaseURL+safeFull, body.Brand["safeStylesheetUrl"])
+			assert.Equal(t, publicSettingsBaseURL+safeColors, body.Brand["safeColorsStylesheetUrl"])
+			assert.Equal(t, tc.wantSafeMode, body.Brand["safeMode"])
 		})
 	}
 }
@@ -474,6 +528,11 @@ var publicBrandAllowedFields = map[string]string{
 	"Appearance":          "appearance",
 	"StylesheetURL":       "stylesheetUrl",
 	"ColorsStylesheetURL": "colorsStylesheetUrl",
+	// The URLs of its two safe stylesheets, served to anyone as the two above are, and whether the
+	// operator's switch draws every page in safe mode, which every page then shows (#816 decision 3).
+	"SafeStylesheetURL":       "safeStylesheetUrl",
+	"SafeColorsStylesheetURL": "safeColorsStylesheetUrl",
+	"SafeMode":                "safeMode",
 	// The brand's images and whether its name gives way to the logo, which its sign-in pages show
 	// anyone (#813 decision 9).
 	"LogoURL":     "logoUrl",

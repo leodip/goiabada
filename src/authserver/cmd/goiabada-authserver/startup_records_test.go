@@ -163,3 +163,22 @@ func TestLogStoredIssuer_AnIssuerTheRuleAcceptsIsNotReported(t *testing.T) {
 		})
 	}
 }
+
+// Safe mode by the environment variable lasts until it is unset and the server restarts, so a start
+// with it on says so, as a Warn naming the variable: an operator must not forget it (#816). A start
+// with it off writes nothing about it.
+func TestLogBrandSafeMode_TheSwitchOnIsReportedOnce(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+
+	logBrandSafeMode(true)
+
+	records := logs.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, slog.LevelWarn, records[0].Level)
+	assert.Contains(t, records[0].Message, "safe mode")
+	assert.Equal(t, "GOIABADA_AUTHSERVER_BRAND_SAFE_MODE", records[0].Attrs["setting"])
+
+	logs = logtest.CaptureSlog(t)
+	logBrandSafeMode(false)
+	assert.Empty(t, logs.Records())
+}

@@ -63,6 +63,9 @@ func ClientPageBrand(ctx context.Context, brands PageBrandReader, clientIdentifi
 // which no page of the auth server links: the public settings carry it for the admin console's admin
 // pages (#813 decision 9). Both are empty, or both are set.
 //
+// A page drawn in safe mode (pageSafeMode) links the brand's safe stylesheets in their place, and
+// takes everything else from the brand as usual (#816 decision 1).
+//
 // Logo, DarkLogo and Favicon are the paths of the assets the brand's slots name, empty for an empty
 // slot; DarkLogo is empty too while there is no Logo, which a write refuses (#813 decision 5).
 // HideAppName is whether the app name's text gives way to the logo: the brand's switch, which has no
@@ -71,10 +74,13 @@ type PageBrand struct {
 	DataTheme        string
 	Stylesheet       string
 	ColorsStylesheet string
-	Logo             string
-	DarkLogo         string
-	Favicon          string
-	HideAppName      bool
+	// STUB(#816)
+	SafeStylesheet       string
+	SafeColorsStylesheet string
+	Logo                 string
+	DarkLogo             string
+	Favicon              string
+	HideAppName          bool
 	// Background is whether the brand has a background image, whatever its fit and whether or not
 	// the image loads: the footer is then drawn on a panel (#814 decision 6).
 	Background bool
@@ -109,27 +115,50 @@ func DefaultPageBrand(ctx context.Context, brands PageBrandReader) PageBrand {
 	return pageBrandOf(ctx, brands, brand)
 }
 
+// pageSafeMode answers whether ctx's pages are drawn in safe mode: every page while the operator's
+// switch is on, and the pages of a sign-in that asked for it (#816 decision 3).
+func pageSafeMode(ctx context.Context) bool {
+	return reqctx.BrandSafeMode(ctx) || reqctx.PageSafeMode(ctx)
+}
+
 // pageBrandOf is what a page drawn in brand takes from it, or nothing when brandthemes cannot draw
 // its colors: a stored theme that is none of the built-in ones, or a custom brand whose palette is
-// missing or not whole. That names no stylesheet and is logged.
+// missing or not whole. That names no stylesheet and is logged. In safe mode the brand's own
+// stylesheets are not built, so a custom brand whose palette cannot be drawn is drawn safe all the
+// same.
 func pageBrandOf(ctx context.Context, assets brandasset.SlotsReader, brand *record.Brand) PageBrand {
 	slots, err := brandasset.ReadSlots(ctx, assets, nil, brand)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to read the assets of the brand a page is drawn in", "brand_id", brand.Id, "error", err)
 		return PageBrand{}
 	}
-	stylesheet, err := brandthemes.StylesheetPath(brand, slots)
-	if err != nil {
+	unlinkable := func(err error) PageBrand {
 		slog.ErrorContext(ctx, "unable to link the brand's stylesheet", "brand_id", brand.Id, "error", err)
 		return PageBrand{}
 	}
-	colorsStylesheet, err := brandthemes.ColorsStylesheetPath(brand)
+	safeStylesheet, err := brandthemes.SafeStylesheetPath(brand, slots)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to link the brand's stylesheet", "brand_id", brand.Id, "error", err)
-		return PageBrand{}
+		return unlinkable(err)
+	}
+	safeColorsStylesheet, err := brandthemes.SafeColorsStylesheetPath(brand)
+	if err != nil {
+		return unlinkable(err)
+	}
+	page := PageBrand{
+		Stylesheet:           safeStylesheet,
+		ColorsStylesheet:     safeColorsStylesheet,
+		SafeStylesheet:       safeStylesheet,
+		SafeColorsStylesheet: safeColorsStylesheet,
+	}
+	if !pageSafeMode(ctx) {
+		if page.Stylesheet, err = brandthemes.StylesheetPath(brand, slots); err != nil {
+			return unlinkable(err)
+		}
+		if page.ColorsStylesheet, err = brandthemes.ColorsStylesheetPath(brand); err != nil {
+			return unlinkable(err)
+		}
 	}
 
-	page := PageBrand{Stylesheet: stylesheet, ColorsStylesheet: colorsStylesheet}
 	// A dark logo is drawn in place of the logo in dark mode, so it is nothing without one, and the
 	// switch hides the name only where a logo takes its place (#813 decision 5).
 	if slots.Logo != nil {

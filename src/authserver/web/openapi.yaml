@@ -8665,6 +8665,25 @@ components:
           description: >-
             The absolute URL of the brand's stylesheet that sets its colors alone, which an admin
             page links after main.css. The URL changes whenever the stylesheet does.
+        safeStylesheetUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's full stylesheet in safe mode: without its custom CSS,
+            in the built-in Blueberry colors in place of a custom palette, and in System UI in place
+            of an uploaded font. The URL changes whenever the stylesheet does.
+        safeColorsStylesheetUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's colors-only stylesheet in safe mode, the built-in
+            Blueberry colors in place of a custom palette. The URL changes whenever the stylesheet
+            does.
+        safeMode:
+          type: boolean
+          description: >-
+            Whether GOIABADA_AUTHSERVER_BRAND_SAFE_MODE draws every page in safe mode. While it
+            does, stylesheetUrl and colorsStylesheetUrl are the safe stylesheets' URLs.
         logoUrl:
           type: string
           format: uri
@@ -8717,6 +8736,9 @@ components:
         - appearance
         - stylesheetUrl
         - colorsStylesheetUrl
+        - safeStylesheetUrl
+        - safeColorsStylesheetUrl
+        - safeMode
         - hideAppName
         - hasBackground
         - footerLinks

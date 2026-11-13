@@ -83,6 +83,14 @@ func StylesheetOf(key string) (Stylesheet, bool) {
 // never its kit (#813 decision 9).
 const ColorsStylesheetRoute = "/brand/{id}/colors.css"
 
+// SafeStylesheetRoute and SafeColorsStylesheetRoute are the routes a brand's two safe stylesheets
+// are served at, the brand's id in {id}: what SafeFullStylesheet and SafeColorsStylesheet answer,
+// which a page drawn in safe mode links in place of the brand's own two (#816 decision 3).
+const (
+	SafeStylesheetRoute       = "/brand/{id}/safe-stylesheet.css"
+	SafeColorsStylesheetRoute = "/brand/{id}/safe-colors.css"
+)
+
 // FullStylesheet returns the stylesheet brand is drawn with on the auth server's pages and the
 // console's end-user pages: its theme's colors, as ColorsStylesheet answers them, then its kit
 // (#813 decision 9). slots are the assets brand's slots name, read without their bytes.
@@ -154,6 +162,39 @@ func FullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, er
 		return colors, nil
 	}
 	return newStylesheet(colors.CSS + "\n" + strings.Join(rules, "\n")), nil
+}
+
+// SafeFullStylesheet returns the stylesheet brand is drawn with in safe mode: FullStylesheet's, without
+// what an administrator authors freely (#816 decision 1). The custom CSS is left out, Blueberry's
+// colors take a custom palette's place, and the System UI family an uploaded font's, so no font file
+// is loaded. Everything else is drawn as FullStylesheet draws it: a built-in theme's colors, the
+// corners, a system family and the background. Nothing stored is read differently or changed.
+//
+// It never reads a custom brand's palette, so it draws a brand whose palette cannot be drawn too.
+func SafeFullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, error) {
+	if brand.Font == record.BrandFontUploaded {
+		// With no font file in its slot, an uploaded font is drawn in System UI and sets nothing.
+		slots.RegularFont, slots.BoldFont = nil, nil
+	}
+	return FullStylesheet(safeBrand(brand), slots)
+}
+
+// SafeColorsStylesheet returns the colors-only stylesheet brand is drawn with in safe mode:
+// ColorsStylesheet's, with Blueberry's colors in place of a custom palette (#816 decision 1).
+func SafeColorsStylesheet(brand *record.Brand) (Stylesheet, error) {
+	return ColorsStylesheet(safeBrand(brand))
+}
+
+// safeBrand is a copy of brand with what safe mode sets aside of the brand itself set aside: no custom
+// CSS, and Blueberry in place of the custom theme. The uploaded font is in the slots, which
+// SafeFullStylesheet empties.
+func safeBrand(brand *record.Brand) *record.Brand {
+	safe := *brand
+	safe.CustomCSS = ""
+	if safe.Theme == record.BrandThemeCustom {
+		safe.Theme, safe.Palette = blueberry, nil
+	}
+	return &safe
 }
 
 // fontFace is the @font-face rule of an uploaded font file, for the weights in weight, or for every
@@ -253,6 +294,26 @@ func ColorsStylesheetPath(brand *record.Brand) (string, error) {
 		return "", err
 	}
 	return linkPath(ColorsStylesheetRoute, brand.Id, stylesheet), nil
+}
+
+// SafeStylesheetPath returns the path a page drawn in safe mode links brand's safe full stylesheet by,
+// as StylesheetPath does the full one's: by its own route and the fingerprint of its own contents.
+func SafeStylesheetPath(brand *record.Brand, slots brandasset.Slots) (string, error) {
+	stylesheet, err := SafeFullStylesheet(brand, slots)
+	if err != nil {
+		return "", err
+	}
+	return linkPath(SafeStylesheetRoute, brand.Id, stylesheet), nil
+}
+
+// SafeColorsStylesheetPath returns the path of brand's safe colors-only stylesheet, as
+// ColorsStylesheetPath does the colors-only one's.
+func SafeColorsStylesheetPath(brand *record.Brand) (string, error) {
+	stylesheet, err := SafeColorsStylesheet(brand)
+	if err != nil {
+		return "", err
+	}
+	return linkPath(SafeColorsStylesheetRoute, brand.Id, stylesheet), nil
 }
 
 func linkPath(route string, brandId int64, stylesheet Stylesheet) string {
