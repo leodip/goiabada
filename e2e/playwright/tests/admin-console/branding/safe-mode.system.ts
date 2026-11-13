@@ -69,9 +69,13 @@ test("a console URL with goiabada_safe_mode=true signs in on safe pages, keeps t
     await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
 
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const admin = await context.newPage();
+    // Whether admin holds a session of the administrator's. A failure signs it out too, so a failed
+    // run leaves no session counting against the administrator's cap: closing the browser does not
+    // end it.
+    let signedIn = false;
     try {
       await setClientBrand(page, consoleClient, brand);
-      const admin = await context.newPage();
 
       // Out of safe mode, the console's sign-in draws all three.
       await admin.goto(`${env.adminUrl}${brandingPath}`);
@@ -90,6 +94,7 @@ test("a console URL with goiabada_safe_mode=true signs in on safe pages, keeps t
       expect(await bodyFont(admin), "not the uploaded font").not.toBe("brand-font");
 
       await submitPassword(admin, env.adminEmail, env.adminPassword);
+      signedIn = true;
       await expect(admin).toHaveURL(`${env.adminUrl}${brandingPath}?goiabada_safe_mode=true`);
 
       // Every console page is in safe mode now, with no parameter: the admin pages say so and are
@@ -112,10 +117,12 @@ test("a console URL with goiabada_safe_mode=true signs in on safe pages, keeps t
 
       // Signing out ends it: the next sign-in is drawn in the brand as saved.
       await signOutOfConsole(admin);
+      signedIn = false;
       await admin.goto(`${env.adminUrl}${brandingPath}`);
       await expect(admin.locator('input[name="password"]')).toBeVisible();
       expect(await linkedBrandStylesheets(admin)).toEqual(["stylesheet"]);
       await submitPassword(admin, env.adminEmail, env.adminPassword);
+      signedIn = true;
       await expect(admin).toHaveURL(`${env.adminUrl}${brandingPath}`);
       expect(await linkedBrandStylesheets(admin)).toEqual(["colors"]);
       await expect(safeModeNotice(admin)).toHaveCount(0);
@@ -125,6 +132,7 @@ test("a console URL with goiabada_safe_mode=true signs in on safe pages, keeps t
       expect(await titleDecoration(admin, ".page-title")).toBe("underline");
       expect(await bodyFont(admin)).toBe("brand-font");
       await signOutOfConsole(admin);
+      signedIn = false;
 
       // The console's home page opened with the parameter, signed out, starts a sign-in in safe mode
       // from its Administration link too, and the session it signs in to stays in safe mode.
@@ -135,13 +143,18 @@ test("a console URL with goiabada_safe_mode=true signs in on safe pages, keeps t
       expect(await linkedBrandStylesheets(admin), "the sign-in the home page starts is safe").toEqual(["safe-stylesheet"]);
       expect(await titleDecoration(admin, ".auth-title"), "no custom CSS").toBe("none");
       await submitPassword(admin, env.adminEmail, env.adminPassword);
+      signedIn = true;
       await expect(admin).toHaveURL(`${env.adminUrl}/admin/clients?goiabada_safe_mode=true`);
       await admin.goto(`${env.adminUrl}/admin/clients`);
       expect(await linkedBrandStylesheets(admin)).toEqual(["safe-colors"]);
       await expect(safeModeNotice(admin)).toHaveText(safeModeSessionNotice);
-      // Signed out, so this test leaves no session of the administrator's behind.
       await signOutOfConsole(admin);
+      signedIn = false;
     } finally {
+      if (signedIn) {
+        // The test's own failure is the one to report, so a sign-out that fails as well is let go.
+        await signOutOfConsole(admin).catch(() => undefined);
+      }
       await context.close();
       await setClientBrand(page, consoleClient, "default");
     }
