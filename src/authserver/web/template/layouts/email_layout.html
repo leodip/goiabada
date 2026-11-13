@@ -37,6 +37,36 @@
             </td>
           </tr>
         </table>
+        {{- /* The brand's footer links, then "Need help?" with its support contact, under the card
+             on the area behind it, as a page draws them, and nothing for a brand with neither.
+             Each value is drawn as a link apart, a middle dot hidden from assistive technology
+             between two, since a client may drop the margin a page spaces them with. */}}
+        {{- with $f.Footer }}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 480px;">
+          <tr>
+            <td style="padding: 16px 28px 0; color: {{ $f.InkMuted }}; font-family: {{ $f.FontFamily }}; font-size: 14px; line-height: 20px; text-align: center; overflow-wrap: anywhere;">
+              <footer>
+                {{- if .Links }}
+                <p style="margin: 0;">
+                  {{- range $i, $link := .Links }}
+                  {{- if $i }} <span aria-hidden="true">&middot;</span> {{ end -}}
+                  <a href="{{ $link.URL }}" style="color: {{ $f.Link }}; text-decoration: underline;">{{ $link.Label }}</a>
+                  {{- end }}
+                </p>
+                {{- end }}
+                {{- if .HasContact }}
+                <p style="margin: {{ if .Links }}4px{{ else }}0{{ end }} 0 0;">
+                  {{- T $.ctx "common.footer.need_help" }}
+                  {{- if .SupportEmail }} <a href="mailto:{{ .SupportMailto }}" style="color: {{ $f.Link }}; text-decoration: underline;">{{ .SupportEmail }}</a>{{ end }}
+                  {{- if .SupportPhone }}{{ if .SupportEmail }} <span aria-hidden="true">&middot;</span>{{ end }} <a href="tel:{{ .SupportPhone }}" style="color: {{ $f.Link }}; text-decoration: underline;">{{ .SupportPhone }}</a>{{ end }}
+                  {{- if .SupportURL }}{{ if or .SupportEmail .SupportPhone }} <span aria-hidden="true">&middot;</span>{{ end }} <a href="{{ .SupportURL }}" style="color: {{ $f.Link }}; text-decoration: underline;">{{ T $.ctx "common.footer.support_page" }}</a>{{ end }}
+                </p>
+                {{- end }}
+              </footer>
+            </td>
+          </tr>
+        </table>
+        {{- end }}
       </td>
     </tr>
   </table>

@@ -213,7 +213,7 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		// from the request it is rendered with, and the email layout writes emailFrame's values
 		// inline, since an email links no stylesheet (#817 decision 1). It is bound none of a page's
 		// brand values, so an email layout copied from an older release draws as before.
-		data["emailFrame"] = emailFrameOf(settings.AppName, RequestPageBrand(r.Context(), h.brands), h.baseURL)
+		data["emailFrame"] = emailFrameOf(r.Context(), settings.AppName, RequestPageBrand(r.Context(), h.brands), h.baseURL)
 	} else {
 		// A page is drawn in its brand: the layouts write brandDataTheme on the html element
 		// and link brandStylesheet after main.css, draw brandLogo and brandDarkLogo above the app

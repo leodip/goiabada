@@ -1,6 +1,7 @@
 package render
 
 import (
+	"context"
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
@@ -34,6 +35,9 @@ type EmailLook struct {
 // family names written unquoted (emailFontFamily).
 // Logo is the logo's absolute URL, empty for none, drawn at LogoWidth by LogoHeight pixels when
 // both are known, with LogoAlt as its alt; ShowAppName is whether the app name is drawn as text.
+// Footer is the brand's footer links and support contact, drawn under the card in InkMuted with each
+// link in Link, as a page draws them under its card, or nil for a brand with neither, which draws no
+// footer (#817 decision 2). Its Panel is not drawn: an email has no background image.
 type EmailFrame struct {
 	ColorScheme string
 	Canvas      string
@@ -49,6 +53,7 @@ type EmailFrame struct {
 	LogoHeight  int
 	LogoAlt     string
 	ShowAppName bool
+	Footer      *PageFooter
 }
 
 // The bounds an email's logo is drawn within: as tall as a page's (.auth-logo img, 4rem), and as wide
@@ -69,14 +74,15 @@ var emailPanelRadii = map[record.BrandCorners]string{
 
 const emailRoundedPanelRadius = "12px"
 
-// emailFrameOf answers the frame an email for an app named appName is drawn in, in brand, its logo
-// linked under baseURL, the auth server's public base URL.
+// emailFrameOf answers the frame an email for an app named appName is drawn in ctx in, in brand, its
+// logo linked under baseURL, the auth server's public base URL, and its footer in the language of
+// ctx's catalog, which the body and the subject are written in too.
 //
 // A brand that cannot be read is drawn as the built-in look, in Blueberry's light colors, rounded and
 // in System UI, with the app name as text (#817, today's page whose brand cannot be read): an email
 // is never refused over its look. With no base URL there is no absolute URL to link the logo by, so
 // the app name takes its place.
-func emailFrameOf(appName string, brand PageBrand, baseURL string) EmailFrame {
+func emailFrameOf(ctx context.Context, appName string, brand PageBrand, baseURL string) EmailFrame {
 	look := brand.Email
 	colors := look.Colors
 	if colors == nil {
@@ -95,6 +101,7 @@ func emailFrameOf(appName string, brand PageBrand, baseURL string) EmailFrame {
 		PanelRadius: emailRoundedPanelRadius,
 		FontFamily:  emailFontFamily(brandkit.SystemUIStack),
 		ShowAppName: true,
+		Footer:      FooterOf(ctx, brand),
 	}
 	if look.Dark {
 		frame.ColorScheme = "dark"

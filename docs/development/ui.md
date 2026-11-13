@@ -308,7 +308,11 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   brand, is linked by an absolute URL under the base URL (`render.Renderer.WithBaseURL`), with
   width and height attributes within 64 by 424 pixels, and takes a page's alt rule. A brand that
   cannot be read is drawn in Blueberry's light colors with the app name as text, and the fault is
-  logged. `TestEmails_EveryBuiltInEmailIsDrawnInlineAlone` holds every built-in email, in every
+  logged. The brand's footer links and support contact are drawn under the card from
+  `emailFrame.Footer`, which is `render.FooterOf`, the page's footer, in the language of the
+  email's catalog, in the muted ink with each link in the brand's color, and nil for a brand with
+  neither; the values are apart by a middle dot hidden from assistive technology, since a client may
+  drop a margin. `TestEmails_EveryBuiltInEmailIsDrawnInlineAlone` holds every built-in email, in every
   language, to these rules.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state, appearance and theme. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table

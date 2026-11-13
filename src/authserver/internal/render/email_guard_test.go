@@ -30,7 +30,8 @@ var hexColor = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 // element and no class, and names no variable; its colors are written on the elements, the area
 // behind the card, the card and each link of its body; and its logo is linked by an absolute URL,
 // since an email has no page to resolve a relative one against. Each is drawn for a dark brand with
-// a logo and a dark logo, and for a light brand with a logo, so both of the frame's logos are held.
+// a logo and a dark logo, and for a light brand with a logo, footer links and a support contact, so
+// both of the frame's logos and its footer are held.
 func TestEmails_EveryBuiltInEmailIsDrawnInlineAlone(t *testing.T) {
 	bodies, err := fs.Glob(web.TemplateFS(), "emails/*.html")
 	require.NoError(t, err)
@@ -39,6 +40,8 @@ func TestEmails_EveryBuiltInEmailIsDrawnInlineAlone(t *testing.T) {
 	dark := kitPageBrand(record.BrandAppearanceDark, true, true, false, false)
 	dark.Theme, dark.Corners, dark.Font = "plum", record.BrandCornersPill, record.BrandFontSerif
 	light := kitPageBrand(record.BrandAppearanceLight, true, false, false, true)
+	light.FooterLinks = threeLinks
+	light.SupportEmail, light.SupportURL, light.SupportPhone = "help@acme.example", "https://acme.example/support", "+442079460958"
 
 	for _, body := range bodies {
 		// email_x.html is English, email_x.<tag>.html is written in tag.
@@ -59,6 +62,9 @@ func TestEmails_EveryBuiltInEmailIsDrawnInlineAlone(t *testing.T) {
 					})
 				require.NoError(t, err)
 				assertDrawnInlineAlone(t, buf.String())
+				if len(brand.FooterLinks) > 0 && !strings.Contains(buf.String(), "<footer") {
+					t.Error("an email of a brand with footer links draws its footer")
+				}
 			})
 		}
 	}
@@ -99,6 +105,7 @@ func assertDrawnInlineAlone(t *testing.T, html string) {
 	inlineColor("the card", doc.Find("body table table").First(), "background-color")
 	inlineColor("the card's text", doc.Find("body table table td").First(), "color")
 	inlineColor("a link", doc.Find("a"), "color")
+	inlineColor("the footer's text", doc.Find("footer").Closest("td"), "color")
 	if scheme, _ := doc.Find(`meta[name="color-scheme"]`).Attr("content"); scheme != "light" && scheme != "dark" {
 		t.Errorf("an email declares the one scheme it is drawn in, not %q", scheme)
 	}
