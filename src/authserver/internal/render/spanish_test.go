@@ -58,6 +58,7 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 		{"email_otp_lockout", "otp_lockout", "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos", "Inicia sesión con uno de tus códigos de recuperación"},
 		{"email_account_deleted", "account_deleted", "Se ha eliminado tu cuenta", "Si no has sido tú, otra persona conocía tu contraseña."},
 		{"email_account_deleted_by_administrator", "account_deleted_by_administrator", "Un administrador ha eliminado tu cuenta", "Si no lo esperabas, contacta con tu administrador."},
+		{"email_test_email", "test_email", "Acme - correo de prueba", "Este es un correo de prueba enviado por Acme."},
 	} {
 		for _, locale := range []string{"es", "es-MX", "es-419"} {
 			t.Run(tc.body+" "+locale, func(t *testing.T) {
@@ -73,12 +74,12 @@ func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 				assert.Contains(t, buf.String(), `<html lang="es">`)
 				assert.Contains(t, buf.String(), tc.sentence)
 				assert.Contains(t, buf.String(), "Acme")
-				// A notice of a change carries no link.
+				// A notice of a change carries no link, and nor does the test email.
 				notice := map[string]bool{"email_address_changed": true, "email_password_changed": true,
 					"email_password_changed_by_administrator": true, "email_password_reset": true,
 					"email_otp_enabled": true, "email_otp_disabled": true, "email_otp_disabled_by_administrator": true,
 					"email_recovery_code_used": true, "email_recovery_codes_replaced": true, "email_otp_lockout": true,
-					"email_account_deleted": true, "email_account_deleted_by_administrator": true}
+					"email_account_deleted": true, "email_account_deleted_by_administrator": true, "email_test_email": true}
 				if !notice[tc.body] {
 					assert.Contains(t, buf.String(), `href="https://example.com/continue"`)
 				} else {

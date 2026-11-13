@@ -552,6 +552,8 @@ The durations the admin console writes in words, under a duration field and in h
 
 An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.nl.html`, in your own [templates directory](#change-the-templates). A copy named for exactly the recipient's language wins. Otherwise the closest copy in their language does: `nl` serves a recipient reading `nl-BE`, and `pt-BR` serves one reading `pt`. A recipient with no copy in their language gets the English template.
 
+The test email from the **Send test email** tab under **Admin**, **Email** is `emails/email_test_email.html`, with its subject in `email.test_email.subject`. It's in the language the administrator reads the admin console in, and goes out in the default brand.
+
 The password reset, the activation link, a new user's setup email and the welcome email each have a button above their link, labelled from the catalogs: `email.forgot_password.button`, `email.register_activate.button`, `email.newuser_set_password.button` and `email.register_confirmation.button`. A language you add needs these four keys too.
 
 ## Templates and static files

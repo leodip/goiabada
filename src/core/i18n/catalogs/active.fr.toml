@@ -2467,6 +2467,7 @@
 "email.account_deleted.subject" = "Votre compte a été supprimé"
 "email.account_deleted_by_administrator.subject" = "Un administrateur a supprimé votre compte"
 "email.otp_lockout.subject" = "Votre application d’authentification a été bloquée après trop de codes erronés"
+"email.test_email.subject" = "{{.appName}} - e-mail de test"
 
 # The label of the button an action email draws above its URL (#817).
 "email.forgot_password.button" = "Réinitialiser le mot de passe"

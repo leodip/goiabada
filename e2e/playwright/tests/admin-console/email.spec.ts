@@ -46,10 +46,11 @@ async function setPasswordOnForm(page: Page, address: string, password: string) 
   await expect(page.getByRole("link", { name: "Sign in to your account" })).toHaveAttribute("href", `${env.adminUrl}/account/profile`);
 }
 
-test("a test email from Settings - Email arrives", async ({ page, request }) => {
+test("a test email from Settings - Email arrives framed, naming the app", async ({ page, request }) => {
   const to = `${uniqueIdentifier("m")}@example.com`;
   await page.goto(sendTest);
   await expect(page).toHaveTitle(/^Send test email – Email settings – /);
+  const appName = (await page.title()).replace(/^Send test email – Email settings – /, "");
   const tabs = page.getByRole("navigation", { name: "Sections", exact: true });
   await expect(tabs.getByRole("link", { name: "Send test email", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(tabs.getByRole("link", { name: "Configuration", exact: true })).toHaveAttribute("href", "/admin/settings/email");
@@ -64,7 +65,16 @@ test("a test email from Settings - Email arrives", async ({ page, request }) => 
     ),
   ).toBeVisible();
   const mail = await waitForMail(request, to);
-  expect(mail.subject).toBeTruthy();
+  expect(mail.subject).toBe(`${appName} - test email`);
+  expect(mail.html).toContain(`This is a test email from ${appName}.`);
+  expect(mail.html).toContain("It was sent from the email settings to check that email can be sent.");
+  // The date is the message's Date header, no longer a sentence of the body.
+  expect(mail.html).not.toContain("Today is");
+  // Drawn through the email layout, as every other email is: on a card, its colors written inline,
+  // the app name above the body.
+  expect(mail.html).toMatch(/<body style="[^"]*background-color: #[0-9a-f]{6};/);
+  expect(mail.html).toContain("<main>");
+  expect(mail.html).toContain(`text-align: center;">${appName}</p>`);
 });
 
 test("a test email to a missing or malformed address is refused at the field, which keeps the address", async ({ page }) => {
@@ -291,7 +301,7 @@ test("the user verifies their email with the mailed code, and the administrator 
   await expect(own.page.locator("#verification-status")).toHaveText(`We sent a code to ${user.email}. Check your inbox and spam folder.`);
 
   const mail = await waitForMail(request, user.email);
-  const code = mail.html.match(/verification code:<\/p>\s*<p>\s*([^<\s]+)\s*<\/p>/)?.[1];
+  const code = mail.html.match(/verification code:<\/p>\s*<p[^>]*>\s*([^<\s]+)\s*<\/p>/)?.[1];
   expect(code, mail.html).toBeTruthy();
   await own.page.locator("#verificationCode").fill(code!);
   await own.page.getByRole("button", { name: "Verify", exact: true }).click();

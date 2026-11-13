@@ -298,6 +298,7 @@ func settingsEmailResponse(settings *record.Settings) api.SettingsEmailResponse 
 func HandleSettingsEmailSendTestPost(
 	emailValidator EmailValidator,
 	emailSender EmailSender,
+	pageRenderer PageRenderer,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -325,12 +326,19 @@ func HandleSettingsEmailSendTestPost(
 			return
 		}
 
-		// Construct simple plain content via core communication interface
-		simpleBody := "This is a test email from Goiabada. Today is " + time.Now().Format("January 2, 2006 at 3:04pm (MST)") + "."
+		// The test email is an email like the others (#817 decision 8): drawn through the email layout
+		// in the default brand, as every email an administrator's action sends is, the request naming
+		// no client, and written in the language the administrator is answered in. It names the app,
+		// and the message's Date header says when it was sent.
+		buf, err := pageRenderer.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_test_email.html", map[string]interface{}{})
+		if err != nil {
+			writeInternalServerError(w, r, err)
+			return
+		}
 		input := &emaildelivery.SendEmailInput{
 			To:       req.To,
-			Subject:  "Test email",
-			HtmlBody: simpleBody,
+			Subject:  i18n.T(r.Context(), "email.test_email.subject", map[string]any{"appName": settings.AppName}),
+			HtmlBody: buf.String(),
 		}
 		// A failure answers the fixed message of its kind and the error goes to the log: the error
 		// carries addresses, operating-system strings and the server's own replies, and anyone who
