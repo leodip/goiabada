@@ -1145,6 +1145,9 @@
 "adminconsole.admin_users.details.field.enabled_hint" = "A disabled user can't sign in, and clients can't renew their tokens."
 "adminconsole.admin_users.details.disable_warning" = "You're disabling the user, so they won't be able to sign in, and clients won't be able to renew their tokens."
 "adminconsole.admin_users.details.user_created_message" = "User created."
+"adminconsole.admin_users.details.setup_email_not_sent" = "The setup email couldn't be sent, so the user can't sign in yet."
+"adminconsole.admin_users.details.setup_email_set_password" = "Set a password for them on the Authentication tab."
+"adminconsole.admin_users.details.setup_email_forgot_password" = "Or, once email works, ask them to select \"Forgot your password?\" on the sign-in page."
 
 # --- Admin users (profile, email, phone, address) ---------------------------
 

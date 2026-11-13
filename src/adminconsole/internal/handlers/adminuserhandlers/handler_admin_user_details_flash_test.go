@@ -122,6 +122,7 @@ func TestHandleDetailsGet_TheTwoNoticesAreIndependentAndEachShowsOnce(t *testing
 		flashes     []string
 		wantSaved   bool
 		wantCreated bool
+		wantNotSent bool
 	}{
 		{
 			name: "neither key set",
@@ -142,6 +143,12 @@ func TestHandleDetailsGet_TheTwoNoticesAreIndependentAndEachShowsOnce(t *testing
 			wantSaved:   true,
 			wantCreated: true,
 		},
+		{
+			// The setup email warning is a third key behind the same guard (#725).
+			name:        "only setupEmailNotSent",
+			flashes:     []string{"setupEmailNotSent"},
+			wantNotSent: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -156,6 +163,7 @@ func TestHandleDetailsGet_TheTwoNoticesAreIndependentAndEachShowsOnce(t *testing
 			bind, rec := renderDetails(t, store, cookie)
 			assert.Equal(t, tc.wantSaved, bind["savedSuccessfully"])
 			assert.Equal(t, tc.wantCreated, bind["userCreated"])
+			assert.Equal(t, tc.wantNotSent, bind["setupEmailNotSent"])
 
 			if cookie == nil {
 				return
@@ -171,6 +179,7 @@ func TestHandleDetailsGet_TheTwoNoticesAreIndependentAndEachShowsOnce(t *testing
 			reloaded, _ := renderDetails(t, store, next)
 			assert.Equal(t, false, reloaded["savedSuccessfully"], "on reload")
 			assert.Equal(t, false, reloaded["userCreated"], "on reload")
+			assert.Equal(t, false, reloaded["setupEmailNotSent"], "on reload")
 		})
 	}
 }

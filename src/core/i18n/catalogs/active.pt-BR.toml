@@ -1091,6 +1091,9 @@
 "adminconsole.admin_users.details.field.enabled_hint" = "Um usuário desabilitado não pode entrar, e os clientes não conseguem renovar os tokens dele."
 "adminconsole.admin_users.details.disable_warning" = "Você está desabilitando o usuário, então ele não poderá entrar, e os clientes não conseguirão renovar os tokens dele."
 "adminconsole.admin_users.details.user_created_message" = "Usuário criado."
+"adminconsole.admin_users.details.setup_email_not_sent" = "Não foi possível enviar o email de configuração, então o usuário ainda não consegue entrar."
+"adminconsole.admin_users.details.setup_email_set_password" = "Defina uma senha para ele na aba Autenticação."
+"adminconsole.admin_users.details.setup_email_forgot_password" = "Ou, quando o email voltar a funcionar, peça que ele selecione \"Esqueceu sua senha?\" na página de entrada."
 
 "adminconsole.admin_users.profile.field.username" = "Nome de usuário"
 "adminconsole.admin_users.profile.field.given_name" = "Nome"

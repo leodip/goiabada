@@ -87,6 +87,10 @@ const (
 
 type CreateUserResponse struct {
 	User UserResponse `json:"user"`
+	// SetupEmailSent is present exactly when the server set out to send a setup email, which is
+	// when email is enabled and the request's setPasswordType is "email": true when it was sent,
+	// false when the send failed. It is absent otherwise, so false never means "not asked" (#725).
+	SetupEmailSent *bool `json:"setupEmailSent,omitempty"`
 }
 
 type UpdateUserEnabledRequest struct {

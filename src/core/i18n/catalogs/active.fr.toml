@@ -1148,6 +1148,9 @@
 "adminconsole.admin_users.details.field.enabled_hint" = "Un utilisateur désactivé ne peut pas se connecter, et les clients ne peuvent pas renouveler ses jetons."
 "adminconsole.admin_users.details.disable_warning" = "Vous désactivez l’utilisateur. Il ne pourra plus se connecter, et les clients ne pourront plus renouveler ses jetons."
 "adminconsole.admin_users.details.user_created_message" = "Utilisateur créé."
+"adminconsole.admin_users.details.setup_email_not_sent" = "L’e-mail de configuration n’a pas pu être envoyé : l’utilisateur ne peut pas encore se connecter."
+"adminconsole.admin_users.details.setup_email_set_password" = "Définissez-lui un mot de passe dans l’onglet Authentification."
+"adminconsole.admin_users.details.setup_email_forgot_password" = "Ou, une fois les e-mails rétablis, demandez-lui de sélectionner « Mot de passe oublié ? » sur la page de connexion."
 
 # --- Admin users (profile, email, phone, address) ---------------------------
 

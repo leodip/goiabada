@@ -28,9 +28,10 @@ import (
 // email drawn in the wrong one fails on its color scheme and on every color of its frame.
 
 // emailLook is what an email's frame says about its brand: the one color scheme it declares, the
-// area behind the card, the card, and the card's text.
+// area behind the card, the card, and the card's text. The fields are exported because the tests
+// read them only through struct equality, which the unused linter does not count as a read.
 type emailLook struct {
-	colorScheme, canvas, surface, ink string
+	ColorScheme, Canvas, Surface, Ink string
 }
 
 // The frames of the brands these tests use, as brandthemes' presets hold their colors.
@@ -60,11 +61,11 @@ func readEmailLook(t *testing.T, message mailpit.Message) emailLook {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(message.HTML))
 	require.NoError(t, err)
 	var look emailLook
-	look.colorScheme, _ = doc.Find(`meta[name="color-scheme"]`).Attr("content")
-	look.canvas = emailStyle(doc.Find("body"))["background-color"]
+	look.ColorScheme, _ = doc.Find(`meta[name="color-scheme"]`).Attr("content")
+	look.Canvas = emailStyle(doc.Find("body"))["background-color"]
 	card := doc.Find("body table table").First()
-	look.surface = emailStyle(card)["background-color"]
-	look.ink = emailStyle(card.Find("td").First())["color"]
+	look.Surface = emailStyle(card)["background-color"]
+	look.Ink = emailStyle(card.Find("td").First())["color"]
 	return look
 }
 

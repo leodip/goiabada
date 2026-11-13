@@ -46,7 +46,7 @@ func (passwordPage) UpdateAccountPassword(context.Context, string, *api.UpdateAc
 	return nil, tooCommon
 }
 
-func (passwordPage) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.UserResponse, error) {
+func (passwordPage) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
 	return nil, tooCommon
 }
 

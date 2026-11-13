@@ -64,7 +64,8 @@ func HandleDetailsGet(
 
 		_, savedSuccessfully := sess.TakeFlash(r.URL.Path, "savedSuccessfully")
 		_, userCreated := sess.TakeFlash(r.URL.Path, "userCreated")
-		if savedSuccessfully || userCreated {
+		_, setupEmailNotSent := sess.TakeFlash(r.URL.Path, "setupEmailNotSent")
+		if savedSuccessfully || userCreated || setupEmailNotSent {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -79,6 +80,7 @@ func HandleDetailsGet(
 			"query":             r.URL.Query().Get("query"),
 			"savedSuccessfully": savedSuccessfully,
 			"userCreated":       userCreated,
+			"setupEmailNotSent": setupEmailNotSent,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_details.html", bind)

@@ -1599,17 +1599,22 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"user":{"otpEnabled":false}}`, want: false,
 		},
 		{
+			// The answer's setupEmailSent reaches the console as it was written, false included,
+			// beside the user (#725).
 			name: "CreateUserAdmin",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
 				got, err := c.CreateUserAdmin(ctx, charAccessToken, charCreateUser)
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				if got.SetupEmailSent == nil {
+					return []any{got.User.Id, "absent"}, nil
+				}
+				return []any{got.User.Id, *got.SetupEmailSent}, nil
 			},
 			verb: "POST", path: "/api/v1/admin/users/create", contentType: charJSON,
 			bodyOf:        charCreateUser,
-			successStatus: 201, reply: `{"user":{"id":99}}`, want: int64(99),
+			successStatus: 201, reply: `{"user":{"id":99},"setupEmailSent":false}`, want: []any{int64(99), false},
 		},
 		{
 			name: "GetUserProfilePicture",

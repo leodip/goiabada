@@ -319,3 +319,39 @@ func TestRender_AdminUserHeaderDownloadDataInEnglish(t *testing.T) {
 
 	assert.Contains(t, out, `<button class="button" type="submit">Download data</button>`)
 }
+
+// A new user whose setup email could not be sent is shown with a warning and what to do: set a
+// password on the Authentication tab, and, only for a verified address, have the user use the
+// sign-in page's forgot-password link once email works, since that link goes only to a verified
+// address (#725 decision 12).
+func TestRender_AdminUserDetailsWarnsOfASetupEmailNotSent(t *testing.T) {
+	const notSent = "The setup email couldn&#39;t be sent, so the user can&#39;t sign in yet."
+	const setPassword = "Set a password for them on the Authentication tab."
+	const forgotPassword = "Or, once email works, ask them to select &#34;Forgot your password?&#34; on the sign-in page."
+
+	page := func(emailVerified, setupEmailNotSent bool) string {
+		return renderMenuPageIn(t, "/admin_users_details.html", map[string]interface{}{
+			"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", EmailVerified: emailVerified},
+			"userFullName":      "",
+			"page":              "",
+			"query":             "",
+			"savedSuccessfully": false,
+			"userCreated":       true,
+			"setupEmailNotSent": setupEmailNotSent,
+		}, "en", true)
+	}
+
+	verified := page(true, true)
+	assert.Contains(t, verified, notSent)
+	assert.Contains(t, verified, setPassword)
+	assert.Contains(t, verified, forgotPassword)
+
+	unverified := page(false, true)
+	assert.Contains(t, unverified, notSent)
+	assert.Contains(t, unverified, setPassword)
+	assert.NotContains(t, unverified, "Forgot your password?", "a forgot-password link is not sent to an unverified address")
+
+	sent := page(true, false)
+	assert.NotContains(t, sent, notSent)
+	assert.NotContains(t, sent, setPassword)
+}

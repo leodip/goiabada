@@ -1150,6 +1150,9 @@
 "adminconsole.admin_users.details.field.enabled_hint" = "Un usuario desactivado no puede iniciar sesión y los clientes no pueden renovar sus tokens."
 "adminconsole.admin_users.details.disable_warning" = "Vas a desactivar al usuario. No podrá iniciar sesión y los clientes no podrán renovar sus tokens."
 "adminconsole.admin_users.details.user_created_message" = "Usuario creado."
+"adminconsole.admin_users.details.setup_email_not_sent" = "No se pudo enviar el correo de configuración, así que el usuario todavía no puede iniciar sesión."
+"adminconsole.admin_users.details.setup_email_set_password" = "Establece una contraseña para el usuario en la pestaña Autenticación."
+"adminconsole.admin_users.details.setup_email_forgot_password" = "O, cuando el correo funcione, pide al usuario que seleccione «¿Olvidaste tu contraseña?» en la página de inicio de sesión."
 
 # --- Admin users (profile, email, phone, address) ---------------------------
 

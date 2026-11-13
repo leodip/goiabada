@@ -188,7 +188,10 @@ paths:
     post:
       tags: [Users]
       summary: Create user
-      description: Create a new user as admin
+      description: |
+        Create a new user as admin. With email enabled and setPasswordType "email", the setup email
+        is sent while the request waits; a setup email that cannot be sent still answers 201 with
+        the user, and setupEmailSent says whether it went out.
       operationId: createUser
       requestBody:
         required: true
@@ -198,7 +201,7 @@ paths:
               $ref: '#/components/schemas/CreateUserRequest'
       responses:
         '201':
-          description: User created
+          description: User created, whether or not its setup email could be sent
           content:
             application/json:
               schema:
@@ -6361,6 +6364,14 @@ components:
       properties:
         user:
           $ref: '#/components/schemas/UserResponse'
+        setupEmailSent:
+          type: boolean
+          description: >-
+            Present exactly when email is enabled and the request's setPasswordType is "email":
+            true when the setup email was sent, false when it could not be sent. The user is
+            created either way. With false, set a password for the user, or, when their address is
+            verified, have them use the sign-in page's forgot-password link once email works.
+            Absent in every other case, so false never means a setup email was not asked for.
       required:
         - user
 

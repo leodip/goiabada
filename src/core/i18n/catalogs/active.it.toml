@@ -1152,6 +1152,9 @@
 "adminconsole.admin_users.details.field.enabled_hint" = "Un utente disabilitato non può accedere e i client non possono rinnovare i suoi token."
 "adminconsole.admin_users.details.disable_warning" = "Stai disabilitando l'utente: non potrà accedere e i client non potranno rinnovare i suoi token."
 "adminconsole.admin_users.details.user_created_message" = "Utente creato."
+"adminconsole.admin_users.details.setup_email_not_sent" = "Non è stato possibile inviare l'email di configurazione, quindi l'utente non può ancora accedere."
+"adminconsole.admin_users.details.setup_email_set_password" = "Imposta una password per l'utente nella scheda Autenticazione."
+"adminconsole.admin_users.details.setup_email_forgot_password" = "Oppure, quando l'email funziona di nuovo, chiedi all'utente di selezionare «Hai dimenticato la password?» nella pagina di accesso."
 
 # --- Admin users (profile, email, phone, address) ---------------------------
 

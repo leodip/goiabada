@@ -1149,6 +1149,9 @@
 "adminconsole.admin_users.details.field.enabled_hint" = "Ein deaktiviertes Konto kann sich nicht anmelden. Clients können seine Tokens nicht erneuern."
 "adminconsole.admin_users.details.disable_warning" = "Sie deaktivieren das Konto. Es kann sich danach nicht mehr anmelden und Clients können seine Tokens nicht erneuern."
 "adminconsole.admin_users.details.user_created_message" = "Konto erstellt."
+"adminconsole.admin_users.details.setup_email_not_sent" = "Die E-Mail zum Einrichten des Passworts konnte nicht gesendet werden. Das Konto kann sich daher noch nicht anmelden."
+"adminconsole.admin_users.details.setup_email_set_password" = "Legen Sie im Tab „Authentifizierung“ ein Passwort für das Konto fest."
+"adminconsole.admin_users.details.setup_email_forgot_password" = "Oder bitten Sie die Person, sobald E-Mails wieder gesendet werden, auf der Anmeldeseite „Passwort vergessen?“ auszuwählen."
 
 # --- Admin users (profile, email, phone, address) ---------------------------
 
