@@ -15,7 +15,7 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's shown at the top of the sign-in pages and ends their titles, as in "Sign in – Acme". It also signs every email, and it's the name authenticator apps list your users' accounts under.
 
-2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and a [custom palette](#custom-palettes) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card, and [custom CSS](#custom-css) for anything the other choices don't cover.
+2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and a [custom palette](#custom-palettes) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card, and [custom CSS](#custom-css) for anything the other choices don't cover. The emails your users get are drawn in the brand too: see [Branded emails](#branded-emails).
 
 3. To give one client a look of its own, click **New brand** and create one, then choose it under **Brand** on the client's **Settings** tab. See [Clients](/concepts/clients/#brand) for the pages it draws.
 
@@ -489,6 +489,32 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
 
 An answer always carries `customCss` as it was saved, each line ending a line feed, or `""` for a brand with none. A refusal of the CSS carries `error_field` set to `/customCss`.
 
+## Branded emails
+
+Every email the auth server sends is drawn in a brand, the brand of the page it was sent from, so a password reset looks like the sign-in it came from.
+
+### What an email takes from its brand
+
+An email is a card on the brand's background color, with the brand's **Logo** above the app name, as on the [sign-in card](#logo-and-app-name). **Hide the app name** hides the name there too, and the logo then carries the app name as its alternative text, which a mail client that blocks images shows in its place. The card takes the brand's colors, its **Corners** and its **Font**. An **Uploaded font** is drawn in **System UI**, since an email can't load a font file.
+
+The password reset, the activation link, a new user's setup email and the welcome email each have a button in the brand's color above their link, and every other link is in the brand's color too. The brand's [footer links and support contact](#footer-links-and-support-contact) are drawn under the card. The background image, the favicon and the custom CSS never reach an email.
+
+An email doesn't follow the reader's light or dark mode, since many mail clients ignore it. A brand whose **Appearance** is **Dark** is drawn in its dark colors, with its **Dark logo** if it has one. **Light** and **Automatic** brands are drawn in their light colors.
+
+Every email is sent as plain text too, for mail clients that show no HTML: its text, its links written out, and the footer.
+
+### Which brand an email takes
+
+An email takes the brand of the page it was sent from:
+
+| Sent from | Drawn in | Emails |
+|---|---|---|
+| The pages of a sign-in to your app | The client's brand | When someone registers, the activation link, the welcome email and the notice that the address already has an account. The password reset link, and the notice that the password was reset. The notices that two-factor authentication was set up, that a recovery code was used, and that the authenticator was disabled after too many wrong codes. |
+| The **Account** pages, or the Account API | The brand of the client the access token was issued to, which for the admin console's **Account** pages is the admin console's own client's brand | The verification code. The notices that the email address or the password was changed, that two-factor authentication was set up or turned off, that the recovery codes were replaced, that the account was deleted, and that the authenticator was disabled after too many wrong codes while confirming a deletion. |
+| An administrator's action | The default brand | A new user's setup email. The notices that an administrator changed the password, turned off two-factor authentication or deleted the account. The test email from **Send test email**. |
+
+A client with no brand of its own gives the default brand, as its pages do: see [Clients](/concepts/clients/#brand). So does the forgot password page opened on its own, outside a sign-in.
+
 ## Safe mode
 
 Safe mode draws the pages without what can make a brand unusable: its custom CSS, a custom palette and an uploaded font. Use it to sign in and fix a brand whose pages you can't read or use.
@@ -511,6 +537,8 @@ You can also turn it on:
 
 - **For one sign-in to your app**, with `goiabada_safe_mode=true` on the [authorization request](/reference/endpoints/authorize/#parameters). Every page of that sign-in is drawn in safe mode.
 - **For every page of both servers**, for everyone, with [`GOIABADA_AUTHSERVER_BRAND_SAFE_MODE`](/reference/environment-variables/#customization) set to `true` on the auth server. It lasts until you unset it and restart the auth server, and signing out doesn't end it.
+
+An email follows safe mode too: one sent from the pages of a sign-in in safe mode, and every email while `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE` is on, shows the Blueberry colors in place of its [brand's](#branded-emails) custom palette. The admin console's safe mode doesn't change the emails its **Account** pages send.
 
 ## How the language is chosen
 
