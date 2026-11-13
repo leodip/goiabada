@@ -311,6 +311,12 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   request-body table's rows read it. The public asset handler grants a font's answer to the admin
   console's origin, which `routes.go` derives from `GOIABADA_ADMINCONSOLE_BASEURL`. The cleanup
   worker sweeps an asset no brand uses once it is a day old (see the [data guide](data.md#brand-assets))
+- `internal/customcss/` - The check a brand's custom CSS passes before it is saved (#816
+  decision 4): `Check`, from CSS text to nil or a `Refusal` naming its rule and line. It reads the
+  CSS as tokens, by a tokenizer of its own that follows CSS Syntax Level 3 section 4, so an escape
+  (`@\69mport`, `\75rl(`) reaches the same rule its plain spelling does. It refuses more than 64 KB,
+  `@import`, a `url()` that is not a `data:` image, `src()`, `image()` and `image-set()` under any
+  vendor prefix, and CSS that does not tokenize cleanly; it rewrites nothing
 - `internal/clientauth/` - Client authentication from plain values, the client identifier and the
   secret presented: the lookup, the secret check and their refusals' wording and shape, shared by
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a
