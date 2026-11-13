@@ -391,6 +391,23 @@
       </div>
     </div>
   </div>
+
+  {{/* Custom CSS (#816): the brand's own rules, added last to its stylesheet, kept as written. The
+       heading is the field's label. The preview never draws the CSS (decision 8), and the sentence
+       after the hint says so and how to try it for real. A refusal names the line it is about in the
+       notice, which describes the field first. A line break follows the start tag, since a browser
+       drops one there, so CSS starting with a blank line keeps it and its lines keep their numbers.
+       Spelling is not checked: CSS is not prose. */}}
+  <div class="panel-body stacked">
+    <div class="field">
+      <h2 class="panel-title"><label for="customCss">{{ T $.ctx "adminconsole.admin_branding.brand.custom_css.title" }}</label></h2>
+      <p class="field-hint" id="customCssHint">{{ T $.ctx "adminconsole.admin_branding.brand.custom_css.hint" }}</p>
+      <p class="field-hint" id="customCssPreviewNote">{{ T $.ctx "adminconsole.admin_branding.brand.custom_css.preview_note" }}</p>
+      <textarea class="control control-mono" id="customCss" name="customCss" rows="12" spellcheck="false" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "customCss" }}brand-error {{ end }}{{ end }}customCssHint customCssPreviewNote"
+        {{- if .error }}{{ if eq .errorField "customCss" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+{{ .brand.CustomCss }}</textarea>
+    </div>
+  </div>
   <div class="panel-footer">
     <a class="button button-quiet" href="/admin/settings/branding">{{ T $.ctx "common.button.cancel" }}</a>
     {{ if .isNew }}

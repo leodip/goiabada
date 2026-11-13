@@ -5,11 +5,12 @@
 // sideways. Only the test's own tab is resized, so the fixtures work at the default size.
 import type { Locator, Page } from "@playwright/test";
 import { addRedirectUri, addSignOutRedirectUri, cancelDialog, clientUrl, setClientBrand, userUrl } from "../../lib/admin-console";
-import { brandUrl, fillBrandFooter, newBrandUrl, paletteField, withBrand } from "../../lib/brands";
+import { brandUrl, customCssField, fillBrandFooter, newBrandUrl, paletteField, withBrand } from "../../lib/brands";
 import { openSignIn } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { browserSignInClient } from "../../lib/test-clients";
+import { uniqueIdentifier } from "../../lib/unique";
 
 // A test visits a dozen pages at its size.
 test.describe.configure({ timeout: 120_000 });
@@ -331,6 +332,27 @@ test("the Colors section keeps each color's two fields side by side at a phone's
           const clipped = await field.evaluate((input) => input.scrollWidth > input.clientWidth);
           expect(clipped, `${width}px: ${token}'s whole value shows`).toBe(false);
         }
+      }
+    });
+  }
+});
+
+// The brand editor's Custom CSS field (#816) at a phone's widths, refused, holding a line longer than
+// the screen: the field, its notice and the sentence about the preview stay within the screen, the long
+// line wraps or scrolls inside the field, and the page does not scroll sideways.
+test("the Custom CSS field, refused, stays within a phone's screen", async ({ page }) => {
+  const longLine = `.auth-card { background-image: url("data:image/gif;base64,${"R0lGODlhAQABAIAAAAAAAP".repeat(12)}"); }`;
+  for (const width of [320, 390]) {
+    await test.step(`${width}px`, async () => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(newBrandUrl);
+      await page.locator("#name").fill(uniqueIdentifier("brand"));
+      await customCssField(page).fill(`${longLine}\n@import "theme.css";\n`);
+      await page.locator("#btnCreate").click();
+      await expect(customCssField(page)).toHaveAttribute("aria-invalid", "true");
+      expect(await sidewaysScroll(page), `${width}px: no sideways scroll`).toBeLessThanOrEqual(0);
+      for (const shown of [page.locator("#brand-error"), customCssField(page), page.locator("#customCssPreviewNote")]) {
+        await expectWithinScreen(page, shown);
       }
     });
   }

@@ -30,6 +30,7 @@ import {
 } from "../../lib/admin-console";
 import {
   brandUrl,
+  customCssField,
   defaultBrand,
   expectPreviewDrawn,
   fillBrandFooter,
@@ -1310,6 +1311,24 @@ test("the settings pages and the audit log", async ({ page }) => {
       await fillBrandFooter(page, { supportPhone: "555-0123" });
       await page.locator("#btnCreate").click();
       await expect(page.locator("#supportPhone")).toBeFocused();
+    }),
+    // The Custom CSS field (#816): filled, and an @import refused at it, the notice naming its line.
+    // Nothing is saved.
+    {
+      name: "branding, a new brand, its custom CSS filled",
+      reach: async () => {
+        await page.goto(newBrandUrl);
+        await customCssField(page).fill('body[data-page="sign-in"] .auth-card {\n  border: 2px solid var(--color-brand);\n}\n');
+        await expect(page.locator("#customCssPreviewNote")).toBeVisible();
+      },
+    },
+    refused(page, "branding, a new brand, its custom CSS refused at its field", "customCss", async () => {
+      await page.goto(newBrandUrl);
+      await page.locator("#name").fill(uniqueIdentifier("brand"));
+      await customCssField(page).fill('.auth-card {\n  color: red;\n}\n@import "https://cdn.example.com/theme.css";\n');
+      await page.locator("#btnCreate").click();
+      await expect(page.locator("#brand-error")).toHaveText("Line 4 of the custom CSS has an @import. Custom CSS cannot load another stylesheet.");
+      await expect(customCssField(page)).toBeFocused();
     }),
     // The Colors section (#815 decisions 7 and 8): Custom picked, in Basic and in Advanced, and a value
     // that is not a color refused at its field in the column the appearance hides, drawn for it.

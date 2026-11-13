@@ -23,7 +23,8 @@ import (
 // decision 3); a brand created and edited, its appearance and theme chosen on option cards whose
 // swatches are drawn from the auth server's own palettes (GET /brand-themes), its corners, font
 // family, background fit and the switch hiding the app name chosen beside them (#813), its footer
-// links and support contact typed in after them (#814), made the default, and deleted, its clients moving to the default. Every write drops the cached public
+// links and support contact typed in after them (#814), then its custom CSS (#816), made the
+// default, and deleted, its clients moving to the default. Every write drops the cached public
 // settings, whose brand is the console's own client's, which may be the brand written or follow the
 // default.
 
@@ -58,7 +59,7 @@ type BrandRow struct {
 // FooterLinks are the form's three rows (#814 decision 11): the links in their order, then the empty
 // rows, so a refusal naming a link by its index, and its sentence by its number, names the row of that
 // number. SupportEmail, SupportUrl and SupportPhone are the contact's three fields, as stored or as
-// sent.
+// sent. CustomCss is the brand's custom CSS (#816), as stored or exactly as sent.
 type BrandForm struct {
 	Name          string
 	Appearance    string
@@ -79,6 +80,8 @@ type BrandForm struct {
 	SupportEmail string
 	SupportUrl   string
 	SupportPhone string
+
+	CustomCss string
 }
 
 // brandFooterRows is how many footer link rows the form draws: as many as a brand has links at most
@@ -185,7 +188,8 @@ type BrandThemeOption struct {
 // about the name to the name; the appearance, theme, corners and background fit choices to theirs;
 // an unknown family and the uploaded font without a regular font file to the font family (#813
 // decision 7); a slot naming no stored asset of its kind to its own field; and a dark logo without a
-// logo, and a bold font file without a regular one, to the field that wants a file.
+// logo, and a bold font file without a regular one, to the field that wants a file; and each refusal
+// of custom CSS, whose sentence names the line, to its field (#816 decision 4).
 var brandErrorFields = map[string]string{
 	i18n.ErrCodeBrandNameRequired:                "name",
 	i18n.ErrCodeBrandNameTooLong:                 "name",
@@ -210,6 +214,11 @@ var brandErrorFields = map[string]string{
 	i18n.ErrCodeBrandSupportURLInvalid:           "supportUrl",
 	i18n.ErrCodeBrandSupportURLTooLong:           "supportUrl",
 	i18n.ErrCodeBrandSupportPhoneInvalid:         "supportPhone",
+	i18n.ErrCodeBrandCustomCSSTooLarge:           "customCss",
+	i18n.ErrCodeBrandCustomCSSImport:             "customCss",
+	i18n.ErrCodeBrandCustomCSSURL:                "customCss",
+	i18n.ErrCodeBrandCustomCSSFunction:           "customCss",
+	i18n.ErrCodeBrandCustomCSSMalformed:          "customCss",
 }
 
 // brandRefusedField answers the form field a refusal of a brand's save is about. A footer link's
@@ -373,7 +382,8 @@ func brandKitStyles() BrandKitStyles {
 // appearance, theme and kit choices as sent, which the auth server compares exactly. The switch is a
 // checkbox, which a browser sends only while it is on. The footer link rows and the contact are read
 // trimmed, as the auth server stores them, the phone number with the separators typed, which the auth
-// server strips (#814 decision 11).
+// server strips (#814 decision 11). The custom CSS is read exactly as sent: the auth server stores what
+// was written, with its line endings made uniform, and counts a refusal's line on it (#816 decision 4).
 func brandFormFrom(r *http.Request) BrandForm {
 	return BrandForm{
 		Name:          strings.TrimSpace(r.PostFormValue("name")),
@@ -387,6 +397,7 @@ func brandFormFrom(r *http.Request) BrandForm {
 		SupportEmail:  strings.TrimSpace(r.PostFormValue("supportEmail")),
 		SupportUrl:    strings.TrimSpace(r.PostFormValue("supportUrl")),
 		SupportPhone:  strings.TrimSpace(r.PostFormValue("supportPhone")),
+		CustomCss:     r.PostFormValue("customCss"),
 	}
 }
 
@@ -677,6 +688,7 @@ func HandleBrandNewPost(
 			SupportUrl:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
 			Palette:       palette.request(form.Theme),
+			CustomCss:     form.CustomCss,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -772,7 +784,7 @@ func HandleBrandGet(
 			Logo: brand.Logo, DarkLogo: brand.DarkLogo, Favicon: brand.Favicon, Background: brand.Background,
 			RegularFont: brand.RegularFont, BoldFont: brand.BoldFont,
 			FooterLinks: footerRowsOf(brand.FooterLinks), SupportEmail: brand.SupportEmail,
-			SupportUrl: brand.SupportUrl, SupportPhone: brand.SupportPhone}
+			SupportUrl: brand.SupportUrl, SupportPhone: brand.SupportPhone, CustomCss: brand.CustomCss}
 		renderBrandForm(httpHelper, w, r, form, brandPaletteFormOf(brand, themes, brand.Theme), themes, map[string]interface{}{
 			"isNew":             false,
 			"storedBrand":       *brand,
@@ -808,8 +820,8 @@ func HandleBrandPost(
 
 		// An update replaces every field (#813 decision 10): each slot is sent as the form holds it,
 		// the stored asset, a file uploaded in place of it, or none once removed, which Save attaches,
-		// and the footer links and the support contact as the form holds them (#814 decision 11). The
-		// editor has no custom CSS field yet, so the stored CSS is sent back as the API answered it.
+		// and the footer links, the support contact (#814 decision 11) and the custom CSS (#816) as the
+		// form holds them.
 		form := brandFormFrom(r)
 		palette := brandPaletteFormFrom(r, brand)
 		ids := brandSlotIdsFrom(r)
@@ -832,7 +844,7 @@ func HandleBrandPost(
 			SupportUrl:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
 			Palette:       palette.request(form.Theme),
-			CustomCss:     brand.CustomCss,
+			CustomCss:     form.CustomCss,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {

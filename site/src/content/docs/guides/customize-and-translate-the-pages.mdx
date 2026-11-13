@@ -15,7 +15,7 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's shown at the top of the sign-in pages and ends their titles, as in "Sign in – Acme". It also signs every email, and it's the name authenticator apps list your users' accounts under.
 
-2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and a [custom palette](#custom-palettes) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card.
+2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and a [custom palette](#custom-palettes) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card, and [custom CSS](#custom-css) for anything the other choices don't cover.
 
 3. To give one client a look of its own, click **New brand** and create one, then choose it under **Brand** on the client's **Settings** tab. See [Clients](/concepts/clients/#brand) for the pages it draws.
 
@@ -62,7 +62,7 @@ Every key you don't name keeps the built-in text. Set `GOIABADA_I18N_OVERRIDES_D
 
 ## Change the templates
 
-To change the layout of a page, or an email's body, you give a server its own copy of the templates. The templates and static files are compiled into each server's binary, and the images hold the binary alone, so there's no `web` folder inside a container to copy out.
+To change the layout of a page, or an email's body, you give a server its own copy of the templates. To restyle the pages, write a brand's [custom CSS](#custom-css) instead: it needs nothing redone when you upgrade. The templates and static files are compiled into each server's binary, and the images hold the binary alone, so there's no `web` folder inside a container to copy out.
 
 <Steps>
 
@@ -431,6 +431,63 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
 An answer always carries all four: `[]` for no links, `""` for a value not set, and `{}` as the `labels` of a link with none. A blank language label is dropped.
 
 A refusal about a footer link carries `error_field`, a JSON Pointer to the member it's about, such as `/footerLinks/1/url` for the second link's URL. The pointer's index is counted from 0, while the message counts links from 1.
+
+## Custom CSS
+
+A brand's custom CSS restyles its pages beyond what its other choices do, such as a page's layout, a heading's size or a card's border.
+
+<Steps>
+
+1. Open **Admin**, **Branding**, and open the brand.
+
+2. Under **Custom CSS**, write your rules. Write them against the [styling contract](/reference/styling-contract/): its variables, page names and classes stay the same from one release to the next, so your rules keep matching after an upgrade.
+
+3. Click **Save**.
+
+4. Open a page in the brand to see your rules. The preview beside the form doesn't draw custom CSS, so try new rules on a brand you've given to a test client, and sign in to that client.
+
+</Steps>
+
+```css
+body[data-page="sign-in"] .auth-card {
+  border: 2px solid var(--color-brand);
+}
+```
+
+The CSS goes after the brand's own styles, so a rule of yours wins over a built-in one of the same [specificity](https://developer.mozilla.org/en-US/docs/Web/CSS/Specificity). It's on every page of the auth server, and on the admin console's Account pages, its home page, and its error and sign-out pages. It's never on the console's admin pages.
+
+### What custom CSS can hold
+
+Custom CSS can't make a browser load anything, so it can't send a visitor's data anywhere:
+
+- It's up to 64 KB.
+- It can't hold `@import`.
+- It can't hold a URL, except a `data:` image in `url()`, such as `url("data:image/svg+xml,…")`. A URL to another site or to the auth server itself is refused. Upload a background, a logo or a font in the brand's [kit](#the-brand-kit) instead.
+- It can't use `src()`, `image()` or `image-set()`, with or without a vendor prefix such as `-webkit-`. Write a `data:` image in `url()` instead.
+- Every comment, string and `url()` must be closed.
+
+The rules apply however you write a name: in capitals, or with a CSS escape such as `\69mport`.
+
+### Custom CSS through the Admin API
+
+A brand carries its custom CSS as one string, `customCss`, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/), [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) and every brand they answer. As with the kit, an update replaces the whole brand, so leaving `customCss` out, or setting it to `null` or `""`, removes the brand's CSS:
+
+```bash
+curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme",
+    "appearance": "auto",
+    "theme": "blueberry",
+    "corners": "rounded",
+    "font": "system-ui",
+    "backgroundFit": "cover",
+    "customCss": "body[data-page=\"sign-in\"] .auth-card {\n  border: 2px solid var(--color-brand);\n}\n"
+  }'
+```
+
+An answer always carries `customCss` as it was saved, each line ending a line feed, or `""` for a brand with none. A refusal of the CSS carries `error_field` set to `/customCss`.
 
 ## How the language is chosen
 
