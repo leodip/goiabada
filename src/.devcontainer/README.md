@@ -68,6 +68,10 @@ an auth server and an admin console for an agent to look at in a browser. They n
 so Docker picks a free one for each stack, on the loopback address only, and two stacks never
 collide; `docker compose port devcontainer 19290` tells which one it picked.
 
+And it caps the devcontainer's memory at 16 GB, swap included, so a test that runs away is
+killed inside its own stack instead of starving the machine and every other stack on it. The
+human container has no cap.
+
 ### Start
 
 Run from anywhere. `--project-directory` pins the compose files' relative paths (the build

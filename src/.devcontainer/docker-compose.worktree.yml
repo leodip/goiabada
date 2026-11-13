@@ -26,6 +26,13 @@ services:
     ports:
       - "127.0.0.1::19290"
       - "127.0.0.1::19291"
+    # A ceiling on the memory of everything run in the devcontainer, swap
+    # included, so a runaway test is killed here instead of starving the
+    # machine. On #816 a mutation made a tokenizer loop while it allocated: the
+    # test binary reached 42 GB of the host's 47 before the kernel killed it,
+    # and the agents' terminals stopped answering on the way (2026-11-12).
+    mem_limit: 16g
+    memswap_limit: 16g
   mysql-server:
     ports: !reset []
     # MySQL keeps its data in memory here, not in the mysql-data volume. Every
