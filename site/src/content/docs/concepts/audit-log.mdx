@@ -140,6 +140,7 @@ No entry records a user's email address. An entry about one records `email_diges
 | `command` | `goiabada-authserver recover`, on every entry the `recover` command writes. An entry an API request made names its token's subject under `logged_in_user` instead. |
 | `consent_id` | The row id of a consent a user gave a client. |
 | `corners` | A brand's corners after the save: `square`, `rounded` or `pill`. |
+| `custom_css_bytes` | The size of a brand's custom CSS after the save, in bytes, left out when the brand has none. The CSS itself is not recorded. |
 | `dark_logo_asset_id` | The row id of the brand asset in a brand's dark logo slot after the save, left out when the slot is empty. |
 | `dpop_bound_access_tokens` | Whether the client now requires DPoP for its token requests. |
 | `email_digest` | The SHA-256 hex digest of the email address the entry is about, in lowercase and, except on a forgot-password request, trimmed: one typed into a form or named by a password grant, an account's, or a test email's recipient. |
@@ -443,8 +444,8 @@ These come from the Account API, which users reach through the admin console's a
 
 | Event | Meaning |
 |---|---|
-| `created_brand` | An administrator created a brand. The entry names it, and holds its support contact, its footer links' URLs, in order, and, on a custom palette, its theme and its custom palette's mode. |
-| `updated_brand` | An administrator saved a brand's name, appearance, theme, corners, font, background fit, whether the app name is hidden, the assets in its logo, dark logo, favicon, background and font slots, its support contact, its footer links' URLs, in order, and its custom palette's mode. |
+| `created_brand` | An administrator created a brand. The entry names it, and holds its support contact, its footer links' URLs, in order, on a custom palette, its theme and its custom palette's mode, and the size of its custom CSS. |
+| `updated_brand` | An administrator saved a brand's name, appearance, theme, corners, font, background fit, whether the app name is hidden, the assets in its logo, dark logo, favicon, background and font slots, its support contact, its footer links' URLs, in order, its custom palette's mode, and the size of its custom CSS. |
 | `deleted_brand` | An administrator deleted a brand. The entry says how many clients moved to the default brand. |
 | `updated_default_brand` | An administrator made another brand the default. The entry names the new and the old default. |
 | `uploaded_brand_asset` | An administrator uploaded a file for a brand's logo, favicon, background or font. No brand uses it until one is saved naming it. |

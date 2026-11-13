@@ -365,6 +365,7 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertScriptSyntax` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSectionSays` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSlogConvention` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertStylingContract` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSymbolOwnership` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesNewTabLinksSaySo` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
@@ -387,6 +388,7 @@ command itself and fails on a tree it changed.
 | `core/guard` | `ScriptToken` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `ScriptValue` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `SourceRoot` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `StylingContract` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `TokenizeScript` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/hashutil` | `HashString` | both-apps | — |
 | `core/healthcheck` | `ArgumentsRefused` | both-apps | — |
@@ -458,6 +460,11 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeBrandBoldFontAssetInvalid` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandBoldFontRegularRequired` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandCornersInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeBrandCustomCSSFunction` | both-apps | Catalog key of an admin API refusal of a brand's custom CSS, whose `error_description` names the line it is about in the request's language while its `error_code` is the key itself (#816 decision 4). The auth server writes it, and the admin console's brand editor names it to mark the Custom CSS field; it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandCustomCSSImport` | both-apps | Catalog key of an admin API refusal of a brand's custom CSS, whose `error_description` names the line it is about in the request's language while its `error_code` is the key itself (#816 decision 4). The auth server writes it, and the admin console's brand editor names it to mark the Custom CSS field; it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandCustomCSSMalformed` | both-apps | Catalog key of an admin API refusal of a brand's custom CSS, whose `error_description` names the line it is about in the request's language while its `error_code` is the key itself (#816 decision 4). The auth server writes it, and the admin console's brand editor names it to mark the Custom CSS field; it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandCustomCSSTooLarge` | both-apps | Catalog key of an admin API refusal of a brand's custom CSS, whose `error_description` names the most bytes it may hold in the request's language while its `error_code` is the key itself (#816 decision 4). The auth server writes it, and the admin console's brand editor names it to mark the Custom CSS field; it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeBrandCustomCSSURL` | both-apps | Catalog key of an admin API refusal of a brand's custom CSS, whose `error_description` names the line it is about in the request's language while its `error_code` is the key itself (#816 decision 4). The auth server writes it, and the admin console's brand editor names it to mark the Custom CSS field; it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandDarkLogoAssetInvalid` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandDarkLogoLogoRequired` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeBrandDefaultDeleteNotAllowed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
@@ -904,6 +911,14 @@ command itself and fails on a tree it changed.
 | `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
 | `core/sourceroot` | `FindSourceRoot` | kernel | — |
 | `core/sourceroot` | `ModuleDirs` | kernel | — |
+| `core/stylingcontract` | `AdminConsole` | test-support | Test support: no binary names it, and both servers' template guards read the styling contract's lists for their pages through it. |
+| `core/stylingcontract` | `AuthServer` | test-support | Test support: no binary names it, and both servers' template guards read the styling contract's lists for their pages through it. |
+| `core/stylingcontract` | `ClassesOn` | test-support | Test support: no binary names it, and both servers' template guards read the styling contract's lists for their pages through it. |
+| `core/stylingcontract` | `PageName` | both-apps | — |
+| `core/stylingcontract` | `PageTemplate` | own-package | — |
+| `core/stylingcontract` | `PagesOn` | test-support | Test support: no binary names it, and both servers' template guards read the styling contract's lists for their pages through it. |
+| `core/stylingcontract` | `Server` | test-support | Test support: no binary names it, and both servers' template guards read the styling contract's lists for their pages through it. |
+| `core/stylingcontract` | `Variables` | test-support | Test support: no binary names it, and both servers' template guards read the styling contract's lists for their pages through it. |
 | `core/timezones` | `All` | contract | The list half of the time zone table whose lookup the auth server validates against. Moving it would put one zone table in two places. |
 | `core/timezones` | `ByZone` | contract | The lookup half of the time zone table whose list the admin console renders. Moving it would put one zone table in two places. |
 | `core/timezones` | `Zone` | contract | The row type both halves of the table share. |

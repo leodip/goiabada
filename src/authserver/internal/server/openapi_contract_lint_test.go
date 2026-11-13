@@ -288,12 +288,14 @@ var documentedPublicRoutes = []string{
 // registered by a constant this table does not hold is one collectRoutes cannot read, which
 // TestOpenAPI_ReadsEveryRoutePath fails on rather than letting every test here skip it.
 var routeConstants = map[string]string{
-	"brandthemes.StylesheetRoute":       brandthemes.StylesheetRoute,
-	"brandthemes.ColorsStylesheetRoute": brandthemes.ColorsStylesheetRoute,
-	"brandasset.Route":                  brandasset.Route,
-	"emaillinks.ForgotPasswordPath":     emaillinks.ForgotPasswordPath,
-	"emaillinks.ResetPasswordPath":      emaillinks.ResetPasswordPath,
-	"emaillinks.AccountActivatePath":    emaillinks.AccountActivatePath,
+	"brandthemes.StylesheetRoute":           brandthemes.StylesheetRoute,
+	"brandthemes.ColorsStylesheetRoute":     brandthemes.ColorsStylesheetRoute,
+	"brandthemes.SafeStylesheetRoute":       brandthemes.SafeStylesheetRoute,
+	"brandthemes.SafeColorsStylesheetRoute": brandthemes.SafeColorsStylesheetRoute,
+	"brandasset.Route":                      brandasset.Route,
+	"emaillinks.ForgotPasswordPath":         emaillinks.ForgotPasswordPath,
+	"emaillinks.ResetPasswordPath":          emaillinks.ResetPasswordPath,
+	"emaillinks.AccountActivatePath":        emaillinks.AccountActivatePath,
 }
 
 // routePath reads a registration's path: a string literal, or a package constant routeConstants

@@ -37,13 +37,15 @@ type signInCeremonies interface {
 // all. A sign-in that cannot be read is left to the step to answer. It writes nothing and refuses
 // nothing.
 //
+// A sign-in that asked for safe mode draws those pages in safe mode (#816 decision 3).
+//
 // It is mounted on the sign-in's step routes, ahead of every guard and limiter there, beneath
 // PageClient.
 func SignInPageClient(ceremonies signInCeremonies) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if authContext, err := ceremonies.GetAuthContext(r); err == nil && authContext != nil {
-				reqctx.NamePageClient(r.Context(), authContext.ClientId)
+				namePageSignIn(r, authContext)
 			}
 			next.ServeHTTP(w, r)
 		})
@@ -68,6 +70,8 @@ type linkedSignInCeremonies interface {
 // malformed id, or none names no client, and the page is drawn in the default brand: on these pages
 // that is never an error. It writes nothing and refuses nothing.
 //
+// A sign-in that asked for safe mode draws those pages in safe mode too (#816 decision 3).
+//
 // It is mounted on those routes ahead of every guard and limiter there, beneath PageClient.
 func LinkedSignInPageClient(ceremonies linkedSignInCeremonies) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -75,10 +79,19 @@ func LinkedSignInPageClient(ceremonies linkedSignInCeremonies) func(next http.Ha
 			ceremonyId := r.URL.Query().Get(ceremony.QueryParameter)
 			if ceremony.IsWellFormedId(ceremonyId) {
 				if authContext, err := ceremonies.HeldAuthContext(r, ceremonyId); err == nil && authContext != nil {
-					reqctx.NamePageClient(r.Context(), authContext.ClientId)
+					namePageSignIn(r, authContext)
 				}
 			}
 			next.ServeHTTP(w, r)
 		})
+	}
+}
+
+// namePageSignIn draws the request's pages as authContext's sign-in draws them: for its client, and
+// in safe mode when it asked for it.
+func namePageSignIn(r *http.Request, authContext *ceremony.AuthContext) {
+	reqctx.NamePageClient(r.Context(), authContext.ClientId)
+	if authContext.SafeMode {
+		reqctx.KeepPageSafeMode(r.Context())
 	}
 }

@@ -1,4 +1,5 @@
 {{define "title"}}{{ T $.ctx "auth.pwd.page_title" }} – {{ .appName }}{{end}}
+{{define "data-page"}}sign-in{{end}}
 {{define "head"}}{{ if .turnstileSiteKey }}<script src="{{ asset "/static/turnstile-widget.js" }}" data-widget-script="{{ .turnstileScriptURL }}" defer></script>{{ end }}{{end}}
 
 {{define "body"}}

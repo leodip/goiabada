@@ -223,6 +223,14 @@ const (
 	ErrCodeBrandPaletteColorNotBasic  = "handler.brand.palette_color_not_basic" // Args: {"mode": string, "token": string}
 	ErrCodeBrandPaletteColorInvalid   = "handler.brand.palette_color_invalid"   // Args: {"mode": string, "token": string}
 
+	// A brand's custom CSS (#816 decision 4). Each refusal points at customCss in the error answer's
+	// error_field; line is the line of the CSS it is about, counted from 1 on the CSS as stored.
+	ErrCodeBrandCustomCSSTooLarge  = "handler.brand.custom_css_too_large" // Args: {"max": int}
+	ErrCodeBrandCustomCSSImport    = "handler.brand.custom_css_import"    // Args: {"line": int}
+	ErrCodeBrandCustomCSSURL       = "handler.brand.custom_css_url"       // Args: {"line": int}
+	ErrCodeBrandCustomCSSFunction  = "handler.brand.custom_css_function"  // Args: {"line": int}
+	ErrCodeBrandCustomCSSMalformed = "handler.brand.custom_css_malformed" // Args: {"line": int}
+
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"

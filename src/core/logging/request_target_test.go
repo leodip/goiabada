@@ -39,7 +39,21 @@ func TestRequestTargetForLog(t *testing.T) {
 			want:   "/auth/authorize?client_id=admin-console&id_token_hint=[redacted]&nonce=[redacted]&redirect_uri=[redacted]&response_type=code&scope=openid+profile&state=[redacted]",
 			secret: jwtLike,
 			gate:   "allowlist miss",
-			note:   "the safe twelve survive, everything else goes",
+			note:   "the safe names survive, everything else goes",
+		},
+		{
+			name:   "authorize asking for safe mode",
+			target: "/auth/authorize?client_id=admin-console&goiabada_safe_mode=true&state=af0ifjsldkj",
+			want:   "/auth/authorize?client_id=admin-console&goiabada_safe_mode=true&state=[redacted]",
+			secret: "af0ifjsldkj",
+			gate:   "allowlist miss",
+			note:   "only true turns safe mode on, so the value is what an operator needs to see",
+		},
+		{
+			name:   "a console URL asking for safe mode",
+			target: "/admin/settings/branding?goiabada_safe_mode=true",
+			want:   "/admin/settings/branding?goiabada_safe_mode=true",
+			note:   "the console reads the same parameter and logs it through the same renderer",
 		},
 		{
 			name: "logout",
@@ -336,6 +350,20 @@ func TestRequestTargetForLog_QueryComponentCap(t *testing.T) {
 		assert.Contains(t, got, token[:512])
 		assert.NotContains(t, got, token)
 		assert.NotContains(t, got, "SIGNATURE-SENTINEL", "the signature must be cut")
+	})
+
+	t.Run("an over-long safe mode value is clipped like any kept value", func(t *testing.T) {
+		// Only true turns safe mode on, but nothing stops a request from sending
+		// more, and the kept value is written whatever it holds, so the bound is
+		// what limits it. 900 unreserved bytes, so 900 rendered bytes.
+		value := strings.Repeat("v", 900)
+
+		u, err := url.ParseRequestURI("/auth/authorize?goiabada_safe_mode=" + value)
+		require.NoError(t, err)
+
+		got := RequestTargetForLog(u)
+
+		assert.Equal(t, "/auth/authorize?goiabada_safe_mode="+value[:512]+"[truncated, 512 of 900 bytes]", got)
 	})
 
 	t.Run("both caps compose on one target", func(t *testing.T) {

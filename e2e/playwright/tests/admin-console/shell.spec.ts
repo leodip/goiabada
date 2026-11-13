@@ -7,9 +7,13 @@ import { expect, test } from "../../lib/fixtures";
 
 const home = `${env.adminUrl}/`;
 
-// The console runs only its own script files, refuses plugins and a <base>, and refuses framing
-// (#518).
-const contentSecurityPolicy = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+// The console runs only its own script files, loads styles, images and fonts only from itself and
+// the auth server, images from data: URLs too, refuses plugins and a <base>, and refuses framing
+// (#518, #816).
+const authOrigin = new URL(env.authUrl).origin;
+const contentSecurityPolicy =
+  `script-src 'self'; style-src 'self' ${authOrigin}; img-src 'self' data: ${authOrigin}; ` +
+  `font-src 'self' ${authOrigin}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`;
 
 test("the home page names the signed-in administrator and links to what they can open", async ({ page }) => {
   await page.goto(home);

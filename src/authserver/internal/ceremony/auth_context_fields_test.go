@@ -38,6 +38,7 @@ var requestFields = []string{
 	"DeferredErrorDescription",
 	"RequestedScope",
 	"DPoPJkt",
+	"SafeMode",
 }
 
 var attemptFields = []string{

@@ -56,6 +56,30 @@ func HandleBrandColorsStylesheetGet(pageRenderer PageRenderer, database brandSty
 	})
 }
 
+// HandleBrandSafeStylesheetGet answers a brand's safe full stylesheet, at
+// brandthemes.SafeStylesheetRoute, as HandleBrandStylesheetGet answers the full one: the brand without
+// its custom CSS, in Blueberry's colors in place of a custom palette and System UI in place of an
+// uploaded font, which a page drawn in safe mode links (#816 decision 1).
+func HandleBrandSafeStylesheetGet(pageRenderer PageRenderer, database brandStylesheetDatabase) http.HandlerFunc {
+	return serveBrandStylesheet(pageRenderer, database, func(r *http.Request, brand *record.Brand) (brandthemes.Stylesheet, error) {
+		slots, err := brandasset.ReadSlots(r.Context(), database, nil, brand)
+		if err != nil {
+			return brandthemes.Stylesheet{}, err
+		}
+		return brandthemes.SafeFullStylesheet(brand, slots)
+	})
+}
+
+// HandleBrandSafeColorsStylesheetGet answers a brand's safe colors-only stylesheet, at
+// brandthemes.SafeColorsStylesheetRoute, as HandleBrandColorsStylesheetGet answers the colors-only
+// one: Blueberry's colors in place of a custom palette, which the admin console's admin pages link in
+// safe mode (#816 decision 2).
+func HandleBrandSafeColorsStylesheetGet(pageRenderer PageRenderer, database brandStylesheetDatabase) http.HandlerFunc {
+	return serveBrandStylesheet(pageRenderer, database, func(_ *http.Request, brand *record.Brand) (brandthemes.Stylesheet, error) {
+		return brandthemes.SafeColorsStylesheet(brand)
+	})
+}
+
 // serveBrandStylesheet answers the stylesheet stylesheetOf builds for the brand the path names,
 // kept for a year when the request names its current fingerprint and five minutes otherwise.
 func serveBrandStylesheet(pageRenderer PageRenderer, database brandStylesheetDatabase,

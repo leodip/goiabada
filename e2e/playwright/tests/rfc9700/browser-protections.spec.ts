@@ -32,8 +32,10 @@ import { freshTotp } from "../../lib/totp";
 const authOrigin = new URL(env.authUrl).origin;
 
 // The whole policy, not only its frame-ancestors: the auth server runs only its own script files,
-// refuses plugins and a <base>, and refuses framing (#518).
-const contentSecurityPolicy = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+// loads styles, images and fonts only from itself, images from data: URLs too, refuses plugins and a
+// <base>, and refuses framing (#518, #816).
+const contentSecurityPolicy =
+  "script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
 
 test("every page of the sign-in, its error pages included, refuses framing and loads nothing from another site (sections 4.16, 4.2.4)", async ({
   page,

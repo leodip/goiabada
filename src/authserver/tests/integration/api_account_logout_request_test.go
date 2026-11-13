@@ -568,7 +568,7 @@ var (
 	// response, and a meta http-equiv in the document head. Those two are the whole of it, so an
 	// allowlist over the directives closes the question rather than sampling it.
 	//
-	// The deployment sends four (#518). This helper reads the directives' names, not their sources, so
+	// The deployment sends seven (#518, #816). This helper reads the directives' names, not their sources, so
 	// each is taught for a reason that holds whatever it lists, and none governs submission:
 	//
 	//   - frame-ancestors governs which pages may frame this one, not what it submits.
@@ -582,6 +582,9 @@ var (
 	//   - base-uri governs the URL a <base> may set, and only ever narrows it. This helper already
 	//     refuses a <base> outright, so a browser's action resolves against the response's own URL
 	//     whatever base-uri lists, exactly as this helper's does.
+	//   - style-src, img-src and font-src govern which stylesheets, images and fonts load. A form
+	//     submits whether they load or not: a refused one leaves the page unstyled, which shows every
+	//     control rather than hiding one.
 	//
 	// The two that would refuse this POST outright are form-action, which names where a form may
 	// submit, and sandbox, which forbids submission entirely unless it carries allow-forms. Both would
@@ -593,6 +596,9 @@ var (
 		"script-src":      true,
 		"object-src":      true,
 		"base-uri":        true,
+		"style-src":       true,
+		"img-src":         true,
+		"font-src":        true,
 	}
 
 	// The http-equiv values the document head may carry, an allowlist for the same reason

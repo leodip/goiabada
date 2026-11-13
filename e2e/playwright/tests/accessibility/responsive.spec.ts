@@ -4,12 +4,25 @@
 // inside its own region; dialogs, menus and forms stay within the screen, and no page scrolls
 // sideways. Only the test's own tab is resized, so the fixtures work at the default size.
 import type { Locator, Page } from "@playwright/test";
-import { addRedirectUri, addSignOutRedirectUri, cancelDialog, clientUrl, setClientBrand, userUrl } from "../../lib/admin-console";
-import { brandUrl, fillBrandFooter, newBrandUrl, paletteField, withBrand } from "../../lib/brands";
+import {
+  addRedirectUri,
+  addSignOutRedirectUri,
+  cancelDialog,
+  clientUrl,
+  safeModeNotice,
+  safeModeSessionNotice,
+  safeModeSwitchNotice,
+  setClientBrand,
+  signInAsAdminInSafeMode,
+  signOutOfConsole,
+  userUrl,
+} from "../../lib/admin-console";
+import { brandUrl, customCssField, fillBrandFooter, newBrandUrl, paletteField, withBrand } from "../../lib/brands";
 import { openSignIn } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { browserSignInClient } from "../../lib/test-clients";
+import { uniqueIdentifier } from "../../lib/unique";
 
 // A test visits a dozen pages at its size.
 test.describe.configure({ timeout: 120_000 });
@@ -333,5 +346,61 @@ test("the Colors section keeps each color's two fields side by side at a phone's
         }
       }
     });
+  }
+});
+
+// The brand editor's Custom CSS field (#816) at a phone's widths, refused, holding a line longer than
+// the screen: the field, its notice and the sentence about the preview stay within the screen, the long
+// line wraps or scrolls inside the field, and the page does not scroll sideways.
+test("the Custom CSS field, refused, stays within a phone's screen", async ({ page }) => {
+  const longLine = `.auth-card { background-image: url("data:image/gif;base64,${"R0lGODlhAQABAIAAAAAAAP".repeat(12)}"); }`;
+  for (const width of [320, 390]) {
+    await test.step(`${width}px`, async () => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(newBrandUrl);
+      await page.locator("#name").fill(uniqueIdentifier("brand"));
+      await customCssField(page).fill(`${longLine}\n@import "theme.css";\n`);
+      await page.locator("#btnCreate").click();
+      await expect(customCssField(page)).toHaveAttribute("aria-invalid", "true");
+      expect(await sidewaysScroll(page), `${width}px: no sideways scroll`).toBeLessThanOrEqual(0);
+      for (const shown of [page.locator("#brand-error"), customCssField(page), page.locator("#customCssPreviewNote")]) {
+        await expectWithinScreen(page, shown);
+      }
+    });
+  }
+});
+
+// The safe mode notice (#816 decision 2) on an admin page at a phone's widths, in light and dark: it
+// wraps within the screen, and the page does not scroll sideways. Signed in in a browser of its own,
+// since safe mode lasts for its console session, and signed out after. The auth server's switch, whose
+// text holds GOIABADA_AUTHSERVER_BRAND_SAFE_MODE, is not turned on in the shared environment, so its
+// text is put in the drawn notice's paragraph in its place: the markup is the same for both.
+test("the safe mode notice stays within a phone's screen", async ({ browser }) => {
+  const { context, page } = await signInAsAdminInSafeMode(browser);
+  try {
+    for (const width of [320, 375]) {
+      for (const colorScheme of ["light", "dark"] as const) {
+        await test.step(`${width}px, ${colorScheme}`, async () => {
+          await page.setViewportSize({ width, height: 800 });
+          await page.emulateMedia({ colorScheme });
+          await page.goto(`${env.adminUrl}/admin/settings/general`);
+          await expect(safeModeNotice(page)).toHaveText(safeModeSessionNotice);
+          expect(await sidewaysScroll(page), `${width}px, ${colorScheme}, the session's: no sideways scroll`).toBeLessThanOrEqual(0);
+          await expectWithinScreen(page, safeModeNotice(page));
+
+          await safeModeNotice(page).locator("p").evaluate((p, text) => {
+            p.textContent = text;
+          }, safeModeSwitchNotice);
+          await expect(safeModeNotice(page)).toHaveText(safeModeSwitchNotice);
+          expect(await sidewaysScroll(page), `${width}px, ${colorScheme}, the switch's: no sideways scroll`).toBeLessThanOrEqual(0);
+          await expectWithinScreen(page, safeModeNotice(page));
+          const textPastItsBox = await safeModeNotice(page).locator("p").evaluate((p) => p.scrollWidth - p.clientWidth);
+          expect(textPastItsBox, `${width}px, ${colorScheme}, the switch's text wraps within the notice`).toBeLessThanOrEqual(0);
+        });
+      }
+    }
+  } finally {
+    await signOutOfConsole(page);
+    await context.close();
   }
 });

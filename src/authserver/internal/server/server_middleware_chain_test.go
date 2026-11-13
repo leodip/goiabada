@@ -53,6 +53,9 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 
 	wantRoot := []string{
 		"github.com/leodip/goiabada/core/requestid.Middleware",
+		// The operator's safe mode switch, ahead of everything that can draw a page, so every page
+		// this server draws, a fault's included, is drawn in safe mode while it is on (#816).
+		"github.com/leodip/goiabada/authserver/internal/middleware.BrandSafeMode.func1",
 		"github.com/leodip/goiabada/core/httpmw.SecurityHeaders.func1",
 		"github.com/leodip/goiabada/core/httpmw.RealIP.func1",
 		"github.com/leodip/goiabada/core/httpmw.RequestLogger.func1",
@@ -118,6 +121,10 @@ var fileRoutes = []string{
 	"HEAD /brand/{id}/stylesheet.css",
 	"GET /brand/{id}/colors.css",
 	"HEAD /brand/{id}/colors.css",
+	"GET /brand/{id}/safe-stylesheet.css",
+	"HEAD /brand/{id}/safe-stylesheet.css",
+	"GET /brand/{id}/safe-colors.css",
+	"HEAD /brand/{id}/safe-colors.css",
 	"GET /brand-assets/{id}",
 	"HEAD /brand-assets/{id}",
 }

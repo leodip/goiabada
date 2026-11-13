@@ -70,7 +70,8 @@ func (wr widgetRenderer) RenderTemplate(w http.ResponseWriter, r *http.Request, 
 	data["turnstileScriptURL"] = ScriptURL
 	header := w.Header()
 	policy := header.Values(contentSecurityPolicy)
-	httpmw.SetContentSecurityPolicy(header, ScriptOrigin)
+	// No asset origin: the auth server serves its pages' stylesheets, images and fonts itself.
+	httpmw.SetContentSecurityPolicy(header, nil, ScriptOrigin)
 	if err := wr.renderer.RenderTemplate(w, r, layoutName, templateName, data); err != nil {
 		if policy == nil {
 			header.Del(contentSecurityPolicy)

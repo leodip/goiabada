@@ -631,6 +631,11 @@ func (s *Server) initMiddleware() appBranches {
 	// (#462 decision 6), on the context of every record, audit event and error page below.
 	s.router.Use(requestid.Middleware)
 
+	// The operator's safe mode switch, on every request ahead of everything that can draw a page, so
+	// every page this server answers, a fault's and the not-found page's included, is drawn in safe
+	// mode while it is on (#816 decision 3). Mounted either way, so the chain has one shape.
+	s.router.Use(middleware.BrandSafeMode(s.cfg.AuthServer.BrandSafeMode))
+
 	// Security headers (before Recoverer so 500 responses carry them too)
 	s.router.Use(httpmw.SecurityHeaders(s.cfg.AuthServer.IsCookieSecure()))
 

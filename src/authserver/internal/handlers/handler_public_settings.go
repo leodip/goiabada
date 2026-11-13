@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
@@ -33,7 +34,8 @@ type publicSettingsDatabase interface {
 // through the same render.ClientPageBrand, with its two stylesheets' URLs made absolute on baseURL,
 // as a client logo's is, so the console links them and draws its pages alike (#810 decision 3): the
 // full one, which the auth server's own pages link, and the colors-only one for the console's admin
-// pages (#813 decision 9). Its logo's, dark logo's and favicon's URLs are made absolute alike, and
+// pages (#813 decision 9), and its two safe stylesheets' beside them, with whether the operator's
+// safe mode switch is on (#816 decision 3). Its logo's, dark logo's and favicon's URLs are made absolute alike, and
 // the switch says whether the name gives way to the logo. A brand that cannot be read leaves brand
 // out rather than failing the answer: the console then draws automatic in the built-in colors, as
 // the auth server's own pages are drawn then.
@@ -113,7 +115,14 @@ func publicBrand(ctx context.Context, brands render.PageBrandReader, baseURL str
 		Appearance:          appearance,
 		StylesheetURL:       baseURL + brand.Stylesheet,
 		ColorsStylesheetURL: baseURL + brand.ColorsStylesheet,
-		HideAppName:         brand.HideAppName,
+		// The safe links, which the console links while its own session is in safe mode, and whether
+		// the operator's switch is on. While it is, the two links above are the safe ones already, as
+		// render.ClientPageBrand answers them on every page, so the console follows it with no state
+		// of its own (#816 decision 2).
+		SafeStylesheetURL:       baseURL + brand.SafeStylesheet,
+		SafeColorsStylesheetURL: baseURL + brand.SafeColorsStylesheet,
+		SafeMode:                reqctx.BrandSafeMode(ctx),
+		HideAppName:             brand.HideAppName,
 		// Whether a background image is set, whatever its fit, so the console draws its card pages'
 		// footer on a panel over it, as the auth server's own pages do (#814 decision 6, D1).
 		HasBackground: brand.Background,

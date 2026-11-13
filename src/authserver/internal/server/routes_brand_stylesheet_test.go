@@ -23,7 +23,8 @@ import (
 // reading the settings or the session: datamocks.NewDatabase(t) fails the test on any call nobody
 // expected, so the brand read is the only one the route may make.
 //
-// The colors-only stylesheet is answered alike, at its own route (#813 decision 11).
+// The colors-only stylesheet is answered alike, at its own route (#813 decision 11), and so are the
+// two safe ones (#816 decision 3).
 func TestRegisterRoutes_TheBrandStylesheetCarriesNoBrowserSession(t *testing.T) {
 	brand := record.NewBrand("Shop", record.BrandAppearanceAuto, "plum")
 	brand.Id = 7
@@ -36,6 +37,10 @@ func TestRegisterRoutes_TheBrandStylesheetCarriesNoBrowserSession(t *testing.T) 
 			return brandthemes.StylesheetPath(brand, brandasset.Slots{})
 		}},
 		{"colors only", brandthemes.ColorsStylesheetPath},
+		{"safe", func(brand *record.Brand) (string, error) {
+			return brandthemes.SafeStylesheetPath(brand, brandasset.Slots{})
+		}},
+		{"safe colors only", brandthemes.SafeColorsStylesheetPath},
 	} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			t.Run(stylesheet.name+" "+method, func(t *testing.T) {

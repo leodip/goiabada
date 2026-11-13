@@ -166,6 +166,15 @@ text to the same shape: a value that does not parse reads as no palette and is l
 the brand is then drawn as one with an unknown theme. A palette is held to its shape, never to its
 contrast: a failing pair never stops a write.
 
+## A brand's custom CSS
+
+A brand's custom CSS is one `custom_css` text column, `''` for none (#816 decision 4), read and
+written whole with its brand for the footer links' reasons. It is unbounded on every engine: the
+admin API bounds it to 65,536 bytes. The rules it is held to are the admin API's alone
+(`apihandlers.validateBrandCustomCSS`, which runs `customcss.Check`): the data layer stores and
+reads the text as given and checks nothing, so a value written to the row by hand reaches the
+brand's full stylesheet unchecked.
+
 ## Schema golden files
 
 Each engine's fully migrated catalog is recorded in

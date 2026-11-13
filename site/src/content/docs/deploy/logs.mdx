@@ -66,7 +66,7 @@ With request logging on, every request gets a record but three kinds, which are 
 
 ## What a request record leaves out
 
-A request record names every query parameter that arrived, but not every value. Every query value is replaced by `[redacted]`, apart from those of these names, whose value is kept: `client_id`, `response_type`, `response_mode`, `scope`, `prompt`, `max_age`, `acr_values`, `code_challenge_method`, `ui_locales`, `error`, `page` and `size`.
+A request record names every query parameter that arrived, but not every value. Every query value is replaced by `[redacted]`, apart from those of these names, whose value is kept: `client_id`, `response_type`, `response_mode`, `scope`, `prompt`, `max_age`, `acr_values`, `code_challenge_method`, `ui_locales`, `goiabada_safe_mode`, `error`, `page` and `size`.
 
 That keeps an `id_token_hint`, an activation code and a password reset code out of the log, along with anything a client puts in a parameter nobody has assessed. Names are matched exactly, so `Client_ID` is redacted like any other unknown name. Activation and password reset links reach the log once each: following one checks the code and redirects to the same page with no query string, so the code never reaches the address bar, the browser's history or the `Referer` of anything the page loads.
 

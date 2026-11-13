@@ -58,10 +58,11 @@ The link works once, for five minutes, and only on its own: a `request_handle` s
 | `acr_values` | No | The level of authentication to ask for. See [ACR and AMR](/concepts/acr-and-amr/#which-level-a-request-asks-for). |
 | `id_token_hint` | No | An ID token naming the user your app expects. See [id_token_hint](/concepts/id-token-hint/). |
 | `ui_locales` | No | The languages for the sign-in pages, as space-separated language tags in order of preference, such as `pt-BR en`. A user's [page language](/guides/customize-and-translate-the-pages/#how-the-language-is-chosen) wins over it. |
+| `goiabada_safe_mode` | No | `true` draws every page of this sign-in in safe mode: without the brand's custom CSS, in the built-in Blueberry colors in place of a custom palette, and in System UI in place of an uploaded font. The pages it links to, such as registration and forgot password, follow it. Use it to sign in when a brand has made the pages unusable. |
 
 PKCE is required for every [public client](/concepts/clients/#public-and-confidential-clients), and for a confidential one unless an administrator made it optional.
 
-`acr_values` and `ui_locales` are never refused for their value, though sent twice they're refused like any repeated parameter. An `acr_values` with no level the auth server knows is ignored, and so is a malformed `ui_locales`; beyond ten language tags or 256 bytes, the rest is ignored. A parameter the auth server doesn't read, such as `login_hint`, `display` or `claims`, is ignored too.
+`acr_values`, `ui_locales` and `goiabada_safe_mode` are never refused for their value, though sent twice they're refused like any repeated parameter. An `acr_values` with no level the auth server knows is ignored, and so is a malformed `ui_locales`; beyond ten language tags or 256 bytes, the rest is ignored. A `goiabada_safe_mode` other than `true` is ignored. A parameter the auth server doesn't read, such as `login_hint`, `display` or `claims`, is ignored too.
 
 ## What the auth server checks
 
@@ -76,7 +77,7 @@ The auth server checks the request before it shows the user anything. A check it
 | `response_mode` is `query`, `fragment` or `form_post` | 400 | "Invalid response_mode parameter. Supported values are: query, fragment, form_post." |
 | `response_mode=form_post` names an `http` or `https` redirect URI | 400 | "response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive." and the modes to use instead: `fragment` for the implicit flow, `query` or `fragment` otherwise |
 
-A missing `client_id` or `redirect_uri` is refused the same way. The page is shown in the language `ui_locales` asks for, unless the browser is signed in as a user who chose a page language.
+A missing `client_id` or `redirect_uri` is refused the same way. The page is shown in the language `ui_locales` asks for, unless the browser is signed in as a user who chose a page language, and in safe mode when `goiabada_safe_mode=true` asks for it.
 
 An unsupported `response_mode` gets no error response at all, whoever is signed in. Understanding the mode is what tells the auth server how to encode a response, so it answers `400 Bad Request` with no `error`, `error_description` or `state`, as [OpenID Connect Core 1.0 section 3.1.2.6](https://openid.net/specs/openid-connect-core-1_0.html#AuthError) requires.
 

@@ -1,0 +1,15 @@
+-- A brand's custom CSS (#816 decision 4): brands gains one text column holding the CSS the admin
+-- API checked, appended to the brand's full stylesheet.
+--
+-- The six questions a migration answers: (1) all four engines. (2) The CSS is text the admin API
+-- checked and stored as written, with line endings made uniform; it is pinned case-sensitive on
+-- MySQL and SQL Server, as every string column is. (3) Nothing compares it: the CSS is read and
+-- written whole with its brand and never looked up, so no index. (4) No key: nothing refers to it.
+-- (5) Every existing brand has no custom CSS, through the column's default, '', which is none, as
+-- an unset support contact value is. (6) Each schema.golden gains the column.
+--
+-- The text is unbounded, as footer_links' is: the admin API bounds the CSS to 65,536 bytes.
+--
+-- The previous release never reads brands, so a replica of it still serving during a rolling
+-- upgrade keeps working. The down migration drops the column and every brand's CSS in it.
+ALTER TABLE brands ADD COLUMN custom_css TEXT NOT NULL DEFAULT '';

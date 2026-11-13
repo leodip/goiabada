@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/guard"
+	"github.com/leodip/goiabada/core/stylingcontract"
 )
 
 // The four rules below run in both servers and live once, in core/guard/template_lint.go, which
@@ -68,3 +69,21 @@ func emailTemplatesAsWalked() []string {
 
 // emailTemplates are not pages: no rule reads them.
 var emailTemplates = []string{"emails/", "layouts/email_layout.html"}
+
+// TestTemplates_KeepTheStylingContract holds this server's pages to the styling contract,
+// core/stylingcontract's lists for the auth server, through core/guard.AssertStylingContract: every
+// page names its data-page value and carries it on <body>, every listed value has a page, every
+// hook class promised here is drawn by some page, and main.css declares every variable (#816
+// decision 7). Every page is in the contract; the emails are not pages.
+func TestTemplates_KeepTheStylingContract(t *testing.T) {
+	css, err := staticFS.ReadFile("static/main.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard.AssertStylingContract(t, templateFS, "template", "../internal", css, guard.StylingContract{
+		Pages:     stylingcontract.PagesOn(stylingcontract.AuthServer),
+		Classes:   stylingcontract.ClassesOn(stylingcontract.AuthServer),
+		Variables: stylingcontract.Variables(),
+		Outside:   []string{"emails/"},
+	})
+}

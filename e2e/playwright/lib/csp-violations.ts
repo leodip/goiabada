@@ -1,7 +1,10 @@
 // A Content-Security-Policy violation on a page of the auth server or the admin console fails the
 // test. Both servers send script-src 'self' (with object-src and base-uri 'none'), so a page that
 // carried an inline script, an on… attribute, a javascript: URL or an eval would have that code
-// refused by the browser, and the page would break, perhaps in no way a test asserts.
+// refused by the browser, and the page would break, perhaps in no way a test asserts. They send
+// style-src, img-src and font-src 'self' too, img-src with data:, and the console's three with the
+// auth server's origin, so a <style> element, a style attribute, or a stylesheet, image or font
+// from any other site is refused the same way.
 //
 // The watcher listens for the securitypolicyviolation event in every page of a browser context, not
 // for console messages: a caught eval fires the event and logs nothing. Pages of other origins, the
@@ -26,6 +29,8 @@ export class CspViolationWatcher {
   // A name of its own, so two watchers can watch one context.
   private readonly binding = `__cspViolation_${randomBytes(6).toString("hex")}`;
   private readonly watched = new Set<BrowserContext>();
+  // Contexts being closed, their pages already settled: what they report from then on is Playwright's.
+  private readonly closing = new WeakSet<BrowserContext>();
   private readonly found: string[] = [];
 
   // origins: such as https://e2e-auth.goiabada.dev, as URL.origin spells them.
@@ -35,7 +40,10 @@ export class CspViolationWatcher {
 
   // Watches every page the context has from now on, in every frame, across navigations. Closing the
   // context or one of its pages, by a test or a helper, first lets its pages hand over what they
-  // have queued, as settle() does: a closed page's queued violation is lost.
+  // have queued, as settle() does: a closed page's queued violation is lost. What a page reports
+  // after that, while the context closes, is not counted: under the suite's screenshot option
+  // Playwright then screenshots each page, and in WebKit that adds a <style> element to the page
+  // (to restart its animations), which the servers' style-src refuses.
   //
   // javaScriptEnabled: as the context was made. A context that runs no script runs no listener and
   // refuses no script, so it has nothing to report, and its pages never answer an evaluate: it is
@@ -47,11 +55,14 @@ export class CspViolationWatcher {
     const closeContext = context.close.bind(context);
     context.close = async (options) => {
       await settlePages(context.pages());
+      this.closing.add(context);
       return closeContext(options);
     };
     for (const page of context.pages()) settleBeforeClose(page);
     context.on("page", settleBeforeClose);
-    await context.exposeBinding(this.binding, (_source, report: Report) => this.record(report));
+    await context.exposeBinding(this.binding, (source, report: Report) => {
+      if (!this.closing.has(source.context)) this.record(report);
+    });
     await context.addInitScript((binding: string) => {
       document.addEventListener("securitypolicyviolation", (event) => {
         const report = (window as unknown as Record<string, (report: unknown) => void>)[binding];

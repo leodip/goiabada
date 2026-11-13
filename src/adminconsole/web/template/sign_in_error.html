@@ -1,4 +1,5 @@
 {{define "title"}}{{ T $.ctx .titleKey }} – {{ .appName }}{{end}}
+{{define "data-page"}}console-sign-in-error{{end}}
 {{define "head"}}{{end}}
 
 {{define "body"}}
@@ -9,7 +10,7 @@
   {{ if .serverFault }}
   <p class="text-sm text-ink-muted">{{ T $.ctx "adminconsole.sign_in_error.log_line" }} <code class="break-all font-mono text-ink">{{ .requestId }}</code></p>
   {{ else }}
-  <a class="button button-primary button-block" href="/">{{ T $.ctx "adminconsole.sign_in_error.start_again" }}</a>
+  <a class="button button-primary button-block" href="{{ .startAgainLink }}">{{ T $.ctx "adminconsole.sign_in_error.start_again" }}</a>
   {{ end }}
 </div>
 {{end}}

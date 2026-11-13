@@ -1177,7 +1177,7 @@ func TestAPIDebug_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/account/users?page=2&size=10", nil))
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
-	// page and size are two of the twelve names the redactor keeps, and they are
+	// page and size are two of the names the redactor keeps, and they are
 	// what an operator reads off this surface, so the change must not have cost
 	// the debug log its pagination.
 	assert.Contains(t, logged.Text(), "/api/v1/account/users?page=2&size=10")
@@ -1185,7 +1185,7 @@ func TestAPIDebug_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
 
 // The reject. `query` is the admin API's free-text user search, so it carries
 // whatever was typed into the box, an email address here. The gate that rejects
-// it is the allowlist miss: `query` is not one of the twelve.
+// it is the allowlist miss: `query` is not one of the names the redactor keeps.
 //
 // The page=2 beside it is what makes the absence attributable. A line that was
 // never written, or a request that never reached the middleware, would satisfy

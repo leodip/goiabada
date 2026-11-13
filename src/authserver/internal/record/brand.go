@@ -159,6 +159,10 @@ type Brand struct {
 	// Palette is the brand's custom palette, nil for a brand on a built-in theme. It is stored
 	// whole as JSON text on a nullable column, NULL for none (#815 decision 3).
 	Palette *BrandPalette `db:"palette"`
+	// CustomCSS is the brand's custom CSS, appended to its full stylesheet, "" for none (#816
+	// decision 4). It is stored as it was written, with line endings made uniform, once the admin
+	// API's check has passed it.
+	CustomCSS string `db:"custom_css"`
 }
 
 // NewBrand answers a brand with the given name, appearance and theme, and the kit an existing

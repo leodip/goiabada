@@ -30,6 +30,7 @@ const (
 	actingUserIdKey
 	dpopProofKey
 	pageClientKey
+	brandSafeModeKey
 )
 
 // ErrNoSettings is what a reader answers its request with when the settings middleware did
@@ -178,8 +179,12 @@ func DPoPProofFrom(ctx context.Context) (*dpop.Proof, bool) {
 // request, by whichever code learns it, on the request every helper below it was already handed. A
 // page that by design belongs to no sign-in forgets it before it is drawn. It is read and marked on
 // the request's own goroutine.
+//
+// It also carries whether the sign-in the pages belong to asked for safe mode, goiabada_safe_mode=true
+// (#816 decision 3): its pages are then drawn safe, whatever client they are drawn for.
 type PageClient struct {
 	clientIdentifier string
+	safeMode         bool
 }
 
 // Name says the request's pages are drawn for the client with this identifier.
@@ -187,9 +192,21 @@ func (p *PageClient) Name(clientIdentifier string) {
 	p.clientIdentifier = clientIdentifier
 }
 
-// Forget says the request's pages are drawn for no client, so in the default brand.
+// Forget says the request's pages are drawn for no client, so in the default brand, and for no
+// sign-in, so not in a sign-in's safe mode.
 func (p *PageClient) Forget() {
 	p.clientIdentifier = ""
+	p.safeMode = false
+}
+
+// KeepSafeMode says the request's pages belong to a sign-in that asked for safe mode.
+func (p *PageClient) KeepSafeMode() {
+	p.safeMode = true
+}
+
+// SafeMode answers whether the request's pages belong to a sign-in that asked for safe mode.
+func (p *PageClient) SafeMode() bool {
+	return p.safeMode
 }
 
 // ClientIdentifier answers the client named, or empty for none.
@@ -230,4 +247,33 @@ func PageClientIdentifier(ctx context.Context) string {
 		return p.ClientIdentifier()
 	}
 	return ""
+}
+
+// KeepPageSafeMode draws ctx's pages in safe mode, for a sign-in that asked for it, when ctx carries
+// a PageClient, and does nothing otherwise.
+func KeepPageSafeMode(ctx context.Context) {
+	if p, ok := PageClientFrom(ctx); ok {
+		p.KeepSafeMode()
+	}
+}
+
+// PageSafeMode answers whether ctx's pages belong to a sign-in that asked for safe mode.
+func PageSafeMode(ctx context.Context) bool {
+	if p, ok := PageClientFrom(ctx); ok {
+		return p.SafeMode()
+	}
+	return false
+}
+
+// WithBrandSafeMode draws every page of ctx in safe mode: the operator's switch,
+// GOIABADA_AUTHSERVER_BRAND_SAFE_MODE, which the root middleware puts on every request while it is on
+// (#816 decision 3).
+func WithBrandSafeMode(ctx context.Context) context.Context {
+	return context.WithValue(ctx, brandSafeModeKey, true)
+}
+
+// BrandSafeMode answers whether the operator's switch draws ctx's pages in safe mode.
+func BrandSafeMode(ctx context.Context) bool {
+	on, _ := ctx.Value(brandSafeModeKey).(bool)
+	return on
 }

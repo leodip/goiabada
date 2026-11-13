@@ -14,7 +14,8 @@ import (
 // HandleAuthorizePost answers a POST to the authorization endpoint with a 303 to a GET, once
 // authflow.AuthorizationParking has parked the request under a one-time handle. It checks the
 // request's settings first, as every ceremony handler does (#580 decision 5), then reads the
-// parameters, refines the request's localizer to their ui_locales hint for the refusal page, and
+// parameters, refines the request's localizer to their ui_locales hint for the refusal page and draws
+// it in safe mode when they ask for it (#816), and
 // writes the answer: the refusal page, a 500, or the redirect. The browser's own session is neither
 // read nor written here; the GET runs the ceremony (#246).
 func HandleAuthorizePost(
@@ -36,6 +37,11 @@ func HandleAuthorizePost(
 		}
 
 		r = withUILocales(r, authflow.AuthorizeUILocales(params))
+		// A request asking for safe mode is drawn safe from its first page, a refusal page included
+		// (#816 decision 3).
+		if authflow.AuthorizeSafeMode(params) {
+			reqctx.KeepPageSafeMode(r.Context())
+		}
 
 		result, err := parking.Run(r.Context(), params, requestid.FromContext(r.Context()))
 		// A park, or an address check, that failed once the request's client was read is drawn in its

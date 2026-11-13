@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/routing"
@@ -44,7 +45,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 	identifierValidator := inputvalidation.NewIdentifierValidator()
 
 	httpHelper := render.New(s.templateFS, s.staticFS)
-	authHelper := oauthclient.NewAuthHelper(s.sessionStore, baseURL, s.cfg.AuthServer.BaseURL)
+	authHelper := oauthclient.NewAuthHelper(s.sessionStore, baseURL, s.cfg.AuthServer.BaseURL, reqctx.SafeModeFrom)
 
 	// Initialize middleware
 	middlewareJwt := middleware.NewJWT(
@@ -68,22 +69,28 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 	// page in it over ?ui_locales and the browser; on Automatic the language the
 	// locale middleware resolved stands (#631 decisions 2, 4 and 7).
 	pageLanguage := middleware.PageLanguage(s.sessionStore, builtin.AdminConsoleSessionName)
+	// Safe mode sits beside it, for the same reason, and before the scope check, whose sign-in asks
+	// for safe mode when the request is in it (#816 decision 2).
+	safeMode := middleware.SafeMode(s.sessionStore, builtin.AdminConsoleSessionName, httpHelper)
 
 	// Define middleware combinations
 	baseAuth := []func(http.Handler) http.Handler{
 		jwtSessionHandler,
 		pageLanguage,
+		safeMode,
 	}
 
 	accountAuth := []func(http.Handler) http.Handler{
 		jwtSessionHandler,
 		pageLanguage,
+		safeMode,
 		requiresAccountScope,
 	}
 
 	adminAuth := []func(http.Handler) http.Handler{
 		jwtSessionHandler,
 		pageLanguage,
+		safeMode,
 		requiresAdminScope,
 	}
 

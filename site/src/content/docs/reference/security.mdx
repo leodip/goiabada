@@ -106,10 +106,12 @@ Both servers add these headers to every answer:
 | Header | Value | What it does |
 |---|---|---|
 | `X-Frame-Options` | `DENY` | No other site can show a page in a frame, so it can't trick a user into clicking. |
-| `Content-Security-Policy` | `script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'` | The browser runs only script files the server serves itself, never an inline script, an `on…` attribute or a `javascript:` URL. It also refuses plugins, a `<base>` element and framing. Styles, images and requests aren't restricted. |
+| `Content-Security-Policy` | `script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'` | The browser runs only script files the server serves itself, never an inline script, an `on…` attribute or a `javascript:` URL. It loads stylesheets, images and fonts only from the server, plus `data:` images, and refuses a `<style>` element and a `style` attribute. It also refuses plugins, a `<base>` element and framing. Requests and frames aren't restricted. |
 | `X-Content-Type-Options` | `nosniff` | The browser takes each answer, an uploaded image included, as the type it's labelled with. |
 | `Referrer-Policy` | `same-origin` | A URL carrying a code or a `state` never reaches another site in the `Referer` header. |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | The browser uses only `https` for a year, subdomains included. Only when the server's base URL is `https`, and never on the HTTP listener's redirects, so it reaches the browser over HTTPS alone. See [listen addresses](/reference/environment-variables/#listen-addresses). |
+
+The admin console's policy also admits the auth server's origin, from `GOIABADA_AUTHSERVER_BASEURL`, to `style-src`, `img-src` and `font-src`, because its pages load the brand's stylesheets, pictures and font, the client logos and the user pictures from the auth server. With the auth server at `https://auth.example.com`, the console sends `script-src 'self'; style-src 'self' https://auth.example.com; img-src 'self' data: https://auth.example.com; font-src 'self' https://auth.example.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`.
 
 While the [Turnstile challenge](/guides/require-a-turnstile-challenge/) is on, the sign-in, forgot-password and registration forms add `https://challenges.cloudflare.com` to `script-src`, for the widget's script. Every other page keeps the policy above.
 

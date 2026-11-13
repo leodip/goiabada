@@ -6,7 +6,11 @@ import type { AddressInfo } from "node:net";
 import type { Browser } from "@playwright/test";
 import { CspViolationWatcher, expect, test as watched } from "../lib/csp-violations";
 
-const policy = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+const policy =
+  "script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+
+// A one-pixel GIF, which img-src's data: admits.
+const pixel = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
 
 // Each element on a line of its own, so the line a violation names is known.
 const pages: Record<string, { type: string; body: string }> = {
@@ -17,10 +21,31 @@ const pages: Record<string, { type: string; body: string }> = {
       "<title>Clean</title>",
       '<script type="application/json" id="data">{"a": 1}</script>',
       '<script src="/clean.js"></script>',
+      '<link rel="stylesheet" href="/clean.css">',
+      `<img src="${pixel}" alt="">`,
       "<h1>Clean</h1>",
     ].join("\n"),
   },
   "/clean.js": { type: "text/javascript", body: "document.body;" },
+  "/clean.css": { type: "text/css", body: "h1 { color: green; }" },
+  // Styles, an image and a font, each written inline or loaded from another site.
+  "/styled": {
+    type: "text/html",
+    body: [
+      "<!DOCTYPE html>",
+      "<title>Styled</title>",
+      "<style>h1 { color: red; }</style>",
+      '<h1 style="color: red">Styled</h1>',
+      '<link rel="stylesheet" href="https://styles.invalid/page.css">',
+      '<img src="https://images.invalid/picture.png" alt="">',
+      '<link rel="stylesheet" href="/font.css">',
+      "<p>Text</p>",
+    ].join("\n"),
+  },
+  "/font.css": {
+    type: "text/css",
+    body: '@font-face { font-family: Remote; src: url("https://fonts.invalid/remote.woff2"); } p { font-family: Remote; }',
+  },
   "/dirty": {
     type: "text/html",
     body: [
@@ -114,6 +139,12 @@ test("a page of a watched origin that runs inline code fails the test", async ({
   await expect(page.getByRole("heading", { name: "Dirty" })).toBeVisible();
 });
 
+test("a page of a watched origin that styles itself inline, or loads styles, images or fonts from elsewhere, fails the test", async ({ page, watchedOrigin }) => {
+  test.fail();
+  await page.goto(`${watchedOrigin}/styled`);
+  await expect(page.getByRole("heading", { name: "Styled" })).toBeVisible();
+});
+
 test("a page of a watched origin in a context the test made fails the test", async ({ browser, watchedOrigin }) => {
   test.fail();
   const context = await browser.newContext();
@@ -164,6 +195,32 @@ test("the watcher names the page, the directive and what was blocked, on its ori
     failure = String(error);
   }
   for (const line of expected) expect(failure).toContain(line);
+  await context.close();
+});
+
+// The servers' policy refuses a <style> element, a style attribute, and a stylesheet, an image or a
+// font from another site, and the watcher names each, so a page that needs one fails its test.
+test("the watcher names each style, image and font the policy refuses", async ({ browser, otherPort }) => {
+  const origin = `http://127.0.0.1:${otherPort}`;
+  const watcher = new CspViolationWatcher([origin]);
+  const context = await browser.newContext();
+  await watcher.watch(context);
+  const page = await context.newPage();
+
+  await page.goto(`${origin}/styled`);
+  await expect(page.getByRole("heading", { name: "Styled" })).toBeVisible();
+
+  // Where the browser says the refused code or address was named is its own to give.
+  const refused = () => [...watcher.violations()].map((line) => line.replace(/, at .*$/, "")).sort();
+  await expect
+    .poll(refused)
+    .toEqual([
+      `${origin}/styled: font-src blocked https://fonts.invalid/remote.woff2`,
+      `${origin}/styled: img-src blocked https://images.invalid/picture.png`,
+      `${origin}/styled: style-src-attr blocked inline`,
+      `${origin}/styled: style-src-elem blocked https://styles.invalid/page.css`,
+      `${origin}/styled: style-src-elem blocked inline`,
+    ]);
   await context.close();
 });
 

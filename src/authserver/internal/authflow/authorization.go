@@ -40,7 +40,7 @@ var authorizeDeliveryParameters = []string{"client_id", "redirect_uri", "respons
 var authorizeRequestParameters = []string{
 	"client_id", "redirect_uri", "response_type", "response_mode",
 	"code_challenge", "code_challenge_method", "max_age", "acr_values", "state", "nonce", "scope",
-	"ui_locales", "prompt", "id_token_hint", "dpop_jkt",
+	"ui_locales", "prompt", "id_token_hint", "dpop_jkt", "goiabada_safe_mode",
 }
 
 // AuthorizeDeliveryParameters answers a copy of the parameters whose repeat is answered on the
@@ -56,6 +56,16 @@ func AuthorizeDeliveryParameters() []string {
 // stated preference (OIDC Core 1.0 section 3.1.2.1) holds on every step after this one.
 func AuthorizeUILocales(params url.Values) []string {
 	return i18n.SanitizeUILocales(params.Get("ui_locales"))
+}
+
+// AuthorizeSafeMode is whether an authorization request asks for safe mode: goiabada_safe_mode=true,
+// and that value alone. The parameter is Goiabada's own, with the vendor prefix RFC 6749 section 8.2
+// asks an unregistered parameter to carry. Any other value is read as absent and refuses nothing, as a ui_locales naming
+// no language is (#816 decision 3); a repeat is refused with every other repeated parameter. The
+// handler draws the request's own pages in safe mode by it, from the first, and Authorization.Run
+// stores it on the ceremony, so every later page of the sign-in is drawn safe too.
+func AuthorizeSafeMode(params url.Values) bool {
+	return params.Get("goiabada_safe_mode") == "true"
 }
 
 // authorizationDatabase is what Authorization reads: the request a POST parked, the client, and the
@@ -260,7 +270,7 @@ func (o *Authorization) ResolveParked(ctx context.Context, params url.Values) (u
 // Run, in order:
 //
 //  1. Creates the ceremony from params: a new ceremony id, every request field, the scope the
-//     response type honours, and the ui_locales hint. Nothing saves it until a route below has
+//     response type honours, the ui_locales hint and whether it asks for safe mode. Nothing saves it until a route below has
 //     given it a state, so a request refused on the page writes nothing and a sign-in in progress
 //     in the same browser survives a malformed link (#436).
 //  2. Answers on the refusal page a request with a repeated delivery parameter, a client_id or
@@ -332,6 +342,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 	if uiLocales := AuthorizeUILocales(params); len(uiLocales) > 0 {
 		authContext.UILocales = uiLocales
 	}
+	authContext.SafeMode = AuthorizeSafeMode(params)
 
 	pageRefusal, err := refuseUnaddressableAuthorizeRequest(ctx, o.validator, arrival.RequestId, params)
 	if err != nil {

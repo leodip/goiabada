@@ -29,7 +29,7 @@
   {{ template "head" . }}
 </head>
 
-<body>
+<body{{ with .dataPage }} data-page="{{ . }}"{{ end }}>
   <a class="skip-link" href="#main">{{ T $.ctx "adminconsole.layout.skip_to_content" }}</a>
   <div class="app-shell">
     <div id="app-sidebar" class="app-sidebar">
@@ -77,6 +77,14 @@
         <noscript>
           <p class="notice notice-caution mb-6">{{ T $.ctx "adminconsole.layout.noscript" }}</p>
         </noscript>
+        {{- /* An admin page says safe mode is on and how to leave it (#816 decision 2). The text is a
+             child element of the notice, which ui.css lets narrow to fit a phone's screen; a bare text
+             node in the flex notice could not, and the switch's long name would run past the screen. */}}
+        {{- with .safeModeNotice }}
+        <div class="notice notice-caution mb-6" role="status">
+          <p>{{ T $.ctx . }}</p>
+        </div>
+        {{- end }}
         {{ template "page" . }}
       </main>
       {{- /* An Account page draws the brand's footer at the foot of its content, its own footer

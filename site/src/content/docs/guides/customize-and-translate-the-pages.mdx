@@ -15,7 +15,7 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's shown at the top of the sign-in pages and ends their titles, as in "Sign in – Acme". It also signs every email, and it's the name authenticator apps list your users' accounts under.
 
-2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and a [custom palette](#custom-palettes) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card.
+2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and a [custom palette](#custom-palettes) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card, and [custom CSS](#custom-css) for anything the other choices don't cover.
 
 3. To give one client a look of its own, click **New brand** and create one, then choose it under **Brand** on the client's **Settings** tab. See [Clients](/concepts/clients/#brand) for the pages it draws.
 
@@ -62,7 +62,7 @@ Every key you don't name keeps the built-in text. Set `GOIABADA_I18N_OVERRIDES_D
 
 ## Change the templates
 
-To change the layout of a page, or an email's body, you give a server its own copy of the templates. The templates and static files are compiled into each server's binary, and the images hold the binary alone, so there's no `web` folder inside a container to copy out.
+To change the layout of a page, or an email's body, you give a server its own copy of the templates. To restyle the pages, write a brand's [custom CSS](#custom-css) instead: it needs nothing redone when you upgrade. The templates and static files are compiled into each server's binary, and the images hold the binary alone, so there's no `web` folder inside a container to copy out.
 
 <Steps>
 
@@ -79,7 +79,7 @@ To change the layout of a page, or an email's body, you give a server its own co
 
    `tailwindcss` isn't served: it's what [regenerating the CSS](#regenerate-the-css) reads.
 
-2. Edit the templates. They're Go [`html/template`](https://pkg.go.dev/html/template) files. Keep the element IDs and the scripts the pages use, or the forms stop working. In the layouts, keep the `data-theme` attribute, the brand's stylesheet link after `main.css`, its icon links, its logo and its footer after `main`, or the pages lose their brand's look. The servers' [`Content-Security-Policy`](/reference/security/#response-headers) makes the browser refuse an inline `<script>`, an `on…` attribute such as `onclick`, a `javascript:` URL and a `<base>` element. A `<script type="application/json">` data block is fine. Put a script of your own in a file in the `static` directory, and load it with `<script src="{{ asset "/static/your-file.js" }}" defer></script>`. Anything your templates load needs its own consent: see [Personal data](/deploy/personal-data/#whats-yours-to-decide).
+2. Edit the templates. They're Go [`html/template`](https://pkg.go.dev/html/template) files. Keep the element IDs and the scripts the pages use, or the forms stop working. In the layouts, keep the `data-theme` attribute, the brand's stylesheet link after `main.css`, its icon links, its logo and its footer after `main`, or the pages lose their brand's look. Keep each page's `data-page` template and the `data-page` attribute the layouts write on `<body>`, which CSS written to the [styling contract](/reference/styling-contract/) relies on. The servers' [`Content-Security-Policy`](/reference/security/#response-headers) makes the browser refuse an inline `<script>`, an `on…` attribute such as `onclick`, a `javascript:` URL, a `<style>` element, a `style` attribute and a `<base>` element. It also refuses a script, stylesheet, image or font from another site. A `<script type="application/json">` data block is fine. Put a script, stylesheet, image or font of your own in the `static` directory, and load it from there, a script with `<script src="{{ asset "/static/your-file.js" }}" defer></script>`. Anything your templates load needs its own consent: see [Personal data](/deploy/personal-data/#whats-yours-to-decide).
 
 3. Make the files readable by the containers. Both images run as uid 10001 and gid 10001 (see [the user the images run as](/deploy/docker-compose/#the-user-the-images-run-as)), and a page whose template the server can't read fails with a 500:
 
@@ -120,6 +120,8 @@ A directory replaces the built-in set **whole**, so it must hold every file of t
 ## Regenerate the CSS
 
 The pages are styled with [Tailwind CSS](https://tailwindcss.com/), and `main.css` holds only the classes the templates used when it was generated. A class you add to a template does nothing until you regenerate it.
+
+The [styling contract](/reference/styling-contract/) lists the variables, page names and classes that stay the same from one release to the next. A rule written against them keeps matching after an upgrade.
 
 The colors are tokens at the top of `tailwindcss/ui.css`: the light palette in its `@theme` block, and the dark one under `@variant dark` just below. They're the **Blueberry** theme, and every other theme draws its own colors over them. To draw the pages in your own colors, give a brand a [custom palette](#custom-palettes) rather than changing them here: it's checked for contrast, and it needs nothing redone when you upgrade.
 
@@ -429,6 +431,86 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
 An answer always carries all four: `[]` for no links, `""` for a value not set, and `{}` as the `labels` of a link with none. A blank language label is dropped.
 
 A refusal about a footer link carries `error_field`, a JSON Pointer to the member it's about, such as `/footerLinks/1/url` for the second link's URL. The pointer's index is counted from 0, while the message counts links from 1.
+
+## Custom CSS
+
+A brand's custom CSS restyles its pages beyond what its other choices do, such as a page's layout, a heading's size or a card's border.
+
+<Steps>
+
+1. Open **Admin**, **Branding**, and open the brand.
+
+2. Under **Custom CSS**, write your rules. Write them against the [styling contract](/reference/styling-contract/): its variables, page names and classes stay the same from one release to the next, so your rules keep matching after an upgrade.
+
+3. Click **Save**.
+
+4. Open a page in the brand to see your rules. The preview beside the form doesn't draw custom CSS, so try new rules on a brand you've given to a test client, and sign in to that client. If a page becomes unusable, [safe mode](#safe-mode) draws it without your CSS.
+
+</Steps>
+
+```css
+body[data-page="sign-in"] .auth-card {
+  border: 2px solid var(--color-brand);
+}
+```
+
+The CSS goes after the brand's own styles, so a rule of yours wins over a built-in one of the same [specificity](https://developer.mozilla.org/en-US/docs/Web/CSS/Specificity). It's on every page of the auth server, and on the admin console's Account pages, its home page, and its error and sign-out pages. It's never on the console's admin pages.
+
+### What custom CSS can hold
+
+Custom CSS can't make a browser load anything, so it can't send a visitor's data anywhere:
+
+- It's up to 64 KB.
+- It can't hold `@import`.
+- It can't hold a URL, except a `data:` image in `url()`, such as `url("data:image/svg+xml,…")`. A URL to another site or to the auth server itself is refused. Upload a background, a logo or a font in the brand's [kit](#the-brand-kit) instead.
+- It can't use `src()`, `image()` or `image-set()`, with or without a vendor prefix such as `-webkit-`. Write a `data:` image in `url()` instead.
+- Every comment, string and `url()` must be closed.
+
+The rules apply however you write a name: in capitals, or with a CSS escape such as `\69mport`.
+
+### Custom CSS through the Admin API
+
+A brand carries its custom CSS as one string, `customCss`, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/), [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) and every brand they answer. As with the kit, an update replaces the whole brand, so leaving `customCss` out, or setting it to `null` or `""`, removes the brand's CSS:
+
+```bash
+curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme",
+    "appearance": "auto",
+    "theme": "blueberry",
+    "corners": "rounded",
+    "font": "system-ui",
+    "backgroundFit": "cover",
+    "customCss": "body[data-page=\"sign-in\"] .auth-card {\n  border: 2px solid var(--color-brand);\n}\n"
+  }'
+```
+
+An answer always carries `customCss` as it was saved, each line ending a line feed, or `""` for a brand with none. A refusal of the CSS carries `error_field` set to `/customCss`.
+
+## Safe mode
+
+Safe mode draws the pages without what can make a brand unusable: its custom CSS, a custom palette and an uploaded font. Use it to sign in and fix a brand whose pages you can't read or use.
+
+<Steps>
+
+1. Open an admin console address with `?goiabada_safe_mode=true` at the end, such as `https://admin.example.com/admin/settings/branding?goiabada_safe_mode=true`.
+
+2. Sign in if you're asked to. The admin console's pages are now in safe mode, and its admin pages say so.
+
+3. Fix the brand under **Admin**, **Branding**.
+
+4. Sign out to leave safe mode, and check the pages.
+
+</Steps>
+
+A page in safe mode shows the built-in Blueberry colors in place of a custom palette, and System UI in place of an uploaded font. A built-in theme's colors, the corners, a system font family, the background image, the logo, the favicon and the footer stay. Nothing saved changes, so the brand editor still shows and saves the CSS, the palette and the font.
+
+You can also turn it on:
+
+- **For one sign-in to your app**, with `goiabada_safe_mode=true` on the [authorization request](/reference/endpoints/authorize/#parameters). Every page of that sign-in is drawn in safe mode.
+- **For every page of both servers**, for everyone, with [`GOIABADA_AUTHSERVER_BRAND_SAFE_MODE`](/reference/environment-variables/#customization) set to `true` on the auth server. It lasts until you unset it and restart the auth server, and signing out doesn't end it.
 
 ## How the language is chosen
 

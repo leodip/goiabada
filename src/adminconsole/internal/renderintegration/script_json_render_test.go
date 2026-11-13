@@ -77,7 +77,7 @@ func TestRender_JSBootstrapWritesCatalogValuesAsEscapedJSON(t *testing.T) {
 			"selectedPhoneCountryUniqueId": "", "phoneNumber": "", "phoneCountries": nil, "savedSuccessfully": false,
 		}},
 		{"/layouts/no_menu_layout.html", "/index.html", map[string]interface{}{
-			"AuthServerBaseUrl": "https://auth.example", "IsAuthenticated": false,
+			"AuthServerBaseUrl": "https://auth.example", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
 			"LoggedInUser": "", "LogoutLink": "", "SessionEnded": false,
 		}},
 	}

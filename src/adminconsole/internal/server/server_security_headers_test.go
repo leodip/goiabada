@@ -21,8 +21,18 @@ import (
 //
 // The values are written out here rather than read from the middleware, so the test is an
 // independent statement of what the console sends.
+//
+// The policy admits the auth server's public origin, the base URL's scheme, host and port without
+// its path, to style-src, img-src and font-src (#816 decision 5): the console's pages load the
+// brand's stylesheets, logo, favicon, background and font, the client logos and the user pictures
+// from it.
 
-const consolePolicy = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+const (
+	authServerBaseURL = "https://auth.example:8443/goiabada/"
+	consolePolicy     = "script-src 'self'; style-src 'self' https://auth.example:8443; " +
+		"img-src 'self' data: https://auth.example:8443; font-src 'self' https://auth.example:8443; " +
+		"object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+)
 
 func TestInitMiddleware_EveryAnswerCarriesTheSecurityHeaders(t *testing.T) {
 	for _, tc := range []struct {
@@ -37,6 +47,7 @@ func TestInitMiddleware_EveryAnswerCarriesTheSecurityHeaders(t *testing.T) {
 			settings := newCountingSettingsServer(t)
 			s := newStaticBranchTestServer(settings.URL, newTestSessionStoreOver(sessiontest.NewMemoryBackend()))
 			s.cfg.AdminConsole.BaseURL = tc.baseURL
+			s.cfg.AuthServer.BaseURL = authServerBaseURL
 			app := s.initMiddleware()
 			s.serveStaticFiles(http.NotFoundHandler())
 			app.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {

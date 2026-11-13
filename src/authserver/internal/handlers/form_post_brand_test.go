@@ -18,12 +18,14 @@ import (
 )
 
 // formPostHead is what the form_post page's head says about its look: the html element's
-// data-theme, whether it carries one, the color-scheme meta, and the stylesheets in link order.
+// data-theme, whether it carries one, the color-scheme meta, and the stylesheets in link order;
+// and the data-page value its <body> carries.
 type formPostHead struct {
 	dataTheme    string
 	hasDataTheme bool
 	colorScheme  string
 	stylesheets  []string
+	dataPage     string
 }
 
 func readFormPostHead(t *testing.T, page string) formPostHead {
@@ -34,6 +36,7 @@ func readFormPostHead(t *testing.T, page string) formPostHead {
 	var head formPostHead
 	head.dataTheme, head.hasDataTheme = doc.Find("html").Attr("data-theme")
 	head.colorScheme, _ = doc.Find(`meta[name="color-scheme"]`).Attr("content")
+	head.dataPage, _ = doc.Find("body").Attr("data-page")
 	doc.Find(`link[rel="stylesheet"]`).Each(func(_ int, link *goquery.Selection) {
 		href, _ := link.Attr("href")
 		head.stylesheets = append(head.stylesheets, href)
@@ -55,6 +58,7 @@ func formPostBrandDatabase(t *testing.T, callback string, brand *record.Brand, e
 // The form_post page is drawn in the default brand as the layouts are, an error and a code alike:
 // data-theme and the color-scheme meta from its appearance, and its stylesheet linked after
 // main.css. It is parsed alone, so the responder the route table builds reads the brand for it.
+// Its <body> carries form-post, its value in the styling contract (#816 decision 7).
 func TestFormPost_ThePageIsDrawnInTheDefaultBrand(t *testing.T) {
 	const callback = "https://example.com/callback"
 	plum, ok := brandthemes.StylesheetOf("plum")
@@ -121,6 +125,7 @@ func TestFormPost_ThePageIsDrawnInTheDefaultBrand(t *testing.T) {
 			require.Len(t, head.stylesheets, 2, "main.css, then the brand's stylesheet")
 			assert.Regexp(t, `^/static/main\.css\?v=[0-9a-f]{12}$`, head.stylesheets[0])
 			assert.Equal(t, tc.wantBrandHref, head.stylesheets[1])
+			assert.Equal(t, "form-post", head.dataPage)
 		})
 	}
 }

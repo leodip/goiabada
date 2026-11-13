@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/requestid"
+	"github.com/leodip/goiabada/core/stylingcontract"
 	"golang.org/x/text/language"
 )
 
@@ -234,6 +235,12 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 	templ, err := template.New(name).Funcs(templateFuncMap).Funcs(template.FuncMap{"asset": h.assets.url}).ParseFS(h.templateFS, templateFiles...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to render template")
+	}
+	// Both layouts write dataPage on <body>, the value the page names in its data-page template,
+	// so custom CSS can aim a rule at one page (#816 decision 7). A page that names none, such as an
+	// email or a template copied from an older release, carries no data-page.
+	if page := stylingcontract.PageName(templ); page != "" {
+		data["dataPage"] = page
 	}
 	var buf bytes.Buffer
 	err = templ.Execute(&buf, data)

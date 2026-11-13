@@ -70,14 +70,17 @@ type PublicSettingsResponse struct {
 // [] for no links and "" for an unset value, as a brand's answer carries them, and the brand's
 // sign-in pages draw all of them under the card for anyone (#814 decision 9).
 type PublicBrandResponse struct {
-	Appearance          string `json:"appearance"`
-	StylesheetURL       string `json:"stylesheetUrl"`
-	ColorsStylesheetURL string `json:"colorsStylesheetUrl"`
-	LogoURL             string `json:"logoUrl,omitempty"`
-	DarkLogoURL         string `json:"darkLogoUrl,omitempty"`
-	FaviconURL          string `json:"faviconUrl,omitempty"`
-	HideAppName         bool   `json:"hideAppName"`
-	HasBackground       bool   `json:"hasBackground"`
+	Appearance              string `json:"appearance"`
+	StylesheetURL           string `json:"stylesheetUrl"`
+	ColorsStylesheetURL     string `json:"colorsStylesheetUrl"`
+	SafeStylesheetURL       string `json:"safeStylesheetUrl"`
+	SafeColorsStylesheetURL string `json:"safeColorsStylesheetUrl"`
+	SafeMode                bool   `json:"safeMode"`
+	LogoURL                 string `json:"logoUrl,omitempty"`
+	DarkLogoURL             string `json:"darkLogoUrl,omitempty"`
+	FaviconURL              string `json:"faviconUrl,omitempty"`
+	HideAppName             bool   `json:"hideAppName"`
+	HasBackground           bool   `json:"hasBackground"`
 
 	FooterLinks  []BrandFooterLinkResponse `json:"footerLinks"`
 	SupportEmail string                    `json:"supportEmail"`

@@ -3,9 +3,10 @@
 // the sign-in pages in its theme and appearance at once. The admin console's own client given a brand
 // (#812) draws the console and its sign-in in it, while another client's sign-in keeps the default,
 // and the Branding list counts the clients each brand draws; given a brand in a custom palette (#815),
-// it draws its admin pages, its Account pages and its sign-in in the palette's colors. Runs alone,
-// since the default brand and
-// the console's own client's brand are what every page is drawn in, and puts back what it found.
+// it draws its admin pages, its Account pages and its sign-in in the palette's colors; given a brand
+// with custom CSS (#816), it draws the CSS on its Account pages and never on its admin pages. Runs
+// alone, since the default brand and the console's own client's brand are what every page is drawn
+// in, and puts back what it found.
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "../../../lib/fixtures";
 import { clientBrandChoice, clientIdFromList, expectRefusal, setClientBrand } from "../../../lib/admin-console";
@@ -27,6 +28,7 @@ import {
   plumCanvas,
   readBrand,
   saveBrand,
+  saveCustomCss,
   submitNewBrand,
   warmBasicPalette,
   withBrand,
@@ -306,5 +308,40 @@ test("the admin console's own client given a brand in a custom palette draws the
     // Put back: the console is drawn in the default again.
     await page.goto(brandingUrl);
     await expectDrawnInSeededDefault(page, seeded.id);
+  });
+});
+
+// The console's own client given a brand whose custom CSS underlines every page title (#816): an
+// Account page, which links the brand's full stylesheet, draws the rule, and an admin page, which links
+// its colors-only one, never does. A test client's brand reaches no console page, so this needs the
+// console's own client, and runs alone.
+test("the admin console's own client given a brand with custom CSS draws it on an Account page and not on an admin page, and it is put back", async ({
+  page,
+}) => {
+  const consoleClient = await clientIdFromList(page, "admin-console-client");
+  const seeded = await defaultBrand(page);
+  const titleDecoration = () => page.locator(".page-title").first().evaluate((title) => getComputedStyle(title).textDecorationLine);
+
+  await withBrand(page, { appearance: "light", theme: "plum" }, async (brand) => {
+    await saveCustomCss(page, brand.id, ".page-title {\n  text-decoration: underline wavy rgb(18, 52, 86);\n}\n");
+    try {
+      await setClientBrand(page, consoleClient, brand);
+
+      await page.goto(`${env.adminUrl}/account/profile`);
+      await expect(page.locator("body")).toHaveAttribute("data-page", "account-profile");
+      expect(await pageBrandStylesheets(page)).toEqual([{ brandId: brand.id, kind: "full" }]);
+      expect(await titleDecoration(), "an Account page draws the custom CSS").toBe("underline");
+
+      await page.goto(brandingUrl);
+      expect(await pageBrandStylesheets(page)).toEqual([{ brandId: brand.id, kind: "colors" }]);
+      expect(await titleDecoration(), "an admin page never draws it").toBe("none");
+    } finally {
+      await setClientBrand(page, consoleClient, "default");
+    }
+
+    // Put back: the console is drawn in the default again, its Account pages without the CSS.
+    await page.goto(`${env.adminUrl}/account/profile`);
+    await expectDrawnInSeededDefault(page, seeded.id);
+    expect(await titleDecoration()).toBe("none");
   });
 });

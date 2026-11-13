@@ -27,7 +27,7 @@
   {{ template "head" . }}
 </head>
 
-<body>
+<body{{ with .dataPage }} data-page="{{ . }}"{{ end }}>
   <div class="auth-page">
     <main class="auth-main">
       <div class="panel auth-card{{ if .layoutWide }} auth-card-wide{{ end }}">

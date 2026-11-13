@@ -1,5 +1,6 @@
-// Package reqctx holds the admin console's two request-scoped values: the signed-in
-// administrator's token set and the auth server's public settings. Each is written by one
+// Package reqctx holds the admin console's three request-scoped values: the signed-in
+// administrator's token set, the auth server's public settings, and whether the request is in safe
+// mode. Each is written by one
 // middleware and read back through a typed accessor, so a reader that finds a value absent
 // answers with one sentinel error rather than a type assertion of its own (#440). It is the twin
 // of the auth server's internal/reqctx (#433).
@@ -34,6 +35,7 @@ type key int
 const (
 	jwtInfoKey key = iota
 	settingsKey
+	safeModeKey
 )
 
 func WithJwtInfo(ctx context.Context, jwtInfo oauthclient.JwtInfo) context.Context {
@@ -56,4 +58,18 @@ func WithSettings(ctx context.Context, s *api.PublicSettingsResponse) context.Co
 func SettingsFrom(ctx context.Context) (*api.PublicSettingsResponse, bool) {
 	s, ok := ctx.Value(settingsKey).(*api.PublicSettingsResponse)
 	return s, ok && s != nil
+}
+
+// WithSafeMode records whether the request is in safe mode: its console session is, or its URL
+// asks for it with goiabada_safe_mode=true (#816 decision 2). middleware.SafeMode writes it.
+func WithSafeMode(ctx context.Context, on bool) context.Context {
+	return context.WithValue(ctx, safeModeKey, on)
+}
+
+// SafeModeFrom is whether the request is in safe mode: its pages are drawn from the brand's safe
+// stylesheets, and every authorization request it sends asks for safe mode. A request nothing marked
+// is not.
+func SafeModeFrom(ctx context.Context) bool {
+	on, _ := ctx.Value(safeModeKey).(bool)
+	return on
 }

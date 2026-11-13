@@ -25,6 +25,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
+	"github.com/leodip/goiabada/authserver/internal/customcss"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/brandkit"
 	"github.com/leodip/goiabada/core/docsreader"
@@ -306,4 +307,30 @@ func TestBrandDocs_TheScopesPagePutsBrandFilesInSettings(t *testing.T) {
 		[]string{"brands and their uploaded files"}, nil)
 	guard.AssertSectionSays(t, root, apiScopesPage, "## The Admin API scopes",
 		[]string{"brands and their uploaded files"}, nil)
+}
+
+// The Custom CSS section (#816) names the editor's field by its label, states the check's cap and
+// each of its rules (decision 4), links the styling contract, and gives the admin API's member and the
+// field its refusals point at. A guide stating a cap or a rule the check does not hold misleads an
+// administrator writing CSS against it.
+func TestBrandDocs_TheCustomCSSSectionStatesTheFieldAndTheRules(t *testing.T) {
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, "## Custom CSS",
+		[]string{
+			"**" + english("adminconsole.admin_branding.brand.custom_css.title") + "**",
+			"up to 64 KB",
+			"`@import`",
+			"a `data:` image in `url()`",
+			"`src()`, `image()` or `image-set()`",
+			"`-webkit-`",
+			"`\\69mport`",
+			"/reference/styling-contract/",
+			"(/reference/api/admin/operations/createbrand/)",
+			"(/reference/api/admin/operations/updatebrand/)",
+			"`customCss`",
+			"`/customCss`",
+			"never on the console's admin pages",
+		}, nil)
+	if customcss.MaxBytes != 64<<10 {
+		t.Errorf("the guide states 64 KB, but customcss.MaxBytes is %d", customcss.MaxBytes)
+	}
 }

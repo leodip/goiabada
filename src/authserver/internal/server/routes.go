@@ -159,11 +159,13 @@ func (s *Server) initRoutes(branches appBranches) {
 	files.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(files, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(files, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
-	// A brand's two stylesheets are answered as a static file is, to anyone and with no session, on
-	// the branch without the settings read and the session load, so no cookie rides on their public
-	// year (#813 decision 11).
+	// A brand's four stylesheets, its own two and the two safe mode links (#816 decision 3), are
+	// answered as a static file is, to anyone and with no session, on the branch without the settings
+	// read and the session load, so no cookie rides on their public year (#813 decision 11).
 	getAndHead(public, brandthemes.StylesheetRoute, handlers.HandleBrandStylesheetGet(httpHelper, s.database))
 	getAndHead(public, brandthemes.ColorsStylesheetRoute, handlers.HandleBrandColorsStylesheetGet(httpHelper, s.database))
+	getAndHead(public, brandthemes.SafeStylesheetRoute, handlers.HandleBrandSafeStylesheetGet(httpHelper, s.database))
+	getAndHead(public, brandthemes.SafeColorsStylesheetRoute, handlers.HandleBrandSafeColorsStylesheetGet(httpHelper, s.database))
 	// A brand asset is answered the same way, a font with the grant that lets the admin console's
 	// pages draw it: the console's origin, as a browser sends it in Origin (#813 decision 8).
 	consoleOrigin, _ := urlmatch.CanonicalOrigin(adminConsoleBaseURL)

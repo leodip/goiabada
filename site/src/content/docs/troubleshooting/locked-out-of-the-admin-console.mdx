@@ -13,6 +13,7 @@ Find your case first:
 - **The password you set in `GOIABADA_ADMIN_PASSWORD` is refused:** [you changed it after the first start](#you-changed-goiabada_admin_password).
 - **The only administrator can't sign in**, because they forgot their password, lost their authenticator, or their authenticator refuses every code: [the last administrator can't sign in](#the-last-administrator-cant-sign-in).
 - **The sign-in form refuses everyone since the Turnstile challenge was turned on**: [the Turnstile challenge refuses every sign-in](#the-turnstile-challenge-refuses-every-sign-in).
+- **The sign-in page or the admin console can't be read or used since a brand changed**: [a brand made the pages unusable](#a-brand-made-the-pages-unusable).
 
 ## The admin console's client secret changed
 
@@ -206,6 +207,24 @@ The admin console signs in through the same form, so once you're signed out, you
 </Tabs>
 
 The forms stop asking for the challenge at the next request, on every replica. Sign in, fix the widget in the Cloudflare dashboard or the site key under **Admin**, **Turnstile**, and turn the challenge on again. Before you sign out, check that a private window can sign in.
+
+## A brand made the pages unusable
+
+A brand's custom CSS, custom palette or uploaded font can leave the sign-in page and the admin console's pages unreadable, or with controls you can't reach. Sign in in [safe mode](/guides/customize-and-translate-the-pages/#safe-mode), which draws the pages without them:
+
+<Steps>
+
+1. Open `https://admin.example.com/admin/settings/branding?goiabada_safe_mode=true`, with your admin console's address.
+
+2. Sign in. The sign-in pages and then the admin console's pages are drawn in safe mode.
+
+3. Fix the brand's custom CSS, palette or font, and click **Save**.
+
+4. Sign out, and sign in from a private window to check.
+
+</Steps>
+
+To draw every client's pages in safe mode too while you fix the brand, set `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE` to `true` on the auth server and restart it. Once the brand is fixed, unset it and restart the auth server again.
 
 ## Next steps
 

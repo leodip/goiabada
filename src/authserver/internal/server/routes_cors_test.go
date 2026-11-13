@@ -72,7 +72,7 @@ func TestRegisterRoutes_APreflightCarriesTheSecurityHeaders(t *testing.T) {
 			header := rr.Result().Header
 			assert.Equal(t, []string{"max-age=31536000; includeSubDomains"}, header.Values("Strict-Transport-Security"))
 			assert.Equal(t, []string{"DENY"}, header.Values("X-Frame-Options"))
-			assert.Equal(t, []string{"script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"},
+			assert.Equal(t, []string{"script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"},
 				header.Values("Content-Security-Policy"))
 			assert.Equal(t, []string{"nosniff"}, header.Values("X-Content-Type-Options"))
 			assert.Equal(t, []string{"same-origin"}, header.Values("Referrer-Policy"))

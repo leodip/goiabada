@@ -129,6 +129,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
 | `core/sourceroot` | kernel | — |
+| `core/stylingcontract` | kernel | — |
 | `core/timezones` | kernel | — |
 
 Notes on rows that are not self-evident:
@@ -245,6 +246,13 @@ Notes on rows that are not self-evident:
   of a color, the two the auth server holds a stored palette to when it reads or writes a brand. It
   is a package of its own rather than part of `core/brandkit`, which holds what a brand draws rather
   than what its colors are held to, and the console reaches no auth server package.
+- `core/stylingcontract` is kernel because the styling contract is one promise across both
+  applications' pages: the auth server's tier and the admin console's each hold their templates to
+  its lists through `core/guard.AssertStylingContract`, the docs test holds the reference page to
+  them, and both renderers bind a page's `data-page` value through its `PageName`, so the two
+  cannot read a page's name differently (#816). It is a package of its own rather than part of
+  `core/brandkit`, which holds what a brand draws rather than what the pages promise any CSS, and
+  the console reaches no auth server package.
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are

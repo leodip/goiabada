@@ -54,7 +54,7 @@ func TestRequiresScope_AnAnonymousRequestWritesNoRow(t *testing.T) {
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
 		}, nil)
 	require.NoError(t, err)
-	authHelper := oauthclient.NewAuthHelper(store, "https://console.example", "https://auth.example")
+	authHelper := oauthclient.NewAuthHelper(store, "https://console.example", "https://auth.example", reqctx.SafeModeFrom)
 	mw := NewJWT(store, nil, builtin.AdminConsoleSessionName, nil, nil, authHelper,
 		stubErrorRenderer{}, "https://console.example", builtin.AdminConsoleClientIdentifier)
 	handler := mw.RequiresScope([]string{"required:scope"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -174,7 +174,7 @@ func TestRequiresScope_ATargetWithinTheBoundAlwaysSeals(t *testing.T) {
 	require.NoError(t, err)
 	const baseURL = "https://console.example"
 	mw := NewJWT(store, nil, builtin.AdminConsoleSessionName, nil, nil,
-		oauthclient.NewAuthHelper(store, baseURL, "https://auth.example"),
+		oauthclient.NewAuthHelper(store, baseURL, "https://auth.example", reqctx.SafeModeFrom),
 		stubErrorRenderer{}, baseURL, builtin.AdminConsoleClientIdentifier)
 	handler := mw.RequiresScope([]string{"required:scope"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("an anonymous request never reaches the page it asked for")

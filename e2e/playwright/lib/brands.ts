@@ -942,3 +942,20 @@ export const failingBasicPalette: PaletteValues = {
   light: { canvas: "#ffffff", surface: "#ffffff", ink: "#777777", brand: "#1f4fa8" },
   dark: warmBasicPalette.dark,
 };
+
+// The brand editor's Custom CSS field (#816), and the sentence beside it saying the preview does not
+// draw custom CSS and how to try it (decision 8).
+export function customCssField(page: Page): Locator {
+  return page.locator("#customCss");
+}
+
+export const customCssPreviewNote =
+  "The preview doesn't show custom CSS. To try it, give this brand to a test client and sign in to that client. If a page becomes unusable, add goiabada_safe_mode=true to the authorization request, or to an admin console address, to draw the pages without it.";
+
+// Saves a brand's page with this custom CSS and waits for "Brand saved.".
+export async function saveCustomCss(page: Page, id: number, css: string) {
+  await page.goto(brandUrl(id, "edit"));
+  await customCssField(page).fill(css);
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
+}

@@ -21,7 +21,11 @@ import {
   legalDocumentUrl,
   resourceUrl,
   retireLegalDocument,
+  safeModeNotice,
+  safeModeSessionNotice,
   setClientBrand,
+  signInAsAdminInSafeMode,
+  signOutOfConsole,
   userUrl,
   type ClientTab,
   type GroupTab,
@@ -30,6 +34,7 @@ import {
 } from "../../lib/admin-console";
 import {
   brandUrl,
+  customCssField,
   defaultBrand,
   expectPreviewDrawn,
   fillBrandFooter,
@@ -466,6 +471,28 @@ test("the console's home, page not found and menus", async ({ page }) => {
       leave: () => page.setViewportSize(desktop),
     },
   ]);
+});
+
+// An admin page and an Account page while the console session is in safe mode (#816 decision 2): the
+// admin page draws a notice saying so. Signed in in a browser of its own, since safe mode lasts for its
+// console session, and signed out after.
+test("the console in safe mode, with its notice", async ({ browser }) => {
+  const { context, page: safe } = await signInAsAdminInSafeMode(browser);
+  try {
+    await checkStates(safe, [
+      {
+        name: "an admin page in safe mode, with its notice",
+        reach: async () => {
+          await safe.goto(`${env.adminUrl}/admin/settings/general`);
+          await expect(safeModeNotice(safe)).toHaveText(safeModeSessionNotice);
+        },
+      },
+      at(safe, "an Account page in safe mode", `${env.adminUrl}/account/profile`),
+    ]);
+  } finally {
+    await signOutOfConsole(safe);
+    await context.close();
+  }
 });
 
 test("a user's account pages", async ({ page, browser, clients, users, legalDocuments }) => {
@@ -1310,6 +1337,24 @@ test("the settings pages and the audit log", async ({ page }) => {
       await fillBrandFooter(page, { supportPhone: "555-0123" });
       await page.locator("#btnCreate").click();
       await expect(page.locator("#supportPhone")).toBeFocused();
+    }),
+    // The Custom CSS field (#816): filled, and an @import refused at it, the notice naming its line.
+    // Nothing is saved.
+    {
+      name: "branding, a new brand, its custom CSS filled",
+      reach: async () => {
+        await page.goto(newBrandUrl);
+        await customCssField(page).fill('body[data-page="sign-in"] .auth-card {\n  border: 2px solid var(--color-brand);\n}\n');
+        await expect(page.locator("#customCssPreviewNote")).toBeVisible();
+      },
+    },
+    refused(page, "branding, a new brand, its custom CSS refused at its field", "customCss", async () => {
+      await page.goto(newBrandUrl);
+      await page.locator("#name").fill(uniqueIdentifier("brand"));
+      await customCssField(page).fill('.auth-card {\n  color: red;\n}\n@import "https://cdn.example.com/theme.css";\n');
+      await page.locator("#btnCreate").click();
+      await expect(page.locator("#brand-error")).toHaveText("Line 4 of the custom CSS has an @import. Custom CSS cannot load another stylesheet.");
+      await expect(customCssField(page)).toBeFocused();
     }),
     // The Colors section (#815 decisions 7 and 8): Custom picked, in Basic and in Advanced, and a value
     // that is not a color refused at its field in the column the appearance hides, drawn for it.

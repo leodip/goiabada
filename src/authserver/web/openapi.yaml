@@ -2355,7 +2355,8 @@ paths:
         support contact are optional: each left out or null is none. The theme `custom` takes a
         palette: a basic one's other colors are worked out when the brand is saved, and every
         answer carries the colors the brand is drawn in and the pairs of them below their minimum
-        contrast, which never stop a save.
+        contrast, which never stop a save. Custom CSS is checked when the brand is saved, and is
+        refused if it could make a browser load anything.
       operationId: createBrand
       requestBody:
         required: true
@@ -2399,7 +2400,11 @@ paths:
             handler.brand.palette_mode_invalid, handler.brand.palette_colors_required,
             handler.brand.palette_color_required, handler.brand.palette_color_unknown,
             handler.brand.palette_color_not_basic and handler.brand.palette_color_invalid, with
-            error_field naming the member, such as `/palette/light/brand`.
+            error_field naming the member, such as `/palette/light/brand`. For the custom CSS,
+            one of handler.brand.custom_css_too_large, handler.brand.custom_css_import,
+            handler.brand.custom_css_url, handler.brand.custom_css_function and
+            handler.brand.custom_css_malformed, with error_field `/customCss`; error_description
+            names the line it is about, counted from 1, except for the size.
           content:
             application/json:
               schema:
@@ -2441,10 +2446,11 @@ paths:
       summary: Update brand
       description: |
         Replace a brand's name, appearance, theme, kit choices, asset slots, footer links,
-        support contact and palette. Every field is written: a choice left out is refused,
-        hideAppName left out is false, a slot left out or null is emptied, footer links or a
-        contact value left out or null are removed, and a built-in theme drops the palette. A brand read and sent back is unchanged. A change to the default brand
-        restyles every page at once.
+        support contact, palette and custom CSS. Every field is written: a choice left out is
+        refused, hideAppName left out is false, a slot left out or null is emptied, footer links,
+        a contact value or the custom CSS left out or null are removed, and a built-in theme
+        drops the palette. A brand read and sent back is unchanged. A change to the default
+        brand restyles every page at once.
       operationId: updateBrand
       parameters:
         - $ref: '#/components/parameters/BrandIdParam'
@@ -8659,6 +8665,25 @@ components:
           description: >-
             The absolute URL of the brand's stylesheet that sets its colors alone, which an admin
             page links after main.css. The URL changes whenever the stylesheet does.
+        safeStylesheetUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's full stylesheet in safe mode: without its custom CSS,
+            in the built-in Blueberry colors in place of a custom palette, and in System UI in place
+            of an uploaded font. The URL changes whenever the stylesheet does.
+        safeColorsStylesheetUrl:
+          type: string
+          format: uri
+          description: >-
+            The absolute URL of the brand's colors-only stylesheet in safe mode, the built-in
+            Blueberry colors in place of a custom palette. The URL changes whenever the stylesheet
+            does.
+        safeMode:
+          type: boolean
+          description: >-
+            Whether GOIABADA_AUTHSERVER_BRAND_SAFE_MODE draws every page in safe mode. While it
+            does, stylesheetUrl and colorsStylesheetUrl are the safe stylesheets' URLs.
         logoUrl:
           type: string
           format: uri
@@ -8711,6 +8736,9 @@ components:
         - appearance
         - stylesheetUrl
         - colorsStylesheetUrl
+        - safeStylesheetUrl
+        - safeColorsStylesheetUrl
+        - safeMode
         - hideAppName
         - hasBackground
         - footerLinks
@@ -9167,6 +9195,12 @@ components:
             so a write ignores it.
           items:
             $ref: '#/components/schemas/BrandContrastWarning'
+        customCss:
+          type: string
+          description: |
+            The brand's custom CSS as stored: as it was written, with each CRLF and CR made a
+            line feed. An empty string when the brand has none. It is appended to the brand's
+            full stylesheet, after its colors and kit.
         isDefault:
           type: boolean
           description: True for the default brand, the one a client with no brand of its own is drawn in.
@@ -9203,6 +9237,7 @@ components:
         - palette
         - colors
         - contrastWarnings
+        - customCss
         - isDefault
         - clientCount
         - createdAt
@@ -9319,6 +9354,18 @@ components:
           allOf:
             - $ref: '#/components/schemas/BrandPalette'
           nullable: true
+        customCss:
+          type: string
+          nullable: true
+          description: |
+            CSS appended to the brand's full stylesheet, which the auth server's pages and the
+            admin console's end-user pages link, and never its admin pages. Left out, null or
+            blank for none. It is stored as written, with each CRLF and CR made a line feed, and
+            is refused when, as stored, it is over 65,536 bytes of UTF-8; holds an `@import`;
+            holds a URL that is not a `data:image/` URL; uses `src()`, `image()` or `image-set()`,
+            under any vendor prefix, whatever they hold; or does not read cleanly as CSS, such as
+            a comment, string or `url()` left open. Escapes count: `@\69mport` is an `@import`.
+            Each refusal has error_field `/customCss`, and each but the size names its line.
       required:
         - name
         - appearance
@@ -9444,6 +9491,18 @@ components:
           allOf:
             - $ref: '#/components/schemas/BrandPalette'
           nullable: true
+        customCss:
+          type: string
+          nullable: true
+          description: |
+            CSS appended to the brand's full stylesheet, which the auth server's pages and the
+            admin console's end-user pages link, and never its admin pages. Left out, null or
+            blank for none. It is stored as written, with each CRLF and CR made a line feed, and
+            is refused when, as stored, it is over 65,536 bytes of UTF-8; holds an `@import`;
+            holds a URL that is not a `data:image/` URL; uses `src()`, `image()` or `image-set()`,
+            under any vendor prefix, whatever they hold; or does not read cleanly as CSS, such as
+            a comment, string or `url()` left open. Escapes count: `@\69mport` is an `@import`.
+            Each refusal has error_field `/customCss`, and each but the size names its line.
       required:
         - name
         - appearance

@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -70,7 +71,7 @@ func redirToAuthorize(t *testing.T) (map[string]string, *httptest.ResponseRecord
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/admin/clients", nil)
-	err := oauthclient.NewAuthHelper(store, helperConsoleBase, helperAuthBase).
+	err := oauthclient.NewAuthHelper(store, helperConsoleBase, helperAuthBase, reqctx.SafeModeFrom).
 		RedirToAuthorize(w, r, helperClientID, helperScope, helperRedirectBack)
 	require.NoError(t, err)
 
@@ -159,7 +160,7 @@ func TestRedirToAuthorize_WritesNoRowAndSetsTheHandshakeCookie(t *testing.T) {
 
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodGet, "/admin/clients", nil)
-			require.NoError(t, oauthclient.NewAuthHelper(store, helperConsoleBase, helperAuthBase).
+			require.NoError(t, oauthclient.NewAuthHelper(store, helperConsoleBase, helperAuthBase, reqctx.SafeModeFrom).
 				RedirToAuthorize(w, r, helperClientID, helperScope, helperRedirectBack))
 
 			assert.Zero(t, backend.creates.Load(), "no browser-session row")
@@ -196,7 +197,7 @@ func (failingSealer) ValuesCookie(name, value string) *http.Cookie {
 func TestRedirToAuthorize_ASealThatFails(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/admin/clients", nil)
-	err := oauthclient.NewAuthHelper(failingSealer{}, helperConsoleBase, helperAuthBase).
+	err := oauthclient.NewAuthHelper(failingSealer{}, helperConsoleBase, helperAuthBase, reqctx.SafeModeFrom).
 		RedirToAuthorize(w, r, helperClientID, helperScope, helperRedirectBack)
 
 	require.Error(t, err)
@@ -211,7 +212,7 @@ func authorizeQuery(t *testing.T, redirect func(*oauthclient.AuthHelper, http.Re
 	store, _ := newHandshakeStore(t, false)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/account/data", nil)
-	require.NoError(t, redirect(oauthclient.NewAuthHelper(store, helperConsoleBase, helperAuthBase), w, r))
+	require.NoError(t, redirect(oauthclient.NewAuthHelper(store, helperConsoleBase, helperAuthBase, reqctx.SafeModeFrom), w, r))
 
 	require.Equal(t, http.StatusFound, w.Code)
 	location := w.Header().Get("Location")
@@ -287,7 +288,7 @@ func TestIsAuthenticated(t *testing.T) {
 		{"a verified id token", oauthclient.JwtInfo{IdToken: &oauth.JwtToken{TokenBase64: "i"}}, true},
 	}
 
-	helper := oauthclient.NewAuthHelper(nil, helperConsoleBase, helperAuthBase)
+	helper := oauthclient.NewAuthHelper(nil, helperConsoleBase, helperAuthBase, reqctx.SafeModeFrom)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, helper.IsAuthenticated(tc.jwtInfo))
@@ -330,7 +331,7 @@ func TestIsAuthorizedToAccessResource(t *testing.T) {
 			[]string{manage}, false},
 	}
 
-	helper := oauthclient.NewAuthHelper(nil, helperConsoleBase, helperAuthBase)
+	helper := oauthclient.NewAuthHelper(nil, helperConsoleBase, helperAuthBase, reqctx.SafeModeFrom)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, helper.IsAuthorizedToAccessResource(tc.jwtInfo, tc.scopesAnyOf))

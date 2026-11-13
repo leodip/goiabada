@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
@@ -205,7 +206,7 @@ func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.
 	store := sessionstoremocks.NewStore(t)
 	store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
-	authHelper := oauthclient.NewAuthHelper(nil, "", "")
+	authHelper := oauthclient.NewAuthHelper(nil, "", "", reqctx.SafeModeFrom)
 
 	serve := func(opts ...handlertest.Option) map[string]interface{} {
 		httpHelper := handlersmocks.NewHttpHelper(t)
@@ -347,7 +348,7 @@ func TestHandleIndexGet_ShowsTheQuerysNoticeOnlyToAVisitorNotSignedIn(t *testing
 	store := sessionstoremocks.NewStore(t)
 	store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
-	authHelper := oauthclient.NewAuthHelper(nil, "", "")
+	authHelper := oauthclient.NewAuthHelper(nil, "", "", reqctx.SafeModeFrom)
 	serve := func(target string, opts ...handlertest.Option) any {
 		httpHelper := handlersmocks.NewHttpHelper(t)
 		handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()

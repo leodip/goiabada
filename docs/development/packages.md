@@ -311,6 +311,12 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   request-body table's rows read it. The public asset handler grants a font's answer to the admin
   console's origin, which `routes.go` derives from `GOIABADA_ADMINCONSOLE_BASEURL`. The cleanup
   worker sweeps an asset no brand uses once it is a day old (see the [data guide](data.md#brand-assets))
+- `internal/customcss/` - The check a brand's custom CSS passes before it is saved (#816
+  decision 4): `Check`, from CSS text to nil or a `Refusal` naming its rule and line. It reads the
+  CSS as tokens, by a tokenizer of its own that follows CSS Syntax Level 3 section 4, so an escape
+  (`@\69mport`, `\75rl(`) reaches the same rule its plain spelling does. It refuses more than 64 KB,
+  `@import`, a `url()` that is not a `data:` image, `src()`, `image()` and `image-set()` under any
+  vendor prefix, and CSS that does not tokenize cleanly; it rewrites nothing
 - `internal/clientauth/` - Client authentication from plain values, the client identifier and the
   secret presented: the lookup, the secret check and their refusals' wording and shape, shared by
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a
@@ -502,12 +508,18 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   expiry, and the six of its sealed sign-in handshake. Stored data: a live session carries the two
   spellings, so renaming one signs every administrator out at deploy, and renaming one of the six
   fails the sign-ins in flight at the deploy. The six stay declared because they key the sealed map
-  and the callback deletes the stale copies a session written before #620 can hold. It was
+  and the callback deletes the stale copies a session written before #620 can hold. `SafeMode` is
+  in both: the handshake of a sign-in started in safe mode carries it, and the callback writes it
+  into the signed-in session (#816). It was
   `internal/constants` until the context keys left for `reqctx` (#440, #620)
 - `internal/render/` - The console's page renderer. Every page is drawn in the brand
   `/api/public/settings` answers (`PageBrand`): an admin page, one whose `menu` template calls
   `admin_menu`, takes the brand's colors-only stylesheet and its logo and keeps Goiabada's icons;
-  every other page takes the full stylesheet, the logo and the brand's favicon (#813)
+  every other page takes the full stylesheet, the logo and the brand's favicon (#813). A request in
+  safe mode (`reqctx.SafeModeFrom`, which `middleware.SafeMode` writes from the console session or
+  a `goiabada_safe_mode=true` URL) links the safe twin of that stylesheet, or none when the auth
+  server publishes no safe links, and an admin page then draws a notice, which the auth server's
+  switch (`safeMode` on the published brand) draws too (#816)
 - `web/template/` - Admin UI templates
 
 ## Configuration
