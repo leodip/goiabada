@@ -8,26 +8,40 @@ import "net/http"
 // reverse.
 const strictTransportSecurityValue = "max-age=31536000; includeSubDomains"
 
-// The Content-Security-Policy, in two parts: the script-src directive's sources, and the directives
-// after it. What each directive does, and why it is not more or less, is on SecurityHeaders.
+// The Content-Security-Policy's parts: the script-src directive's sources, the three directives that
+// say where styles, images and fonts come from, and the directives after them. What each directive
+// does, and why it is not more or less, is on SecurityHeaders.
 const (
 	scriptSrcSelf        = "script-src 'self'"
-	policyAfterScriptSrc = "; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+	styleSrcSelf         = "; style-src 'self'"
+	imgSrcSelf           = "; img-src 'self' data:"
+	fontSrcSelf          = "; font-src 'self'"
+	policyAfterAssetSrcs = "; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 )
 
 // SetContentSecurityPolicy sets h's Content-Security-Policy to the one SecurityHeaders sends, with
-// scriptOrigins admitted to script-src beside 'self'. SecurityHeaders sets it with none. A handler
-// calls it, before it writes the response, to widen script-src for that one response: an origin
-// in script-src runs with the page's authority, over its forms and what the user types, so it
-// belongs only on the pages its scripts run on. The auth server admits Cloudflare's on the forms
-// carrying the Turnstile challenge, while it is on (#642 decision 9). Each origin is a constant
-// of the caller's, never a value a request carries.
-func SetContentSecurityPolicy(h http.Header, scriptOrigins ...string) {
+// assetOrigins admitted beside 'self' to style-src, img-src and font-src, and scriptOrigins
+// admitted beside 'self' to script-src. SecurityHeaders sets it with its own asset origins and no
+// script origin. A handler calls it, before it writes the response, to widen script-src for that
+// one response, passing the asset origins its server's SecurityHeaders was given: an origin in
+// script-src runs with the page's authority, over its forms and what the user types, so it belongs
+// only on the pages its scripts run on. The auth server admits Cloudflare's on the forms carrying
+// the Turnstile challenge, while it is on (#642 decision 9). Each origin is a constant or the
+// configuration of the caller's, never a value a request carries.
+func SetContentSecurityPolicy(h http.Header, assetOrigins []string, scriptOrigins ...string) {
+	assets := ""
+	for _, origin := range assetOrigins {
+		assets += " " + origin
+	}
 	scriptSrc := scriptSrcSelf
 	for _, origin := range scriptOrigins {
 		scriptSrc += " " + origin
 	}
-	h.Set("Content-Security-Policy", scriptSrc+policyAfterScriptSrc)
+	h.Set("Content-Security-Policy", scriptSrc+
+		styleSrcSelf+assets+
+		imgSrcSelf+assets+
+		fontSrcSelf+assets+
+		policyAfterAssetSrcs)
 }
 
 // SecurityHeaders sets baseline security response headers on every
@@ -39,21 +53,38 @@ func SetContentSecurityPolicy(h http.Header, scriptOrigins ...string) {
 //   - X-Frame-Options: DENY blocks clickjacking (the login/consent/OTP pages are
 //     never meant to be framed).
 //
-//   - Content-Security-Policy: script-src 'self'; object-src 'none';
-//     base-uri 'none'; frame-ancestors 'none' (#518). A browser runs only the
-//     script files this origin serves, and refuses every inline <script>, on…
+//   - Content-Security-Policy: script-src 'self'; style-src 'self';
+//     img-src 'self' data:; font-src 'self'; object-src 'none';
+//     base-uri 'none'; frame-ancestors 'none' (#518, #816). A browser runs only
+//     the script files this origin serves, and refuses every inline <script>, on…
 //     attribute, javascript: URL and eval, so markup that reaches a page through
 //     a missed sink or an operator's template cannot run code. Every built-in
 //     page keeps its scripts in static files and hands them data in JSON data
 //     blocks, which a browser never runs (core/guard.AssertWellFormedTemplates
 //     holds the templates to that), so the policy needs no nonce or hash and
 //     stays one constant. A page that loads a script from elsewhere admits
-//     that origin on its own responses (SetContentSecurityPolicy). object-src
-//     'none' refuses <object> and <embed>, which nothing else restricts with no
-//     default-src sent; base-uri 'none' refuses a <base> that would move every
-//     relative form action to another origin; frame-ancestors 'none' refuses
-//     framing, as X-Frame-Options does. None of the four governs form
-//     submission, so the form_post page and every other form submit as before. Styles, images and fetches are not restricted.
+//     that origin on its own responses (SetContentSecurityPolicy).
+//
+//     style-src, img-src and font-src load stylesheets, images and fonts only
+//     from this origin, and images from data: URLs too. A brand's custom CSS
+//     reaches the pages, and CSS that could load from anywhere could read a
+//     value on the page and send it away in a URL; the three directives leave
+//     it no other site to send it to. style-src 'self' also refuses every <style>
+//     element and style attribute; every built-in page keeps its styles in
+//     static files. data: images carry their bytes in the URL and send nothing
+//     anywhere: the built-in stylesheet's icons, the console's authenticator
+//     QR code and the picture being cropped are such images. assetOrigins are
+//     admitted beside 'self' to the three: the console passes the auth
+//     server's origin, which serves the brand's stylesheets, pictures and font,
+//     the client logos and the user pictures its pages draw (#816 decision 5).
+//
+//     object-src 'none' refuses <object> and <embed>, which nothing else
+//     restricts with no default-src sent; base-uri 'none' refuses a <base> that
+//     would move every relative form action to another origin; frame-ancestors
+//     'none' refuses framing, as X-Frame-Options does. None of the seven
+//     governs form submission, fetches or frames, so the form_post page and
+//     every other form submit as before, and the Turnstile widget's frame
+//     loads.
 //
 //   - X-Content-Type-Options: nosniff stops MIME sniffing (this also protects
 //     the image-serving endpoints).
@@ -82,12 +113,12 @@ func SetContentSecurityPolicy(h http.Header, scriptOrigins ...string) {
 //
 //   - Strict-Transport-Security is emitted only when secure is true (i.e. the
 //     deployment serves over HTTPS); it is meaningless over plain HTTP.
-func SecurityHeaders(secure bool) func(next http.Handler) http.Handler {
+func SecurityHeaders(secure bool, assetOrigins ...string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			h := w.Header()
 			h.Set("X-Frame-Options", "DENY")
-			SetContentSecurityPolicy(h)
+			SetContentSecurityPolicy(h, assetOrigins)
 			h.Set("X-Content-Type-Options", "nosniff")
 			// same-origin, not no-referrer. See the note above: no-referrer makes
 			// browsers send "Origin: null" on form POSTs, which fails the CSRF

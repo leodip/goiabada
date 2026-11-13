@@ -18,7 +18,7 @@ func TestSecurityHeaders(t *testing.T) {
 			secure: false,
 			want: map[string]string{
 				"X-Frame-Options":           "DENY",
-				"Content-Security-Policy":   "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+				"Content-Security-Policy":   "script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
 				"X-Content-Type-Options":    "nosniff",
 				"Referrer-Policy":           "same-origin",
 				"Strict-Transport-Security": "",
@@ -29,7 +29,7 @@ func TestSecurityHeaders(t *testing.T) {
 			secure: true,
 			want: map[string]string{
 				"X-Frame-Options":           "DENY",
-				"Content-Security-Policy":   "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+				"Content-Security-Policy":   "script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
 				"X-Content-Type-Options":    "nosniff",
 				"Referrer-Policy":           "same-origin",
 				"Strict-Transport-Security": strictTransportSecurityValue,
@@ -206,12 +206,12 @@ func TestSecurityHeaders_ScriptPolicyRunsOnlyTheServersOwnScriptFiles(t *testing
 // every other directive stays as SecurityHeaders sends it, the policy is still sent once, and the
 // next response the same middleware answers carries the policy unwidened.
 func TestSetContentSecurityPolicy_WidensScriptSrcForOneResponse(t *testing.T) {
-	const widened = "script-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
-	const unwidened = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+	const widened = "script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+	const unwidened = "script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 	handler := SecurityHeaders(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/widened" {
-			SetContentSecurityPolicy(w.Header(), "https://challenges.cloudflare.com")
+			SetContentSecurityPolicy(w.Header(), nil, "https://challenges.cloudflare.com")
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -229,4 +229,122 @@ func TestSetContentSecurityPolicy_WidensScriptSrcForOneResponse(t *testing.T) {
 			t.Errorf("GET %s: Content-Security-Policy = %q, want once %q", tt.path, got, tt.want)
 		}
 	}
+}
+
+// TestSecurityHeaders_AssetPolicyLoadsStylesImagesAndFontsOnlyFromTheServer says why style-src,
+// img-src and font-src are what they are (#816), so that relaxing one fails with a reason.
+//
+// Custom CSS reaches the pages, and CSS can read a value on the page and send it away in the URL of
+// an image, a font or an imported stylesheet. With no default-src sent, a directive left out leaves
+// its kind of request unrestricted, so each of the three is sent:
+//
+//   - style-src 'self': a browser loads only the stylesheets the server serves, and refuses every
+//     <style> element and style attribute, so markup that reaches a page cannot style it. Every
+//     built-in page keeps its styles in static files. 'unsafe-inline', a nonce, a hash, a scheme, a
+//     host or a wildcard would admit styles from elsewhere.
+//   - img-src 'self' data:: the server's own images, and the data: images the built-in stylesheet's
+//     icons and the console's QR code and cropper are. data: carries its bytes in the URL, so it
+//     sends nothing anywhere.
+//   - font-src 'self': the server's own fonts, an uploaded brand font among them.
+//
+// Nothing beside them is sent: default-src, connect-src, frame-src and form-action would restrict
+// what the pages do today (the form_post page's submission, Cloudflare's frame), which is not what
+// these three are for.
+func TestSecurityHeaders_AssetPolicyLoadsStylesImagesAndFontsOnlyFromTheServer(t *testing.T) {
+	for _, secure := range []bool{false, true} {
+		handler := SecurityHeaders(secure)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/auth/pwd", nil))
+
+		directives := policyDirectives(t, rr.Header().Get("Content-Security-Policy"))
+		want := map[string]string{
+			"script-src":      "'self'",
+			"style-src":       "'self'",
+			"img-src":         "'self' data:",
+			"font-src":        "'self'",
+			"object-src":      "'none'",
+			"base-uri":        "'none'",
+			"frame-ancestors": "'none'",
+		}
+		for name, sources := range want {
+			got, ok := directives[name]
+			if !ok {
+				t.Errorf("the policy has no %s (secure=%v), so a browser loads that kind of resource "+
+					"from anywhere", name, secure)
+				continue
+			}
+			if got != sources {
+				t.Errorf("%s is %q (secure=%v), want %q", name, got, secure, sources)
+			}
+		}
+		for name := range directives {
+			if _, ok := want[name]; !ok {
+				t.Errorf("the policy carries %s (secure=%v), which restricts what the pages do "+
+					"today rather than where styles, images and fonts come from", name, secure)
+			}
+		}
+	}
+}
+
+// TestSecurityHeaders_AssetOriginsAreAdmittedToStylesImagesAndFonts is the console's policy (#816
+// decision 5): the auth server's origin, which serves the brand's stylesheets, logo, favicon,
+// background and font, the client logos and the user pictures the console's pages draw, is admitted
+// to style-src, img-src and font-src beside 'self', and to nothing else. script-src stays 'self':
+// the console runs no script of the auth server's.
+func TestSecurityHeaders_AssetOriginsAreAdmittedToStylesImagesAndFonts(t *testing.T) {
+	const want = "script-src 'self'; style-src 'self' https://auth.example:8443; " +
+		"img-src 'self' data: https://auth.example:8443; font-src 'self' https://auth.example:8443; " +
+		"object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+
+	handler := SecurityHeaders(true, "https://auth.example:8443")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for range 2 {
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/account/profile", nil))
+
+		if got := rr.Header().Values("Content-Security-Policy"); len(got) != 1 || got[0] != want {
+			t.Errorf("Content-Security-Policy = %q, want once %q", got, want)
+		}
+	}
+}
+
+// TestSetContentSecurityPolicy_KeepsTheAssetOriginsWhenItWidensScriptSrc: a handler that widens
+// script-src on a server that admits another origin's assets passes those origins too, and the
+// widened policy keeps them where SecurityHeaders puts them.
+func TestSetContentSecurityPolicy_KeepsTheAssetOriginsWhenItWidensScriptSrc(t *testing.T) {
+	const want = "script-src 'self' https://scripts.example; style-src 'self' https://auth.example; " +
+		"img-src 'self' data: https://auth.example; font-src 'self' https://auth.example; " +
+		"object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+
+	h := http.Header{}
+	SetContentSecurityPolicy(h, []string{"https://auth.example"}, "https://scripts.example")
+
+	if got := h.Values("Content-Security-Policy"); len(got) != 1 || got[0] != want {
+		t.Errorf("Content-Security-Policy = %q, want once %q", got, want)
+	}
+}
+
+// policyDirectives reads policy's directives into their names, lowercased, and their sources as
+// written, failing the test on a directive sent twice, which a browser would ignore.
+func policyDirectives(t *testing.T, policy string) map[string]string {
+	t.Helper()
+	directives := map[string]string{}
+	for _, directive := range strings.Split(policy, ";") {
+		fields := strings.Fields(directive)
+		if len(fields) == 0 {
+			continue
+		}
+		name := strings.ToLower(fields[0])
+		if _, seen := directives[name]; seen {
+			t.Errorf("directive %s appears twice; a browser ignores the second", name)
+			continue
+		}
+		directives[name] = strings.Join(fields[1:], " ")
+	}
+	return directives
 }

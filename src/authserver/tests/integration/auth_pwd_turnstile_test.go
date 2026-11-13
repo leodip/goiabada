@@ -36,7 +36,7 @@ const (
 
 	turnstileRefusal = "Complete the security check, then try again. The check needs JavaScript."
 
-	turnstileWidenedPolicy = "script-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+	turnstileWidenedPolicy = "script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 )
 
 // turnOnTurnstile turns the challenge on in the settings row with secretKey, restoring the row when

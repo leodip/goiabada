@@ -1,7 +1,10 @@
 // A Content-Security-Policy violation on a page of the auth server or the admin console fails the
 // test. Both servers send script-src 'self' (with object-src and base-uri 'none'), so a page that
 // carried an inline script, an on… attribute, a javascript: URL or an eval would have that code
-// refused by the browser, and the page would break, perhaps in no way a test asserts.
+// refused by the browser, and the page would break, perhaps in no way a test asserts. They send
+// style-src, img-src and font-src 'self' too, img-src with data:, and the console's three with the
+// auth server's origin, so a <style> element, a style attribute, or a stylesheet, image or font
+// from any other site is refused the same way.
 //
 // The watcher listens for the securitypolicyviolation event in every page of a browser context, not
 // for console messages: a caught eval fires the event and logs nothing. Pages of other origins, the

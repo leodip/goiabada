@@ -74,7 +74,9 @@ func newStartableTestServer(t *testing.T, configure func(*config.AdminConsoleCon
 			ListenHostHttp:  "127.0.0.1",
 			ListenPortHttp:  9091,
 		},
-		AuthServer: config.AuthServerConfig{BaseURL: authServer.URL},
+		// The browser's address of the auth server, which the policy admits, and the address this
+		// process calls it at.
+		AuthServer: config.AuthServerConfig{BaseURL: "https://auth.example.test:9443", InternalBaseURL: authServer.URL},
 	}
 	configure(&cfg.AdminConsole)
 	registry := metrics.NewRegistry()
@@ -128,7 +130,9 @@ func sendToHTTPListener(t *testing.T, addr, method, request string) (*http.Respo
 func assertBaselineHeadersWithoutHSTS(t *testing.T, header http.Header) {
 	t.Helper()
 	assert.Equal(t, []string{"DENY"}, header.Values("X-Frame-Options"))
-	assert.Equal(t, []string{"script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"},
+	assert.Equal(t, []string{"script-src 'self'; style-src 'self' https://auth.example.test:9443; " +
+		"img-src 'self' data: https://auth.example.test:9443; font-src 'self' https://auth.example.test:9443; " +
+		"object-src 'none'; base-uri 'none'; frame-ancestors 'none'"},
 		header.Values("Content-Security-Policy"))
 	assert.Equal(t, []string{"nosniff"}, header.Values("X-Content-Type-Options"))
 	assert.Equal(t, []string{"same-origin"}, header.Values("Referrer-Policy"))

@@ -45,8 +45,8 @@ const (
 	ceremonyNoLongerActive = "This page belongs to a sign-in that can no longer continue."
 
 	// The policy every page is sent, and the one the challenge's pages are sent while it is on.
-	plainPolicy   = "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
-	widenedPolicy = "script-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+	plainPolicy   = "script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+	widenedPolicy = "script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 	// pwd_account_net: failures per 15 minutes per account per client block.
 	pwdAccountNetBudget = 10

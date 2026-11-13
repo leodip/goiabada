@@ -230,11 +230,20 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   inside the link, so it is part of the link's name and nothing visible moves;
   `core/guard.AssertTemplatesNewTabLinksSaySo` refuses a template whose `target="_blank"` link
   lacks it. `form_post.html` carries the text in its data, as `$.page.NewTabNotice`.
-- **Scripts**: no executable script in a template, no `on…` attribute, no `javascript:` URL. The
-  browser enforces it: both servers send `Content-Security-Policy: script-src 'self'; object-src
-  'none'; base-uri 'none'; frame-ancestors 'none'` (`core/httpmw.SecurityHeaders`), which refuses
-  inline code, `eval`, `<object>`/`<embed>` and `<base>`, so a page needing any of them breaks
-  rather than being given a nonce, a hash or an exception. The one origin admitted beside `'self'`
+- **Scripts and styles**: no executable script in a template, no `on…` attribute, no
+  `javascript:` URL, no `<style>` element and no `style` attribute. The browser enforces it: the
+  auth server sends `Content-Security-Policy: script-src 'self'; style-src 'self'; img-src 'self'
+  data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`
+  (`core/httpmw.SecurityHeaders`), which refuses inline code, `eval`, inline styles,
+  `<object>`/`<embed>`, `<base>`, and any stylesheet, image or font from another site, so a page
+  needing any of them breaks rather than being given a nonce, a hash or an exception. The console
+  sends the same policy with the auth server's public origin, from `GOIABADA_AUTHSERVER_BASEURL`,
+  beside `'self'` in `style-src`, `img-src` and `font-src`, for the brand's stylesheets, pictures
+  and font, the client logos and the user pictures it loads from there (#816 decision 5). A
+  script sets a style through the CSSOM (`element.style`, a constructed stylesheet), which the
+  policy admits; never with `setAttribute("style", …)` or a script-made `<style>`, which it
+  refuses. An image the page makes itself, such as the QR code or the picture being cropped, is a
+  `data:` URL. The one origin admitted beside `'self'`
   is Cloudflare's, for the Turnstile challenge (#642): while it is on, the auth server's sign-in,
   forgot-password and registration forms carry its widget, and each response drawing one of them
   through `turnstile.WithWidget` adds the constant `https://challenges.cloudflare.com` to

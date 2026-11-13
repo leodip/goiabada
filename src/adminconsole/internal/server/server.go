@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -292,7 +293,7 @@ func (s *Server) redirectingRouter() *routing.Router {
 
 	r := routing.New()
 	r.Use(requestid.Middleware)
-	r.Use(httpmw.SecurityHeaders(false))
+	r.Use(httpmw.SecurityHeaders(false, s.assetOrigins()...))
 	r.Use(httpmw.RealIP(false, s.trustedProxies))
 	r.Use(httpmw.RequestLogger(s.cfg.AdminConsole.LogHttpRequests))
 	r.Use(s.httpMetrics)
@@ -344,6 +345,20 @@ func httpsOrigin(baseURL string) string {
 		authority = authority[at+1:]
 	}
 	return "https://" + authority
+}
+
+// assetOrigins is what the console's Content-Security-Policy admits beside 'self' to style-src,
+// img-src and font-src: the auth server's public origin, its base URL's scheme, host and port
+// without the path (#816 decision 5). A browser loads from it the brand's two stylesheets, its logo,
+// favicon, background and uploaded font, the client logos and the user pictures, which the console's
+// pages name by that base URL; the console's own requests to the auth server go to its internal
+// base URL, which no browser is sent to. A base URL with no scheme or host admits nothing.
+func (s *Server) assetOrigins() []string {
+	base, err := url.Parse(strings.TrimSpace(s.cfg.AuthServer.BaseURL))
+	if err != nil || base.Scheme == "" || base.Host == "" {
+		return nil
+	}
+	return []string{(&url.URL{Scheme: base.Scheme, Host: base.Host}).String()}
 }
 
 // metricsHandler is the metrics listener's whole handler, the auth server's copied rather than
@@ -549,8 +564,9 @@ func (s *Server) initMiddleware() *routing.Router {
 	// (#462 decision 6), on the context of every record, audit event and error page below.
 	s.router.Use(requestid.Middleware)
 
-	// Security headers (before Recoverer so 500 responses carry them too)
-	s.router.Use(httpmw.SecurityHeaders(s.cfg.AdminConsole.IsCookieSecure()))
+	// Security headers (before Recoverer so 500 responses carry them too), the policy admitting the
+	// auth server's origin for the stylesheets, images and fonts the pages load from it.
+	s.router.Use(httpmw.SecurityHeaders(s.cfg.AdminConsole.IsCookieSecure(), s.assetOrigins()...))
 
 	// Real IP: resolve the client IP into r.RemoteAddr from the socket peer and
 	// (when trusted) the forwarded headers, so all downstream consumers (session/
