@@ -324,7 +324,9 @@ func auditRequestedRegistration(ctx context.Context, auditLogger AuditLogger, cl
 // and so is a lookup that failed, whose 500 says nothing about the address.
 //
 // Without it the form creates a usable account at once, so whether an address has one cannot be
-// hidden, and a taken address is told so (#207 decision 3).
+// hidden, and a taken address is told so (#207 decision 3). Its welcome email, with email on, is sent
+// in a job after the response, so a mail that fails is an Error record and never the error page for
+// an account that was created (#817 decision 13).
 //
 // Registration from an app's sign-in carries that sign-in on (#622 decision 9): the Create an account
 // link names it in the page's URL, which the form posts back to. Without verification, the account
@@ -511,32 +513,13 @@ func HandleRegisterPost(
 			"email_digest": hashutil.HashString(user.Email),
 		})
 
+		// The welcome email goes out in a job once the response is written, deferred so it is handed
+		// over on either answer below: a relay that is down, or a render that fails, is one Error
+		// record and the person is answered as when it goes out (#817 decision 13).
 		if settings.SMTPEnabled {
-			bind := map[string]interface{}{
-				"link": adminConsoleBaseURL + "/account/profile",
-			}
-			// Recipient is the freshly-created user; no stored Locale yet, so the welcome email
-			// takes the language the registration page was matched to, then English, the
-			// fallback the stored-locale senders carry. The page's matcher and not the first
-			// Accept-Language tag alone, so the mail follows the page and its subject and body
-			// agree (#607).
-			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, i18n.CatalogTag(r.Context()), "en"))
-			buf, emailErr := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
-			if emailErr != nil {
-				pageRenderer.InternalServerError(w, r, emailErr)
-				return
-			}
-
-			input := &emaildelivery.SendEmailInput{
-				To:       email,
-				Subject:  i18n.T(emailReq.Context(), "email.register_confirmation.subject"),
-				HtmlBody: buf.String(),
-			}
-			_, emailErr = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
-			if emailErr != nil {
-				pageRenderer.InternalServerError(w, r, emailErr)
-				return
-			}
+			defer afterResponse.Go(r.Context(), afterresponse.ClassRegistration, func(ctx context.Context) {
+				sendWelcomeEmail(ctx, r, emailSender, pageRenderer, adminConsoleBaseURL, settings, user)
+			})
 		}
 
 		// Registered from an app's sign-in the browser still holds: signed straight into it, and on into
@@ -553,6 +536,47 @@ func HandleRegisterPost(
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 		}
+	}
+}
+
+// sendWelcomeEmail mails an account registered without verification the welcome email. ctx is the
+// job's, detached from the request's cancellation and carrying its id, so a render or a send that
+// fails is an Error record on that id: the registrant has been answered already (#817 decision 13).
+//
+// r is the request the job was started from, read for nothing but the renderer's inputs, the
+// brand of the sign-in it came from among them; its context is replaced by ctx before anything
+// reads it.
+func sendWelcomeEmail(
+	ctx context.Context,
+	r *http.Request,
+	emailSender EmailSender,
+	pageRenderer PageRenderer,
+	adminConsoleBaseURL string,
+	settings *record.Settings,
+	user *record.User,
+) {
+	bind := map[string]interface{}{
+		"link": adminConsoleBaseURL + "/account/profile",
+	}
+	// Recipient is the freshly-created user; no stored Locale yet, so the welcome email takes the
+	// language the registration page was matched to, then English, the fallback the stored-locale
+	// senders carry. The page's matcher and not the first Accept-Language tag alone, so the mail
+	// follows the page and its subject and body agree (#607).
+	emailReq := r.WithContext(i18n.WithLocale(ctx, true, i18n.CatalogTag(ctx), "en"))
+	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to render the welcome email", "user_id", user.Id, "error", err)
+		return
+	}
+
+	input := &emaildelivery.SendEmailInput{
+		To:       user.Email,
+		Subject:  i18n.T(emailReq.Context(), "email.register_confirmation.subject"),
+		HtmlBody: buf.String(),
+	}
+	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to send the welcome email", "user_id", user.Id, "error", err)
 	}
 }
 

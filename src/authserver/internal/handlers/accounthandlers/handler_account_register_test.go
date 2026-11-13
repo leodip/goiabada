@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
+	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
@@ -824,7 +825,8 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		jobs := &heldJobs{}
+		handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 		form := url.Values{}
 		form.Add("email", "test@example.com")
@@ -881,6 +883,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
+		jobs.runAll(t, afterresponse.ClassRegistration)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		// The account is named by its id and its address by the digest, never the address itself
@@ -937,8 +940,9 @@ func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
+			jobs := &heldJobs{}
 			handler := HandleRegisterPost(pageRenderer, heldCeremonies{}, legalDocumentsInEffect{}, database, userCreator, emailValidator, passwordValidator,
-				emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+				emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
 			form := url.Values{}
 			form.Add("email", "test@example.com")
@@ -990,6 +994,7 @@ func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 				mock.Anything).Return(nil)
 
 			handler.ServeHTTP(rr, req)
+			jobs.runAll(t, afterresponse.ClassRegistration)
 
 			assert.Equal(t, http.StatusOK, rr.Code)
 			require.NotNil(t, mailReq)
