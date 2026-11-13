@@ -524,6 +524,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		// client identifier on a client_credentials token, so the token type must be gated.
 		r.Use(apiBearer.RequireUserBoundToken())
 		r.Use(apiBearer.RequireValidSession(s.database))
+		// An email sent from here is drawn in the brand of the client the token names (#817).
+		r.Use(middleware.TokenPageClient())
 
 		r.Get("/profile", apihandlers.HandleAccountProfileGet(s.database))
 		r.Put("/profile", apihandlers.HandleAccountProfilePut(s.database, profileValidator, auditLogger))

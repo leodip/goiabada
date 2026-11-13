@@ -70,8 +70,9 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 		}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*record.User)(nil), nil)
 		database.On("TrySetUserEmail", mock.Anything, mock.Anything, int64(1), previousEmail, true, newEmail).Return(true, nil).Once()
-		// The notice is drawn in the default brand, here none, as an email sent through the account
-		// API is (#817).
+		// The notice is drawn in the brand of the client the token names, as an email sent through the
+		// account API is: that client is on the default, here none (#817 decision 1).
+		database.On("GetClientPageBrand", mock.Anything, mock.Anything, routesTestAPIClientId).Return((*record.Brand)(nil), nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return((*record.Brand)(nil), nil).Once()
 		s := newServer(t, database)
 
@@ -198,7 +199,9 @@ func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testin
 			return &read, nil
 		}).Maybe()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*record.User)(nil), nil).Maybe()
-	// The one notice is drawn in the default brand, here none (#817).
+	// The one notice is drawn in the brand of the token's client, which is on the default, here none
+	// (#817 decision 1).
+	database.On("GetClientPageBrand", mock.Anything, mock.Anything, routesTestAPIClientId).Return((*record.Brand)(nil), nil).Once()
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return((*record.Brand)(nil), nil).Once()
 	database.EXPECT().TrySetUserEmail(mock.Anything, mock.Anything, int64(1), mock.Anything, mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, _ *sql.Tx, _ int64, fromEmail string, fromVerified bool, toEmail string) (bool, error) {

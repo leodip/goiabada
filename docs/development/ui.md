@@ -289,8 +289,9 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
 - **Emails**: an email is not a page, and the rules above for styles do not apply to it; these do
   (#817). It is drawn in the brand of the page it was sent from: the renderer reads
   `render.RequestPageBrand` from the request the email is rendered with, so an email sent from a
-  sign-in's pages takes that client's brand and safe mode, and one sent elsewhere the default, and
-  binds `emailFrame` (`render.EmailFrame`), which `layouts/email_layout.html` writes inline. Many
+  sign-in's pages takes that client's brand and safe mode, one sent through the account API the
+  brand of the client its access token names (`middleware.TokenPageClient`) and the operator's
+  safe mode alone, and one sent elsewhere the default, and binds `emailFrame` (`render.EmailFrame`), which `layouts/email_layout.html` writes inline. Many
   clients drop a style sheet, a `<style>` element and a class, and none resolves a CSS variable, so
   an email links nothing, holds no `<style>` and no class, names no `var(`, and writes every value
   in a `style` attribute on the element it styles, from `emailFrame`: the area behind the card, the
