@@ -321,7 +321,11 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   code is drawn with `{{ template "email_code" . }}`, in `CodeFamily`, main.css's `--font-mono`
   unquoted, larger, in a `Subtle` box rounded as a page's multi-line box.
   `TestEmails_EveryBuiltInEmailIsDrawnInlineAlone` holds every built-in email, in every language, to
-  these rules.
+  these rules. There is no text template: the sender (`emaildelivery`) works every message's
+  plain-text part out of the HTML, from `<main>` and then the `<footer>` outside it, so the logo and
+  the app name above the body stay out of it. A block element is a paragraph and `<br>` a line
+  break; a link is its URL, or its label then `<URL>` when they differ. The button's table carries
+  `data-email-button`, which the sender leaves out, the URL under it being in the text already.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state, appearance and theme. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon

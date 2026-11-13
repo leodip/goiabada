@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"mime"
-	"mime/quotedprintable"
 	"net/mail"
 	"regexp"
 	"strings"
@@ -52,6 +51,8 @@ func TestSendEmail(t *testing.T) {
 	require.NoError(t, err)
 
 	sent := mailpit.New(mailpitURL).AssertEmailSent(t, recipient, "<p>This is a test email</p>")
+	// A real MIME parser finds the text the sender worked out of the HTML, beside it.
+	assert.Equal(t, "This is a test email", strings.TrimSpace(sent.Text))
 
 	// The from-name carries a comma on purpose. go-simple-mail concatenated the name unquoted and
 	// then parsed the result, so this send failed outright with "mail: missing '@' or angle-addr"
@@ -1073,13 +1074,13 @@ func TestSendEmail_MessageHeaderOrder(t *testing.T) {
 		"Message-ID",
 		"MIME-Version",
 		"Content-Type",
-		"Content-Transfer-Encoding",
 	}, m.order)
 
 	assert.Equal(t, "<"+fixtureRecipient+">", m.headers["To"])
 	assert.Equal(t, "1.0", m.headers["MIME-Version"])
-	assert.Equal(t, "text/html; charset=UTF-8", m.headers["Content-Type"])
-	assert.Equal(t, "quoted-printable", m.headers["Content-Transfer-Encoding"])
+	// Two parts, the text and the HTML, each quoted-printable: the message itself is 7-bit, the
+	// default a multipart message names no encoding for (RFC 2045 section 6.1).
+	assert.True(t, strings.HasPrefix(m.headers["Content-Type"], "multipart/alternative; boundary="), m.headers["Content-Type"])
 
 	_, err := time.Parse(time.RFC1123Z, m.headers["Date"])
 	assert.NoError(t, err, "Date must parse as RFC 1123Z, which is what the old library emitted")
@@ -1610,12 +1611,12 @@ func TestSendEmail_Body(t *testing.T) {
 
 	assert.Contains(t, m.raw, "\r\n..\r\n", "RFC 5321 4.5.2: a body line of '.' has to be stuffed on the wire")
 
-	decoded, err := io.ReadAll(quotedprintable.NewReader(strings.NewReader(m.body)))
-	require.NoError(t, err)
+	_, parts := alternativeParts(t, m)
+	require.Len(t, parts, 2)
 	// The quoted-printable writer turns every LF into a CRLF, which is what a message body has to
-	// carry, and net/smtp's dot writer terminates the block with one more so the dot lands on a
-	// line of its own.
-	assert.Equal(t, strings.ReplaceAll(body, "\n", "\r\n")+"\r\n", string(decoded))
+	// carry; alternativeParts reads each back as an LF.
+	assert.Contains(t, parts[1].raw, "\r\n.\r\n")
+	assert.Equal(t, body, parts[1].decoded)
 }
 
 // TestSendEmail_HeaderInjection holds that no operator-editable or catalog-sourced value can add a

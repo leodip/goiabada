@@ -3,8 +3,6 @@ package emaildelivery
 import (
 	"context"
 	"crypto/sha256"
-	"io"
-	"mime/quotedprintable"
 	"net"
 	"strconv"
 	"strings"
@@ -158,13 +156,12 @@ func TestSendEmail_ASlowButSteadyBodyIsNotCutByTheCommandLimit(t *testing.T) {
 				"the body arrived within one command limit, so no write had to renew its deadline")
 			assert.Less(t, elapsed, sender.sendTimeout, "the send ran past its budget")
 
-			decoded, err := io.ReadAll(quotedprintable.NewReader(strings.NewReader(parseMessage(t, f.data()).body)))
-			require.NoError(t, err)
-			// The body ends at a line end, so the dot writer adds no line end of its own.
-			want := strings.ReplaceAll(body, "\n", "\r\n")
+			_, parts := alternativeParts(t, parseMessage(t, f.data()))
+			require.Len(t, parts, 2, "the text and the HTML")
+			decoded := parts[1].decoded
 			// Compared by digest, since a diff of 32 MB would bury the failure.
-			assert.Equal(t, sha256.Sum256([]byte(want)), sha256.Sum256(decoded),
-				"the body arrived altered: %d bytes decoded of %d", len(decoded), len(want))
+			assert.Equal(t, sha256.Sum256([]byte(body)), sha256.Sum256([]byte(decoded)),
+				"the body arrived altered: %d bytes decoded of %d", len(decoded), len(body))
 		})
 	}
 }
