@@ -30,8 +30,8 @@ const (
 	// goes writes a live credential to the log in full. Delete this and that
 	// happens again.
 	//
-	// Why 512 and not 256: eleven of the twelve names below are comfortable at
-	// either bound, and scope is the outlier, since a client granted twenty or so
+	// Why 512 and not 256: every name below but scope is comfortable at either
+	// bound, and scope is the outlier, since a client granted twenty or so
 	// resource:permission pairs passes 256 legitimately, and scope is the value an
 	// operator reads when diagnosing consent and scope filtering. A JWT loses its
 	// signature well before either bound, so a clipped token cannot be replayed.
@@ -48,7 +48,9 @@ const (
 // parameter nobody has assessed yet is logged in full on the day it lands. Every
 // name here is drawn from a fixed vocabulary or is a number, and together they are
 // what a support question turns on, which client, which flow, which ACR, which
-// page.
+// page, and whether a sign-in or a console URL asked for safe mode: only
+// goiabada_safe_mode=true turns it on, so a redacted value would leave an operator
+// helping a locked-out administrator unable to tell whether it did (#816).
 //
 // Matching is deliberately case-sensitive, which is the fail-closed direction for
 // an allowlist: the server's own reads are case-sensitive, so Client_ID is not a
@@ -57,7 +59,7 @@ const (
 var loggableQueryParams = map[string]struct{}{
 	"client_id": {}, "response_type": {}, "response_mode": {}, "scope": {},
 	"prompt": {}, "max_age": {}, "acr_values": {}, "code_challenge_method": {},
-	"ui_locales": {}, "error": {}, "page": {}, "size": {},
+	"ui_locales": {}, "goiabada_safe_mode": {}, "error": {}, "page": {}, "size": {},
 }
 
 // RequestTargetForLog renders what a log line may say about a request target.
