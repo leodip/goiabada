@@ -225,6 +225,29 @@ func TestHandleBrandNewGet_StartsAutomaticOnTheFirstTheme(t *testing.T) {
 	assert.Equal(t, wantThemeOptions[0], bind["appearanceTheme"], "the appearance cards show the chosen theme")
 }
 
+// Each upload field's picker offers the types its kind takes: a logo, drawn in emails too, a PNG or
+// a JPEG, and a background, drawn on pages alone, a WebP as well (#817 decision 5).
+func TestHandleBrandNewGet_EachPickerOffersItsKindsTypes(t *testing.T) {
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
+
+	HandleBrandNewGet(httpHelper, newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
+		handlertest.Request(http.MethodGet, "/admin/settings/branding/new", handlertest.WithAccessToken()))
+
+	uploads := handlertest.Bind(t, httpHelper)["brandAssetUploads"].(map[string]BrandAssetUpload)
+	accepts := map[string]string{}
+	for kind, upload := range uploads {
+		accepts[kind] = upload.Accept
+	}
+	assert.Equal(t, map[string]string{
+		"logo":       "image/png,image/jpeg",
+		"favicon":    "image/png",
+		"background": "image/png,image/jpeg,image/webp",
+		"font":       ".woff2,font/woff2",
+	}, accepts)
+}
+
 func TestHandleBrandNewPost_CreatesTheBrandAndGoesBackToTheList(t *testing.T) {
 	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)

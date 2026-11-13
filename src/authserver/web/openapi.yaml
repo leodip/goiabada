@@ -2577,8 +2577,8 @@ paths:
         deleted once it is a day old.
 
         Send it as `multipart/form-data` in the field `file`. A logo or a dark logo: a still
-        PNG, JPEG or WebP image, each side from 10 to 512 pixels, of at most 1 MiB (1048576
-        bytes). An animated image, a GIF and an SVG are refused.
+        PNG or JPEG image, each side from 10 to 512 pixels, of at most 1 MiB (1048576 bytes).
+        An animated image, a WebP, a GIF and an SVG are refused.
       operationId: uploadBrandLogo
       requestBody:
         required: true

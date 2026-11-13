@@ -490,8 +490,9 @@ const (
 
 	// Image validator — profile picture, client logo and brand image uploads, from
 	// authserver/internal/imageupload. The type refusal names the types of the upload's kind:
-	// unsupported_type a profile picture's and a client logo's, unsupported_type_png_jpeg_webp a
-	// brand logo's and background's, and unsupported_type_png a favicon's (#813 decision 3).
+	// unsupported_type a profile picture's and a client logo's, unsupported_type_png_jpeg a brand
+	// logo's (#817 decision 5), unsupported_type_png_jpeg_webp a brand background's, and
+	// unsupported_type_png a favicon's (#813 decision 3).
 	ErrCodeImageTooLarge                   = "validator.image.too_large" // Args: {"max": int64}
 	ErrCodeImageEmpty                      = "validator.image.empty"
 	ErrCodeImageUnsupportedType            = "validator.image.unsupported_type"
@@ -499,6 +500,7 @@ const (
 	ErrCodeImageDimensionsTooSmall         = "validator.image.dimensions_too_small" // Args: {"min": int}
 	ErrCodeImageDimensionsTooLarge         = "validator.image.dimensions_too_large" // Args: {"max": int}
 	ErrCodeImageUnsupportedTypePngJpegWebp = "validator.image.unsupported_type_png_jpeg_webp"
+	ErrCodeImageUnsupportedTypePngJpeg     = "validator.image.unsupported_type_png_jpeg"
 	ErrCodeImageUnsupportedTypePng         = "validator.image.unsupported_type_png"
 	ErrCodeImageNotSquare                  = "validator.image.not_square" // Args: {"width": int, "height": int}
 	ErrCodeImageAnimated                   = "validator.image.animated"

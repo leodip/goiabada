@@ -595,6 +595,24 @@ export function pngFile(name: string, width: number, height: number, rgb: [numbe
   return { name, mimeType: "image/png", buffer: solidPng(width, height, rgb) };
 }
 
+// A still WebP made on the spot, as a file picked in the editor: its RIFF header and a VP8X chunk
+// naming width by height pixels and no animation, as far as the auth server reads to tell its type
+// and size (RFC 9649 section 2.7).
+export function webpFile(name: string, width: number, height: number): PickedFile {
+  const vp8x = Buffer.alloc(18);
+  vp8x.write("VP8X", 0, "ascii");
+  vp8x.writeUInt32LE(10, 4);
+  vp8x.writeUIntLE(width - 1, 12, 3);
+  vp8x.writeUIntLE(height - 1, 15, 3);
+  const riffSize = Buffer.alloc(4);
+  riffSize.writeUInt32LE(4 + vp8x.length);
+  return {
+    name,
+    mimeType: "image/webp",
+    buffer: Buffer.concat([Buffer.from("RIFF", "ascii"), riffSize, Buffer.from("WEBP", "ascii"), vp8x]),
+  };
+}
+
 // A file the auth server takes as a WOFF2 font, which it tells by the signature its first four bytes
 // hold. No browser draws it, and no spec needs one to: they check the family a page asks for, not how
 // its letters look.

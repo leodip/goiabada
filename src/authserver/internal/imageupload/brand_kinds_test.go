@@ -12,7 +12,8 @@ import (
 )
 
 // A brand's three image kinds, each held to its own fixed rules (#813 decision 3): a logo is a
-// still PNG, JPEG or WebP, each side from 10 to 512 pixels, up to 1 MiB; a favicon a still, square
+// still PNG or JPEG, each side from 10 to 512 pixels, up to 1 MiB, the formats pages and email
+// clients both draw (#817 decision 5); a favicon a still, square
 // PNG from 48 to 512 pixels a side, up to 1 MiB; a background a still PNG, JPEG or WebP, each side
 // from 10 to 3840 pixels, up to 2 MiB. Each limit is tested at the bound and one past it.
 
@@ -82,6 +83,7 @@ func paddedTo(data []byte, size int) []byte {
 const svgLogo = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100"/></svg>`
 
 const (
+	pngJpegSentence     = "The image type is not supported. Allowed types are PNG and JPEG."
 	pngJpegWebpSentence = "The image type is not supported. Allowed types are PNG, JPEG and WebP."
 	pngOnlySentence     = "The image type is not supported. The only allowed type is PNG."
 	animatedSentence    = "Animated images are not allowed. Upload a still image."
@@ -106,7 +108,6 @@ func TestBrandKinds_Accept(t *testing.T) {
 		{"logo/a PNG at the maximum sides", BrandLogo(), pngOfSize(512, 512), "image/png", 512, 512},
 		{"logo/a wide PNG", BrandLogo(), pngOfSize(512, 10), "image/png", 512, 10},
 		{"logo/a JPEG", BrandLogo(), createTestJPEG(200, 100), "image/jpeg", 200, 100},
-		{"logo/a still WebP", BrandLogo(), webpOfSizeWithFlags(300, 120, 0x10), "image/webp", 300, 120},
 		{"logo/exactly 1 MiB", BrandLogo(), paddedTo(createTestPNG(100, 100), 1048576), "image/png", 100, 100},
 
 		{"favicon/a PNG at the minimum side", BrandFavicon(), createTestPNG(48, 48), "image/png", 48, 48},
@@ -141,9 +142,13 @@ func TestBrandKinds_Refuse(t *testing.T) {
 		{"logo/one byte over 1 MiB", BrandLogo(), paddedTo(createTestPNG(100, 100), 1048577),
 			i18n.ErrCodeImageTooLarge, map[string]any{"max": int64(1048576)}, "The image can be at most 1048576 bytes."},
 		{"logo/a GIF", BrandLogo(), createTestGIF(50, 50),
-			i18n.ErrCodeImageUnsupportedTypePngJpegWebp, nil, pngJpegWebpSentence},
+			i18n.ErrCodeImageUnsupportedTypePngJpeg, nil, pngJpegSentence},
 		{"logo/an SVG", BrandLogo(), []byte(svgLogo),
-			i18n.ErrCodeImageUnsupportedTypePngJpegWebp, nil, pngJpegWebpSentence},
+			i18n.ErrCodeImageUnsupportedTypePngJpeg, nil, pngJpegSentence},
+		// Outlook on Windows does not draw a WebP, and Gmail turns one into a JPEG without its
+		// transparency, so a logo, the one image drawn in emails too, is never one (#817 decision 5).
+		{"logo/a still WebP", BrandLogo(), webpOfSizeWithFlags(300, 120, 0x10),
+			i18n.ErrCodeImageUnsupportedTypePngJpeg, nil, pngJpegSentence},
 		{"logo/one pixel under the minimum", BrandLogo(), createTestPNG(9, 10),
 			i18n.ErrCodeImageDimensionsTooSmall, map[string]any{"min": 10}, "The image must be at least 10x10 pixels."},
 		{"logo/one pixel over the maximum", BrandLogo(), pngOfSize(513, 512),
@@ -151,7 +156,7 @@ func TestBrandKinds_Refuse(t *testing.T) {
 		{"logo/an animated PNG", BrandLogo(), animatedPNG(100, 100),
 			i18n.ErrCodeImageAnimated, nil, animatedSentence},
 		{"logo/an animated WebP", BrandLogo(), animatedWebP(100, 100),
-			i18n.ErrCodeImageAnimated, nil, animatedSentence},
+			i18n.ErrCodeImageUnsupportedTypePngJpeg, nil, pngJpegSentence},
 
 		{"favicon/one byte over 1 MiB", BrandFavicon(), paddedTo(createTestPNG(64, 64), 1048577),
 			i18n.ErrCodeImageTooLarge, map[string]any{"max": int64(1048576)}, "The image can be at most 1048576 bytes."},

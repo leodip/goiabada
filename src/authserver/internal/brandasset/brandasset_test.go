@@ -104,7 +104,7 @@ func TestValidate_EachImageKindToItsOwnRules(t *testing.T) {
 	// A font is not an image, and an image kind does not take one.
 	_, err = Validate(record.BrandAssetKindLogo, woff2(64))
 	require.ErrorAs(t, err, &localized)
-	assert.Equal(t, i18n.ErrCodeImageUnsupportedTypePngJpegWebp, localized.Code)
+	assert.Equal(t, i18n.ErrCodeImageUnsupportedTypePngJpeg, localized.Code)
 }
 
 func TestValidate_AnUnknownKindIsAnError(t *testing.T) {

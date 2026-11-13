@@ -637,7 +637,7 @@ func TestRender_AdminSettingsBrandingFormHandsThePreviewTheKitsStyles(t *testing
 // its byte limit and the sentence refusing a file over it, in values no kind has, so a field drawn from
 // anything but the bind cannot pass.
 var renderUploads = map[string]adminsettingshandlers.BrandAssetUpload{
-	"logo":       {URL: "/admin/settings/branding/assets/logo", Accept: "image/png,image/jpeg,image/webp", MaxBytes: 1001, TooLarge: "Logo grande."},
+	"logo":       {URL: "/admin/settings/branding/assets/logo", Accept: "image/png,image/jpeg", MaxBytes: 1001, TooLarge: "Logo grande."},
 	"favicon":    {URL: "/admin/settings/branding/assets/favicon", Accept: "image/png", MaxBytes: 1002, TooLarge: "Favicon grande."},
 	"background": {URL: "/admin/settings/branding/assets/background", Accept: "image/png,image/jpeg,image/webp", MaxBytes: 1003, TooLarge: "Fundo grande."},
 	"font":       {URL: "/admin/settings/branding/assets/font", Accept: ".woff2,font/woff2", MaxBytes: 1004, TooLarge: "Fonte grande."},
@@ -697,7 +697,7 @@ func TestRender_AdminSettingsBrandingFormDrawsAnUploadFieldPerSlot(t *testing.T)
 		// holding text and one holding a URL are.
 		id, url, src string
 	}{
-		{"logo", "logo", "Logotipo", "Exibido acima do nome do aplicativo no cartão de entrada. Uma imagem estática PNG, JPEG ou WebP, de 10 a 512 pixels de lado, até 1 MB.",
+		{"logo", "logo", "Logotipo", "Exibido acima do nome do aplicativo no cartão de entrada. Uma imagem estática PNG ou JPEG, de 10 a 512 pixels de lado, até 1 MB.",
 			"brand-asset-thumb", "11", "https://login.example.test/brand-assets/11?v=a&amp;x=&lt;b&gt;", "https://login.example.test/brand-assets/11?v=a&amp;x=%3cb%3e"},
 		{"darkLogo", "logo", "Logotipo escuro", "Exibido no modo escuro no lugar do logotipo, com as mesmas regras. Requer um logotipo.",
 			"brand-asset-thumb brand-asset-thumb-dark", "", "", ""},

@@ -36,11 +36,11 @@ type brandAssetKind struct {
 	maxBytes     int64
 }
 
-// brandAssetKinds are the four kinds, by the name their upload route ends in. A logo and a background
-// are a PNG, JPEG or WebP, a favicon a PNG, and a font a WOFF2 file, which a picker knows by its
-// extension better than by its type.
+// brandAssetKinds are the four kinds, by the name their upload route ends in. A logo is a PNG or
+// JPEG, which emails draw too (#817 decision 5), a background a PNG, JPEG or WebP, a favicon a PNG,
+// and a font a WOFF2 file, which a picker knows by its extension better than by its type.
 var brandAssetKinds = map[string]brandAssetKind{
-	"logo":       {"image/png,image/jpeg,image/webp", i18n.ErrCodeImageTooLarge, brandkit.LogoMaxBytes},
+	"logo":       {"image/png,image/jpeg", i18n.ErrCodeImageTooLarge, brandkit.LogoMaxBytes},
 	"favicon":    {"image/png", i18n.ErrCodeImageTooLarge, brandkit.FaviconMaxBytes},
 	"background": {"image/png,image/jpeg,image/webp", i18n.ErrCodeImageTooLarge, brandkit.BackgroundMaxBytes},
 	"font":       {".woff2,font/woff2", i18n.ErrCodeFontTooLarge, brandkit.FontMaxBytes},

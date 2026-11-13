@@ -28,9 +28,18 @@ var userImageTypes = map[string]bool{
 	"image/webp": true,
 }
 
-// brandImageTypes is what a brand's logo and background may be: no GIF, which is made to animate,
-// and no SVG, which http.DetectContentType does not answer as an image (#813 decision 3).
-var brandImageTypes = map[string]bool{
+// logoTypes is what a brand's logo and dark logo may be: the formats pages and email clients both
+// draw, a logo being the one image drawn in emails too. Outlook on Windows does not draw a WebP,
+// and Gmail turns one into a JPEG without its transparency (#817 decision 5).
+var logoTypes = map[string]bool{
+	"image/png":  true,
+	"image/jpeg": true,
+}
+
+// backgroundTypes is what a brand's background may be, which pages alone draw: no GIF, which is
+// made to animate, and no SVG, which http.DetectContentType does not answer as an image (#813
+// decision 3).
+var backgroundTypes = map[string]bool{
 	"image/png":  true,
 	"image/jpeg": true,
 	"image/webp": true,
@@ -73,10 +82,10 @@ const (
 	BrandBackgroundMaxBytes = brandkit.BackgroundMaxBytes
 )
 
-// BrandLogo is the rules a brand's logo and dark logo are held to: a still PNG, JPEG or WebP, each
-// side from 10 to 512 pixels, up to 1 MiB.
+// BrandLogo is the rules a brand's logo and dark logo are held to: a still PNG or JPEG, each side
+// from 10 to 512 pixels, up to 1 MiB.
 func BrandLogo() Rules {
-	return Rules{contentTypes: brandImageTypes, typeRefusal: i18n.ErrCodeImageUnsupportedTypePngJpegWebp,
+	return Rules{contentTypes: logoTypes, typeRefusal: i18n.ErrCodeImageUnsupportedTypePngJpeg,
 		minSide: 10, maxSide: 512, still: true, maxBytes: BrandLogoMaxBytes}
 }
 
@@ -90,7 +99,7 @@ func BrandFavicon() Rules {
 // BrandBackground is the rules the image behind a brand's card is held to: a still PNG, JPEG or
 // WebP, each side from 10 to 3840 pixels, up to 2 MiB.
 func BrandBackground() Rules {
-	return Rules{contentTypes: brandImageTypes, typeRefusal: i18n.ErrCodeImageUnsupportedTypePngJpegWebp,
+	return Rules{contentTypes: backgroundTypes, typeRefusal: i18n.ErrCodeImageUnsupportedTypePngJpegWebp,
 		minSide: 10, maxSide: 3840, still: true, maxBytes: BrandBackgroundMaxBytes}
 }
 
