@@ -52,7 +52,7 @@ func TestRender_LayoutsPublishTheCatalogLanguage(t *testing.T) {
 			"savedSuccessfully": false, "permissions": []api.PermissionResponse{},
 		}},
 		{"/layouts/no_menu_layout.html", "/index.html", map[string]interface{}{
-			"AuthServerBaseUrl": "https://auth.example", "IsAuthenticated": false,
+			"AuthServerBaseUrl": "https://auth.example", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
 			"LoggedInUser": "", "LogoutLink": "", "SessionEnded": false,
 		}},
 	} {

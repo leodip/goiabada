@@ -66,7 +66,7 @@ var (
 		}}
 	homeConsolePage = consolePage{"the home page", "/layouts/no_menu_layout.html", "/",
 		"/index.html", func() map[string]interface{} {
-			return map[string]interface{}{"AuthServerBaseUrl": "https://id.example.test", "IsAuthenticated": false,
+			return map[string]interface{}{"AuthServerBaseUrl": "https://id.example.test", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
 				"LoggedInUser": "", "LogoutLink": "", "SessionEnded": false}
 		}}
 	// An error answered for an admin URL is a card page, and so an end-user page (#813 decision 9).

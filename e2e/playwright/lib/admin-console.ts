@@ -166,12 +166,14 @@ export async function signInAsAdmin(page: Page) {
 }
 
 // The notice an admin page draws while safe mode is on (#816 decision 2), and its text when the
-// console session turned it on.
+// console session turned it on, and when the auth server's switch did.
 export const safeModeSessionNotice =
   "Safe mode is on: these pages leave out the brand's custom CSS, custom palette and uploaded font, which stay saved as they are. Sign out to leave safe mode.";
+export const safeModeSwitchNotice =
+  "Safe mode is on for every page, by GOIABADA_AUTHSERVER_BRAND_SAFE_MODE: pages leave out every brand's custom CSS, custom palette and uploaded font, which stay saved as they are. Unset it and restart the auth server to leave safe mode.";
 
 export function safeModeNotice(page: Page) {
-  return page.locator('.app-main > p.notice-caution[role="status"]');
+  return page.locator('.app-main > .notice-caution[role="status"]');
 }
 
 // Signs the administrator in to the admin console in safe mode, in a browser of its own with no

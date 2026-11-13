@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -41,13 +42,26 @@ func HandleIndexGet(
 
 		// The index is the one page mounted outside RequiresScope, so an absent token set is the
 		// anonymous visitor rather than a fault.
-		if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
+		jwtInfo, signedIn := reqctx.JwtInfoFrom(r.Context())
+		if signedIn {
 			isAuthenticated = authHelper.IsAuthenticated(jwtInfo)
 			if isAuthenticated {
 				loggedInUser = jwtInfo.IdToken.StringClaim("email")
 				logoutLink = "/auth/logout"
 			}
 		}
+
+		// Your account and Administration start a sign-in for a browser not signed in. Its safe mode
+		// lasts only this request, since nothing is stored before a sign-in (#620), so the links
+		// carry it on, and the sign-in they start asks for it (#816 decision 2). A signed-in
+		// session keeps it itself.
+		accountLink, adminLink := "/account/profile", "/admin/clients"
+		if !signedIn && reqctx.SafeModeFrom(r.Context()) {
+			accountLink += "?" + oauthclient.SafeModeParameter + "=true"
+			adminLink += "?" + oauthclient.SafeModeParameter + "=true"
+		}
+		bind["AccountLink"] = accountLink
+		bind["AdminLink"] = adminLink
 
 		bind["IsAuthenticated"] = isAuthenticated
 		bind["LoggedInUser"] = loggedInUser

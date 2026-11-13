@@ -1,8 +1,10 @@
 package server
 
 import (
+	"html"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -75,4 +77,49 @@ func TestInitRoutes_ASignInFromASafeConsoleURLAsksForSafeMode(t *testing.T) {
 	rec := serveRouting(s, http.MethodGet, "/admin/clients", nil)
 	require.Equal(t, http.StatusFound, rec.Code)
 	assert.NotContains(t, rec.Header().Get("Location"), "goiabada_safe_mode")
+}
+
+// The home page is drawn for a browser not signed in, and nothing keeps its safe mode past that
+// request (#620): so a home page opened with goiabada_safe_mode=true carries it on its two sign-in
+// links, Your account and Administration, and following either starts a sign-in that asks for safe
+// mode. Opened without it, the links are bare (#816 decision 2).
+func TestInitRoutes_ASafeHomePagesLinksStartSafeSignIns(t *testing.T) {
+	s, authServerURL := newRoutingTestServer(t)
+
+	hrefs := func(target string) map[string]string {
+		home := serveRouting(s, http.MethodGet, target, nil)
+		require.Equal(t, http.StatusOK, home.Code, home.Body.String())
+		found := map[string]string{}
+		for _, match := range regexp.MustCompile(`href="([^"]*)"`).FindAllStringSubmatch(home.Body.String(), -1) {
+			href := html.UnescapeString(match[1])
+			parsed, err := url.Parse(href)
+			require.NoError(t, err)
+			if parsed.Path == "/admin/clients" || parsed.Path == "/account/profile" {
+				found[parsed.Path] = href
+			}
+		}
+		return found
+	}
+
+	safe := hrefs("/?goiabada_safe_mode=true")
+	assert.Equal(t, map[string]string{
+		"/account/profile": "/account/profile?goiabada_safe_mode=true",
+		"/admin/clients":   "/admin/clients?goiabada_safe_mode=true",
+	}, safe)
+	for path, href := range safe {
+		signIn := serveRouting(s, http.MethodGet, href, nil)
+		require.Equal(t, http.StatusFound, signIn.Code, path)
+		location := signIn.Header().Get("Location")
+		require.True(t, strings.HasPrefix(location, authServerURL+"/auth/authorize?"), location)
+		query, err := url.ParseQuery(strings.TrimPrefix(location, authServerURL+"/auth/authorize?"))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"true"}, query["goiabada_safe_mode"], path)
+	}
+
+	for _, target := range []string{"/", "/?goiabada_safe_mode=false"} {
+		assert.Equal(t, map[string]string{
+			"/account/profile": "/account/profile",
+			"/admin/clients":   "/admin/clients",
+		}, hrefs(target), target)
+	}
 }

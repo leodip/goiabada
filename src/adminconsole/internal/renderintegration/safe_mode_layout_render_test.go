@@ -32,7 +32,9 @@ const (
 		"and restart the auth server to leave safe mode."
 )
 
-var safeModeNoticeRe = regexp.MustCompile(`<p class="notice notice-caution mb-6" role="status">([^<]*)</p>`)
+// The notice's text is a paragraph inside it, never a bare text node: ui.css lets only a notice's
+// child elements shrink and wrap, and the switch's text holds a word wider than a phone's screen.
+var safeModeNoticeRe = regexp.MustCompile(`<div class="notice notice-caution mb-6" role="status">\s*<p>([^<]*)</p>\s*</div>`)
 
 // safeKitBrand is kitBrand publishing its safe links too.
 func safeKitBrand() *api.PublicBrandResponse {

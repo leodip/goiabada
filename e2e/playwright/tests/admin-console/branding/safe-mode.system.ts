@@ -3,7 +3,8 @@
 // browser opening a console URL with goiabada_safe_mode=true signs in on safe pages, and its console
 // session stays in safe mode: the admin pages link the brand's safe colors-only stylesheet, are drawn in
 // Blueberry in place of the palette and say safe mode is on, and the Account pages draw neither the CSS
-// nor the font. Signing out ends it. Runs alone, since the console's own client's brand is what every
+// nor the font. Signing out ends it. The console's home page opened with the parameter starts its
+// sign-ins in safe mode too. Runs alone, since the console's own client's brand is what every
 // console page is drawn in, and puts it back.
 import type { Page } from "@playwright/test";
 import { expect, test } from "../../../lib/fixtures";
@@ -123,6 +124,21 @@ test("a console URL with goiabada_safe_mode=true signs in on safe pages, keeps t
       expect(await linkedBrandStylesheets(admin)).toEqual(["stylesheet"]);
       expect(await titleDecoration(admin, ".page-title")).toBe("underline");
       expect(await bodyFont(admin)).toBe("brand-font");
+      await signOutOfConsole(admin);
+
+      // The console's home page opened with the parameter, signed out, starts a sign-in in safe mode
+      // from its Administration link too, and the session it signs in to stays in safe mode.
+      await admin.goto(`${env.adminUrl}/?goiabada_safe_mode=true`);
+      expect(await linkedBrandStylesheets(admin)).toEqual(["safe-stylesheet"]);
+      await admin.getByRole("link", { name: /^Administration/ }).click();
+      await expect(admin.locator('input[name="password"]')).toBeVisible();
+      expect(await linkedBrandStylesheets(admin), "the sign-in the home page starts is safe").toEqual(["safe-stylesheet"]);
+      expect(await titleDecoration(admin, ".auth-title"), "no custom CSS").toBe("none");
+      await submitPassword(admin, env.adminEmail, env.adminPassword);
+      await expect(admin).toHaveURL(`${env.adminUrl}/admin/clients?goiabada_safe_mode=true`);
+      await admin.goto(`${env.adminUrl}/admin/clients`);
+      expect(await linkedBrandStylesheets(admin)).toEqual(["safe-colors"]);
+      await expect(safeModeNotice(admin)).toHaveText(safeModeSessionNotice);
       // Signed out, so this test leaves no session of the administrator's behind.
       await signOutOfConsole(admin);
     } finally {

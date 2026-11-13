@@ -24,6 +24,8 @@ func TestRender_IndexPage_TheSessionEndedNotice(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			out := renderWithLayout(t, "/layouts/no_menu_layout.html", "/index.html", map[string]interface{}{
 				"AuthServerBaseUrl": "https://auth.example",
+				"AccountLink":       "/account/profile",
+				"AdminLink":         "/admin/clients",
 				"IsAuthenticated":   false,
 				"LoggedInUser":      "",
 				"LogoutLink":        "",
