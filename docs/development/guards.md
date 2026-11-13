@@ -63,6 +63,20 @@ nothing, and without the reporting half under test a defect in the five lines th
 the guard across every module with nothing going red -- which is what blinding
 `AssertNoDeadInterfaces` demonstrated on `8883642d` (#333).
 
+## Styling contract guard
+
+The auth server and admin console unit tiers each run `TestTemplates_KeepTheStylingContract`,
+holding their templates to `core/stylingcontract`'s lists for that server through
+`core/guard.AssertStylingContract` (#816). Every page template the caller does not name as outside
+the contract (the emails; the console's `admin_*.html` and `settings_unavailable.html`) defines a
+`data-page` template holding one listed value, which no other page names, and its `<body>`, read as
+served in each layout a handler renders it in, writes `data-page`. Every listed value has a page,
+every hook class promised on the server is drawn by some page in the contract as served, in any
+branch, a class only an admin page or an uncalled partial draws counting for nothing, and the
+served `main.css` declares every listed variable. Pages are composed and walked as
+`AssertWellFormedTemplates` composes them. Its rule tests cover a tree breaking each rule, one
+keeping them all, and the walks that reach nothing.
+
 ## gofmt guard
 
 Every module's unit tier runs `TestGoSourcesAreGofmted`, which holds every Go file under `src/` to

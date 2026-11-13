@@ -29,7 +29,7 @@
   {{ template "head" . }}
 </head>
 
-<body>
+<body{{ with .dataPage }} data-page="{{ . }}"{{ end }}>
   <a class="skip-link" href="#main">{{ T $.ctx "adminconsole.layout.skip_to_content" }}</a>
   <div class="app-shell">
     <div id="app-sidebar" class="app-sidebar">

@@ -2,7 +2,9 @@
      GOIABADA_AUTHSERVER_TEMPLATEDIR: it encodes an authorization response on the wire. It is parsed
      alone, with no layout and no template functions, so everything it shows arrives in .page. With
      JavaScript, form-post.js submits it as soon as it is parsed; without, its button does. Its card
-     is held back for 2 seconds (ui.css), so it does not flash by while the next page loads. */ -}}
+     is held back for 2 seconds (ui.css), so it does not flash by while the next page loads. Its
+     data-page value is written on <body> from the template that holds it, as no renderer binds it. */ -}}
+{{- define "data-page"}}form-post{{end -}}
 <!DOCTYPE html>
 <html lang="{{ .page.Lang }}"{{ with .page.Theme }} data-theme="{{ . }}"{{ end }}>
 
@@ -22,7 +24,7 @@
   <script src="{{ .page.Script }}" defer></script>
 </head>
 
-<body>
+<body data-page="{{ template "data-page" . }}">
   <div class="auth-page">
     <main class="auth-main">
       <div class="panel auth-card">

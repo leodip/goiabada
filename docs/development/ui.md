@@ -207,6 +207,19 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   with an `image-preview` (`-square` for a logo), cropped in the `crop_dialog` partial: a
   `crop-area` the cropper draws in, and `crop-controls` whose `crop-slider`s do what dragging does,
   so a crop needs neither a pointer nor a drag.
+- **Styling contract**: what CSS written for the pages can rely on from release to release (#816),
+  published on the docs' Styling contract page, which `stylingcontract_docs_test.go` holds to the
+  lists in `core/stylingcontract`: 28 variables, a `data-page` value per page and 45 hook classes,
+  each promised on the server whose pages draw it. Every auth server page and every console
+  end-user page (the Account pages, and the cards: home, the error pages and sign-out) defines `{{define "data-page"}}<value>{{end}}` beside its title, one value per template whatever
+  state it is drawn in, a console one beginning `account-` or `console-`. The renderers read it
+  through `stylingcontract.PageName` and bind `dataPage`, which all four layouts write on `<body>`;
+  `form_post.html`, parsed alone, writes its own. The admin pages and `settings_unavailable.html`
+  define none and carry none. `core/guard.AssertStylingContract` holds both servers' templates to
+  the lists in their unit tiers, so a new end-user page needs a value added to the list and to the
+  reference page, and removing or renaming a listed variable, value or hook class, or no longer
+  drawing a hook class on a server it is promised on, needs the list, the page and the release
+  notes changed with it. Tailwind utilities and a class one page draws are never promised.
 - **Markup**: `core/guard.AssertWellFormedTemplates` holds every page to well-formed HTML and to the
   accessibility rules readable from a template: every element closed explicitly and in order, what a
   branch opens closed in it, quoted attributes, no nesting a browser repairs, a label for every

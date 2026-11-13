@@ -187,6 +187,7 @@ export default defineConfig({
 						},
 						{ label: 'Environment variables', slug: 'reference/environment-variables' },
 						{ label: 'Security', slug: 'reference/security' },
+						{ label: 'Styling contract', slug: 'reference/styling-contract' },
 					],
 				},
 				{

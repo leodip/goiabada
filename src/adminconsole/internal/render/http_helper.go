@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/requestid"
+	"github.com/leodip/goiabada/core/stylingcontract"
 )
 
 // This renderer is one of two. The auth server has its own copy in
@@ -278,6 +279,12 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 		if footer := footerOf(r.Context(), settings.Brand); footer != nil {
 			data["brandFooter"] = footer
 		}
+	}
+	// Both layouts write dataPage on <body>, the value an end-user page names in its data-page
+	// template, so custom CSS can aim a rule at one page or keep it off the console's (#816
+	// decisions 6 and 7). An admin page names none and carries no data-page.
+	if page := stylingcontract.PageName(templ); page != "" {
+		data["dataPage"] = page
 	}
 
 	var buf bytes.Buffer

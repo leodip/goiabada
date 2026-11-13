@@ -1,4 +1,5 @@
 {{define "title"}}{{ T $.ctx "adminconsole.account.delete.page_title" }} – {{ .appName }}{{end}}
+{{define "data-page"}}account-delete{{end}}
 {{define "menu"}}{{ template "account_menu" . }}{{end}}
 {{define "head"}}
 {{ if .otpEnabled }}<script src="{{ asset "/static/pages/account-delete.js" }}" defer></script>{{ end }}

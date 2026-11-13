@@ -1,0 +1,207 @@
+---
+title: Styling contract
+description: The CSS variables, page names and classes your CSS for Goiabada's pages can rely on from one release to the next.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page lists what CSS you write for Goiabada's pages can rely on: the CSS variables, a name on every page, and the classes on the parts every page shares. They stay the same from one release to the next. A release that removes or renames one says so in its release notes.
+
+The contract covers every page of the auth server, and the admin console's Account pages, its home page, and its error and sign-out pages. The console's admin pages aren't in it.
+
+Anything this page doesn't list can change in any release: a class only one page draws, the markup's nesting, the Tailwind utility classes such as `mt-4` or `flex`, and every other variable.
+
+## CSS variables
+
+The color variables are the [custom palette's](/guides/customize-and-translate-the-pages/#custom-palettes) colors, by token. A brand's theme or palette sets them for light and dark, and its corners and font set the radius and font variables.
+
+| Variable | What it sets |
+|---|---|
+| `--color-canvas` | Background |
+| `--color-surface` | Card |
+| `--color-subtle` | Subtle background |
+| `--color-line` | Border |
+| `--color-line-strong` | Strong border |
+| `--color-ink` | Text |
+| `--color-ink-muted` | Muted text |
+| `--color-brand` | Brand color |
+| `--color-brand-strong` | Strong brand color |
+| `--color-on-brand` | Text on brand color |
+| `--color-brand-soft` | Soft brand background |
+| `--color-danger` | Danger color |
+| `--color-danger-strong` | Strong danger color |
+| `--color-on-danger` | Text on danger color |
+| `--color-danger-soft` | Soft danger background |
+| `--color-danger-ink` | Danger text |
+| `--color-positive-soft` | Soft positive background |
+| `--color-positive-ink` | Positive text |
+| `--color-caution-soft` | Soft caution background |
+| `--color-caution-ink` | Caution text |
+| `--color-note-soft` | Soft note background |
+| `--color-note-ink` | Note text |
+| `--color-focus` | Focus ring |
+| `--radius-control` | The corners of a field, a button and other controls |
+| `--radius-panel` | The corners of the card and other panels |
+| `--font-sans` | The font family every page's text is in |
+| `--shadow-panel` | The shadow under the card and other panels |
+| `--shadow-overlay` | The shadow under a dialog or a menu |
+
+## Page names
+
+Every page in the contract carries its name in a `data-page` attribute on `<body>`, the same whatever state the page is drawn in. Aim a rule at one page with it:
+
+```css
+body[data-page="sign-in"] .auth-title {
+  font-size: 2rem;
+}
+```
+
+Every name on the admin console begins with `account-` or `console-`, so `body[data-page^="account-"]` selects every Account page, and `body:not([data-page^="account-"], [data-page^="console-"])` keeps a rule to the auth server's pages.
+
+### Auth server pages
+
+| `data-page` | Page |
+|---|---|
+| `sign-in` | Sign in, with an email and a password |
+| `one-time-code` | The code from an authenticator app |
+| `authenticator-setup` | Setting up an authenticator app |
+| `recovery-code` | Signing in with a recovery code |
+| `new-recovery-codes` | The recovery codes, shown once |
+| `consent` | Asking the user to allow what an application asks for |
+| `legal-acceptance` | Asking the user to accept legal documents |
+| `legal-document` | One legal document |
+| `register` | Creating an account |
+| `register-check-email` | Asking the new user to check their email |
+| `register-success` | The account is created |
+| `activation-result` | The outcome of an activation link |
+| `activate-account` | Choosing a password to activate an account |
+| `forgot-password` | Asking for a password reset link |
+| `reset-password` | Choosing a new password from a reset link |
+| `sign-in-error` | An error that stops a sign-in |
+| `redirect-blocked` | A sign-in stopped without sending the user anywhere |
+| `sign-out` | Asking the user to confirm signing out |
+| `sign-out-declined` | Still signed in, after declining to sign out |
+| `signed-out` | Signed out |
+| `form-post` | The page that sends a sign-in's answer to the application, for `response_mode=form_post` |
+| `error` | An unexpected error |
+| `not-found` | A page that doesn't exist |
+
+### Account pages
+
+| `data-page` | Page |
+|---|---|
+| `account-profile` | Profile |
+| `account-email` | Email |
+| `account-email-verification` | Verifying the email address |
+| `account-phone` | Phone |
+| `account-address` | Address |
+| `account-password` | Changing the password |
+| `account-authenticator` | Two-factor authentication |
+| `account-picture` | Picture |
+| `account-consents` | The consents the user gave |
+| `account-legal-documents` | The legal documents the user accepted |
+| `account-sessions` | Sessions |
+| `account-data` | Downloading the user's data |
+| `account-delete` | Deleting the account |
+| `account-deleted` | The account is deleted |
+
+### Other console pages
+
+| `data-page` | Page |
+|---|---|
+| `console-home` | The admin console's home page |
+| `console-sign-out` | Asking the user to confirm signing out |
+| `console-sign-out-form-post` | The page that sends the sign-out to the auth server |
+| `console-sign-in-error` | A sign-in to the console that failed |
+| `console-unauthorized` | Administrators only |
+| `console-error` | An unexpected error |
+| `console-not-found` | A page that doesn't exist |
+
+## Hook classes
+
+These classes mark the pages' structure and the components every page shares. **On** says whose pages draw each one. A class can be on some pages and not others: the client block only shows on a sign-in for an application, for example.
+
+### Card layout
+
+Every auth server page, and every console page but the Account pages, is a card on a page.
+
+| Class | What it is | On |
+|---|---|---|
+| `auth-page` | The whole page around the card | Both |
+| `auth-main` | The page's main region, holding the card | Both |
+| `auth-card` | The card | Both |
+| `auth-logo` | The brand's logo | Both |
+| `auth-brand` | The app name over the card's content | Both |
+| `auth-title` | The page's heading | Both |
+| `auth-lead` | The sentence under the heading | Both |
+| `auth-status` | An outcome: an icon, a heading and a message | Both |
+| `auth-actions` | Two answers side by side, such as Allow and Deny | Both |
+| `auth-footer` | The links at the foot of the card's content | Auth server |
+
+### Client block
+
+The application a sign-in is for, under the app name.
+
+| Class | What it is | On |
+|---|---|---|
+| `auth-client` | The block | Auth server |
+| `auth-client-logo` | The application's logo | Auth server |
+| `auth-client-name` | The application's name | Auth server |
+| `auth-client-description` | The application's description | Auth server |
+
+### Brand footer
+
+The brand's [footer links and support contact](/guides/customize-and-translate-the-pages/#footer-links-and-support-contact).
+
+| Class | What it is | On |
+|---|---|---|
+| `brand-footer` | The footer | Both |
+| `brand-footer-panel` | The footer on a panel, while the brand has a background image | Both |
+| `brand-footer-links` | The list of footer links | Both |
+| `brand-footer-link` | One link, a footer link or a way to reach support | Both |
+| `brand-footer-contact` | The support contact | Both |
+
+### Components
+
+| Class | What it is | On |
+|---|---|---|
+| `panel` | A panel, the card among them | Both |
+| `button` | Every button | Both |
+| `button-primary` | A form's main action | Both |
+| `button-danger` | An action that deletes or removes | Admin console |
+| `button-quiet` | A secondary action | Admin console |
+| `field` | A field: its label, control and hint | Both |
+| `field-label` | A field's label | Both |
+| `field-hint` | The help under a field | Both |
+| `control` | A text field, a text area or a list | Both |
+| `input-row` | A field with the button that acts on it | Both |
+| `notice` | A message box | Both |
+| `notice-danger` | An error message | Both |
+| `notice-positive` | A success message | Admin console |
+| `notice-caution` | A warning | Both |
+| `notice-note` | A note | Auth server |
+| `status-icon` | The icon of an outcome | Both |
+| `text-link` | A link in text | Both |
+| `check-list` | A list of checkboxes | Auth server |
+| `check-row` | One checkbox in a `check-list` | Auth server |
+
+### Account shell
+
+The Account pages' frame: a menu beside the content.
+
+| Class | What it is | On |
+|---|---|---|
+| `app-shell` | The whole page | Admin console |
+| `app-header` | The bar across the top | Admin console |
+| `app-sidebar` | The menu | Admin console |
+| `app-main` | The page's content | Admin console |
+| `app-footer` | The brand's footer under the content | Admin console |
+| `page-header` | The content's heading and the sentence under it | Admin console |
+| `page-title` | The content's heading | Admin console |
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Customize and translate the pages" description="Brands, themes, the brand kit and the templates." href="/guides/customize-and-translate-the-pages/" />
+  <LinkCard title="Security" description="The response headers both servers send." href="/reference/security/#response-headers" />
+</CardGrid>
