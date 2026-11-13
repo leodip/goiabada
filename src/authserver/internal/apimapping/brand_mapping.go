@@ -14,7 +14,8 @@ import (
 // its six slots, slots being the assets they name, each answered as ToBrandAssetResponse answers it
 // and null for an empty slot; isDefault says whether the settings row points at the brand and
 // clientCount how many clients are drawn in it. It answers the brand's custom palette, its colors and
-// their contrast warnings as ToBrandPalette, ToBrandColors and ToBrandContrastWarnings do (#815).
+// their contrast warnings as ToBrandPalette, ToBrandColors and ToBrandContrastWarnings do (#815), and
+// its custom CSS as stored, "" for none (#816).
 func ToBrandResponse(brand *record.Brand, slots brandasset.Slots, baseURL string, isDefault bool, clientCount int) api.BrandResponse {
 	slot := func(asset *record.BrandAsset) *api.BrandAssetResponse {
 		if asset == nil {
@@ -43,6 +44,7 @@ func ToBrandResponse(brand *record.Brand, slots brandasset.Slots, baseURL string
 		SupportUrl:    brand.SupportURL,
 		SupportPhone:  brand.SupportPhone,
 		Palette:       ToBrandPalette(brand),
+		CustomCss:     brand.CustomCSS,
 		IsDefault:     isDefault,
 		ClientCount:   clientCount,
 	}

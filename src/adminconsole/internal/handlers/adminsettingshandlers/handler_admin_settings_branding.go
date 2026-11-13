@@ -808,7 +808,8 @@ func HandleBrandPost(
 
 		// An update replaces every field (#813 decision 10): each slot is sent as the form holds it,
 		// the stored asset, a file uploaded in place of it, or none once removed, which Save attaches,
-		// and the footer links and the support contact as the form holds them (#814 decision 11).
+		// and the footer links and the support contact as the form holds them (#814 decision 11). The
+		// editor has no custom CSS field yet, so the stored CSS is sent back as the API answered it.
 		form := brandFormFrom(r)
 		palette := brandPaletteFormFrom(r, brand)
 		ids := brandSlotIdsFrom(r)
@@ -831,6 +832,7 @@ func HandleBrandPost(
 			SupportUrl:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
 			Palette:       palette.request(form.Theme),
+			CustomCss:     brand.CustomCss,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {

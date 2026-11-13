@@ -98,11 +98,14 @@ const ColorsStylesheetRoute = "/brand/{id}/colors.css"
 //   - The background image, on the card pages' .auth-page, over the theme's background color, so a
 //     contained image leaves that color around it and one that fails to load leaves the page as it
 //     was (decision 6): cover and contain centred on the window, tile repeated at its own size.
+//   - The brand's custom CSS, last and as it was stored (#816), which the admin API checked can make
+//     a browser request nothing. The colors-only stylesheet never carries it, so it reaches the
+//     pages linking the full stylesheet and never the console's admin pages.
 //
-// A choice drawn as today sets nothing, so a brand nobody has changed is drawn exactly as before the
-// kit, and its full stylesheet is its colors-only one. The logo, the dark logo and the favicon are
-// the page's to draw. A theme that is none of the built-in ones is an error, as ColorsStylesheet
-// says.
+// A choice drawn as today sets nothing, so a brand nobody has changed and with no custom CSS is
+// drawn exactly as before the kit, and its full stylesheet is its colors-only one. The logo, the
+// dark logo and the favicon are the page's to draw. A theme that is none of the built-in ones is an
+// error, as ColorsStylesheet says.
 func FullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, error) {
 	colors, err := ColorsStylesheet(brand)
 	if err != nil {
@@ -138,6 +141,13 @@ func FullStylesheet(brand *record.Brand, slots brandasset.Slots) (Stylesheet, er
 
 	if slots.Background != nil {
 		rules = append(rules, backgroundRule(slots.Background, brand.BackgroundFit))
+	}
+
+	// The custom CSS goes last, as it was stored, so its rules win over everything before them
+	// that they match as specifically, and nothing after it can be swallowed by a block it leaves
+	// open (#816).
+	if brand.CustomCSS != "" {
+		rules = append(rules, brand.CustomCSS)
 	}
 
 	if len(rules) == 0 {

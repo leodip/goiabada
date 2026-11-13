@@ -47,6 +47,7 @@ type BrandResponse struct {
 	Palette          *BrandPaletteResponse     `json:"palette"`
 	Colors           *BrandColors              `json:"colors"`
 	ContrastWarnings []BrandContrastWarning    `json:"contrastWarnings"`
+	CustomCss        string                    `json:"customCss"`
 	IsDefault        bool                      `json:"isDefault"`
 	ClientCount      int                       `json:"clientCount"`
 	CreatedAt        *time.Time                `json:"createdAt"`
@@ -168,6 +169,7 @@ type CreateBrandRequest struct {
 	SupportUrl    string            `json:"supportUrl"`
 	SupportPhone  string            `json:"supportPhone"`
 	Palette       *BrandPalette     `json:"palette"`
+	CustomCss     string            `json:"customCss"`
 }
 
 type CreateBrandResponse struct {
@@ -200,6 +202,7 @@ type UpdateBrandRequest struct {
 	SupportUrl    string            `json:"supportUrl"`
 	SupportPhone  string            `json:"supportPhone"`
 	Palette       *BrandPalette     `json:"palette"`
+	CustomCss     string            `json:"customCss"`
 }
 
 type UpdateBrandResponse struct {

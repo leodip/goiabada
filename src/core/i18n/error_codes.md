@@ -347,6 +347,11 @@ cause, each a whole sentence.
 | `handler.brand.palette_color_unknown` | `mode` (string), `token` (string) | The palette's {{.mode}} colors name {{.token}}, which is not a color token. |
 | `handler.brand.palette_color_not_basic` | `mode` (string), `token` (string) | A basic palette sets only canvas, surface, ink and brand, and its {{.mode}} colors name {{.token}}. |
 | `handler.brand.palette_color_invalid` | `mode` (string), `token` (string) | The palette's {{.mode}} {{.token}} color must be # and six hexadecimal digits, such as #2456c4. |
+| `handler.brand.custom_css_too_large` | `max` (int) | The custom CSS cannot exceed {{.max}} bytes. |
+| `handler.brand.custom_css_import` | `line` (int) | Line {{.line}} of the custom CSS has an @import. Custom CSS cannot load another stylesheet. |
+| `handler.brand.custom_css_url` | `line` (int) | Line {{.line}} of the custom CSS has a URL that is not a data: image. Custom CSS can hold no other URL. |
+| `handler.brand.custom_css_function` | `line` (int) | Line {{.line}} of the custom CSS uses src(), image() or image-set(). Write a data: image in url() instead. |
+| `handler.brand.custom_css_malformed` | `line` (int) | Line {{.line}} of the custom CSS cannot be read as CSS: a comment, a string or a url() is not closed or is written wrongly. |
 | `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
 | `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
 | `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |

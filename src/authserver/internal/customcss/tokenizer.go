@@ -268,17 +268,17 @@ func (t *tokenizer) consumeString(ending rune) (tokenKind, string) {
 	var b strings.Builder
 	for {
 		c := t.peek(0)
-		switch {
-		case c == ending:
+		switch c {
+		case ending:
 			t.pos++
 			return tokenString, b.String()
-		case c == eof:
+		case eof:
 			t.bad = true
 			return tokenString, b.String()
-		case c == '\n':
+		case '\n':
 			t.bad = true
 			return tokenString, b.String()
-		case c == '\\':
+		case '\\':
 			t.pos++
 			switch t.peek(0) {
 			case eof:
@@ -429,10 +429,10 @@ func startsIdentSequence(first, second, third rune) bool {
 
 // startsNumber is "check if three code points would start a number".
 func startsNumber(first, second, third rune) bool {
-	switch {
-	case first == '+' || first == '-':
+	switch first {
+	case '+', '-':
 		return isDigit(second) || (second == '.' && isDigit(third))
-	case first == '.':
+	case '.':
 		return isDigit(second)
 	}
 	return isDigit(first)
