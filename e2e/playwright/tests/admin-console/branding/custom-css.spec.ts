@@ -16,7 +16,7 @@ import {
   customCssPreviewNote,
   fillBrandForm,
   newBrandUrl,
-  previewSample,
+  previewView,
   saveCustomCss,
   withBrand,
 } from "../../../lib/brands";
@@ -67,7 +67,7 @@ test("custom CSS saved in the editor is drawn on the client's sign-in page, and 
     await saveCustomCss(page, brand.id, customCss);
     await page.goto(brandUrl(brand.id, "edit"));
     await expect(customCssField(page)).toHaveValue(customCss);
-    const sample = await cardLook(page, previewSample(page, "light").locator(".auth-card"));
+    const sample = await cardLook(page, previewView(page, "light", "signin"));
     expect(sample.outline, "the preview does not draw custom CSS").not.toContain("rgb(18, 52, 86)");
     expect(sample.backgroundImage).toBe("none");
 
