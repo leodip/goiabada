@@ -2472,6 +2472,12 @@
 "email.account_deleted_by_administrator.subject" = "Un amministratore ha eliminato il tuo account"
 "email.otp_lockout.subject" = "La tua app di autenticazione è stata bloccata dopo troppi codici errati"
 
+# The label of the button an action email draws above its URL (#817).
+"email.forgot_password.button" = "Reimposta la password"
+"email.register_activate.button" = "Attiva l'account"
+"email.newuser_set_password.button" = "Crea la password"
+"email.register_confirmation.button" = "Accedi"
+
 # --- JS bootstrap ------------------------------------------------------------
 #
 # Strings consumed by client-side JS. The JSBootstrap template helper renders

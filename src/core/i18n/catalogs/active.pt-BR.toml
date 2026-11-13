@@ -2359,6 +2359,12 @@
 "email.account_deleted_by_administrator.subject" = "Um administrador excluiu a sua conta"
 "email.otp_lockout.subject" = "Seu aplicativo autenticador foi bloqueado após muitos códigos errados"
 
+# The label of the button an action email draws above its URL (#817).
+"email.forgot_password.button" = "Redefinir senha"
+"email.register_activate.button" = "Ativar conta"
+"email.newuser_set_password.button" = "Criar senha"
+"email.register_confirmation.button" = "Entrar"
+
 # --- Bootstrap de JS --------------------------------------------------------
 
 "js.error.session_expired_title" = "Sessão expirada"

@@ -29,31 +29,39 @@ type EmailLook struct {
 //
 // ColorScheme is the one scheme the email is drawn in, light or dark, which it declares. The colors
 // are each a #rrggbb value, and each is used for what a page uses it for: Canvas behind the card,
-// Surface the card, Line its border, Ink the text, InkMuted the app name, and Link a link, the
-// brand's color. PanelRadius is the card's corner, in pixels, and FontFamily the text's font list.
-// Each is a value html/template's style filter passes as it is: a color, a length, or a list of
-// family names written unquoted (emailFontFamily).
+// Surface the card, Line its border, Ink the text, InkMuted the app name, Link a link and an action's
+// button, the brand's color, OnBrand the button's label on it, and Subtle the box the verification
+// code is set apart in. PanelRadius is the card's corner, in pixels, ControlRadius a button's, as a
+// page's control is rounded, and BoxRadius the code's box, as a page's multi-line box is. FontFamily is
+// the text's font list and CodeFamily the code's, a monospace one. Each is a value html/template's
+// style filter passes as it is: a color, a length, or a list of family names written unquoted
+// (emailFontFamily).
 // Logo is the logo's absolute URL, empty for none, drawn at LogoWidth by LogoHeight pixels when
 // both are known, with LogoAlt as its alt; ShowAppName is whether the app name is drawn as text.
 // Footer is the brand's footer links and support contact, drawn under the card in InkMuted with each
 // link in Link, as a page draws them under its card, or nil for a brand with neither, which draws no
 // footer (#817 decision 2). Its Panel is not drawn: an email has no background image.
 type EmailFrame struct {
-	ColorScheme string
-	Canvas      string
-	Surface     string
-	Line        string
-	Ink         string
-	InkMuted    string
-	Link        string
-	PanelRadius string
-	FontFamily  string
-	Logo        string
-	LogoWidth   int
-	LogoHeight  int
-	LogoAlt     string
-	ShowAppName bool
-	Footer      *PageFooter
+	ColorScheme   string
+	Canvas        string
+	Surface       string
+	Line          string
+	Ink           string
+	InkMuted      string
+	Link          string
+	OnBrand       string
+	Subtle        string
+	PanelRadius   string
+	ControlRadius string
+	BoxRadius     string
+	FontFamily    string
+	CodeFamily    string
+	Logo          string
+	LogoWidth     int
+	LogoHeight    int
+	LogoAlt       string
+	ShowAppName   bool
+	Footer        *PageFooter
 }
 
 // The bounds an email's logo is drawn within: as tall as a page's (.auth-logo img, 4rem), and as wide
@@ -64,15 +72,25 @@ const (
 	emailLogoMaxWidth  = 424
 )
 
-// emailPanelRadii are the card's corner for each corner shape, a panel's radius in pixels, since rem
-// is not drawn alike by every client: brandkit's for square and pill, and ui.css's --radius-panel,
-// 0.75rem, for rounded and for a value that is none of the three.
-var emailPanelRadii = map[record.BrandCorners]string{
-	record.BrandCornersSquare: "0",
-	record.BrandCornersPill:   "24px",
+// emailRadii are the corners of the card, a button and the code's box for each corner shape, in
+// pixels, since rem is not drawn alike by every client: brandkit's panel and control radii for square
+// and pill, and ui.css's --radius-panel, 0.75rem, and --radius-control, 0.5rem, for rounded and for a
+// value that is none of the three. The box is ui.css's --radius-box, the control's held to 1rem.
+type emailRadii struct {
+	panel, control, box string
 }
 
-const emailRoundedPanelRadius = "12px"
+var emailCornerRadii = map[record.BrandCorners]emailRadii{
+	record.BrandCornersSquare: {panel: "0", control: "0", box: "0"},
+	record.BrandCornersPill:   {panel: "24px", control: "9999px", box: "16px"},
+}
+
+var emailRoundedRadii = emailRadii{panel: "12px", control: "8px", box: "8px"}
+
+// emailCodeFamily is main.css's --font-mono, the monospace face a page draws a code in, as an email
+// writes it, its names unquoted.
+var emailCodeFamily = emailFontFamily("ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', " +
+	"'Courier New', monospace")
 
 // emailFrameOf answers the frame an email for an app named appName is drawn in ctx in, in brand, its
 // logo linked under baseURL, the auth server's public base URL, and its footer in the language of
@@ -91,23 +109,28 @@ func emailFrameOf(ctx context.Context, appName string, brand PageBrand, baseURL 
 	}
 
 	frame := EmailFrame{
-		ColorScheme: "light",
-		Canvas:      colors["canvas"],
-		Surface:     colors["surface"],
-		Line:        colors["line"],
-		Ink:         colors["ink"],
-		InkMuted:    colors["ink-muted"],
-		Link:        colors["brand"],
-		PanelRadius: emailRoundedPanelRadius,
-		FontFamily:  emailFontFamily(brandkit.SystemUIStack),
-		ShowAppName: true,
-		Footer:      FooterOf(ctx, brand),
+		ColorScheme:   "light",
+		Canvas:        colors["canvas"],
+		Surface:       colors["surface"],
+		Line:          colors["line"],
+		Ink:           colors["ink"],
+		InkMuted:      colors["ink-muted"],
+		Link:          colors["brand"],
+		OnBrand:       colors["on-brand"],
+		Subtle:        colors["subtle"],
+		PanelRadius:   emailRoundedRadii.panel,
+		ControlRadius: emailRoundedRadii.control,
+		BoxRadius:     emailRoundedRadii.box,
+		FontFamily:    emailFontFamily(brandkit.SystemUIStack),
+		CodeFamily:    emailCodeFamily,
+		ShowAppName:   true,
+		Footer:        FooterOf(ctx, brand),
 	}
 	if look.Dark {
 		frame.ColorScheme = "dark"
 	}
-	if radius, ok := emailPanelRadii[look.Corners]; ok {
-		frame.PanelRadius = radius
+	if radii, ok := emailCornerRadii[look.Corners]; ok {
+		frame.PanelRadius, frame.ControlRadius, frame.BoxRadius = radii.panel, radii.control, radii.box
 	}
 	// An uploaded font is a file a page loads, which an email cannot: it is drawn in System UI, as
 	// its fallback is.

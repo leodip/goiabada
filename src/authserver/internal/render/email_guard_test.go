@@ -105,6 +105,8 @@ func assertDrawnInlineAlone(t *testing.T, html string) {
 	inlineColor("the card", doc.Find("body table table").First(), "background-color")
 	inlineColor("the card's text", doc.Find("body table table td").First(), "color")
 	inlineColor("a link", doc.Find("a"), "color")
+	inlineColor("a button", doc.Find("main td"), "background-color")
+	inlineColor("a button", doc.Find("main td a"), "background-color")
 	inlineColor("the footer's text", doc.Find("footer").Closest("td"), "color")
 	if scheme, _ := doc.Find(`meta[name="color-scheme"]`).Attr("content"); scheme != "light" && scheme != "dark" {
 		t.Errorf("an email declares the one scheme it is drawn in, not %q", scheme)

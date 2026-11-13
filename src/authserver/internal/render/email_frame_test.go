@@ -123,7 +123,12 @@ func readEmail(t *testing.T, html string) drawnEmail {
 	email.name = strings.TrimSpace(name.Text())
 	email.colors.inkMuted = styleOf(name)["color"]
 
+	// A button is drawn in the brand's color with its label in the color drawn on it; the links
+	// are the body's others.
 	doc.Find("main a").Each(func(_ int, link *goquery.Selection) {
+		if isEmailButton(link) {
+			return
+		}
 		email.linkColors = append(email.linkColors, styleOf(link)["color"])
 	})
 	if len(email.linkColors) > 0 {

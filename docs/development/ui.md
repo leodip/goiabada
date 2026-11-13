@@ -312,8 +312,15 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `emailFrame.Footer`, which is `render.FooterOf`, the page's footer, in the language of the
   email's catalog, in the muted ink with each link in the brand's color, and nil for a brand with
   neither; the values are apart by a middle dot hidden from assistive technology, since a client may
-  drop a margin. `TestEmails_EveryBuiltInEmailIsDrawnInlineAlone` holds every built-in email, in every
-  language, to these rules.
+  drop a margin. An email whose point is one action, the forgot-password, activation, setup and
+  welcome emails, draws it with `{{ template "email_button" (args . (T .ctx "email.<name>.button")) }}`
+  above its URL, which stays as a link to copy: a table whose cell carries the brand's color as
+  `bgcolor` and inline, since a client may drop a link's padding, around a link in `OnBrand`,
+  rounded as a page's control (`0`, `8px` or `9999px`). No other link is a button. The verification
+  code is drawn with `{{ template "email_code" . }}`, in `CodeFamily`, main.css's `--font-mono`
+  unquoted, larger, in a `Subtle` box rounded as a page's multi-line box.
+  `TestEmails_EveryBuiltInEmailIsDrawnInlineAlone` holds every built-in email, in every language, to
+  these rules.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state, appearance and theme. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon

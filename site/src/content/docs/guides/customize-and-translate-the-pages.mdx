@@ -552,6 +552,8 @@ The durations the admin console writes in words, under a duration field and in h
 
 An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.nl.html`, in your own [templates directory](#change-the-templates). A copy named for exactly the recipient's language wins. Otherwise the closest copy in their language does: `nl` serves a recipient reading `nl-BE`, and `pt-BR` serves one reading `pt`. A recipient with no copy in their language gets the English template.
 
+The password reset, the activation link, a new user's setup email and the welcome email each have a button above their link, labelled from the catalogs: `email.forgot_password.button`, `email.register_activate.button`, `email.newuser_set_password.button` and `email.register_confirmation.button`. A language you add needs these four keys too.
+
 ## Templates and static files
 
 A server reads a template each time it renders the page, so an edited template shows on the next request with no restart. The pages link a static file with a fingerprint of its contents in the URL, which changes when the file does, so an edited file shows on the next page too. Requested by that URL, a static file of up to 1 MiB is served with `Cache-Control: public, max-age=31536000, immutable`; a larger one, or one requested by any other URL, such as a favicon's, with `public, max-age=300`. The four directory variables are on [Environment variables](/reference/environment-variables/#customization).
