@@ -328,6 +328,8 @@
 "adminconsole.layout.close_menu" = "Cerrar menú"
 "adminconsole.layout.user_menu" = "Menú de cuenta"
 "adminconsole.layout.noscript" = "La consola de administración necesita JavaScript. Actívalo en tu navegador y recarga esta página."
+"adminconsole.layout.safe_mode_session" = "El modo seguro está activado: estas páginas omiten el CSS personalizado, la paleta personalizada y la fuente subida de la marca, que siguen guardados tal como están. Cierra sesión para salir del modo seguro."
+"adminconsole.layout.safe_mode_switch" = "El modo seguro está activado en todas las páginas, por GOIABADA_AUTHSERVER_BRAND_SAFE_MODE: las páginas omiten el CSS personalizado, la paleta personalizada y la fuente subida de todas las marcas, que siguen guardados tal como están. Quita la variable y reinicia el servidor de autenticación para salir del modo seguro."
 "adminconsole.tabs.label" = "Secciones"
 "adminconsole.paginator.label" = "Paginación"
 "adminconsole.paginator.previous" = "Página anterior"

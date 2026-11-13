@@ -1,6 +1,7 @@
 package oauthclient
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -27,17 +28,27 @@ type handshakeSealer interface {
 	ValuesCookie(name, value string) *http.Cookie
 }
 
+// SafeModeParameter is the authorization request's parameter asking for safe mode, which the auth
+// server keeps for the sign-in (#816 decision 3).
+const SafeModeParameter = "goiabada_safe_mode"
+
 type AuthHelper struct {
 	sealer            handshakeSealer
 	baseURL           string
 	authServerBaseURL string
+	safeMode          func(ctx context.Context) bool
 }
 
-func NewAuthHelper(sealer handshakeSealer, baseURL, authServerBaseURL string) *AuthHelper {
+// NewAuthHelper returns the helper that sends the console's sign-ins. safeMode is whether a request
+// is in safe mode, reqctx.SafeModeFrom in production: every sign-in it sends for such a request asks
+// for safe mode, the ordinary one and a stronger one alike (#816 decision 2). It is handed in because
+// reqctx imports this package.
+func NewAuthHelper(sealer handshakeSealer, baseURL, authServerBaseURL string, safeMode func(ctx context.Context) bool) *AuthHelper {
 	return &AuthHelper{
 		sealer:            sealer,
 		baseURL:           baseURL,
 		authServerBaseURL: authServerBaseURL,
+		safeMode:          safeMode,
 	}
 }
 
@@ -68,7 +79,9 @@ func (s *AuthHelper) RedirToAuthorize(
 }
 
 // RedirToAuthorizeWith is RedirToAuthorize adding the options that are set. The handshake is the
-// same six values: the callback finishes either sign-in the same way.
+// same six values: the callback finishes either sign-in the same way. A request in safe mode adds
+// goiabada_safe_mode=true to either, and a seventh value to the handshake, sessionkeys.SafeMode, for
+// the callback to keep the signed-in session in safe mode.
 func (s *AuthHelper) RedirToAuthorizeWith(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -83,14 +96,19 @@ func (s *AuthHelper) RedirToAuthorizeWith(
 	state := securerandom.String(16)
 	nonce := securerandom.String(16)
 
-	sealed, err := s.sealer.SealCookieValues(SignInHandshakeCookie, map[string]string{
+	handshake := map[string]string{
 		sessionkeys.State:          state,
 		sessionkeys.Nonce:          nonce,
 		sessionkeys.CodeVerifier:   codeVerifier,
 		sessionkeys.RedirectURI:    redirectURI,
 		sessionkeys.RedirectBack:   redirectBack,
 		sessionkeys.RequestedScope: scope,
-	})
+	}
+	safeMode := s.safeMode(r.Context())
+	if safeMode {
+		handshake[sessionkeys.SafeMode] = "true"
+	}
+	sealed, err := s.sealer.SealCookieValues(SignInHandshakeCookie, handshake)
 	if err != nil {
 		return err
 	}
@@ -111,6 +129,9 @@ func (s *AuthHelper) RedirToAuthorizeWith(
 	}
 	if options.AcrValues != "" {
 		values.Add("acr_values", options.AcrValues)
+	}
+	if safeMode {
+		values.Add(SafeModeParameter, "true")
 	}
 
 	destUrl := fmt.Sprintf("%v/auth/authorize?%v", s.authServerBaseURL, values.Encode())

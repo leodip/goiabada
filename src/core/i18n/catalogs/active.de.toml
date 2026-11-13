@@ -327,6 +327,8 @@
 "adminconsole.layout.close_menu" = "Menü schließen"
 "adminconsole.layout.user_menu" = "Kontomenü"
 "adminconsole.layout.noscript" = "Die Verwaltungskonsole benötigt JavaScript. Aktivieren Sie es in Ihrem Browser und laden Sie diese Seite neu."
+"adminconsole.layout.safe_mode_session" = "Der abgesicherte Modus ist aktiv: Diese Seiten lassen das eigene CSS, die benutzerdefinierte Palette und die hochgeladene Schrift der Marke weg, die unverändert gespeichert bleiben. Melden Sie sich ab, um den abgesicherten Modus zu verlassen."
+"adminconsole.layout.safe_mode_switch" = "Der abgesicherte Modus ist auf allen Seiten aktiv, durch GOIABADA_AUTHSERVER_BRAND_SAFE_MODE: Die Seiten lassen das eigene CSS, die benutzerdefinierte Palette und die hochgeladene Schrift jeder Marke weg, die unverändert gespeichert bleiben. Entfernen Sie die Variable und starten Sie den Authentifizierungsserver neu, um den abgesicherten Modus zu verlassen."
 "adminconsole.tabs.label" = "Bereiche"
 "adminconsole.paginator.label" = "Seitennavigation"
 "adminconsole.paginator.previous" = "Vorherige Seite"

@@ -77,6 +77,10 @@
         <noscript>
           <p class="notice notice-caution mb-6">{{ T $.ctx "adminconsole.layout.noscript" }}</p>
         </noscript>
+        {{- /* An admin page says safe mode is on and how to leave it (#816 decision 2). */}}
+        {{- with .safeModeNotice }}
+        <p class="notice notice-caution mb-6" role="status">{{ T $.ctx . }}</p>
+        {{- end }}
         {{ template "page" . }}
       </main>
       {{- /* An Account page draws the brand's footer at the foot of its content, its own footer

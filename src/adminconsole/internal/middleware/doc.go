@@ -4,7 +4,9 @@
 // browser without the scope a route needs to sign in or to the unauthorized page, or answers a page
 // script's request whose sign-in has ended with the session-ended JSON; SettingsCache,
 // which puts the auth server's public settings on the context; and PageLanguage, which draws a
-// signed-in user's pages in the page language their session holds a copy of. The middleware both
+// signed-in user's pages in the page language their session holds a copy of; and SafeMode, which
+// puts on the context whether the request is in safe mode, by its console session or its URL. The
+// middleware both
 // processes mount is in core/httpmw.
 //
 // Every token is checked by oauthclient's parser, which decides the issuer and audience itself, so

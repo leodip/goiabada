@@ -4,7 +4,17 @@
 // inside its own region; dialogs, menus and forms stay within the screen, and no page scrolls
 // sideways. Only the test's own tab is resized, so the fixtures work at the default size.
 import type { Locator, Page } from "@playwright/test";
-import { addRedirectUri, addSignOutRedirectUri, cancelDialog, clientUrl, setClientBrand, userUrl } from "../../lib/admin-console";
+import {
+  addRedirectUri,
+  addSignOutRedirectUri,
+  cancelDialog,
+  clientUrl,
+  safeModeNotice,
+  setClientBrand,
+  signInAsAdminInSafeMode,
+  signOutOfConsole,
+  userUrl,
+} from "../../lib/admin-console";
 import { brandUrl, customCssField, fillBrandFooter, newBrandUrl, paletteField, withBrand } from "../../lib/brands";
 import { openSignIn } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
@@ -355,5 +365,26 @@ test("the Custom CSS field, refused, stays within a phone's screen", async ({ pa
         await expectWithinScreen(page, shown);
       }
     });
+  }
+});
+
+// The safe mode notice (#816 decision 2) on an admin page at a phone's widths: it wraps within the
+// screen, and the page does not scroll sideways. Signed in in a browser of its own, since safe mode
+// lasts for its console session, and signed out after.
+test("the safe mode notice stays within a phone's screen", async ({ browser }) => {
+  const { context, page } = await signInAsAdminInSafeMode(browser);
+  try {
+    for (const width of [320, 390]) {
+      await test.step(`${width}px`, async () => {
+        await page.setViewportSize({ width, height: 800 });
+        await page.goto(`${env.adminUrl}/admin/settings/general`);
+        await expect(safeModeNotice(page)).toBeVisible();
+        expect(await sidewaysScroll(page), `${width}px: no sideways scroll`).toBeLessThanOrEqual(0);
+        await expectWithinScreen(page, safeModeNotice(page));
+      });
+    }
+  } finally {
+    await signOutOfConsole(page);
+    await context.close();
   }
 });

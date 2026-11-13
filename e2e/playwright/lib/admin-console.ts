@@ -1,5 +1,5 @@
 // Helpers for driving the admin console as the signed-in administrator.
-import { expect, type Page } from "@playwright/test";
+import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { submitPassword } from "./browser-sign-in";
 import { env } from "./environment";
 
@@ -163,6 +163,36 @@ export async function signInAsAdmin(page: Page) {
   await page.goto(`${env.adminUrl}/admin/clients`);
   await submitPassword(page, env.adminEmail, env.adminPassword);
   await expect(page).toHaveURL(`${env.adminUrl}/admin/clients`);
+}
+
+// The notice an admin page draws while safe mode is on (#816 decision 2), and its text when the
+// console session turned it on.
+export const safeModeSessionNotice =
+  "Safe mode is on: these pages leave out the brand's custom CSS, custom palette and uploaded font, which stay saved as they are. Sign out to leave safe mode.";
+
+export function safeModeNotice(page: Page) {
+  return page.locator('.app-main > p.notice-caution[role="status"]');
+}
+
+// Signs the administrator in to the admin console in safe mode, in a browser of its own with no
+// session, through a console URL carrying goiabada_safe_mode=true. The console session stays in safe
+// mode until signOutOfConsole, which the caller runs before closing the context, so the session does
+// not count against the administrator's cap of sessions for the rest of the run.
+export async function signInAsAdminInSafeMode(browser: Browser, path = "/admin/clients"): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await page.goto(`${env.adminUrl}${path}?goiabada_safe_mode=true`);
+  await submitPassword(page, env.adminEmail, env.adminPassword);
+  await expect(page).toHaveURL(`${env.adminUrl}${path}?goiabada_safe_mode=true`);
+  return { context, page };
+}
+
+// Signs out of the admin console and the auth server through the console's Sign out page, which ends
+// on the console's home page.
+export async function signOutOfConsole(page: Page) {
+  await page.goto(`${env.adminUrl}/auth/logout`);
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.waitForURL((url) => url.origin === env.adminUrl && url.pathname === "/");
 }
 
 // Deletes something the way an administrator does on a delete page: type what the page asks for,

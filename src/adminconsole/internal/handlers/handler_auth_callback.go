@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -131,6 +132,11 @@ func HandleAuthCallbackPost(
 			refuseSignIn(httpHelper, w, r, refusalNoSession, errs.Wrap(err, "the sign-in handshake cookie did not open"))
 			return
 		}
+		// A sign-in started in safe mode draws its refusal pages safe too (#816 decision 2).
+		safeMode := handshake[sessionkeys.SafeMode] == "true"
+		if safeMode {
+			r = r.WithContext(reqctx.WithSafeMode(r.Context(), true))
+		}
 		for _, key := range signInHandshakeKeys {
 			if handshake[key] == "" {
 				// A handshake that came back but does not hold every value is the ordinary
@@ -222,6 +228,14 @@ func HandleAuthCallbackPost(
 			delete(sess.Values, key)
 		}
 		sess.Values[sessionkeys.PageLanguage] = signedInPageLanguage(r.Context(), accountProfiles, stored.AccessToken)
+		// The session is in safe mode when this sign-in asked for it, and only then: a value an
+		// earlier sign-in left in a session that outlived its tokens is not carried into this one
+		// (#816 decision 2).
+		if safeMode {
+			sess.Values[sessionkeys.SafeMode] = true
+		} else {
+			delete(sess.Values, sessionkeys.SafeMode)
+		}
 		// The identifier rotates here, and this is the admin console's one privilege
 		// transition: the lines above turn a session that was holding nothing, usually one the
 		// store made up on this request, into one holding an administrator's access, id and

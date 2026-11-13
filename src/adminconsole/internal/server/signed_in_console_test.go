@@ -32,7 +32,14 @@ import (
 // accepts as a session is made once.
 func newSignedInConsole(t *testing.T, scope string, adminAPI http.HandlerFunc) (*Server, []*http.Cookie) {
 	t.Helper()
-	return newSignedInConsoleServedBy(t, scope, adminAPI, httptest.NewServer, nil)
+	return newSignedInConsoleServedBy(t, scope, adminAPI, httptest.NewServer, nil, "")
+}
+
+// newSignedInConsoleWithBrand is newSignedInConsole with the auth server publishing brand, the
+// public settings' brand member as JSON.
+func newSignedInConsoleWithBrand(t *testing.T, scope, brand string, adminAPI http.HandlerFunc) (*Server, []*http.Cookie) {
+	t.Helper()
+	return newSignedInConsoleServedBy(t, scope, adminAPI, httptest.NewServer, nil, brand)
 }
 
 // newSignedInConsoleOverTLS is newSignedInConsole with the auth server served over TLS under a
@@ -48,20 +55,25 @@ func newSignedInConsoleOverTLS(t *testing.T, scope string, adminAPI http.Handler
 		roots.AddCert(server.Certificate())
 		return server
 	}
-	return newSignedInConsoleServedBy(t, scope, adminAPI, serve, func() *x509.CertPool { return roots })
+	return newSignedInConsoleServedBy(t, scope, adminAPI, serve, func() *x509.CertPool { return roots }, "")
 }
 
 // newSignedInConsoleServedBy is newSignedInConsole with the auth server started by serve, and the
-// root pool rootCAs answers, nil for the system roots, handed to everything that calls it.
+// root pool rootCAs answers, nil for the system roots, handed to everything that calls it. brand is
+// the public settings' brand member as JSON, empty for none.
 func newSignedInConsoleServedBy(t *testing.T, scope string, adminAPI http.HandlerFunc,
-	serve func(http.Handler) *httptest.Server, rootCAs func() *x509.CertPool) (*Server, []*http.Cookie) {
+	serve func(http.Handler) *httptest.Server, rootCAs func() *x509.CertPool, brand string) (*Server, []*http.Cookie) {
 	t.Helper()
 	signing, _ := oauthclienttest.Keys(t)
 	authServer := serve(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/api/public/settings":
-			_, _ = w.Write([]byte(`{"appName":"Goiabada Test","issuer":"` + oauthclienttest.Issuer + `"}`))
+			settings := `{"appName":"Goiabada Test","issuer":"` + oauthclienttest.Issuer + `"`
+			if brand != "" {
+				settings += `,"brand":` + brand
+			}
+			_, _ = w.Write([]byte(settings + `}`))
 		case "/certs":
 			assert.NoError(t, json.NewEncoder(w).Encode(oauth.Jwks{
 				Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))

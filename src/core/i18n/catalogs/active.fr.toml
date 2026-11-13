@@ -326,6 +326,8 @@
 "adminconsole.layout.close_menu" = "Fermer le menu"
 "adminconsole.layout.user_menu" = "Menu du compte"
 "adminconsole.layout.noscript" = "La console d’administration nécessite JavaScript. Activez-le dans votre navigateur, puis rechargez cette page."
+"adminconsole.layout.safe_mode_session" = "Le mode sans échec est activé : ces pages laissent de côté le CSS personnalisé, la palette personnalisée et la police importée de la marque, qui restent enregistrés tels quels. Déconnectez-vous pour quitter le mode sans échec."
+"adminconsole.layout.safe_mode_switch" = "Le mode sans échec est activé sur toutes les pages, par GOIABADA_AUTHSERVER_BRAND_SAFE_MODE : les pages laissent de côté le CSS personnalisé, la palette personnalisée et la police importée de chaque marque, qui restent enregistrés tels quels. Supprimez la variable et redémarrez le serveur d’authentification pour quitter le mode sans échec."
 "adminconsole.tabs.label" = "Sections"
 "adminconsole.paginator.label" = "Pagination"
 "adminconsole.paginator.previous" = "Page précédente"

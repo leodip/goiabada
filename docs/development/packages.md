@@ -508,12 +508,18 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   expiry, and the six of its sealed sign-in handshake. Stored data: a live session carries the two
   spellings, so renaming one signs every administrator out at deploy, and renaming one of the six
   fails the sign-ins in flight at the deploy. The six stay declared because they key the sealed map
-  and the callback deletes the stale copies a session written before #620 can hold. It was
+  and the callback deletes the stale copies a session written before #620 can hold. `SafeMode` is
+  in both: the handshake of a sign-in started in safe mode carries it, and the callback writes it
+  into the signed-in session (#816). It was
   `internal/constants` until the context keys left for `reqctx` (#440, #620)
 - `internal/render/` - The console's page renderer. Every page is drawn in the brand
   `/api/public/settings` answers (`PageBrand`): an admin page, one whose `menu` template calls
   `admin_menu`, takes the brand's colors-only stylesheet and its logo and keeps Goiabada's icons;
-  every other page takes the full stylesheet, the logo and the brand's favicon (#813)
+  every other page takes the full stylesheet, the logo and the brand's favicon (#813). A request in
+  safe mode (`reqctx.SafeModeFrom`, which `middleware.SafeMode` writes from the console session or
+  a `goiabada_safe_mode=true` URL) links the safe twin of that stylesheet, or none when the auth
+  server publishes no safe links, and an admin page then draws a notice, which the auth server's
+  switch (`safeMode` on the published brand) draws too (#816)
 - `web/template/` - Admin UI templates
 
 ## Configuration

@@ -15,6 +15,9 @@
 // renaming one fails only the sign-ins in flight at the deploy. They stay declared here because
 // they key the sealed map, and because the callback deletes the stale copies a session written
 // before #620 can still hold.
+//
+// SafeMode is in both: the handshake carries it to the callback, which writes it into the session
+// (#816 decision 2). Renaming it takes the sessions in safe mode at the deploy out of it.
 package sessionkeys
 
 // JWT is the authenticated-session key. Its string value, like every one here, is the
@@ -46,3 +49,10 @@ const RedirectBack string = "RedirectBack"
 // grant to equal it when the token response carries no scope parameter, which RFC 6749 section
 // 3.3 allows only when the two are identical (#427).
 const RequestedScope string = "RequestedScope"
+
+// SafeMode keys safe mode in two places (#816 decision 2). In the sealed handshake it is "true"
+// when the sign-in was started in safe mode, and the authorization request asked for it; it is left
+// out otherwise. In the browser session it is true while the signed-in session is in safe mode,
+// written by the callback from the handshake or by middleware.SafeMode from a console URL, and left
+// out otherwise. Signing out ends it with the tokens.
+const SafeMode string = "SafeMode"

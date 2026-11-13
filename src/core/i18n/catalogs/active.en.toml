@@ -323,6 +323,8 @@
 "adminconsole.layout.close_menu" = "Close menu"
 "adminconsole.layout.user_menu" = "Account menu"
 "adminconsole.layout.noscript" = "The admin console needs JavaScript. Turn it on in your browser, then reload this page."
+"adminconsole.layout.safe_mode_session" = "Safe mode is on: these pages leave out the brand's custom CSS, custom palette and uploaded font, which stay saved as they are. Sign out to leave safe mode."
+"adminconsole.layout.safe_mode_switch" = "Safe mode is on for every page, by GOIABADA_AUTHSERVER_BRAND_SAFE_MODE: pages leave out every brand's custom CSS, custom palette and uploaded font, which stay saved as they are. Unset it and restart the auth server to leave safe mode."
 "adminconsole.tabs.label" = "Sections"
 "adminconsole.paginator.label" = "Pagination"
 "adminconsole.paginator.previous" = "Previous page"

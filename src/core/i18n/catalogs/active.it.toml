@@ -330,6 +330,8 @@
 "adminconsole.layout.close_menu" = "Chiudi menu"
 "adminconsole.layout.user_menu" = "Menu account"
 "adminconsole.layout.noscript" = "La console di amministrazione richiede JavaScript. Attivalo nel browser e ricarica questa pagina."
+"adminconsole.layout.safe_mode_session" = "La modalità provvisoria è attiva: queste pagine tralasciano il CSS personalizzato, la palette personalizzata e il font caricato del marchio, che restano salvati così come sono. Esci per lasciare la modalità provvisoria."
+"adminconsole.layout.safe_mode_switch" = "La modalità provvisoria è attiva su tutte le pagine, tramite GOIABADA_AUTHSERVER_BRAND_SAFE_MODE: le pagine tralasciano il CSS personalizzato, la palette personalizzata e il font caricato di ogni marchio, che restano salvati così come sono. Rimuovi la variabile e riavvia il server di autenticazione per lasciare la modalità provvisoria."
 "adminconsole.tabs.label" = "Sezioni"
 "adminconsole.paginator.label" = "Paginazione"
 "adminconsole.paginator.previous" = "Pagina precedente"

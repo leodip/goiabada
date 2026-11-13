@@ -444,7 +444,7 @@ A brand's custom CSS restyles its pages beyond what its other choices do, such a
 
 3. Click **Save**.
 
-4. Open a page in the brand to see your rules. The preview beside the form doesn't draw custom CSS, so try new rules on a brand you've given to a test client, and sign in to that client.
+4. Open a page in the brand to see your rules. The preview beside the form doesn't draw custom CSS, so try new rules on a brand you've given to a test client, and sign in to that client. If a page becomes unusable, [safe mode](#safe-mode) draws it without your CSS.
 
 </Steps>
 
@@ -488,6 +488,29 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
 ```
 
 An answer always carries `customCss` as it was saved, each line ending a line feed, or `""` for a brand with none. A refusal of the CSS carries `error_field` set to `/customCss`.
+
+## Safe mode
+
+Safe mode draws the pages without what can make a brand unusable: its custom CSS, a custom palette and an uploaded font. Use it to sign in and fix a brand whose pages you can't read or use.
+
+<Steps>
+
+1. Open an admin console address with `?goiabada_safe_mode=true` at the end, such as `https://admin.example.com/admin/settings/branding?goiabada_safe_mode=true`.
+
+2. Sign in if you're asked to. The admin console's pages are now in safe mode, and its admin pages say so.
+
+3. Fix the brand under **Admin**, **Branding**.
+
+4. Sign out to leave safe mode, and check the pages.
+
+</Steps>
+
+A page in safe mode shows the built-in Blueberry colors in place of a custom palette, and System UI in place of an uploaded font. A built-in theme's colors, the corners, a system font family, the background image, the logo, the favicon and the footer stay. Nothing saved changes, so the brand editor still shows and saves the CSS, the palette and the font.
+
+You can also turn it on:
+
+- **For one sign-in to your app**, with `goiabada_safe_mode=true` on the [authorization request](/reference/endpoints/authorize/#parameters). Every page of that sign-in is drawn in safe mode.
+- **For every page of both servers**, for everyone, with [`GOIABADA_AUTHSERVER_BRAND_SAFE_MODE`](/reference/environment-variables/#customization) set to `true` on the auth server. It lasts until you unset it and restart the auth server, and signing out doesn't end it.
 
 ## How the language is chosen
 

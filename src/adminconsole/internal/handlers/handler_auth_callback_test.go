@@ -24,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
+	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
@@ -748,7 +749,7 @@ func TestHandleAuthCallbackPost_ARefusedTabLeavesAnotherTabsSignIn(t *testing.T)
 	require.NoError(t, err)
 	jar, err := cookiejar.New(nil)
 	require.NoError(t, err)
-	helper := oauthclient.NewAuthHelper(h.store, console.String(), "http://auth.example")
+	helper := oauthclient.NewAuthHelper(h.store, console.String(), "http://auth.example", reqctx.SafeModeFrom)
 
 	// startSignIn runs RedirToAuthorize into the jar and returns the state it sent.
 	startSignIn := func(redirectBack string) string {

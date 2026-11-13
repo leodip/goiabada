@@ -21,7 +21,11 @@ import {
   legalDocumentUrl,
   resourceUrl,
   retireLegalDocument,
+  safeModeNotice,
+  safeModeSessionNotice,
   setClientBrand,
+  signInAsAdminInSafeMode,
+  signOutOfConsole,
   userUrl,
   type ClientTab,
   type GroupTab,
@@ -467,6 +471,28 @@ test("the console's home, page not found and menus", async ({ page }) => {
       leave: () => page.setViewportSize(desktop),
     },
   ]);
+});
+
+// An admin page and an Account page while the console session is in safe mode (#816 decision 2): the
+// admin page draws a notice saying so. Signed in in a browser of its own, since safe mode lasts for its
+// console session, and signed out after.
+test("the console in safe mode, with its notice", async ({ browser }) => {
+  const { context, page: safe } = await signInAsAdminInSafeMode(browser);
+  try {
+    await checkStates(safe, [
+      {
+        name: "an admin page in safe mode, with its notice",
+        reach: async () => {
+          await safe.goto(`${env.adminUrl}/admin/settings/general`);
+          await expect(safeModeNotice(safe)).toHaveText(safeModeSessionNotice);
+        },
+      },
+      at(safe, "an Account page in safe mode", `${env.adminUrl}/account/profile`),
+    ]);
+  } finally {
+    await signOutOfConsole(safe);
+    await context.close();
+  }
 });
 
 test("a user's account pages", async ({ page, browser, clients, users, legalDocuments }) => {

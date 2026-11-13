@@ -265,7 +265,8 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 	// no brand, as by an auth server older than brands, a page is drawn automatic in main.css's colors.
 	// uiTheme is no longer bound, so a layout copied from an older release draws every page automatic.
 	adminPage := drawsAdminMenu(templ)
-	brand := pageBrand(settings.Brand, adminPage)
+	safeMode := reqctx.SafeModeFrom(r.Context())
+	brand := pageBrand(settings.Brand, adminPage, safeMode)
 	data["brandDataTheme"] = brand.DataTheme
 	data["brandStylesheet"] = brand.Stylesheet
 	data["brandLogo"] = brand.Logo
@@ -279,6 +280,12 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 		if footer := footerOf(r.Context(), settings.Brand); footer != nil {
 			data["brandFooter"] = footer
 		}
+	}
+	// An admin page says safe mode is on, and how to leave it, so the brand editor's stored palette
+	// and the page around it do not disagree without a word: by the auth server's switch, which only
+	// unsetting it ends, or by the console session, which signing out ends (#816 decision 2).
+	if notice := safeModeNotice(settings.Brand, adminPage, safeMode); notice != "" {
+		data["safeModeNotice"] = notice
 	}
 	// Both layouts write dataPage on <body>, the value an end-user page names in its data-page
 	// template, so custom CSS can aim a rule at one page or keep it off the console's (#816
@@ -379,8 +386,11 @@ type PageBrand struct {
 }
 
 // pageBrand is what a page takes from brand. An admin page takes the brand's colors and logo and
-// nothing else: the colors-only stylesheet, and Goiabada's icons (#813 decision 9).
-func pageBrand(brand *api.PublicBrandResponse, adminPage bool) PageBrand {
+// nothing else: the colors-only stylesheet, and Goiabada's icons (#813 decision 9). A page whose
+// console session is in safe mode links the safe twin of that stylesheet, or none when the auth
+// server publishes no safe links, as an older one does; the rest of the brand stays (#816 decisions
+// 1 and 2).
+func pageBrand(brand *api.PublicBrandResponse, adminPage, safeMode bool) PageBrand {
 	if brand == nil {
 		return PageBrand{}
 	}
@@ -388,10 +398,17 @@ func pageBrand(brand *api.PublicBrandResponse, adminPage bool) PageBrand {
 	if brand.Appearance == "light" || brand.Appearance == "dark" {
 		page.DataTheme = brand.Appearance
 	}
-	if adminPage {
+	switch {
+	case adminPage && safeMode:
+		page.Stylesheet = brand.SafeColorsStylesheetURL
+	case adminPage:
 		page.Stylesheet = brand.ColorsStylesheetURL
-	} else {
+	case safeMode:
+		page.Stylesheet = brand.SafeStylesheetURL
+	default:
 		page.Stylesheet = brand.StylesheetURL
+	}
+	if !adminPage {
 		page.Favicon = brand.FaviconURL
 	}
 	if brand.LogoURL != "" {
@@ -400,6 +417,20 @@ func pageBrand(brand *api.PublicBrandResponse, adminPage bool) PageBrand {
 		page.HideAppName = brand.HideAppName
 	}
 	return page
+}
+
+// safeModeNotice is the catalog key of the notice an admin page draws while safe mode is on, empty
+// for none. The switch's wins, since signing out does not end it.
+func safeModeNotice(brand *api.PublicBrandResponse, adminPage, safeMode bool) string {
+	switch {
+	case !adminPage:
+		return ""
+	case brand != nil && brand.SafeMode:
+		return "adminconsole.layout.safe_mode_switch"
+	case safeMode:
+		return "adminconsole.layout.safe_mode_session"
+	}
+	return ""
 }
 
 // drawsAdminMenu is whether a page is an admin page: one whose menu is the admin menu. The menu
