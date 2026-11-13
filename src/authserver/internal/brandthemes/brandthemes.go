@@ -249,6 +249,41 @@ func ColorsStylesheet(brand *record.Brand) (Stylesheet, error) {
 	return stylesheet, nil
 }
 
+// ModeColors returns the 23 colors brand is drawn in in one mode, its dark palette when dark is set
+// and its light one otherwise: a built-in theme's, or a custom brand's stored palette, held to what
+// ColorsStylesheet holds it to, so a theme or a palette it cannot draw is the same error. An email,
+// which links no stylesheet, writes them inline (#817 decision 4). The palette is a copy.
+func ModeColors(brand *record.Brand, dark bool) (Palette, error) {
+	var light, darkColors map[string]string
+	if brand.Theme == record.BrandThemeCustom {
+		if _, err := customStylesheet(brand); err != nil {
+			return nil, err
+		}
+		light, darkColors = brand.Palette.Light, brand.Palette.Dark
+	} else {
+		preset, ok := Get(brand.Theme)
+		if !ok {
+			return nil, errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brand.Id, brand.Theme)
+		}
+		light, darkColors = preset.Light, preset.Dark
+	}
+	colors := light
+	if dark {
+		colors = darkColors
+	}
+	mode := make(Palette, len(tokens))
+	for _, token := range tokens {
+		mode[token] = colors[token]
+	}
+	return mode, nil
+}
+
+// SafeModeColors returns ModeColors in safe mode: Blueberry's colors in place of a custom palette, a
+// built-in theme's as they are (#816 decision 1).
+func SafeModeColors(brand *record.Brand, dark bool) (Palette, error) {
+	return ModeColors(safeBrand(brand), dark)
+}
+
 // customStylesheet is the colors stylesheet of a brand on the custom theme: its stored palette's 23
 // colors of each mode, set as a built-in theme's are, whichever mode made the palette (#815 decision
 // 1). It is built on each call, from what the brand stores, and does no color math. A custom brand

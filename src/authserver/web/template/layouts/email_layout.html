@@ -1,16 +1,45 @@
+{{- /* An email is drawn in the brand of the page it was sent from, as a sign-in card is (#817): the
+     logo above the app name, then the body, on a card. Many clients drop a style sheet, a style
+     element and a class, and none resolves a CSS variable, so every value is written inline from
+     emailFrame, in the one scheme the email declares, and the layout is tables a client lays out
+     alike. */ -}}
+{{- $f := .emailFrame -}}
 <!DOCTYPE html>
 <html lang="{{ .emailLang }}">
 
 <head>
-  <meta charset="UTF-8" />  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="{{ $f.ColorScheme }}">
+  <meta name="supported-color-schemes" content="{{ $f.ColorScheme }}">
 
-  <title>{{template "title" .}}</title>  
+  <title>{{template "title" .}}</title>
 
   {{template "head" .}}
 </head>
 
-<body>
-  <main>{{template "body" .}}</main>
+<body style="margin: 0; padding: 0; background-color: {{ $f.Canvas }}; color: {{ $f.Ink }}; font-family: {{ $f.FontFamily }};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; background-color: {{ $f.Canvas }};">
+    <tr>
+      <td align="center" style="padding: 24px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 480px; background-color: {{ $f.Surface }}; border: 1px solid {{ $f.Line }}; border-radius: {{ $f.PanelRadius }}; border-collapse: separate;">
+          <tr>
+            <td style="padding: 32px 28px; color: {{ $f.Ink }}; font-family: {{ $f.FontFamily }}; font-size: 16px; line-height: 1.5; text-align: left; overflow-wrap: anywhere;">
+              {{- if $f.Logo }}
+              <div style="margin: 0 0 {{ if $f.ShowAppName }}12px{{ else }}24px{{ end }}; text-align: center;">
+                <img src="{{ $f.Logo }}" alt="{{ $f.LogoAlt }}"{{ if $f.LogoWidth }} width="{{ $f.LogoWidth }}" height="{{ $f.LogoHeight }}"{{ end }} style="display: inline-block; max-width: 100%; height: auto; border: 0;">
+              </div>
+              {{- end }}
+              {{- if $f.ShowAppName }}
+              <p style="margin: 0 0 24px; color: {{ $f.InkMuted }}; font-size: 15px; font-weight: 600; text-align: center;">{{ .appName }}</p>
+              {{- end }}
+              <main>{{template "body" .}}</main>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 
 {{versionComment}}

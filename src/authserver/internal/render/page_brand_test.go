@@ -204,12 +204,14 @@ func TestRender_APageWithNoReadableBrandIsStillDrawn(t *testing.T) {
 	}
 }
 
-// An email is not a page: it links no stylesheet, so its render reads no brand (#810 leaves emails
-// to #817).
-func TestRender_AnEmailReadsNoBrand(t *testing.T) {
+// An email reads its brand, as a page does, and is drawn in it through the frame its layout writes
+// inline (#817 decision 2); it is not a page, so it is bound none of a page's stylesheets, favicon or
+// data-theme.
+func TestRender_AnEmailReadsItsBrandForItsFrameAlone(t *testing.T) {
 	templateFS := fstest.MapFS{
-		"layouts/email_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)},
-		"emails/note.html":          {Data: []byte(`{{define "content"}}note{{end}}`)},
+		"layouts/email_layout.html": {Data: []byte(`<html>{{ with .brandStylesheet }}linked{{ end }}{{ with .brandDataTheme }}themed{{ end }}` +
+			`{{ .emailFrame.ColorScheme }}|{{template "content" .}}</html>`)},
+		"emails/note.html": {Data: []byte(`{{define "content"}}note{{end}}`)},
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
@@ -218,8 +220,8 @@ func TestRender_AnEmailReadsNoBrand(t *testing.T) {
 	buf, err := New(templateFS, nil, brands).RenderTemplateToBuffer(req, "layouts/email_layout.html", "emails/note.html", nil)
 
 	require.NoError(t, err)
-	assert.Equal(t, "<html>note</html>", buf.String())
-	assert.Zero(t, brands.reads)
+	assert.Equal(t, "<html>dark|note</html>", buf.String())
+	assert.Equal(t, 1, brands.reads)
 }
 
 // A page whose request names a client is drawn in the brand that client's pages take, which the

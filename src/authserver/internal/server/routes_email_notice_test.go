@@ -70,6 +70,9 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 		}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*record.User)(nil), nil)
 		database.On("TrySetUserEmail", mock.Anything, mock.Anything, int64(1), previousEmail, true, newEmail).Return(true, nil).Once()
+		// The notice is drawn in the default brand, here none, as an email sent through the account
+		// API is (#817).
+		database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return((*record.Brand)(nil), nil).Once()
 		s := newServer(t, database)
 
 		body := `{"email":"` + newEmail + `","currentPassword":"` + password + `"}`
@@ -195,6 +198,8 @@ func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testin
 			return &read, nil
 		}).Maybe()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*record.User)(nil), nil).Maybe()
+	// The one notice is drawn in the default brand, here none (#817).
+	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return((*record.Brand)(nil), nil).Once()
 	database.EXPECT().TrySetUserEmail(mock.Anything, mock.Anything, int64(1), mock.Anything, mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, _ *sql.Tx, _ int64, fromEmail string, fromVerified bool, toEmail string) (bool, error) {
 			mu.Lock()

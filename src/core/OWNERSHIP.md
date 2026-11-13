@@ -305,6 +305,7 @@ command itself and fails on a tree it changed.
 | `core/brandkit` | `MailtoAddress` | both-apps | — |
 | `core/brandkit` | `Radii` | own-package | — |
 | `core/brandkit` | `RegularFontWeights` | both-apps | — |
+| `core/brandkit` | `SystemUIStack` | own-package | — |
 | `core/brandkit` | `UploadedFontFamily` | both-apps | — |
 | `core/buildinfo` | `BuildDate` | both-apps | — |
 | `core/buildinfo` | `GitCommit` | kernel | — |

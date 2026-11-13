@@ -18,6 +18,10 @@
 @import "tailwindcss" source(none);
 
 @source "../template";
+/* An email is drawn by the inline styles its templates write and never by main.css (#817), and
+   the words of those styles, "inline" or "border-collapse", would each become a rule here. */
+@source not "../template/emails";
+@source not "../template/layouts/email_layout.html";
 @source "../static/*.js";
 @source "../static/pages/*.js";
 /* The classes the i18n catalogs write into message HTML, which no @source reads: scanning

@@ -31,10 +31,11 @@ var cornerRadii = map[string]Radii{
 // which the uploaded font's list names first.
 const UploadedFontFamily = `"brand-font"`
 
-// systemUIStack is main.css's --font-sans, the System UI family, which follows an uploaded font as
+// SystemUIStack is main.css's --font-sans, the System UI family, which follows an uploaded font as
 // its fallback: text is drawn in it at once while the font loads, and for any character the font
-// lacks (#813 decision 7).
-const systemUIStack = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, " +
+// lacks (#813 decision 7). An email, which declares no font, writes it for a brand on System UI or
+// on an uploaded font (#817 decision 2).
+const SystemUIStack = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, " +
 	"sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
 
 // fontStacks are the font-family lists of the five system families besides System UI, each a list
@@ -48,7 +49,7 @@ var fontStacks = map[string]string{
 	"serif":         "Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif",
 	"neo-grotesque": "Inter, Roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', Arial, sans-serif",
 	"rounded":       "ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, Manjari, 'Arial Rounded MT', 'Arial Rounded MT Bold', Calibri, source-sans-pro, sans-serif",
-	"uploaded":      UploadedFontFamily + ", " + systemUIStack,
+	"uploaded":      UploadedFontFamily + ", " + SystemUIStack,
 }
 
 // CornerRadii returns the radii of corners, a brand's stored corner shape, and whether it sets any:
