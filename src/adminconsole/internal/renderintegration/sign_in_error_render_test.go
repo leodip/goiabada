@@ -78,12 +78,13 @@ func TestRender_SignInErrorPage(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			out := renderWithLayout(t, "/layouts/no_menu_layout.html", "/sign_in_error.html", map[string]interface{}{
-				"titleKey":    tc.titleKey,
-				"messageKey":  tc.messageKey,
-				"code":        tc.code,
-				"description": tc.description,
-				"serverFault": tc.serverFault,
-				"requestId":   requestID,
+				"titleKey":       tc.titleKey,
+				"messageKey":     tc.messageKey,
+				"code":           tc.code,
+				"description":    tc.description,
+				"serverFault":    tc.serverFault,
+				"requestId":      requestID,
+				"startAgainLink": "/",
 			})
 
 			assert.Contains(t, out, tc.wantTitle)
@@ -106,15 +107,30 @@ func TestRender_SignInErrorPage(t *testing.T) {
 // error_description characters, which admit '<' and '>'. It reaches the page as text.
 func TestRender_SignInErrorPage_EscapesTheAuthServersDescription(t *testing.T) {
 	out := renderWithLayout(t, "/layouts/no_menu_layout.html", "/sign_in_error.html", map[string]interface{}{
-		"titleKey":    "adminconsole.sign_in_error.refused.title",
-		"messageKey":  "adminconsole.sign_in_error.refused.body_description",
-		"code":        "access_denied",
-		"description": "<script>alert(1)</script><b>bold</b>",
-		"serverFault": false,
-		"requestId":   "req",
+		"titleKey":       "adminconsole.sign_in_error.refused.title",
+		"messageKey":     "adminconsole.sign_in_error.refused.body_description",
+		"code":           "access_denied",
+		"description":    "<script>alert(1)</script><b>bold</b>",
+		"serverFault":    false,
+		"requestId":      "req",
+		"startAgainLink": "/",
 	})
 
 	assert.NotContains(t, out, "<script>alert(1)</script>")
 	assert.NotContains(t, out, "<b>bold</b>")
 	assert.Contains(t, out, "&lt;script&gt;alert(1)&lt;/script&gt;", "rendered as text")
+}
+
+// A refused sign-in started in safe mode starts again in safe mode, through the link the callback
+// binds (#816 decision 2): the template writes it as it is, query string included.
+func TestRender_SignInErrorPage_StartsAgainInSafeMode(t *testing.T) {
+	out := renderWithLayout(t, "/layouts/no_menu_layout.html", "/sign_in_error.html", map[string]interface{}{
+		"titleKey":       "adminconsole.sign_in_error.session.title",
+		"messageKey":     "adminconsole.sign_in_error.session.body",
+		"serverFault":    false,
+		"requestId":      "req",
+		"startAgainLink": "/?goiabada_safe_mode=true",
+	})
+
+	assert.Contains(t, out, `href="/?goiabada_safe_mode=true"`)
 }

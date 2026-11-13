@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,6 +51,40 @@ func TestHandleAuthCallbackPost_KeepsTheSignInsSafeModeForTheSession(t *testing.
 			} else {
 				assert.NotContains(t, sess.Values, sessionkeys.SafeMode)
 			}
+		})
+	}
+}
+
+// A refused sign-in that was started in safe mode offers Start again in safe mode. The browser is not
+// signed in, so the link is the only thing that carries safe mode on, to the home page and from its
+// links to the next sign-in; a bare / would draw that sign-in in the brand safe mode set aside (#816
+// decision 2). A sign-in started out of safe mode starts again out of it.
+func TestHandleAuthCallbackPost_StartsAgainInTheSignInsSafeMode(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		handshake string
+		wantLink  string
+	}{
+		{"asked for", "true", "/?goiabada_safe_mode=true"},
+		{"not asked for", "", "/"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newCallbackHarness(t)
+			handlertest.RefuseInternalServerError(t, h.httpHelper)
+			handlertest.ExpectRender(h.httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
+			values := handshake()
+			if tc.handshake != "" {
+				values[sessionkeys.SafeMode] = tc.handshake
+			}
+
+			h.serve(&recordingExchanger{response: h.tokenResponse()},
+				[]*http.Cookie{h.handshakeCookie(values)},
+				url.Values{"state": {callbackState}, "error": {"access_denied"}})
+
+			bind := handlertest.Bind(t, h.httpHelper)
+			assert.Equal(t, http.StatusBadRequest, bind["_httpStatus"])
+			assert.Equal(t, false, bind["serverFault"], "a 400 offers Start again")
+			assert.Equal(t, tc.wantLink, bind["startAgainLink"])
 		})
 	}
 }

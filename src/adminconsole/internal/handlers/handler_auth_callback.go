@@ -334,14 +334,23 @@ func renderSignInRefusal(httpHelper HttpHelper, w http.ResponseWriter, r *http.R
 		slog.WarnContext(r.Context(), "sign-in refused", "error", cause)
 	}
 
+	// A refused sign-in started in safe mode is drawn safe, and its Start again link carries safe mode
+	// on to the home page, whose links carry it to the next sign-in: nothing is stored for a browser
+	// not signed in (#816 decision 2).
+	startAgainLink := "/"
+	if reqctx.SafeModeFrom(r.Context()) {
+		startAgainLink += "?" + oauthclient.SafeModeParameter + "=true"
+	}
+
 	bind := map[string]interface{}{
-		"titleKey":    refusal.titleKey,
-		"messageKey":  refusal.messageKey,
-		"code":        errorCode,
-		"description": errorDescription,
-		"serverFault": serverFault,
-		"requestId":   requestid.FromContext(r.Context()),
-		"_httpStatus": refusal.status,
+		"titleKey":       refusal.titleKey,
+		"messageKey":     refusal.messageKey,
+		"code":           errorCode,
+		"description":    errorDescription,
+		"serverFault":    serverFault,
+		"requestId":      requestid.FromContext(r.Context()),
+		"startAgainLink": startAgainLink,
+		"_httpStatus":    refusal.status,
 	}
 	if err := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/sign_in_error.html", bind); err != nil {
 		httpHelper.InternalServerError(w, r, err)
