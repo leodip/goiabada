@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -111,8 +112,8 @@ func TestHandleAccountEmailVerificationSendPost_AuditsTheAddressDigest(t *testin
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
 	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 		mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-		"/emails/email_verification.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.VerificationCode, mock.Anything).
+		Return(emailtemplate.Message{Subject: "Email verification", HTML: "<p>x</p>"}, nil).Once()
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil).Once()
 	details := captureAuditDetails(auditLogger, audit.EventSentEmailVerificationMessage)
 

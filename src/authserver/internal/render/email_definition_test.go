@@ -100,3 +100,30 @@ func TestRenderEmail_RefusesARequestWithoutSettings(t *testing.T) {
 	_, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderEmail(req, emailtemplate.PasswordResetLink, definitionValues)
 	require.ErrorIs(t, err, reqctx.ErrNoSettings)
 }
+
+// definedEmail is an email sent from its built-in definition as a recipient reading one language
+// gets it: its subject and a sentence of its body.
+type definedEmail struct {
+	email             *emailtemplate.Email
+	subject, sentence string
+}
+
+// assertDefinedEmailsFollowTheRecipient renders each email for a recipient reading each of locales,
+// and holds it to its subject, to being marked with lang, and to its sentence; the verification code
+// holds its code.
+func assertDefinedEmailsFollowTheRecipient(t *testing.T, locales []string, lang string, emails []definedEmail) {
+	t.Helper()
+	for _, locale := range locales {
+		for _, tc := range emails {
+			t.Run(locale+"/"+tc.email.ID, func(t *testing.T) {
+				message := renderDefinition(t, tc.email, locale, nil)
+				assert.Equal(t, tc.subject, message.Subject)
+				assert.Contains(t, message.HTML, `<html lang="`+lang+`">`)
+				assert.Contains(t, message.HTML, tc.sentence)
+				if tc.email == emailtemplate.VerificationCode {
+					assert.Contains(t, message.HTML, `">482915</p>`, "the code is drawn")
+				}
+			})
+		}
+	}
+}

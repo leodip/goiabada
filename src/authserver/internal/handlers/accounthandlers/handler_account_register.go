@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/legaldocuments"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -555,15 +556,13 @@ func sendWelcomeEmail(
 	settings *record.Settings,
 	user *record.User,
 ) {
-	bind := map[string]interface{}{
-		"link": adminConsoleBaseURL + "/account/profile",
-	}
+	values := emailtemplate.Values{Link: adminConsoleBaseURL + "/account/profile"}
 	// Recipient is the freshly-created user; no stored Locale yet, so the welcome email takes the
 	// language the registration page was matched to, then English, the fallback the stored-locale
 	// senders carry. The page's matcher and not the first Accept-Language tag alone, so the mail
 	// follows the page and its subject and body agree (#607).
 	emailReq := r.WithContext(i18n.WithLocale(ctx, true, i18n.CatalogTag(ctx), "en"))
-	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", bind)
+	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.Welcome, values)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to render the welcome email", "user_id", user.Id, "error", err)
 		return
@@ -571,8 +570,8 @@ func sendWelcomeEmail(
 
 	input := &emaildelivery.SendEmailInput{
 		To:       user.Email,
-		Subject:  i18n.T(emailReq.Context(), "email.register_confirmation.subject"),
-		HtmlBody: buf.String(),
+		Subject:  message.Subject,
+		HtmlBody: message.HTML,
 	}
 	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {
@@ -766,18 +765,20 @@ func issueActivationLink(
 	auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, preRegistration.Id,
 		registrationOutcomeLinkIssued)
 
-	bind := map[string]interface{}{
+	values := emailtemplate.Values{
 		// The code and nothing else: the address used to travel here too, which broke every '+'
 		// and '%xx' address under form-urlencoded query parsing (#112). The helper also owns the
 		// path the activation handler redirects back to, so the two cannot drift.
-		"link": emaillinks.AccountActivateLink(baseURL, verificationCode, ceremonyId),
+		Link: emaillinks.AccountActivateLink(baseURL, verificationCode, ceremonyId),
+		// The email says how long the link lasts (#818 decision 4).
+		Expiry: emaillinks.ActivationCodeLifetime,
 	}
 	// The address has no account and so no stored locale; the mail takes the language the
 	// registration page was matched to, then English, the fallback the stored-locale senders
 	// carry. The page's matcher and not the first Accept-Language tag alone, so the mail follows
 	// the page and its subject and body agree (#607).
 	emailReq := r.WithContext(i18n.WithLocale(ctx, true, i18n.CatalogTag(ctx), "en"))
-	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_activate.html", bind)
+	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.ActivationLink, values)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to render the activation email", "pre_registration_id", preRegistration.Id, "error", err)
 		return
@@ -785,8 +786,8 @@ func issueActivationLink(
 
 	input := &emaildelivery.SendEmailInput{
 		To:       email,
-		Subject:  i18n.T(emailReq.Context(), "email.register_activate.subject"),
-		HtmlBody: buf.String(),
+		Subject:  message.Subject,
+		HtmlBody: message.HTML,
 	}
 	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {
@@ -808,11 +809,9 @@ func sendExistingAccountNotice(
 	settings *record.Settings,
 	user *record.User,
 ) {
-	bind := map[string]interface{}{
-		"link": baseURL + emaillinks.ForgotPasswordPath,
-	}
+	values := emailtemplate.Values{Link: baseURL + emaillinks.ForgotPasswordPath}
 	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, user.PageLanguage, user.Locale))
-	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_register_existing_account.html", bind)
+	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.RegistrationExistingAccount, values)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to render the existing account notice", "user_id", user.Id, "error", err)
 		return
@@ -820,8 +819,8 @@ func sendExistingAccountNotice(
 
 	input := &emaildelivery.SendEmailInput{
 		To:       user.Email,
-		Subject:  i18n.T(emailReq.Context(), "email.register_existing_account.subject"),
-		HtmlBody: buf.String(),
+		Subject:  message.Subject,
+		HtmlBody: message.HTML,
 	}
 	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {

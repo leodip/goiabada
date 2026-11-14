@@ -33,15 +33,15 @@ var emailButtonLabels = map[string]map[string]string{
 		"en": "Reset password", "de": "Passwort zurücksetzen", "es": "Restablecer contraseña",
 		"fr": "Réinitialiser le mot de passe", "it": "Reimposta la password", "pt-BR": "Redefinir senha",
 	},
-	"register_activate": {
+	"activation_link": {
 		"en": "Activate account", "de": "Konto aktivieren", "es": "Activar cuenta",
 		"fr": "Activer le compte", "it": "Attiva l'account", "pt-BR": "Ativar conta",
 	},
-	"newuser_set_password": {
+	"new_user_setup": {
 		"en": "Create password", "de": "Passwort festlegen", "es": "Crear contraseña",
 		"fr": "Créer le mot de passe", "it": "Crea la password", "pt-BR": "Criar senha",
 	},
-	"register_confirmation": {
+	"welcome": {
 		"en": "Sign in", "de": "Anmelden", "es": "Iniciar sesión",
 		"fr": "Se connecter", "it": "Accedi", "pt-BR": "Entrar",
 	},
@@ -112,7 +112,7 @@ func renderBodyIn(t *testing.T, base, lang string, brand *record.Brand) string {
 	brands := &defaultBrandStub{brand: brand, assets: kitAssets}
 	buf, err := New(web.TemplateFS(), web.StaticFS(), brands).WithBaseURL(emailBaseURL).RenderTemplateToBuffer(req,
 		"/layouts/email_layout.html", "/emails/"+base+".html", map[string]interface{}{
-			"name": "Ana", "link": buttonLink, "verificationCode": "482915", "remaining": 3,
+			"name": "Ana", "link": buttonLink, "remaining": 3,
 		})
 	require.NoError(t, err)
 	return buf.String()
@@ -184,7 +184,7 @@ func TestRender_AnEmailsButtonTakesItsBrandsCorners(t *testing.T) {
 			brand := themedBrand(record.BrandAppearanceLight, "plum")
 			brand.Corners = tc.corners
 
-			drawn := readEmailAction(t, renderBodyIn(t, "email_register_activate", "en", brand))
+			drawn := readEmailAction(t, renderActionEmail(t, "activation_link", "en", brand))
 
 			require.Len(t, drawn.buttons, 1)
 			assert.Equal(t, tc.want, drawn.buttons[0].cellRadius)
@@ -196,29 +196,43 @@ func TestRender_AnEmailsButtonTakesItsBrandsCorners(t *testing.T) {
 // Every other email draws no button: its links, the verification email's and the "this address
 // already has an account" notice's among them, are links in the brand's link color.
 func TestRender_OnlyTheFourActionEmailsDrawAButton(t *testing.T) {
+	assertNoButton := func(t *testing.T, html string) {
+		t.Helper()
+		drawn := readEmailAction(t, html)
+		assert.Empty(t, drawn.buttons)
+		for _, color := range drawn.linkColors {
+			assert.Equal(t, "#7a3aa8", color)
+		}
+	}
+
 	bodies, err := fs.Glob(web.TemplateFS(), "emails/*.html")
 	require.NoError(t, err)
-	buttons := 0
 	for _, body := range bodies {
 		name := strings.TrimSuffix(path.Base(body), ".html")
 		base, lang, _ := strings.Cut(name, ".")
 		if lang == "" {
 			lang = "en"
 		}
-		if _, action := emailButtonLabels[strings.TrimPrefix(base, "email_")]; action {
-			buttons++
-			continue
-		}
 		t.Run(name, func(t *testing.T) {
-			drawn := readEmailAction(t, renderBodyIn(t, base, lang, themedBrand(record.BrandAppearanceLight, "plum")))
-
-			assert.Empty(t, drawn.buttons)
-			for _, color := range drawn.linkColors {
-				assert.Equal(t, "#7a3aa8", color)
-			}
+			assertNoButton(t, renderBodyIn(t, base, lang, themedBrand(record.BrandAppearanceLight, "plum")))
 		})
 	}
-	assert.Equal(t, 3*len(emailLanguages), buttons, "the three action emails still written as files are written in every language")
+
+	actions := 0
+	for _, email := range emailtemplate.BuiltIns() {
+		if _, action := emailButtonLabels[email.ID]; action {
+			assert.True(t, email.HasButton(), "%s offers the button", email.ID)
+			actions++
+			continue
+		}
+		assert.False(t, email.HasButton(), "%s offers no button", email.ID)
+		for _, lang := range emailLanguages {
+			t.Run(email.ID+"/"+lang, func(t *testing.T) {
+				assertNoButton(t, renderDefinition(t, email, lang, themedBrand(record.BrandAppearanceLight, "plum")).HTML)
+			})
+		}
+	}
+	assert.Equal(t, len(emailButtonLabels), actions, "the four action emails are sent from their definitions")
 }
 
 // drawnCode is the element that holds the verification code alone, and its style.
@@ -257,7 +271,7 @@ func TestRender_TheVerificationCodeIsSetApartLargerAndInAMonospaceFace(t *testin
 	} {
 		for _, lang := range emailLanguages {
 			t.Run(string(tc.appearance)+"/"+lang, func(t *testing.T) {
-				html := renderBodyIn(t, "email_verification", lang, themedBrand(tc.appearance, "plum"))
+				html := renderDefinition(t, emailtemplate.VerificationCode, lang, themedBrand(tc.appearance, "plum")).HTML
 
 				code := readEmailCode(t, html, "482915")
 

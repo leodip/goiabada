@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -115,23 +116,25 @@ func HandleAccountEmailVerificationSendPost(
 		user.EmailVerificationCodeEncrypted = encrypted
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: issuedAt, Valid: true}
 
-		// Render email content
-		bind := map[string]interface{}{
-			"name":             user.FullName(),
-			"link":             adminConsoleBaseURL + "/account/email-verification",
-			"verificationCode": verificationCode,
+		// The email greets a user with no name by their address and says how long the code
+		// lasts (#818 decisions 4 and 15).
+		values := emailtemplate.Values{
+			Name:   emailtemplate.RecipientName(user.FullName(), user.Email),
+			Link:   adminConsoleBaseURL + "/account/email-verification",
+			Code:   verificationCode,
+			Expiry: emailVerificationCodeLifetime,
 		}
 		emailReq := r.WithContext(i18n.WithRecipientLanguage(r.Context(), user.PageLanguage, user.Locale))
-		buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_verification.html", bind)
+		message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.VerificationCode, values)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "Failed to render email template"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to render the verification email"), "user_id", user.Id)
 			return
 		}
 
 		input := &emaildelivery.SendEmailInput{
 			To:       user.Email,
-			Subject:  i18n.T(emailReq.Context(), "email.verification.subject", map[string]any{"code": verificationCode}),
-			HtmlBody: buf.String(),
+			Subject:  message.Subject,
+			HtmlBody: message.HTML,
 		}
 		if _, err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "Failed to send verification email"), "user_id", user.Id)

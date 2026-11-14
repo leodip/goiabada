@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
@@ -67,8 +66,6 @@ type PageRenderer interface {
 	NotFound(w http.ResponseWriter, r *http.Request)
 	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) error
-	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
-		data map[string]interface{}) (*bytes.Buffer, error)
 	// RenderEmail renders an email sent from its built-in definition (#818) as the message its
 	// recipient receives, in the language and the brand r's context carries.
 	RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error)

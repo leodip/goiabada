@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"bytes"
 	"context"
 	"net/http"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 )
@@ -40,11 +40,11 @@ type AuditLogger interface {
 
 // PageRenderer is one method wide here, and deliberately so. Every handler in this package answers
 // JSON: a 500 is writeInternalServerError and a refusal is writeJSONError (#279 decision 7), so
-// the page writers the parent's declaration carries have no caller here and are not named. The two
-// sites that remain render an email body to a buffer, which is a template but not a response.
+// the page writers the parent's declaration carries have no caller here and are not named. The
+// sites that remain render an email from its built-in definition (#818), which is drawn in a
+// template but is not a response.
 type PageRenderer interface {
-	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
-		data map[string]interface{}) (*bytes.Buffer, error)
+	RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error)
 }
 
 // EmailSender delivers one message. The context is the request's, or the job's that a request

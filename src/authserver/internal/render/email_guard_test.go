@@ -59,7 +59,7 @@ func TestEmails_EveryBuiltInEmailIsDrawnInlineAlone(t *testing.T) {
 				brands := &defaultBrandStub{brand: brand, assets: kitAssets}
 				buf, err := New(web.TemplateFS(), web.StaticFS(), brands).WithBaseURL(emailBaseURL).RenderTemplateToBuffer(req,
 					"/layouts/email_layout.html", "/emails/"+base+".html", map[string]interface{}{
-						"name": "Ana", "link": "https://auth.example.com/a-link", "verificationCode": "123456", "remaining": 3,
+						"name": "Ana", "link": "https://auth.example.com/a-link", "remaining": 3,
 					})
 				require.NoError(t, err)
 				assertDrawnInlineAlone(t, buf.String())

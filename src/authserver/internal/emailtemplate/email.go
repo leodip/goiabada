@@ -130,7 +130,9 @@ func RecipientName(fullName, address string) string {
 }
 
 // builtIns are every email's built-in definition.
-var builtIns = []*Email{PasswordResetLink}
+var builtIns = []*Email{
+	PasswordResetLink, ActivationLink, Welcome, RegistrationExistingAccount, NewUserSetup, VerificationCode, TestEmail,
+}
 
 // BuiltIns answers every email's built-in definition. The slice is the caller's own.
 func BuiltIns() []*Email {

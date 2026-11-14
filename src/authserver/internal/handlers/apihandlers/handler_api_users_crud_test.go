@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -450,14 +451,14 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 		}).
 		Return(createdUser, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
-	var emailedLink, emailedName string
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-		"/emails/email_newuser_set_password.html", mock.Anything).
+	var emailed emailtemplate.Values
+	var renderLocale string
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.NewUserSetup, mock.Anything).
 		Run(func(args mock.Arguments) {
 			rendered = true
-			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
-			emailedName, _ = args.Get(3).(map[string]interface{})["name"].(string)
-		}).Return(&bytes.Buffer{}, nil)
+			renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
+			emailed = args.Get(2).(emailtemplate.Values)
+		}).Return(emailtemplate.Message{Subject: "TestApp - create a password for your new account", HTML: "<p>x</p>"}, nil)
 	// The relay is the request's settings (#433).
 	var sent *emaildelivery.SendEmailInput
 	emailSender.On("SendEmail", mock.Anything,
@@ -488,11 +489,13 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	// This site's only job is to hand the issued code to the shared builder; the link's shape
 	// and the absence of an address in it belong to ResetPasswordLink's own tests (#112
 	// decision 5).
-	assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode, ""), emailedLink,
+	assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode, ""), emailed.Link,
 		"the emailed link must be the shared builder's output for the code that was issued")
-	assert.Equal(t, "Ana Silva", emailedName, "the email greets the new user by the names the request carried")
+	assert.Equal(t, "Ana Silva", emailed.Name, "the email greets the new user by the names the request carried")
+	assert.Equal(t, 24*time.Hour, emailed.Expiry, "the email says the link works for a day (#818 decision 4)")
+	assert.Equal(t, "en", renderLocale, "the email is the new user's, in English, not the administrator's language")
 	require.NotNil(t, sent)
-	assert.Equal(t, "TestApp - create a password for your new account", sent.Subject)
+	assert.Equal(t, "TestApp - create a password for your new account", sent.Subject, "the subject is the rendered email's")
 	assert.Equal(t, "newuser@example.com", sent.To)
 
 	// The answer says the email was sent (#725 decision 12).
@@ -540,8 +543,8 @@ func TestHandleUserCreatePost_ASetupEmailThatFailsToSendAnswersTheUser(t *testin
 		Run(func(args mock.Arguments) { input = args.Get(1).(*usercreation.Input) }).
 		Return(&record.User{Id: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Email: "newuser@example.com", Enabled: true}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return().Once()
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-		"/emails/email_newuser_set_password.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.NewUserSetup, mock.Anything).
+		Return(emailtemplate.Message{Subject: "TestApp - create a password for your new account", HTML: "<p>x</p>"}, nil).Once()
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(mock.Arguments) { require.NotNil(t, input, "the create must finish before the mail is sent") }).
 		Return(emaildelivery.SendResult{}, errs.New("the relay refused the message")).Once()
@@ -605,9 +608,8 @@ func TestHandleUserCreatePost_ASetupEmailThatCannotBeRenderedCreatesNothing(t *t
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: true}))
 
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil).Once()
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-		"/emails/email_newuser_set_password.html", mock.Anything).
-		Return(nil, errs.New("the template is missing")).Once()
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.NewUserSetup, mock.Anything).
+		Return(emailtemplate.Message{}, errs.New("the email layout is missing")).Once()
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -911,9 +913,8 @@ func TestHandleUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
 			}
 			if tc.wantEmail {
-				pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-					"/emails/email_newuser_set_password.html", mock.Anything).
-					Return(&bytes.Buffer{}, nil)
+				pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.NewUserSetup, mock.Anything).
+					Return(emailtemplate.Message{Subject: "TestApp - create a password for your new account", HTML: "<p>x</p>"}, nil)
 				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil)
 			}
 

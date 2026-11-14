@@ -2457,11 +2457,6 @@
 # holds its subject and its button's label there, in the six built-in languages,
 # and has no message here (#818).
 
-"email.register_activate.subject" = "Activa tu cuenta"
-"email.register_existing_account.subject" = "Ya tienes una cuenta"
-"email.register_confirmation.subject" = "¡Te damos la bienvenida!"
-"email.verification.subject" = "Verificación del correo - código {{.code}}"
-"email.newuser_set_password.subject" = "{{.appName}} - crea una contraseña para tu nueva cuenta"
 "email.address_changed.subject" = "Tu dirección de correo electrónico ha cambiado"
 "email.password_changed.subject" = "Tu contraseña ha cambiado"
 "email.password_changed_by_administrator.subject" = "Un administrador ha cambiado tu contraseña"
@@ -2474,12 +2469,6 @@
 "email.account_deleted.subject" = "Se ha eliminado tu cuenta"
 "email.account_deleted_by_administrator.subject" = "Un administrador ha eliminado tu cuenta"
 "email.otp_lockout.subject" = "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos"
-"email.test_email.subject" = "{{.appName}} - correo de prueba"
-
-# The label of the button an action email draws above its URL (#817).
-"email.register_activate.button" = "Activar cuenta"
-"email.newuser_set_password.button" = "Crear contraseña"
-"email.register_confirmation.button" = "Iniciar sesión"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

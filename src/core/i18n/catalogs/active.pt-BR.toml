@@ -2343,11 +2343,6 @@
 
 # --- Assuntos de e-mail -----------------------------------------------------
 
-"email.register_activate.subject" = "Ative sua conta"
-"email.register_existing_account.subject" = "Você já tem uma conta"
-"email.register_confirmation.subject" = "Bem-vindo(a)!"
-"email.verification.subject" = "Verificação de e-mail - código {{.code}}"
-"email.newuser_set_password.subject" = "{{.appName}} - crie uma senha para sua nova conta"
 "email.address_changed.subject" = "Seu endereço de e-mail foi alterado"
 "email.password_changed.subject" = "Sua senha foi alterada"
 "email.password_changed_by_administrator.subject" = "Um administrador alterou a sua senha"
@@ -2360,12 +2355,6 @@
 "email.account_deleted.subject" = "Sua conta foi excluída"
 "email.account_deleted_by_administrator.subject" = "Um administrador excluiu a sua conta"
 "email.otp_lockout.subject" = "Seu aplicativo autenticador foi bloqueado após muitos códigos errados"
-"email.test_email.subject" = "{{.appName}} - e-mail de teste"
-
-# The label of the button an action email draws above its URL (#817).
-"email.register_activate.button" = "Ativar conta"
-"email.newuser_set_password.button" = "Criar senha"
-"email.register_confirmation.button" = "Entrar"
 
 # --- Bootstrap de JS --------------------------------------------------------
 

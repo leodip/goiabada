@@ -319,7 +319,7 @@ func TestRenderTemplateToBuffer_EmailIsMarkedWithItsBodyCopyLanguage(t *testing.
 	}
 }
 
-// The emails this server ships are marked so too: the activation email, drawn in the real
+// The emails this server ships are marked so too: the password changed notice, drawn in the real
 // layout from the real copies, says pt-BR for a pt-BR recipient and en for an English one or one
 // whose language has no copy.
 func TestRenderTemplateToBuffer_ShippedEmailsAreMarkedWithTheirBodyCopyLanguage(t *testing.T) {
@@ -330,8 +330,8 @@ func TestRenderTemplateToBuffer_ShippedEmailsAreMarkedWithTheirBodyCopyLanguage(
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, locale, "en"))
 
 			buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(req,
-				"/layouts/email_layout.html", "/emails/email_register_activate.html",
-				map[string]interface{}{"link": "https://example.com/activate"})
+				"/layouts/email_layout.html", "/emails/email_password_changed.html",
+				map[string]interface{}{"name": "Ana"})
 
 			require.NoError(t, err)
 			assert.Contains(t, buf.String(), `<html lang="`+want+`">`)

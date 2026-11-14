@@ -315,7 +315,7 @@ func renderEmailIn(t *testing.T, base, lang string, footer bool) string {
 	}
 	buf, err := renderer.RenderTemplateToBuffer(req,
 		"/layouts/email_layout.html", "/emails/"+base+".html", map[string]interface{}{
-			"name": "Ana", "link": emailLink, "verificationCode": "482915", "remaining": 3,
+			"name": "Ana", "link": emailLink, "remaining": 3,
 		})
 	require.NoError(t, err)
 	require.Contains(t, buf.String(), "<img", "the email draws its brand's logo")
@@ -346,8 +346,8 @@ Need help? help@acme.example · +442079460958 · Support page <https://acme.exam
 `, textOf(t, renderEmail(t, "password_reset_link", true)))
 }
 
-// The verification code is on a line of its own, and a brand with no footer adds nothing under the
-// body.
+// The verification code is on a line of its own, followed by how long it lasts, and a brand with no
+// footer adds nothing under the body.
 func TestSendEmail_TheTextOfTheVerificationEmail(t *testing.T) {
 	assert.Equal(t, `Hello Ana,
 
@@ -355,11 +355,13 @@ This is your email verification code:
 
 482915
 
+The code expires in 5 minutes.
+
 You can enter your code here: https://auth.example.com/reset-password?code=abc&email=ana%40example.com
 
 Best regards,
 Acme Portal
-`, textOf(t, renderEmail(t, "email_verification", false)))
+`, textOf(t, renderEmail(t, "verification_code", false)))
 }
 
 // logoSource is the logo an email draws.

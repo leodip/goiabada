@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -118,18 +118,16 @@ func TestHandleRegisterPost_TheWelcomeEmailIsSentAfterTheResponse(t *testing.T) 
 	}
 	outcomes := []outcome{
 		{name: "the send fails", expect: func(w *welcomeRegistration) {
-			w.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_register_confirmation.html", mock.Anything).
-				Return(bytes.NewBufferString("welcome"), nil).Once()
+			w.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.Welcome, mock.Anything).
+				Return(emailtemplate.Message{Subject: "Welcome!", HTML: "welcome"}, nil).Once()
 			w.emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 2525},
 				mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
 					return input.To == newAccountEmail && input.Subject == "Welcome!"
 				})).Return(emaildelivery.SendResult{}, assert.AnError).Once()
 		}},
 		{name: "the render fails", expect: func(w *welcomeRegistration) {
-			w.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_register_confirmation.html", mock.Anything).
-				Return(nil, assert.AnError).Once()
+			w.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.Welcome, mock.Anything).
+				Return(emailtemplate.Message{}, assert.AnError).Once()
 		}},
 	}
 	type landing struct {
@@ -196,10 +194,9 @@ func TestHandleRegisterPost_TheWelcomeEmailJob(t *testing.T) {
 
 		w.handler.ServeHTTP(rr, welcomeRequest("", true))
 
-		w.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-			"/emails/email_register_confirmation.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-				return data["link"] == testAdminConsoleBaseURL+"/account/profile"
-			})).Return(bytes.NewBufferString("welcome"), nil).Once()
+		w.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.Welcome,
+			emailtemplate.Values{Link: testAdminConsoleBaseURL + "/account/profile"}).
+			Return(emailtemplate.Message{Subject: "Welcome!", HTML: "welcome"}, nil).Once()
 		w.emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 2525},
 			&emaildelivery.SendEmailInput{To: newAccountEmail, Subject: "Welcome!", HtmlBody: "welcome"}).
 			Return(emaildelivery.SendResult{}, nil).Once()

@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
@@ -17,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -284,14 +284,13 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 		}).Return(nil).Once()
 	details, _ := captureRequestedRegistration(h.auditLogger, &order)
 
-	var mailBind map[string]interface{}
+	var mailValues emailtemplate.Values
 	var mailReq *http.Request
-	h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-		"/emails/email_register_activate.html", mock.Anything).
+	h.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.ActivationLink, mock.Anything).
 		Run(func(args mock.Arguments) {
 			mailReq = args.Get(0).(*http.Request)
-			mailBind = args.Get(3).(map[string]interface{})
-		}).Return(bytes.NewBufferString("activation mail"), nil).Once()
+			mailValues = args.Get(2).(emailtemplate.Values)
+		}).Return(emailtemplate.Message{Subject: "Ative sua conta", HTML: "activation mail"}, nil).Once()
 	var sent *emaildelivery.SendEmailInput
 	h.emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -321,11 +320,12 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 	assert.Equal(t, []string{"create", "audit", "send"}, order,
 		"the record is written once the row is, and before the mail is sent")
 
-	assert.Equal(t, testBaseURL+"/account/activate?code="+code, mailBind["link"])
+	// The link holds the code alone, and the email says it lasts five minutes (#818 decision 4).
+	assert.Equal(t, emailtemplate.Values{Link: testBaseURL + "/account/activate?code=" + code, Expiry: 5 * time.Minute}, mailValues)
 	assert.Equal(t, "pt-BR", i18n.LocaleTag(mailReq.Context()), "the mail is rendered in the registrant's locale")
 	require.NotNil(t, sent)
 	assert.Equal(t, registerSomeoneEmail, sent.To)
-	assert.Equal(t, "Ative sua conta", sent.Subject)
+	assert.Equal(t, "Ative sua conta", sent.Subject, "the subject is the rendered email's")
 	assert.Equal(t, "activation mail", sent.HtmlBody)
 	h.userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 }
@@ -340,22 +340,21 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 // rather than defer to, or the subject takes the page's catalog over the first tag's body copy.
 func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguage(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		accept      string
-		uiLocales   string
-		spanish     bool
-		wantTag     string
-		wantSubject string
+		name      string
+		accept    string
+		uiLocales string
+		spanish   bool
+		wantTag   string
 	}{
 		{name: "the page's matched language, not the first Accept-Language tag alone",
-			accept: "nl-BE,nl;q=0.9,pt-BR;q=0.8", wantTag: "pt-BR", wantSubject: "Ative sua conta"},
+			accept: "nl-BE,nl;q=0.9,pt-BR;q=0.8", wantTag: "pt-BR"},
 		{name: "a lone base language is sent under its catalog's tag",
-			accept: "pt", wantTag: "pt-BR", wantSubject: "Ative sua conta"},
+			accept: "pt", wantTag: "pt-BR"},
 		{name: "a cross-language guess gets English for both subject and body",
-			accept: "gl", spanish: true, wantTag: "en", wantSubject: "Activate your account"},
-		{name: "a Spanish recipient keeps the operator override", accept: "es-MX", spanish: true, wantTag: "es", wantSubject: spanishActivateSubject},
+			accept: "gl", spanish: true, wantTag: "en"},
+		{name: "a regional Spanish recipient, with an operator's Spanish catalog", accept: "es-MX", spanish: true, wantTag: "es"},
 		{name: "ui_locales, the ceremony's explicit intent, also follows the page",
-			uiLocales: "nl pt-BR", wantTag: "pt-BR", wantSubject: "Ative sua conta"},
+			uiLocales: "nl pt-BR", wantTag: "pt-BR"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.spanish {
@@ -383,10 +382,9 @@ func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguag
 			captureRequestedRegistration(h.auditLogger, nil)
 
 			var mailReq *http.Request
-			h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_register_activate.html", mock.Anything).
+			h.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.ActivationLink, mock.Anything).
 				Run(func(args mock.Arguments) { mailReq = args.Get(0).(*http.Request) }).
-				Return(bytes.NewBufferString("activation mail"), nil).Once()
+				Return(emailtemplate.Message{Subject: "the rendered subject", HTML: "activation mail"}, nil).Once()
 			var sent *emaildelivery.SendEmailInput
 			h.emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
 				Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).
@@ -397,30 +395,24 @@ func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguag
 
 			require.NotNil(t, mailReq)
 			assert.Equal(t, tc.wantTag, i18n.LocaleTag(mailReq.Context()),
-				"the mail is rendered in the page's language, which is also what picks its body copy")
+				"the mail is rendered in the page's language, which picks its text")
 			require.NotNil(t, sent)
-			assert.Equal(t, tc.wantSubject, sent.Subject)
+			assert.Equal(t, "the rendered subject", sent.Subject)
 		})
 	}
 }
 
-// The subjects installSpanishOverrideCatalog gives the two registration mails.
-const (
-	spanishActivateSubject     = "Activa tu cuenta"
-	spanishConfirmationSubject = "¡Bienvenido!"
-)
-
-// installSpanishOverrideCatalog installs an operator's es subjects until the test ends.
-// A regional Spanish request uses them; Galician, which has no catalog of its own,
-// still gets English rather than a guessed Spanish match (#658).
+// installSpanishOverrideCatalog installs an operator's es catalog until the test ends. A regional
+// Spanish request is matched to it; Galician, which has no catalog of its own, still gets English
+// rather than a guessed Spanish match (#658). An email's text is no longer in a catalog (#818), so
+// the catalog holds a page's message.
 func installSpanishOverrideCatalog(t *testing.T) {
 	t.Helper()
 	overrides := t.TempDir()
 	catalogs := filepath.Join(overrides, "catalogs")
 	require.NoError(t, os.Mkdir(catalogs, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(catalogs, "active.es.toml"),
-		[]byte("\"email.register_activate.subject\" = \""+spanishActivateSubject+"\"\n"+
-			"\"email.register_confirmation.subject\" = \""+spanishConfirmationSubject+"\"\n"), 0o600))
+		[]byte("\"auth.pwd.title\" = \"Iniciar sesión\"\n"), 0o600))
 	require.NoError(t, i18n.LoadBundle(overrides))
 	t.Cleanup(func() { require.NoError(t, i18n.LoadBundle("")) })
 }
@@ -467,14 +459,13 @@ func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNoti
 
 			order := []string{}
 			details, _ := captureRequestedRegistration(h.auditLogger, &order)
-			var mailBind map[string]interface{}
+			var mailValues emailtemplate.Values
 			var mailReq *http.Request
-			h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_register_existing_account.html", mock.Anything).
+			h.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.RegistrationExistingAccount, mock.Anything).
 				Run(func(args mock.Arguments) {
 					mailReq = args.Get(0).(*http.Request)
-					mailBind = args.Get(3).(map[string]interface{})
-				}).Return(bytes.NewBufferString("notice"), nil).Once()
+					mailValues = args.Get(2).(emailtemplate.Values)
+				}).Return(emailtemplate.Message{Subject: "the rendered subject", HTML: "notice"}, nil).Once()
 			var sent *emaildelivery.SendEmailInput
 			h.emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -493,12 +484,12 @@ func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNoti
 			}, *details)
 			assert.Equal(t, []string{"audit", "send"}, order, "the record is written before the mail is sent")
 
-			assert.Equal(t, map[string]interface{}{"link": testBaseURL + "/forgot-password"}, mailBind,
+			assert.Equal(t, emailtemplate.Values{Link: testBaseURL + "/forgot-password"}, mailValues,
 				"the notice carries the forgot-password page and no code")
 			assert.Equal(t, tc.wantLocale, i18n.LocaleTag(mailReq.Context()))
 			require.NotNil(t, sent)
 			assert.Equal(t, registerSomeoneEmail, sent.To)
-			assert.Equal(t, tc.wantSubject, sent.Subject)
+			assert.Equal(t, "the rendered subject", sent.Subject)
 			assert.Equal(t, "notice", sent.HtmlBody)
 
 			h.database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
@@ -652,8 +643,8 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 		h.database.On("CreatePreRegistration", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 			Run(func(args mock.Arguments) { args.Get(2).(*record.PreRegistration).Id = 42 }).Return(nil).Once()
 		details, _ := captureRequestedRegistration(h.auditLogger, nil)
-		h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-			"/emails/email_register_activate.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
+		h.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.ActivationLink, mock.Anything).
+			Return(emailtemplate.Message{Subject: "Activate your account", HTML: "<p>x</p>"}, nil).Once()
 		h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, assert.AnError).Once()
 
 		h.handler.ServeHTTP(rr, req)
@@ -675,8 +666,8 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 			&record.User{Id: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail}, nil)
 		h.expectCheckEmailPage(rr, req)
 		details, _ := captureRequestedRegistration(h.auditLogger, nil)
-		h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-			"/emails/email_register_existing_account.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
+		h.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.RegistrationExistingAccount, mock.Anything).
+			Return(emailtemplate.Message{Subject: "You already have an account", HTML: "<p>x</p>"}, nil).Once()
 		h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, assert.AnError).Once()
 
 		h.handler.ServeHTTP(rr, req)

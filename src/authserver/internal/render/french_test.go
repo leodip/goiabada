@@ -7,6 +7,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -41,11 +42,6 @@ func TestFrench_SignInPageUsesQueryOrCanadianHeader(t *testing.T) {
 func TestFrench_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 	for _, locale := range []string{"fr", "fr-FR", "fr-CA", "fr-BE", "fr-CH"} {
 		for _, tc := range []struct{ name, subject, body string }{
-			{"register_activate", "Activez votre compte", "Le lien expire dans 5 minutes."},
-			{"register_existing_account", "Vous avez déjà un compte", "Aucun nouveau compte n’a donc été créé."},
-			{"register_confirmation", "Bienvenue\u00a0!", "Votre compte a été créé."},
-			{"verification", "Vérification de l’adresse e-mail - code 123456", "Voici votre code de vérification"},
-			{"newuser_set_password", "Test - créez un mot de passe pour votre nouveau compte", "Le lien est valable 24 heures."},
 			{"address_changed", "Votre adresse e-mail a été modifiée", "une autre personne connaît peut-être votre mot de passe."},
 			{"password_changed", "Votre mot de passe a été modifié", "Sinon, une autre personne utilise peut-être votre compte."},
 			{"password_changed_by_administrator", "Un administrateur a modifié votre mot de passe", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
@@ -58,7 +54,6 @@ func TestFrench_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 			{"otp_lockout", "Votre application d’authentification a été bloquée après trop de codes erronés", "Connectez-vous avec l’un de vos codes de récupération"},
 			{"account_deleted", "Votre compte a été supprimé", "Sinon, une autre personne connaissait votre mot de passe."},
 			{"account_deleted_by_administrator", "Un administrateur a supprimé votre compte", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
-			{"test_email", "Test - e-mail de test", "Ceci est un e-mail de test envoyé par Test."},
 		} {
 			t.Run(locale+"/"+tc.name, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -69,14 +64,11 @@ func TestFrench_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 				assert.Equal(t, tc.subject, i18n.T(ctx, "email."+tc.name+".subject", map[string]any{"code": "123456", "appName": "Test"}))
 				buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(req,
 					"layouts/email_layout.html", "emails/email_"+tc.name+".html",
-					map[string]interface{}{"name": "Camille", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3})
+					map[string]interface{}{"name": "Camille", "link": "https://example.com/continue", "remaining": 3})
 				require.NoError(t, err)
 				assert.Contains(t, buf.String(), `<html lang="fr">`)
 				assert.Contains(t, buf.String(), tc.body)
 				assert.NotContains(t, buf.String(), "<no value>")
-				if tc.name == "verification" {
-					assert.Contains(t, buf.String(), "123456")
-				}
 			})
 		}
 	}
@@ -96,14 +88,28 @@ func TestFrench_ExactRegionalEmailOverrideStillWins(t *testing.T) {
 		}
 		return err
 	}))
-	templates["emails/email_register_activate.fr-CA.html"] = &fstest.MapFile{Data: []byte(`{{define "title"}}Courriel personnalisé{{end}}{{define "head"}}{{end}}{{define "body"}}Votre courriel de récupération{{end}}`)}
+	templates["emails/email_password_changed.fr-CA.html"] = &fstest.MapFile{Data: []byte(`{{define "title"}}Courriel personnalisé{{end}}{{define "head"}}{{end}}{{define "body"}}Votre courriel de récupération{{end}}`)}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "fr-CA", "en"))
 	buf, err := New(templates, web.StaticFS(), nil).RenderTemplateToBuffer(req,
-		"layouts/email_layout.html", "emails/email_register_activate.html", nil)
+		"layouts/email_layout.html", "emails/email_password_changed.html", nil)
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), `<html lang="fr-CA">`)
 	assert.Contains(t, buf.String(), "Votre courriel de récupération")
-	assert.NotContains(t, buf.String(), "Le lien expire dans 5 minutes.")
+	assert.NotContains(t, buf.String(), "Sinon, une autre personne utilise peut-être votre compte.")
+}
+
+// The emails sent from their built-in definitions (#818) follow a recipient reading French, in any
+// region, as the template emails do: the subject, the language the email is marked with, and a
+// sentence of the body, the activation link's and the verification code's saying how long they last.
+func TestFrench_EveryDefinedEmailFollowsTheRecipient(t *testing.T) {
+	assertDefinedEmailsFollowTheRecipient(t, []string{"fr", "fr-FR", "fr-CA", "fr-BE", "fr-CH"}, "fr", []definedEmail{
+		{emailtemplate.ActivationLink, "Activez votre compte", "Le lien expire dans 5 minutes."},
+		{emailtemplate.RegistrationExistingAccount, "Vous avez déjà un compte", "Aucun nouveau compte n’a donc été créé."},
+		{emailtemplate.Welcome, "Bienvenue\u00a0!", "Votre compte a été créé."},
+		{emailtemplate.VerificationCode, "Vérification de l’adresse e-mail - code 482915", "Le code expire dans 5 minutes."},
+		{emailtemplate.NewUserSetup, "Acme Portal - créez un mot de passe pour votre nouveau compte", "Pour créer votre mot de passe"},
+		{emailtemplate.TestEmail, "Acme Portal - e-mail de test", "Ceci est un e-mail de test envoyé par Acme Portal."},
+	})
 }
