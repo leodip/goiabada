@@ -75,3 +75,11 @@ last  = ["e2e"]   # after the review, before the push: the browser suite against
 # accepts, and installs the suite's packages here.
 [pr]
 host_paths = [".placido", ".claude", ".codex", ".mcp.json", "src/.devcontainer", "e2e"]
+
+# CodeRabbit reviews every pull request, and its check is one of the pull request's,
+# so its review is in once CI concludes. Placido then answers its comments, fixes what
+# holds in the pull request, and drafts the rest as follow-ups; what its comments look
+# like is in .placido/notes/review-comments.md.
+[review_comments]
+accounts = ["coderabbitai[bot]"]
+passes   = 2   # its first review, then its review of placido's fixes
