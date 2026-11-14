@@ -2,6 +2,8 @@ package render
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -256,4 +259,47 @@ func TestRender_AnEmailsFooterEscapesEveryValue(t *testing.T) {
 	assert.Equal(t, "mailto:50%2541off@acme.example", footer.contact[0].Href)
 	assert.Equal(t, "50%41off@acme.example", footer.contact[0].Text)
 	assert.Equal(t, "+1<script>", footer.contact[1].Text)
+}
+
+// The preview and the test send of an email template draw the email in the language being edited
+// (#818 decisions 11 and 12), its footer included: the brand's link labels and "Need help?" and
+// "Support page" in that language, as the real email in it reads, whatever language the
+// administrator asking reads the console in, a page language of their own included. The brand is
+// the default one, or the one chosen.
+func TestRender_AnEmailSampleDrawsItsFooterInTheLanguageEdited(t *testing.T) {
+	brand := footerBrand(threeLinks, "help@acme.example", "https://acme.example/support", "")
+	for _, tc := range []struct {
+		name   string
+		caller func(context.Context) context.Context
+		chosen *record.Brand
+	}{
+		{"a caller reading English, the default brand", func(ctx context.Context) context.Context {
+			return i18n.WithLocale(ctx, true, "en")
+		}, nil},
+		{"a caller with a page language of their own, the brand chosen", func(ctx context.Context) context.Context {
+			return i18n.WithPageLanguage(i18n.WithLocale(ctx, true, "fr"), "pt-BR")
+		}, brand},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tc.caller(reqctx.WithSettings(context.Background(), &record.Settings{AppName: "Acme Portal"}))
+			req := httptest.NewRequest(http.MethodPost, "/", nil).WithContext(ctx)
+			r := New(web.TemplateFS(), web.StaticFS(), &defaultBrandStub{brand: brand}).WithBaseURL(emailBaseURL)
+
+			message, err := r.RenderEmailSample(req, emailtemplate.PasswordResetLink, "de",
+				emailtemplate.PasswordResetLink.BuiltIn["de"], definitionValues, tc.chosen)
+			require.NoError(t, err)
+
+			footer := readEmailFooter(t, message.HTML)
+			assert.Equal(t, []string{"Datenschutz", "Status", "Acme"}, footerLinkTexts(footer.links))
+			assert.Equal(t, "Brauchen Sie Hilfe? help@acme.example Supportseite", footer.contactText)
+		})
+	}
+}
+
+func footerLinkTexts(links []emailFooterLink) []string {
+	texts := make([]string, len(links))
+	for i, link := range links {
+		texts[i] = link.Text
+	}
+	return texts
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -135,6 +136,87 @@ func TestAPIEmailTemplates_AnInvalidEditIsMarkedWithItsProblems(t *testing.T) {
 		"message": "This email does not offer {{full_name}}. It offers {{app_name}}, {{name}}.",
 	}}, es["problems"])
 	assert.Equal(t, "invalid", listedStatus(t, manageToken, "password_changed", "es"))
+}
+
+// A body that types characters but draws nothing to read, an empty list here, is refused by a save,
+// and one already stored is read as invalid, naming the rule, so its email is sent with the
+// built-in text (#818 decisions 8 and 17).
+func TestAPIEmailTemplates_ABodyThatDrawsNothingToReadIsRefusedAndInvalid(t *testing.T) {
+	manageToken, _ := createAdminClientWithToken(t)
+	resetEmailTemplateWhenDone(t, "otp_enabled", "en")
+
+	status, answer, _ := emailTemplateCall(t, manageToken, http.MethodPut, emailTemplatesPath+"/otp_enabled/en",
+		map[string]any{"subject": "Two-factor on", "body": "- "})
+
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, "handler.email_template.nothing_to_read", answer["error_code"])
+	assert.Equal(t, "/body", answer["error_field"])
+	edit, err := database.GetEmailTemplate(context.Background(), nil, "otp_enabled", "en")
+	require.NoError(t, err)
+	assert.Nil(t, edit, "a refused save stores nothing")
+
+	// Stored as a release whose rule read the characters typed might have left it.
+	saveEmailTemplateEdit(t, "otp_enabled", "en", "", "", "- ")
+
+	en := emailTemplateLanguage(t, manageToken, "otp_enabled", "en")
+	assert.Equal(t, "invalid", en["status"])
+	assert.Equal(t, []any{map[string]any{
+		"field": "body", "rule": "nothing_to_read",
+		"message": "The body needs something to read besides the button.",
+	}}, en["problems"])
+	assert.Equal(t, "invalid", listedStatus(t, manageToken, "otp_enabled", "en"))
+}
+
+// Two first saves of one email and language at once both succeed, the last one's edit left
+// stored: the API saves inside RunInTransaction, which retries a deadlock victim on MySQL and SQL
+// Server (#818 decision 7).
+func TestAPIEmailTemplates_SimultaneousFirstSavesBothSucceed(t *testing.T) {
+	manageToken, _ := createAdminClientWithToken(t)
+	resetEmailTemplateWhenDone(t, "otp_disabled", "fr")
+	path := emailTemplatesPath + "/otp_disabled/fr"
+	subjects := []string{"Première", "Seconde"}
+
+	for round := 0; round < 10; round++ {
+		_, deleteErr := database.DeleteEmailTemplate(context.Background(), nil, "otp_disabled", "fr")
+		require.NoError(t, deleteErr)
+
+		requests := make([]*http.Request, len(subjects))
+		for i, subject := range subjects {
+			encoded, err := json.Marshal(map[string]any{"subject": subject, "body": "Bonjour {{name}}."})
+			require.NoError(t, err)
+			requests[i], err = http.NewRequest(http.MethodPut, appConfig.AuthServer.BaseURL+path, bytes.NewReader(encoded))
+			require.NoError(t, err)
+			requests[i].Header.Set("Authorization", "Bearer "+manageToken)
+			requests[i].Header.Set("Content-Type", "application/json")
+		}
+		client := createHttpClient(t)
+		statuses := make([]int, len(requests))
+		failures := make([]error, len(requests))
+		var wg sync.WaitGroup
+		for i, req := range requests {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				resp, err := client.Do(req)
+				if err != nil {
+					failures[i] = err
+					return
+				}
+				statuses[i] = resp.StatusCode
+				_ = resp.Body.Close()
+			}()
+		}
+		wg.Wait()
+
+		for i := range requests {
+			require.NoErrorf(t, failures[i], "round %d, save %d", round, i)
+			require.Equalf(t, http.StatusOK, statuses[i], "round %d, save %d", round, i)
+		}
+		edit, readErr := database.GetEmailTemplate(context.Background(), nil, "otp_disabled", "fr")
+		require.NoError(t, readErr)
+		require.NotNil(t, edit, "round %d", round)
+		assert.Contains(t, subjects, edit.Subject.String, "round %d: one save's edit is left", round)
+	}
 }
 
 // A save that breaks a rule is refused 400, naming the field and the rule, in the caller's

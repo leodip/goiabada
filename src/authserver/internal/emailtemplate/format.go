@@ -63,8 +63,11 @@ const (
 	// RulePlaceholderInLinkDestination is a placeholder in a link's destination other than {{link}}
 	// as the whole of it, which would hand the link to another site.
 	RulePlaceholderInLinkDestination Rule = "placeholder_in_link_destination"
-	// RuleNothingToRead is a body that is empty once {{button}} is left out, which in a brand with no
-	// footer could never be sent, the sender refusing a message with no text.
+	// RuleNothingToRead is a body that draws nothing to read once {{button}} is left out, which in a
+	// brand with no footer could never be sent, the sender refusing a message with no text. What
+	// counts is what the body draws, not the characters typed: an empty list item, a link with no
+	// label whose address is dropped, or a reference to a whitespace character draws nothing, while
+	// a placeholder other than the button, whose value is never empty, draws its value.
 	RuleNothingToRead Rule = "nothing_to_read"
 )
 
@@ -232,7 +235,7 @@ func (e *Email) checkSubject(subject string) Problems {
 	if strings.ContainsAny(subject, "\r\n") {
 		problems = append(problems, Problem{Field: FieldSubject, Rule: RuleNotOneLine})
 	}
-	for _, found := range placeholdersIn(subject, false) {
+	for _, found := range subjectPlaceholders(subject) {
 		p, offered := e.placeholder(found)
 		switch {
 		case !offered:
@@ -249,13 +252,13 @@ func (e *Email) checkSubject(subject string) Problems {
 // tabs trimmed.
 var placeholderSyntax = regexp.MustCompile(`\{\{([^{}\n]*)\}\}`)
 
-// placeholdersIn answers the names of the placeholders written in s, in order. A placeholder whose
-// braces follow a backslash is escaped and is not one; markdown says whether s is Markdown, where a
-// backslash escapes a backslash, so one after an even run of them still is.
-func placeholdersIn(s string, markdown bool) []string {
+// placeholdersIn answers the names of the placeholders written in s, a piece of Markdown such as a
+// link's destination, in order. A placeholder whose braces follow a backslash is escaped and is not
+// one; in Markdown a backslash escapes a backslash, so one after an even run of them still is.
+func placeholdersIn(s string) []string {
 	var names []string
 	for _, match := range placeholderSyntax.FindAllStringSubmatchIndex(s, -1) {
-		if escapedAt(s, match[0], markdown) {
+		if escapedAt(s, match[0]) {
 			continue
 		}
 		names = append(names, placeholderName(s[match[2]:match[3]]))
@@ -263,16 +266,72 @@ func placeholdersIn(s string, markdown bool) []string {
 	return names
 }
 
-// escapedAt reports whether the braces at i follow an escaping backslash.
-func escapedAt(s string, i int, markdown bool) bool {
+// escapedAt reports whether the braces at i of a piece of Markdown follow an escaping backslash.
+func escapedAt(s string, i int) bool {
 	backslashes := 0
 	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
 		backslashes++
-		if !markdown {
-			break
-		}
 	}
 	return backslashes%2 == 1
+}
+
+// escapedBraces is how a subject writes two braces that do not begin a placeholder.
+const escapedBraces = `\{{`
+
+// subjectPart is a piece of a subject: literal text, or a placeholder, by its name.
+type subjectPart struct {
+	text          string
+	isPlaceholder bool
+	placeholder   string
+}
+
+// placeholderAtStart is placeholderSyntax where a piece of text begins.
+var placeholderAtStart = regexp.MustCompile(`^` + placeholderSyntax.String())
+
+// subjectParts reads a subject from the left: \{{ is the two braces, wherever it is and whatever
+// follows it, a placeholder is {{name}}, and every other character is itself. A subject is plain
+// text, not Markdown, so a backslash before anything but two braces is a backslash.
+func subjectParts(subject string) []subjectPart {
+	var parts []subjectPart
+	var literal strings.Builder
+	for i := 0; i < len(subject); {
+		if strings.HasPrefix(subject[i:], escapedBraces) {
+			literal.WriteString("{{")
+			i += len(escapedBraces)
+			continue
+		}
+		if subject[i] != '{' {
+			literal.WriteByte(subject[i])
+			i++
+			continue
+		}
+		if match := placeholderAtStart.FindStringSubmatchIndex(subject[i:]); match != nil {
+			if literal.Len() > 0 {
+				parts = append(parts, subjectPart{text: literal.String()})
+				literal.Reset()
+			}
+			parts = append(parts, subjectPart{isPlaceholder: true, placeholder: placeholderName(subject[i+match[2] : i+match[3]])})
+			i += match[1]
+			continue
+		}
+		literal.WriteByte(subject[i])
+		i++
+	}
+	if literal.Len() > 0 {
+		parts = append(parts, subjectPart{text: literal.String()})
+	}
+	return parts
+}
+
+// subjectPlaceholders answers the names of the placeholders written in a subject, in order.
+func subjectPlaceholders(subject string) []string {
+	var names []string
+	for _, part := range subjectParts(subject) {
+		if part.isPlaceholder {
+			names = append(names, part.placeholder)
+		}
+	}
+	return names
 }
 
 func placeholderName(inner string) string {
@@ -283,18 +342,13 @@ func placeholderName(inner string) string {
 // subject is plain text, a header the sender encodes, so nothing is escaped.
 func substitute(subject string, values map[string]string) string {
 	var out strings.Builder
-	last := 0
-	for _, match := range placeholderSyntax.FindAllStringSubmatchIndex(subject, -1) {
-		if escapedAt(subject, match[0], false) {
-			out.WriteString(subject[last : match[0]-1])
-			out.WriteString(subject[match[0]:match[1]])
-		} else {
-			out.WriteString(subject[last:match[0]])
-			out.WriteString(values[placeholderName(subject[match[2]:match[3]])])
+	for _, part := range subjectParts(subject) {
+		if part.isPlaceholder {
+			out.WriteString(values[part.placeholder])
+			continue
 		}
-		last = match[1]
+		out.WriteString(part.text)
 	}
-	out.WriteString(subject[last:])
 	return out.String()
 }
 
@@ -338,7 +392,7 @@ func (e *Email) body(source string, r *bodyRenderer) (string, Problems) {
 			problems = append(problems, Problem{Field: FieldBody, Rule: RuleRequiredPlaceholderMissing, Placeholder: p.Name})
 		}
 	}
-	if strings.TrimSpace(buttonLine.ReplaceAllString(source, "")) == "" {
+	if !w.readable {
 		problems = append(problems, Problem{Field: FieldBody, Rule: RuleNothingToRead})
 	}
 	return out.String(), problems
@@ -364,6 +418,10 @@ type bodyWalker struct {
 	used     map[string]bool
 	// inLink is how many links the walk is inside; a link inside a link's text is its text.
 	inLink int
+	// readable is whether the walk has drawn something a reader reads, the button left out
+	// (RuleNothingToRead). It is judged alike with and without values: a placeholder's value is
+	// never empty.
+	readable bool
 }
 
 func (w *bodyWalker) write(s string) { _, _ = w.out.WriteString(s) }
@@ -419,6 +477,7 @@ func (w *bodyWalker) paragraph(paragraph *ast.Paragraph) {
 				return
 			case node.name == Code:
 				w.used[Code] = true
+				w.readable = true
 				w.code()
 				return
 			}
@@ -488,14 +547,26 @@ func (w *bodyWalker) inline(n ast.Node) {
 }
 
 // text writes a piece of the source as goldmark writes text: backslash escapes and entity
-// references resolved, then escaped, or, raw, only escaped.
+// references resolved, then escaped, or, raw, only escaped. It is something to read when what it
+// writes holds a character other than the whitespace a reader's text collapses.
 func (w *bodyWalker) text(value []byte, raw bool) {
+	var written bytes.Buffer
+	out := bufio.NewWriter(&written)
 	if raw {
-		gmhtml.DefaultWriter.RawWrite(w.out, value)
-		return
+		gmhtml.DefaultWriter.RawWrite(out, value)
+	} else {
+		gmhtml.DefaultWriter.Write(out, value)
 	}
-	gmhtml.DefaultWriter.Write(w.out, value)
+	_ = out.Flush()
+	if strings.Trim(written.String(), htmlSpace) != "" {
+		w.readable = true
+	}
+	_, _ = w.out.Write(written.Bytes())
 }
+
+// htmlSpace is the whitespace HTML collapses, which the plain-text part leaves out
+// (emaildelivery.PlainText).
+const htmlSpace = " \t\n\r\f"
 
 func (w *bodyWalker) placeholder(node *placeholderNode) {
 	if _, offered := w.email.placeholder(node.name); !offered {
@@ -508,6 +579,7 @@ func (w *bodyWalker) placeholder(node *placeholderNode) {
 		w.problem(RuleButtonNotAlone, Button)
 	case Link:
 		w.used[Link] = true
+		w.readable = true
 		if w.inLink > 0 {
 			w.escaped(w.value(Link))
 			return
@@ -517,6 +589,7 @@ func (w *bodyWalker) placeholder(node *placeholderNode) {
 		w.write("</a>")
 	default:
 		w.used[node.name] = true
+		w.readable = true
 		w.escaped(w.value(node.name))
 	}
 }
@@ -540,12 +613,16 @@ var allowedSchemes = []string{"https://", "http://", "mailto:", "tel:"}
 func (w *bodyWalker) link(link *ast.Link) {
 	destination := string(link.Destination)
 	href := ""
-	switch names := placeholdersIn(destination, true); {
+	// kept is whether the link keeps an address, which the plain-text part writes even when its
+	// label is empty; with no values, {{link}}'s address is not known, but it is never empty.
+	kept := false
+	switch names := placeholdersIn(destination); {
 	case len(names) == 0:
 		escaped := string(util.URLEscape(link.Destination, true))
 		for _, scheme := range allowedSchemes {
 			if len(escaped) >= len(scheme) && strings.EqualFold(escaped[:len(scheme)], scheme) {
 				href = escaped
+				kept = true
 				break
 			}
 		}
@@ -556,8 +633,12 @@ func (w *bodyWalker) link(link *ast.Link) {
 		}
 		w.used[Link] = true
 		href = w.value(Link)
+		kept = true
 	default:
 		w.problem(RulePlaceholderInLinkDestination, names[0])
+	}
+	if kept {
+		w.readable = true
 	}
 
 	if href == "" || w.inLink > 0 {
@@ -575,6 +656,7 @@ func (w *bodyWalker) link(link *ast.Link) {
 
 // imageAsTyped writes an image as the characters typed: no image is loaded.
 func (w *bodyWalker) imageAsTyped(image *ast.Image) {
+	w.readable = true
 	w.write("![")
 	w.inlines(image)
 	w.write("](")

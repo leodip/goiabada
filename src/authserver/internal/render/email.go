@@ -57,20 +57,24 @@ func (h *Renderer) RenderEmail(r *http.Request, email *emailtemplate.Email, valu
 // draws an email sent with it: the email template preview and its test send (#818 decisions 11 and
 // 12), whose text nobody may have saved. It is drawn in brand, or in the default brand when brand is
 // nil, whatever page r is from, and values, whose app name is the settings', are the caller's sample
-// values.
+// values. The whole email is in lang, its frame and footer as well as its text, as a recipient
+// reading lang gets it, whatever language the caller reads; r's own context is left in the caller's.
 func (h *Renderer) RenderEmailSample(r *http.Request, email *emailtemplate.Email, lang string, text emailtemplate.Text,
 	values emailtemplate.Values, brand *record.Brand) (emailtemplate.Message, error) {
 	if _, ok := email.BuiltIn[lang]; !ok {
 		return emailtemplate.Message{}, errs.Errorf("the email %s has no built-in text in %s", email.ID, lang)
 	}
-	page := DefaultPageBrand(r.Context(), h.brands)
+	// lang is one of the six built-in catalogs' tags, so the recipient's language is exactly it, and
+	// it replaces the caller's page language as an email to a user replaces the sender's.
+	ctx := i18n.WithRecipientLanguage(r.Context(), lang, "")
+	page := DefaultPageBrand(ctx, h.brands)
 	if brand != nil {
 		page = PageBrand{}
 		if h.brands != nil {
-			page = pageBrandOf(r.Context(), h.brands, brand)
+			page = pageBrandOf(ctx, h.brands, brand)
 		}
 	}
-	return h.drawEmail(r.Context(), email, lang, text, values, page)
+	return h.drawEmail(ctx, email, lang, text, values, page)
 }
 
 // drawEmail draws email in lang with text and values, whose app name is the settings', inside the

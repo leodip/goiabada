@@ -174,6 +174,31 @@ func TestRenderEmail_AnInvalidEditSendsTheBuiltInTextAndWarns(t *testing.T) {
 	}
 }
 
+// A stored edit whose body draws nothing to read besides the button, such as an empty list, is
+// invalid as a save would find it (#818 decisions 8 and 17): its email is sent with the built-in text
+// of its language, every field of it, so a brand with no footer still sends a message with text, and
+// a warning names the rule.
+func TestRenderEmail_AnEditThatDrawsNothingToReadSendsTheBuiltInText(t *testing.T) {
+	for _, body := range []string{"- ", "{{button}}\n\n- ", "{{button}}\n\n[ ](relative)", "&NewLine;"} {
+		t.Run(body, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+			edits := &editsStub{edits: map[[2]string]*record.EmailTemplate{
+				{"welcome", "en"}: stored("welcome", "en", ptr("Hi there"), ptr("Open"), ptr(body)),
+			}}
+
+			sent := renderWithEdits(t, edits, emailtemplate.Welcome, "en")
+
+			assert.Equal(t, "Welcome!", sent.subject, "the built-in subject, not the valid edited one")
+			assert.Contains(t, sent.main, "Congratulations! Your account has been created.")
+			assert.Equal(t, []string{"Sign in"}, sent.buttons)
+			records := logs.Records()
+			require.Len(t, records, 1)
+			assert.Equal(t, slog.LevelWarn, records[0].Level)
+			assert.Equal(t, []string{"body: nothing_to_read"}, records[0].Attrs["problems"])
+		})
+	}
+}
+
 // An edit that cannot be read, the database briefly unreachable, sends the built-in text and logs an
 // error naming the email, the language and the cause: a reset link in the built-in wording is
 // better than none.

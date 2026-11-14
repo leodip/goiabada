@@ -34,6 +34,10 @@ var emailTemplateIds = []string{
 // The six built-in languages, English first.
 var emailTemplateLanguages = []string{"en", "de", "es", "fr", "it", "pt-BR"}
 
+// emailTemplateTx is the transaction a save and a reset run their write in: the write is enlisted
+// in RunInTransaction, which retries a deadlock victim, and never made outside it with nil.
+var emailTemplateTx = &sql.Tx{}
+
 func nullString(s string) sql.NullString { return sql.NullString{String: s, Valid: true} }
 
 // emailTemplateRequest is an admin API request from grantCaller holding scope, with body when it
@@ -328,6 +332,11 @@ func TestEmailTemplatePut_Refusals(t *testing.T) {
 			"A link's address can hold a placeholder only as {{link}} on its own, the whole address. This one holds {{link}}."},
 		{"nothing to read besides the button", "welcome", "Welcome", "Activate", "{{button}}",
 			"handler.email_template.nothing_to_read", "/body", "The body needs something to read besides the button."},
+		{"an empty list, which draws nothing to read", "password_changed", "Changed", "", "- ",
+			"handler.email_template.nothing_to_read", "/body", "The body needs something to read besides the button."},
+		{"the button and a link with no label whose address is dropped", "welcome", "Welcome", "Activate",
+			"{{button}}\n\n[ ](relative)",
+			"handler.email_template.nothing_to_read", "/body", "The body needs something to read besides the button."},
 	}
 	for _, c := range cases {
 		for _, scope := range []string{"authserver:manage", "authserver:manage-settings"} {
@@ -368,7 +377,8 @@ func TestEmailTemplatePut_StoresOnlyWhatDiffersFromTheBuiltInText(t *testing.T) 
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	records := recordLoggedEvents(auditLogger)
 	var saved *record.EmailTemplate
-	database.On("SaveEmailTemplate", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.EmailTemplate")).
+	datamocks.ExpectRunInTransaction(database, emailTemplateTx)
+	database.On("SaveEmailTemplate", mock.Anything, emailTemplateTx, mock.AnythingOfType("*record.EmailTemplate")).
 		Run(func(args mock.Arguments) { saved = args.Get(2).(*record.EmailTemplate) }).Return(nil).Once()
 
 	builtInBody := readBuiltInBody(t, "password_reset_link", "en")
@@ -406,7 +416,8 @@ func TestEmailTemplatePut_EveryFieldEdited(t *testing.T) {
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	records := recordLoggedEvents(auditLogger)
 	var saved *record.EmailTemplate
-	database.On("SaveEmailTemplate", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.EmailTemplate")).
+	datamocks.ExpectRunInTransaction(database, emailTemplateTx)
+	database.On("SaveEmailTemplate", mock.Anything, emailTemplateTx, mock.AnythingOfType("*record.EmailTemplate")).
 		Run(func(args mock.Arguments) { saved = args.Get(2).(*record.EmailTemplate) }).Return(nil).Once()
 
 	rr, body := serveEmailTemplate(HandleEmailTemplatePut(database, auditLogger),
@@ -437,7 +448,8 @@ func TestEmailTemplatePut_TheBuiltInTextRemovesTheEdit(t *testing.T) {
 			if existed {
 				records = recordLoggedEvents(auditLogger)
 			}
-			database.On("DeleteEmailTemplate", mock.Anything, (*sql.Tx)(nil), "password_changed", "it").Return(existed, nil).Once()
+			datamocks.ExpectRunInTransaction(database, emailTemplateTx)
+			database.On("DeleteEmailTemplate", mock.Anything, emailTemplateTx, "password_changed", "it").Return(existed, nil).Once()
 
 			rr, body := serveEmailTemplate(HandleEmailTemplatePut(database, auditLogger),
 				emailTemplateRequest(http.MethodPut, "authserver:manage", "password_changed", "it",
@@ -463,7 +475,8 @@ func TestEmailTemplatePut_TheBuiltInTextRemovesTheEdit(t *testing.T) {
 func TestEmailTemplatePut_AFailedWriteIsA500AndNotAudited(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("SaveEmailTemplate", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(errs.New("database down")).Once()
+	datamocks.ExpectRunInTransaction(database, emailTemplateTx)
+	database.On("SaveEmailTemplate", mock.Anything, emailTemplateTx, mock.Anything).Return(errs.New("database down")).Once()
 
 	rr, _ := serveEmailTemplate(HandleEmailTemplatePut(database, auditLogger),
 		emailTemplateRequest(http.MethodPut, "authserver:manage", "password_changed", "en", saveBody(t, "Changed", "", "Hello.")))
@@ -478,7 +491,8 @@ func TestEmailTemplateDelete_RemovesTheEditAndAuditsIt(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	records := recordLoggedEvents(auditLogger)
-	database.On("DeleteEmailTemplate", mock.Anything, (*sql.Tx)(nil), "verification_code", "fr").Return(true, nil).Once()
+	datamocks.ExpectRunInTransaction(database, emailTemplateTx)
+	database.On("DeleteEmailTemplate", mock.Anything, emailTemplateTx, "verification_code", "fr").Return(true, nil).Once()
 
 	rr, _ := serveEmailTemplate(HandleEmailTemplateDelete(database, auditLogger),
 		emailTemplateRequest(http.MethodDelete, "authserver:manage", "verification_code", "fr", ""))
@@ -495,7 +509,8 @@ func TestEmailTemplateDelete_RemovesTheEditAndAuditsIt(t *testing.T) {
 func TestEmailTemplateDelete_AResetWithNoEditIsA204AndLogsNothing(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("DeleteEmailTemplate", mock.Anything, (*sql.Tx)(nil), "verification_code", "fr").Return(false, nil).Once()
+	datamocks.ExpectRunInTransaction(database, emailTemplateTx)
+	database.On("DeleteEmailTemplate", mock.Anything, emailTemplateTx, "verification_code", "fr").Return(false, nil).Once()
 
 	rr, _ := serveEmailTemplate(HandleEmailTemplateDelete(database, auditLogger),
 		emailTemplateRequest(http.MethodDelete, "authserver:manage", "verification_code", "fr", ""))

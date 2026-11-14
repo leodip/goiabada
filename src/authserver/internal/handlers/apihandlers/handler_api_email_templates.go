@@ -33,14 +33,17 @@ type emailTemplatesReader interface {
 }
 
 // emailTemplateSaver is what a save needs: storing an edit, or removing it when the text saved is
-// the built-in one.
+// the built-in one, inside a transaction, since two first saves of one email and language can
+// deadlock each other on MySQL and SQL Server and RunInTransaction retries the victim.
 type emailTemplateSaver interface {
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	SaveEmailTemplate(ctx context.Context, tx *sql.Tx, edit *record.EmailTemplate) error
 	DeleteEmailTemplate(ctx context.Context, tx *sql.Tx, emailTemplate string, language string) (bool, error)
 }
 
-// emailTemplateResetter is what a reset needs: removing an edit.
+// emailTemplateResetter is what a reset needs: removing an edit, inside a transaction as a save is.
 type emailTemplateResetter interface {
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	DeleteEmailTemplate(ctx context.Context, tx *sql.Tx, emailTemplate string, language string) (bool, error)
 }
 
@@ -154,10 +157,9 @@ func HandleEmailTemplatePut(database emailTemplateSaver, auditLogger AuditLogger
 
 		edit := emailTemplateEditOf(email, lang, text)
 		if !edit.HasEditedField() {
-			deleted, err := database.DeleteEmailTemplate(r.Context(), nil, email.ID, lang)
+			deleted, err := deleteEmailTemplateEdit(r.Context(), database, email, lang)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error removing the email template edit"),
-					"email_template", email.ID, "language", lang)
+				writeInternalServerError(w, r, err, "email_template", email.ID, "language", lang)
 				return
 			}
 			if deleted {
@@ -167,7 +169,12 @@ func HandleEmailTemplatePut(database emailTemplateSaver, auditLogger AuditLogger
 			return
 		}
 
-		if err := database.SaveEmailTemplate(r.Context(), nil, edit); err != nil {
+		// The save runs inside RunInTransaction, which retries a deadlock victim (data.Database's
+		// SaveEmailTemplate); the audit entry and the answer follow the commit.
+		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			return database.SaveEmailTemplate(r.Context(), tx, edit)
+		})
+		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error saving the email template edit"),
 				"email_template", email.ID, "language", lang)
 			return
@@ -203,10 +210,9 @@ func HandleEmailTemplateDelete(database emailTemplateResetter, auditLogger Audit
 		if !settingsCeilingAllows(w, r, auditLogger) {
 			return
 		}
-		deleted, err := database.DeleteEmailTemplate(r.Context(), nil, email.ID, lang)
+		deleted, err := deleteEmailTemplateEdit(r.Context(), database, email, lang)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error removing the email template edit"),
-				"email_template", email.ID, "language", lang)
+			writeInternalServerError(w, r, err, "email_template", email.ID, "language", lang)
 			return
 		}
 		if deleted {
@@ -214,6 +220,21 @@ func HandleEmailTemplateDelete(database emailTemplateResetter, auditLogger Audit
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+// deleteEmailTemplateEdit removes the edit of email in lang inside RunInTransaction, as a save is
+// stored, and answers whether there was one. The caller audits a removal after the commit.
+func deleteEmailTemplateEdit(ctx context.Context, database emailTemplateResetter, email *emailtemplate.Email, lang string) (bool, error) {
+	var deleted bool
+	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		var err error
+		deleted, err = database.DeleteEmailTemplate(ctx, tx, email.ID, lang)
+		return err
+	})
+	if err != nil {
+		return false, errs.Wrap(err, "database error removing the email template edit")
+	}
+	return deleted, nil
 }
 
 func logEmailTemplateReset(r *http.Request, auditLogger AuditLogger, email *emailtemplate.Email, lang string) {

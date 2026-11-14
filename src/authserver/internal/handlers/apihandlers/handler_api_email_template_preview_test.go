@@ -242,6 +242,72 @@ func TestEmailTemplatePreview_ABodyThatIsOnlyTheButtonIsRefused(t *testing.T) {
 	assert.Equal(t, "handler.email_template.nothing_to_read", body["error_code"])
 }
 
+// A body that types characters but draws nothing to read, such as an empty list item, is refused as
+// a save refuses it, rather than drawn as an email with no text (#818 decision 17).
+func TestEmailTemplatePreview_ABodyThatDrawsNothingToReadIsRefused(t *testing.T) {
+	for _, text := range []string{"- ", "&NewLine;", "[]()"} {
+		t.Run(text, func(t *testing.T) {
+			r := sampleRequest(t, "authserver:admin-read", "otp_enabled", "en", "", acmeSettings(), map[string]any{
+				"subject": "Two-factor on", "body": text,
+			})
+
+			rr, body := serveJSON(t, HandleEmailTemplatePreviewPost(datamocks.NewDatabase(t), sampleRenderer()), r)
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+			assert.Equal(t, "handler.email_template.nothing_to_read", body["error_code"])
+			assert.Equal(t, "/body", body["error_field"])
+		})
+	}
+}
+
+// germanFooterRenderer draws in a default brand whose footer has a link with a German label and a
+// support address, so an email's footer says which language it is drawn in.
+func germanFooterRenderer() *render.Renderer {
+	brand := record.NewBrand("Default", record.BrandAppearanceLight, "plum")
+	brand.FooterLinks = record.BrandFooterLinks{
+		{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz"}},
+	}
+	brand.SupportEmail = "help@acme.example"
+	brand.SupportURL = "https://acme.example/support"
+	return render.New(web.TemplateFS(), web.StaticFS(), &testEmailBrands{defaultBrand: &brand})
+}
+
+// assertGermanFooter asserts an email's footer is the German one: the link's German label and
+// "Need help?" and "Support page" in German, in the HTML and the plain-text part alike.
+func assertGermanFooter(t *testing.T, html string) {
+	t.Helper()
+	footer := strings.Join(strings.Fields(htmlDoc(t, html).Find("footer").Text()), " ")
+	assert.Contains(t, footer, "Datenschutz")
+	assert.Contains(t, footer, "Brauchen Sie Hilfe?")
+	assert.Contains(t, footer, "Supportseite")
+	assert.NotContains(t, footer, "Privacy")
+	assert.NotContains(t, footer, "Need help?")
+	text, err := emaildelivery.PlainText(html)
+	require.NoError(t, err)
+	assert.Contains(t, text, "Brauchen Sie Hilfe?")
+}
+
+// The preview is the whole email in the language being edited, its footer included, for a caller
+// reading the console in English (#818 decision 11); a refusal stays in the caller's language.
+func TestEmailTemplatePreview_TheFooterIsInTheLanguageEdited(t *testing.T) {
+	r := sampleRequest(t, "authserver:admin-read", "password_changed", "de", "en", acmeSettings(), map[string]any{
+		"subject": "Passwort geändert", "body": "Hallo {{name}}.",
+	})
+
+	rr, body := serveJSON(t, HandleEmailTemplatePreviewPost(datamocks.NewDatabase(t), germanFooterRenderer()), r)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assertGermanFooter(t, body["html"].(string))
+	assert.Contains(t, body["text"], "Brauchen Sie Hilfe?")
+
+	refused := sampleRequest(t, "authserver:admin-read", "password_changed", "de", "en", acmeSettings(), map[string]any{
+		"subject": "Passwort geändert", "body": "- ",
+	})
+	rr, body = serveJSON(t, HandleEmailTemplatePreviewPost(datamocks.NewDatabase(t), germanFooterRenderer()), refused)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, "The body needs something to read besides the button.", body["error_description"])
+}
+
 func TestEmailTemplatePreview_AnUnknownEmailOrLanguageIsA404(t *testing.T) {
 	for _, path := range [][2]string{{"no_such_email", "en"}, {"welcome", "fr-CA"}, {"welcome", "nl"}} {
 		r := sampleRequest(t, "authserver:admin-read", path[0], path[1], "", acmeSettings(), map[string]any{"subject": "S", "body": "B"})
@@ -308,6 +374,29 @@ func TestEmailTemplateSendTest_SendsTheTextToTheAddress(t *testing.T) {
 		"email_template": "password_reset_link",
 		"language":       "it",
 	}, *details)
+}
+
+// The test email is sent in the language being edited, its footer included, for a caller reading
+// the console in English (#818 decision 12).
+func TestEmailTemplateSendTest_TheFooterIsInTheLanguageEdited(t *testing.T) {
+	emailSender := accounthandlersmocks.NewEmailSender(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	var sent *emaildelivery.SendEmailInput
+	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).
+		Return(emaildelivery.SendResult{}, nil).Once()
+	captureAuditDetails(auditLogger, "sent_test_email")
+
+	r := sampleRequest(t, "authserver:manage", "password_changed", "de", "en", acmeSettings(), map[string]any{
+		"to": "ana@example.com", "subject": "Passwort geändert", "body": "Hallo {{name}}.",
+	})
+	handler := HandleEmailTemplateSendTestPost(datamocks.NewDatabase(t), accountvalidation.NewEmailValidator(nil), emailSender,
+		germanFooterRenderer(), auditLogger)
+	rr, _ := serveJSON(t, handler, r)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	require.NotNil(t, sent)
+	assertGermanFooter(t, sent.HtmlBody)
 }
 
 // Sending text nobody has saved to an address someone typed takes the scope a save takes (#818

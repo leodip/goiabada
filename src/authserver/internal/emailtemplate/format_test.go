@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 )
 
 // The format's rules (#818 decisions 2, 3, 5 and 17), each driven with a text an administrator
@@ -191,6 +193,12 @@ func TestRender_TheSubject(t *testing.T) {
 		{"{{app_name}} - code {{code}}", "Acme Portal - code 482915"},
 		{"Hello {{ name }}", "Hello Ana"},
 		{`Use \{{name}}`, "Use {{name}}"},
+		{`Use \{{ name }} for the name`, "Use {{ name }} for the name"},
+		{`Print \{{ to begin a placeholder`, "Print {{ to begin a placeholder"},
+		{`Print \{{name to begin one`, "Print {{name to begin one"},
+		{`\{{ and {{app_name}}`, "{{ and Acme Portal"},
+		{`{{app_name}} then \{{`, "Acme Portal then {{"},
+		{`A backslash \ alone`, `A backslash \ alone`},
 		{"Valid for {{expiry}}", "Valid for 5 minutes"},
 		{"# Not *Markdown* & <b>", "# Not *Markdown* & <b>"},
 	} {
@@ -297,6 +305,59 @@ func TestCheck_AWelcomeBodyOfOnlyTheButtonIsRefused(t *testing.T) {
 	welcome := &Email{ID: "welcome", Placeholders: []Placeholder{{Name: AppName}, {Name: Link}, {Name: Button}}}
 	assert.Equal(t, Problems{{Field: FieldBody, Rule: RuleNothingToRead}}, welcome.Check(Text{ButtonLabel: "Go", Subject: "Welcome!", Body: "{{button}}"}))
 	assert.Empty(t, welcome.Check(Text{ButtonLabel: "Go", Subject: "Welcome!", Body: "Welcome.\n{{button}}"}))
+}
+
+// A body must hold something to read besides the button (#818 decision 17), judged on what it
+// draws and not on the characters typed: an empty list item, a link with no label whose address is
+// dropped, or a character reference to whitespace draws nothing a reader reads, and the sender
+// would refuse the message for want of text in a brand with no footer.
+func TestCheck_ABodyThatDrawsNothingToReadIsRefused(t *testing.T) {
+	for _, body := range []string{
+		"- ",
+		"1. ",
+		"- \n- \n\n1. ",
+		"[]()",
+		"[ ](relative)",
+		"[](javascript:alert(1))",
+		"&NewLine;",
+		"&#32;&#9;&#10;",
+		"{{button}}\n\n- ",
+		"- \n\n{{button}}\n\n[ ]()",
+	} {
+		t.Run(body, func(t *testing.T) {
+			assert.Equal(t, Problems{{Field: FieldBody, Rule: RuleNothingToRead}},
+				everything.Check(Text{ButtonLabel: "Go", Subject: "Welcome!", Body: body}))
+		})
+	}
+}
+
+// What a body draws for a reader counts, whatever the values: a placeholder other than the button,
+// whose value is never empty, a link with no label, which the plain-text part writes as its
+// address, a character written by a reference or an escape, and syntax shown as typed.
+func TestCheck_ABodyThatDrawsSomethingToReadIsAccepted(t *testing.T) {
+	for _, body := range []string{
+		"{{name}}",
+		"{{button}}\n\n{{app_name}}",
+		"- {{expiry}}",
+		"{{code}}",
+		"{{link}}",
+		"[](https://acme.example/help)",
+		"[]({{link}})",
+		"&amp;",
+		"\\-",
+		"![]()",
+		"# ",
+	} {
+		t.Run(body, func(t *testing.T) {
+			text := Text{ButtonLabel: "Go", Subject: "Welcome!", Body: body}
+			require.Empty(t, everything.Check(text))
+			rendered, err := everything.Render("en", text, testValues, testLook)
+			require.NoError(t, err)
+			plain, err := emaildelivery.PlainText("<main>" + string(rendered.Body) + "</main>")
+			require.NoError(t, err, "the sender finds text in %q", rendered.Body)
+			assert.NotEmpty(t, strings.TrimSpace(plain))
+		})
+	}
 }
 
 // A text at each limit, counted in characters, is accepted: 200 for the subject, 60 for the button
