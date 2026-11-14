@@ -123,7 +123,7 @@ func validateBrandFooterLink(i int, link api.BrandFooterLink) (record.BrandFoote
 	// The tags in order, so the refusal of a link with several faults is the same on every request.
 	var labels map[string]string
 	for _, tag := range slices.Sorted(maps.Keys(link.Labels)) {
-		if !i18n.IsBuiltInCatalogTag(tag) {
+		if !i18n.IsCatalogTag(tag) {
 			return record.BrandFooterLink{}, refusalAt(i18n.NewLocalizedError(i18n.ErrCodeBrandFooterLinkLanguageInvalid,
 				map[string]any{"link": number, "language": tag}), "footerLinks", index, "labels", tag)
 		}

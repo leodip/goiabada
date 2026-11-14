@@ -1,6 +1,6 @@
 package apihandlers
 
-// The brands as Customize and translate the pages describes them, held to the code (#810), and a
+// The brands as Customize the pages and emails describes them, held to the code (#810), and a
 // client's brand as the Clients page, the glossary and the Logout reference describe it (#812).
 //
 // The guide is where an operator learns which looks there are before choosing one: the themes, by
@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	customizeGuidePage = "site/src/content/docs/guides/customize-and-translate-the-pages.mdx"
+	customizeGuidePage = "site/src/content/docs/guides/customize-the-pages-and-emails.mdx"
 	glossaryPage       = "site/src/content/docs/concepts/glossary.mdx"
 	logoutPage         = "site/src/content/docs/reference/endpoints/logout.mdx"
 
@@ -47,7 +47,7 @@ const (
 
 	// brandKitLink is the customize guide's section on a brand's kit (#813), which the other pages
 	// link to rather than repeat.
-	brandKitLink = "/guides/customize-and-translate-the-pages/#the-brand-kit"
+	brandKitLink = "/guides/customize-the-pages-and-emails/#the-brand-kit"
 	brandKitHead = "## The brand kit"
 
 	securityReferencePage = "site/src/content/docs/reference/security.mdx"
@@ -73,6 +73,16 @@ func boldList(names []string) string {
 		return strings.Join(bold, "")
 	}
 	return strings.Join(bold[:len(bold)-1], ", ") + " and " + bold[len(bold)-1]
+}
+
+// The guide is titled for what it covers, the pages and the emails, at the address that title gives
+// it, and the sidebar lists it by that title (#819 decision 7).
+func TestBrandDocs_TheGuideIsCustomizeThePagesAndEmails(t *testing.T) {
+	root := filepath.Dir(guard.SourceRoot(t))
+	guard.AssertSectionSays(t, root, customizeGuidePage, "",
+		[]string{"\ntitle: Customize the pages and emails\n"}, nil)
+	guard.AssertSectionSays(t, root, "site/astro.config.mjs", "",
+		[]string{"{ label: 'Customize the pages and emails', slug: 'guides/customize-the-pages-and-emails' }"}, nil)
 }
 
 // The step that opens the Branding pages names them by the console's menu label.

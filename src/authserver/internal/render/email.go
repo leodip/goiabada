@@ -45,10 +45,9 @@ const emailContent = `{{define "title"}}{{.emailSubject}}{{end}}{{define "head"}
 // name is the settings'. The body is drawn inside the email layout, which writes the frame inline
 // from emailFrame, and the layout marks the email with the language its text is written in. The
 // whole email is in that language, its frame and footer as well as its text: the frame and footer
-// are drawn from the recipient's catalog when it is written in that language, so an operator's
-// fr-CA wording reaches an email in French, and from the language's own catalog when it is not, so
-// a recipient reading a language with no built-in text, one an operator added through an override
-// catalog, gets all of it in English.
+// are drawn from the recipient's catalog when it is written in that language, and from the
+// language's own catalog when it is not, so a recipient reading a language with no built-in text
+// gets all of it in English.
 func (h *Renderer) RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error) {
 	lang := emailtemplate.Language(i18n.LocaleTag(r.Context()))
 	if _, ok := email.BuiltIn[lang]; !ok {
@@ -103,15 +102,12 @@ func (h *Renderer) drawEmail(ctx context.Context, email *emailtemplate.Email, la
 		return emailtemplate.Message{}, errs.Wrap(err, "unable to render the email "+email.ID)
 	}
 
-	templ, err := template.New(filepath.Base(emailLayout)).Funcs(templateFuncMap).ParseFS(h.templateFS, emailLayout)
+	frameSet, err := h.emailFrameSet()
 	if err != nil {
-		return emailtemplate.Message{}, errs.Wrap(err, "unable to parse the email layout")
-	}
-	if templ, err = templ.Parse(emailContent); err != nil {
-		return emailtemplate.Message{}, errs.Wrap(err, "unable to parse the email's content")
+		return emailtemplate.Message{}, err
 	}
 	var buf bytes.Buffer
-	err = templ.ExecuteTemplate(&buf, filepath.Base(emailLayout), map[string]interface{}{
+	err = frameSet.templ.ExecuteTemplate(&buf, filepath.Base(emailLayout), map[string]interface{}{
 		"ctx":          ctx,
 		"appName":      settings.AppName,
 		"emailLang":    lang,
@@ -123,6 +119,21 @@ func (h *Renderer) drawEmail(ctx context.Context, email *emailtemplate.Email, la
 		return emailtemplate.Message{}, errs.Wrap(err, "unable to execute the email layout")
 	}
 	return emailtemplate.Message{Subject: rendered.Subject, HTML: buf.String()}, nil
+}
+
+// emailFrameSet is the email layout with emailContent filling its blocks, parsed the first time an
+// email is drawn and kept. What fills them, the subject and the body, is a value of each email's.
+func (h *Renderer) emailFrameSet() (*templateSet, error) {
+	return h.sets.get(emailLayout, func() (*templateSet, error) {
+		templ, err := template.New(filepath.Base(emailLayout)).Funcs(templateFuncMap).ParseFS(h.templateFS, emailLayout)
+		if err != nil {
+			return nil, errs.Wrap(err, "unable to parse the email layout")
+		}
+		if templ, err = templ.Parse(emailContent); err != nil {
+			return nil, errs.Wrap(err, "unable to parse the email's content")
+		}
+		return &templateSet{templ: templ}, nil
+	})
 }
 
 // textToSend answers the text email is sent with in lang: its administrator's edit in lang laid over

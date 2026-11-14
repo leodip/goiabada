@@ -168,8 +168,8 @@ func ClassesOn(server Server) []string {
 const PageTemplate = "data-page"
 
 // PageName answers the data-page value a parsed page names: the text of its PageTemplate, the
-// space around it trimmed. It answers "" for a page that defines none, as an admin page or a
-// template copied from an older release, and for one whose template writes anything but text.
+// space around it trimmed. It answers "" for a page that defines none, as an admin page, and for
+// one whose template writes anything but text.
 func PageName(t *template.Template) string {
 	page := t.Lookup(PageTemplate)
 	if page == nil || page.Tree == nil || page.Tree.Root == nil {

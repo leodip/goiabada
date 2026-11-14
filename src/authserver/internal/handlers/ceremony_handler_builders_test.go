@@ -33,7 +33,7 @@ func testCeremonyBoundary(pageRenderer PageRenderer, ceremonyStore CeremonyStore
 // database owes no brand read. The tests of the page's brand build the responder itself.
 func testClientErrorResponder(database *datamocks.Database, pageRenderer PageRenderer, formPostFS fs.FS) *ClientErrorResponder {
 	responder := NewClientErrorResponder(database, pageRenderer)
-	responder.formPost = formPostTemplate{fs: formPostFS}
+	responder.formPost = newFormPostTemplate(formPostFS, nil)
 	return responder
 }
 

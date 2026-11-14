@@ -9,7 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
@@ -247,7 +249,7 @@ func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
 	require.Error(t, err)
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, i18n.ErrCodeAuthorizeClientIdMissing, locErr.Code)
+	assert.Equal(t, errcode.AuthorizeClientIdMissing, locErr.Code)
 	assert.Equal(t, "The client_id parameter is missing.", locErr.EnglishFallback())
 }
 
@@ -263,7 +265,7 @@ func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
 	require.Error(t, err)
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, i18n.ErrCodeAuthorizeClientNotFound, locErr.Code)
+	assert.Equal(t, errcode.AuthorizeClientNotFound, locErr.Code)
 	assert.Equal(t, "Invalid client_id parameter. The application does not exist.", locErr.EnglishFallback())
 }
 
@@ -279,7 +281,7 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 	require.Error(t, err)
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, i18n.ErrCodeAuthorizeClientDisabled, locErr.Code)
+	assert.Equal(t, errcode.AuthorizeClientDisabled, locErr.Code)
 	assert.Equal(t, "Invalid client_id parameter. The application is disabled.", locErr.EnglishFallback())
 }
 
@@ -323,7 +325,7 @@ func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
 	require.Error(t, err)
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, i18n.ErrCodeAuthorizeRedirectURIMissing, locErr.Code)
+	assert.Equal(t, errcode.AuthorizeRedirectURIMissing, locErr.Code)
 	assert.Equal(t, "The redirect_uri parameter is missing.", locErr.EnglishFallback())
 }
 
@@ -615,12 +617,12 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			// sentence. A row whose code says "not registered" and whose text says "not
 			// absolute" is the #122 diagnosis-swap this table exists to refuse, and after
 			// #213 that swap can happen in the catalog rather than in the validator.
-			wantCode := i18n.ErrCodeAuthorizeRedirectURINotRegistered
+			wantCode := errcode.AuthorizeRedirectURINotRegistered
 			switch tc.wantMessage {
 			case notAbsolute:
-				wantCode = i18n.ErrCodeAuthorizeRedirectURINotAbsolute
+				wantCode = errcode.AuthorizeRedirectURINotAbsolute
 			case insecureHTTP:
-				wantCode = i18n.ErrCodeAuthorizeRedirectURIInsecureHTTP
+				wantCode = errcode.AuthorizeRedirectURIInsecureHTTP
 			}
 			assert.Equal(t, wantCode, locErr.Code)
 			assert.Equal(t, tc.wantMessage, locErr.EnglishFallback())
@@ -648,7 +650,7 @@ func TestValidateClientAndRedirectURI_InsecureHTTPIsLoggedByClientBeforeAnyRead(
 
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, i18n.ErrCodeAuthorizeRedirectURIInsecureHTTP, locErr.Code)
+	assert.Equal(t, errcode.AuthorizeRedirectURIInsecureHTTP, locErr.Code)
 
 	var warnings []logtest.CapturedRecord
 	for _, rec := range logs.Records() {
@@ -1094,7 +1096,7 @@ func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
 	require.Error(t, err)
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, i18n.ErrCodeAuthorizeClientNotFound, locErr.Code)
+	assert.Equal(t, errcode.AuthorizeClientNotFound, locErr.Code)
 	assert.Equal(t, "Invalid client_id parameter. The application does not exist.", locErr.EnglishFallback())
 }
 
@@ -1119,7 +1121,7 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 	require.Error(t, err)
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, i18n.ErrCodeAuthorizeRedirectURINotRegistered, locErr.Code)
+	assert.Equal(t, errcode.AuthorizeRedirectURINotRegistered, locErr.Code)
 	assert.Equal(t, "Invalid redirect_uri parameter. The application does not have this redirect URI registered.", locErr.EnglishFallback())
 }
 

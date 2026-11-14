@@ -1,6 +1,6 @@
 package apihandlers
 
-// An email's brand as Customize and translate the pages describes it, held to the code (#817).
+// An email's brand as Customize the pages and emails describes it, held to the code (#817).
 //
 // The guide is where an administrator learns, before setting up a brand, what its emails take from
 // it and which brand each email is drawn in: the kit's fields and choices an email draws, by the
@@ -23,7 +23,7 @@ const (
 	// which brand it takes.
 	brandedEmailsHead = "## Branded emails"
 	// brandedEmailsLink is that section, which the guide's first steps and the glossary link to.
-	brandedEmailsLink = "/guides/customize-and-translate-the-pages/#branded-emails"
+	brandedEmailsLink = "/guides/customize-the-pages-and-emails/#branded-emails"
 )
 
 // The section names what an email draws of the kit by the editor's labels (#817 decisions 2 and 4):
@@ -84,7 +84,7 @@ func TestBrandEmailDocs_SafeModeSaysItReachesEmails(t *testing.T) {
 			"sent from the pages of a sign-in in safe mode",
 			"every email while `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE` is on",
 			"The admin console's safe mode doesn't change the emails its **" + english("adminconsole.menu.account") + "** pages send",
-			brandedEmailsLink[len("/guides/customize-and-translate-the-pages/"):],
+			brandedEmailsLink[len("/guides/customize-the-pages-and-emails/"):],
 		}, nil)
 }
 

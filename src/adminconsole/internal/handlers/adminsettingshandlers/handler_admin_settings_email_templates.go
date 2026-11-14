@@ -178,8 +178,8 @@ type emailTemplateReader interface {
 
 // editorLanguage is the built-in language the editor opens in for a console read in catalogTag, as
 // an email's language is matched against the languages its text is written in: a regional variant
-// opens its language (fr-CA opens fr), and a language with none, one an operator added among them,
-// opens English, which the API lists first.
+// opens its language (fr-CA opens fr), and a language with none opens English, which the API lists
+// first.
 func editorLanguage(catalogTag string, languages []api.EmailTemplateLanguageResponse) string {
 	if len(languages) == 0 {
 		return ""

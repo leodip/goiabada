@@ -107,7 +107,7 @@ func ResolveRequestLocale(ctx context.Context, r *http.Request) context.Context 
 }
 
 func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocalesReader) context.Context {
-	b := current()
+	b := builtIn()
 
 	// (1) Query parameter. Do NOT call r.ParseForm / r.FormValue — that
 	// would consume the body and interfere with handlers that do their
@@ -128,7 +128,7 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 	}
 
 	// (3) Accept-Language, parsed per RFC 9110 section 12.5.4 and matched
-	// against the loaded catalogs (see bundle.localizerFor).
+	// against the built-in catalogs (see bundle.localizerFor).
 	if al := r.Header.Get("Accept-Language"); al != "" {
 		return attachLocale(ctx, b.localizerFor([]string{al}), al, false, false)
 	}
@@ -205,7 +205,7 @@ func withLocale(ctx context.Context, explicit bool, tags []string) context.Conte
 	// catalog and the matcher reads the list as one preference order.
 	// Matching only the first tag would answer English there, silently
 	// discarding the RP's second choice (#385).
-	return attachLocale(ctx, current().localizerFor(usable), usable[0], explicit, false)
+	return attachLocale(ctx, builtIn().localizerFor(usable), usable[0], explicit, false)
 }
 
 // attachLocale stores the localizer plus the primary resolved language tag

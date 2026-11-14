@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -18,30 +17,21 @@ import (
 // contents, the URL changes exactly when the file does, and the new file is fetched at once
 // (#617).
 //
-// The fingerprint is read from the file system the server serves, so a deployment serving its own
-// static directory gets its own files' fingerprints. A file is hashed again only when its size or
-// modification time changes, which the embedded files never do.
+// A file is read for its fingerprint the first time a page links it, and the fingerprint is kept:
+// the built-in files cannot change while the server runs.
 type assetFingerprints struct {
 	fsys  fs.FS
 	mu    sync.Mutex
-	known map[string]assetFingerprint
-}
-
-type assetFingerprint struct {
-	size    int64
-	modTime time.Time
-	sum     string
+	known map[string]string
 }
 
 func newAssetFingerprints(staticFS fs.FS) *assetFingerprints {
-	return &assetFingerprints{fsys: staticFS, known: map[string]assetFingerprint{}}
+	return &assetFingerprints{fsys: staticFS, known: map[string]string{}}
 }
 
 // AssetFingerprint is the fingerprint a page links a static file with these contents by, for the
 // static file server: a URL whose fingerprint is that of the bytes it answers with may be kept for
-// a year, since the URL changes whenever the file does (#810 decision 7). The server checks it on
-// the bytes it sends, read once, so a file replaced while it is answered never earns the year for
-// contents its URL does not name.
+// a year, since the URL changes whenever the file does (#810 decision 7).
 func AssetFingerprint(content []byte) string {
 	digest := sha256.Sum256(content)
 	return hex.EncodeToString(digest[:6])
@@ -63,16 +53,12 @@ func (a *assetFingerprints) fingerprint(path string) (string, error) {
 	if !ok || a.fsys == nil {
 		return "", errs.Errorf("asset %q is not a static file this server serves", path)
 	}
-	info, err := fs.Stat(a.fsys, name)
-	if err != nil {
-		return "", errs.Wrapf(err, "unable to read static file %q", path)
-	}
-
+	// The lock is held through the read, so a page that links a file while it is first read waits
+	// for its fingerprint instead of reading the file again.
 	a.mu.Lock()
-	known, ok := a.known[name]
-	a.mu.Unlock()
-	if ok && known.size == info.Size() && known.modTime.Equal(info.ModTime()) {
-		return known.sum, nil
+	defer a.mu.Unlock()
+	if sum, ok := a.known[name]; ok {
+		return sum, nil
 	}
 
 	content, err := fs.ReadFile(a.fsys, name)
@@ -80,9 +66,6 @@ func (a *assetFingerprints) fingerprint(path string) (string, error) {
 		return "", errs.Wrapf(err, "unable to read static file %q", path)
 	}
 	sum := AssetFingerprint(content)
-
-	a.mu.Lock()
-	a.known[name] = assetFingerprint{size: info.Size(), modTime: info.ModTime(), sum: sum}
-	a.mu.Unlock()
+	a.known[name] = sum
 	return sum, nil
 }

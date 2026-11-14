@@ -46,8 +46,6 @@ type AuthServerConfig struct {
 	CertFile                 string
 	KeyFile                  string
 	LogSQL                   bool
-	StaticDir                string
-	TemplateDir              string
 	DebugAPIRequests         bool
 	BootstrapEnvOutFile      string
 	SessionAuthenticationKey string
@@ -71,10 +69,6 @@ type AuthServerConfig struct {
 	// an address literal, held to RFC 5321 by Load, or empty for the address of each connection's
 	// own end (#718 decision 9).
 	SMTPEHLOName string
-	// I18nOverridesDir is the directory whose catalogs/ main merges over the embedded message
-	// catalogs, or empty for none. It has no flag, like the admin console's, so the one variable
-	// configures both servers the same way (#431).
-	I18nOverridesDir string
 }
 
 // IsCookieSecure reports whether cookies should carry the Secure flag. It is
@@ -253,8 +247,6 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			CertFile:                         getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
 			KeyFile:                          getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
 			LogSQL:                           getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL", &malformed),
-			StaticDir:                        getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
-			TemplateDir:                      getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
 			DebugAPIRequests:                 getEnvAsBool("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS", &malformed),
 			BootstrapEnvOutFile:              getEnv("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", ""),
 			SessionAuthenticationKey:         getEnv("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", ""),
@@ -268,7 +260,6 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			ListenPortMetrics:                getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS", 9190, &malformed),
 			ProfilePictureMaxSizeBytes:       getEnvAsUploadSize("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", defaultProfilePictureMaxSizeBytes, &malformed),
 			SMTPEHLOName:                     getEnv("GOIABADA_AUTHSERVER_SMTP_EHLO_NAME", ""),
-			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 		},
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:           getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
@@ -400,8 +391,6 @@ func registerFlags(fs *flag.FlagSet, c *Config, trustedProxies *string) {
 	fs.StringVar(&c.AuthServer.CertFile, "authserver-certfile", c.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")
 	fs.StringVar(&c.AuthServer.KeyFile, "authserver-keyfile", c.AuthServer.KeyFile, "Key file for HTTPS (auth server)")
 	fs.BoolVar(&c.AuthServer.LogSQL, "authserver-log-sql", c.AuthServer.LogSQL, "Log SQL queries for auth server")
-	fs.StringVar(&c.AuthServer.StaticDir, "authserver-staticdir", c.AuthServer.StaticDir, "Static files directory for auth server")
-	fs.StringVar(&c.AuthServer.TemplateDir, "authserver-templatedir", c.AuthServer.TemplateDir, "Template files directory for auth server")
 	fs.BoolVar(&c.AuthServer.DebugAPIRequests, "authserver-debug-api-requests", c.AuthServer.DebugAPIRequests, "Enable debug logging for API requests on auth server")
 	fs.StringVar(&c.AuthServer.BootstrapEnvOutFile, "authserver-bootstrap-env-outfile", c.AuthServer.BootstrapEnvOutFile, "If set, write initial admin console OAuth credentials to this file (0600) during DB seed")
 	fs.BoolVar(&c.AuthServer.RateLimiterEnabled, "authserver-ratelimiter-enabled", c.AuthServer.RateLimiterEnabled, "Enable rate limiting for security-sensitive endpoints on auth server")

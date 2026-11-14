@@ -30,9 +30,9 @@ const (
 	// brandFooterAPIHead is its subsection on the admin API's members.
 	brandFooterAPIHead = "### The footer through the Admin API"
 	// footerLinksLink is the guide's subsection on footer links, which the other pages link to.
-	footerLinksLink = "/guides/customize-and-translate-the-pages/#footer-links"
+	footerLinksLink = "/guides/customize-the-pages-and-emails/#footer-links"
 	// brandFooterLink is the guide's whole section, which the other pages link to.
-	brandFooterLink = "/guides/customize-and-translate-the-pages/#footer-links-and-support-contact"
+	brandFooterLink = "/guides/customize-the-pages-and-emails/#footer-links-and-support-contact"
 
 	auditLogDocsPage    = "site/src/content/docs/concepts/audit-log.mdx"
 	legalDocumentsGuide = "site/src/content/docs/guides/publish-legal-documents.mdx"
@@ -117,14 +117,10 @@ func TestBrandFooterDocs_TheGuideGivesTheAPIsMembers(t *testing.T) {
 		}, nil)
 }
 
-// The brand-the-pages step points at the footer's section, and the templates step tells an operator
-// keeping their own layouts to keep the footer, or the pages lose it.
+// The brand-the-pages step points at the footer's section.
 func TestBrandFooterDocs_TheGuidesStepsMentionTheFooter(t *testing.T) {
-	root := filepath.Dir(guard.SourceRoot(t))
-	guard.AssertSectionSays(t, root, customizeGuidePage, "## Brand the pages",
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, "## Brand the pages",
 		[]string{"#footer-links-and-support-contact"}, nil)
-	guard.AssertSectionSays(t, root, customizeGuidePage, "## Change the templates",
-		[]string{"footer"}, nil)
 }
 
 // The glossary's brand holds its footer links and support contact, and points at the guide for them.

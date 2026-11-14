@@ -167,12 +167,13 @@ func TestWithPageLanguage_AWithLocaleBeneathAChoiceSurvivesALaterAutomatic(t *te
 	assert.Equal(t, "Connexion", T(refined, "auth.pwd.title"))
 }
 
-// A value that names no loaded catalog counts as Automatic, whether it never named one or its
-// catalog has gone: the request's own language stands, and a later explicit request still applies.
+// A value that names no built-in catalog counts as Automatic, a language Goiabada doesn't ship
+// included: the request's own language stands, not English, and a later explicit request still
+// applies.
 func TestWithPageLanguage_AValueNamingNoCatalogIsAutomatic(t *testing.T) {
 	base := throughLocale(t, nil, "/auth/pwd?ui_locales=es", "en")
 
-	for _, value := range []string{"ja", "pt", "pt-br", " pt-BR", "pt_BR", "pt-BR-x-y"} {
+	for _, value := range []string{"ja", "nl", "pt", "pt-br", " pt-BR", "pt_BR", "pt-BR-x-y"} {
 		t.Run(value, func(t *testing.T) {
 			ctx := WithPageLanguage(base, value)
 			assert.Equal(t, base, ctx, "%q names no catalog, so the context is unchanged", value)
@@ -183,21 +184,9 @@ func TestWithPageLanguage_AValueNamingNoCatalogIsAutomatic(t *testing.T) {
 	}
 }
 
-// CatalogTags lists the catalogs this process has loaded: the six built in, English first, and any
-// an operator's override directory adds.
-func TestCatalogTags_ListsTheLoadedCatalogs(t *testing.T) {
-	saved := installed.Load()
-	t.Cleanup(func() { installed.Store(saved) })
-
-	installed.Store(nil)
+// CatalogTags lists the six catalogs built into Goiabada, English first, and nothing else.
+func TestCatalogTags_ListsTheBuiltInCatalogs(t *testing.T) {
 	assert.Equal(t, []string{"en", "de", "es", "fr", "it", "pt-BR"}, CatalogTags())
-
-	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
-		"active.nl.toml":    "\"auth.pwd.title\" = \"Aanmelden\"\n",
-		"active.pt-BR.toml": "\"auth.pwd.title\" = \"Acessar\"\n",
-	})))
-	assert.Equal(t, []string{"en", "de", "es", "fr", "it", "pt-BR", "nl"}, CatalogTags(),
-		"an override of a built-in catalog adds no entry; an override-only one does")
 }
 
 // The list is the caller's own: changing it changes nothing the next caller sees.
@@ -208,58 +197,13 @@ func TestCatalogTags_ReturnsACopy(t *testing.T) {
 	assert.Equal(t, "en", CatalogTags()[0])
 }
 
-// The built-in catalogs are the six compiled in, whichever catalogs an override directory adds or
-// overrides, and a tag names one only when it is spelt exactly as its catalog is.
-func TestIsBuiltInCatalogTag(t *testing.T) {
-	saved := installed.Load()
-	t.Cleanup(func() { installed.Store(saved) })
-	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
-		"active.nl.toml":    "\"auth.pwd.title\" = \"Aanmelden\"\n",
-		"active.pt-BR.toml": "\"auth.pwd.title\" = \"Acessar\"\n",
-	})))
-	require.True(t, IsCatalogTag("nl"), "the override directory adds nl")
-
-	for _, tag := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
-		assert.True(t, IsBuiltInCatalogTag(tag), "%q is a built-in catalog", tag)
-	}
-	for _, tag := range []string{"", "nl", "ja", "pt", "pt-br", "PT-BR", " pt-BR", "en-US", "EN"} {
-		assert.False(t, IsBuiltInCatalogTag(tag), "%q is not a built-in catalog's tag", tag)
-	}
-}
-
+// The built-in catalogs are the six compiled in, and a tag names one only when it is spelt exactly as
+// its catalog is: a page language and a brand's footer link label are both checked against them.
 func TestIsCatalogTag(t *testing.T) {
 	for _, tag := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
 		assert.True(t, IsCatalogTag(tag), "%q is a built-in catalog", tag)
 	}
-	for _, tag := range []string{"", "ja", "pt", "pt-br", "PT-BR", " pt-BR", "pt-BR ", "en-US", "nl"} {
-		assert.False(t, IsCatalogTag(tag), "%q names no loaded catalog", tag)
+	for _, tag := range []string{"", "ja", "nl", "pt", "pt-br", "PT-BR", " pt-BR", "pt-BR ", "en-US", "EN", "fr-CA"} {
+		assert.False(t, IsCatalogTag(tag), "%q names no built-in catalog", tag)
 	}
-}
-
-// An operator's override-only catalog can be chosen while it is loaded. Once it is gone, the stored
-// tag counts as Automatic: the request's own language, not English, and no longer the choice.
-func TestPageLanguage_AVanishedCatalogCountsAsAutomatic(t *testing.T) {
-	saved := installed.Load()
-	t.Cleanup(func() { installed.Store(saved) })
-
-	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
-		"active.nl.toml": "\"auth.pwd.title\" = \"Aanmelden\"\n",
-	})))
-	require.True(t, IsCatalogTag("nl"))
-	base := throughLocale(t, nil, "/auth/pwd", "es")
-	loaded := WithPageLanguage(base, "nl")
-	assert.Equal(t, "Aanmelden", T(loaded, "auth.pwd.title"))
-	assert.Equal(t, "nl", CatalogTag(loaded))
-
-	// The operator removes the catalog and the process starts again.
-	require.NoError(t, LoadBundle(""))
-	assert.False(t, IsCatalogTag("nl"))
-	assert.NotContains(t, CatalogTags(), "nl")
-
-	base = throughLocale(t, nil, "/auth/pwd", "es")
-	vanished := WithPageLanguage(base, "nl")
-	assert.Equal(t, "Iniciar sesión", T(vanished, "auth.pwd.title"), "the browser's language, not English")
-	assert.Equal(t, "es", CatalogTag(vanished))
-	assert.Equal(t, "Connexion", T(WithLocale(vanished, true, "fr"), "auth.pwd.title"),
-		"a vanished choice no longer holds off a later explicit request")
 }

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
@@ -228,7 +229,7 @@ func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, formPost
 		if err != nil {
 			return err
 		}
-		return writeFormPost(w, formPost.fs, page, redirectURI, params)
+		return writeFormPost(w, formPost.parsed, page, redirectURI, params)
 	default:
 		return writeQueryRedirect(w, r, redirectURI, params)
 	}
@@ -303,11 +304,44 @@ func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI stri
 	return nil
 }
 
-// formPostTemplate is the form_post page: the template set form_post.html is read from, and where it
-// reads the brand it is drawn in, which a nil brands leaves automatic in the built-in colors.
+// formPostTemplate is the form_post page: form_post.html, parsed once, and where it reads the brand
+// it is drawn in, which a nil brands leaves automatic in the built-in colors.
 type formPostTemplate struct {
-	fs     fs.FS
+	parsed *parsedFormPost
 	brands render.PageBrandReader
+}
+
+// newFormPostTemplate is the form_post page read from the template set fsys, drawn in the brand
+// brands reads.
+func newFormPostTemplate(fsys fs.FS, brands render.PageBrandReader) formPostTemplate {
+	return formPostTemplate{parsed: &parsedFormPost{fs: fsys}, brands: brands}
+}
+
+// parsedFormPost is form_post.html, parsed the first time a response is posted and kept: the
+// built-in templates cannot change while the server runs, so a response only executes it (#819
+// decision 5). A page that does not parse is not kept, and is an error at each response. Every
+// response, concurrent ones included, shares it.
+type parsedFormPost struct {
+	fs    fs.FS
+	mu    sync.Mutex
+	templ *template.Template
+}
+
+// template answers the parsed page, parsing it the first time.
+func (p *parsedFormPost) template() (*template.Template, error) {
+	if p == nil {
+		return nil, errs.New("no form_post template set")
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.templ == nil {
+		templ, err := template.ParseFS(p.fs, "form_post.html")
+		if err != nil {
+			return nil, errs.Wrap(err, "unable to parse template")
+		}
+		p.templ = templ
+	}
+	return p.templ, nil
 }
 
 // formPostPage is what the form_post page shows around the response it carries: its language, its
@@ -381,19 +415,16 @@ func newFormPostPage(ctx context.Context, settings *record.Settings, brands rend
 }
 
 // writeFormPost answers with form_post.html, a form posting params to redirectURI, which its script
-// submits at once and its button submits without JavaScript.
-//
-// formPostFS is the built-in template set in every server (NewClientErrorResponder), never
-// GOIABADA_AUTHSERVER_TEMPLATEDIR: the page is how an authorization response is encoded on the wire,
-// as the query string is for the query encoding, and a copy taken from an older release would drop
-// a parameter, iss among them, that discovery says every response carries (#576, decision 5).
+// submits at once and its button submits without JavaScript. The page is how an authorization
+// response is encoded on the wire, as the query string is for the query encoding, so it posts every
+// parameter in params, iss among them, which discovery says every response carries (#576).
 //
 // The bind map holds redirectURI, page, and exactly the parameters in params, so a parameter the
 // caller left out, an empty state above all, is absent rather than present and empty. {{.state}} and
 // {{if .state}} cannot tell the two apart, but a template that enumerates the map can: range yields
 // the key only when it is present, and len counts it. TestFormPostBindMapOmitsAnAbsentState pins it
 // through both emitters (#146).
-func writeFormPost(w http.ResponseWriter, formPostFS fs.FS, page formPostPage, redirectURI string, params []responseParam) error {
+func writeFormPost(w http.ResponseWriter, formPost *parsedFormPost, page formPostPage, redirectURI string, params []responseParam) error {
 	m := make(map[string]interface{}, 2+len(params))
 	m["redirectURI"] = redirectURI
 	m["page"] = page
@@ -401,9 +432,9 @@ func writeFormPost(w http.ResponseWriter, formPostFS fs.FS, page formPostPage, r
 		m[param.name] = param.value
 	}
 
-	t, err := template.ParseFS(formPostFS, "form_post.html")
+	t, err := formPost.template()
 	if err != nil {
-		return errs.Wrap(err, "unable to parse template")
+		return err
 	}
 
 	// Render into a buffer, not straight to w. Execute writes as it walks the template, so a

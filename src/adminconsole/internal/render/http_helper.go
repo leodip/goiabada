@@ -40,6 +40,7 @@ import (
 // Renderer renders pages from the template file system it was built over, and writes JSON.
 type Renderer struct {
 	templateFS fs.FS
+	sets       *templateSets
 	assets     *assetFingerprints
 }
 
@@ -47,7 +48,7 @@ type Renderer struct {
 // static files the server serves under /static/, which the pages name through the asset template
 // function.
 func New(templateFS fs.FS, staticFS fs.FS) *Renderer {
-	return &Renderer{templateFS: templateFS, assets: newAssetFingerprints(staticFS)}
+	return &Renderer{templateFS: templateFS, sets: newTemplateSets(), assets: newAssetFingerprints(staticFS)}
 }
 
 // InternalServerError logs err once, with a stack and the request id the page shows, and renders
@@ -232,27 +233,9 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 		}
 	}
 
-	name := filepath.Base(layoutName)
-
-	templateName = strings.TrimPrefix(templateName, "/")
-	layoutName = strings.TrimPrefix(layoutName, "/")
-
-	templateFiles := []string{
-		layoutName,
-		templateName,
-	}
-
-	files, err := fs.ReadDir(h.templateFS, "partials")
-	if err == nil && len(files) > 0 {
-		// Partials directory exists and has files, so include them
-		for _, file := range files {
-			templateFiles = append(templateFiles, "partials/"+file.Name())
-		}
-	}
-
-	templ, err := template.New(name).Funcs(templateFuncMap).Funcs(template.FuncMap{"asset": h.assets.url}).ParseFS(h.templateFS, templateFiles...)
+	set, err := h.pageSet(layoutName, templateName)
 	if err != nil {
-		return nil, errs.Wrap(err, "unable to render template")
+		return nil, err
 	}
 
 	// A page is drawn in the brand the auth server publishes, the console's own client's or the
@@ -263,8 +246,7 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 	// decisions 4 and 9). Both draw brandLogo and brandDarkLogo beside the app name, or in its place
 	// while brandHideAppName (#813 decision 5). The URLs are the auth server's, linked as given. Given
 	// no brand, as by an auth server older than brands, a page is drawn automatic in main.css's colors.
-	// uiTheme is no longer bound, so a layout copied from an older release draws every page automatic.
-	adminPage := drawsAdminMenu(templ)
+	adminPage := set.adminPage
 	safeMode := reqctx.SafeModeFrom(r.Context())
 	brand := pageBrand(settings.Brand, adminPage, safeMode)
 	data["brandDataTheme"] = brand.DataTheme
@@ -290,12 +272,12 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 	// Both layouts write dataPage on <body>, the value an end-user page names in its data-page
 	// template, so custom CSS can aim a rule at one page or keep it off the console's (#816
 	// decisions 6 and 7). An admin page names none and carries no data-page.
-	if page := stylingcontract.PageName(templ); page != "" {
-		data["dataPage"] = page
+	if set.page != "" {
+		data["dataPage"] = set.page
 	}
 
 	var buf bytes.Buffer
-	err = templ.Execute(&buf, data)
+	err = set.templ.Execute(&buf, data)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to execute template")
 	}
@@ -431,6 +413,35 @@ func safeModeNotice(brand *api.PublicBrandResponse, adminPage, safeMode bool) st
 		return "adminconsole.layout.safe_mode_session"
 	}
 	return ""
+}
+
+// pageSet is the template set a page is drawn from, its layout, its template and every shared
+// partial, parsed the first time the page is drawn and kept.
+func (h *Renderer) pageSet(layoutName string, templateName string) (*templateSet, error) {
+	name := filepath.Base(layoutName)
+	templateName = strings.TrimPrefix(templateName, "/")
+	layoutName = strings.TrimPrefix(layoutName, "/")
+
+	return h.sets.get(layoutName+"\x00"+templateName, func() (*templateSet, error) {
+		templateFiles := []string{
+			layoutName,
+			templateName,
+		}
+
+		files, err := fs.ReadDir(h.templateFS, "partials")
+		if err == nil && len(files) > 0 {
+			// Partials directory exists and has files, so include them
+			for _, file := range files {
+				templateFiles = append(templateFiles, "partials/"+file.Name())
+			}
+		}
+
+		templ, err := template.New(name).Funcs(templateFuncMap).Funcs(template.FuncMap{"asset": h.assets.url}).ParseFS(h.templateFS, templateFiles...)
+		if err != nil {
+			return nil, errs.Wrap(err, "unable to render template")
+		}
+		return &templateSet{templ: templ, page: stylingcontract.PageName(templ), adminPage: drawsAdminMenu(templ)}, nil
+	})
 }
 
 // drawsAdminMenu is whether a page is an admin page: one whose menu is the admin menu. The menu

@@ -166,8 +166,8 @@ func durationCases() []durationCase {
 		describeIn("pt-BR", `"160000000"`, portugueseMessage, "1.851 dias, 20 horas, 26 minutos e 40 segundos"),
 		describeIn("pt-BR", `"160000001"`, portugueseMessage, "Longo demais."),
 
-		// The duration speaks the catalog's language, an operator's added one included, with words
-		// from the runtime's CLDR data, and never the language the page is marked with.
+		// The duration speaks the catalog's language, with words from the runtime's CLDR data, and
+		// never the language the page is marked with.
 		// CLDR's French writes "1 heure" with a no-break space, as the browser shows it.
 		formatIn("fr", "5400", settingsUnits, "1\u00a0heure et 30 minutes"),
 		durationCase{Lang: "de-DE", CatalogLang: tag("pt-BR"), Call: "formatDuration(5400, " + settingsUnits + ")",

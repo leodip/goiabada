@@ -2941,7 +2941,7 @@ func TestIssueAuthCode(t *testing.T) {
 				</form>`)},
 		}
 
-		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
+		err := issueAuthCode(w, r, newFormPostTemplate(templateFS, nil), code, "form_post")
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -2981,7 +2981,7 @@ func TestIssueAuthCode(t *testing.T) {
 			"form_post.html": {Data: []byte(`{{.InvalidTemplate`)},
 		}
 
-		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
+		err := issueAuthCode(w, r, newFormPostTemplate(templateFS, nil), code, "form_post")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to parse template")
@@ -3055,7 +3055,7 @@ func TestIssueAuthCode(t *testing.T) {
 						"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit></form>`)},
 					}
 
-					err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, mode.value)
+					err := issueAuthCode(w, r, newFormPostTemplate(templateFS, nil), code, mode.value)
 
 					require.Error(t, err, tc.why)
 					assert.Empty(t, w.Header().Get("Location"), "no Location may be written for %q", tc.redirectURI)
@@ -3337,7 +3337,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 			"form_post.html": {Data: []byte(`<input name="state" value="{{.state}}">`)},
 		}
 
-		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
+		err := issueAuthCode(w, r, newFormPostTemplate(templateFS, nil), code, "form_post")
 
 		require.NoError(t, err)
 		// html/template escapes "+" as &#43; and "&" as &amp; in an attribute; both decode back to
@@ -3363,7 +3363,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit></form>`)},
 		}
 
-		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
+		err := issueAuthCode(w, r, newFormPostTemplate(templateFS, nil), code, "form_post")
 
 		require.NoError(t, err)
 		assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
@@ -3383,7 +3383,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form>{{index . "missing" 0}}</form>`)},
 		}
 
-		err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
+		err := issueAuthCode(w, r, newFormPostTemplate(templateFS, nil), code, "form_post")
 
 		require.Error(t, err)
 		assert.Empty(t, w.Header().Get("Cache-Control"))
@@ -3412,7 +3412,7 @@ func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 		"form_post.html": {Data: []byte(`<form action="{{.redirectURI}}"><input value="{{.code}}">{{index . "missing" 0}}</form>`)},
 	}
 
-	err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
+	err := issueAuthCode(w, r, newFormPostTemplate(templateFS, nil), code, "form_post")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to execute template")
@@ -3469,7 +3469,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 					"form_post.html": {Data: []byte(keysTemplate)},
 				}
 
-				err := issueAuthCode(w, r, formPostTemplate{fs: templateFS}, code, "form_post")
+				err := issueAuthCode(w, r, newFormPostTemplate(templateFS, nil), code, "form_post")
 
 				require.NoError(t, err)
 				assert.Equal(t, tc.want, w.Body.String())
@@ -3536,7 +3536,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 				r = withSessionSettings(r)
 				code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
-				err := issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, code, "form_post")
+				err := issueAuthCode(w, r, newFormPostTemplate(web.TemplateFS(), nil), code, "form_post")
 
 				require.NoError(t, err)
 				body := w.Body.String()

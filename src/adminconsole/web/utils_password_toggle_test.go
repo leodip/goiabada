@@ -222,18 +222,17 @@ process.stdin.on("end", function () {
     look("shown false", field, button, row);
   }
 
-  // The client secret's tab, as the new template draws it and as an operator's copy of the old one
-  // does, with Generate answered at once by a new secret.
-  for (const copy of ["new", "old"]) {
+  // The client secret's tab, as the template draws it, with Generate answered at once by a new
+  // secret.
+  {
     const doc = new FakeDocument();
     const field = el(doc, "input", { id: "clientSecret", type: "password", name: "clientSecret", readonly: "" });
     field.value = "the-stored-secret";
-    const attrs = copy === "new" ? {
+    const button = el(doc, "button", {
       class: "button", type: "button", id: "showSecretBtn", "data-password-toggle": "", "aria-controls": "clientSecret",
       "aria-label": "Show client secret", "data-hide-name": "Hide client secret", "data-hide-label": "Hide",
       "data-shown-status": "Shown", "data-hidden-status": "Hidden", hidden: "",
-    } : { class: "button", type: "button", id: "showSecretBtn", "aria-controls": "clientSecret", "data-hide-label": "Hide" };
-    const button = el(doc, "button", attrs, "Show");
+    }, "Show");
     const row = el(doc, "div", { class: "input-row" }, "", [field, button]);
     const generate = el(doc, "button", { class: "button", type: "button", id: "generateSecretBtn" }, "Generate a new secret");
     const panel = el(doc, "div", { class: "field", id: "confidentialClientPanel" }, "", [
@@ -251,7 +250,7 @@ process.stdin.on("end", function () {
     p.context.showNotice = function (region, tone, text) { region.textContent = text; };
     p.setUp();
     vm.runInContext(request.page, p.context, { filename: "admin-clients-authentication.js" });
-    const step = copy + " copy";
+    const step = "client secret";
 
     seen[step + ", drawn: button hidden"] = button.hidden;
     button.fire("click");
@@ -268,8 +267,7 @@ process.stdin.on("end", function () {
 
 // What the page must show at each step, written as a person reads it: the field's type, the
 // button's visible word and accessible name, and the status region's words (#722 decisions 7 and
-// 8, and the assumed behaviour: reset on submit and pageshow, focus and caret kept, an old copy of
-// the client secret's template still working).
+// 8, and the assumed behaviour: reset on submit and pageshow, focus and caret kept).
 var passwordToggleSeen = map[string]any{
 	"drawn: button hidden": false,
 	"drawn: status role":   "status",
@@ -319,44 +317,26 @@ var passwordToggleSeen = map[string]any{
 	"shown false: button name": "Show new password",
 	"shown false: status":      "Hidden",
 
-	"new copy, drawn: button hidden":       false,
-	"new copy, pressed once: type":         "text",
-	"new copy, pressed once: button text":  "Hide",
-	"new copy, pressed once: button name":  "Hide client secret",
-	"new copy, pressed once: status":       "Shown",
-	"new copy, pressed twice: type":        "password",
-	"new copy, pressed twice: button text": "Show",
-	"new copy, pressed twice: button name": "Show client secret",
-	"new copy, pressed twice: status":      "Hidden",
-	"new copy, generated: type":            "text",
-	"new copy, generated: button text":     "Hide",
-	"new copy, generated: button name":     "Hide client secret",
-	"new copy, generated: status":          "Shown",
-	"new copy, generated: value":           "a-new-secret",
-
-	// The old copy draws its button shown, with no name of its own and no status words, so it keeps
-	// its text for a name and has no status region.
-	"old copy, drawn: button hidden":       false,
-	"old copy, pressed once: type":         "text",
-	"old copy, pressed once: button text":  "Hide",
-	"old copy, pressed once: button name":  nil,
-	"old copy, pressed once: status":       nil,
-	"old copy, pressed twice: type":        "password",
-	"old copy, pressed twice: button text": "Show",
-	"old copy, pressed twice: button name": nil,
-	"old copy, pressed twice: status":      nil,
-	"old copy, generated: type":            "text",
-	"old copy, generated: button text":     "Hide",
-	"old copy, generated: button name":     nil,
-	"old copy, generated: status":          nil,
-	"old copy, generated: value":           "a-new-secret",
+	"client secret, drawn: button hidden":       false,
+	"client secret, pressed once: type":         "text",
+	"client secret, pressed once: button text":  "Hide",
+	"client secret, pressed once: button name":  "Hide client secret",
+	"client secret, pressed once: status":       "Shown",
+	"client secret, pressed twice: type":        "password",
+	"client secret, pressed twice: button text": "Show",
+	"client secret, pressed twice: button name": "Show client secret",
+	"client secret, pressed twice: status":      "Hidden",
+	"client secret, generated: type":            "text",
+	"client secret, generated: button text":     "Hide",
+	"client secret, generated: button name":     "Hide client secret",
+	"client secret, generated: status":          "Shown",
+	"client secret, generated: value":           "a-new-secret",
 }
 
 // A password field's show/hide button, wired by utils.js, shows the password as text and back, its
 // visible word, its name and the status region saying each state; keeps the focus where it was and
 // the field's caret; puts the field back to dots when its form is sent and when the browser brings
-// the page back; and works on the client secret, Generate included, in the template's new and old
-// copies alike.
+// the page back; and works on the client secret, Generate included.
 func TestUtilsJS_PasswordToggles(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {

@@ -5,9 +5,9 @@ package handlers
 //
 // The Personal data page is the one home of what a deployment stores and shares and of what stays
 // the operator's to decide about cookie consent. A reader choosing Always under Closing the
-// browser, turning Turnstile on, editing the templates, publishing a privacy notice or checking a
-// deployment before it goes live doesn't look there, so each of those sections links to it. A
-// place that loses its link fails, and so does a link to a section the page no longer has.
+// browser, turning Turnstile on, publishing a privacy notice or checking a deployment before it
+// goes live doesn't look there, so each of those sections links to it. A place that loses its link
+// fails, and so does a link to a section the page no longer has.
 //
 // It reads files.
 
@@ -46,7 +46,6 @@ var personalDataLinkPlaces = []personalDataLinkPlace{
 	{conceptSection{"site/src/content/docs/deploy/production-checklist.mdx", "## Personal data"}, "", personalDataPageItself, ""},
 	{conceptSection{"site/src/content/docs/concepts/sessions.mdx", "## Closing the browser"}, "**Always**", personalDataYoursToDecide, ""},
 	{conceptSection{"site/src/content/docs/guides/require-a-turnstile-challenge.mdx", "## What it costs"}, "", personalDataYoursToDecide, ""},
-	{conceptSection{"site/src/content/docs/guides/customize-and-translate-the-pages.mdx", "## Change the templates"}, "", personalDataYoursToDecide, ""},
 	{conceptSection{"site/src/content/docs/guides/publish-legal-documents.mdx", "## Next steps"}, "", personalDataPageItself, `href="/deploy/personal-data/"`},
 	{conceptSection{"site/src/content/docs/about/privacy.mdx", "## Goiabada servers run by others"}, "", personalDataPageItself, ""},
 }

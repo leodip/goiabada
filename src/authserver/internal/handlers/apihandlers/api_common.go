@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -89,7 +91,7 @@ func writeInternalServerErrorWithCode(w http.ResponseWriter, r *http.Request, er
 // #425 (#414 item 1).
 func writeEmailTakenOrInternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, data.ErrUniqueViolation) {
-		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyExists, nil), "EMAIL_ALREADY_EXISTS", http.StatusConflict)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.EmailAlreadyExists, nil), "EMAIL_ALREADY_EXISTS", http.StatusConflict)
 		return
 	}
 	writeInternalServerError(w, r, err)
@@ -112,11 +114,11 @@ var errListChanged = errors.New("the stored list differs from the list the calle
 // Every other failure is the one 500, with the caller's attributes (#428).
 func writeListSaveFailure(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
 	if errors.Is(err, errListChanged) {
-		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeListSaveChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.ListSaveChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 		return
 	}
 	if errors.Is(err, data.ErrUniqueViolation) {
-		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeListSaveChangedConcurrently, nil), "CONCURRENT_UPDATE", http.StatusConflict)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.ListSaveChangedConcurrently, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 		return
 	}
 	writeInternalServerError(w, r, err, attrs...)

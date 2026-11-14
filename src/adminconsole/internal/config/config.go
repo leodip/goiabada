@@ -35,8 +35,6 @@ type AdminConsoleConfig struct {
 	LogFormat                string
 	CertFile                 string
 	KeyFile                  string
-	StaticDir                string
-	TemplateDir              string
 	OAuthClientSecret        string
 	SessionAuthenticationKey string
 	SessionEncryptionKey     string
@@ -49,10 +47,6 @@ type AdminConsoleConfig struct {
 	MetricsEnabled    bool
 	ListenHostMetrics string
 	ListenPortMetrics int
-	// I18nOverridesDir is the directory whose catalogs/ main merges over the embedded message
-	// catalogs, or empty for none. It has no flag, like the auth server's, so the one variable
-	// configures both servers the same way (#431).
-	I18nOverridesDir string
 	// InternalCAFile is the PEM file whose authorities the console appends to the system roots
 	// before it verifies the auth server's certificate on an https internal URL, so a private CA
 	// can sign that URL without the process's own roots being replaced. Empty, its calls verify
@@ -155,8 +149,6 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			LogFormat:                        getEnv("GOIABADA_ADMINCONSOLE_LOG_FORMAT", "text"),
 			CertFile:                         getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
 			KeyFile:                          getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
-			StaticDir:                        getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
-			TemplateDir:                      getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
 			OAuthClientSecret:                getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
 			SessionAuthenticationKey:         getEnv("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", ""),
 			SessionEncryptionKey:             getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", ""),
@@ -165,7 +157,6 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			MetricsEnabled:                   getEnvAsBool("GOIABADA_ADMINCONSOLE_METRICS_ENABLED", &malformed),
 			ListenHostMetrics:                getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS", "0.0.0.0"),
 			ListenPortMetrics:                getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", 9191, &malformed),
-			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 			InternalCAFile:                   getEnv("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", ""),
 		},
 		AuthServer: authServerFromEnv(),
@@ -229,8 +220,6 @@ func registerFlags(fs *flag.FlagSet, c *Config, trustedProxies *string) {
 	fs.StringVar(&c.AdminConsole.LogFormat, "adminconsole-log-format", c.AdminConsole.LogFormat, "Format the admin console writes log records in. Options: text, json")
 	fs.StringVar(&c.AdminConsole.CertFile, "adminconsole-certfile", c.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
 	fs.StringVar(&c.AdminConsole.KeyFile, "adminconsole-keyfile", c.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
-	fs.StringVar(&c.AdminConsole.StaticDir, "adminconsole-staticdir", c.AdminConsole.StaticDir, "Static files directory for admin console")
-	fs.StringVar(&c.AdminConsole.TemplateDir, "adminconsole-templatedir", c.AdminConsole.TemplateDir, "Template files directory for admin console")
 	fs.StringVar(&c.AdminConsole.InternalCAFile, "adminconsole-internal-ca-file", c.AdminConsole.InternalCAFile, "PEM file of certificate authorities trusted on top of the system roots for the calls to the auth server (admin console)")
 	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 	fs.BoolVar(&c.AdminConsole.MetricsEnabled, "adminconsole-metrics-enabled", c.AdminConsole.MetricsEnabled, "Serve Prometheus metrics on the admin console's metrics listener")

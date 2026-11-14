@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -61,7 +63,7 @@ func HandleAccountEmailVerificationSendPost(
 			return
 		}
 		if !settings.SMTPEnabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSMTPNotEnabled, nil), "SMTP_NOT_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.SMTPNotEnabled, nil), "SMTP_NOT_ENABLED", http.StatusBadRequest)
 			return
 		}
 
@@ -110,7 +112,7 @@ func HandleAccountEmailVerificationSendPost(
 			if current != nil && writeSendNotNeeded(w, r, current) {
 				return
 			}
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailVerificationAccountChanged, nil), "CONCURRENT_UPDATE", http.StatusConflict)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.EmailVerificationAccountChanged, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 			return
 		}
 		user.EmailVerificationCodeEncrypted = encrypted
@@ -200,7 +202,7 @@ func HandleAccountEmailVerificationPost(
 			return
 		}
 		if !settings.SMTPEnabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSMTPNotEnabled, nil), "SMTP_NOT_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.SMTPNotEnabled, nil), "SMTP_NOT_ENABLED", http.StatusBadRequest)
 			return
 		}
 
@@ -261,7 +263,7 @@ func HandleAccountEmailVerificationPost(
 				"logged_in_user": subject,
 			})
 
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailVerificationCodeInvalid, nil), "INVALID_OR_EXPIRED_VERIFICATION_CODE", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.EmailVerificationCodeInvalid, nil), "INVALID_OR_EXPIRED_VERIFICATION_CODE", http.StatusBadRequest)
 			return
 		}
 
@@ -291,7 +293,7 @@ func HandleAccountEmailVerificationPost(
 				writeJSON(w, r, http.StatusOK, api.UpdateUserResponse{User: *apimapping.ToUserResponse(current)})
 				return
 			}
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailVerificationCodeInvalid, nil), "INVALID_OR_EXPIRED_VERIFICATION_CODE", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.EmailVerificationCodeInvalid, nil), "INVALID_OR_EXPIRED_VERIFICATION_CODE", http.StatusBadRequest)
 			return
 		}
 		user.EmailVerified = true

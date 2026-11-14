@@ -13,6 +13,8 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
@@ -266,7 +268,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// entries are computed the same way the handler computes them rather than written
 		// as literals, so a catalog reword moves the page and the test together while a
 		// handler that stopped localizing still fails.
-		validationError := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
+		validationError := i18n.NewLocalizedError(errcode.AuthorizeClientNotFound, nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(validationError)
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {

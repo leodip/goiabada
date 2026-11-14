@@ -124,7 +124,7 @@ func TestAjax_ThePagesLanguageOutranksTheBrowser(t *testing.T) {
 				ctx := i18n.ResolveRequestLocale(r.Context(), r)
 				w.WriteHeader(http.StatusConflict)
 				_ = json.NewEncoder(w).Encode(api.ErrorResponse{ErrorCode: "CONCURRENT_UPDATE",
-					ErrorDescription: i18n.T(ctx, i18n.ErrCodeListSaveChangedSinceLoaded)})
+					ErrorDescription: i18n.T(ctx, "handler.list_save.changed_since_loaded")})
 			}))
 			defer upstream.Close()
 

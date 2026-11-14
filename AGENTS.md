@@ -118,8 +118,7 @@ Run the relevant command inside the dev container and include its output in the 
 | A version pin | `./version-manager.sh update` | `src/authserver` |
 
 The two servers' `web/tailwindcss/ui.css` files must match; a shared CSS change updates both and
-regenerates both outputs. Built-in translations change together. Keep message IDs stable;
-renames require release notes because operator overrides use those IDs.
+regenerates both outputs. Built-in translations change together.
 
 ## Maintain these instructions
 

@@ -22,7 +22,7 @@ func Raw(ctx context.Context, key string) string {
 		}
 	}
 	if loc == nil {
-		loc = current().localizerFor([]string{LocaleTag(ctx)})
+		loc = builtIn().localizerFor([]string{LocaleTag(ctx)})
 	}
 	if m, ok := loc.lookup(key); ok {
 		return m.raw

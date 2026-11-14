@@ -96,12 +96,13 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   a response's status through. They replaced chi's middleware package, which linked `net/http/pprof`
   and `expvar` into both servers (#462). Each application's own middleware - session, JWT, rate
   limiting - is in its `internal/middleware`
-- `i18n/` - The internationalization layer: the embedded message catalogs and the runtime overrides
-  that win over them, the `Locale` middleware early in every request chain, the three locale setters
+- `i18n/` - The internationalization layer: the message catalogs built into Goiabada, the `Locale`
+  middleware early in every request chain, the three locale setters
   (`WithLocale` for a locale the request asks for, a non-explicit call deferring to explicit intent
   already on the context; `WithPageLanguage` for a user's page language, which wins over it, and
   whose Automatic gives the request's language back; `WithRecipientLanguage` for an email to a
-  user), the loaded catalogs a page language can name (`CatalogTags`, `IsCatalogTag`), and the
+  user), the built-in catalogs a page language and a brand's footer link label can name
+  (`CatalogTags`, `IsCatalogTag`), and the
   error-code vocabulary in `error_codes.md`. The six template helpers only the
   admin console renders with, the locale picker's label, the country, phone-country and timezone
   labels and the two date formatters, are that console's, unexported in its `internal/render`: they
@@ -457,6 +458,12 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   set with `{{name}}` placeholders, which `Email.Check` checks and `Email.Render` draws in the
   brand's look; the other of the two guarded `template.HTML` values. `render.Renderer.RenderEmail`
   draws it inside the email layout (#818)
+- `internal/errcode/` - The catalog keys of the refusals only the auth server writes, whose sentence
+  `i18n.NewLocalizedError` carries and no refusal answers as its `error_code`: the account API's,
+  the conflicts and uploads the admin API answers under a code of their own, the SMTP test send's,
+  the OTP and Turnstile refusals on the sign-in pages, and the `/auth/authorize` refusal pages. The
+  keys both applications name, or that a refusal answers as its `error_code`, stay in
+  `core/i18n`'s `error_codes.go`; `core/i18n/error_codes.md` lists them all (#819)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlmatch,uuid}/` - The authserver-only utilities
   #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and
   origin predicates, UUIDs (#360); `urlmatch` also holds the back-channel logout URI rule every intake

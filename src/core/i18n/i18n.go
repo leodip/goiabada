@@ -2,14 +2,9 @@
 //
 // At a high level:
 //
-//   - The embedded message catalogs are served without any setup: they are
-//     built once, on first use, so a test or a tool renders any built-in
-//     language with no call to make first.
-//   - LoadBundle is called once by each main, with the overrides directory its
-//     configuration read. It merges that directory's catalogs over the embedded
-//     ones (override files win on conflict) and refuses a catalog that does not
-//     parse, so a broken override stops the server at startup. The package
-//     reads no environment variable itself (#431).
+//   - The message catalogs built into Goiabada are its only ones, served
+//     without any setup: they are built once, on first use, so a server, a
+//     test or a tool renders any built-in language with no call to make first.
 //   - Locale runs early in every request chain (before identity
 //     is established) and attaches a tentative localizer based on
 //     ?ui_locales, in-flight UI locales (authserver only),
@@ -20,7 +15,7 @@
 //     A non-explicit call defers to explicit intent already on the context.
 //   - WithPageLanguage attaches a user's page language, the catalog they chose
 //     for Goiabada's own pages. It wins over every source above, and no later
-//     WithLocale call moves it; a tag naming no loaded catalog (CatalogTags,
+//     WithLocale call moves it; a tag naming no built-in catalog (CatalogTags,
 //     IsCatalogTag) is Automatic, the language the request asks for, which also
 //     replaces an earlier user's choice. Each server applies it in a page-language
 //     middleware of its own: authserver from the known user's row, adminconsole
@@ -39,7 +34,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"text/template"
 
 	"github.com/BurntSushi/toml"
@@ -77,8 +71,8 @@ type message struct {
 // bundle holds every catalog, keyed by language tag, plus the matcher that
 // turns a request's preferences into one of those tags.
 type bundle struct {
-	// tags is English first, then catalogs in load order with override-only
-	// locales last. The matcher indexes into it, so the two must stay aligned.
+	// tags is English first, then the other catalogs in file-name order. The
+	// matcher indexes into it, so the two must stay aligned.
 	tags     []language.Tag
 	matcher  language.Matcher
 	messages map[language.Tag]map[string]*message
@@ -93,39 +87,20 @@ type translator struct {
 	tag    language.Tag
 }
 
-// catalogFile is one parsed catalog awaiting the merge, in load order.
+// catalogFile is one parsed catalog, ready to build a bundle from.
 type catalogFile struct {
 	tag      language.Tag
 	messages map[string]string
 }
 
-// embedded is the bundle a process serves until its main calls LoadBundle, and
-// the only one a test or a tool ever needs: the embedded catalogs, built once on
-// first use. It replaced a package variable that stayed nil until LoadBundle ran,
-// which made every package whose tests read a rendered sentence carry a TestMain
-// whose only job was to load it (#431).
-var embedded = sync.OnceValue(func() *bundle {
-	return orEmpty(load(""))
+// builtIn is the bundle every rendering surface reads: the catalogs built into
+// Goiabada, built once, on first use. Nothing replaces it, so a test or a tool
+// renders any built-in language with no call to make first (#431).
+var builtIn = sync.OnceValue(func() *bundle {
+	return orEmpty(load())
 })
 
-// installed is the bundle main installed through LoadBundle: the embedded
-// catalogs with the operator's overrides merged over them. Nil until then. It is
-// an atomic pointer rather than a plain variable so that installing is safe
-// against a reader on another goroutine whatever the order: main installs before
-// it serves, but a test installing while a parallel test renders would otherwise
-// be a data race the race tier reports (#431).
-var installed atomic.Pointer[bundle]
-
-// current is the bundle every rendering surface reads: what main installed, or
-// else the embedded default.
-func current() *bundle {
-	if b := installed.Load(); b != nil {
-		return b
-	}
-	return embedded()
-}
-
-// orEmpty is load's answer for the embedded default, which has no caller to
+// orEmpty is load's answer for the built-in bundle, which has no caller to
 // return an error to. A failure there means a catalog compiled into the binary
 // does not parse, which catalog_hygiene_test.go exists to stop before it ships.
 // Should it happen anyway, every key renders as itself, the visible-miss policy,
@@ -138,73 +113,34 @@ func orEmpty(b *bundle, err error) *bundle {
 	return b
 }
 
-// LoadBundle builds the embedded catalogs with the overrides under
-// overridesDir merged over them, and installs the result as the bundle every
-// rendering surface reads. An empty overridesDir means the embedded catalogs
-// alone.
-//
-// Each main calls it once, at startup, with the directory its own configuration
-// read from GOIABADA_I18N_OVERRIDES_DIR, and stops on the error: a catalog that
-// does not parse is a configuration bug the operator has to see. On an error
-// nothing is installed, so whatever was served before is served still.
-func LoadBundle(overridesDir string) error {
-	b, err := load(overridesDir)
-	if err != nil {
-		return err
-	}
-	installed.Store(b)
-	return nil
-}
-
-// load builds a bundle from the embedded catalogs and, when dir is not empty,
-// the override catalogs under it, touching nothing global. It is what
-// LoadBundle installs and what the embedded default is built from, and what the
-// override tests call without installing anything.
-func load(dir string) (*bundle, error) {
+// load builds a bundle from the embedded catalogs, touching nothing global. It is
+// what the built-in bundle is built from.
+func load() (*bundle, error) {
 	files, err := loadEmbeddedCatalogs()
 	if err != nil {
 		return nil, err
 	}
-
-	if dir != "" {
-		overrides, err := loadOverrideCatalogs(dir)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, overrides...)
-	}
-
 	return build(files), nil
 }
 
-// build merges files, in order, into a bundle. With no files it answers a bundle
-// holding no message, whose matcher still answers English: orEmpty's fallback.
+// build makes a bundle of files, one catalog per language. With no files it
+// answers a bundle holding no message, whose matcher still answers English:
+// orEmpty's fallback.
 func build(files []catalogFile) *bundle {
 	b := &bundle{messages: map[language.Tag]map[string]*message{}}
-	fileTags := make([]language.Tag, 0, len(files))
-	for _, f := range files {
-		fileTags = append(fileTags, f.tag)
-		locale := b.messages[f.tag]
-		if locale == nil {
-			locale = map[string]*message{}
-			b.messages[f.tag] = locale
-		}
-		for k, v := range f.messages {
-			// An empty value means "no translation here", so a later file
-			// removes an earlier one's key rather than shadowing it with a
-			// blank. The key then renders English, which is what a
-			// self-hoster blanking a line in an override file is asking for
-			// (#273).
-			if v == "" {
-				delete(locale, k)
-				continue
-			}
-			locale[k] = &message{raw: v}
-		}
-	}
 	// English leads the tag list because it is the source-of-truth catalog and
 	// the matcher's answer when nothing else matches.
-	b.tags = mergeTags([]language.Tag{language.English}, fileTags)
+	b.tags = []language.Tag{language.English}
+	for _, f := range files {
+		if f.tag != language.English {
+			b.tags = append(b.tags, f.tag)
+		}
+		locale := make(map[string]*message, len(f.messages))
+		for k, v := range f.messages {
+			locale[k] = &message{raw: v}
+		}
+		b.messages[f.tag] = locale
+	}
 	b.matcher = language.NewMatcher(b.tags)
 	b.english = &translator{bundle: b, tag: language.English}
 	compileTemplates(b)
@@ -213,7 +149,7 @@ func build(files []catalogFile) *bundle {
 }
 
 // compileTemplates parses every value carrying a "{{" placeholder, once, after
-// the last file has been merged. The result is immutable for the process
+// the bundle is built. The result is immutable for the process
 // lifetime, so rendering needs no lock and no cache.
 func compileTemplates(b *bundle) {
 	for _, locale := range b.messages {
@@ -239,8 +175,7 @@ func compileTemplates(b *bundle) {
 // fails the whole load naming the file and the key, so the process does not
 // start rendering one plural form for every count (#273).
 //
-// An empty value is returned as it stands: the merge in build needs to
-// see it to remove the key, and the catalog hygiene test needs to see it to
+// An empty value is returned as it stands, so the catalog hygiene test can
 // forbid it in the embedded catalogs.
 func parseCatalog(name string, data []byte) (language.Tag, map[string]string, error) {
 	var parsed map[string]any
@@ -264,31 +199,6 @@ func parseCatalog(name string, data []byte) (language.Tag, map[string]string, er
 // tag string LocaleTag() carries on the request context.
 func localeFromCatalogFile(name string) string {
 	return strings.TrimSuffix(strings.TrimPrefix(name, "active."), ".toml")
-}
-
-// mergeTags appends extras into base, dropping duplicates. Order is preserved
-// (base order first, then any extras not already in base) so a bundle's tags
-// list embedded locales ahead of override-only ones.
-func mergeTags(base, extras []language.Tag) []language.Tag {
-	seen := make(map[string]struct{}, len(base)+len(extras))
-	out := make([]language.Tag, 0, len(base)+len(extras))
-	for _, t := range base {
-		k := t.String()
-		if _, ok := seen[k]; ok {
-			continue
-		}
-		seen[k] = struct{}{}
-		out = append(out, t)
-	}
-	for _, t := range extras {
-		k := t.String()
-		if _, ok := seen[k]; ok {
-			continue
-		}
-		seen[k] = struct{}{}
-		out = append(out, t)
-	}
-	return out
 }
 
 func loadEmbeddedCatalogs() ([]catalogFile, error) {
@@ -345,8 +255,7 @@ func (b *bundle) localizerFor(tags []string) *translator {
 
 // lookup finds key in the translator's own locale, then in English. The
 // English hop is what makes a locale that is missing a key render the English
-// text rather than the key itself, as guides/customize-and-translate-the-pages.mdx
-// promises (#273).
+// text rather than the key itself (#273).
 func (l *translator) lookup(key string) (*message, bool) {
 	if l == nil || l.bundle == nil {
 		return nil, false
@@ -426,9 +335,8 @@ func LocaleTag(ctx context.Context) string {
 	return "en"
 }
 
-// CatalogTag returns the language tag of the catalog T renders from on ctx, whether a built-in
-// catalog or an override-only one. Returns "en" when no localizer is
-// attached, which is the catalog T then renders from.
+// CatalogTag returns the language tag of the built-in catalog T renders from on ctx. Returns "en"
+// when no localizer is attached, which is the catalog T then renders from.
 //
 // It differs from LocaleTag, which answers the first preference asked for whether or not any
 // catalog matches it: "nl-BE,nl;q=0.9,pt-BR;q=0.8" renders in pt-BR, and LocaleTag answers nl-BE.
@@ -436,13 +344,13 @@ func LocaleTag(ctx context.Context) string {
 // in, and the admin console names its CLDR country labels in it (#645 decisions 8 and 9).
 // The admin console sends this tag as Accept-Language on every admin API call, so the auth server
 // answers a refusal in the language the console's page is rendered in; the value is always one of
-// the loaded catalogs' tags, never text the browser sent (#559 decision 3).
+// the built-in catalogs' tags, never text the browser sent (#559 decision 3).
 func CatalogTag(ctx context.Context) string {
 	return localizer(ctx).tag.String()
 }
 
 // localizer returns the translator attached to ctx by the locale middleware
-// (or by the per-handler refinement helpers), or the current bundle's English
+// (or by the per-handler refinement helpers), or the built-in bundle's English
 // translator if none is attached (test contexts, background jobs that never went
 // through middleware).
 func localizer(ctx context.Context) *translator {
@@ -453,5 +361,5 @@ func localizer(ctx context.Context) *translator {
 			}
 		}
 	}
-	return current().english
+	return builtIn().english
 }

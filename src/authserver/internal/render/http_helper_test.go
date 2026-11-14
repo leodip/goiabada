@@ -239,7 +239,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 	t.Run("Layout settings reach the template", func(t *testing.T) {
 		layoutFS := fstest.MapFS{
 			"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
-			"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}")},
+			"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.smtpEnabled}}{{end}}")},
 		}
 		layoutHelper := New(layoutFS, nil, nil)
 		req := httptest.NewRequest("GET", "/", nil)
@@ -251,9 +251,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		buf, err := layoutHelper.RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", map[string]interface{}{})
 
 		require.NoError(t, err)
-		// ui_theme is no longer bound: a layout copied from an older release, which reads it, draws
-		// every page automatic (#810).
-		assert.Equal(t, "<html>sentinel app||true</html>", buf.String())
+		assert.Equal(t, "<html>sentinel app|true</html>", buf.String())
 	})
 
 	// Every application route runs under middleware.Settings, so a render without settings is a

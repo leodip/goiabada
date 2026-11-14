@@ -38,7 +38,7 @@ func TestFormPost_TheCardDrawsTheBrandsLogoAndFavicon(t *testing.T) {
 	r := withSettings(httptest.NewRequest(http.MethodGet, "/auth/issue", nil),
 		&record.Settings{Issuer: testResponseIssuer, AppName: "Acme Portal"})
 
-	require.NoError(t, issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS(), brands: database},
+	require.NoError(t, issueAuthCode(w, r, newFormPostTemplate(web.TemplateFS(), database),
 		&record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "form_post"))
 
 	require.Equal(t, http.StatusOK, w.Code)
@@ -72,7 +72,7 @@ func TestFormPost_ABrandWithoutAKitIsDrawnAsBefore(t *testing.T) {
 	r := withSettings(httptest.NewRequest(http.MethodGet, "/auth/issue", nil),
 		&record.Settings{Issuer: testResponseIssuer, AppName: "Acme Portal"})
 
-	require.NoError(t, issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS(), brands: database},
+	require.NoError(t, issueAuthCode(w, r, newFormPostTemplate(web.TemplateFS(), database),
 		&record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "form_post"))
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(w.Body.String()))

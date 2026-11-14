@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -167,7 +169,7 @@ func TestHandleAuthorizePost_ARequestTheGetWouldRefuseOnThePageWritesNoRow(t *te
 	ctx := httptest.NewRequest(http.MethodGet, "/", nil).Context()
 	malformed := i18n.T(ctx, "auth_error.malformed_request.message")
 	unsupportedMode := i18n.T(ctx, "auth_error.unsupported_response_mode.message")
-	localized := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
+	localized := i18n.NewLocalizedError(errcode.AuthorizeClientNotFound, nil)
 
 	t.Run("a body that does not parse", func(t *testing.T) {
 		e := newAuthorizePostEndpoint(t)

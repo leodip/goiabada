@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
@@ -100,16 +102,16 @@ func HandleAccountRecoveryCodesPost(
 
 		// A blank password compares nothing, so it is refused without spending the budget (#219).
 		if strings.TrimSpace(req.Password) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 		if !passwordhash.Verify(user.PasswordHash, req.Password) {
 			credentialFailures.RecordCredentialFailure(r)
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 
-		notEnabled := i18n.NewLocalizedError(i18n.ErrCodeUserOTPNotEnabled, nil)
+		notEnabled := i18n.NewLocalizedError(errcode.UserOTPNotEnabled, nil)
 		if !user.OTPEnabled {
 			writeLocalizedError(w, r, notEnabled, "OTP_NOT_ENABLED", http.StatusBadRequest)
 			return

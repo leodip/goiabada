@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -54,7 +56,7 @@ func HandleAccountEmailPut(
 		// A blank one is refused before the account is read and charges nothing: no password was
 		// compared, so charging it would let a caller spend the budget without guessing (#219).
 		if strings.TrimSpace(req.CurrentPassword) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountCurrentPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountCurrentPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -76,7 +78,7 @@ func HandleAccountEmailPut(
 		if !passwordhash.Verify(user.PasswordHash, req.CurrentPassword) {
 			credentialFailures.RecordCredentialFailure(r)
 
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountCurrentPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountCurrentPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 
@@ -106,7 +108,7 @@ func HandleAccountEmailPut(
 			return
 		}
 		if !changed {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 			return
 		}
 		// What the write matched, so what the notice below is decided on is what the row held

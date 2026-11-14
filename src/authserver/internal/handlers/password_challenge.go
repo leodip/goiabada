@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -60,7 +62,7 @@ func RequirePasswordChallenge(boundary *CeremonyBoundary, pageRenderer PageRende
 			// left it (#743).
 			email := strings.ToLower(strings.TrimSpace(r.PostFormValue("email")))
 			renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo,
-				i18n.NewLocalizedError(i18n.ErrCodeChallengeFailed, nil), "", email,
+				i18n.NewLocalizedError(errcode.ChallengeFailed, nil), "", email,
 				r.PostFormValue(keepSignedInField) == keepSignedInTicked)
 		})
 	}

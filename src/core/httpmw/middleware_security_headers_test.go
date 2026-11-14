@@ -110,15 +110,15 @@ func TestSecurityHeaders_ReferrerPolicyIsNotNoReferrer(t *testing.T) {
 // a string mismatch in the table above (#518).
 //
 // script-src is exactly 'self': a browser runs the script files this origin serves and
-// nothing else, so markup that reaches a page through a missed sink or an operator's
-// template cannot run an inline <script>, an on… attribute, a javascript: URL or eval (CSP
+// nothing else, so markup that reaches a page through a missed sink cannot run an inline
+// <script>, an on… attribute, a javascript: URL or eval (CSP
 // Level 3 §6.1.10). Every built-in page already keeps its scripts in static files (#617),
 // which core/guard.AssertWellFormedTemplates holds, so nothing needs more:
 //
 //   - 'unsafe-inline' and 'unsafe-eval' switch the protection off for what it exists to stop.
 //   - A nonce or a hash marks an inline script as allowed, and there is none to mark; a
-//     nonce would also need per-request state threaded through every layout and every
-//     operator's template, for nothing 'self' refuses that a page needs.
+//     nonce would also need per-request state threaded through every layout, for nothing
+//     'self' refuses that a page needs.
 //   - 'strict-dynamic' trusts whatever an allowed script loads, and makes a browser ignore
 //     'self' altogether.
 //   - A scheme (https:, data:, blob:), a host or a wildcard allows scripts from elsewhere;
@@ -127,8 +127,8 @@ func TestSecurityHeaders_ReferrerPolicyIsNotNoReferrer(t *testing.T) {
 // object-src is 'none' because, with no default-src sent, a policy without it leaves
 // <object> and <embed> unrestricted (§6.1.9). base-uri is 'none' because an injected <base
 // href> would move every relative form action, the password form's /auth/pwd among them, to
-// another origin, which script-src does not stop (§6.3.1); no page uses a <base>, so one an
-// operator's template adds is refused visibly rather than allowed for the same origin.
+// another origin, which script-src does not stop (§6.3.1); no page uses a <base>, so one that
+// reaches a page is refused visibly rather than allowed for the same origin.
 // frame-ancestors 'none' is the clickjacking protection the header carried before.
 func TestSecurityHeaders_ScriptPolicyRunsOnlyTheServersOwnScriptFiles(t *testing.T) {
 	for _, secure := range []bool{false, true} {

@@ -2,7 +2,7 @@ package i18n
 
 // The documentation of a user's page language, held to the console's own labels (#631).
 //
-// Customize and translate the pages says how each page's language is chosen. A user's page
+// Customize the pages and emails says how each page's language is chosen. A user's page
 // language, chosen under Account, Profile, comes before every source a request carries: a
 // ui_locales, then the browser's Accept-Language, then English. Language and region no longer
 // steers the console, which once read it from the ID token's locale claim, and an email follows it
@@ -15,6 +15,7 @@ package i18n
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -26,10 +27,11 @@ import (
 
 // The pages, relative to the repository root, and the guide's anchor the others link to.
 const (
+	customizeGuide      = "site/src/content/docs/guides/customize-the-pages-and-emails.mdx"
 	authorizePage       = "site/src/content/docs/reference/endpoints/authorize.mdx"
 	logoutPage          = "site/src/content/docs/reference/endpoints/logout.mdx"
 	scopesPage          = "site/src/content/docs/concepts/scopes.mdx"
-	languageChosenLink  = "/guides/customize-and-translate-the-pages/#how-the-language-is-chosen"
+	languageChosenLink  = "/guides/customize-the-pages-and-emails/#how-the-language-is-chosen"
 	languageChosenTitle = "## How the language is chosen"
 )
 
@@ -59,10 +61,18 @@ func TestPageLanguageDocs_TheGuideSaysThePageLanguageComesFirst(t *testing.T) {
 	assertSaysInOrder(t, root, customizeGuide, languageChosenTitle, pageLanguage, "`ui_locales`", "`Accept-Language`")
 }
 
-// The guide's step on where users choose the language names the page language.
-func TestPageLanguageDocs_AddingALanguageSaysWhereUsersChooseIt(t *testing.T) {
-	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuide, "## Add a language",
-		[]string{bold("adminconsole.account.profile.field.page_language"), "`ui_locales`", "(#how-the-language-is-chosen)"}, nil)
+// The guide names the languages Goiabada ships, by their English names, as the languages a page can
+// be written in, so a language added to or dropped from the built-in catalogs fails until the guide
+// follows.
+func TestPageLanguageDocs_TheGuideNamesTheBuiltInLanguages(t *testing.T) {
+	named := []string{"de", "en", "es", "fr", "it", "pt-BR"}
+	shipped := CatalogTags()
+	slices.Sort(shipped)
+	if !slices.Equal(shipped, named) {
+		t.Fatalf("the built-in catalogs are %q, but the guide names %q", shipped, named)
+	}
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuide, languageChosenTitle,
+		[]string{"The pages come in English, Portuguese (Brazil), Spanish, French, Italian and German."}, nil)
 }
 
 // The authorize and sign-out pages' ui_locales rows say a user's page language wins over them.
@@ -201,5 +211,16 @@ func assertSaysInOrder(r guard.Reporter, root, page, heading string, texts ...st
 			r.Errorf("%s: %s names %q before %q", page, heading, text, texts[i-1])
 		}
 		previous = at
+	}
+}
+
+func writeGuideFixture(t *testing.T, root, name, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("creating %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("writing %s: %v", path, err)
 	}
 }

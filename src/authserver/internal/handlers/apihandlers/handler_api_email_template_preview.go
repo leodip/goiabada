@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
@@ -173,7 +175,7 @@ func HandleEmailTemplateSendTestPost(
 			return
 		}
 		if !settings.SMTPEnabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSMTPNotEnabled, nil), "SMTP_NOT_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.SMTPNotEnabled, nil), "SMTP_NOT_ENABLED", http.StatusBadRequest)
 			return
 		}
 

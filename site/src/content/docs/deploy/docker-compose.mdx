@@ -94,7 +94,7 @@ If the admin console then can't reach the auth server, see [Can't reach the auth
 
 Both images run as uid 10001 and gid 10001, and never as root. The image names them by number, since it has no `/etc/passwd`, so a platform that refuses a root container, such as Kubernetes with `runAsNonRoot`, can verify the user. The binary and the `/app` directory holding it belong to root, so the process can't replace what its next start runs.
 
-A file you mount into a container must be readable by uid 10001 or gid 10001: the certificate and key named by `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` (and the admin console's pair), and the templates and static files of a [customization](/guides/customize-and-translate-the-pages/#change-the-templates). A key file left at mode `0600` and owned by root can't be read; give it to the user, or to the group with mode `0640`:
+A file you mount into a container must be readable by uid 10001 or gid 10001, such as the certificate and key named by `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` (and the admin console's pair). A key file left at mode `0600` and owned by root can't be read; give it to the user, or to the group with mode `0640`:
 
 ```bash
 sudo chown 10001:10001 key.pem

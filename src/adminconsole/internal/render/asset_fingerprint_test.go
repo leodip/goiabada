@@ -1,7 +1,9 @@
 package render
 
 import (
-	"regexp"
+	"io/fs"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -10,28 +12,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var fingerprinted = regexp.MustCompile(`^/static/main\.css\?v=[0-9a-f]{12}$`)
-
-// A page names a static file by its contents: the URL carries a fingerprint that stays put while
-// the file does and changes the moment it changes, which is what makes a browser fetch a new
-// stylesheet straight after an upgrade rather than keep the old one for its five minutes (#617).
-func TestAssetFingerprints_TheURLChangesExactlyWhenTheFileDoes(t *testing.T) {
-	fsys := fstest.MapFS{"main.css": {Data: []byte("body{color:red}"), ModTime: time.Unix(1, 0)}}
+// A page names a static file by its contents, read once: the fingerprint is kept, and a page
+// linking the file again opens nothing, since the built-in files cannot change while the server
+// runs.
+func TestAssetFingerprints_AFileIsReadOnceForItsFingerprint(t *testing.T) {
+	fsys := &openCountingFS{FS: fstest.MapFS{"main.css": {Data: []byte("body{color:red}")}}}
 	assets := newAssetFingerprints(fsys)
 
 	first, err := assets.url("/static/main.css")
 	require.NoError(t, err)
-	assert.Regexp(t, fingerprinted, first)
+	assert.Equal(t, "/static/main.css?v=15c42ab7768d", first)
+	opened := fsys.opens.Load()
+	require.Positive(t, opened, "the first link reads the file")
 
 	again, err := assets.url("/static/main.css")
 	require.NoError(t, err)
-	assert.Equal(t, first, again, "an unchanged file keeps its URL")
+	assert.Equal(t, first, again)
+	assert.Equal(t, opened, fsys.opens.Load(), "a second link opens nothing")
+}
 
-	fsys["main.css"] = &fstest.MapFile{Data: []byte("body{color:blue}"), ModTime: time.Unix(2, 0)}
-	changed, err := assets.url("/static/main.css")
-	require.NoError(t, err)
-	assert.Regexp(t, fingerprinted, changed)
-	assert.NotEqual(t, first, changed, "a changed file gets a new URL")
+// openCountingFS is a set of files, static files or templates, that counts what is opened, a Stat
+// among them.
+type openCountingFS struct {
+	fs.FS
+	opens atomic.Int64
+}
+
+func (f *openCountingFS) Open(name string) (fs.File, error) {
+	f.opens.Add(1)
+	return f.FS.Open(name)
 }
 
 // A layout naming a file the server does not serve fails its render, rather than shipping a page
@@ -55,8 +64,62 @@ func TestAssetFingerprint_IsTheFingerprintAPageLinksTheseContentsBy(t *testing.T
 	assert.Equal(t, "15c42ab7768d", AssetFingerprint([]byte("body{color:red}")))
 	assert.Equal(t, "fab4811e9952", AssetFingerprint([]byte("body{color:blue}")))
 
-	fsys := fstest.MapFS{"main.css": {Data: []byte("body{color:red}"), ModTime: time.Unix(1, 0)}}
+	fsys := fstest.MapFS{"main.css": {Data: []byte("body{color:red}")}}
 	linked, err := newAssetFingerprints(fsys).url("/static/main.css")
 	require.NoError(t, err)
 	assert.Equal(t, "/static/main.css?v=15c42ab7768d", linked)
+}
+
+// pausedReadFS is a set of static files whose ReadFile, the read for a fingerprint, counts each
+// call and waits for release, so a second first link can arrive while the first is still reading.
+type pausedReadFS struct {
+	fs.FS
+	reads   atomic.Int64
+	started chan struct{}
+	release chan struct{}
+}
+
+func (f *pausedReadFS) ReadFile(name string) ([]byte, error) {
+	f.reads.Add(1)
+	f.started <- struct{}{}
+	<-f.release
+	return fs.ReadFile(f.FS, name)
+}
+
+// Two pages that both link a file before its fingerprint is known read it once between them: the
+// second waits for the first's fingerprint rather than computing it again, and both link the file
+// by it.
+func TestAssetFingerprints_ConcurrentFirstLinksReadAFileOnce(t *testing.T) {
+	fsys := &pausedReadFS{
+		FS:      fstest.MapFS{"main.css": {Data: []byte("body{color:red}")}},
+		started: make(chan struct{}, 2),
+		release: make(chan struct{}),
+	}
+	assets := newAssetFingerprints(fsys)
+
+	var wg sync.WaitGroup
+	urls := make([]string, 2)
+	failures := make([]error, len(urls))
+	link := func(i int) func() {
+		return func() { urls[i], failures[i] = assets.url("/static/main.css") }
+	}
+	wg.Go(link(0))
+	select {
+	case <-fsys.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the first link did not read the file for its fingerprint")
+	}
+	wg.Go(link(1))
+	select {
+	case <-fsys.started:
+	case <-time.After(time.Second):
+	}
+	close(fsys.release)
+	wg.Wait()
+
+	for i, got := range urls {
+		require.NoError(t, failures[i])
+		assert.Equal(t, "/static/main.css?v=15c42ab7768d", got)
+	}
+	assert.Equal(t, int64(1), fsys.reads.Load(), "the file is read once for its fingerprint")
 }

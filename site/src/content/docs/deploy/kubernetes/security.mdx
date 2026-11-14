@@ -44,7 +44,7 @@ It sets no user or group ID, so each container runs as [the user the images run 
 
 No writable volume is mounted, because neither server writes to its file system here.
 
-A certificate or customization you mount from a Secret or ConfigMap is readable at the default mode, `0644`. With a stricter `defaultMode`, such as `0440`, the server reads the files through their group: add `fsGroup: 10001` to the pod's `securityContext`, in a kustomization over the manifest, and Kubernetes gives the mounted files that group. On OpenShift, leave `fsGroup` out: `restricted-v2` assigns one, and refuses 10001.
+A certificate you mount from a Secret is readable at the default mode, `0644`. With a stricter `defaultMode`, such as `0440`, the server reads the files through their group: add `fsGroup: 10001` to the pod's `securityContext`, in a kustomization over the manifest, and Kubernetes gives the mounted files that group. On OpenShift, leave `fsGroup` out: `restricted-v2` assigns one, and refuses 10001.
 
 Both pod specs also set:
 

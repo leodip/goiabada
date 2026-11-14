@@ -40,7 +40,6 @@ import (
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/healthcheck"
-	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/localzone"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/routing"
@@ -209,14 +208,6 @@ func run() int {
 		return 1
 	}
 	slog.Info("current working directory", "directory", dir)
-
-	// Merge the overrides directory the configuration read from GOIABADA_I18N_OVERRIDES_DIR over
-	// the embedded message catalogs. Fail-fast: a malformed catalog is a config bug.
-	if loadBundleErr := i18n.LoadBundle(cfg.AuthServer.I18nOverridesDir); loadBundleErr != nil {
-		slog.Error("unable to load the i18n message catalogs", "error", loadBundleErr)
-		return 1
-	}
-	slog.Info("i18n catalogs loaded")
 
 	now := time.Now()
 	slog.Info("process clock",

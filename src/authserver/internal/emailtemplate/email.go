@@ -112,9 +112,8 @@ var languageTags = func() []language.Tag {
 // Language answers the built-in language an email to a recipient reading locale is written in, as an
 // email's copy was chosen before its text moved here (#531): locale is matched against the six
 // languages followed by English, so a regional variant reads its language's text (fr-CA reads fr)
-// and a language with none, one an operator added through an override catalog among them, reads
-// English. The answer is always one of Languages, by the index the matcher answers rather than the
-// tag it prints, which can come back region-extended.
+// and a language with none reads English. The answer is always one of Languages, by the index the
+// matcher answers rather than the tag it prints, which can come back region-extended.
 func Language(locale string) string {
 	parsed, _, err := language.ParseAcceptLanguage(locale)
 	if err != nil || len(parsed) == 0 {
@@ -125,7 +124,7 @@ func Language(locale string) string {
 }
 
 // SameLanguage reports whether the catalog tagged tag is written in lang's language, a regional
-// variant included: fr-CA is French, while nl, a language an operator added, is not English.
+// variant included: fr-CA is French, while nl is not English.
 func SameLanguage(tag, lang string) bool {
 	tagBase, _ := language.Make(tag).Base()
 	langBase, _ := language.Make(lang).Base()

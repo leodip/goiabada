@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 	"sync"
@@ -143,26 +142,13 @@ func NewServer(router *routing.Router, database data.Database, sessionStore *ses
 		secretKeyChecker:  challengeVerifier,
 
 		tokenProofs: tokenProofs,
+
+		staticFS:   web.StaticFS(),
+		templateFS: web.TemplateFS(),
 	}
 	metrics.RegisterBuildInfo(s.metrics)
 	metrics.RegisterRuntime(s.metrics)
 	poolmetrics.Register(s.metrics, database)
-
-	if envVar := cfg.AuthServer.StaticDir; len(envVar) == 0 {
-		s.staticFS = web.StaticFS()
-		slog.Info("using the embedded static files")
-	} else {
-		s.staticFS = os.DirFS(envVar)
-		slog.Info("using static files from a directory", "directory", envVar)
-	}
-
-	if envVar := cfg.AuthServer.TemplateDir; len(envVar) == 0 {
-		s.templateFS = web.TemplateFS()
-		slog.Info("using the embedded template files")
-	} else {
-		s.templateFS = os.DirFS(envVar)
-		slog.Info("using template files from a directory", "directory", envVar)
-	}
 
 	return &s
 }
@@ -987,9 +973,8 @@ const (
 // so neither the path nor the file system is a parameter.
 //
 // A file requested by its current fingerprint, as the pages link it, is kept for a year and
-// immutable; any other request, the favicons' among them, for five minutes. The fingerprint is
-// checked on the bytes the answer carries, read once and kept while the file is unchanged
-// (staticSnapshots); a file over staticSnapshotLimit is never read whole, and is kept five minutes.
+// immutable; any other request, the favicons' among them, for five minutes. A file's fingerprint
+// is read once and kept (staticFingerprints), and every request is answered from the static files.
 //
 // A directory is the 404 page, /static/ itself included, where Go's file server answered one with
 // a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
@@ -998,7 +983,7 @@ const (
 // language from, so a directory costs what an unmatched path costs; a file still costs neither.
 func (s *Server) serveStaticFiles() {
 	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
-	snapshots := newStaticSnapshots(s.staticFS)
+	fingerprints := newStaticFingerprints(s.staticFS)
 	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS, s.database))
 	directory := http.Handler(notFound)
 	chain := s.pageChain()
@@ -1013,21 +998,16 @@ func (s *Server) serveStaticFiles() {
 		}
 
 		cacheControl, lifetime := staticOtherCache, staticOtherLifetime
-		serve := files
-		if fingerprints := r.URL.Query()["v"]; len(fingerprints) == 1 {
-			// The fingerprint is checked on the bytes the answer carries.
-			if snapshot, ok := snapshots.read(r.URL.Path); ok {
-				serve = http.StripPrefix(staticPrefix, http.FileServer(http.FS(snapshot)))
-				if snapshot.fingerprint == fingerprints[0] {
-					cacheControl, lifetime = staticCurrentCache, staticCurrentLifetime
-				}
+		if requested := r.URL.Query()["v"]; len(requested) == 1 {
+			if current, ok := fingerprints.fingerprint(r.URL.Path); ok && current == requested[0] {
+				cacheControl, lifetime = staticCurrentCache, staticCurrentLifetime
 			}
 		}
 		w.Header().Set("Cache-Control", cacheControl)
 		w.Header().Set("Expires", time.Now().UTC().Add(lifetime).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
-		serve.ServeHTTP(w, r)
+		files.ServeHTTP(w, r)
 	})
 }
 

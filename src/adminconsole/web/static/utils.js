@@ -319,9 +319,7 @@ const passwordToggles = new WeakMap();
 // speak a focused button's new name. A pointer press keeps the focus where it was, and the field's
 // caret and selection survive the change of type; a keyboard press leaves the focus on the button.
 // The field goes back to dots when its form is sent, a submission a confirmation holds back
-// included, and when the browser brings the page back, as on Back. A button without the name or
-// status attributes, as an operator's copy of an older template draws the client secret's, keeps
-// its own name and has no status region.
+// included, and when the browser brings the page back, as on Back.
 function passwordToggle(button) {
   let toggle = passwordToggles.get(button);
   if (!toggle) {
@@ -340,13 +338,10 @@ function makePasswordToggle(button) {
   const hideLabel = button.dataset.hideLabel || showLabel;
   const showName = button.getAttribute("aria-label");
   const hideName = button.dataset.hideName;
-  let status = null;
-  if (button.dataset.shownStatus && button.dataset.hiddenStatus) {
-    status = document.createElement("span");
-    status.className = "sr-only";
-    status.setAttribute("role", "status");
-    (button.parentElement || button).after(status);
-  }
+  const status = document.createElement("span");
+  status.className = "sr-only";
+  status.setAttribute("role", "status");
+  (button.parentElement || button).after(status);
   let shown = false;
 
   const show = function (on) {
@@ -363,12 +358,8 @@ function makePasswordToggle(button) {
       field.setSelectionRange(start, end, direction || "none");
     }
     button.textContent = on ? hideLabel : showLabel;
-    if (showName && hideName) {
-      button.setAttribute("aria-label", on ? hideName : showName);
-    }
-    if (status) {
-      status.textContent = on ? button.dataset.shownStatus : button.dataset.hiddenStatus;
-    }
+    button.setAttribute("aria-label", on ? hideName : showName);
+    status.textContent = on ? button.dataset.shownStatus : button.dataset.hiddenStatus;
   };
 
   // A pointer press would move the focus to the button, out of the field the person types in.
@@ -822,10 +813,10 @@ function formatDuration(seconds, units) {
 
 // durationLanguage names the language formatDuration writes in: the catalog this page rendered
 // from, data-catalog-lang, since a duration is a fragment of one of its sentences, rather than the
-// page's lang (#645 decision 1). An operator's added catalog gets its words from the browser's own
-// CLDR data, with nothing to translate. Where the browser has no data for that language, for its
-// unit names or for its list joining, or the tag is missing or one Intl refuses as malformed, it is
-// English, never the browser's own default language, so a duration is written wholly in one.
+// page's lang (#645 decision 1). Its words come from the browser's own CLDR data, with nothing to
+// translate. Where the browser has no data for that language, for its unit names or for its list
+// joining, or the tag is missing or one Intl refuses as malformed, it is English, never the
+// browser's own default language, so a duration is written wholly in one.
 function durationLanguage() {
   const lang = document.documentElement.dataset.catalogLang;
   try {

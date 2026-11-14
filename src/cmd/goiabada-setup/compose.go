@@ -163,8 +163,6 @@ func generateAuthServerService(config *Config) string {
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LOG_LEVEL", "info")
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LOG_FORMAT", "text")
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LOG_SQL", "false")
-	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_STATICDIR", "")
-	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_TEMPLATEDIR", "")
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS", "false")
 	writeComposeVariable(&sb, "GOIABADA_DB_TYPE", config.Engine.name)
 
@@ -234,8 +232,6 @@ func generateAdminConsoleService(config *Config) string {
 	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", "true")
 	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LOG_LEVEL", "info")
 	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_LOG_FORMAT", "text")
-	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_STATICDIR", "")
-	writeComposeVariable(&sb, "GOIABADA_ADMINCONSOLE_TEMPLATEDIR", "")
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_BASEURL", config.AuthServerURL)
 	writeComposeInternalURL(&sb, authInternalURL)
 	sb.WriteString("\n")

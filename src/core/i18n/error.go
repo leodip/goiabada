@@ -35,7 +35,7 @@ func (e *LocalizedError) Error() string { return e.EnglishFallback() }
 // If the code is missing from the English catalog, returns e.Code so the gap
 // is visible.
 func (e *LocalizedError) EnglishFallback() string {
-	return current().english.render(e.Code, e.Args)
+	return builtIn().english.render(e.Code, e.Args)
 }
 
 // Localize renders e against the locale carried on ctx, with e.Args

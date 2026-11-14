@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestLocalizedError_EnglishFallback(t *testing.T) {
@@ -25,17 +24,12 @@ func TestLocalizedError_LocalizePtBR(t *testing.T) {
 	assert.Equal(t, "Falha na autenticação.", le.Localize(ctxFor("pt-BR")))
 }
 
+// A language whose catalog misses the code renders the English message, not the code.
 func TestLocalizedError_LocalizeFallsThroughToEnglishWhenLocaleMissesKey(t *testing.T) {
-	// The embedded catalogs are held to identical key sets, so the fallback
-	// needs a locale that genuinely misses the key: an override-only fr
-	// catalog carrying nothing but the title.
-	b, err := loadWithOverrides(t, map[string]string{
-		"active.nl.toml": `"auth.pwd.title" = "Aanmelden"` + "\n",
-	})
-	require.NoError(t, err)
+	b := builtInWithout(t, "pt-BR", ErrCodeLoginAuthFailed)
 
 	le := NewLocalizedError(ErrCodeLoginAuthFailed, nil)
-	assert.Equal(t, "Authentication failed.", le.Localize(ctxForBundle(b, "nl")))
+	assert.Equal(t, "Authentication failed.", le.Localize(ctxForBundle(b, "pt-BR")))
 }
 
 func TestLocalizedError_ArgsSubstituteInEveryRendering(t *testing.T) {

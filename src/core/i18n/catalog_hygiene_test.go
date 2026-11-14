@@ -12,7 +12,7 @@ import (
 
 // loadCatalogFlat parses an embedded catalog TOML into a flat key->value map,
 // through the loader's own parser, so the assertions below hold the embedded
-// catalogs to exactly the rules LoadBundle enforces at startup. The catalogs
+// catalogs to exactly the rules the built-in bundle is built by. The catalogs
 // use quoted dotted keys (e.g. "auth.pwd.title"), which TOML treats as literal
 // single keys, so a flat map[string]string is correct.
 func loadCatalogFlat(t *testing.T, name string) map[string]string {
@@ -40,14 +40,12 @@ other = "hi"
 }
 
 // TestCatalog_NoEmptyValues guards against the "empty_prefix" class of bug: an
-// empty value means "no translation here", so the loader removes the key from
-// that locale and T() renders English. In the English catalog itself that
-// leaves nothing to render but the key. An intentionally-empty slot can
-// therefore never work.
+// empty value renders as nothing, a label, heading or button with no text, in
+// that language. An intentionally-empty slot is never what a screen wants.
 func TestCatalog_NoEmptyValues(t *testing.T) {
 	for _, name := range catalogNames(t) {
 		for k, v := range loadCatalogFlat(t, name) {
-			assert.NotEmptyf(t, v, "%s: key %q has an empty value; the loader treats it as absent, so the key renders English or leaks into the UI", name, k)
+			assert.NotEmptyf(t, v, "%s: key %q has an empty value; the UI would show nothing where its text belongs", name, k)
 		}
 	}
 }
@@ -144,8 +142,6 @@ func saysLogInOrOut(v string) bool {
 // TestCatalog_EnglishSaysSignInAndSignOut holds the English catalog to the
 // glossary's words (#519): "sign in" and "sign out" as verbs, "sign-in" as the
 // noun, never login or logout, and "signed out" for what a sign-out leaves.
-// Keys are not values, so translation overrides keyed on the old spelling keep
-// working.
 func TestCatalog_EnglishSaysSignInAndSignOut(t *testing.T) {
 	for k, v := range loadCatalogFlat(t, "active.en.toml") {
 		assert.Falsef(t, saysLogInOrOut(v), "active.en.toml: key %q says %q; the UI says sign in, sign out and sign-in", k, v)

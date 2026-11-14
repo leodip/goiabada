@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -502,7 +504,7 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 			return nil
 		})
 		if errors.Is(err, data.ErrUniqueViolation) {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentPublishedConcurrently, nil),
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.LegalDocumentPublishedConcurrently, nil),
 				"CONCURRENT_UPDATE", http.StatusConflict)
 			return
 		}

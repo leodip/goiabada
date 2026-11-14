@@ -95,7 +95,7 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 }
 
 // configVariables is every live GOIABADA_* variable this process loads: the admin console's own
-// 24 and the 2 auth server endpoints it talks to, of which 21 have a flag. The names Load
+// 21 and the 2 auth server endpoints it talks to, of which 19 have a flag. The names Load
 // mentions that are not live configuration are in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Admin console
@@ -136,12 +136,6 @@ var configVariables = []configVar{
 	strVar("GOIABADA_ADMINCONSOLE_KEYFILE", "adminconsole-keyfile", "",
 		"/env/admin-key.pem", "/flag/admin-key.pem",
 		func(c *Config) any { return c.AdminConsole.KeyFile }),
-	strVar("GOIABADA_ADMINCONSOLE_STATICDIR", "adminconsole-staticdir", "",
-		"/env/admin-static", "/flag/admin-static",
-		func(c *Config) any { return c.AdminConsole.StaticDir }),
-	strVar("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", "adminconsole-templatedir", "",
-		"/env/admin-templates", "/flag/admin-templates",
-		func(c *Config) any { return c.AdminConsole.TemplateDir }),
 	strVar("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", "adminconsole-oauth-client-secret", "",
 		"env-client-secret", "flag-client-secret",
 		func(c *Config) any { return c.AdminConsole.OAuthClientSecret }),
@@ -164,13 +158,6 @@ var configVariables = []configVar{
 	intVar("GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", "adminconsole-listen-port-metrics", 9191,
 		19191, 29191,
 		func(c *Config) any { return c.AdminConsole.ListenPortMetrics }),
-	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
-	// is what pins both now that the configuration reads it instead (#431).
-	{
-		env: "GOIABADA_I18N_OVERRIDES_DIR", def: "",
-		envValue: " /env/i18n-overrides ", envWant: "/env/i18n-overrides",
-		read: func(c *Config) any { return c.AdminConsole.I18nOverridesDir },
-	},
 	// Load reads the file the setting names, and refuses one it cannot (#525), so both values
 	// are real files: certificates and nothing else.
 	strVar("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", "adminconsole-internal-ca-file", "",
@@ -370,9 +357,10 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 // Seam 2: the registered flag set of this binary
 // -----------------------------------------------------------------------------
 
-// adminConsoleFlags is the 21 flags the admin console registers: its own 19, and the two auth
+// adminConsoleFlags is the 19 flags the admin console registers: its own 17, and the two auth
 // server endpoints it talks to. 17 were what the split left (#351); the three metrics listener
-// flags came after it (#400), and the internal CA file's after #525.
+// flags came after it (#400), and the internal CA file's after #525. The template and static
+// directory flags went with the directories (#819).
 //
 // It is written out rather than derived from configVariables, and that is the whole point. A
 // derived expectation cannot fail when a flag is dropped from the table and from config.go
@@ -395,8 +383,6 @@ var adminConsoleFlags = []string{
 	"adminconsole-log-level",
 	"adminconsole-metrics-enabled",
 	"adminconsole-oauth-client-secret",
-	"adminconsole-staticdir",
-	"adminconsole-templatedir",
 	"adminconsole-trust-proxy-headers",
 	"adminconsole-trusted-proxies",
 	"authserver-baseurl",
@@ -412,8 +398,14 @@ var flagsAddedAfterTheSplit = []string{
 	"adminconsole-internal-ca-file",
 }
 
-// refusedFlags is the other half of the narrowing, named rather than merely absent: the 28
-// settings this binary used to accept and ignore -- the auth server's own 17, the 8 database
+// flagsDroppedByBoth counts the flags both binaries registered before #351 and neither registers
+// now: the template and static directory flags of the two servers, which went with the
+// directories (#819). Counted rather than named: the exact flag set test already holds that this
+// binary registers none of them.
+const flagsDroppedByBoth = 4
+
+// refusedFlags is the other half of the narrowing, named rather than merely absent: the 26
+// settings this binary used to accept and ignore -- the auth server's own 15, the 8 database
 // flags and the 3 initial-setup flags, none of which the admin console can act on, since it has
 // no listener of the auth server's, no database access and seeds nothing. flag.CommandLine is
 // built with ExitOnError, so `goiabada-adminconsole -db-type=mysql` now prints "flag provided but
@@ -438,8 +430,6 @@ var refusedFlags = []string{
 	"authserver-log-level",
 	"authserver-log-sql",
 	"authserver-ratelimiter-enabled",
-	"authserver-staticdir",
-	"authserver-templatedir",
 	"authserver-trust-proxy-headers",
 	"authserver-trusted-proxies",
 	"db-create",
@@ -532,16 +522,17 @@ func TestFlagLists_AgreeWithTheTable(t *testing.T) {
 		}
 	}
 
-	// 45 flags were registered by both binaries before the split, and the admin console keeps 17
-	// of them. The two lists partition that surface, less the flags added since, so a flag that
-	// quietly left both is a flag nobody decided about.
+	// 45 flags were registered by both binaries before the split, and the admin console kept 17
+	// of them. The two lists partition that surface, less the flags added since and the four
+	// directory flags both binaries dropped (#819), so a flag that quietly left both is a flag
+	// nobody decided about.
 	for _, name := range flagsAddedAfterTheSplit {
 		if !expected[name] {
 			t.Errorf("flagsAddedAfterTheSplit names %q, which adminConsoleFlags does not list", name)
 		}
 	}
-	if got := len(adminConsoleFlags) - len(flagsAddedAfterTheSplit) + len(refusedFlags); got != 45 {
-		t.Errorf("the two lists cover %d of the flags both binaries registered before the split, want 45", got)
+	if got := len(adminConsoleFlags) - len(flagsAddedAfterTheSplit) + len(refusedFlags) + flagsDroppedByBoth; got != 45 {
+		t.Errorf("the two lists and the %d flags both binaries dropped cover %d of the flags both binaries registered before the split, want 45", flagsDroppedByBoth, got)
 	}
 }
 

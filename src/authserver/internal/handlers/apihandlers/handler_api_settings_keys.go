@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -122,7 +124,7 @@ func HandleSettingsKeysRotatePost(
 			// admin console announce one rotation twice, and would invite a caller to believe
 			// it holds a key it never created. Retrying is wrong for the same reason, which is
 			// what the operation's description in openapi.yaml says.
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysRotationInProgress, nil), "ROTATION_IN_PROGRESS",
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.SettingsKeysRotationInProgress, nil), "ROTATION_IN_PROGRESS",
 				http.StatusConflict)
 
 		case errors.Is(err, signingkeys.ErrKeySetIncomplete):
@@ -145,7 +147,7 @@ func HandleSettingsKeysRotatePost(
 			// driver's error and the same request id on the wire, because an operator has to
 			// inspect the keys and that record is what joins the refusal to its cause (#279).
 			requestId := apiresponse.LogInternalServerError(r, errs.Wrap(err, "unable to rotate the signing keys"))
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysCommitOutcomeUnknown,
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.SettingsKeysCommitOutcomeUnknown,
 				map[string]any{"requestId": requestId}),
 				"ROTATION_OUTCOME_UNKNOWN", http.StatusConflict)
 

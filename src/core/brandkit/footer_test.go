@@ -7,7 +7,7 @@ import (
 )
 
 // A link is drawn with its label for the page's language, and with its fallback label in a language
-// it has none for, a blank one or one no built-in catalog has included (#814 decision 5). The tag is
+// it has none for, a blank one or one Goiabada doesn't ship (#814 decision 5). The tag is
 // the page's lang attribute, compared exactly.
 func TestFooterLinkLabel(t *testing.T) {
 	labels := map[string]string{"pt-BR": "Privacidade", "de": "Datenschutz", "fr": "  "}

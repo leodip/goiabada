@@ -10,6 +10,8 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
@@ -24,8 +26,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // Seam 4 of #437 for /auth/issue's re-checks and for the implicit grant's transaction: each outcome
@@ -187,7 +189,7 @@ func TestHandleIssueGet_ADisabledClientIsRefusedOnThePage(t *testing.T) {
 			var order []string
 			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
-			wantMessage := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientDisabled, nil).Localize(f.req.Context())
+			wantMessage := i18n.NewLocalizedError(errcode.AuthorizeClientDisabled, nil).Localize(f.req.Context())
 			f.pageRenderer.On("RenderTemplate", f.rr, f.req, "/layouts/no_menu_layout.html", "/auth_error.html",
 				mock.MatchedBy(func(bind map[string]interface{}) bool {
 					return bind["error"] == wantMessage && bind["_httpStatus"] == http.StatusOK

@@ -11,8 +11,11 @@ package i18n
 //   - handler.<domain>.<reason>: errors emitted by handlers (auth flow,
 //     account self-service, admin operations).
 //
-// Adding a new error means: (1) add a constant here, (2) add a catalog
-// entry under the same key in active.en.toml, (3) add the same key to
+// A key only the auth server names, and which no refusal answers as its
+// error_code, is declared in src/authserver/internal/errcode instead (#819).
+//
+// Adding a new error means: (1) add a constant here, or there, (2) add a
+// catalog entry under the same key in active.en.toml, (3) add the same key to
 // active.<other>.toml for every supported locale.
 const (
 	// Login flow — used by /auth/pwd POST.
@@ -20,10 +23,6 @@ const (
 	ErrCodeLoginPasswordRequired = "validator.login.password_required" //nolint:gosec // G101: a catalog key naming a message, not a credential
 	ErrCodeLoginAuthFailed       = "handler.login.auth_failed"
 	ErrCodeLoginAccountDisabled  = "handler.login.account_disabled"
-
-	// Turnstile challenge — the refusal of a submission whose token Cloudflare did not verify,
-	// or that carried none, on each form the challenge is on (#642).
-	ErrCodeChallengeFailed = "handler.challenge.failed"
 
 	// Email validator — used wherever an email address is validated outside
 	// the OAuth protocol path (account self-service, admin user CRUD, SMTP
@@ -102,13 +101,6 @@ const (
 	ErrCodeOtpAccountDisabled = "handler.otp.account_disabled"
 	ErrCodeOtpCodeRequired    = "handler.otp.code_required"
 	ErrCodeOtpIncorrectCode   = "handler.otp.incorrect_code"
-	// A code from the time step after the server's current one, which only an authenticator
-	// whose clock runs ahead shows: refused with this rather than as a wrong code (#142).
-	ErrCodeOtpClockAhead = "handler.otp.clock_ahead"
-	// The recovery-code form's refusals (#257): no code, and a code that is wrong, of a replaced
-	// set or already used, which one message answers so the submitter cannot tell them apart.
-	ErrCodeOtpRecoveryCodeRequired  = "handler.otp.recovery_code_required"
-	ErrCodeOtpIncorrectRecoveryCode = "handler.otp.incorrect_recovery_code"
 
 	// Admin resource permissions handler — in-page validation for the
 	// permission-creation form (browser-flow JSON, surface A).
@@ -123,20 +115,6 @@ const (
 	ErrCodeAttributeKeyRequired             = "handler.attribute.key_required"
 	ErrCodeSettingsEmailDestinationRequired = "handler.settings_email.destination_required"
 
-	// Refusals of the admin and account API that a person reaches through the admin console. The
-	// API writes each with the error_code and the status it always had, and only the description
-	// comes from here, in the request's language (#559 decisions 1 and 2).
-	//
-	// Shared by several areas: the two conflicts of a list save, the email taken by a concurrent
-	// write, the last administrator, and the image upload's two refusals.
-	ErrCodeListSaveChangedSinceLoaded  = "handler.list_save.changed_since_loaded"
-	ErrCodeListSaveChangedConcurrently = "handler.list_save.changed_concurrently"
-	ErrCodeEmailAlreadyExists          = "handler.email.already_exists"
-	ErrCodeLastAdministrator           = "handler.administrators.last_administrator"
-	ErrCodeImageUploadTooLarge         = "handler.image_upload.too_large"
-	ErrCodeImageUploadNoFile           = "handler.image_upload.no_file"
-	ErrCodeBrandAssetUploadNoFile      = "handler.brand_asset.no_file"
-
 	// Resources.
 	ErrCodeResourceIdentifierRequired          = "handler.resource.identifier_required"
 	ErrCodeResourceDescriptionTooLong          = "handler.resource.description_too_long" // Args: {"max": int}
@@ -146,26 +124,25 @@ const (
 	ErrCodeResourceSystemLevelDeleteNotAllowed = "handler.resource.system_level_delete_not_allowed"
 
 	// Legal documents (#622).
-	ErrCodeLegalDocumentKindInvalid           = "handler.legal_document.kind_invalid"
-	ErrCodeLegalDocumentShortNameRequired     = "handler.legal_document.short_name_required"
-	ErrCodeLegalDocumentShortNameInvalid      = "handler.legal_document.short_name_invalid"
-	ErrCodeLegalDocumentShortNameTooLong      = "handler.legal_document.short_name_too_long" // Args: {"max": int}
-	ErrCodeLegalDocumentShortNameInUse        = "handler.legal_document.short_name_in_use"
-	ErrCodeLegalDocumentShortNameFixed        = "handler.legal_document.short_name_fixed"
-	ErrCodeLegalDocumentTitleRequired         = "handler.legal_document.title_required"
-	ErrCodeLegalDocumentTitleTooLong          = "handler.legal_document.title_too_long"    // Args: {"max": int}
-	ErrCodeLegalDocumentMarkdownTooLong       = "handler.legal_document.markdown_too_long" // Args: {"max": int}
-	ErrCodeLegalDocumentNoDraft               = "handler.legal_document.no_draft"
-	ErrCodeLegalDocumentDraftEmpty            = "handler.legal_document.draft_empty"
-	ErrCodeLegalDocumentRetired               = "handler.legal_document.retired"
-	ErrCodeLegalDocumentNotPublished          = "handler.legal_document.not_published"
-	ErrCodeLegalDocumentAlreadyRetired        = "handler.legal_document.already_retired"
-	ErrCodeLegalDocumentNotRetired            = "handler.legal_document.not_retired"
-	ErrCodeLegalDocumentPublishedNotDeleted   = "handler.legal_document.published_not_deleted"
-	ErrCodeLegalDocumentPublishedConcurrently = "handler.legal_document.published_concurrently"
-	ErrCodeLegalDocumentAppliesToInvalid      = "handler.legal_document.applies_to_invalid"
-	ErrCodeLegalDocumentAppsWithAllApps       = "handler.legal_document.apps_with_all_apps"
-	ErrCodeLegalDocumentAdminConsoleClient    = "handler.legal_document.admin_console_client"
+	ErrCodeLegalDocumentKindInvalid         = "handler.legal_document.kind_invalid"
+	ErrCodeLegalDocumentShortNameRequired   = "handler.legal_document.short_name_required"
+	ErrCodeLegalDocumentShortNameInvalid    = "handler.legal_document.short_name_invalid"
+	ErrCodeLegalDocumentShortNameTooLong    = "handler.legal_document.short_name_too_long" // Args: {"max": int}
+	ErrCodeLegalDocumentShortNameInUse      = "handler.legal_document.short_name_in_use"
+	ErrCodeLegalDocumentShortNameFixed      = "handler.legal_document.short_name_fixed"
+	ErrCodeLegalDocumentTitleRequired       = "handler.legal_document.title_required"
+	ErrCodeLegalDocumentTitleTooLong        = "handler.legal_document.title_too_long"    // Args: {"max": int}
+	ErrCodeLegalDocumentMarkdownTooLong     = "handler.legal_document.markdown_too_long" // Args: {"max": int}
+	ErrCodeLegalDocumentNoDraft             = "handler.legal_document.no_draft"
+	ErrCodeLegalDocumentDraftEmpty          = "handler.legal_document.draft_empty"
+	ErrCodeLegalDocumentRetired             = "handler.legal_document.retired"
+	ErrCodeLegalDocumentNotPublished        = "handler.legal_document.not_published"
+	ErrCodeLegalDocumentAlreadyRetired      = "handler.legal_document.already_retired"
+	ErrCodeLegalDocumentNotRetired          = "handler.legal_document.not_retired"
+	ErrCodeLegalDocumentPublishedNotDeleted = "handler.legal_document.published_not_deleted"
+	ErrCodeLegalDocumentAppliesToInvalid    = "handler.legal_document.applies_to_invalid"
+	ErrCodeLegalDocumentAppsWithAllApps     = "handler.legal_document.apps_with_all_apps"
+	ErrCodeLegalDocumentAdminConsoleClient  = "handler.legal_document.admin_console_client"
 
 	// Brands (#810 decision 5).
 	ErrCodeBrandNameRequired            = "handler.brand.name_required"
@@ -274,15 +251,12 @@ const (
 
 	// Users, a user's groups, and the email verification code an administrator generates. The
 	// account's own send says the code's sentence too.
-	ErrCodeUserEmailRequired               = "handler.user.email_required"
-	ErrCodeUserEmailTooLong                = "handler.user.email_too_long" // Args: {"max": int}
-	ErrCodeUserSetPasswordTypeInvalid      = "handler.user.set_password_type_invalid"
-	ErrCodeUserPasswordRequired            = "handler.user.password_required"
-	ErrCodeUserNewPasswordRequired         = "handler.user.new_password_required"
-	ErrCodeUserOTPEnableNotSupported       = "handler.user.otp_enable_not_supported"
-	ErrCodeUserOTPNotEnabled               = "handler.user.otp_not_enabled"
-	ErrCodeUserGroupsTooMany               = "handler.user_groups.too_many"
-	ErrCodeEmailVerificationAccountChanged = "handler.email_verification.account_changed"
+	ErrCodeUserEmailRequired          = "handler.user.email_required"
+	ErrCodeUserSetPasswordTypeInvalid = "handler.user.set_password_type_invalid"
+	ErrCodeUserPasswordRequired       = "handler.user.password_required"
+	ErrCodeUserNewPasswordRequired    = "handler.user.new_password_required"
+	ErrCodeUserOTPEnableNotSupported  = "handler.user.otp_enable_not_supported"
+	ErrCodeUserGroupsTooMany          = "handler.user_groups.too_many"
 
 	// Clients, their administrative scopes, permissions, redirect URIs, web origins and tokens. A
 	// client's identifier refusal is handler.client.identifier_required above, and its description
@@ -365,41 +339,6 @@ const (
 	ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid  = "handler.client_tokens.include_claims_in_access_token_invalid"
 	ErrCodeClientTokensIncludeClaimsInIdTokenInvalid      = "handler.client_tokens.include_claims_in_id_token_invalid"
 
-	// The account: email, email verification, password, two-factor authentication and the logout
-	// request. Disabling an authenticator the account does not have is handler.user.otp_not_enabled
-	// above, a wrong code on enabling one is handler.otp.incorrect_code, a code from the next time step
-	// handler.otp.clock_ahead, and the email verification
-	// send's conflict is handler.email_verification.account_changed. SMTP being off is one sentence
-	// for every endpoint that needs it.
-	ErrCodeAccountCurrentPasswordRequired  = "handler.account.current_password_required"
-	ErrCodeAccountNewPasswordRequired      = "handler.account.new_password_required"
-	ErrCodeAccountCurrentPasswordIncorrect = "handler.account.current_password_incorrect"
-	ErrCodeAccountPasswordIncorrect        = "handler.account.password_incorrect"
-	ErrCodeAccountChangedSinceLoaded       = "handler.account.changed_since_loaded"
-	ErrCodeSMTPNotEnabled                  = "handler.smtp.not_enabled"
-	ErrCodeEmailVerificationCodeInvalid    = "handler.email_verification.code_invalid_or_expired"
-
-	ErrCodeAccountOTPAlreadyEnabled       = "handler.account_otp.already_enabled"
-	ErrCodeAccountOTPSecretKeyNotAccepted = "handler.account_otp.secret_key_not_accepted"
-	ErrCodeAccountOTPCodeRequired         = "handler.account_otp.code_required"
-	ErrCodeAccountOTPCodeInvalid          = "handler.account_otp.code_invalid"
-	ErrCodeAccountOTPEnrollmentNotPending = "handler.account_otp.enrollment_not_pending"
-
-	// The account's own deletion (#783 decisions 3 and 9): the setting turned off, the last
-	// administrator, worded for a user deleting themselves rather than for an administrator acting on
-	// another user, and an authenticator code sent beside a recovery code. A wrong password, code or
-	// recovery code is answered with the sentence those checks already use.
-	ErrCodeAccountDeletionDisabled          = "handler.account_deletion.disabled"
-	ErrCodeAccountDeletionLastAdministrator = "handler.account_deletion.last_administrator"
-	ErrCodeAccountDeletionOneSecondFactor   = "handler.account_deletion.one_second_factor"
-
-	ErrCodeAccountLogoutRedirectURIRequired      = "handler.account_logout.post_logout_redirect_uri_required"
-	ErrCodeAccountLogoutClientIdentifierInvalid  = "handler.account_logout.client_identifier_invalid"
-	ErrCodeAccountLogoutClientUnresolved         = "handler.account_logout.client_unresolved"
-	ErrCodeAccountLogoutRedirectURINotRegistered = "handler.account_logout.post_logout_redirect_uri_not_registered"
-	ErrCodeAccountLogoutRedirectURINotAbsolute   = "handler.account_logout.post_logout_redirect_uri_not_absolute"
-	ErrCodeAccountLogoutRedirectURIInsecureHTTP  = "handler.account_logout.post_logout_redirect_uri_insecure_http"
-
 	// Settings: general, sessions, tokens, email, signing keys and audit logs. A settings
 	// refusal sentence that a client's tokens or the account already say reuses that key: the offline
 	// idle timeout above its max lifetime is handler.client_tokens.offline_idle_timeout_above_max_lifetime,
@@ -460,21 +399,6 @@ const (
 	ErrCodeSettingsEmailConnectFailedRefused      = "handler.settings_email.connect_failed_refused"
 	ErrCodeSettingsEmailConnectFailed             = "handler.settings_email.connect_failed"
 
-	ErrCodeSettingsEmailSendFailedHostNotFound   = "handler.settings_email.send_failed_host_not_found"
-	ErrCodeSettingsEmailSendFailedTimedOut       = "handler.settings_email.send_failed_timed_out"
-	ErrCodeSettingsEmailSendFailedRefused        = "handler.settings_email.send_failed_refused"
-	ErrCodeSettingsEmailSendFailed               = "handler.settings_email.send_failed"
-	ErrCodeSettingsEmailSTARTTLSNotOffered       = "handler.settings_email.starttls_not_offered"
-	ErrCodeSettingsEmailPasswordUnencrypted      = "handler.settings_email.password_unencrypted"
-	ErrCodeSettingsEmailNoAuthentication         = "handler.settings_email.no_authentication"
-	ErrCodeSettingsEmailNoSupportedMechanism     = "handler.settings_email.no_supported_mechanism"
-	ErrCodeSettingsEmailPlainCredentialsUnusable = "handler.settings_email.plain_credentials_unusable"
-	ErrCodeSettingsEmailTLSFailed                = "handler.settings_email.tls_failed"
-	ErrCodeSettingsEmailAuthenticationRejected   = "handler.settings_email.authentication_rejected"
-	ErrCodeSettingsEmailMessageRefused           = "handler.settings_email.message_refused"
-
-	ErrCodeSettingsKeysRotationInProgress    = "handler.settings_keys.rotation_in_progress"
-	ErrCodeSettingsKeysCommitOutcomeUnknown  = "handler.settings_keys.commit_outcome_unknown"
 	ErrCodeSettingsKeysKeyNotFound           = "handler.settings_keys.key_not_found"
 	ErrCodeSettingsKeysOnlyPreviousRevocable = "handler.settings_keys.only_previous_revocable"
 
@@ -530,19 +454,4 @@ const (
 	ErrCodeFontTooLarge        = "validator.font.too_large" // Args: {"max": int64}
 	ErrCodeFontEmpty           = "validator.font.empty"
 	ErrCodeFontUnsupportedType = "validator.font.unsupported_type"
-
-	// Authorize endpoint, client and redirect_uri validation. These seven are
-	// the only authorize-endpoint errors represented here, and the reason is
-	// where they come out rather than what they say: RFC 6749 4.1.2.1 forbids
-	// redirecting to an invalid redirection URI, so each of these renders a
-	// page and none of them ever becomes an error_description. The five
-	// validations that run after them do become one, are addressed to the
-	// client developer, and stay English (#213).
-	ErrCodeAuthorizeClientIdMissing          = "validator.authorize.client_id_missing"
-	ErrCodeAuthorizeClientNotFound           = "validator.authorize.client_not_found"
-	ErrCodeAuthorizeClientDisabled           = "validator.authorize.client_disabled"
-	ErrCodeAuthorizeRedirectURIMissing       = "validator.authorize.redirect_uri_missing"
-	ErrCodeAuthorizeRedirectURINotAbsolute   = "validator.authorize.redirect_uri_not_absolute"
-	ErrCodeAuthorizeRedirectURIInsecureHTTP  = "validator.authorize.redirect_uri_insecure_http"
-	ErrCodeAuthorizeRedirectURINotRegistered = "validator.authorize.redirect_uri_not_registered"
 )

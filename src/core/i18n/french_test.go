@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestFrench_RequestPreferencesAndRefusals(t *testing.T) {
@@ -38,15 +37,4 @@ func TestFrench_RegionalTagsUseTheBuiltInCatalog(t *testing.T) {
 			assert.Equal(t, "Mot de passe", T(ctx, "auth.pwd.password_label"))
 		})
 	}
-}
-
-func TestFrench_OperatorOverridesWinAndOmittedKeysNowReadFrench(t *testing.T) {
-	b, err := loadWithOverrides(t, map[string]string{
-		"active.fr.toml": `"auth.pwd.title" = "Accéder à votre espace"` + "\n",
-	})
-	require.NoError(t, err)
-	ctx := ctxForBundle(b, "fr-CA")
-	assert.Equal(t, "Accéder à votre espace", T(ctx, "auth.pwd.title"))
-	assert.Equal(t, "Mot de passe", T(ctx, "auth.pwd.password_label"))
-	assert.Equal(t, "Se connecter", T(ctx, "auth.pwd.button"))
 }

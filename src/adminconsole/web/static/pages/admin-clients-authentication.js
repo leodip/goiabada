@@ -1,11 +1,10 @@
 // admin-clients-authentication.js is the client authentication tab's behaviour. The secret shows
 // only for a confidential client, and choosing confidential for a client with none generates one.
-// Show and Hide reveal the secret, which is drawn hidden, through utils.js's passwordToggle, which
-// wires the button by id here as well as by its data-password-toggle, so an operator's copy of the
-// template from before that attribute keeps a working button. Generate asks the console for a new
-// one, which the field then shows, saying so in the tab's status region, as it says a failure. A
-// type the browser restores, as on Back, is shown as chosen. The save, which asks first about a
-// change of type and about a new secret, is shell.js's.
+// Show and Hide reveal the secret, which is drawn hidden, through utils.js's passwordToggle, whose
+// controller for the Show button, reached here by id, shows a generated secret. Generate asks the
+// console for a new one, which the field then shows, saying so in the tab's status region, as it
+// says a failure. A type the browser restores, as on Back, is shown as chosen. The save, which asks
+// first about a change of type and about a new secret, is shell.js's.
 
 const secretPanel = document.getElementById("confidentialClientPanel");
 const secretField = document.getElementById("clientSecret");

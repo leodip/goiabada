@@ -177,14 +177,14 @@ func TestAuthorizationResponse_EveryFormPostCarriesIssAfterState(t *testing.T) {
 		{
 			name: "a code",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "form_post")
+				return issueAuthCode(w, r, newFormPostTemplate(web.TemplateFS(), nil), &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "form_post")
 			},
 			want: [][2]string{{"code", "c0de"}, {"state", "st"}, {"iss", testResponseIssuer}},
 		},
 		{
 			name: "implicit tokens",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", callback, "st", &issuance.ImplicitGrantResponse{
+				return issueImplicitTokens(w, r, newFormPostTemplate(web.TemplateFS(), nil), "form_post", callback, "st", &issuance.ImplicitGrantResponse{
 					AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IdToken: "it", Scope: "openid",
 				})
 			},
@@ -203,7 +203,7 @@ func TestAuthorizationResponse_EveryFormPostCarriesIssAfterState(t *testing.T) {
 		{
 			name: "a code for a request that sent no state",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, &record.Code{Code: "c0de", RedirectURI: callback}, "form_post")
+				return issueAuthCode(w, r, newFormPostTemplate(web.TemplateFS(), nil), &record.Code{Code: "c0de", RedirectURI: callback}, "form_post")
 			},
 			want: [][2]string{{"code", "c0de"}, {"iss", testResponseIssuer}},
 		},
@@ -231,7 +231,7 @@ func TestAuthorizationResponse_WithoutSettingsNothingIsWritten(t *testing.T) {
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodGet, "/auth/issue", nil)
 
-			err := issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, mode)
+			err := issueAuthCode(w, r, newFormPostTemplate(web.TemplateFS(), nil), &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, mode)
 
 			require.Error(t, err)
 			assert.Empty(t, w.Header().Get("Location"))
@@ -241,11 +241,11 @@ func TestAuthorizationResponse_WithoutSettingsNothingIsWritten(t *testing.T) {
 	}
 }
 
-// The responder the route table builds renders form_post.html from the built-in templates, which
-// carry iss, so an operator's template directory holding a copy from an older release cannot drop
-// it: NewClientErrorResponder takes no template set to be handed one (#576, decision 5). The code
-// and the implicit tokens are written through the same responder's page at /auth/issue.
-func TestNewClientErrorResponder_TheFormPostPageIsTheBuiltInOne(t *testing.T) {
+// The responder the route table builds renders form_post.html from the built-in templates, whose
+// page posts iss beside the error, as RFC 9207 section 2.4 has a client expect once discovery
+// advertises it (#576). The code and the implicit tokens are written through the same responder's
+// page at /auth/issue.
+func TestNewClientErrorResponder_TheFormPostPagePostsIss(t *testing.T) {
 	const callback = "https://example.com/callback"
 	w := httptest.NewRecorder()
 	r := withResponseIssuer(httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))

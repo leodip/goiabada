@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/requestid"
@@ -43,10 +44,10 @@ func (h *Renderer) SettingsUnavailable(w http.ResponseWriter, r *http.Request, t
 	stylesheet, err := h.assets.url("/static/main.css")
 	if err == nil {
 		page.Stylesheet = stylesheet
-		var templ *template.Template
-		templ, err = template.ParseFS(h.templateFS, "settings_unavailable.html")
+		var set *templateSet
+		set, err = h.settingsUnavailableSet()
 		if err == nil {
-			err = templ.Execute(&buf, page)
+			err = set.templ.Execute(&buf, page)
 		}
 	}
 	if err != nil {
@@ -62,3 +63,19 @@ func (h *Renderer) SettingsUnavailable(w http.ResponseWriter, r *http.Request, t
 	w.WriteHeader(http.StatusInternalServerError)
 	_, _ = buf.WriteTo(w)
 }
+
+// settingsUnavailableSet is settings_unavailable.html, parsed the first time it is drawn and kept, as
+// every page's set is.
+func (h *Renderer) settingsUnavailableSet() (*templateSet, error) {
+	return h.sets.get(settingsUnavailableTemplate, func() (*templateSet, error) {
+		templ, err := template.ParseFS(h.templateFS, settingsUnavailableTemplate)
+		if err != nil {
+			return nil, errs.Wrap(err, "unable to parse the settings unavailable page")
+		}
+		return &templateSet{templ: templ}, nil
+	})
+}
+
+// settingsUnavailableTemplate is the page SettingsUnavailable draws, its file and its key among the
+// sets.
+const settingsUnavailableTemplate = "settings_unavailable.html"

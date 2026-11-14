@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGerman_RequestPreferencesAndRefusals(t *testing.T) {
@@ -38,17 +37,4 @@ func TestGerman_RegionalTagsUseTheBuiltInCatalog(t *testing.T) {
 			assert.Equal(t, "Passwort", T(ctx, "auth.pwd.password_label"))
 		})
 	}
-}
-
-func TestGerman_OperatorOverridesWinAndOmittedKeysNowReadGerman(t *testing.T) {
-	b, err := loadWithOverrides(t, map[string]string{
-		"active.de.toml": `"auth.pwd.title" = "Zum Konto"
-"common.button.cancel" = ""` + "\n",
-	})
-	require.NoError(t, err)
-	ctx := ctxForBundle(b, "de-AT")
-	assert.Equal(t, "Zum Konto", T(ctx, "auth.pwd.title"))
-	assert.Equal(t, "Passwort", T(ctx, "auth.pwd.password_label"))
-	assert.Equal(t, "Anmelden", T(ctx, "auth.pwd.button"))
-	assert.Equal(t, "Cancel", T(ctx, "common.button.cancel"))
 }

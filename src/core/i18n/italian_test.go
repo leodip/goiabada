@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestItalian_RequestPreferencesAndRefusals(t *testing.T) {
@@ -38,16 +37,4 @@ func TestItalian_RegionalTagsUseTheBuiltInCatalog(t *testing.T) {
 			assert.Equal(t, "Password", T(ctx, "auth.pwd.password_label"))
 		})
 	}
-}
-
-func TestItalian_OperatorOverridesWinAndOmittedKeysNowReadItalian(t *testing.T) {
-	b, err := loadWithOverrides(t, map[string]string{
-		"active.it.toml": `"auth.pwd.title" = "Entra nel tuo spazio"` + "\n" + `"auth.pwd.forgot_password" = ""` + "\n",
-	})
-	require.NoError(t, err)
-	ctx := ctxForBundle(b, "it-CH")
-	assert.Equal(t, "Entra nel tuo spazio", T(ctx, "auth.pwd.title"))
-	assert.Equal(t, "Password", T(ctx, "auth.pwd.password_label"))
-	assert.Equal(t, "Accedi", T(ctx, "auth.pwd.button"))
-	assert.Equal(t, "Forgot your password?", T(ctx, "auth.pwd.forgot_password"), "an explicitly empty override keeps the English fallback")
 }

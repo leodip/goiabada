@@ -1,6 +1,6 @@
 {{- $theme := "" }}{{ with .brandDataTheme }}{{ if eq . "light" "dark" }}{{ $theme = . }}{{ end }}{{ end -}}
 <!DOCTYPE html>
-<html lang="{{ Lang $.ctx }}" data-catalog-lang="{{ CatalogLang $.ctx }}"{{ with $theme }} data-theme="{{ . }}"{{ end }}>
+<html lang="{{ Lang $.ctx }}" data-catalog-lang="{{ Lang $.ctx }}"{{ with $theme }} data-theme="{{ . }}"{{ end }}>
 
 <head>
   <meta charset="utf-8">
