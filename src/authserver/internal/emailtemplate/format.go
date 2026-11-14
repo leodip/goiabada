@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -610,11 +611,31 @@ func (w *bodyWalker) anchor(href string) {
 // resolves against nothing, keeps its text and loses its address.
 var allowedSchemes = []string{"https://", "http://", "mailto:", "tel:"}
 
+// linkAddress is the address the plain-text part writes for a link to href, as
+// emaildelivery.PlainText works it out: a mailto: or tel: link's address or number, without the
+// scheme or a query, decoded, and any other link's whole URL, either without surrounding
+// whitespace; empty when it writes none. TestCheck_ALinkIsReadableExactlyWhenTheSenderWritesIt
+// holds the two together.
+func linkAddress(href string) string {
+	target := strings.TrimSpace(href)
+	for _, scheme := range []string{"mailto:", "tel:"} {
+		if len(target) >= len(scheme) && strings.EqualFold(target[:len(scheme)], scheme) {
+			target, _, _ = strings.Cut(target[len(scheme):], "?")
+			if unescaped, err := url.PathUnescape(target); err == nil {
+				target = unescaped
+			}
+			return strings.TrimSpace(target)
+		}
+	}
+	return target
+}
+
 func (w *bodyWalker) link(link *ast.Link) {
 	destination := string(link.Destination)
 	href := ""
-	// kept is whether the link keeps an address, which the plain-text part writes even when its
-	// label is empty; with no values, {{link}}'s address is not known, but it is never empty.
+	// kept is whether the link keeps an address the plain-text part writes even when its label is
+	// empty: a mailto: or tel: link with no address or number keeps none. With no values, {{link}}'s
+	// address is not known, but it is never empty.
 	kept := false
 	switch names := placeholdersIn(destination); {
 	case len(names) == 0:
@@ -622,7 +643,7 @@ func (w *bodyWalker) link(link *ast.Link) {
 		for _, scheme := range allowedSchemes {
 			if len(escaped) >= len(scheme) && strings.EqualFold(escaped[:len(scheme)], scheme) {
 				href = escaped
-				kept = true
+				kept = linkAddress(escaped) != ""
 				break
 			}
 		}
@@ -637,7 +658,7 @@ func (w *bodyWalker) link(link *ast.Link) {
 	default:
 		w.problem(RulePlaceholderInLinkDestination, names[0])
 	}
-	if kept {
+	if kept && w.inLink == 0 {
 		w.readable = true
 	}
 

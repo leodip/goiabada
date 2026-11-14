@@ -179,7 +179,8 @@ func TestRenderEmail_AnInvalidEditSendsTheBuiltInTextAndWarns(t *testing.T) {
 // of its language, every field of it, so a brand with no footer still sends a message with text, and
 // a warning names the rule.
 func TestRenderEmail_AnEditThatDrawsNothingToReadSendsTheBuiltInText(t *testing.T) {
-	for _, body := range []string{"- ", "{{button}}\n\n- ", "{{button}}\n\n[ ](relative)", "&NewLine;"} {
+	for _, body := range []string{"- ", "{{button}}\n\n- ", "{{button}}\n\n[ ](relative)", "&NewLine;",
+		"[](mailto:)", "{{button}}\n\n[](tel:)", "[](mailto:?subject=Help)"} {
 		t.Run(body, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 			edits := &editsStub{edits: map[[2]string]*record.EmailTemplate{

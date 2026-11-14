@@ -138,33 +138,37 @@ func TestAPIEmailTemplates_AnInvalidEditIsMarkedWithItsProblems(t *testing.T) {
 	assert.Equal(t, "invalid", listedStatus(t, manageToken, "password_changed", "es"))
 }
 
-// A body that types characters but draws nothing to read, an empty list here, is refused by a save,
-// and one already stored is read as invalid, naming the rule, so its email is sent with the
-// built-in text (#818 decisions 8 and 17).
+// A body that types characters but draws nothing to read, an empty list or a mail link with no
+// address, is refused by a save, and one already stored is read as invalid, naming the rule, so its
+// email is sent with the built-in text (#818 decisions 8 and 17).
 func TestAPIEmailTemplates_ABodyThatDrawsNothingToReadIsRefusedAndInvalid(t *testing.T) {
 	manageToken, _ := createAdminClientWithToken(t)
-	resetEmailTemplateWhenDone(t, "otp_enabled", "en")
+	for _, body := range []string{"- ", "[](mailto:?subject=Help)"} {
+		t.Run(body, func(t *testing.T) {
+			resetEmailTemplateWhenDone(t, "otp_enabled", "en")
 
-	status, answer, _ := emailTemplateCall(t, manageToken, http.MethodPut, emailTemplatesPath+"/otp_enabled/en",
-		map[string]any{"subject": "Two-factor on", "body": "- "})
+			status, answer, _ := emailTemplateCall(t, manageToken, http.MethodPut, emailTemplatesPath+"/otp_enabled/en",
+				map[string]any{"subject": "Two-factor on", "body": body})
 
-	assert.Equal(t, http.StatusBadRequest, status)
-	assert.Equal(t, "handler.email_template.nothing_to_read", answer["error_code"])
-	assert.Equal(t, "/body", answer["error_field"])
-	edit, err := database.GetEmailTemplate(context.Background(), nil, "otp_enabled", "en")
-	require.NoError(t, err)
-	assert.Nil(t, edit, "a refused save stores nothing")
+			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, "handler.email_template.nothing_to_read", answer["error_code"])
+			assert.Equal(t, "/body", answer["error_field"])
+			edit, err := database.GetEmailTemplate(context.Background(), nil, "otp_enabled", "en")
+			require.NoError(t, err)
+			assert.Nil(t, edit, "a refused save stores nothing")
 
-	// Stored as a release whose rule read the characters typed might have left it.
-	saveEmailTemplateEdit(t, "otp_enabled", "en", "", "", "- ")
+			// Stored as a release whose rule read the characters typed might have left it.
+			saveEmailTemplateEdit(t, "otp_enabled", "en", "", "", body)
 
-	en := emailTemplateLanguage(t, manageToken, "otp_enabled", "en")
-	assert.Equal(t, "invalid", en["status"])
-	assert.Equal(t, []any{map[string]any{
-		"field": "body", "rule": "nothing_to_read",
-		"message": "The body needs something to read besides the button.",
-	}}, en["problems"])
-	assert.Equal(t, "invalid", listedStatus(t, manageToken, "otp_enabled", "en"))
+			en := emailTemplateLanguage(t, manageToken, "otp_enabled", "en")
+			assert.Equal(t, "invalid", en["status"])
+			assert.Equal(t, []any{map[string]any{
+				"field": "body", "rule": "nothing_to_read",
+				"message": "The body needs something to read besides the button.",
+			}}, en["problems"])
+			assert.Equal(t, "invalid", listedStatus(t, manageToken, "otp_enabled", "en"))
+		})
+	}
 }
 
 // Two first saves of one email and language at once both succeed, the last one's edit left

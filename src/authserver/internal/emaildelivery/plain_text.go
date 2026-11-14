@@ -188,6 +188,8 @@ func (w *textWriter) link(n *html.Node) {
 			if unescaped, err := url.PathUnescape(target); err == nil {
 				target = unescaped
 			}
+			// An address or number of only whitespace is none.
+			target = strings.TrimSpace(target)
 		}
 	}
 

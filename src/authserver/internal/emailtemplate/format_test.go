@@ -323,6 +323,14 @@ func TestCheck_ABodyThatDrawsNothingToReadIsRefused(t *testing.T) {
 		"&#32;&#9;&#10;",
 		"{{button}}\n\n- ",
 		"- \n\n{{button}}\n\n[ ]()",
+		"[](mailto:)",
+		"[](tel:)",
+		"[](mailto:?subject=Help)",
+		"{{button}}\n\n[](tel:)",
+		"[](MAILTO:)",
+		"[ ](<mailto: >)",
+		"[](mailto:%20%09)",
+		"[](tel:%20?x=1)",
 	} {
 		t.Run(body, func(t *testing.T) {
 			assert.Equal(t, Problems{{Field: FieldBody, Rule: RuleNothingToRead}},
@@ -342,6 +350,11 @@ func TestCheck_ABodyThatDrawsSomethingToReadIsAccepted(t *testing.T) {
 		"{{code}}",
 		"{{link}}",
 		"[](https://acme.example/help)",
+		"[](mailto:help@acme.example)",
+		"[](mailto:help@acme.example?subject=Hi)",
+		"[](tel:+442079460958)",
+		"[Help](mailto:)",
+		"[](https://)",
 		"[]({{link}})",
 		"&amp;",
 		"\\-",
@@ -356,6 +369,41 @@ func TestCheck_ABodyThatDrawsSomethingToReadIsAccepted(t *testing.T) {
 			plain, err := emaildelivery.PlainText("<main>" + string(rendered.Body) + "</main>")
 			require.NoError(t, err, "the sender finds text in %q", rendered.Body)
 			assert.NotEmpty(t, strings.TrimSpace(plain))
+		})
+	}
+}
+
+// A link with no label counts as something to read exactly when the plain-text part writes an
+// address for it (#818 decision 17): the check and the sender read a link's address alike, so no
+// body passes the check whose text the sender finds empty. Each address is drawn after a readable
+// name, which keeps the body valid, and its text compared with the name's alone.
+func TestCheck_ALinkIsReadableExactlyWhenTheSenderWritesIt(t *testing.T) {
+	for _, destination := range []string{
+		"https://acme.example/help", "http://acme.example", "https://", "HTTPS://acme.example",
+		"mailto:help@acme.example", "mailto:help@acme.example?subject=Hi", "mailto:%20help@acme.example",
+		"MailTo:help@acme.example", "tel:+442079460958", "tel:+44%2020", "<tel:+44 20>",
+		"mailto:", "tel:", "MAILTO:", "TEL:", "mailto:?subject=Help", "tel:?x=1", "mailto:%20%09",
+		"<mailto: >", "<tel:\t>", "mailto:%0A?subject=x", "tel:%", "mailto:%zz",
+		"", "relative", "javascript:alert(1)", "ftp://acme.example", "http:acme.example",
+	} {
+		t.Run(destination, func(t *testing.T) {
+			alone := Text{ButtonLabel: "Go", Subject: "Welcome!", Body: "[](" + destination + ")"}
+			checked := everything.Check(alone)
+
+			named := alone
+			named.Body = "{{name}}\n\n" + alone.Body
+			rendered, err := everything.Render("en", named, testValues, testLook)
+			require.NoError(t, err)
+			plain, err := emaildelivery.PlainText("<main>" + string(rendered.Body) + "</main>")
+			require.NoError(t, err)
+			written := strings.TrimSpace(strings.TrimPrefix(plain, testValues.Name))
+
+			if written == "" {
+				assert.Equal(t, Problems{{Field: FieldBody, Rule: RuleNothingToRead}}, checked,
+					"the sender writes nothing for the link")
+			} else {
+				assert.Empty(t, checked, "the sender writes %q for the link", written)
+			}
 		})
 	}
 }

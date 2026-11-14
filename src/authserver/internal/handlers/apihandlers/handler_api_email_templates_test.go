@@ -337,6 +337,11 @@ func TestEmailTemplatePut_Refusals(t *testing.T) {
 		{"the button and a link with no label whose address is dropped", "welcome", "Welcome", "Activate",
 			"{{button}}\n\n[ ](relative)",
 			"handler.email_template.nothing_to_read", "/body", "The body needs something to read besides the button."},
+		{"the button and a phone link with no number", "welcome", "Welcome", "Activate",
+			"{{button}}\n\n[](tel:)",
+			"handler.email_template.nothing_to_read", "/body", "The body needs something to read besides the button."},
+		{"a mail link with no address", "password_changed", "Changed", "", "[](mailto:)",
+			"handler.email_template.nothing_to_read", "/body", "The body needs something to read besides the button."},
 	}
 	for _, c := range cases {
 		for _, scope := range []string{"authserver:manage", "authserver:manage-settings"} {

@@ -245,7 +245,7 @@ func TestEmailTemplatePreview_ABodyThatIsOnlyTheButtonIsRefused(t *testing.T) {
 // A body that types characters but draws nothing to read, such as an empty list item, is refused as
 // a save refuses it, rather than drawn as an email with no text (#818 decision 17).
 func TestEmailTemplatePreview_ABodyThatDrawsNothingToReadIsRefused(t *testing.T) {
-	for _, text := range []string{"- ", "&NewLine;", "[]()"} {
+	for _, text := range []string{"- ", "&NewLine;", "[]()", "[](mailto:)", "[](tel:?x=1)"} {
 		t.Run(text, func(t *testing.T) {
 			r := sampleRequest(t, "authserver:admin-read", "otp_enabled", "en", "", acmeSettings(), map[string]any{
 				"subject": "Two-factor on", "body": text,
@@ -455,6 +455,8 @@ func TestEmailTemplateSendTest_Refusals(t *testing.T) {
 			"validator.email.invalid_format", ""},
 		{"a placeholder the email does not offer", map[string]any{"to": "admin@example.com", "subject": "S", "body": "Hello {{code}}."},
 			"handler.email_template.unknown_placeholder", "/body"},
+		{"nothing to read, a mail link with no address", map[string]any{"to": "admin@example.com", "subject": "S", "body": "[](mailto:?subject=Help)"},
+			"handler.email_template.nothing_to_read", "/body"},
 		{"a brand that is not there", map[string]any{"to": "admin@example.com", "subject": "S", "body": "Hello {{name}}.", "brandId": 99},
 			"handler.email_template.brand_not_found", "/brandId"},
 	} {

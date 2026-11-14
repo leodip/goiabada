@@ -220,6 +220,10 @@ func TestSendEmail_TheTextOfEachPartOfABody(t *testing.T) {
 		{"a link with no label", `<p><a href="https://x.example/"></a></p>`, "https://x.example/\n"},
 		{"a mail address", `<p><a href="mailto:help%2Bdesk@x.example">help+desk@x.example</a></p>`, "help+desk@x.example\n"},
 		{"a phone number", `<p><a href="tel:+44 20 7946 0958">+44 20 7946 0958</a></p>`, "+44 20 7946 0958\n"},
+		{"a mail address with a query", `<p><a href="mailto:help@x.example?subject=Hi"></a></p>`, "help@x.example\n"},
+		{"a mail link with no address", `<p>Write <a href="mailto:?subject=Hi"></a>to us</p>`, "Write to us\n"},
+		{"a phone link with no number", `<p>Call <a href="tel:"></a>us</p>`, "Call us\n"},
+		{"a mail address of only whitespace", `<p>Write <a href="mailto:%20%09">us</a></p>`, "Write us\n"},
 		{"an image", `<p>Before<img src="https://x.example/i.png" alt="An image">after</p>`, "Beforeafter\n"},
 		{"a script", "<p>Kept</p><script>dropped()</script>", "Kept\n"},
 		{"text outside a paragraph", "Hello <b>there</b>", "Hello there\n"},
@@ -233,7 +237,8 @@ func TestSendEmail_TheTextOfEachPartOfABody(t *testing.T) {
 
 // No email is sent without its text: a body with nothing to read is refused before the dial.
 func TestSendEmail_AnEmailWithNoTextIsNotSent(t *testing.T) {
-	for _, html := range []string{"", "<p> \n </p>", `<img src="https://x.example/i.png">`} {
+	for _, html := range []string{"", "<p> \n </p>", `<img src="https://x.example/i.png">`,
+		`<p><a href="mailto:"></a></p>`, `<p><a href="tel:%20?x=1"></a></p>`} {
 		t.Run(html, func(t *testing.T) {
 			f := &fakeSMTP{ext: []string{"8BITMIME"}}
 			port := f.start(t)
