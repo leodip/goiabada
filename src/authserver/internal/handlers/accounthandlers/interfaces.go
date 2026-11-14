@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -58,7 +59,7 @@ type logoutTokenSender interface {
 	Send(ctx context.Context, issuer string, deliveries []backchannel.Delivery)
 }
 
-// PageRenderer renders this package's pages and its two email bodies. These handlers answer
+// PageRenderer renders this package's pages and its emails. These handlers answer
 // HTML, so unlike apihandlers they name every page writer. NotFound answers every
 // self-registration page while the feature is off (#425).
 type PageRenderer interface {
@@ -68,6 +69,9 @@ type PageRenderer interface {
 		data map[string]interface{}) error
 	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) (*bytes.Buffer, error)
+	// RenderEmail renders an email sent from its built-in definition (#818) as the message its
+	// recipient receives, in the language and the brand r's context carries.
+	RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error)
 }
 
 // EmailSender delivers one message. The context is the request's, or the job's that a request

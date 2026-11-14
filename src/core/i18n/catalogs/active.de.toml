@@ -2452,8 +2452,10 @@
 # Subjects render through T against the recipient-locale context (i18n.WithLocale)
 # at the email-send site. Email bodies use the per-locale template-file pattern:
 # emails/email_xxx.<locale>.html overrides emails/email_xxx.html when present.
+# An email sent from its built-in definition (authserver/internal/emailtemplate)
+# holds its subject and its button's label there, in the six built-in languages,
+# and has no message here (#818).
 
-"email.forgot_password.subject" = "Passwort zurücksetzen"
 "email.register_activate.subject" = "Aktivieren Sie Ihr Konto"
 "email.register_existing_account.subject" = "Sie haben bereits ein Konto"
 "email.register_confirmation.subject" = "Willkommen!"
@@ -2474,7 +2476,6 @@
 "email.test_email.subject" = "{{.appName}} – Test-E-Mail"
 
 # The label of the button an action email draws above its URL (#817).
-"email.forgot_password.button" = "Passwort zurücksetzen"
 "email.register_activate.button" = "Konto aktivieren"
 "email.newuser_set_password.button" = "Passwort festlegen"
 "email.register_confirmation.button" = "Anmelden"

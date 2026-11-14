@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -28,7 +29,7 @@ const buttonLink = "https://auth.example.com/an-action?code=abc"
 
 // emailButtonLabels are the four buttons' labels in each built-in language.
 var emailButtonLabels = map[string]map[string]string{
-	"forgot_password": {
+	"password_reset_link": {
 		"en": "Reset password", "de": "Passwort zurücksetzen", "es": "Restablecer contraseña",
 		"fr": "Réinitialiser le mot de passe", "it": "Reimposta la password", "pt-BR": "Redefinir senha",
 	},
@@ -117,6 +118,18 @@ func renderBodyIn(t *testing.T, base, lang string, brand *record.Brand) string {
 	return buf.String()
 }
 
+// renderActionEmail renders the action email name in lang for brand: from its built-in definition
+// when it has one (#818), else from its template file email_<name>.html.
+func renderActionEmail(t *testing.T, name, lang string, brand *record.Brand) string {
+	t.Helper()
+	for _, email := range emailtemplate.BuiltIns() {
+		if email.ID == name {
+			return renderDefinition(t, email, lang, brand).HTML
+		}
+	}
+	return renderBodyIn(t, "email_"+name, lang, brand)
+}
+
 // Each of the four action emails, in each built-in language, draws one button labelled in that
 // language, linking the action, in the brand's color with its text in the color drawn on it, and
 // then the URL itself, as a link in the brand's link color.
@@ -124,7 +137,7 @@ func TestRender_AnActionEmailDrawsAButtonAboveItsURL(t *testing.T) {
 	for email, labels := range emailButtonLabels {
 		for _, lang := range emailLanguages {
 			t.Run(email+"/"+lang, func(t *testing.T) {
-				html := renderBodyIn(t, "email_"+email, lang, themedBrand(record.BrandAppearanceLight, "plum"))
+				html := renderActionEmail(t, email, lang, themedBrand(record.BrandAppearanceLight, "plum"))
 
 				drawn := readEmailAction(t, html)
 
@@ -148,7 +161,7 @@ func TestRender_AnActionEmailDrawsAButtonAboveItsURL(t *testing.T) {
 
 // A dark brand's button is in its dark palette's brand color, with the color drawn on that.
 func TestRender_ADarkBrandsButtonIsInItsDarkPalette(t *testing.T) {
-	drawn := readEmailAction(t, renderBodyIn(t, "email_forgot_password", "en", themedBrand(record.BrandAppearanceDark, "plum")))
+	drawn := readEmailAction(t, renderActionEmail(t, "password_reset_link", "en", themedBrand(record.BrandAppearanceDark, "plum")))
 
 	require.Len(t, drawn.buttons, 1)
 	assert.Equal(t, "#cda4f0", drawn.buttons[0].cellColor)
@@ -205,7 +218,7 @@ func TestRender_OnlyTheFourActionEmailsDrawAButton(t *testing.T) {
 			}
 		})
 	}
-	assert.Equal(t, 4*len(emailLanguages), buttons, "the four action emails are written in every language")
+	assert.Equal(t, 3*len(emailLanguages), buttons, "the three action emails still written as files are written in every language")
 }
 
 // drawnCode is the element that holds the verification code alone, and its style.

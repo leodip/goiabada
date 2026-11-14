@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -147,6 +148,78 @@ func (_c *PageRenderer_NotFound_Call) Return() *PageRenderer_NotFound_Call {
 
 func (_c *PageRenderer_NotFound_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request)) *PageRenderer_NotFound_Call {
 	_c.Run(run)
+	return _c
+}
+
+// RenderEmail provides a mock function for the type PageRenderer
+func (_mock *PageRenderer) RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error) {
+	ret := _mock.Called(r, email, values)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RenderEmail")
+	}
+
+	var r0 emailtemplate.Message
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*http.Request, *emailtemplate.Email, emailtemplate.Values) (emailtemplate.Message, error)); ok {
+		return returnFunc(r, email, values)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*http.Request, *emailtemplate.Email, emailtemplate.Values) emailtemplate.Message); ok {
+		r0 = returnFunc(r, email, values)
+	} else {
+		r0 = ret.Get(0).(emailtemplate.Message)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*http.Request, *emailtemplate.Email, emailtemplate.Values) error); ok {
+		r1 = returnFunc(r, email, values)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// PageRenderer_RenderEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RenderEmail'
+type PageRenderer_RenderEmail_Call struct {
+	*mock.Call
+}
+
+// RenderEmail is a helper method to define mock.On call
+//   - r *http.Request
+//   - email *emailtemplate.Email
+//   - values emailtemplate.Values
+func (_e *PageRenderer_Expecter) RenderEmail(r any, email any, values any) *PageRenderer_RenderEmail_Call {
+	return &PageRenderer_RenderEmail_Call{Call: _e.mock.On("RenderEmail", r, email, values)}
+}
+
+func (_c *PageRenderer_RenderEmail_Call) Run(run func(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values)) *PageRenderer_RenderEmail_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *http.Request
+		if args[0] != nil {
+			arg0 = args[0].(*http.Request)
+		}
+		var arg1 *emailtemplate.Email
+		if args[1] != nil {
+			arg1 = args[1].(*emailtemplate.Email)
+		}
+		var arg2 emailtemplate.Values
+		if args[2] != nil {
+			arg2 = args[2].(emailtemplate.Values)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *PageRenderer_RenderEmail_Call) Return(message emailtemplate.Message, err error) *PageRenderer_RenderEmail_Call {
+	_c.Call.Return(message, err)
+	return _c
+}
+
+func (_c *PageRenderer_RenderEmail_Call) RunAndReturn(run func(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error)) *PageRenderer_RenderEmail_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

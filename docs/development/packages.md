@@ -448,8 +448,14 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   (#781)
 - `internal/legalmarkdown/` - A legal document's Markdown rendered to HTML through goldmark, for the
   admin API's preview and the public pages alike: CommonMark and tables, raw HTML left out,
-  dangerous addresses dropped, images drawn as links. Its output is the auth server's one
-  `template.HTML` built from data, which its `trusted_html_lint_test.go` holds (#622 decision 4)
+  dangerous addresses dropped, images drawn as links. Its output is one of the auth server's two
+  `template.HTML` values built from data, which its `trusted_html_lint_test.go` holds (#622
+  decision 4)
+- `internal/emailtemplate/` - The emails as email templates: each email's built-in definition, its
+  placeholders and its text in the six built-in languages, and the email format, a small Markdown
+  set with `{{name}}` placeholders, which `Email.Check` checks and `Email.Render` draws in the
+  brand's look; the other of the two guarded `template.HTML` values. `render.Renderer.RenderEmail`
+  draws it inside the email layout (#818)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlmatch,uuid}/` - The authserver-only utilities
   #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and
   origin predicates, UUIDs (#360); `urlmatch` also holds the back-channel logout URI rule every intake

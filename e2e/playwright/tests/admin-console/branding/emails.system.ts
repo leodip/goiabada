@@ -108,6 +108,8 @@ test("a password reset is drawn in the brand of the sign-in it was asked from, w
 
       const mail = await waitForMail(request, branded.email);
       expect(mail.subject).toBe("Password reset");
+      // The title is the subject (#818).
+      expect(mail.html).toContain("<title>Password reset</title>");
       // The logo by its absolute URL, above the app name, which shows, so the logo's alt is empty.
       expect(logo.url).toMatch(/^https:\/\//);
       expect(mail.html).toContain(`<img src="${logo.url}" alt=""`);
@@ -134,6 +136,8 @@ test("a password reset is drawn in the brand of the sign-in it was asked from, w
           "You can reset your password by clicking the link below:",
           "",
           "<link>",
+          "",
+          "The link expires in 5 minutes.",
           "",
           "If you have trouble clicking the link, you can copy and paste it into your web browser.",
           "",

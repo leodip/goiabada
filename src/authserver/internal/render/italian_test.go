@@ -41,7 +41,6 @@ func TestItalian_SignInPageUsesQueryOrSwissHeader(t *testing.T) {
 func TestItalian_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
 	for _, locale := range []string{"it", "it-IT", "it-CH", "it-SM", "it-VA"} {
 		for _, tc := range []struct{ name, subject, body string }{
-			{"forgot_password", "Reimpostazione della password", "Per reimpostare la password"},
 			{"register_activate", "Attiva il tuo account", "Il link scade tra 5 minuti."},
 			{"register_existing_account", "Hai già un account", "non ne è stato creato uno nuovo."},
 			{"register_confirmation", "Benvenuto!", "Il tuo account è stato creato."},
@@ -97,14 +96,14 @@ func TestItalian_ExactRegionalEmailOverrideStillWins(t *testing.T) {
 		}
 		return err
 	}))
-	templates["emails/email_forgot_password.it-CH.html"] = &fstest.MapFile{Data: []byte(`{{define "title"}}Email personalizzata{{end}}{{define "head"}}{{end}}{{define "body"}}La tua email di recupero{{end}}`)}
+	templates["emails/email_register_activate.it-CH.html"] = &fstest.MapFile{Data: []byte(`{{define "title"}}Email personalizzata{{end}}{{define "head"}}{{end}}{{define "body"}}La tua email di recupero{{end}}`)}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "it-CH", "en"))
 	buf, err := New(templates, web.StaticFS(), nil).RenderTemplateToBuffer(req,
-		"layouts/email_layout.html", "emails/email_forgot_password.html", nil)
+		"layouts/email_layout.html", "emails/email_register_activate.html", nil)
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), `<html lang="it-CH">`)
 	assert.Contains(t, buf.String(), "La tua email di recupero")
-	assert.NotContains(t, buf.String(), "Per reimpostare la password")
+	assert.NotContains(t, buf.String(), "Il link scade tra 5 minuti.")
 }

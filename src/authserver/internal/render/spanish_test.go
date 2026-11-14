@@ -40,7 +40,6 @@ func TestSpanish_SignInPageFromRequestPreferences(t *testing.T) {
 
 func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
 	for _, tc := range []struct{ body, key, subject, sentence string }{
-		{"email_forgot_password", "forgot_password", "Restablecimiento de contraseña", "Para restablecer tu contraseña"},
 		{"email_register_activate", "register_activate", "Activa tu cuenta", "El enlace caduca a los 5 minutos."},
 		{"email_register_existing_account", "register_existing_account", "Ya tienes una cuenta", "Tu cuenta no ha cambiado."},
 		{"email_register_confirmation", "register_confirmation", "¡Te damos la bienvenida!", "¡Tu cuenta ya está creada!"},

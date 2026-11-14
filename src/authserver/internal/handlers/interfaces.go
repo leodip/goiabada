@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
@@ -24,6 +25,9 @@ type PageRenderer interface {
 		data map[string]interface{}) error
 	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) (*bytes.Buffer, error)
+	// RenderEmail renders an email sent from its built-in definition (#818) as the message its
+	// recipient receives, in the language and the brand r's context carries.
+	RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error)
 }
 
 // JSONWriter answers the JSON endpoints. JSONError writes an ErrorDetail in the RFC 6749 section

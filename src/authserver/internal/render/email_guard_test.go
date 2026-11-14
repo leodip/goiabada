@@ -14,6 +14,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -66,6 +67,30 @@ func TestEmails_EveryBuiltInEmailIsDrawnInlineAlone(t *testing.T) {
 					t.Error("an email of a brand with footer links draws its footer")
 				}
 			})
+		}
+	}
+}
+
+// TestEmails_EveryDefinedEmailIsDrawnInlineAlone holds every email sent from its built-in definition
+// (#818), in each of the six languages, to the same rules, drawn for the same two brands.
+func TestEmails_EveryDefinedEmailIsDrawnInlineAlone(t *testing.T) {
+	dark := kitPageBrand(record.BrandAppearanceDark, true, true, false, false)
+	dark.Theme, dark.Corners, dark.Font = "plum", record.BrandCornersPill, record.BrandFontSerif
+	light := kitPageBrand(record.BrandAppearanceLight, true, false, false, true)
+	light.FooterLinks = threeLinks
+	light.SupportEmail, light.SupportURL, light.SupportPhone = "help@acme.example", "https://acme.example/support", "+442079460958"
+
+	for _, email := range emailtemplate.BuiltIns() {
+		for _, lang := range emailtemplate.Languages {
+			for _, brand := range []*record.Brand{dark, light} {
+				t.Run(email.ID+"/"+lang+"/"+string(brand.Appearance), func(t *testing.T) {
+					html := renderDefinition(t, email, lang, brand).HTML
+					assertDrawnInlineAlone(t, html)
+					if len(brand.FooterLinks) > 0 && !strings.Contains(html, "<footer") {
+						t.Error("an email of a brand with footer links draws its footer")
+					}
+				})
+			}
 		}
 	}
 }

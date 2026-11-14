@@ -313,8 +313,8 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `emailFrame.Footer`, which is `render.FooterOf`, the page's footer, in the language of the
   email's catalog, in the muted ink with each link in the brand's color, and nil for a brand with
   neither; the values are apart by a middle dot hidden from assistive technology, since a client may
-  drop a margin. An email whose point is one action, the forgot-password, activation, setup and
-  welcome emails, draws it with `{{ template "email_button" (args . (T .ctx "email.<name>.button")) }}`
+  drop a margin. An email whose point is one action, the activation, setup and welcome emails,
+  draws it with `{{ template "email_button" (args . (T .ctx "email.<name>.button")) }}`
   above its URL, which stays as a link to copy: a table whose cell carries the brand's color as
   `bgcolor` and inline, since a client may drop a link's padding, around a link in `OnBrand`,
   rounded as a page's control (`0`, `8px` or `9999px`). No other link is a button. The verification
@@ -326,6 +326,31 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   the app name above the body stay out of it. A block element is a paragraph and `<br>` a line
   break; a link is its URL, or its label then `<URL>` when they differ. The button's table carries
   `data-email-button`, which the sender leaves out, the URL under it being in the text already.
+- **Email templates**: an email sent from its built-in definition, today the password reset link,
+  has no template file and no catalog message (#818). Its definition in `internal/emailtemplate`
+  holds its identifier, the placeholders it offers and requires, and its subject, button label and
+  body in the six built-in languages; `render.Renderer.RenderEmail` picks the language as a template
+  copy is picked (`emailtemplate.Language`, English for any other), renders the body inside
+  `layouts/email_layout.html` with the frame above, and writes the subject as the `<title>`. The
+  body is a small Markdown set: paragraphs, a single newline as a line break, bold, italic, links,
+  bulleted and numbered lists. goldmark parses it with every other parser left out, so a heading, a
+  quote, a table, code, an image or raw HTML shows as typed, and `format.go` draws it, not goldmark's
+  renderer: every link inline in `emailFrame.Link`, and one to an address other than `http`, `https`,
+  `mailto` or `tel` as its text alone. A placeholder is `{{name}}`, its value written as text,
+  escaped; `\{{` writes the braces. `{{link}}` alone is the URL as a link to itself, or the whole
+  destination of a link, never part of one; `{{button}}` alone on its line draws the button
+  `email_button` draws, labelled with the button label, which is plain text; `{{code}}` alone in its
+  paragraph draws the box `email_code` draws, and is text elsewhere. `{{name}}` is
+  `emailtemplate.RecipientName`, the address for a user with none, and `{{expiry}}` a lifetime in
+  the email's language. `Email.Check` gives the refusals: a name the email does not offer, a required
+  one the body does not draw (`{{button}}` does not draw the link), the link or the button in the
+  subject, the button not alone, a placeholder in a destination, and a body with nothing to read
+  besides the button. Its output is the auth server's second guarded `template.HTML`, which
+  `legalmarkdown/trusted_html_lint_test.go` holds. `TestBuiltIns_EveryTextPassesItsOwnRules` holds
+  every built-in text to its email's rules in the six languages, and
+  `TestEmails_EveryDefinedEmailIsDrawnInlineAlone` to the inline rules above. A change to the
+  placeholders an email offers or requires can make an administrator's edit of it invalid, so it
+  needs a release-notes line.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state, appearance and theme. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon

@@ -1,15 +1,17 @@
 package legalmarkdown
 
-// The one place the auth server is held to "markup built from data comes from Render".
+// The one place the auth server is held to "markup built from data comes from a guarded renderer".
 //
 // html/template escapes every value a page prints, unless the value is one of its trusted types,
 // template.HTML above all, which it prints as markup. Every such value is therefore a sink: the
 // day it carries text a person wrote, that text runs in the page. Before #622 the auth server built
 // exactly one, a build-stamp comment from constants; #622 adds the second, a legal document's
 // Markdown rendered by Render, whose rules (raw HTML out, dangerous addresses dropped, images as
-// links) are what make it safe to print (decision 4). A third written anywhere else would bypass
-// them, so this refuses any use of html/template's trusted types in the module's production code
-// outside the two files named below.
+// links) are what make it safe to print (decision 4). #818 adds the third, an email's body in the
+// email format, rendered by emailtemplate's format.go, whose rules (only its small Markdown set,
+// values written as text, links screened, no image loaded) do the same for an email. A fourth
+// written anywhere else would bypass them, so this refuses any use of html/template's trusted types
+// in the module's production code outside the three files named below.
 //
 // It reads and parses files and nothing else, so it runs in the internal tier on every CI job.
 
@@ -31,9 +33,10 @@ import (
 
 // trustedHTMLOwners are the files allowed to name html/template's trusted types, relative to the
 // source root with forward slashes. Not the place for a new owner: markup a page shows is written in
-// a template, and a document's text goes through Render.
+// a template, a document's text goes through Render, and an email's through emailtemplate.
 var trustedHTMLOwners = map[string]string{
 	"authserver/internal/legalmarkdown/render.go":  "a legal document's Markdown, rendered under this package's rules",
+	"authserver/internal/emailtemplate/format.go":  "an email's body, rendered under the email format's rules",
 	"authserver/internal/render/template_funcs.go": "versionComment, the build stamp as an HTML comment, built from constants",
 }
 
@@ -135,8 +138,9 @@ func assertNoTrustedHTML(r guard.Reporter, root, moduleDir string, owners map[st
 	}
 	for _, use := range uses {
 		r.Errorf("%s:%d: %s is printed by html/template as markup, unescaped. Write markup in a "+
-			"template, and render a legal document's Markdown with legalmarkdown.Render, the one "+
-			"guarded HTML sink (#622 decision 4)", use.file, use.line, use.name)
+			"template, render a legal document's Markdown with legalmarkdown.Render and an email's "+
+			"body with emailtemplate's Render, the guarded HTML sinks (#622 decision 4, #818 decision 2)",
+			use.file, use.line, use.name)
 	}
 }
 

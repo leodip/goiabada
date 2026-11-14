@@ -2343,7 +2343,6 @@
 
 # --- Assuntos de e-mail -----------------------------------------------------
 
-"email.forgot_password.subject" = "Redefinição de senha"
 "email.register_activate.subject" = "Ative sua conta"
 "email.register_existing_account.subject" = "Você já tem uma conta"
 "email.register_confirmation.subject" = "Bem-vindo(a)!"
@@ -2364,7 +2363,6 @@
 "email.test_email.subject" = "{{.appName}} - e-mail de teste"
 
 # The label of the button an action email draws above its URL (#817).
-"email.forgot_password.button" = "Redefinir senha"
 "email.register_activate.button" = "Ativar conta"
 "email.newuser_set_password.button" = "Criar senha"
 "email.register_confirmation.button" = "Entrar"

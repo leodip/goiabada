@@ -239,7 +239,7 @@ func TestRenderTemplateToBuffer_EmailBodyFollowsTheSubjectCatalog(t *testing.T) 
 	}
 	for _, lang := range []string{"es", "sr"} {
 		require.NoError(t, os.WriteFile(filepath.Join(catalogs, "active."+lang+".toml"),
-			[]byte("\"email.forgot_password.subject\" = \"subject\"\n"), 0o600))
+			[]byte("\"auth.pwd.title\" = \"title\"\n"), 0o600))
 		templateFS["emails/note."+lang+".html"] = &fstest.MapFile{Data: []byte(`{{define "content"}}` + lang + `{{end}}`)}
 	}
 	require.NoError(t, i18n.LoadBundle(overrides))
@@ -319,7 +319,7 @@ func TestRenderTemplateToBuffer_EmailIsMarkedWithItsBodyCopyLanguage(t *testing.
 	}
 }
 
-// The emails this server ships are marked so too: the forgot-password email, drawn in the real
+// The emails this server ships are marked so too: the activation email, drawn in the real
 // layout from the real copies, says pt-BR for a pt-BR recipient and en for an English one or one
 // whose language has no copy.
 func TestRenderTemplateToBuffer_ShippedEmailsAreMarkedWithTheirBodyCopyLanguage(t *testing.T) {
@@ -330,8 +330,8 @@ func TestRenderTemplateToBuffer_ShippedEmailsAreMarkedWithTheirBodyCopyLanguage(
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, locale, "en"))
 
 			buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(req,
-				"/layouts/email_layout.html", "/emails/email_forgot_password.html",
-				map[string]interface{}{"name": "Ana", "link": "https://example.com/reset"})
+				"/layouts/email_layout.html", "/emails/email_register_activate.html",
+				map[string]interface{}{"link": "https://example.com/activate"})
 
 			require.NoError(t, err)
 			assert.Contains(t, buf.String(), `<html lang="`+want+`">`)
