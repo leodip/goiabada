@@ -309,8 +309,9 @@ func TestCheck_AWelcomeBodyOfOnlyTheButtonIsRefused(t *testing.T) {
 
 // A body must hold something to read besides the button (#818 decision 17), judged on what it
 // draws and not on the characters typed: an empty list item, a link with no label whose address is
-// dropped, or a character reference to whitespace draws nothing a reader reads, and the sender
-// would refuse the message for want of text in a brand with no footer.
+// dropped, or a character reference to whitespace, a non-breaking space among it, draws nothing a
+// reader reads. The sender would refuse such a message for want of text in a brand with no footer,
+// or, for a non-breaking space outside a link, send one with nothing to read.
 func TestCheck_ABodyThatDrawsNothingToReadIsRefused(t *testing.T) {
 	for _, body := range []string{
 		"- ",
@@ -321,6 +322,8 @@ func TestCheck_ABodyThatDrawsNothingToReadIsRefused(t *testing.T) {
 		"[](javascript:alert(1))",
 		"&NewLine;",
 		"&#32;&#9;&#10;",
+		"&nbsp;",
+		"[&#160;](mailto:)",
 		"{{button}}\n\n- ",
 		"- \n\n{{button}}\n\n[ ]()",
 		"[](mailto:)",

@@ -549,7 +549,9 @@ func (w *bodyWalker) inline(n ast.Node) {
 
 // text writes a piece of the source as goldmark writes text: backslash escapes and entity
 // references resolved, then escaped, or, raw, only escaped. It is something to read when what it
-// writes holds a character other than the whitespace a reader's text collapses.
+// writes holds a character other than whitespace, as the subject and the button label are judged: a
+// non-breaking space is none, and the plain-text part (emaildelivery.PlainText) drops a link's label
+// of only such spaces.
 func (w *bodyWalker) text(value []byte, raw bool) {
 	var written bytes.Buffer
 	out := bufio.NewWriter(&written)
@@ -559,15 +561,11 @@ func (w *bodyWalker) text(value []byte, raw bool) {
 		gmhtml.DefaultWriter.Write(out, value)
 	}
 	_ = out.Flush()
-	if strings.Trim(written.String(), htmlSpace) != "" {
+	if strings.TrimSpace(written.String()) != "" {
 		w.readable = true
 	}
 	_, _ = w.out.Write(written.Bytes())
 }
-
-// htmlSpace is the whitespace HTML collapses, which the plain-text part leaves out
-// (emaildelivery.PlainText).
-const htmlSpace = " \t\n\r\f"
 
 func (w *bodyWalker) placeholder(node *placeholderNode) {
 	if _, offered := w.email.placeholder(node.name); !offered {

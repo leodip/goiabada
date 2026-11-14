@@ -307,10 +307,9 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// second place and let the two disagree.
 		assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode, ""), emailed.Link,
 			"the emailed link must be the shared builder's output for the code that was issued")
-		// The user has no name, so the email greets them by their address, and it says the link
-		// lasts as long as a reset code does (#818 decisions 4 and 15).
+		// The user has no name, so the email greets them by their address (#818 decision 15). The
+		// link's lifetime the email states is checked in TheEmailSaysHowLongTheResetAcceptsTheLink.
 		assert.Equal(t, "existing@example.com", emailed.Name)
-		assert.Equal(t, 5*time.Minute, emailed.Expiry)
 
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -829,6 +828,52 @@ func TestForgotPasswordRequiresEmail(t *testing.T) {
 
 		assert.Equal(t, 1, calls)
 	})
+}
+
+// The email says how long the reset accepts its link (#818 decision 4): a reset code's five minutes
+// for an account with a password, and a setup link's day for one with none yet, such as a user an
+// administrator created with the setup email, whose code the reset accepts that long.
+func TestHandleForgotPasswordPost_TheEmailSaysHowLongTheResetAcceptsTheLink(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		passwordHash string
+		wantExpiry   time.Duration
+	}{
+		{name: "an account with a password", passwordHash: "$2a$10$hash", wantExpiry: 5 * time.Minute},
+		{name: "an account with no password yet", passwordHash: "", wantExpiry: 24 * time.Hour},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			jobs := &heldJobs{}
+
+			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+			req := forgotPasswordRequest("existing@example.com")
+			rr := httptest.NewRecorder()
+
+			user := &record.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true, PasswordHash: tc.passwordHash}
+			database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(user, nil)
+			expectLinkSentPage(pageRenderer, rr, req)
+			handler.ServeHTTP(rr, req)
+			require.Equal(t, http.StatusOK, rr.Code)
+
+			database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(1), "existing@example.com",
+				mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
+			var emailed emailtemplate.Values
+			pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordResetLink, mock.Anything).
+				Run(func(args mock.Arguments) {
+					emailed = args.Get(2).(emailtemplate.Values)
+				}).Return(emailtemplate.Message{Subject: "Password reset", HTML: "<p>x</p>"}, nil)
+			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil)
+			auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.Anything).Return().Once()
+
+			jobs.runAll(t, afterresponse.ClassRecovery)
+
+			assert.Equal(t, tc.wantExpiry, emailed.Expiry)
+		})
+	}
 }
 
 // A request made on a forgot-password page whose URL names a sign-in mails a link naming it beside
