@@ -98,18 +98,18 @@ func TestAssetFingerprints_ConcurrentFirstLinksReadAFileOnce(t *testing.T) {
 	assets := newAssetFingerprints(fsys)
 
 	var wg sync.WaitGroup
-	link := func() {
-		got, err := assets.url("/static/main.css")
-		assert.NoError(t, err)
-		assert.Equal(t, "/static/main.css?v=15c42ab7768d", got)
+	urls := make([]string, 2)
+	failures := make([]error, len(urls))
+	link := func(i int) func() {
+		return func() { urls[i], failures[i] = assets.url("/static/main.css") }
 	}
-	wg.Go(link)
+	wg.Go(link(0))
 	select {
 	case <-fsys.started:
 	case <-time.After(5 * time.Second):
 		t.Fatal("the first link did not read the file for its fingerprint")
 	}
-	wg.Go(link)
+	wg.Go(link(1))
 	select {
 	case <-fsys.started:
 	case <-time.After(time.Second):
@@ -117,5 +117,9 @@ func TestAssetFingerprints_ConcurrentFirstLinksReadAFileOnce(t *testing.T) {
 	close(fsys.release)
 	wg.Wait()
 
+	for i, got := range urls {
+		require.NoError(t, failures[i])
+		assert.Equal(t, "/static/main.css?v=15c42ab7768d", got)
+	}
 	assert.Equal(t, int64(1), fsys.reads.Load(), "the file is read once for its fingerprint")
 }
