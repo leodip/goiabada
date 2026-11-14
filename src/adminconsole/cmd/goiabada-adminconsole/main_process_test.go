@@ -77,30 +77,6 @@ func runMainProcess(t *testing.T, env []string, args ...string) (int, string) {
 	}
 }
 
-// TestMain_HandsTheOverridesDirectoryToTheCatalogs is the wiring between the two halves the
-// configuration matrix and core/i18n's own tests each cover alone: that main passes the directory
-// config read from GOIABADA_I18N_OVERRIDES_DIR to LoadBundle. The directory holds a catalog that
-// does not parse, so a main that forwards it stops with the catalog refusal (#431).
-//
-// The exit code alone proves nothing: a main that passed "" instead goes on and stops, 1 again, at
-// the listener this harness disables. The refusal's text, which only it writes, is what fails.
-func TestMain_HandsTheOverridesDirectoryToTheCatalogs(t *testing.T) {
-	overrides := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(overrides, "catalogs"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(overrides, "catalogs", "active.en.toml"),
-		[]byte("[section]\nother = \"x\"\n"), 0o644))
-
-	code, stderr := runMainProcess(t, []string{
-		"GOIABADA_I18N_OVERRIDES_DIR=" + overrides,
-		// Neither listener, so a child that got past the catalogs stops rather than serves.
-		"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=0",
-	})
-
-	require.Equal(t, 1, code, "stderr: %s", stderr)
-	assert.Contains(t, stderr, "unable to load the i18n message catalogs")
-	assert.Contains(t, stderr, "active.en.toml")
-}
-
 // TestMain_RefusesAMalformedVariable is the wiring between config.Load's refusal and the process:
 // that main stops on it with exit 2, the code a bad flag gets, and writes it to stderr as the one
 // line an operator reads, before the log handler is installed (#434). Two variables are malformed,

@@ -120,10 +120,10 @@ adapters, `bootstrap`), `cleanup`, the developer tools and generators, test supp
 wizard. Each entry is one directory and not its subtree, so a package created anywhere else, beneath
 a listed one included, is checked from its first commit (#442). The plain-record rule admits the
 functions `slogPlainSites` names, each with the reason no context reaches it: the admin console's
-template function `addUrlParam` and the `convertToString` it calls, `core/i18n`'s startup records in
-`loadOverrideCatalogs` and `orEmpty`, and `StaticFS` and `TemplateFS` in each application's `web`
-package. That rule is what refuses a new helper written without a context after sloglint has
-admitted it. `AssertRequestPathContext` and `AssertAuditLogContext` share the same scope, and
+template function `addUrlParam` and the `convertToString` it calls, `core/i18n`'s record in
+`orEmpty`, written once when its built-in catalogs are first built, and `StaticFS` and `TemplateFS`
+in each application's `web` package. That rule is what refuses a new helper written without a
+context after sloglint has admitted it. `AssertRequestPathContext` and `AssertAuditLogContext` share the same scope, and
 `requestContextOwners` admits `core/i18n`'s `WithLocale`, whose background context is the fallback
 for a nil one. A package holding both startup and request work, like `core/i18n` with its locale
 middleware, stays in scope with its startup functions admitted by name. A request-path helper

@@ -914,21 +914,17 @@ func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 		name      string
 		accept    string
 		uiLocales string
-		spanish   bool
 		wantTag   string
 	}{
 		{name: "the page's matched language, not the first Accept-Language tag alone",
 			accept: "nl-BE,nl;q=0.9,pt-BR;q=0.8", wantTag: "pt-BR"},
 		{name: "a cross-language guess gets English for both subject and body",
-			accept: "gl", spanish: true, wantTag: "en"},
-		{name: "a regional Spanish recipient, with an operator's Spanish catalog", accept: "es-MX", spanish: true, wantTag: "es"},
+			accept: "gl", wantTag: "en"},
+		{name: "a regional Spanish recipient", accept: "es-MX", wantTag: "es"},
 		{name: "ui_locales, the ceremony's explicit intent, also follows the page",
 			uiLocales: "nl pt-BR", wantTag: "pt-BR"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.spanish {
-				installSpanishOverrideCatalog(t)
-			}
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			database := datamocks.NewDatabase(t)
 			userCreator := accounthandlersmocks.NewUserCreator(t)

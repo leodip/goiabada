@@ -4,9 +4,8 @@ import "strings"
 
 // FooterLinkLabel answers the label a brand's footer link is drawn with on a page written in lang,
 // the tag its html element's lang attribute names: the link's own label for that language, else its
-// fallback label (#814 decisions 5 and 9). A language the link has no label for, a language only an
-// override catalog adds among them, takes the fallback, and the tag is compared exactly, as the
-// labels are stored under the built-in catalogs' own tags. The auth server's pages and the admin
+// fallback label (#814 decisions 5 and 9). A language the link has no label for takes the fallback,
+// and the tag is compared exactly, as the labels are stored under the built-in catalogs' own tags. The auth server's pages and the admin
 // console's pick a label by it, so a link reads alike on both.
 func FooterLinkLabel(label string, labels map[string]string, lang string) string {
 	if own := labels[lang]; strings.TrimSpace(own) != "" {

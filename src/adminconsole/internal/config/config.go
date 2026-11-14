@@ -49,10 +49,6 @@ type AdminConsoleConfig struct {
 	MetricsEnabled    bool
 	ListenHostMetrics string
 	ListenPortMetrics int
-	// I18nOverridesDir is the directory whose catalogs/ main merges over the embedded message
-	// catalogs, or empty for none. It has no flag, like the auth server's, so the one variable
-	// configures both servers the same way (#431).
-	I18nOverridesDir string
 	// InternalCAFile is the PEM file whose authorities the console appends to the system roots
 	// before it verifies the auth server's certificate on an https internal URL, so a private CA
 	// can sign that URL without the process's own roots being replaced. Empty, its calls verify
@@ -165,7 +161,6 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			MetricsEnabled:                   getEnvAsBool("GOIABADA_ADMINCONSOLE_METRICS_ENABLED", &malformed),
 			ListenHostMetrics:                getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS", "0.0.0.0"),
 			ListenPortMetrics:                getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", 9191, &malformed),
-			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 			InternalCAFile:                   getEnv("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", ""),
 		},
 		AuthServer: authServerFromEnv(),

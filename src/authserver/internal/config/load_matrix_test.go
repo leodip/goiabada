@@ -223,13 +223,6 @@ var configVariables = []configVar{
 		func(c *Config) any { return c.AuthServer.SMTPEHLOName }),
 	int64VarNoFlag("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024, 5*1024*1024,
 		func(c *Config) any { return c.AuthServer.ProfilePictureMaxSizeBytes }),
-	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
-	// is what pins both now that the configuration reads it instead (#431).
-	{
-		env: "GOIABADA_I18N_OVERRIDES_DIR", def: "",
-		envValue: " /env/i18n-overrides ", envWant: "/env/i18n-overrides",
-		read: func(c *Config) any { return c.AuthServer.I18nOverridesDir },
-	},
 
 	// Admin console: the two values this process reads. The other 17 GOIABADA_ADMINCONSOLE_*
 	// variables are the peer's own and are not loaded here, so they have no row -- and the drift

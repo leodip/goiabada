@@ -6447,7 +6447,7 @@ components:
           type: string
           description: >-
             The language the user chose for Goiabada's own pages and emails: the tag of one of
-            the auth server's language catalogs, such as `pt-BR`, or empty for Automatic, where
+            Goiabada's built-in languages, such as `pt-BR`, or empty for Automatic, where
             pages follow the language the application or the browser asks for and emails follow
             `locale`.
         birthDate:
@@ -6759,8 +6759,7 @@ components:
             The language of Goiabada's own pages and emails for the user. Optional: when it is
             left out, the stored page language is kept, so a client that doesn't send it never
             resets it. Empty sets Automatic. Any other value must be exactly the tag of one of
-            the auth server's language catalogs: `en`, `pt-BR`, `es`, `fr`, `it`, `de`, or one an
-            operator added.
+            Goiabada's six built-in languages: `en`, `pt-BR`, `es`, `fr`, `it` or `de`.
 
     UpdateUserEmailRequest:
       type: object

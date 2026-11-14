@@ -2,14 +2,11 @@ package renderintegration
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"regexp"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
-	"github.com/leodip/goiabada/core/i18n"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,12 +59,18 @@ func TestRender_AdminSettingsKeysWritesTheKeyListAsEscapedJSON(t *testing.T) {
 	assert.Equal(t, `{"kid":"</script>"}`, decoded[0].PublicKeyJWK)
 }
 
-// The bootstrap block carries catalog text, which an operator can replace through the override
-// directory, so the hostile value arrives the way a self-hoster's catalog would deliver it. Both
-// console layouts write the block, and each is rendered.
+// builtInUnexpectedError is the pt-BR catalog's js.error.unexpected, which holds markup for the
+// script to insert and a placeholder for tFormat, and builtInUnexpectedErrorJSON is how the page may
+// carry it inside a script: every < and > as a \u escape.
+const (
+	builtInUnexpectedError     = "Ocorreu um erro inesperado: <span class='text-error'>{{detail}}</span>. Atualize a página e tente novamente."
+	builtInUnexpectedErrorJSON = `"Ocorreu um erro inesperado: \u003cspan class='text-error'\u003e{{detail}}\u003c/span\u003e. Atualize a página e tente novamente."`
+)
+
+// The bootstrap block carries catalog text, and a built-in value holds markup, so the engine's
+// escaping is what keeps it from reaching the page as live markup. Both console layouts write the
+// block, and each is rendered.
 func TestRender_JSBootstrapWritesCatalogValuesAsEscapedJSON(t *testing.T) {
-	installCatalogOverride(t, "active.pt-BR.toml",
-		`"js.error.error_title" = "</script><svg onload=alert(1)> & \u2028 \"q\""`+"\n")
 
 	layouts := []struct {
 		layout, page string
@@ -85,30 +88,15 @@ func TestRender_JSBootstrapWritesCatalogValuesAsEscapedJSON(t *testing.T) {
 		t.Run(l.layout, func(t *testing.T) {
 			out := renderWithLayout(t, l.layout, l.page, l.bind)
 
-			assert.Contains(t, out, `"js.error.error_title":`+hostileScriptJSON)
-			assert.NotContains(t, out, "<svg onload", "a catalog value reached the page as live markup")
+			assert.Contains(t, out, `"js.error.unexpected":`+builtInUnexpectedErrorJSON)
+			assert.NotContains(t, out, "<span class='text-error'>", "a catalog value reached the page as live markup")
 
 			m := jsI18nBlockRe.FindStringSubmatch(out)
 			require.Len(t, m, 2, "the #js-i18n data block is not in the page")
 			var kv map[string]string
 			require.NoError(t, json.Unmarshal([]byte(m[1]), &kv))
-			assert.Equal(t, hostileScriptValue, kv["js.error.error_title"])
-			assert.Equal(t, "Sessão expirada", kv["js.error.session_expired_title"],
-				"the rest of the catalog is untouched by the override")
-			assert.Contains(t, kv["js.error.unexpected"], "{{detail}}", "a client-side placeholder survives for tFormat")
+			assert.Equal(t, builtInUnexpectedError, kv["js.error.unexpected"], "escaped once and no more")
+			assert.Equal(t, "Sessão expirada", kv["js.error.session_expired_title"])
 		})
 	}
-}
-
-// installCatalogOverride installs the embedded catalogs with one override file over them, the way
-// GOIABADA_I18N_OVERRIDES_DIR does at startup, and puts the embedded catalogs alone back after the
-// test, which is what every other test in this package renders against.
-func installCatalogOverride(t *testing.T, name, content string) {
-	t.Helper()
-	dir := t.TempDir()
-	catalogs := filepath.Join(dir, "catalogs")
-	require.NoError(t, os.MkdirAll(catalogs, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(catalogs, name), []byte(content), 0o600))
-	require.NoError(t, i18n.LoadBundle(dir))
-	t.Cleanup(func() { require.NoError(t, i18n.LoadBundle("")) })
 }

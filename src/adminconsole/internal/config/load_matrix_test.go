@@ -164,13 +164,6 @@ var configVariables = []configVar{
 	intVar("GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", "adminconsole-listen-port-metrics", 9191,
 		19191, 29191,
 		func(c *Config) any { return c.AdminConsole.ListenPortMetrics }),
-	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
-	// is what pins both now that the configuration reads it instead (#431).
-	{
-		env: "GOIABADA_I18N_OVERRIDES_DIR", def: "",
-		envValue: " /env/i18n-overrides ", envWant: "/env/i18n-overrides",
-		read: func(c *Config) any { return c.AdminConsole.I18nOverridesDir },
-	},
 	// Load reads the file the setting names, and refuses one it cannot (#525), so both values
 	// are real files: certificates and nothing else.
 	strVar("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", "adminconsole-internal-ca-file", "",

@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -343,7 +341,6 @@ func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguag
 		name      string
 		accept    string
 		uiLocales string
-		spanish   bool
 		wantTag   string
 	}{
 		{name: "the page's matched language, not the first Accept-Language tag alone",
@@ -351,15 +348,12 @@ func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguag
 		{name: "a lone base language is sent under its catalog's tag",
 			accept: "pt", wantTag: "pt-BR"},
 		{name: "a cross-language guess gets English for both subject and body",
-			accept: "gl", spanish: true, wantTag: "en"},
-		{name: "a regional Spanish recipient, with an operator's Spanish catalog", accept: "es-MX", spanish: true, wantTag: "es"},
+			accept: "gl", wantTag: "en"},
+		{name: "a regional Spanish recipient", accept: "es-MX", wantTag: "es"},
 		{name: "ui_locales, the ceremony's explicit intent, also follows the page",
 			uiLocales: "nl pt-BR", wantTag: "pt-BR"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.spanish {
-				installSpanishOverrideCatalog(t)
-			}
 			h := newRegisterHarness(t)
 			req := registrationRequest(registerSomeoneEmail)
 			if tc.accept != "" {
@@ -400,21 +394,6 @@ func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguag
 			assert.Equal(t, "the rendered subject", sent.Subject)
 		})
 	}
-}
-
-// installSpanishOverrideCatalog installs an operator's es catalog until the test ends. A regional
-// Spanish request is matched to it; Galician, which has no catalog of its own, still gets English
-// rather than a guessed Spanish match (#658). An email's text is no longer in a catalog (#818), so
-// the catalog holds a page's message.
-func installSpanishOverrideCatalog(t *testing.T) {
-	t.Helper()
-	overrides := t.TempDir()
-	catalogs := filepath.Join(overrides, "catalogs")
-	require.NoError(t, os.Mkdir(catalogs, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(catalogs, "active.es.toml"),
-		[]byte("\"auth.pwd.title\" = \"Iniciar sesión\"\n"), 0o600))
-	require.NoError(t, i18n.LoadBundle(overrides))
-	t.Cleanup(func() { require.NoError(t, i18n.LoadBundle("")) })
 }
 
 // A verified, enabled account is sent the notice: no code, a pointer to the forgot-password page,

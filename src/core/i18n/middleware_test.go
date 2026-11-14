@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/text/language"
 )
 
 type stubUILocalesReader struct {
@@ -462,34 +461,15 @@ func TestCatalogTag_FollowsWithLocaleAndDefaultsToEnglish(t *testing.T) {
 	assert.Equal(t, "nl", LocaleTag(refined), "LocaleTag still answers the first preference")
 }
 
-// An override-only catalog is a catalog like the embedded ones: a request matching it names it.
-func TestCatalogTag_NamesAnOverrideOnlyCatalog(t *testing.T) {
-	saved := installed.Load()
-	t.Cleanup(func() { installed.Store(saved) })
-
-	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
-		"active.nl.toml": "\"auth.pwd.title\" = \"Aanmelden\"\n",
-	})))
-
-	assert.Equal(t, "nl", CatalogTag(WithLocale(context.Background(), false, "nl-BE")))
-}
-
-// The whole planned language set exercises cross-language guesses even before
-// those catalogs ship. WithLocale must prefer English to a guessed language,
-// preserve regional variants, and still honor a listed second choice (#658).
+// A language with no built-in catalog reads English, never a guessed neighbour: WithLocale prefers
+// English to a guessed language, keeps a regional variant on its language, and still honours a
+// listed second choice (#658).
 func TestWithLocale_EnglishWinsOverGuessedLanguages(t *testing.T) {
-	saved := installed.Load()
-	t.Cleanup(func() { installed.Store(saved) })
-	var files []catalogFile
-	for _, tag := range []string{"en", "pt-BR", "es", "fr", "it", "de", "ja", "zh-Hans", "ko", "pl", "ru", "ar", "id", "hi"} {
-		files = append(files, catalogFile{tag: language.Make(tag), messages: map[string]string{"test.language": tag}})
-	}
-	installed.Store(build(files))
-	for _, tag := range []string{"uk", "sr", "bg", "ba", "be", "kk", "ky", "fa", "zh-TW", "zh-HK", "zh-Hant", "gl", "eu", "gsw", "lb", "ms", "jv", "su", "mr", "gu"} {
+	for _, tag := range []string{"uk", "sr", "bg", "ba", "be", "kk", "ky", "fa", "ja", "nl", "ru", "zh-TW", "zh-Hant", "gl", "eu", "ca", "gsw", "lb", "oc", "co", "ms", "jv", "su", "mr", "gu"} {
 		t.Run(tag, func(t *testing.T) {
 			ctx := WithLocale(context.Background(), true, tag)
 			assert.Equal(t, "en", CatalogTag(ctx))
-			assert.Equal(t, "en", T(ctx, "test.language"))
+			assert.Equal(t, "Sign in", T(ctx, "auth.pwd.title"))
 			assert.Equal(t, tag, LocaleTag(ctx), "the requested locale is still recorded for email copies")
 		})
 	}
@@ -498,15 +478,15 @@ func TestWithLocale_EnglishWinsOverGuessedLanguages(t *testing.T) {
 		want string
 	}{
 		{[]string{"es-MX"}, "es"}, {[]string{"es-419"}, "es"}, {[]string{"es-AR"}, "es"},
-		{[]string{"de-CH"}, "de"}, {[]string{"fr-CA"}, "fr"}, {[]string{"ar-SA"}, "ar"}, {[]string{"zh-SG"}, "zh-Hans"},
-		{[]string{"uk", "ru"}, "ru"}, {[]string{"gl", "es"}, "es"},
-		{[]string{"uk,ru;q=0.8"}, "ru"}, {[]string{"gl,es-MX;q=0.8"}, "es"},
+		{[]string{"de-CH"}, "de"}, {[]string{"de-AT"}, "de"}, {[]string{"fr-CA"}, "fr"}, {[]string{"it-CH"}, "it"},
+		{[]string{"pt-PT"}, "pt-BR"},
+		{[]string{"uk", "de"}, "de"}, {[]string{"gl", "es"}, "es"},
+		{[]string{"uk,de;q=0.8"}, "de"}, {[]string{"gl,es-MX;q=0.8"}, "es"},
 		{[]string{"es;q=0,en;q=0.5"}, "en"},
 	} {
 		t.Run(strings.Join(tc.tags, " "), func(t *testing.T) {
 			ctx := WithLocale(context.Background(), true, tc.tags...)
 			assert.Equal(t, tc.want, CatalogTag(ctx))
-			assert.Equal(t, tc.want, T(ctx, "test.language"))
 		})
 	}
 }

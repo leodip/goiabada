@@ -137,7 +137,7 @@ func translatedErrorExampleFindings(root, page string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	embedded, err := load("")
+	embedded, err := load()
 	if err != nil {
 		return nil, fmt.Errorf("loading the embedded catalogs: %w", err)
 	}

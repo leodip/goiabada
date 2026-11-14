@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSpanish_RegionalPreferencesAndRefusals(t *testing.T) {
@@ -19,17 +18,4 @@ func TestSpanish_RegionalPreferencesAndRefusals(t *testing.T) {
 			assert.Equal(t, "{{count}} resultados", Raw(ctx, "js.combobox.results"))
 		})
 	}
-}
-
-func TestSpanish_OverridesWinAndUnspecifiedKeysKeepSpanish(t *testing.T) {
-	b, err := loadWithOverrides(t, map[string]string{
-		"active.es.toml": `"auth.pwd.title" = "Acceder a Acme"
-"auth.pwd.email_label" = ""
-`,
-	})
-	require.NoError(t, err)
-	ctx := ctxForBundle(b, "es-MX")
-	assert.Equal(t, "Acceder a Acme", T(ctx, "auth.pwd.title"))
-	assert.Equal(t, "Contraseña", T(ctx, "auth.pwd.password_label"))
-	assert.Equal(t, "Email", T(ctx, "auth.pwd.email_label"), "an explicitly empty override still requests English")
 }

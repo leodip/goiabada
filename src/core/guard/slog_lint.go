@@ -310,22 +310,20 @@ type slogPlainSite struct {
 // core/middleware's parseCIDRs was a third until #425 made a malformed trusted-proxy entry refuse
 // startup: its replacement returns the error to main and logs nothing.
 //
-// loadOverrideCatalogs and orEmpty are core/i18n's startup records. LoadBundle runs once, from
-// each main before the first request, and loadOverrideCatalogs writes its two records while it
-// does; orEmpty writes its one only when the catalogs compiled into the binary fail to parse,
-// which is also decided at load. core/i18n is not in slogNoRequestDirs because the locale
-// middleware every request runs through is there, so the two are admitted by name and the rest of
-// the package is held to the rule (#442).
+// orEmpty is core/i18n's one record outside a request: it writes it only when the catalogs compiled
+// into the binary fail to parse, which is decided once, inside the sync.OnceValue that first builds
+// them, whichever caller gets there first, so no request's context is its own. core/i18n is not in
+// slogNoRequestDirs because the locale middleware every request runs through is there, so orEmpty
+// is admitted by name and the rest of the package is held to the rule (#442).
 //
 // StaticFS and TemplateFS, in each application's web package, open the embedded static and
 // template trees, and record the one fault that can stop them. Their only callers are the two
 // server.NewServer functions, which run once before the first request. Neither web package is in
 // slogNoRequestDirs: the auth server's also serves the OpenAPI document on every request, so both
-// are admitted function by function, the way core/i18n's startup records are (#442).
+// are admitted function by function, the way core/i18n's orEmpty is (#442).
 var slogPlainSites = []slogPlainSite{
 	{scope: "adminconsole/internal/render/template_funcs.go", name: "addUrlParam"},
 	{scope: "adminconsole/internal/render/template_funcs.go", name: "convertToString"},
-	{scope: "core/i18n/overrides.go", name: "loadOverrideCatalogs"},
 	{scope: "core/i18n/i18n.go", name: "orEmpty"},
 	{scope: "authserver/web/embed_fs.go", name: "StaticFS"},
 	{scope: "authserver/web/embed_fs.go", name: "TemplateFS"},

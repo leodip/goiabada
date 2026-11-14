@@ -15,6 +15,7 @@ package i18n
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -26,6 +27,7 @@ import (
 
 // The pages, relative to the repository root, and the guide's anchor the others link to.
 const (
+	customizeGuide      = "site/src/content/docs/guides/customize-and-translate-the-pages.mdx"
 	authorizePage       = "site/src/content/docs/reference/endpoints/authorize.mdx"
 	logoutPage          = "site/src/content/docs/reference/endpoints/logout.mdx"
 	scopesPage          = "site/src/content/docs/concepts/scopes.mdx"
@@ -201,5 +203,16 @@ func assertSaysInOrder(r guard.Reporter, root, page, heading string, texts ...st
 			r.Errorf("%s: %s names %q before %q", page, heading, text, texts[i-1])
 		}
 		previous = at
+	}
+}
+
+func writeGuideFixture(t *testing.T, root, name, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("creating %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("writing %s: %v", path, err)
 	}
 }

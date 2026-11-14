@@ -111,14 +111,12 @@ type FooterLanguage struct {
 }
 
 // brandFooterLanguages are the six built-in languages, in the order the console lists its catalogs,
-// English first. A language only an operator's override directory adds has no label of its own (#814
-// decision 5).
+// English first (#814 decision 5).
 func brandFooterLanguages() []FooterLanguage {
-	var languages []FooterLanguage
-	for _, option := range render.PageLanguageOptions() {
-		if i18n.IsBuiltInCatalogTag(option.Tag) {
-			languages = append(languages, FooterLanguage(option))
-		}
+	options := render.PageLanguageOptions()
+	languages := make([]FooterLanguage, 0, len(options))
+	for _, option := range options {
+		languages = append(languages, FooterLanguage(option))
 	}
 	return languages
 }
@@ -252,7 +250,7 @@ func footerLinkInput(tokens []string) string {
 	switch {
 	case len(tokens) == 3 && (tokens[2] == "label" || tokens[2] == "url"):
 		return fmt.Sprintf("footerLinks-%d-%s", index, tokens[2])
-	case len(tokens) == 4 && tokens[2] == "labels" && i18n.IsBuiltInCatalogTag(tokens[3]):
+	case len(tokens) == 4 && tokens[2] == "labels" && i18n.IsCatalogTag(tokens[3]):
 		return fmt.Sprintf("footerLinks-%d-labels-%s", index, tokens[3])
 	}
 	return ""

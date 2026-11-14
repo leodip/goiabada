@@ -71,10 +71,6 @@ type AuthServerConfig struct {
 	// an address literal, held to RFC 5321 by Load, or empty for the address of each connection's
 	// own end (#718 decision 9).
 	SMTPEHLOName string
-	// I18nOverridesDir is the directory whose catalogs/ main merges over the embedded message
-	// catalogs, or empty for none. It has no flag, like the admin console's, so the one variable
-	// configures both servers the same way (#431).
-	I18nOverridesDir string
 }
 
 // IsCookieSecure reports whether cookies should carry the Secure flag. It is
@@ -268,7 +264,6 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			ListenPortMetrics:                getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS", 9190, &malformed),
 			ProfilePictureMaxSizeBytes:       getEnvAsUploadSize("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", defaultProfilePictureMaxSizeBytes, &malformed),
 			SMTPEHLOName:                     getEnv("GOIABADA_AUTHSERVER_SMTP_EHLO_NAME", ""),
-			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 		},
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:           getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),

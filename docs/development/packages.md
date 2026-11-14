@@ -96,12 +96,13 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   a response's status through. They replaced chi's middleware package, which linked `net/http/pprof`
   and `expvar` into both servers (#462). Each application's own middleware - session, JWT, rate
   limiting - is in its `internal/middleware`
-- `i18n/` - The internationalization layer: the embedded message catalogs and the runtime overrides
-  that win over them, the `Locale` middleware early in every request chain, the three locale setters
+- `i18n/` - The internationalization layer: the message catalogs built into Goiabada, the `Locale`
+  middleware early in every request chain, the three locale setters
   (`WithLocale` for a locale the request asks for, a non-explicit call deferring to explicit intent
   already on the context; `WithPageLanguage` for a user's page language, which wins over it, and
   whose Automatic gives the request's language back; `WithRecipientLanguage` for an email to a
-  user), the loaded catalogs a page language can name (`CatalogTags`, `IsCatalogTag`), and the
+  user), the built-in catalogs a page language and a brand's footer link label can name
+  (`CatalogTags`, `IsCatalogTag`), and the
   error-code vocabulary in `error_codes.md`. The six template helpers only the
   admin console renders with, the locale picker's label, the country, phone-country and timezone
   labels and the two date formatters, are that console's, unexported in its `internal/render`: they

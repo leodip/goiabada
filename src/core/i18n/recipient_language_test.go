@@ -67,25 +67,3 @@ func TestWithRecipientLanguage_ReplacesThePageLanguageOfWhoeverSentIt(t *testing
 		})
 	}
 }
-
-// An operator's override-only catalog can be a recipient's chosen language while it is loaded. Once
-// it is gone, the choice counts as Automatic: Language and region, not English.
-func TestWithRecipientLanguage_AVanishedCatalogCountsAsAutomatic(t *testing.T) {
-	saved := installed.Load()
-	t.Cleanup(func() { installed.Store(saved) })
-
-	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
-		"active.nl.toml": "\"forgot_password.title\" = \"Wachtwoord herstellen\"\n",
-	})))
-	sender := throughLocale(t, nil, "/forgot-password", "it")
-	loaded := WithRecipientLanguage(sender, "nl", "fr")
-	assert.Equal(t, "Wachtwoord herstellen", T(loaded, "forgot_password.title"))
-	assert.Equal(t, "nl", LocaleTag(loaded))
-
-	// The operator removes the catalog and the process starts again.
-	require.NoError(t, LoadBundle(""))
-	sender = throughLocale(t, nil, "/forgot-password", "it")
-	vanished := WithRecipientLanguage(sender, "nl", "fr")
-	assert.Equal(t, "Réinitialiser votre mot de passe", T(vanished, "forgot_password.title"))
-	assert.Equal(t, "fr", LocaleTag(vanished))
-}

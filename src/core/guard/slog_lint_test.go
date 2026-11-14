@@ -462,18 +462,9 @@ import "log/slog"
 
 func run() { slog.Info("job finished") }
 `)
-	// core/i18n is both: LoadBundle's two startup records and orEmpty's, written before any request
-	// exists, are admitted by name, and the rest of the package, the locale middleware included,
-	// is held to the rule.
-	tree.write("core/i18n/overrides.go", `package i18n
-
-import "log/slog"
-
-func loadOverrideCatalogs(dir string) {
-	slog.Info("override directory has no catalogs subdirectory, skipping it", slog.String("dir", dir))
-	slog.Info("loaded an override catalog, which wins over the embedded one", slog.String("path", dir))
-}
-`)
+	// core/i18n is both: orEmpty's record, written once when the built-in catalogs are first built,
+	// is admitted by name, and the rest of the package, the locale middleware included, is held to
+	// the rule.
 	tree.write("core/i18n/i18n.go", `package i18n
 
 import "log/slog"
@@ -512,7 +503,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 
 	violations, files, err := findSlogViolations(tree.root, tree.golangci, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 35, files, "every non-exempt fixture is walked")
+	assert.Equal(t, 34, files, "every non-exempt fixture is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {
