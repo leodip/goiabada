@@ -1,7 +1,8 @@
 // Package emaildelivery sends the auth server's mail: one message per call, over the SMTP relay
 // the settings row configures. SSL/TLS and STARTTLS are refused rather than downgraded; STARTTLS if
 // available, the `none` mode, upgrades when it can and says when it could not. It renders nothing;
-// the handlers build the HTML body from their templates and pass the relay as an SMTPConfig.
+// the handlers build the HTML body from their templates and pass the relay as an SMTPConfig, and
+// the sender works the message's plain-text part out of that HTML.
 package emaildelivery
 
 import (
@@ -16,6 +17,7 @@ import (
 	"io"
 	"log/slog"
 	"mime"
+	"mime/multipart"
 	"mime/quotedprintable"
 	"net"
 	"net/mail"
@@ -682,12 +684,23 @@ func isLocalHost(host string) bool {
 	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
-// buildMessage writes the RFC 5322 message: a fixed header order, then a quoted-printable
-// text/html body. go-simple-mail emitted the headers in Go map order, so nothing downstream can
-// have depended on the old order (#274).
+// buildMessage writes the RFC 5322 message: a fixed header order, then a multipart/alternative
+// body of two quoted-printable parts, the plain text worked out of the HTML and then the HTML.
+// go-simple-mail emitted the headers in Go map order, so nothing downstream can have depended on
+// the old order (#274).
 func (e *Sender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]byte, error) {
 
+	// No email is sent without its text (#817 decision 10).
+	text, err := plainText(input.HtmlBody)
+	if err != nil {
+		return nil, err
+	}
+
 	messageID, err := e.newMessageID(from.Address)
+	if err != nil {
+		return nil, err
+	}
+	boundary, err := e.newBoundary()
 	if err != nil {
 		return nil, err
 	}
@@ -709,21 +722,65 @@ func (e *Sender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]
 	writeHeader(&b, "Date", time.Now().Format(time.RFC1123Z))
 	writeHeader(&b, "Message-ID", messageID)
 	writeHeader(&b, "MIME-Version", "1.0")
-	writeHeader(&b, "Content-Type", "text/html; charset=UTF-8")
-	writeHeader(&b, "Content-Transfer-Encoding", "quoted-printable")
+	// Every part is quoted-printable, so the message as a whole is 7-bit, the default a multipart
+	// message names no Content-Transfer-Encoding for (RFC 2045 section 6.1).
+	writeHeader(&b, "Content-Type", mime.FormatMediaType("multipart/alternative", map[string]string{"boundary": boundary}))
 	b.WriteString("\r\n")
 
-	// Quoted-printable rather than raw 8-bit: BODY=8BITMIME does not lift RFC 5322's 998-byte
-	// line limit, and a rendered HTML line can exceed it. net/smtp's data writer dot-stuffs.
-	qp := quotedprintable.NewWriter(&b)
-	if _, err := qp.Write([]byte(input.HtmlBody)); err != nil {
+	parts := multipart.NewWriter(&b)
+	if err := parts.SetBoundary(boundary); err != nil {
 		return nil, errs.WithStack(err)
 	}
-	if err := qp.Close(); err != nil {
+	// RFC 2046 section 5.1.4: the parts in increasing order of preference, the plainest first and
+	// the richest last.
+	for _, part := range []struct{ contentType, content string }{
+		{"text/plain; charset=UTF-8", text},
+		{"text/html; charset=UTF-8", input.HtmlBody},
+	} {
+		w, err := parts.CreatePart(textproto.MIMEHeader{
+			"Content-Type":              {part.contentType},
+			"Content-Transfer-Encoding": {"quoted-printable"},
+		})
+		if err != nil {
+			return nil, errs.WithStack(err)
+		}
+		// Quoted-printable rather than raw 8-bit: BODY=8BITMIME does not lift RFC 5322's 998-byte
+		// line limit, and a rendered HTML line can exceed it. net/smtp's data writer dot-stuffs.
+		qp := quotedprintable.NewWriter(w)
+		if _, err := qp.Write([]byte(part.content)); err != nil {
+			return nil, errs.WithStack(err)
+		}
+		if err := qp.Close(); err != nil {
+			return nil, errs.WithStack(err)
+		}
+	}
+	if err := parts.Close(); err != nil {
 		return nil, errs.WithStack(err)
 	}
 
 	return b.Bytes(), nil
+}
+
+// newBoundary returns the multipart boundary of one message: "=_" and 24 random hex characters.
+// RFC 2046 section 5.1.1 requires that it appear in no part, and a quoted-printable part never
+// holds "=_", since its "=" is always followed by two hex digits or a line end. 26 characters stay
+// within the 70 it allows, and keep the Content-Type header that quotes it within RFC 5322's 78.
+func (e *Sender) newBoundary() (string, error) {
+	raw := make([]byte, 12)
+	if err := e.random(raw); err != nil {
+		return "", errs.Wrap(err, "unable to generate a multipart boundary")
+	}
+	return "=_" + hex.EncodeToString(raw), nil
+}
+
+// random fills raw from the sender's source of randomness.
+func (e *Sender) random(raw []byte) error {
+	reader := e.randReader
+	if reader == nil {
+		reader = rand.Reader
+	}
+	_, err := io.ReadFull(reader, raw)
+	return err
 }
 
 // newMessageID returns `<32 hex characters@domain>`, per RFC 5322 section 3.6.4's SHOULD. The
@@ -731,16 +788,11 @@ func (e *Sender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]
 // on the way into the settings (apihandlers.HandleSettingsEmailPut), which is what keeps this
 // from being a header injection point (#274).
 func (e *Sender) newMessageID(fromAddress string) (string, error) {
-	reader := e.randReader
-	if reader == nil {
-		reader = rand.Reader
-	}
-
 	raw := make([]byte, 16)
 	// crypto/rand.Read is documented never to fail, so in production this branch is unreachable.
 	// It is still an error rather than an empty left-hand side: `<@domain>` would be emitted on
 	// every send, which is worse than no Message-ID at all.
-	if _, err := io.ReadFull(reader, raw); err != nil {
+	if err := e.random(raw); err != nil {
 		return "", errs.Wrap(err, "unable to generate a Message-ID")
 	}
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -494,9 +495,13 @@ func HandleUserCreatePost(
 		// writes the user after the insert: a save of the row as created could undo whatever
 		// another request changed in between (#471 decision 4). A create that loses its address
 		// below discards the code with the row.
-		var verificationCode string
+		//
+		// The email is rendered here too, before the create, so a fault in rendering it refuses the
+		// request with nothing written; once the user exists, only the send is left to fail, and a
+		// failed send no longer fails the request (#725).
+		var setupEmail *emaildelivery.SendEmailInput
 		if sendSetupEmail {
-			verificationCode = securerandom.String(32)
+			verificationCode := securerandom.String(32)
 			input.ForgotPasswordCodeEncrypted, err = dataCipher.Encrypt(verificationCode)
 			if err != nil {
 				writeInternalServerError(w, r, err)
@@ -508,6 +513,12 @@ func HandleUserCreatePost(
 			// proves a submitted code matches, where the hash only locates the row.
 			input.ForgotPasswordCodeHash = hashutil.HashString(verificationCode)
 			input.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+
+			setupEmail, err = renderSetupEmail(r, pageRenderer, settings, input, verificationCode, baseURL)
+			if err != nil {
+				writeInternalServerError(w, r, err)
+				return
+			}
 		}
 
 		// Create user using UserCreator
@@ -543,50 +554,64 @@ func HandleUserCreatePost(
 			"logged_in_user": loggedInUser,
 		})
 
-		// Handle email flow if needed
-		if sendSetupEmail {
-			// Prepare and send email
-			name := createdUser.FullName()
-			if len(name) == 0 {
-				name = createdUser.Email
-			}
-
-			bind := map[string]interface{}{
-				"name": name,
-				"link": emaillinks.ResetPasswordLink(baseURL, verificationCode, ""),
-			}
-
-			// The email is the new user's, in their language by the rule every email to a user
-			// follows, not the administrator's: a user created here has chosen no page language
-			// and has no Language and region yet, so it is in English. Once they choose,
-			// subsequent emails honor it.
-			emailReq := r.WithContext(i18n.WithRecipientLanguage(r.Context(), createdUser.PageLanguage, createdUser.Locale))
-			buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
-			if err != nil {
-				writeInternalServerError(w, r, err)
-				return
-			}
-
-			input := &emaildelivery.SendEmailInput{
-				To:       createdUser.Email,
-				Subject:  i18n.T(emailReq.Context(), "email.newuser_set_password.subject", map[string]any{"appName": settings.AppName}),
-				HtmlBody: buf.String(),
-			}
-			_, err = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
-			if err != nil {
-				writeInternalServerError(w, r, err)
-				return
-			}
-		}
-
-		// Create response
 		response := api.CreateUserResponse{
 			User: *apimapping.ToUserResponse(createdUser),
+		}
+
+		// The user exists, so a send that fails is reported in the answer rather than as a
+		// failure of the request: the administrator is on the page and can set a password or ask
+		// the user to use "Forgot password?" (#725 decision 12). The member is present exactly when
+		// a setup email was attempted.
+		if setupEmail != nil {
+			sent := true
+			_, err = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), setupEmail)
+			if err != nil {
+				sent = false
+				slog.ErrorContext(r.Context(), "unable to send the setup email of a new user",
+					"user_id", createdUser.Id, "error", err)
+			}
+			response.SetupEmailSent = &sent
 		}
 
 		// Set content type and encode response
 		writeJSON(w, r, http.StatusCreated, response)
 	}
+}
+
+// renderSetupEmail renders the email that lets a new user create their password, before the user
+// it is for is created. The email is the new user's, in their language by the rule every email to
+// a user follows, not the administrator's: a user created here has chosen no page language and has
+// no Language and region yet, so it is in English. Once they choose, subsequent emails honor it.
+func renderSetupEmail(r *http.Request, pageRenderer PageRenderer, settings *record.Settings,
+	input *usercreation.Input, verificationCode string, baseURL string) (*emaildelivery.SendEmailInput, error) {
+
+	newUser := &record.User{
+		Email:      input.Email,
+		GivenName:  input.GivenName,
+		MiddleName: input.MiddleName,
+		FamilyName: input.FamilyName,
+	}
+	name := newUser.FullName()
+	if len(name) == 0 {
+		name = newUser.Email
+	}
+
+	bind := map[string]interface{}{
+		"name": name,
+		"link": emaillinks.ResetPasswordLink(baseURL, verificationCode, ""),
+	}
+
+	emailReq := r.WithContext(i18n.WithRecipientLanguage(r.Context(), newUser.PageLanguage, newUser.Locale))
+	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
+	if err != nil {
+		return nil, err
+	}
+
+	return &emaildelivery.SendEmailInput{
+		To:       newUser.Email,
+		Subject:  i18n.T(emailReq.Context(), "email.newuser_set_password.subject", map[string]any{"appName": settings.AppName}),
+		HtmlBody: buf.String(),
+	}, nil
 }
 
 // errUserAlreadyDisabled is what HandleUserEnabledPut's write callback returns to

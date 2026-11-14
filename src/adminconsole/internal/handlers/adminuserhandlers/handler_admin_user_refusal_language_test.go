@@ -27,7 +27,7 @@ func (*refusingUserApiClient) GetUserAttributeById(_ context.Context, _ string, 
 	return &api.UserAttributeResponse{Id: attributeId, Key: "department", UserId: 5}, nil
 }
 
-func (*refusingUserApiClient) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.UserResponse, error) {
+func (*refusingUserApiClient) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
 	panic("unexpected call to CreateUserAdmin")
 }
 

@@ -28,6 +28,7 @@ import {
   slotHolds,
   uploadKit,
   uploadSays,
+  webpFile,
   woff2File,
 } from "../../../lib/brands";
 import { openSignIn } from "../../../lib/browser-sign-in";
@@ -138,7 +139,8 @@ test("each field of the kit set in the editor is drawn on a sign-in page, light 
 });
 
 // Each refusal names what was wrong and the limit it broke, at the field, and the slot keeps what it
-// held (#813 decision 3). A file over the kind's byte limit is refused before it is sent.
+// held (#813 decision 3). A file over the kind's byte limit is refused before it is sent. A logo or a
+// dark logo is a PNG or a JPEG, which emails draw too, so a WebP is refused there (#817 decision 5).
 test("a file the kit's rules refuse is said at its field, and the slot keeps what it held", async ({ page }) => {
   await page.goto(newBrandUrl);
 
@@ -150,6 +152,10 @@ test("a file the kit's rules refuse is said at its field, and the slot keeps wha
   expect(await pickInEditor(page, "logo", tooLarge)).toBe("The image can be at most 1048576 bytes.");
   expect(sent, "a file over the limit is not sent").toEqual([]);
 
+  const pngOrJpeg = "The image type is not supported. Allowed types are PNG and JPEG.";
+  expect(await pickInEditor(page, "logo", webpFile("logo.webp", 240, 80))).toBe(pngOrJpeg);
+  expect(await pickInEditor(page, "darkLogo", webpFile("dark-logo.webp", 240, 80))).toBe(pngOrJpeg);
+
   expect(await pickInEditor(page, "favicon", pngFile("wide.png", 96, 64, [10, 20, 30]))).toBe(
     "The image must be square. This one is 96x64 pixels.",
   );
@@ -159,7 +165,7 @@ test("a file the kit's rules refuse is said at its field, and the slot keeps wha
   expect(await pickInEditor(page, "regularFont", pngFile("not-a-font.png", 20, 20, [0, 0, 0]))).toBe(
     "The font type is not supported. The only allowed type is WOFF2.",
   );
-  for (const slot of ["logo", "favicon", "background", "regularFont"] as const) {
+  for (const slot of ["logo", "darkLogo", "favicon", "background", "regularFont"] as const) {
     expect(await slotHolds(page, slot), `the ${slot} is still empty`).toEqual({ id: "", url: "" });
     await expect(page.locator(`#${slot}Remove`)).toBeHidden();
   }

@@ -1150,6 +1150,9 @@
 "adminconsole.admin_users.details.field.enabled_hint" = "Un usuario desactivado no puede iniciar sesión y los clientes no pueden renovar sus tokens."
 "adminconsole.admin_users.details.disable_warning" = "Vas a desactivar al usuario. No podrá iniciar sesión y los clientes no podrán renovar sus tokens."
 "adminconsole.admin_users.details.user_created_message" = "Usuario creado."
+"adminconsole.admin_users.details.setup_email_not_sent" = "No se pudo enviar el correo de configuración, así que el usuario todavía no puede iniciar sesión."
+"adminconsole.admin_users.details.setup_email_set_password" = "Establece una contraseña para el usuario en la pestaña Autenticación."
+"adminconsole.admin_users.details.setup_email_forgot_password" = "O, cuando el correo funcione, pide al usuario que seleccione «¿Olvidaste tu contraseña?» en la página de inicio de sesión."
 
 # --- Admin users (profile, email, phone, address) ---------------------------
 
@@ -1792,7 +1795,7 @@
 "adminconsole.admin_branding.brand.field.hide_app_name" = "Ocultar el nombre de la aplicación"
 "adminconsole.admin_branding.brand.hide_app_name_hint" = "Para un logo que ya muestra el nombre. Una marca sin logo siempre muestra el nombre."
 "adminconsole.admin_branding.brand.field.logo" = "Logo"
-"adminconsole.admin_branding.brand.logo_hint" = "Se muestra encima del nombre de la aplicación en la tarjeta de inicio de sesión. Una imagen fija PNG, JPEG o WebP, de 10 a 512 píxeles por lado, hasta 1 MB."
+"adminconsole.admin_branding.brand.logo_hint" = "Se muestra encima del nombre de la aplicación en la tarjeta de inicio de sesión. Una imagen fija PNG o JPEG, de 10 a 512 píxeles por lado, hasta 1 MB."
 "adminconsole.admin_branding.brand.field.dark_logo" = "Logo oscuro"
 "adminconsole.admin_branding.brand.dark_logo_hint" = "Se muestra en modo oscuro en lugar del logo, con las mismas reglas. Necesita un logo."
 "adminconsole.admin_branding.brand.field.favicon" = "Favicon"
@@ -2420,6 +2423,7 @@
 "validator.image.dimensions_too_small" = "La imagen debe tener al menos {{.min}} × {{.min}} píxeles."
 "validator.image.dimensions_too_large" = "La imagen no puede superar los {{.max}} × {{.max}} píxeles."
 "validator.image.unsupported_type_png_jpeg_webp" = "El tipo de imagen no es compatible. Se admiten PNG, JPEG y WebP."
+"validator.image.unsupported_type_png_jpeg" = "El tipo de imagen no es compatible. Se admiten PNG y JPEG."
 "validator.image.unsupported_type_png" = "El tipo de imagen no es compatible. Solo se admite PNG."
 "validator.image.not_square" = "La imagen debe ser cuadrada. Esta mide {{.width}} × {{.height}} píxeles."
 "validator.image.animated" = "No se admiten imágenes animadas. Sube una imagen fija."
@@ -2468,6 +2472,13 @@
 "email.account_deleted.subject" = "Se ha eliminado tu cuenta"
 "email.account_deleted_by_administrator.subject" = "Un administrador ha eliminado tu cuenta"
 "email.otp_lockout.subject" = "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos"
+"email.test_email.subject" = "{{.appName}} - correo de prueba"
+
+# The label of the button an action email draws above its URL (#817).
+"email.forgot_password.button" = "Restablecer contraseña"
+"email.register_activate.button" = "Activar cuenta"
+"email.newuser_set_password.button" = "Crear contraseña"
+"email.register_confirmation.button" = "Iniciar sesión"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

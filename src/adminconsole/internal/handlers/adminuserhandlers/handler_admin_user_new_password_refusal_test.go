@@ -20,7 +20,7 @@ type refusingUserNewAPI struct {
 	code string
 }
 
-func (a refusingUserNewAPI) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.UserResponse, error) {
+func (a refusingUserNewAPI) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
 	return nil, &apiclient.APIError{Code: a.code, Message: "refused", StatusCode: http.StatusBadRequest}
 }
 

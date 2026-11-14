@@ -150,7 +150,7 @@ func TestHandleSettingsEmailSendTestPost_AuditsTheLowercasedRecipientsDigest(t *
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
 	rr := httptest.NewRecorder()
 
-	HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).ServeHTTP(rr, req)
+	HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, testEmailRenderer(), auditLogger).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, map[string]interface{}{

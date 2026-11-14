@@ -426,7 +426,7 @@ func TestSettingsEmailRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	sendTest := func(settings *record.Settings, to string) func(*testing.T, string) *httptest.ResponseRecorder {
 		return settingsRefusal(http.MethodPost, "/api/v1/admin/settings/email/send-test", map[string]any{"to": to}, settings, nil,
 			func(t *testing.T, database *datamocks.Database) http.Handler {
-				return HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), accounthandlersmocks.NewEmailSender(t), handlersmocks.NewAuditLogger(t))
+				return HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), accounthandlersmocks.NewEmailSender(t), testEmailRenderer(), handlersmocks.NewAuditLogger(t))
 			})
 	}
 
@@ -583,7 +583,7 @@ func TestSettingsEmailSendFailures_AreInTheRequestsLanguage(t *testing.T) {
 				Return(emaildelivery.SendResult{}, errs.WithStack(&emaildelivery.SendError{Kind: kind, Err: cause})).Once()
 			r := sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true})
 			rr := httptest.NewRecorder()
-			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, handlersmocks.NewAuditLogger(t)).
+			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, testEmailRenderer(), handlersmocks.NewAuditLogger(t)).
 				ServeHTTP(rr, inRequestLanguage(r, acceptLanguage))
 			return rr
 		}

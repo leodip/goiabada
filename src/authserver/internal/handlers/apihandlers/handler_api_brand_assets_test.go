@@ -65,7 +65,18 @@ func assetAPNG(width, height int) []byte {
 
 // assetAnimatedWebP is a WebP whose VP8X header sets the animation flag.
 func assetAnimatedWebP(width, height int) []byte {
-	body := append([]byte("WEBPVP8X\x0a\x00\x00\x00"), 0x02, 0, 0, 0,
+	return assetWebP(width, height, 0x02)
+}
+
+// assetStillWebP is a WebP whose VP8X header sets no animation flag.
+func assetStillWebP(width, height int) []byte {
+	return assetWebP(width, height, 0)
+}
+
+// assetWebP is a WebP's RIFF header and its VP8X chunk with the flags given and the size of width by
+// height pixels, as far as a decoder reads to answer the size.
+func assetWebP(width, height int, flags byte) []byte {
+	body := append([]byte("WEBPVP8X\x0a\x00\x00\x00"), flags, 0, 0, 0,
 		byte(width-1), byte((width-1)>>8), byte((width-1)>>16),
 		byte(height-1), byte((height-1)>>8), byte((height-1)>>16))
 	size := len(body)
@@ -106,7 +117,10 @@ func TestBrandAssetPost_StoresEachKindUnattachedAndAnswersItsURL(t *testing.T) {
 	}{
 		{record.BrandAssetKindLogo, createTestPNG(120, 40), "image/png", 120, 40},
 		{record.BrandAssetKindFavicon, createTestPNG(64, 64), "image/png", 64, 64},
+		{record.BrandAssetKindLogo, assetJPEG(200, 100), "image/jpeg", 200, 100},
 		{record.BrandAssetKindBackground, assetJPEG(320, 200), "image/jpeg", 320, 200},
+		// A background keeps WebP, which pages alone draw (#817 decision 5).
+		{record.BrandAssetKindBackground, assetStillWebP(1920, 1080), "image/webp", 1920, 1080},
 		// A background up to 2 MiB, twice a logo's limit, is the background's to take.
 		{record.BrandAssetKindBackground, paddedAsset(createTestPNG(100, 100), 2097152), "image/png", 100, 100},
 		{record.BrandAssetKindFont, assetWOFF2(4096), "font/woff2", 0, 0},
@@ -163,15 +177,20 @@ func TestBrandAssetPost_RefusesAFileItsKindDoesNotTake(t *testing.T) {
 		code    string
 		english string
 	}{
-		{"a GIF logo", record.BrandAssetKindLogo, assetGIF(50, 50), "validator.image.unsupported_type_png_jpeg_webp",
-			"The image type is not supported. Allowed types are PNG, JPEG and WebP."},
+		{"a GIF logo", record.BrandAssetKindLogo, assetGIF(50, 50), "validator.image.unsupported_type_png_jpeg",
+			"The image type is not supported. Allowed types are PNG and JPEG."},
 		{"an SVG logo", record.BrandAssetKindLogo, []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`),
-			"validator.image.unsupported_type_png_jpeg_webp",
-			"The image type is not supported. Allowed types are PNG, JPEG and WebP."},
+			"validator.image.unsupported_type_png_jpeg",
+			"The image type is not supported. Allowed types are PNG and JPEG."},
+		// A logo is drawn in emails too, where a WebP is not drawn everywhere (#817 decision 5).
+		{"a still WebP logo", record.BrandAssetKindLogo, assetStillWebP(300, 120), "validator.image.unsupported_type_png_jpeg",
+			"The image type is not supported. Allowed types are PNG and JPEG."},
 		{"an animated PNG logo", record.BrandAssetKindLogo, assetAPNG(100, 100), "validator.image.animated",
 			"Animated images are not allowed. Upload a still image."},
-		{"an animated WebP logo", record.BrandAssetKindLogo, assetAnimatedWebP(100, 100), "validator.image.animated",
-			"Animated images are not allowed. Upload a still image."},
+		{"an animated WebP logo", record.BrandAssetKindLogo, assetAnimatedWebP(100, 100), "validator.image.unsupported_type_png_jpeg",
+			"The image type is not supported. Allowed types are PNG and JPEG."},
+		{"a GIF background", record.BrandAssetKindBackground, assetGIF(50, 50), "validator.image.unsupported_type_png_jpeg_webp",
+			"The image type is not supported. Allowed types are PNG, JPEG and WebP."},
 		{"a logo one byte over 1 MiB", record.BrandAssetKindLogo, paddedAsset(createTestPNG(100, 100), 1048577),
 			"validator.image.too_large", "The image can be at most 1048576 bytes."},
 		{"a logo one pixel too wide", record.BrandAssetKindLogo, createTestPNG(513, 100),

@@ -9,9 +9,9 @@
 
     <p>Este é o seu código de verificação de e-mail:</p>
 
-    <p>{{.verificationCode}}</p>
+    {{ template "email_code" . }}
 
-    <p>Você pode inserir o código aqui: <a href="{{.link}}">{{.link}}</a></p>
+    <p>Você pode inserir o código aqui: <a href="{{.link}}" style="color: {{ .emailFrame.Link }};">{{.link}}</a></p>
 
     <p>Atenciosamente,<br />{{ .appName }}</p>
 </div>

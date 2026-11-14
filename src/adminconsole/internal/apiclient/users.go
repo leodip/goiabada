@@ -143,8 +143,10 @@ func (c *AuthServerClient) UpdateUserOTP(ctx context.Context, accessToken string
 	return &response.User, nil
 }
 
-func (c *AuthServerClient) CreateUserAdmin(ctx context.Context, accessToken string, request *api.CreateUserAdminRequest) (*api.UserResponse, error) {
-	response, err := execute[api.CreateUserResponse](ctx, c, accessToken, apiRequest{
+// CreateUserAdmin answers the whole of the create's answer: the user, and whether its setup email
+// was sent when one was asked for (#725).
+func (c *AuthServerClient) CreateUserAdmin(ctx context.Context, accessToken string, request *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
+	return execute[api.CreateUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "POST",
 		url:           c.baseURL + "/api/v1/admin/users/create",
 		jsonBody:      request,
@@ -153,10 +155,6 @@ func (c *AuthServerClient) CreateUserAdmin(ctx context.Context, accessToken stri
 		// Only a user given a setup email waits for a send; an absent type means a password now.
 		sendsMail: request.SetPasswordType == api.SetPasswordTypeEmail,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return &response.User, nil
 }
 
 func (c *AuthServerClient) GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error) {

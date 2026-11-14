@@ -218,8 +218,9 @@ func WithPageClient(ctx context.Context, p *PageClient) context.Context {
 	return context.WithValue(ctx, pageClientKey, p)
 }
 
-// PageClientFrom answers false when the page middleware did not run: an API or protocol request,
-// which draws no page, or a handler invoked outside its middleware. Like SettingsFrom it answers
+// PageClientFrom answers false when neither the page middleware nor the account API's ran: another
+// API or a protocol request, which draws no page and sends no email, or a handler invoked outside its
+// middleware. Like SettingsFrom it answers
 // false for a nil pointer.
 func PageClientFrom(ctx context.Context) (*PageClient, bool) {
 	p, ok := ctx.Value(pageClientKey).(*PageClient)

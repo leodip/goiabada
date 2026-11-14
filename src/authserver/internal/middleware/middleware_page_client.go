@@ -95,3 +95,24 @@ func namePageSignIn(r *http.Request, authContext *ceremony.AuthContext) {
 		reqctx.KeepPageSafeMode(r.Context())
 	}
 }
+
+// TokenPageClient puts a reqctx.PageClient on an account API request naming the client the caller's
+// access token was issued to, its client_id claim (RFC 9068 section 2.2), so an email the request
+// sends is drawn in that client's brand, its own or the default (#817 decision 1). For the admin
+// console's token that is the brand its Account pages are drawn in. It names no sign-in, so the email
+// follows the operator's safe mode switch alone (decision 6).
+//
+// It is mounted on the account API after RequireValidSession, which has resolved the claim to a live,
+// enabled client. A request carrying no token names no client, and its emails are drawn in the
+// default brand. It writes nothing and refuses nothing.
+func TokenPageClient() func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			pageClient := &reqctx.PageClient{}
+			if token, ok := reqctx.BearerTokenFrom(r.Context()); ok {
+				pageClient.Name(token.StringClaim("client_id"))
+			}
+			next.ServeHTTP(w, r.WithContext(reqctx.WithPageClient(r.Context(), pageClient)))
+		})
+	}
+}

@@ -472,6 +472,7 @@ cause, each a whole sentence.
 | `validator.image.dimensions_too_small` | `min` (int) | The image must be at least {{.min}}x{{.min}} pixels. |
 | `validator.image.dimensions_too_large` | `max` (int) | The image can be at most {{.max}}x{{.max}} pixels. |
 | `validator.image.unsupported_type_png_jpeg_webp` | (none) | The image type is not supported. Allowed types are PNG, JPEG and WebP. |
+| `validator.image.unsupported_type_png_jpeg` | (none) | The image type is not supported. Allowed types are PNG and JPEG. |
 | `validator.image.unsupported_type_png` | (none) | The image type is not supported. The only allowed type is PNG. |
 | `validator.image.not_square` | `width` (int), `height` (int) | The image must be square. This one is {{.width}}x{{.height}} pixels. |
 | `validator.image.animated` | (none) | Animated images are not allowed. Upload a still image. |

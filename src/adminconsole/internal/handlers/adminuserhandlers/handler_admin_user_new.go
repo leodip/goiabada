@@ -44,7 +44,7 @@ func HandleNewGet(
 
 // userNewAPI is what the new user page needs: the one write it makes.
 type userNewAPI interface {
-	CreateUserAdmin(ctx context.Context, accessToken string, request *api.CreateUserAdminRequest) (*api.UserResponse, error)
+	CreateUserAdmin(ctx context.Context, accessToken string, request *api.CreateUserAdminRequest) (*api.CreateUserResponse, error)
 }
 
 func HandleNewPost(
@@ -115,7 +115,7 @@ func HandleNewPost(
 			password = r.PostFormValue("password")
 		}
 
-		user, err := apiClient.CreateUserAdmin(r.Context(), jwtInfo.TokenResponse.AccessToken, &api.CreateUserAdminRequest{
+		created, err := apiClient.CreateUserAdmin(r.Context(), jwtInfo.TokenResponse.AccessToken, &api.CreateUserAdminRequest{
 			Email:           email,
 			EmailVerified:   r.FormValue("emailVerified") == "on",
 			GivenName:       r.FormValue("givenName"),
@@ -137,8 +137,13 @@ func HandleNewPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		pagePath := fmt.Sprintf("/admin/users/%v/details", user.Id)
+		pagePath := fmt.Sprintf("/admin/users/%v/details", created.User.Id)
 		sess.SetFlash(pagePath, "userCreated", "true")
+		// A setup email the auth server could not send is told on the new user's page, with what
+		// to do instead (#725). The member is there only when a setup email was attempted.
+		if created.SetupEmailSent != nil && !*created.SetupEmailSent {
+			sess.SetFlash(pagePath, "setupEmailNotSent", "true")
+		}
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

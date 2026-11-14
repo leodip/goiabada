@@ -42,8 +42,9 @@ type Class string
 const (
 	// ClassRecovery is forgot-password's code store, audit record and mail: public, unauthenticated.
 	ClassRecovery Class = "recovery"
-	// ClassRegistration is self-registration's pre-registration write, audit record and mail:
-	// public, unauthenticated, reachable while self-registration is enabled.
+	// ClassRegistration is self-registration's pre-registration write, audit record and mail, and
+	// the welcome email of a registration without verification: public, unauthenticated, reachable
+	// while self-registration is enabled.
 	ClassRegistration Class = "registration"
 	// ClassAccountNotice is the self-service email change's notice to the previous address: behind a
 	// bearer token, and the one job whose loss benefits whoever holds a stolen session.

@@ -114,8 +114,8 @@ func (returnURLStubApiClient) UpdateUserEmail(_ context.Context, _ string, userI
 }
 
 func (returnURLStubApiClient) CreateUserAdmin(_ context.Context, _ string,
-	_ *api.CreateUserAdminRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 7}, nil
+	_ *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
+	return &api.CreateUserResponse{User: api.UserResponse{Id: 7}}, nil
 }
 
 func (returnURLStubApiClient) UpdateUserPhone(_ context.Context, _ string, userId int64,

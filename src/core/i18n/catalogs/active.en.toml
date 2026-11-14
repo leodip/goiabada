@@ -1145,6 +1145,9 @@
 "adminconsole.admin_users.details.field.enabled_hint" = "A disabled user can't sign in, and clients can't renew their tokens."
 "adminconsole.admin_users.details.disable_warning" = "You're disabling the user, so they won't be able to sign in, and clients won't be able to renew their tokens."
 "adminconsole.admin_users.details.user_created_message" = "User created."
+"adminconsole.admin_users.details.setup_email_not_sent" = "The setup email couldn't be sent, so the user can't sign in yet."
+"adminconsole.admin_users.details.setup_email_set_password" = "Set a password for them on the Authentication tab."
+"adminconsole.admin_users.details.setup_email_forgot_password" = "Or, once email works, ask them to select \"Forgot your password?\" on the sign-in page."
 
 # --- Admin users (profile, email, phone, address) ---------------------------
 
@@ -1787,7 +1790,7 @@
 "adminconsole.admin_branding.brand.field.hide_app_name" = "Hide the app name"
 "adminconsole.admin_branding.brand.hide_app_name_hint" = "For a logo that already shows the name. A brand without a logo always shows the name."
 "adminconsole.admin_branding.brand.field.logo" = "Logo"
-"adminconsole.admin_branding.brand.logo_hint" = "Drawn above the app name on the sign-in card. A still PNG, JPEG or WebP image, 10 to 512 pixels a side, up to 1 MB."
+"adminconsole.admin_branding.brand.logo_hint" = "Drawn above the app name on the sign-in card. A still PNG or JPEG image, 10 to 512 pixels a side, up to 1 MB."
 "adminconsole.admin_branding.brand.field.dark_logo" = "Dark logo"
 "adminconsole.admin_branding.brand.dark_logo_hint" = "Drawn in dark mode in place of the logo, with the same rules. It needs a logo."
 "adminconsole.admin_branding.brand.field.favicon" = "Favicon"
@@ -2415,6 +2418,7 @@
 "validator.image.dimensions_too_small" = "The image must be at least {{.min}}x{{.min}} pixels."
 "validator.image.dimensions_too_large" = "The image can be at most {{.max}}x{{.max}} pixels."
 "validator.image.unsupported_type_png_jpeg_webp" = "The image type is not supported. Allowed types are PNG, JPEG and WebP."
+"validator.image.unsupported_type_png_jpeg" = "The image type is not supported. Allowed types are PNG and JPEG."
 "validator.image.unsupported_type_png" = "The image type is not supported. The only allowed type is PNG."
 "validator.image.not_square" = "The image must be square. This one is {{.width}}x{{.height}} pixels."
 "validator.image.animated" = "Animated images are not allowed. Upload a still image."
@@ -2465,6 +2469,13 @@
 "email.account_deleted.subject" = "Your account was deleted"
 "email.account_deleted_by_administrator.subject" = "An administrator deleted your account"
 "email.otp_lockout.subject" = "Your authenticator was disabled after too many wrong codes"
+"email.test_email.subject" = "{{.appName}} - test email"
+
+# The label of the button an action email draws above its URL (#817).
+"email.forgot_password.button" = "Reset password"
+"email.register_activate.button" = "Activate account"
+"email.newuser_set_password.button" = "Create password"
+"email.register_confirmation.button" = "Sign in"
 
 # --- JS bootstrap ------------------------------------------------------------
 #

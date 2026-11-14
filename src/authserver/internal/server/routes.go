@@ -71,8 +71,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	emailSender := emaildelivery.NewSender(s.dataCipher, s.cfg.AuthServer.SMTPEHLOName)
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
-	// or handlers.JSONWriter (#435).
-	httpHelper := render.New(s.templateFS, s.staticFS, s.database)
+	// or handlers.JSONWriter (#435). Every email is rendered through it, and links its brand's logo
+	// under the public base URL (#817).
+	httpHelper := render.New(s.templateFS, s.staticFS, s.database).WithBaseURL(s.cfg.AuthServer.BaseURL)
 	// The one notifier every account notice goes through, after its response (#724).
 	notifier := accountnotice.New(httpHelper, emailSender, s.jobs)
 	// The one sender every logout token goes through, after the end of the session it tells of has
@@ -458,7 +459,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// Settings - Email
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/email", apihandlers.HandleSettingsEmailGet())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/email", apihandlers.HandleSettingsEmailPut(s.database, emailValidator, auditLogger, s.dataCipher))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/email/send-test", apihandlers.HandleSettingsEmailSendTestPost(emailValidator, emailSender, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/email/send-test", apihandlers.HandleSettingsEmailSendTestPost(emailValidator, emailSender, httpHelper, auditLogger))
 
 		// Settings - Turnstile
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/turnstile", apihandlers.HandleSettingsTurnstileGet())
@@ -523,6 +524,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		// client identifier on a client_credentials token, so the token type must be gated.
 		r.Use(apiBearer.RequireUserBoundToken())
 		r.Use(apiBearer.RequireValidSession(s.database))
+		// An email sent from here is drawn in the brand of the client the token names (#817).
+		r.Use(middleware.TokenPageClient())
 
 		r.Get("/profile", apihandlers.HandleAccountProfileGet(s.database))
 		r.Put("/profile", apihandlers.HandleAccountProfilePut(s.database, profileValidator, auditLogger))

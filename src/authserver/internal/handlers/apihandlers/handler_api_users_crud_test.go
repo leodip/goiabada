@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -22,9 +23,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -419,6 +422,8 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 
 	body, err := json.Marshal(map[string]interface{}{
 		"email":           "newuser@example.com",
+		"givenName":       "Ana",
+		"familyName":      "Silva",
 		"setPasswordType": "email",
 	})
 	require.NoError(t, err)
@@ -434,16 +439,24 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	createdUser := &record.User{Id: 7, Email: "newuser@example.com"}
 
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
+	// The setup email is rendered before the user is created, so a render that fails refuses the
+	// request with nothing written (#725).
+	var rendered bool
 	var input *usercreation.Input
 	userCreator.On("CreateUser", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) { input = args.Get(1).(*usercreation.Input) }).
+		Run(func(args mock.Arguments) {
+			require.True(t, rendered, "the setup email must be rendered before the user is created")
+			input = args.Get(1).(*usercreation.Input)
+		}).
 		Return(createdUser, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
-	var emailedLink string
+	var emailedLink, emailedName string
 	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 		"/emails/email_newuser_set_password.html", mock.Anything).
 		Run(func(args mock.Arguments) {
+			rendered = true
 			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
+			emailedName, _ = args.Get(3).(map[string]interface{})["name"].(string)
 		}).Return(&bytes.Buffer{}, nil)
 	// The relay is the request's settings (#433).
 	var sent *emaildelivery.SendEmailInput
@@ -477,8 +490,13 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	// decision 5).
 	assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode, ""), emailedLink,
 		"the emailed link must be the shared builder's output for the code that was issued")
+	assert.Equal(t, "Ana Silva", emailedName, "the email greets the new user by the names the request carried")
 	require.NotNil(t, sent)
 	assert.Equal(t, "TestApp - create a password for your new account", sent.Subject)
+	assert.Equal(t, "newuser@example.com", sent.To)
+
+	// The answer says the email was sent (#725 decision 12).
+	assert.Equal(t, json.RawMessage("true"), createAnswerMembers(t, rr)["setupEmailSent"])
 
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 	pageRenderer.AssertExpectations(t)
@@ -486,11 +504,13 @@ func TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode(t *testing.T) {
 	emailSender.AssertExpectations(t)
 }
 
-// TestHandleUserCreatePost_ASetupEmailThatFailsToSendKeepsTheUserAndItsCode is the send failure
-// #471 decision 4 keeps as it was: the user and its reset code are already stored by the insert
-// when the mail is refused, the answer is 500, and nothing is written or deleted after the create,
-// so an administrator can send the link again from the stored account.
-func TestHandleUserCreatePost_ASetupEmailThatFailsToSendKeepsTheUserAndItsCode(t *testing.T) {
+// TestHandleUserCreatePost_ASetupEmailThatFailsToSendAnswersTheUser is #725: the user and its
+// reset code are already stored by the insert when the relay refuses the mail, so the answer is 201
+// with the user and setupEmailSent false, where it was a 500 for a user that existed and a retry
+// was refused as a taken address. Nothing is written or deleted after the create, and the failure is
+// one error record that names the user and not the address.
+func TestHandleUserCreatePost_ASetupEmailThatFailsToSendAnswersTheUser(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
 	userCreator := accounthandlersmocks.NewUserCreator(t)
@@ -518,7 +538,7 @@ func TestHandleUserCreatePost_ASetupEmailThatFailsToSendKeepsTheUserAndItsCode(t
 	var input *usercreation.Input
 	userCreator.On("CreateUser", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { input = args.Get(1).(*usercreation.Input) }).
-		Return(&record.User{Id: 7, Email: "newuser@example.com"}, nil).Once()
+		Return(&record.User{Id: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Email: "newuser@example.com", Enabled: true}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return().Once()
 	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 		"/emails/email_newuser_set_password.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
@@ -529,8 +549,13 @@ func TestHandleUserCreatePost_ASetupEmailThatFailsToSendKeepsTheUserAndItsCode(t
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	require.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
-	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
+	require.Equal(t, http.StatusCreated, rr.Code, rr.Body.String())
+	members := createAnswerMembers(t, rr)
+	assert.Equal(t, json.RawMessage("false"), members["setupEmailSent"])
+	var answered api.UserResponse
+	require.NoError(t, json.Unmarshal(members["user"], &answered))
+	assert.Equal(t, int64(7), answered.Id)
+	assert.Equal(t, "newuser@example.com", answered.Email)
 
 	// The code the insert stored is a usable one: its hash finds the row the link points at, and
 	// its issued-at keeps the reset page from refusing it as expired.
@@ -541,8 +566,67 @@ func TestHandleUserCreatePost_ASetupEmailThatFailsToSendKeepsTheUserAndItsCode(t
 	assert.Equal(t, hashutil.HashString(issuedCode), input.ForgotPasswordCodeHash)
 	assert.True(t, input.ForgotPasswordCodeIssuedAt.Valid)
 
+	records := capture.Records()
+	require.Len(t, records, 1, capture.Text())
+	assert.Equal(t, slog.LevelError, records[0].Level)
+	assert.Equal(t, int64(7), records[0].Attrs["user_id"])
+	assert.NotNil(t, records[0].Attrs["error"])
+	assert.NotContains(t, capture.Text(), "newuser@example.com", "the record names no address")
+
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "DeleteUser", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// A setup email that cannot be rendered refuses the request before anything is written: no user,
+// no code and no audit entry, so the administrator can try again with the same address (#725
+// decision 11).
+func TestHandleUserCreatePost_ASetupEmailThatCannotBeRenderedCreatesNothing(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewUserCreator(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
+
+	handler := HandleUserCreatePost(pageRenderer, database, userCreator,
+		accountvalidation.NewEmailValidator(database),
+		accountvalidation.NewProfileValidator(database),
+		accountvalidation.NewPasswordValidator(),
+		auditLogger, emailSender, testDataCipher, testBaseURL)
+
+	body, err := json.Marshal(map[string]interface{}{
+		"email":           "newuser@example.com",
+		"setPasswordType": "email",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp", SMTPEnabled: true}))
+
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil).Once()
+	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+		"/emails/email_newuser_set_password.html", mock.Anything).
+		Return(nil, errs.New("the template is missing")).Once()
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
+
+	userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// createAnswerMembers is the create answer's top-level members as they were written, so a test can
+// tell a member that is false from one that is not there.
+func createAnswerMembers(t *testing.T, rr *httptest.ResponseRecorder) map[string]json.RawMessage {
+	t.Helper()
+	var members map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &members), rr.Body.String())
+	return members
 }
 
 // The password arm issues no code: the account is reachable through the password it was created
@@ -583,6 +667,7 @@ func TestHandleUserCreatePost_APasswordCreateInsertsNoResetCode(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusCreated, rr.Code, rr.Body.String())
+	assert.NotContains(t, createAnswerMembers(t, rr), "setupEmailSent", "no setup email was asked for")
 	require.NotNil(t, input)
 	assert.Empty(t, input.ForgotPasswordCodeEncrypted)
 	assert.Empty(t, input.ForgotPasswordCodeHash)
@@ -838,6 +923,17 @@ func TestHandleUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			require.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
 			if tc.wantMessage != "" {
 				assert.Contains(t, rr.Body.String(), tc.wantMessage)
+			}
+			// setupEmailSent is in the answer exactly when the server set out to send a setup
+			// email, so false never means "not asked" (#725 decision 12). With no SMTP, "email"
+			// behaves as it always has, and the answer has no such member.
+			if tc.wantCreated {
+				sent, present := createAnswerMembers(t, rr)["setupEmailSent"]
+				if tc.wantEmail {
+					assert.Equal(t, json.RawMessage("true"), sent)
+				} else {
+					assert.False(t, present, "no setup email was sent, so the answer does not mention one")
+				}
 			}
 
 			if tc.wantCreated && !tc.wantEmail {

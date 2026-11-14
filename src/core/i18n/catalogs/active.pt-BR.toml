@@ -1091,6 +1091,9 @@
 "adminconsole.admin_users.details.field.enabled_hint" = "Um usuário desabilitado não pode entrar, e os clientes não conseguem renovar os tokens dele."
 "adminconsole.admin_users.details.disable_warning" = "Você está desabilitando o usuário, então ele não poderá entrar, e os clientes não conseguirão renovar os tokens dele."
 "adminconsole.admin_users.details.user_created_message" = "Usuário criado."
+"adminconsole.admin_users.details.setup_email_not_sent" = "Não foi possível enviar o email de configuração, então o usuário ainda não consegue entrar."
+"adminconsole.admin_users.details.setup_email_set_password" = "Defina uma senha para ele na aba Autenticação."
+"adminconsole.admin_users.details.setup_email_forgot_password" = "Ou, quando o email voltar a funcionar, peça que ele selecione \"Esqueceu sua senha?\" na página de entrada."
 
 "adminconsole.admin_users.profile.field.username" = "Nome de usuário"
 "adminconsole.admin_users.profile.field.given_name" = "Nome"
@@ -1723,7 +1726,7 @@
 "adminconsole.admin_branding.brand.field.hide_app_name" = "Ocultar o nome do aplicativo"
 "adminconsole.admin_branding.brand.hide_app_name_hint" = "Para um logotipo que já mostra o nome. Uma marca sem logotipo sempre mostra o nome."
 "adminconsole.admin_branding.brand.field.logo" = "Logotipo"
-"adminconsole.admin_branding.brand.logo_hint" = "Exibido acima do nome do aplicativo no cartão de entrada. Uma imagem estática PNG, JPEG ou WebP, de 10 a 512 pixels de lado, até 1 MB."
+"adminconsole.admin_branding.brand.logo_hint" = "Exibido acima do nome do aplicativo no cartão de entrada. Uma imagem estática PNG ou JPEG, de 10 a 512 pixels de lado, até 1 MB."
 "adminconsole.admin_branding.brand.field.dark_logo" = "Logotipo escuro"
 "adminconsole.admin_branding.brand.dark_logo_hint" = "Exibido no modo escuro no lugar do logotipo, com as mesmas regras. Requer um logotipo."
 "adminconsole.admin_branding.brand.field.favicon" = "Favicon"
@@ -2319,6 +2322,7 @@
 "validator.image.dimensions_too_small" = "A imagem deve ter pelo menos {{.min}}x{{.min}} pixels."
 "validator.image.dimensions_too_large" = "A imagem pode ter no máximo {{.max}}x{{.max}} pixels."
 "validator.image.unsupported_type_png_jpeg_webp" = "Tipo de imagem não suportado. Os tipos permitidos são PNG, JPEG e WebP."
+"validator.image.unsupported_type_png_jpeg" = "Tipo de imagem não suportado. Os tipos permitidos são PNG e JPEG."
 "validator.image.unsupported_type_png" = "Tipo de imagem não suportado. O único tipo permitido é PNG."
 "validator.image.not_square" = "A imagem deve ser quadrada. Esta tem {{.width}}x{{.height}} pixels."
 "validator.image.animated" = "Imagens animadas não são permitidas. Envie uma imagem estática."
@@ -2357,6 +2361,13 @@
 "email.account_deleted.subject" = "Sua conta foi excluída"
 "email.account_deleted_by_administrator.subject" = "Um administrador excluiu a sua conta"
 "email.otp_lockout.subject" = "Seu aplicativo autenticador foi bloqueado após muitos códigos errados"
+"email.test_email.subject" = "{{.appName}} - e-mail de teste"
+
+# The label of the button an action email draws above its URL (#817).
+"email.forgot_password.button" = "Redefinir senha"
+"email.register_activate.button" = "Ativar conta"
+"email.newuser_set_password.button" = "Criar senha"
+"email.register_confirmation.button" = "Entrar"
 
 # --- Bootstrap de JS --------------------------------------------------------
 

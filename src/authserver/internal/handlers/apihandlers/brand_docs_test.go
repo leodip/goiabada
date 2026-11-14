@@ -27,10 +27,13 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
 	"github.com/leodip/goiabada/authserver/internal/customcss"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/brandkit"
 	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -231,7 +234,8 @@ func kitRow(rows [][]string, label string) []string {
 
 // The kit's limits table holds each kind of file to the limits #813 decision 3 fixes: its types,
 // its pixel bounds and its size. The values are written out, so a guide and a rule that drift
-// apart fail here or in the upload tests that hold the code to the same values.
+// apart fail here or in the upload tests that hold the code to the same values. A logo's row names
+// no WebP, which a logo no longer takes (#817 decision 5).
 func TestBrandDocs_TheKitStatesEachKindsLimits(t *testing.T) {
 	text, err := docsreader.Section(filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, brandKitHead)
 	if err != nil {
@@ -239,15 +243,16 @@ func TestBrandDocs_TheKitStatesEachKindsLimits(t *testing.T) {
 	}
 	rows := docsreader.Rows(text)
 	for _, want := range []struct {
-		label string
-		cells []string
+		label  string
+		cells  []string
+		absent []string
 	}{
-		{english("adminconsole.admin_branding.brand.field.logo"), []string{"PNG, JPEG or WebP", "10 to 512 pixels", "1 MiB"}},
-		{english("adminconsole.admin_branding.brand.field.dark_logo"), []string{"PNG, JPEG or WebP", "10 to 512 pixels", "1 MiB"}},
-		{english("adminconsole.admin_branding.brand.field.favicon"), []string{"PNG", "square", "48 to 512 pixels", "1 MiB"}},
-		{english("adminconsole.admin_branding.brand.field.background_fit"), []string{"PNG, JPEG or WebP", "10 to 3840 pixels", "2 MiB"}},
-		{english("adminconsole.admin_branding.brand.field.regular_font"), []string{"WOFF2", "2 MiB"}},
-		{english("adminconsole.admin_branding.brand.field.bold_font"), []string{"WOFF2", "2 MiB"}},
+		{english("adminconsole.admin_branding.brand.field.logo"), []string{"PNG or JPEG", "10 to 512 pixels", "1 MiB"}, []string{"WebP"}},
+		{english("adminconsole.admin_branding.brand.field.dark_logo"), []string{"PNG or JPEG", "10 to 512 pixels", "1 MiB"}, []string{"WebP"}},
+		{english("adminconsole.admin_branding.brand.field.favicon"), []string{"PNG", "square", "48 to 512 pixels", "1 MiB"}, nil},
+		{english("adminconsole.admin_branding.brand.field.background_fit"), []string{"PNG, JPEG or WebP", "10 to 3840 pixels", "2 MiB"}, nil},
+		{english("adminconsole.admin_branding.brand.field.regular_font"), []string{"WOFF2", "2 MiB"}, nil},
+		{english("adminconsole.admin_branding.brand.field.bold_font"), []string{"WOFF2", "2 MiB"}, nil},
 	} {
 		row := kitRow(rows, want.label)
 		if row == nil {
@@ -260,10 +265,36 @@ func TestBrandDocs_TheKitStatesEachKindsLimits(t *testing.T) {
 				t.Errorf("%s: %s's row for **%s** does not say %q: %s", customizeGuidePage, brandKitHead, want.label, cell, joined)
 			}
 		}
+		for _, cell := range want.absent {
+			if strings.Contains(joined, cell) {
+				t.Errorf("%s: %s's row for **%s** says %q: %s", customizeGuidePage, brandKitHead, want.label, cell, joined)
+			}
+		}
 	}
 	if brandkit.LogoMaxBytes != 1<<20 || brandkit.FaviconMaxBytes != 1<<20 ||
 		brandkit.BackgroundMaxBytes != 2<<20 || brandkit.FontMaxBytes != 2<<20 {
 		t.Errorf("the guide states 1 MiB for a logo and a favicon and 2 MiB for a background and a font, but brandkit's limits differ")
+	}
+}
+
+// The admin API's upload operations name the types each kind takes: a logo PNG or JPEG, a WebP
+// among what it refuses, and a background a WebP as well (#817 decision 5). What is read is the embedded spec, which is what
+// GET /openapi.yaml serves.
+func TestBrandDocs_TheUploadOperationsNameEachKindsTypes(t *testing.T) {
+	for _, check := range []struct {
+		path string
+		says []string
+	}{
+		{"/api/v1/admin/brand-assets/logo", []string{"a still PNG or JPEG image", "a WebP, a GIF and an SVG are refused"}},
+		{"/api/v1/admin/brand-assets/background", []string{"a still PNG, JPEG or WebP image", "a GIF and an SVG are refused"}},
+	} {
+		description, err := openAPIOperationDescription(web.OpenAPISpec(), "post", check.path)
+		require.NoError(t, err)
+		// The description wraps where the YAML does, so its words are compared one space apart.
+		flat := strings.Join(strings.Fields(description), " ")
+		for _, says := range check.says {
+			assert.Contains(t, flat, says, check.path)
+		}
 	}
 }
 

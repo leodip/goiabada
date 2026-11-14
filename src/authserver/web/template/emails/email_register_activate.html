@@ -9,7 +9,9 @@
 
     <p>To finish creating your {{ .appName }} account, click the link below and choose a password:</p>
 
-    <p><a href="{{.link}}">{{.link}}</a></p>
+    {{ template "email_button" (args . (T .ctx "email.register_activate.button")) }}
+
+    <p><a href="{{.link}}" style="color: {{ .emailFrame.Link }};">{{.link}}</a></p>
 
     <p>The link expires in 5 minutes. If you have trouble clicking it, copy and paste it into your web browser.</p>
 

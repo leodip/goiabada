@@ -1,17 +1,99 @@
+{{- /* An email is drawn in the brand of the page it was sent from, as a sign-in card is (#817): the
+     logo above the app name, then the body, on a card. Many clients drop a style sheet, a style
+     element and a class, and none resolves a CSS variable, so every value is written inline from
+     emailFrame, in the one scheme the email declares, and the layout is tables a client lays out
+     alike. */ -}}
+{{- $f := .emailFrame -}}
 <!DOCTYPE html>
 <html lang="{{ .emailLang }}">
 
 <head>
-  <meta charset="UTF-8" />  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="{{ $f.ColorScheme }}">
+  <meta name="supported-color-schemes" content="{{ $f.ColorScheme }}">
 
-  <title>{{template "title" .}}</title>  
+  <title>{{template "title" .}}</title>
 
   {{template "head" .}}
 </head>
 
-<body>
-  <main>{{template "body" .}}</main>
+<body style="margin: 0; padding: 0; background-color: {{ $f.Canvas }}; color: {{ $f.Ink }}; font-family: {{ $f.FontFamily }};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; background-color: {{ $f.Canvas }};">
+    <tr>
+      <td align="center" style="padding: 24px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 480px; background-color: {{ $f.Surface }}; border: 1px solid {{ $f.Line }}; border-radius: {{ $f.PanelRadius }}; border-collapse: separate;">
+          <tr>
+            <td style="padding: 32px 28px; color: {{ $f.Ink }}; font-family: {{ $f.FontFamily }}; font-size: 16px; line-height: 1.5; text-align: left; overflow-wrap: anywhere;">
+              {{- if $f.Logo }}
+              <div style="margin: 0 0 {{ if $f.ShowAppName }}12px{{ else }}24px{{ end }}; text-align: center;">
+                <img src="{{ $f.Logo }}" alt="{{ $f.LogoAlt }}"{{ if $f.LogoWidth }} width="{{ $f.LogoWidth }}" height="{{ $f.LogoHeight }}"{{ end }} style="display: inline-block; max-width: 100%; height: auto; border: 0;">
+              </div>
+              {{- end }}
+              {{- if $f.ShowAppName }}
+              <p style="margin: 0 0 24px; color: {{ $f.InkMuted }}; font-size: 15px; font-weight: 600; text-align: center;">{{ .appName }}</p>
+              {{- end }}
+              <main>{{template "body" .}}</main>
+            </td>
+          </tr>
+        </table>
+        {{- /* The brand's footer links, then "Need help?" with its support contact, under the card
+             on the area behind it, as a page draws them, and nothing for a brand with neither.
+             Each value is drawn as a link apart, a middle dot hidden from assistive technology
+             between two, since a client may drop the margin a page spaces them with. */}}
+        {{- with $f.Footer }}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 480px;">
+          <tr>
+            <td style="padding: 16px 28px 0; color: {{ $f.InkMuted }}; font-family: {{ $f.FontFamily }}; font-size: 14px; line-height: 20px; text-align: center; overflow-wrap: anywhere;">
+              <footer>
+                {{- if .Links }}
+                <p style="margin: 0;">
+                  {{- range $i, $link := .Links }}
+                  {{- if $i }} <span aria-hidden="true">&middot;</span> {{ end -}}
+                  <a href="{{ $link.URL }}" style="color: {{ $f.Link }}; text-decoration: underline;">{{ $link.Label }}</a>
+                  {{- end }}
+                </p>
+                {{- end }}
+                {{- if .HasContact }}
+                <p style="margin: {{ if .Links }}4px{{ else }}0{{ end }} 0 0;">
+                  {{- T $.ctx "common.footer.need_help" }}
+                  {{- if .SupportEmail }} <a href="mailto:{{ .SupportMailto }}" style="color: {{ $f.Link }}; text-decoration: underline;">{{ .SupportEmail }}</a>{{ end }}
+                  {{- if .SupportPhone }}{{ if .SupportEmail }} <span aria-hidden="true">&middot;</span>{{ end }} <a href="tel:{{ .SupportPhone }}" style="color: {{ $f.Link }}; text-decoration: underline;">{{ .SupportPhone }}</a>{{ end }}
+                  {{- if .SupportURL }}{{ if or .SupportEmail .SupportPhone }} <span aria-hidden="true">&middot;</span>{{ end }} <a href="{{ .SupportURL }}" style="color: {{ $f.Link }}; text-decoration: underline;">{{ T $.ctx "common.footer.support_page" }}</a>{{ end }}
+                </p>
+                {{- end }}
+              </footer>
+            </td>
+          </tr>
+        </table>
+        {{- end }}
+      </td>
+    </tr>
+  </table>
 </body>
 
 {{versionComment}}
 </html>
+{{- /* An action's button, which a body draws above its URL with
+     {{ template "email_button" (args . (T .ctx "email.<name>.button")) }}: the brand's color on the
+     cell, as bgcolor too, since a client that drops a link's padding still paints the cell, and on
+     the link, the label in the color drawn on the brand's, rounded as a page's button is.
+     data-email-button tells the sender to leave the button out of the plain-text part, whose URL
+     is written under it. */ -}}
+{{- define "email_button" -}}
+{{- $root := index . 0 -}}
+{{- $f := $root.emailFrame -}}
+<table role="presentation" data-email-button cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 16px; border-collapse: separate;">
+  <tr>
+    <td align="center" bgcolor="{{ $f.Link }}" style="background-color: {{ $f.Link }}; border-radius: {{ $f.ControlRadius }};">
+      <a href="{{ $root.link }}" style="display: inline-block; padding: 12px 24px; border: 1px solid {{ $f.Link }}; border-radius: {{ $f.ControlRadius }}; background-color: {{ $f.Link }}; color: {{ $f.OnBrand }}; font-family: {{ $f.FontFamily }}; font-size: 16px; font-weight: 600; line-height: 24px; text-decoration: none;">{{ index . 1 }}</a>
+    </td>
+  </tr>
+</table>
+{{- end -}}
+{{- /* The verification code, set apart in a box of its own, larger than the text and in a
+     monospace face, which a body draws with {{ template "email_code" . }}. */ -}}
+{{- define "email_code" -}}
+{{- $f := .emailFrame -}}
+<p style="margin: 0 0 16px; padding: 12px 16px; background-color: {{ $f.Subtle }}; border: 1px solid {{ $f.Line }}; border-radius: {{ $f.BoxRadius }}; color: {{ $f.Ink }}; font-family: {{ $f.CodeFamily }}; font-size: 28px; font-weight: 600; letter-spacing: 4px; line-height: 36px; text-align: center;">{{ .verificationCode }}</p>
+{{- end -}}

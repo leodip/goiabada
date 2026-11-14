@@ -21,6 +21,14 @@
       <p>{{ T $.ctx "adminconsole.admin_users.details.user_created_message" }}</p>
     </div>
     {{ end }}
+    {{/* The new user's setup email could not be sent (#725). The forgot-password link goes only to a
+         verified address, so it is offered only for one. */}}
+    {{ if .setupEmailNotSent }}
+    <div class="notice notice-caution" role="status" id="setupEmailNotSent">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_users.details.setup_email_not_sent" }} {{ T $.ctx "adminconsole.admin_users.details.setup_email_set_password" }}{{ if .user.EmailVerified }} {{ T $.ctx "adminconsole.admin_users.details.setup_email_forgot_password" }}{{ end }}</p>
+    </div>
+    {{ end }}
     {{ if .savedSuccessfully }}
     <div class="notice notice-positive" role="status">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>

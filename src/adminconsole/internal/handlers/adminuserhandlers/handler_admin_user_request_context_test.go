@@ -70,7 +70,7 @@ func (s *ctxRecordingApiClient) UpdateUserEmail(ctx context.Context, _ string, _
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) CreateUserAdmin(ctx context.Context, _ string, _ *api.CreateUserAdminRequest) (*api.UserResponse, error) {
+func (s *ctxRecordingApiClient) CreateUserAdmin(ctx context.Context, _ string, _ *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
 	return nil, s.record(ctx)
 }
 

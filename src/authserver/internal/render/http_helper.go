@@ -28,6 +28,7 @@ type Renderer struct {
 	templateFS fs.FS
 	assets     *assetFingerprints
 	brands     PageBrandReader
+	baseURL    string
 }
 
 // New returns a Renderer over templateFS, which holds the layouts and pages, and staticFS, the
@@ -37,6 +38,15 @@ type Renderer struct {
 // every page automatic in the built-in colors.
 func New(templateFS fs.FS, staticFS fs.FS, brands PageBrandReader) *Renderer {
 	return &Renderer{templateFS: templateFS, assets: newAssetFingerprints(staticFS), brands: brands}
+}
+
+// WithBaseURL returns a copy of h whose emails link their brand's logo by an absolute URL under
+// baseURL, the auth server's public base URL: an email has no page to resolve a relative one against.
+// A renderer without one draws an email's app name in the logo's place.
+func (h *Renderer) WithBaseURL(baseURL string) *Renderer {
+	withBaseURL := *h
+	withBaseURL.baseURL = baseURL
+	return &withBaseURL
 }
 
 // InternalServerError logs err once, with a stack and the request id the page shows, and renders
@@ -199,14 +209,19 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 			}
 		}
 		data["emailLang"] = emailCopyLang(requested, templateName)
+		// An email is drawn in the brand of the page it was sent from, as RequestPageBrand reads it
+		// from the request it is rendered with, and the email layout writes emailFrame's values
+		// inline, since an email links no stylesheet (#817 decision 1). It is bound none of a page's
+		// brand values, so an email layout copied from an older release draws as before.
+		data["emailFrame"] = emailFrameOf(r.Context(), settings.AppName, RequestPageBrand(r.Context(), h.brands), h.baseURL)
 	} else {
 		// A page is drawn in its brand: the layouts write brandDataTheme on the html element
 		// and link brandStylesheet after main.css, draw brandLogo and brandDarkLogo above the app
 		// name on the card, or in its place while brandHideAppName, and link brandFavicon in place
 		// of Goiabada's icons (#813 decisions 4 and 5), and draw brandFooter under the card, bound
-		// only for a brand with links or a contact (#814). An email links no stylesheet, so it reads
-		// no brand. ui_theme is no longer bound, so a layout copied from an older release, which
-		// reads it, draws every page automatic in the built-in colors.
+		// only for a brand with links or a contact (#814). ui_theme is no longer bound, so a layout
+		// copied from an older release, which reads it, draws every page automatic in the built-in
+		// colors.
 		brand := RequestPageBrand(r.Context(), h.brands)
 		data["brandDataTheme"] = brand.DataTheme
 		data["brandStylesheet"] = brand.Stylesheet

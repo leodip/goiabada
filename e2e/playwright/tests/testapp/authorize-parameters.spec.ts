@@ -91,7 +91,10 @@ test("a sign-in by someone other than the id_token_hint's user is refused with n
   const alice = await users.create();
   const bob = await users.create();
   const { context, page: app } = await userBrowser(browser);
-  await signInToWebApp(app, testapp.web, alice);
+  // The third web app, which registered no back-channel logout URI. Ending Alice's session would send
+  // the first web app a logout token, which can land between the refused callback and the page after
+  // it, and replace the outcome the test reads with "Signed out by the auth server".
+  await signInToWebApp(app, testapp.web3, alice);
   await expectResult(app, "Signed in");
 
   // With prompt=login the hint naming Alice asks for a password over her session, and Bob enters his.
@@ -99,7 +102,7 @@ test("a sign-in by someone other than the id_token_hint's user is refused with n
   app.on("framenavigated", (frame) => {
     if (frame === app.mainFrame()) visited.push(new URL(frame.url()).pathname);
   });
-  expect((await signInToWebApp(app, testapp.web, bob, { id_token_hint: "yes", prompt: "login" })).askedForPassword).toBe(true);
+  expect((await signInToWebApp(app, testapp.web3, bob, { id_token_hint: "yes", prompt: "login" })).askedForPassword).toBe(true);
   await expectResult(app, "Sign-in failed");
   const refusal = await resultBody(app);
   expect(refusal.error).toBe("login_required");

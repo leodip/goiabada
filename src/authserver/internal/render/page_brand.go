@@ -90,6 +90,9 @@ type PageBrand struct {
 	SupportEmail string
 	SupportURL   string
 	SupportPhone string
+	// Email is what an email drawn in the brand takes from it besides the logo switch (#817), the
+	// zero value for a brand that cannot be read.
+	Email EmailLook
 }
 
 // DefaultPageBrand answers what a page drawn in ctx takes from the default brand brands reads: every
@@ -180,6 +183,27 @@ func pageBrandOf(ctx context.Context, assets brandasset.SlotsReader, brand *reco
 	// so the device's preference decides.
 	if brand.Appearance == record.BrandAppearanceLight || brand.Appearance == record.BrandAppearanceDark {
 		page.DataTheme = string(brand.Appearance)
+	}
+
+	// An email follows no device, so it is drawn in one mode: a dark brand's dark palette and dark
+	// logo, and a light or automatic brand's light ones; in safe mode as the page is (#817 decisions 4
+	// and 6). The colors were drawn into the stylesheets above, so they can be read here.
+	dark := brand.Appearance == record.BrandAppearanceDark
+	modeColors := brandthemes.ModeColors
+	if pageSafeMode(ctx) {
+		modeColors = brandthemes.SafeModeColors
+	}
+	colors, err := modeColors(brand, dark)
+	if err != nil {
+		return unlinkable(err)
+	}
+	page.Email = EmailLook{Dark: dark, Colors: colors, Corners: brand.Corners, Font: brand.Font}
+	if logo := slots.Logo; logo != nil {
+		if dark && slots.DarkLogo != nil {
+			logo = slots.DarkLogo
+		}
+		page.Email.Logo = brandasset.Path(logo)
+		page.Email.LogoWidth, page.Email.LogoHeight = logo.Width, logo.Height
 	}
 	return page
 }

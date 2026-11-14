@@ -286,6 +286,46 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   posts, asking first when the button carries `data-confirm`; a search that finds users to add is
   `#userSearchForm`, which `static/pages/user-search.js` turns into a search as the person types and
   never lets submit.
+- **Emails**: an email is not a page, and the rules above for styles do not apply to it; these do
+  (#817). It is drawn in the brand of the page it was sent from: the renderer reads
+  `render.RequestPageBrand` from the request the email is rendered with, so an email sent from a
+  sign-in's pages takes that client's brand and safe mode, one sent through the account API the
+  brand of the client its access token names (`middleware.TokenPageClient`) and the operator's
+  safe mode alone, and one sent elsewhere the default, and binds `emailFrame` (`render.EmailFrame`), which `layouts/email_layout.html` writes inline. Many
+  clients drop a style sheet, a `<style>` element and a class, and none resolves a CSS variable, so
+  an email links nothing, holds no `<style>` and no class, names no `var(`, and writes every value
+  in a `style` attribute on the element it styles, from `emailFrame`: the area behind the card, the
+  card, its text, the app name and each link a body holds, `style="color: {{ .emailFrame.Link }};"`.
+  Its colors are the brand's 23 tokens of one mode (`brandthemes.ModeColors`, `SafeModeColors` in
+  safe mode), each used for what a page uses it for, so the contrast checks of the themes and a
+  custom palette's warnings cover it: the dark palette for a dark brand and the light one for a
+  light or automatic one, which the email declares in its `color-scheme` meta, with no rule
+  following the device, since most clients ignore `prefers-color-scheme`. A length is in pixels,
+  the card's corner `0`, `12px` or `24px` for square, rounded and pill, and the font list is
+  `brandkit`'s with its names unquoted, since `html/template` refuses a quote in a style value and
+  `template.CSS` is a trusted type the auth server does not use; an uploaded font is drawn in
+  System UI. The layout is tables, which every client lays out. `main.css` never draws an email,
+  so the auth server's `input.css` keeps the email templates out of Tailwind's scan. The logo, the dark one for a dark
+  brand, is linked by an absolute URL under the base URL (`render.Renderer.WithBaseURL`), with
+  width and height attributes within 64 by 424 pixels, and takes a page's alt rule. A brand that
+  cannot be read is drawn in Blueberry's light colors with the app name as text, and the fault is
+  logged. The brand's footer links and support contact are drawn under the card from
+  `emailFrame.Footer`, which is `render.FooterOf`, the page's footer, in the language of the
+  email's catalog, in the muted ink with each link in the brand's color, and nil for a brand with
+  neither; the values are apart by a middle dot hidden from assistive technology, since a client may
+  drop a margin. An email whose point is one action, the forgot-password, activation, setup and
+  welcome emails, draws it with `{{ template "email_button" (args . (T .ctx "email.<name>.button")) }}`
+  above its URL, which stays as a link to copy: a table whose cell carries the brand's color as
+  `bgcolor` and inline, since a client may drop a link's padding, around a link in `OnBrand`,
+  rounded as a page's control (`0`, `8px` or `9999px`). No other link is a button. The verification
+  code is drawn with `{{ template "email_code" . }}`, in `CodeFamily`, main.css's `--font-mono`
+  unquoted, larger, in a `Subtle` box rounded as a page's multi-line box.
+  `TestEmails_EveryBuiltInEmailIsDrawnInlineAlone` holds every built-in email, in every language, to
+  these rules. There is no text template: the sender (`emaildelivery`) works every message's
+  plain-text part out of the HTML, from `<main>` and then the `<footer>` outside it, so the logo and
+  the app name above the body stay out of it. A block element is a paragraph and `<br>` a line
+  break; a link is its URL, or its label then `<URL>` when they differ. The button's table carries
+  `data-email-button`, which the sender leaves out, the URL under it being in the text already.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state, appearance and theme. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon

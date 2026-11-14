@@ -51,6 +51,7 @@ func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	settings := &record.Settings{
+		AppName:               "Goiabada",
 		SMTPEnabled:           true,
 		SMTPHost:              "smtp.example.com",
 		SMTPPort:              465,
@@ -70,12 +71,12 @@ func TestHandleSettingsEmailSendTestPost_SendsThroughTheSettingsRelay(t *testing
 		Username:          "relay-user",
 		PasswordEncrypted: []byte("ciphertext"),
 	}, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
-		return input.To == "admin@example.com" && input.Subject == "Test email"
+		return input.To == "admin@example.com" && input.Subject == "Goiabada - test email"
 	})).Return(emaildelivery.SendResult{Encrypted: true}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventSentTestEmail, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
+	HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, testEmailRenderer(), auditLogger).
 		ServeHTTP(rr, sendTestEmailRequest(t, settings))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -100,7 +101,7 @@ func TestHandleSettingsEmailSendTestPost_AnswersWhetherTheMessageWentEncrypted(t
 			auditLogger.On("Log", mock.Anything, audit.EventSentTestEmail, mock.Anything).Return().Once()
 
 			rr := httptest.NewRecorder()
-			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).
+			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, testEmailRenderer(), auditLogger).
 				ServeHTTP(rr, sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true, SMTPEncryption: "none"}))
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -200,7 +201,7 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			r := sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true})
 			r = r.WithContext(requestid.NewContext(r.Context(), sendTestRequestId))
 			rr := httptest.NewRecorder()
-			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).ServeHTTP(rr, r)
+			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, testEmailRenderer(), auditLogger).ServeHTTP(rr, r)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			for _, leak := range []string{"192.0.2.25", "2587", "internal-banner", "535", "XOAUTH2", "connect:"} {
