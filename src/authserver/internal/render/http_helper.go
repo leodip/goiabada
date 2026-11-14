@@ -25,6 +25,7 @@ import (
 // Renderer renders pages from the template file system it was built over, and writes JSON.
 type Renderer struct {
 	templateFS fs.FS
+	sets       *templateSets
 	assets     *assetFingerprints
 	brands     PageBrandReader
 	baseURL    string
@@ -37,7 +38,7 @@ type Renderer struct {
 // it: the brand of the client the request names, or the default; a nil brands reads none, and draws
 // every page automatic in the built-in colors.
 func New(templateFS fs.FS, staticFS fs.FS, brands PageBrandReader) *Renderer {
-	return &Renderer{templateFS: templateFS, assets: newAssetFingerprints(staticFS), brands: brands}
+	return &Renderer{templateFS: templateFS, sets: newTemplateSets(), assets: newAssetFingerprints(staticFS), brands: brands}
 }
 
 // WithBaseURL returns a copy of h whose emails link their brand's logo by an absolute URL under
@@ -176,11 +177,6 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 	// own, and the two are deliberately separate (#385).
 	data["ctx"] = r.Context()
 
-	name := filepath.Base(layoutName)
-
-	templateName = strings.TrimPrefix(templateName, "/")
-	layoutName = strings.TrimPrefix(layoutName, "/")
-
 	// A page is drawn in its brand: the layouts write brandDataTheme on the html element
 	// and link brandStylesheet after main.css, draw brandLogo and brandDarkLogo above the app
 	// name on the card, or in its place while brandHideAppName, and link brandFavicon in place
@@ -197,35 +193,51 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		data["brandFooter"] = footer
 	}
 
-	templateFiles := []string{
-		layoutName,
-		templateName,
-	}
-
-	files, err := fs.ReadDir(h.templateFS, "partials")
-	if err == nil && len(files) > 0 {
-		// Partials directory exists and has files, so include them
-		for _, file := range files {
-			templateFiles = append(templateFiles, "partials/"+file.Name())
-		}
-	}
-
-	templ, err := template.New(name).Funcs(templateFuncMap).Funcs(template.FuncMap{"asset": h.assets.url}).ParseFS(h.templateFS, templateFiles...)
+	set, err := h.pageSet(layoutName, templateName)
 	if err != nil {
-		return nil, errs.Wrap(err, "unable to render template")
+		return nil, err
 	}
 	// Both layouts write dataPage on <body>, the value the page names in its data-page template,
 	// so custom CSS can aim a rule at one page (#816 decision 7). A page that names none carries no
 	// data-page.
-	if page := stylingcontract.PageName(templ); page != "" {
-		data["dataPage"] = page
+	if set.page != "" {
+		data["dataPage"] = set.page
 	}
 	var buf bytes.Buffer
-	err = templ.Execute(&buf, data)
+	err = set.templ.Execute(&buf, data)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to execute template")
 	}
 	return &buf, nil
+}
+
+// pageSet is the template set a page is drawn from, its layout, its template and every shared
+// partial, parsed the first time the page is drawn and kept.
+func (h *Renderer) pageSet(layoutName string, templateName string) (*templateSet, error) {
+	name := filepath.Base(layoutName)
+	templateName = strings.TrimPrefix(templateName, "/")
+	layoutName = strings.TrimPrefix(layoutName, "/")
+
+	return h.sets.get(layoutName+"\x00"+templateName, func() (*templateSet, error) {
+		templateFiles := []string{
+			layoutName,
+			templateName,
+		}
+
+		files, err := fs.ReadDir(h.templateFS, "partials")
+		if err == nil && len(files) > 0 {
+			// Partials directory exists and has files, so include them
+			for _, file := range files {
+				templateFiles = append(templateFiles, "partials/"+file.Name())
+			}
+		}
+
+		templ, err := template.New(name).Funcs(templateFuncMap).Funcs(template.FuncMap{"asset": h.assets.url}).ParseFS(h.templateFS, templateFiles...)
+		if err != nil {
+			return nil, errs.Wrap(err, "unable to render template")
+		}
+		return &templateSet{templ: templ, page: stylingcontract.PageName(templ)}, nil
+	})
 }
 
 func (h *Renderer) JSONError(w http.ResponseWriter, r *http.Request, err error) {

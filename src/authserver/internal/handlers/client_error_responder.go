@@ -45,7 +45,7 @@ func NewClientErrorResponder(database clientErrorDatabase, pageRenderer PageRend
 	return &ClientErrorResponder{
 		database:     database,
 		pageRenderer: pageRenderer,
-		formPost:     formPostTemplate{fs: web.TemplateFS(), brands: database},
+		formPost:     newFormPostTemplate(web.TemplateFS(), database),
 	}
 }
 

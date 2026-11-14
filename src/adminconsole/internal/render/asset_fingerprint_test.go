@@ -29,7 +29,8 @@ func TestAssetFingerprints_AFileIsReadOnceForItsFingerprint(t *testing.T) {
 	assert.Equal(t, opened, fsys.opens.Load(), "a second link opens nothing")
 }
 
-// openCountingFS is a set of static files that counts what is opened, a Stat among them.
+// openCountingFS is a set of files, static files or templates, that counts what is opened, a Stat
+// among them.
 type openCountingFS struct {
 	fs.FS
 	opens atomic.Int64

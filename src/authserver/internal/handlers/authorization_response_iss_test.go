@@ -177,14 +177,14 @@ func TestAuthorizationResponse_EveryFormPostCarriesIssAfterState(t *testing.T) {
 		{
 			name: "a code",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "form_post")
+				return issueAuthCode(w, r, newFormPostTemplate(web.TemplateFS(), nil), &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "form_post")
 			},
 			want: [][2]string{{"code", "c0de"}, {"state", "st"}, {"iss", testResponseIssuer}},
 		},
 		{
 			name: "implicit tokens",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueImplicitTokens(w, r, formPostTemplate{fs: web.TemplateFS()}, "form_post", callback, "st", &issuance.ImplicitGrantResponse{
+				return issueImplicitTokens(w, r, newFormPostTemplate(web.TemplateFS(), nil), "form_post", callback, "st", &issuance.ImplicitGrantResponse{
 					AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IdToken: "it", Scope: "openid",
 				})
 			},
@@ -203,7 +203,7 @@ func TestAuthorizationResponse_EveryFormPostCarriesIssAfterState(t *testing.T) {
 		{
 			name: "a code for a request that sent no state",
 			write: func(w http.ResponseWriter, r *http.Request) error {
-				return issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, &record.Code{Code: "c0de", RedirectURI: callback}, "form_post")
+				return issueAuthCode(w, r, newFormPostTemplate(web.TemplateFS(), nil), &record.Code{Code: "c0de", RedirectURI: callback}, "form_post")
 			},
 			want: [][2]string{{"code", "c0de"}, {"iss", testResponseIssuer}},
 		},
@@ -231,7 +231,7 @@ func TestAuthorizationResponse_WithoutSettingsNothingIsWritten(t *testing.T) {
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodGet, "/auth/issue", nil)
 
-			err := issueAuthCode(w, r, formPostTemplate{fs: web.TemplateFS()}, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, mode)
+			err := issueAuthCode(w, r, newFormPostTemplate(web.TemplateFS(), nil), &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, mode)
 
 			require.Error(t, err)
 			assert.Empty(t, w.Header().Get("Location"))

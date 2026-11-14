@@ -102,15 +102,12 @@ func (h *Renderer) drawEmail(ctx context.Context, email *emailtemplate.Email, la
 		return emailtemplate.Message{}, errs.Wrap(err, "unable to render the email "+email.ID)
 	}
 
-	templ, err := template.New(filepath.Base(emailLayout)).Funcs(templateFuncMap).ParseFS(h.templateFS, emailLayout)
+	frameSet, err := h.emailFrameSet()
 	if err != nil {
-		return emailtemplate.Message{}, errs.Wrap(err, "unable to parse the email layout")
-	}
-	if templ, err = templ.Parse(emailContent); err != nil {
-		return emailtemplate.Message{}, errs.Wrap(err, "unable to parse the email's content")
+		return emailtemplate.Message{}, err
 	}
 	var buf bytes.Buffer
-	err = templ.ExecuteTemplate(&buf, filepath.Base(emailLayout), map[string]interface{}{
+	err = frameSet.templ.ExecuteTemplate(&buf, filepath.Base(emailLayout), map[string]interface{}{
 		"ctx":          ctx,
 		"appName":      settings.AppName,
 		"emailLang":    lang,
@@ -122,6 +119,21 @@ func (h *Renderer) drawEmail(ctx context.Context, email *emailtemplate.Email, la
 		return emailtemplate.Message{}, errs.Wrap(err, "unable to execute the email layout")
 	}
 	return emailtemplate.Message{Subject: rendered.Subject, HTML: buf.String()}, nil
+}
+
+// emailFrameSet is the email layout with emailContent filling its blocks, parsed the first time an
+// email is drawn and kept. What fills them, the subject and the body, is a value of each email's.
+func (h *Renderer) emailFrameSet() (*templateSet, error) {
+	return h.sets.get(emailLayout, func() (*templateSet, error) {
+		templ, err := template.New(filepath.Base(emailLayout)).Funcs(templateFuncMap).ParseFS(h.templateFS, emailLayout)
+		if err != nil {
+			return nil, errs.Wrap(err, "unable to parse the email layout")
+		}
+		if templ, err = templ.Parse(emailContent); err != nil {
+			return nil, errs.Wrap(err, "unable to parse the email's content")
+		}
+		return &templateSet{templ: templ}, nil
+	})
 }
 
 // textToSend answers the text email is sent with in lang: its administrator's edit in lang laid over
