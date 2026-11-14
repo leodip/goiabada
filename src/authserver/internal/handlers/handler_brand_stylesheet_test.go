@@ -172,8 +172,8 @@ func TestHandleBrandStylesheetGet_DeclaresTheThemesColorsInBothModes(t *testing.
 	assert.Equal(t, avocadoStylesheet, rr.Body.String())
 }
 
-// Blueberry is the palette main.css is built with, so its stylesheet declares no colors and an
-// operator's regenerated colors stay (#810 decision 4). It is still served and still linked.
+// Blueberry is the palette main.css is built with, so its stylesheet declares no colors (#810
+// decision 4). It is still served and still linked.
 func TestHandleBrandStylesheetGet_BlueberryDeclaresNoColors(t *testing.T) {
 	brand := themedBrand(7, "blueberry")
 	brand.Appearance = record.BrandAppearanceDark

@@ -303,7 +303,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 		layoutFS := fstest.MapFS{
 			"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 			"page.html": {Data: []byte("{{define \"content\"}}{{.appName}}|{{.brandDataTheme}}|{{.brandStylesheet}}|" +
-				"{{.smtpEnabled}}|{{.uiTheme}}{{end}}")},
+				"{{.smtpEnabled}}{{end}}")},
 		}
 		layoutHelper := New(layoutFS, nil)
 		req := httptest.NewRequest("GET", "/", nil)
@@ -319,8 +319,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 		body, err := renderPage(layoutHelper, req, "layouts/layout.html", "page.html", map[string]interface{}{})
 
 		require.NoError(t, err)
-		// uiTheme is no longer bound: a layout copied from an older release draws automatic.
-		assert.Equal(t, "<html>sentinel app|dark|https://auth.example.test/brand/7/stylesheet.css?v=0123456789ab|true|</html>", body)
+		assert.Equal(t, "<html>sentinel app|dark|https://auth.example.test/brand/7/stylesheet.css?v=0123456789ab|true</html>", body)
 	})
 
 	// Every application route runs under middleware.SettingsCache, so a render without settings is

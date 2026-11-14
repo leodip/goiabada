@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
 # Lint i18n error code parity:
-#   - Every Err* constant whose value is a "validator.*" or "handler.*"
-#     catalog key in src/core/i18n/error_codes.go must have a matching
-#     entry in src/core/i18n/catalogs/active.en.toml.
+#   - Every constant whose value is a "validator.*" or "handler.*" catalog
+#     key in src/core/i18n/error_codes.go or
+#     src/authserver/internal/errcode/errcode.go must have a matching entry
+#     in src/core/i18n/catalogs/active.en.toml.
 #   - Every "validator.*" / "handler.*" key in active.en.toml must have
-#     a code constant in error_codes.go.
+#     a code constant in one of those two files.
 #
 # Exits 0 on parity, 1 on any mismatch. Diagnostics go to stderr.
 
@@ -13,10 +14,15 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CODES_GO="$ROOT/src/core/i18n/error_codes.go"
+AUTHSERVER_CODES_GO="$ROOT/src/authserver/internal/errcode/errcode.go"
 CATALOG="$ROOT/src/core/i18n/catalogs/active.en.toml"
 
 if [[ ! -f "$CODES_GO" ]]; then
     echo "lint-error-codes: $CODES_GO not found" >&2
+    exit 2
+fi
+if [[ ! -f "$AUTHSERVER_CODES_GO" ]]; then
+    echo "lint-error-codes: $AUTHSERVER_CODES_GO not found" >&2
     exit 2
 fi
 if [[ ! -f "$CATALOG" ]]; then
@@ -26,7 +32,7 @@ fi
 
 # Extract code-constant values that point at validator.*/handler.* keys.
 # Match lines like:   ErrCodeFoo = "validator.bar.baz"
-codes_from_go="$(grep -oE '"(validator|handler)\.[a-zA-Z0-9_.]+"' "$CODES_GO" | tr -d '"' | sort -u)"
+codes_from_go="$(grep -hoE '"(validator|handler)\.[a-zA-Z0-9_.]+"' "$CODES_GO" "$AUTHSERVER_CODES_GO" | tr -d '"' | sort -u)"
 
 # Extract validator.*/handler.* keys defined in the English catalog.
 # Match lines like:   "validator.bar.baz" = "..."

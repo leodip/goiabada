@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
@@ -102,7 +104,7 @@ func HandleAccountDeletionPost(
 			return
 		}
 		if !settings.AccountDeletionEnabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountDeletionDisabled, nil),
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountDeletionDisabled, nil),
 				"ACCOUNT_DELETION_DISABLED", http.StatusForbidden)
 			return
 		}
@@ -117,7 +119,7 @@ func HandleAccountDeletionPost(
 		// The shape of the request rather than a credential, so it is refused before anything is
 		// read or checked, and spends nothing.
 		if otpCode != "" && recoveryCodeSent {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountDeletionOneSecondFactor, nil),
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountDeletionOneSecondFactor, nil),
 				"VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -143,7 +145,7 @@ func HandleAccountDeletionPost(
 		// 409 LAST_ADMINISTRATOR, as every guarded write is answered, with a sentence of its own:
 		// the one the other writes use is worded for an administrator acting on another user
 		// (decision 9). The deletion's transaction answers its own refusal the same way.
-		lastAdministrator := i18n.NewLocalizedError(i18n.ErrCodeAccountDeletionLastAdministrator, nil)
+		lastAdministrator := i18n.NewLocalizedError(errcode.AccountDeletionLastAdministrator, nil)
 		if sole {
 			writeLocalizedError(w, r, lastAdministrator, "LAST_ADMINISTRATOR", http.StatusConflict)
 			return
@@ -151,13 +153,13 @@ func HandleAccountDeletionPost(
 
 		// A blank password compares nothing, so it is refused without spending the budget (#219).
 		if strings.TrimSpace(req.Password) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil),
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountPasswordIncorrect, nil),
 				"AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 		if !passwordhash.Verify(user.PasswordHash, req.Password) {
 			credentialFailures.RecordCredentialFailure(r)
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil),
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountPasswordIncorrect, nil),
 				"AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
@@ -176,7 +178,7 @@ func HandleAccountDeletionPost(
 			case recoveryCodeSent:
 				useRecoveryCode = true
 			default:
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPCodeRequired, nil),
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeRequired, nil),
 					"OTP_CODE_REQUIRED", http.StatusBadRequest)
 				return
 			}
@@ -256,7 +258,7 @@ func HandleAccountDeletionPost(
 			return
 		case errors.Is(err, errPasswordReplaced):
 			// Not a guess: the password was right when it was checked, so it spends nothing.
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil),
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountPasswordIncorrect, nil),
 				"AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		case errors.Is(err, errAuthenticatorReplaced):
@@ -265,7 +267,7 @@ func HandleAccountDeletionPost(
 				"INVALID_OTP_CODE", http.StatusBadRequest)
 			return
 		case errors.Is(err, errSecondFactorNowRequired):
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPCodeRequired, nil),
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeRequired, nil),
 				"OTP_CODE_REQUIRED", http.StatusBadRequest)
 			return
 		case errors.Is(err, errAccountGone):
@@ -352,7 +354,7 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 			"logged_in_user": subject,
 			"reason":         audit.AuthFailedOtpClockAhead,
 		})
-		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeOtpClockAhead, nil),
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OtpClockAhead, nil),
 			"OTP_CLOCK_AHEAD", http.StatusBadRequest)
 		return false
 	default:
@@ -389,6 +391,6 @@ func refuseDeletionRecoveryCode(w http.ResponseWriter, r *http.Request, database
 			"logged_in_user": subject,
 		})
 	}
-	writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectRecoveryCode, nil),
+	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OtpIncorrectRecoveryCode, nil),
 		"INVALID_RECOVERY_CODE", http.StatusBadRequest)
 }

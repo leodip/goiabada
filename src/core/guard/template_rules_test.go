@@ -109,7 +109,7 @@ func TestTemplates_TheCsrfFieldTable(t *testing.T) {
 // TestTemplates_TheHtmlLangTable holds the hardcoded-lang rule, which is scoped by path: only under a
 // layouts/ directory. An email layout is held to it like any other: the bodies are per-locale sibling
 // files, but the one layout they are drawn in is shared, so a hardcoded "en" marked every pt-BR email
-// and every operator copy English (#645 decision 10).
+// English (#645 decision 10).
 //
 // The last admitted row is the rule's stated boundary rather than an oversight. It matches the one
 // spelling <html lang="en", so a layout hardcoding some other language passes. That is where both

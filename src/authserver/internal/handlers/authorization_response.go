@@ -381,12 +381,9 @@ func newFormPostPage(ctx context.Context, settings *record.Settings, brands rend
 }
 
 // writeFormPost answers with form_post.html, a form posting params to redirectURI, which its script
-// submits at once and its button submits without JavaScript.
-//
-// formPostFS is the built-in template set in every server (NewClientErrorResponder), never
-// GOIABADA_AUTHSERVER_TEMPLATEDIR: the page is how an authorization response is encoded on the wire,
-// as the query string is for the query encoding, and a copy taken from an older release would drop
-// a parameter, iss among them, that discovery says every response carries (#576, decision 5).
+// submits at once and its button submits without JavaScript. The page is how an authorization
+// response is encoded on the wire, as the query string is for the query encoding, so it posts every
+// parameter in params, iss among them, which discovery says every response carries (#576).
 //
 // The bind map holds redirectURI, page, and exactly the parameters in params, so a parameter the
 // caller left out, an empty state above all, is absent rather than present and empty. {{.state}} and

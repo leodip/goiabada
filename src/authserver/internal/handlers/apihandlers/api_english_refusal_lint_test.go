@@ -459,7 +459,7 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 			name: "a call through a localizing writer writes no English",
 			src: `package p
 func HandleX() {
-	writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeListSaveChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
+	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.ListSaveChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 	writeValidationError(w, r, err)
 }`,
 		},
@@ -498,7 +498,7 @@ func TestAPIRefusals_TheGuardPassesASurfaceThatMatchesItsTable(t *testing.T) {
 
 func HandleX() {
 	writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
-	writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyExists, nil), "EMAIL_ALREADY_EXISTS", http.StatusConflict)
+	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.EmailAlreadyExists, nil), "EMAIL_ALREADY_EXISTS", http.StatusConflict)
 }
 `,
 	})

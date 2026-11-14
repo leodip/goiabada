@@ -145,17 +145,17 @@ func TestInstantOf(t *testing.T) {
 	}
 }
 
-// TestTemplateFuncMap_IsThisApplicationsTwentyFive pins the split #385 made. The one map in core
+// TestTemplateFuncMap_IsThisApplicationsTwentyFour pins the split #385 made. The one map in core
 // held twenty-two and the auth server parsed every template with all of them, though its pages
 // call four: T, Lang, args and versionComment, which are also here. The other nineteen -- the
 // five page predicates over this console's own URL paths, the JS bootstrap catalog, the
 // reference-data formatters -- are this application's alone, and a new entry here means one of its
 // templates calls it. marshal, which typed the keys page's JSON as already safe, went in #120, the
-// engine escaping that value itself. CatalogLang came in #559, the catalog a page rendered from,
-// which its scripts name back on every request, and ScopeList in #617, the scopes the account
-// consents page names in words. isAdminLegalDocumentPage came in #622, the sidebar's Legal
-// documents section, and isAdminBrandingPage in #810, the sidebar's Branding pages.
-func TestTemplateFuncMap_IsThisApplicationsTwentyFive(t *testing.T) {
+// engine escaping that value itself, and CatalogLang, Lang under the name #559 gave it, in #819.
+// ScopeList came in #617, the scopes the account consents page names in words.
+// isAdminLegalDocumentPage came in #622, the sidebar's Legal documents section, and
+// isAdminBrandingPage in #810, the sidebar's Branding pages.
+func TestTemplateFuncMap_IsThisApplicationsTwentyFour(t *testing.T) {
 	keys := make([]string, 0, len(templateFuncMap))
 	for k := range templateFuncMap {
 		keys = append(keys, k)
@@ -163,7 +163,7 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyFive(t *testing.T) {
 	sort.Strings(keys)
 
 	want := []string{
-		"CatalogLang", "DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
+		"DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
 		"RefTimezone", "ScopeList", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
 		"isAdminBrandingPage", "isAdminClientPage", "isAdminGroupPage", "isAdminLegalDocumentPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
 		"isAdminUserPage", "isLast", "versionComment",

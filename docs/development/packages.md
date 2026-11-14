@@ -458,6 +458,12 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   set with `{{name}}` placeholders, which `Email.Check` checks and `Email.Render` draws in the
   brand's look; the other of the two guarded `template.HTML` values. `render.Renderer.RenderEmail`
   draws it inside the email layout (#818)
+- `internal/errcode/` - The catalog keys of the refusals only the auth server writes, whose sentence
+  `i18n.NewLocalizedError` carries and no refusal answers as its `error_code`: the account API's,
+  the conflicts and uploads the admin API answers under a code of their own, the SMTP test send's,
+  the OTP and Turnstile refusals on the sign-in pages, and the `/auth/authorize` refusal pages. The
+  keys both applications name, or that a refusal answers as its `error_code`, stay in
+  `core/i18n`'s `error_codes.go`; `core/i18n/error_codes.md` lists them all (#819)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlmatch,uuid}/` - The authserver-only utilities
   #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and
   origin predicates, UUIDs (#360); `urlmatch` also holds the back-channel logout URI rule every intake

@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -175,7 +177,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 // naming that client, which a failure of the client's own read never is (#812).
 func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context, input *ValidateClientAndRedirectURIInput) error {
 	if len(input.ClientId) == 0 {
-		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientIdMissing, nil)
+		return i18n.NewLocalizedError(errcode.AuthorizeClientIdMissing, nil)
 	}
 
 	client, err := val.database.GetClientByClientIdentifier(ctx, nil, input.ClientId)
@@ -183,10 +185,10 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		return err
 	}
 	if client == nil {
-		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil)
+		return i18n.NewLocalizedError(errcode.AuthorizeClientNotFound, nil)
 	}
 	if !client.Enabled {
-		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientDisabled, nil)
+		return i18n.NewLocalizedError(errcode.AuthorizeClientDisabled, nil)
 	}
 
 	// Parse response_type for the loopback port rule alone. Which flows the request asks for no
@@ -209,7 +211,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 	allowLoopbackPortFlexibility := rtInfo.IsCodeOnly()
 
 	if len(input.RedirectURI) == 0 {
-		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURIMissing, nil)
+		return i18n.NewLocalizedError(errcode.AuthorizeRedirectURIMissing, nil)
 	}
 
 	// RFC 6749 section 3.1.2: "The redirection endpoint URI MUST be an absolute URI as
@@ -234,7 +236,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		// out: the operator reads the offending value off the client's page.
 		slog.WarnContext(ctx, "rejected an authorization request whose redirect_uri is not an absolute uri, or is an http or https uri naming no host",
 			"client_identifier", client.ClientIdentifier)
-		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotAbsolute, nil)
+		return i18n.NewLocalizedError(errcode.AuthorizeRedirectURINotAbsolute, nil)
 	}
 
 	// RFC 9700 section 2.6: "Authorization responses MUST NOT be transmitted over unencrypted
@@ -250,7 +252,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 	if loopback.IsPlainHTTPOff(input.RedirectURI) {
 		slog.WarnContext(ctx, "rejected an authorization request whose redirect_uri uses plain http off the loopback interface",
 			"client_identifier", client.ClientIdentifier)
-		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURIInsecureHTTP, nil)
+		return i18n.NewLocalizedError(errcode.AuthorizeRedirectURIInsecureHTTP, nil)
 	}
 
 	err = val.database.ClientLoadRedirectURIs(ctx, nil, client)
@@ -263,7 +265,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		registered = append(registered, r.URI)
 	}
 	if !urlmatch.RedirectURIIsRegistered(registered, input.RedirectURI, allowLoopbackPortFlexibility) {
-		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotRegistered, nil)
+		return i18n.NewLocalizedError(errcode.AuthorizeRedirectURINotRegistered, nil)
 	}
 	return nil
 }

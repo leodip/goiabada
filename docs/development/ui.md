@@ -266,9 +266,9 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `showNotice`, not in a dialog, its failures too (`sendAjaxRequest`'s `statusRegion`); a removal
   asks first in a `modal_dialog` of type `confirm`, whose second button names the action; a button
   marked `data-copy-target` copies, a page script may call `passwordToggle` on a show/hide button it
-  reaches by id, so an operator's older template keeps working, a long `select` marked `data-searchable` becomes a `combobox`
-  that filters as the person types, the select kept hidden to post the value, its field taking the
-  select's `autocomplete` (`off` where it has none), turning `autocorrect` off, since a keyboard's
+  reaches by id for the controller that shows its field, a long `select` marked `data-searchable`
+  becomes a `combobox` that filters as the person types, the select kept hidden to post the value,
+  its field taking the select's `autocomplete` (`off` where it has none), turning `autocorrect` off, since a keyboard's
   correction fires the input event Firefox's fill does, and committing a browser's fill to the select,
   by option value, case aside, then by name, flag aside, or for `tel-country-code` by the one
   option whose `data-calling-code` it is, a fill naming nothing in a field without the focus
@@ -472,5 +472,4 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   tense included: a question asked before an action says what will happen ("The key will be
   deleted"), a notice after it what was done, and help about standing behaviour the present.
   Sentence case; a button says what it does ("Save", "New user"); a page title reads "Page – app
-  name". All built-in catalogs change together, a message ID is kept, and a renamed one goes in the
-  release notes, since operators' override catalogs are keyed by it.
+  name". All built-in catalogs change together.

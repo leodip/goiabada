@@ -185,9 +185,7 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 	// and link brandStylesheet after main.css, draw brandLogo and brandDarkLogo above the app
 	// name on the card, or in its place while brandHideAppName, and link brandFavicon in place
 	// of Goiabada's icons (#813 decisions 4 and 5), and draw brandFooter under the card, bound
-	// only for a brand with links or a contact (#814). ui_theme is no longer bound, so a layout
-	// copied from an older release, which reads it, draws every page automatic in the built-in
-	// colors.
+	// only for a brand with links or a contact (#814).
 	brand := RequestPageBrand(r.Context(), h.brands)
 	data["brandDataTheme"] = brand.DataTheme
 	data["brandStylesheet"] = brand.Stylesheet
@@ -217,8 +215,8 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		return nil, errs.Wrap(err, "unable to render template")
 	}
 	// Both layouts write dataPage on <body>, the value the page names in its data-page template,
-	// so custom CSS can aim a rule at one page (#816 decision 7). A page that names none, such as a
-	// template copied from an older release, carries no data-page.
+	// so custom CSS can aim a rule at one page (#816 decision 7). A page that names none carries no
+	// data-page.
 	if page := stylingcontract.PageName(templ); page != "" {
 		data["dataPage"] = page
 	}

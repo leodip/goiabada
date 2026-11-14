@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
@@ -70,7 +72,7 @@ func HandleIssueGet(
 				slog.ErrorContext(r.Context(), "unable to clear the auth context while refusing a disabled client, rendering the refusal anyway",
 					"error", result.ClearErr)
 			}
-			message := i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientDisabled, nil).Localize(r.Context())
+			message := i18n.NewLocalizedError(errcode.AuthorizeClientDisabled, nil).Localize(r.Context())
 			renderAuthorizeRefusal(pageRenderer, w, r, message, http.StatusOK)
 
 		case result.ClientError != nil:

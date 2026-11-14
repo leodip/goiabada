@@ -190,9 +190,8 @@ func TestLayouts_LoadTheScriptThatRegistersPasswordToggles(t *testing.T) {
 	}
 }
 
-// The client secret's page shows a generated secret through the shared behaviour, and reaches its
-// Show button by id, so an operator's copy of the template from before the button carried
-// data-password-toggle still gets a working button (#722, assumed: "an operator's old copy").
+// The client secret's page shows a generated secret through the shared behaviour, the controller it
+// asks passwordToggle for by its Show button, which it reaches by id (#722).
 func TestClientAuthenticationJS_UsesTheSharedPasswordToggle(t *testing.T) {
 	script, err := staticFS.ReadFile("static/pages/admin-clients-authentication.js")
 	if err != nil {

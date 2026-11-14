@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -79,7 +81,7 @@ func HandleUserEmailVerificationCodePost(
 			return
 		}
 		if !stored {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailVerificationAccountChanged, nil), "CONCURRENT_UPDATE", http.StatusConflict)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.EmailVerificationAccountChanged, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 			return
 		}
 

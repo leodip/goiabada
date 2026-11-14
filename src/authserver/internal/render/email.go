@@ -45,10 +45,9 @@ const emailContent = `{{define "title"}}{{.emailSubject}}{{end}}{{define "head"}
 // name is the settings'. The body is drawn inside the email layout, which writes the frame inline
 // from emailFrame, and the layout marks the email with the language its text is written in. The
 // whole email is in that language, its frame and footer as well as its text: the frame and footer
-// are drawn from the recipient's catalog when it is written in that language, so an operator's
-// fr-CA wording reaches an email in French, and from the language's own catalog when it is not, so
-// a recipient reading a language with no built-in text, one an operator added through an override
-// catalog, gets all of it in English.
+// are drawn from the recipient's catalog when it is written in that language, and from the
+// language's own catalog when it is not, so a recipient reading a language with no built-in text
+// gets all of it in English.
 func (h *Renderer) RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error) {
 	lang := emailtemplate.Language(i18n.LocaleTag(r.Context()))
 	if _, ok := email.BuiltIn[lang]; !ok {

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/brandasset"
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -20,9 +22,9 @@ func readUploadedImage(w http.ResponseWriter, r *http.Request, maxUploadBytes in
 	case err == nil:
 		return data, true
 	case errors.Is(err, imageupload.ErrUploadTooLarge), errors.Is(err, imageupload.ErrNotMultipart):
-		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeImageUploadTooLarge, nil), "FILE_TOO_LARGE", http.StatusBadRequest)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.ImageUploadTooLarge, nil), "FILE_TOO_LARGE", http.StatusBadRequest)
 	case errors.Is(err, imageupload.ErrNoUpload):
-		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeImageUploadNoFile, nil), "NO_FILE", http.StatusBadRequest)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.ImageUploadNoFile, nil), "NO_FILE", http.StatusBadRequest)
 	default:
 		writeInternalServerError(w, r, err)
 	}
@@ -41,9 +43,9 @@ func readUploadedBrandAsset(w http.ResponseWriter, r *http.Request, kind record.
 	case errors.Is(err, imageupload.ErrUploadTooLarge):
 		writeValidationError(w, r, brandasset.TooLarge(kind))
 	case errors.Is(err, imageupload.ErrNotMultipart):
-		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeImageUploadTooLarge, nil), "FILE_TOO_LARGE", http.StatusBadRequest)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.ImageUploadTooLarge, nil), "FILE_TOO_LARGE", http.StatusBadRequest)
 	case errors.Is(err, imageupload.ErrNoUpload):
-		writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeBrandAssetUploadNoFile, nil), "NO_FILE", http.StatusBadRequest)
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.BrandAssetUploadNoFile, nil), "NO_FILE", http.StatusBadRequest)
 	default:
 		writeInternalServerError(w, r, err)
 	}

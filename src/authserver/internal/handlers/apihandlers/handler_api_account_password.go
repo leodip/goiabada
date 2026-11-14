@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
@@ -56,11 +58,11 @@ func HandleAccountPasswordPut(
 
 		// Validate required fields
 		if strings.TrimSpace(req.CurrentPassword) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountCurrentPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountCurrentPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if strings.TrimSpace(req.NewPassword) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountNewPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountNewPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -84,7 +86,7 @@ func HandleAccountPasswordPut(
 			// spend a budget without ever attempting the credential (#219).
 			credentialFailures.RecordCredentialFailure(r)
 
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountCurrentPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountCurrentPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 

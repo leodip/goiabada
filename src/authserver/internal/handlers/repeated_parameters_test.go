@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -203,7 +205,7 @@ func TestHandleAuthorizeGet_ARepeatedDeliveryParameterIsAnsweredOnThePage(t *tes
 		e.validator.On("ValidateClientAndRedirectURI", mock.Anything,
 			mock.MatchedBy(func(in *protocolvalidation.ValidateClientAndRedirectURIInput) bool {
 				return in.ClientId == "test-client" && in.RedirectURI == "https://example.com"
-			})).Return(i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil))
+			})).Return(i18n.NewLocalizedError(errcode.AuthorizeClientNotFound, nil))
 		e.pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
 			mock.Anything).Return(nil)
 		e.get(t, validAuthorizeQuery+"&response_mode=query")

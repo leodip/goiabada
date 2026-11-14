@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/web"
@@ -191,7 +193,7 @@ func TestAdministrativeDocs_TheConsoleLockoutRecoveryRequestsManage(t *testing.T
 // to it (#522).
 func TestAdministrativeDocs_TheLastAdministratorSectionQuotesTheRefusal(t *testing.T) {
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), apiAdministratorsPage, "## The last administrator",
-		[]string{i18n.NewLocalizedError(i18n.ErrCodeLastAdministrator, nil).EnglishFallback()}, nil)
+		[]string{i18n.NewLocalizedError(errcode.LastAdministrator, nil).EnglishFallback()}, nil)
 }
 
 func TestAdministrativeDocs_ARecoveryRequestingAGranularScopeFails(t *testing.T) {

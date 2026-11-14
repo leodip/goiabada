@@ -377,8 +377,7 @@ func buildStylesheets() map[string]Stylesheet {
 // main.css and is not in a layer, so it wins over main.css's tokens, and each dark rule is more
 // specific than the light one, so it wins over that.
 //
-// Blueberry declares no colors: main.css already holds them, and an operator who regenerated it with
-// their own keeps those on Blueberry (#810 decision 4).
+// Blueberry declares no colors: main.css already holds them (#810 decision 4).
 func stylesheetCSS(preset Preset) string {
 	if preset.Key == blueberry {
 		return "/* Blueberry is the palette main.css is built with: this stylesheet declares no colors. */\n"

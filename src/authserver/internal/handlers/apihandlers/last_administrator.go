@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -61,7 +63,7 @@ var errLastAdministrator = errors.New("the change would leave no enabled user ho
 // 409s on this surface (#402 decision 12). The sentence is in the request's language, which the
 // admin console shows as it is (#559).
 func writeLastAdministrator(w http.ResponseWriter, r *http.Request) {
-	writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLastAdministrator, nil), "LAST_ADMINISTRATOR", http.StatusConflict)
+	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.LastAdministrator, nil), "LAST_ADMINISTRATOR", http.StatusConflict)
 }
 
 // administratorRemoval is one guarded write's hold on the administrators, from the lock to the

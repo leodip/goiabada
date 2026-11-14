@@ -241,11 +241,11 @@ func TestAuthorizationResponse_WithoutSettingsNothingIsWritten(t *testing.T) {
 	}
 }
 
-// The responder the route table builds renders form_post.html from the built-in templates, which
-// carry iss, so an operator's template directory holding a copy from an older release cannot drop
-// it: NewClientErrorResponder takes no template set to be handed one (#576, decision 5). The code
-// and the implicit tokens are written through the same responder's page at /auth/issue.
-func TestNewClientErrorResponder_TheFormPostPageIsTheBuiltInOne(t *testing.T) {
+// The responder the route table builds renders form_post.html from the built-in templates, whose
+// page posts iss beside the error, as RFC 9207 section 2.4 has a client expect once discovery
+// advertises it (#576). The code and the implicit tokens are written through the same responder's
+// page at /auth/issue.
+func TestNewClientErrorResponder_TheFormPostPagePostsIss(t *testing.T) {
 	const callback = "https://example.com/callback"
 	w := httptest.NewRecorder()
 	r := withResponseIssuer(httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"net/url"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -61,7 +63,7 @@ func HandleAccountLogoutRequestPost(
 
 		postLogout := req.PostLogoutRedirectUri
 		if postLogout == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURIRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountLogoutRedirectURIRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -72,11 +74,11 @@ func HandleAccountLogoutRequestPost(
 		// naming what is wrong with it. The absolute-URI rule comes first because a hostless http
 		// URI fails it and is named for that (#590 decision 13).
 		if !urlmatch.IsAbsoluteRedirectURI(postLogout) {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURINotAbsolute, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountLogoutRedirectURINotAbsolute, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 		if loopback.IsPlainHTTPOff(postLogout) {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURIInsecureHTTP, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountLogoutRedirectURIInsecureHTTP, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -102,7 +104,7 @@ func HandleAccountLogoutRequestPost(
 				return
 			}
 			if client == nil {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutClientIdentifierInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountLogoutClientIdentifierInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if err = database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
@@ -117,7 +119,7 @@ func HandleAccountLogoutRequestPost(
 				}
 			}
 			if !found {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutRedirectURINotRegistered, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountLogoutRedirectURINotRegistered, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		} else {
@@ -132,7 +134,7 @@ func HandleAccountLogoutRequestPost(
 				return
 			}
 			if len(matches) != 1 {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountLogoutClientUnresolved, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountLogoutClientUnresolved, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			client = &matches[0]

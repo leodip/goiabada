@@ -6,13 +6,15 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
@@ -137,7 +139,7 @@ func TestHandleAuthorizeGet_DrawsTheRefusalPageInSafeMode(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).
-				Return(i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil))
+				Return(i18n.NewLocalizedError(errcode.AuthorizeClientNotFound, nil))
 
 			var drawnSafe, drawn bool
 			pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).

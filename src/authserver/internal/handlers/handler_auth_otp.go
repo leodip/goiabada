@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
@@ -143,7 +145,7 @@ func HandleAuthOtpPost(
 		case authflow.OTPRefused:
 			renderRefusal(i18n.ErrCodeOtpIncorrectCode)
 		case authflow.OTPClockAhead:
-			renderRefusal(i18n.ErrCodeOtpClockAhead)
+			renderRefusal(errcode.OtpClockAhead)
 		case authflow.OTPAccepted:
 			boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 		}
@@ -199,9 +201,9 @@ func answerRecoveryCode(w http.ResponseWriter, r *http.Request, boundary *Ceremo
 	case authflow.OTPEnrolmentLost:
 		answerLostEnrolment(w, r, boundary, pageRenderer, result.SaveErr)
 	case authflow.OTPRecoveryCodeMissing:
-		renderRefusal(i18n.ErrCodeOtpRecoveryCodeRequired)
+		renderRefusal(errcode.OtpRecoveryCodeRequired)
 	case authflow.OTPRecoveryCodeRefused:
-		renderRefusal(i18n.ErrCodeOtpIncorrectRecoveryCode)
+		renderRefusal(errcode.OtpIncorrectRecoveryCode)
 	case authflow.OTPAccepted:
 		boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 	}

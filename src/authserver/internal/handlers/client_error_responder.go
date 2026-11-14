@@ -40,11 +40,7 @@ type ClientErrorResponder struct {
 	formPost formPostTemplate
 }
 
-// NewClientErrorResponder builds the responder. Its form_post page is the built-in one whatever
-// GOIABADA_AUTHSERVER_TEMPLATEDIR says, so no constructor parameter can hand it the directory: the
-// page encodes an authorization response, and an operator's copy taken from an older release would
-// drop iss while discovery advertises it, which RFC 9207 section 2.4 has a client reject (#576,
-// decision 5).
+// NewClientErrorResponder builds the responder, its form_post page drawn from the built-in templates.
 func NewClientErrorResponder(database clientErrorDatabase, pageRenderer PageRenderer) *ClientErrorResponder {
 	return &ClientErrorResponder{
 		database:     database,

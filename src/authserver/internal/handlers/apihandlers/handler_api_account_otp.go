@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -85,13 +87,13 @@ func writeLostOTPChange(w http.ResponseWriter, r *http.Request, database userByI
 	}
 	if current != nil && current.OTPEnabled == wantEnabled {
 		if wantEnabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 		} else {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserOTPNotEnabled, nil), "OTP_NOT_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.UserOTPNotEnabled, nil), "OTP_NOT_ENABLED", http.StatusBadRequest)
 		}
 		return
 	}
-	writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
+	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 }
 
 // userByIdReader is the one read writeLostOTPChange makes.
@@ -139,7 +141,7 @@ func HandleAccountOTPEnrollmentGet(
 
 		// If already enabled, cannot enroll
 		if user.OTPEnabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 			return
 		}
 
@@ -208,7 +210,7 @@ func HandleAccountOTPEnrollmentGet(
 					return
 				}
 				if user.OTPEnabled {
-					writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+					writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 					return
 				}
 
@@ -291,7 +293,7 @@ func HandleAccountOTPPut(
 		// about the shape of the request rather than about who sent it, and an integrator
 		// upgrading needs to see the reason rather than a password failure.
 		if _, sent := rawFields["secretKey"]; sent {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPSecretKeyNotAccepted, nil), "SECRET_KEY_NOT_ACCEPTED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPSecretKeyNotAccepted, nil), "SECRET_KEY_NOT_ACCEPTED", http.StatusBadRequest)
 			return
 		}
 
@@ -314,7 +316,7 @@ func HandleAccountOTPPut(
 
 		// Verify password for both enable and disable operations
 		if strings.TrimSpace(req.Password) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 		if !passwordhash.Verify(user.PasswordHash, req.Password) {
@@ -331,7 +333,7 @@ func HandleAccountOTPPut(
 			// no code at all (#113, #219).
 			credentialFailures.RecordCredentialFailure(r)
 
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountPasswordIncorrect, nil), "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
 
@@ -351,22 +353,22 @@ func HandleAccountOTPPut(
 		if req.Enabled {
 			// Enable OTP
 			if user.OTPEnabled {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 				return
 			}
 			if strings.TrimSpace(req.OtpCode) == "" {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPCodeRequired, nil), "OTP_CODE_REQUIRED", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeRequired, nil), "OTP_CODE_REQUIRED", http.StatusBadRequest)
 				return
 			}
 
 			// OTP code must be 6 digits
 			if len(req.OtpCode) != 6 {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
 			}
 			for i := 0; i < 6; i++ {
 				if req.OtpCode[i] < '0' || req.OtpCode[i] > '9' {
-					writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
+					writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
 					return
 				}
 			}
@@ -389,7 +391,7 @@ func HandleAccountOTPPut(
 				return
 			}
 			if keyURL == "" {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAccountOTPEnrollmentNotPending, nil), "OTP_ENROLLMENT_NOT_PENDING", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPEnrollmentNotPending, nil), "OTP_ENROLLMENT_NOT_PENDING", http.StatusBadRequest)
 				return
 			}
 
@@ -442,7 +444,7 @@ func HandleAccountOTPPut(
 					"logged_in_user": subject,
 					"reason":         audit.AuthFailedOtpClockAhead,
 				})
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeOtpClockAhead, nil),
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OtpClockAhead, nil),
 					"OTP_CLOCK_AHEAD", http.StatusBadRequest)
 				return
 			}
@@ -480,7 +482,7 @@ func HandleAccountOTPPut(
 		} else {
 			// Disable OTP
 			if !user.OTPEnabled {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserOTPNotEnabled, nil), "OTP_NOT_ENABLED", http.StatusBadRequest)
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.UserOTPNotEnabled, nil), "OTP_NOT_ENABLED", http.StatusBadRequest)
 				return
 			}
 

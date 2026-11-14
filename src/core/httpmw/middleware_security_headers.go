@@ -58,7 +58,7 @@ func SetContentSecurityPolicy(h http.Header, assetOrigins []string, scriptOrigin
 //     base-uri 'none'; frame-ancestors 'none' (#518, #816). A browser runs only
 //     the script files this origin serves, and refuses every inline <script>, on…
 //     attribute, javascript: URL and eval, so markup that reaches a page through
-//     a missed sink or an operator's template cannot run code. Every built-in
+//     a missed sink cannot run code. Every built-in
 //     page keeps its scripts in static files and hands them data in JSON data
 //     blocks, which a browser never runs (core/guard.AssertWellFormedTemplates
 //     holds the templates to that), so the policy needs no nonce or hash and

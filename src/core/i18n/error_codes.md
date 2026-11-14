@@ -1,8 +1,10 @@
 # Error code taxonomy
 
 Catalog of every stable error code emitted by Goiabada's localizable error
-paths. Companion to `error_codes.go`. Adding a new code means: add a constant
-to `error_codes.go`, add an entry here with the English message and arg shape,
+paths. Companion to `error_codes.go` and to the auth server's
+`internal/errcode`, which holds the keys only the auth server names and no
+refusal answers as its `error_code`. Adding a new code means: add a constant
+to one of them, add an entry here with the English message and arg shape,
 and add the same key to every `active.*.toml` catalog.
 
 ## Login flow

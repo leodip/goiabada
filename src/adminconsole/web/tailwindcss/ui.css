@@ -129,8 +129,8 @@
   }
 }
 
-/* The two classes the message catalogs write into their HTML, in dialog sentences, which operators'
-   override catalogs may write too: a value the sentence names, and an error detail. */
+/* The two classes the message catalogs write into their HTML, in dialog sentences: a value the
+   sentence names, and an error detail. */
 @utility text-accent {
   color: var(--color-ink);
   font-weight: 600;

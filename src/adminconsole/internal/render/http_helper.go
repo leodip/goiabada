@@ -263,7 +263,6 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 	// decisions 4 and 9). Both draw brandLogo and brandDarkLogo beside the app name, or in its place
 	// while brandHideAppName (#813 decision 5). The URLs are the auth server's, linked as given. Given
 	// no brand, as by an auth server older than brands, a page is drawn automatic in main.css's colors.
-	// uiTheme is no longer bound, so a layout copied from an older release draws every page automatic.
 	adminPage := drawsAdminMenu(templ)
 	safeMode := reqctx.SafeModeFrom(r.Context())
 	brand := pageBrand(settings.Brand, adminPage, safeMode)

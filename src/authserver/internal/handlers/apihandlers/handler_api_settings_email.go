@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -309,7 +311,7 @@ func HandleSettingsEmailSendTestPost(
 			return
 		}
 		if !settings.SMTPEnabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSMTPNotEnabled, nil), "SMTP_NOT_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.SMTPNotEnabled, nil), "SMTP_NOT_ENABLED", http.StatusBadRequest)
 			return
 		}
 
@@ -386,10 +388,10 @@ var smtpDialFailure = connectionFailure{
 
 // testSendConnectionFailure is what a test send that could not connect answers.
 var testSendConnectionFailure = connectionFailure{
-	hostNotFound: i18n.ErrCodeSettingsEmailSendFailedHostNotFound,
-	timedOut:     i18n.ErrCodeSettingsEmailSendFailedTimedOut,
-	refused:      i18n.ErrCodeSettingsEmailSendFailedRefused,
-	noCause:      i18n.ErrCodeSettingsEmailSendFailed,
+	hostNotFound: errcode.SettingsEmailSendFailedHostNotFound,
+	timedOut:     errcode.SettingsEmailSendFailedTimedOut,
+	refused:      errcode.SettingsEmailSendFailedRefused,
+	noCause:      errcode.SettingsEmailSendFailed,
 }
 
 // connectionFailureMessage is failure's sentence for cause. It is the only text a failed connection
@@ -416,22 +418,22 @@ func sendFailureMessage(err error) *i18n.LocalizedError {
 	case emaildelivery.SendFailureConnection:
 		return connectionFailureMessage(testSendConnectionFailure, emaildelivery.ClassifyConnectionError(err))
 	case emaildelivery.SendFailureSTARTTLSNotOffered:
-		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSTARTTLSNotOffered, nil)
+		return i18n.NewLocalizedError(errcode.SettingsEmailSTARTTLSNotOffered, nil)
 	case emaildelivery.SendFailureUnencryptedPassword:
-		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailPasswordUnencrypted, nil)
+		return i18n.NewLocalizedError(errcode.SettingsEmailPasswordUnencrypted, nil)
 	case emaildelivery.SendFailureNoAuthentication:
-		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailNoAuthentication, nil)
+		return i18n.NewLocalizedError(errcode.SettingsEmailNoAuthentication, nil)
 	case emaildelivery.SendFailureNoSupportedMechanism:
-		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailNoSupportedMechanism, nil)
+		return i18n.NewLocalizedError(errcode.SettingsEmailNoSupportedMechanism, nil)
 	case emaildelivery.SendFailureUnusablePlainCredentials:
-		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailPlainCredentialsUnusable, nil)
+		return i18n.NewLocalizedError(errcode.SettingsEmailPlainCredentialsUnusable, nil)
 	case emaildelivery.SendFailureTLS:
-		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailTLSFailed, nil)
+		return i18n.NewLocalizedError(errcode.SettingsEmailTLSFailed, nil)
 	case emaildelivery.SendFailureAuthenticationRejected:
-		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailAuthenticationRejected, nil)
+		return i18n.NewLocalizedError(errcode.SettingsEmailAuthenticationRejected, nil)
 	case emaildelivery.SendFailureMessageRefused:
-		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailMessageRefused, nil)
+		return i18n.NewLocalizedError(errcode.SettingsEmailMessageRefused, nil)
 	default:
-		return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSendFailed, nil)
+		return i18n.NewLocalizedError(errcode.SettingsEmailSendFailed, nil)
 	}
 }

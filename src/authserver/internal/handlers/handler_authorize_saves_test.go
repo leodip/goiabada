@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -17,8 +19,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // A request /auth/authorize refuses before it has assigned a state writes no auth context (#436).
@@ -39,7 +41,7 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 		{
 			name:         "an unknown client_id is refused on a page",
 			query:        "client_id=no-such-client&redirect_uri=https://example.com&response_type=code&scope=openid",
-			validatorErr: i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientNotFound, nil),
+			validatorErr: i18n.NewLocalizedError(errcode.AuthorizeClientNotFound, nil),
 			expect: func(pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 					mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -50,7 +52,7 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 		{
 			name:         "an unregistered redirect_uri is refused on a page",
 			query:        "client_id=test-client&redirect_uri=https://elsewhere.example&response_type=code&scope=openid",
-			validatorErr: i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotRegistered, nil),
+			validatorErr: i18n.NewLocalizedError(errcode.AuthorizeRedirectURINotRegistered, nil),
 			expect: func(pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 					mock.MatchedBy(func(data map[string]interface{}) bool {

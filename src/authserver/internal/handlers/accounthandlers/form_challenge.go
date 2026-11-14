@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/turnstile"
@@ -66,7 +68,7 @@ func requireChallenge(form turnstile.Form, verifier ChallengeVerifier,
 			}
 
 			// i18n surface: A — browser-flow form rerender.
-			refuse(w, r, settings, i18n.NewLocalizedError(i18n.ErrCodeChallengeFailed, nil).Localize(r.Context()))
+			refuse(w, r, settings, i18n.NewLocalizedError(errcode.ChallengeFailed, nil).Localize(r.Context()))
 		})
 	}
 }

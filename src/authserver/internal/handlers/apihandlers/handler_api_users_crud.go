@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/errcode"
+
 	"github.com/leodip/goiabada/authserver/internal/accountnotice"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
@@ -291,7 +293,7 @@ func HandleUserOTPPut(
 
 		// Only proceed if user currently has OTP enabled and we're disabling it
 		if !user.OTPEnabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserOTPNotEnabled, nil), "OTP_NOT_ENABLED", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.UserOTPNotEnabled, nil), "OTP_NOT_ENABLED", http.StatusBadRequest)
 			return
 		}
 
@@ -393,7 +395,7 @@ func HandleUserCreatePost(
 
 		// Email length validation, at the limit every path that sets an address applies (#632)
 		if inputvalidation.TextLength(req.Email) > accountvalidation.MaxEmailLength {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserEmailTooLong, map[string]any{"max": accountvalidation.MaxEmailLength}), "EMAIL_TOO_LONG", http.StatusBadRequest)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.UserEmailTooLong, map[string]any{"max": accountvalidation.MaxEmailLength}), "EMAIL_TOO_LONG", http.StatusBadRequest)
 			return
 		}
 
@@ -404,7 +406,7 @@ func HandleUserCreatePost(
 			return
 		}
 		if existingUser != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyExists, nil), "EMAIL_ALREADY_EXISTS", http.StatusConflict)
+			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.EmailAlreadyExists, nil), "EMAIL_ALREADY_EXISTS", http.StatusConflict)
 			return
 		}
 
