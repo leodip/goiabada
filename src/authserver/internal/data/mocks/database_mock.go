@@ -4536,6 +4536,84 @@ func (_c *Database_DeleteDeadPreRegistrations_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
+// DeleteEmailTemplate provides a mock function for the type Database
+func (_mock *Database) DeleteEmailTemplate(ctx context.Context, tx *sql.Tx, emailTemplate string, language string) (bool, error) {
+	ret := _mock.Called(ctx, tx, emailTemplate, language)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteEmailTemplate")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string) (bool, error)); ok {
+		return returnFunc(ctx, tx, emailTemplate, language)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string) bool); ok {
+		r0 = returnFunc(ctx, tx, emailTemplate, language)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, string) error); ok {
+		r1 = returnFunc(ctx, tx, emailTemplate, language)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_DeleteEmailTemplate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteEmailTemplate'
+type Database_DeleteEmailTemplate_Call struct {
+	*mock.Call
+}
+
+// DeleteEmailTemplate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - emailTemplate string
+//   - language string
+func (_e *Database_Expecter) DeleteEmailTemplate(ctx any, tx any, emailTemplate any, language any) *Database_DeleteEmailTemplate_Call {
+	return &Database_DeleteEmailTemplate_Call{Call: _e.mock.On("DeleteEmailTemplate", ctx, tx, emailTemplate, language)}
+}
+
+func (_c *Database_DeleteEmailTemplate_Call) Run(run func(ctx context.Context, tx *sql.Tx, emailTemplate string, language string)) *Database_DeleteEmailTemplate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteEmailTemplate_Call) Return(deleted bool, err error) *Database_DeleteEmailTemplate_Call {
+	_c.Call.Return(deleted, err)
+	return _c
+}
+
+func (_c *Database_DeleteEmailTemplate_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, emailTemplate string, language string) (bool, error)) *Database_DeleteEmailTemplate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteExpiredAuthorizeRequests provides a mock function for the type Database
 func (_mock *Database) DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error {
 	ret := _mock.Called(ctx, tx, now)
@@ -6837,6 +6915,74 @@ func (_c *Database_GetAllClients_Call) Return(clients []record.Client, err error
 }
 
 func (_c *Database_GetAllClients_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx) ([]record.Client, error)) *Database_GetAllClients_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAllEmailTemplates provides a mock function for the type Database
+func (_mock *Database) GetAllEmailTemplates(ctx context.Context, tx *sql.Tx) ([]record.EmailTemplate, error) {
+	ret := _mock.Called(ctx, tx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAllEmailTemplates")
+	}
+
+	var r0 []record.EmailTemplate
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx) ([]record.EmailTemplate, error)); ok {
+		return returnFunc(ctx, tx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx) []record.EmailTemplate); ok {
+		r0 = returnFunc(ctx, tx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.EmailTemplate)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx) error); ok {
+		r1 = returnFunc(ctx, tx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetAllEmailTemplates_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAllEmailTemplates'
+type Database_GetAllEmailTemplates_Call struct {
+	*mock.Call
+}
+
+// GetAllEmailTemplates is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+func (_e *Database_Expecter) GetAllEmailTemplates(ctx any, tx any) *Database_GetAllEmailTemplates_Call {
+	return &Database_GetAllEmailTemplates_Call{Call: _e.mock.On("GetAllEmailTemplates", ctx, tx)}
+}
+
+func (_c *Database_GetAllEmailTemplates_Call) Run(run func(ctx context.Context, tx *sql.Tx)) *Database_GetAllEmailTemplates_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetAllEmailTemplates_Call) Return(emailTemplates []record.EmailTemplate, err error) *Database_GetAllEmailTemplates_Call {
+	_c.Call.Return(emailTemplates, err)
+	return _c
+}
+
+func (_c *Database_GetAllEmailTemplates_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx) ([]record.EmailTemplate, error)) *Database_GetAllEmailTemplates_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -9155,6 +9301,86 @@ func (_c *Database_GetDeletedClientByClientIdentifier_Call) Return(deletedClient
 }
 
 func (_c *Database_GetDeletedClientByClientIdentifier_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)) *Database_GetDeletedClientByClientIdentifier_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetEmailTemplate provides a mock function for the type Database
+func (_mock *Database) GetEmailTemplate(ctx context.Context, tx *sql.Tx, emailTemplate string, language string) (*record.EmailTemplate, error) {
+	ret := _mock.Called(ctx, tx, emailTemplate, language)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEmailTemplate")
+	}
+
+	var r0 *record.EmailTemplate
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string) (*record.EmailTemplate, error)); ok {
+		return returnFunc(ctx, tx, emailTemplate, language)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string) *record.EmailTemplate); ok {
+		r0 = returnFunc(ctx, tx, emailTemplate, language)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*record.EmailTemplate)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, string) error); ok {
+		r1 = returnFunc(ctx, tx, emailTemplate, language)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetEmailTemplate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEmailTemplate'
+type Database_GetEmailTemplate_Call struct {
+	*mock.Call
+}
+
+// GetEmailTemplate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - emailTemplate string
+//   - language string
+func (_e *Database_Expecter) GetEmailTemplate(ctx any, tx any, emailTemplate any, language any) *Database_GetEmailTemplate_Call {
+	return &Database_GetEmailTemplate_Call{Call: _e.mock.On("GetEmailTemplate", ctx, tx, emailTemplate, language)}
+}
+
+func (_c *Database_GetEmailTemplate_Call) Run(run func(ctx context.Context, tx *sql.Tx, emailTemplate string, language string)) *Database_GetEmailTemplate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetEmailTemplate_Call) Return(emailTemplate1 *record.EmailTemplate, err error) *Database_GetEmailTemplate_Call {
+	_c.Call.Return(emailTemplate1, err)
+	return _c
+}
+
+func (_c *Database_GetEmailTemplate_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, emailTemplate string, language string) (*record.EmailTemplate, error)) *Database_GetEmailTemplate_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -17128,6 +17354,69 @@ func (_c *Database_RunInTransaction_Call) Return(err error) *Database_RunInTrans
 }
 
 func (_c *Database_RunInTransaction_Call) RunAndReturn(run func(ctx context.Context, fn func(tx *sql.Tx) error) error) *Database_RunInTransaction_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SaveEmailTemplate provides a mock function for the type Database
+func (_mock *Database) SaveEmailTemplate(ctx context.Context, tx *sql.Tx, edit *record.EmailTemplate) error {
+	ret := _mock.Called(ctx, tx, edit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SaveEmailTemplate")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.EmailTemplate) error); ok {
+		r0 = returnFunc(ctx, tx, edit)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_SaveEmailTemplate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SaveEmailTemplate'
+type Database_SaveEmailTemplate_Call struct {
+	*mock.Call
+}
+
+// SaveEmailTemplate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - edit *record.EmailTemplate
+func (_e *Database_Expecter) SaveEmailTemplate(ctx any, tx any, edit any) *Database_SaveEmailTemplate_Call {
+	return &Database_SaveEmailTemplate_Call{Call: _e.mock.On("SaveEmailTemplate", ctx, tx, edit)}
+}
+
+func (_c *Database_SaveEmailTemplate_Call) Run(run func(ctx context.Context, tx *sql.Tx, edit *record.EmailTemplate)) *Database_SaveEmailTemplate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.EmailTemplate
+		if args[2] != nil {
+			arg2 = args[2].(*record.EmailTemplate)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SaveEmailTemplate_Call) Return(err error) *Database_SaveEmailTemplate_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_SaveEmailTemplate_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, edit *record.EmailTemplate) error) *Database_SaveEmailTemplate_Call {
 	_c.Call.Return(run)
 	return _c
 }
