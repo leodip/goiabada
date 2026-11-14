@@ -471,6 +471,11 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/email-templates/{email}", apihandlers.HandleEmailTemplateGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/email-templates/{email}/{language}", apihandlers.HandleEmailTemplatePut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/email-templates/{email}/{language}", apihandlers.HandleEmailTemplateDelete(s.database, auditLogger))
+		// The preview stores and sends nothing, so it reads as the read does; the test send sends
+		// text nobody has saved, which its handler reserves to authserver:manage (#818 decisions 11
+		// and 12).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Post("/email-templates/{email}/{language}/preview", apihandlers.HandleEmailTemplatePreviewPost(s.database, httpHelper))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/email-templates/{email}/{language}/send-test", apihandlers.HandleEmailTemplateSendTestPost(s.database, emailValidator, emailSender, httpHelper, auditLogger))
 
 		// Settings - Turnstile
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/turnstile", apihandlers.HandleSettingsTurnstileGet())

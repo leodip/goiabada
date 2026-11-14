@@ -352,10 +352,14 @@ func HandleSettingsEmailSendTestPost(
 		}
 
 		// The recipient is typed, so it is normalized as stored addresses are before it is digested:
-		// the digest then matches every other entry about that address (#779 decision 1).
+		// the digest then matches every other entry about that address (#779 decision 1). The entry
+		// names the test email template and the language it was sent in, as a test of an email
+		// template from its editor does (#818 decision 13).
 		auditLogger.Log(r.Context(), audit.EventSentTestEmail, map[string]interface{}{
 			"logged_in_user": callerSubject(r),
 			"email_digest":   hashutil.HashString(strings.ToLower(strings.TrimSpace(req.To))),
+			"email_template": emailtemplate.TestEmail.ID,
+			"language":       emailtemplate.Language(i18n.LocaleTag(r.Context())),
 		})
 
 		// Whether the message went over TLS: STARTTLS if available sends in plaintext when the relay

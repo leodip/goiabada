@@ -2209,6 +2209,7 @@
 "handler.email_template.button_not_alone" = "Pon {{.placeholder}} solo en su línea."
 "handler.email_template.placeholder_in_link_destination" = "La dirección de un enlace solo puede contener un marcador como {{.link}} solo, la dirección entera. Esta contiene {{.placeholder}}."
 "handler.email_template.nothing_to_read" = "El cuerpo necesita algo que leer además del botón."
+"handler.email_template.brand_not_found" = "La marca no existe."
 "handler.legal_document.applies_to_invalid" = "Elija si el documento se aplica a todas las aplicaciones o a las aplicaciones seleccionadas."
 "handler.legal_document.apps_with_all_apps" = "Un documento que se aplica a todas las aplicaciones no enumera ninguna. Elija las aplicaciones seleccionadas para enumerarlas."
 "handler.legal_document.admin_console_client" = "No se puede elegir la consola de administración: a los usuarios nunca se les pide aceptar un documento legal al iniciar sesión en ella."

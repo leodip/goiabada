@@ -100,3 +100,31 @@ type SaveEmailTemplateRequest struct {
 	ButtonLabel string `json:"buttonLabel"`
 	Body        string `json:"body"`
 }
+
+// PreviewEmailTemplateRequest is a text of one language to preview, saved or not: its subject, its
+// button label for an email with a button, and its body, with the brand to draw it in, the default
+// brand when BrandId is left out.
+type PreviewEmailTemplateRequest struct {
+	Subject     string `json:"subject"`
+	ButtonLabel string `json:"buttonLabel"`
+	Body        string `json:"body"`
+	BrandId     *int64 `json:"brandId,omitempty"`
+}
+
+// PreviewEmailTemplateResponse is the email a preview draws, with the sample values: its subject,
+// the HTML document it is sent as, and its plain-text part.
+type PreviewEmailTemplateResponse struct {
+	Subject string `json:"subject"`
+	Html    string `json:"html"`
+	Text    string `json:"text"`
+}
+
+// SendTestEmailTemplateRequest is a text of one language to send to To as a recipient would get
+// it, with the preview's sample values, in the brand BrandId names or the default brand.
+type SendTestEmailTemplateRequest struct {
+	To          string `json:"to"`
+	Subject     string `json:"subject"`
+	ButtonLabel string `json:"buttonLabel"`
+	Body        string `json:"body"`
+	BrandId     *int64 `json:"brandId,omitempty"`
+}

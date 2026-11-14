@@ -248,6 +248,9 @@ const (
 	ErrCodeEmailTemplateButtonNotAlone               = "handler.email_template.button_not_alone"                // Args: {"placeholder": string}
 	ErrCodeEmailTemplatePlaceholderInLinkDestination = "handler.email_template.placeholder_in_link_destination" // Args: {"placeholder": string, "link": string}
 	ErrCodeEmailTemplateNothingToRead                = "handler.email_template.nothing_to_read"
+	// The brand a preview or a test send of an email template names is not there (#818 decisions
+	// 11 and 12); error_field is brandId.
+	ErrCodeEmailTemplateBrandNotFound = "handler.email_template.brand_not_found"
 
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.

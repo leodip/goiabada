@@ -45,18 +45,46 @@ const emailContent = `{{define "title"}}{{.emailSubject}}{{end}}{{define "head"}
 // name is the settings'. The body is drawn inside the email layout, which writes the frame inline
 // from emailFrame, and the layout marks the email with the language its text is written in.
 func (h *Renderer) RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error) {
-	settings, ok := reqctx.SettingsFrom(r.Context())
-	if !ok {
-		return emailtemplate.Message{}, reqctx.ErrNoSettings
-	}
 	lang := emailtemplate.Language(i18n.LocaleTag(r.Context()))
 	if _, ok := email.BuiltIn[lang]; !ok {
 		return emailtemplate.Message{}, errs.Errorf("the email %s has no built-in text in %s", email.ID, lang)
 	}
-	text := h.textToSend(r.Context(), email, lang)
+	return h.drawEmail(r.Context(), email, lang, h.textToSend(r.Context(), email, lang), values,
+		RequestPageBrand(r.Context(), h.brands))
+}
+
+// RenderEmailSample renders email in lang with text, as given and unchecked, the way RenderEmail
+// draws an email sent with it: the email template preview and its test send (#818 decisions 11 and
+// 12), whose text nobody may have saved. It is drawn in brand, or in the default brand when brand is
+// nil, whatever page r is from, and values, whose app name is the settings', are the caller's sample
+// values.
+func (h *Renderer) RenderEmailSample(r *http.Request, email *emailtemplate.Email, lang string, text emailtemplate.Text,
+	values emailtemplate.Values, brand *record.Brand) (emailtemplate.Message, error) {
+	if _, ok := email.BuiltIn[lang]; !ok {
+		return emailtemplate.Message{}, errs.Errorf("the email %s has no built-in text in %s", email.ID, lang)
+	}
+	page := DefaultPageBrand(r.Context(), h.brands)
+	if brand != nil {
+		page = PageBrand{}
+		if h.brands != nil {
+			page = pageBrandOf(r.Context(), h.brands, brand)
+		}
+	}
+	return h.drawEmail(r.Context(), email, lang, text, values, page)
+}
+
+// drawEmail draws email in lang with text and values, whose app name is the settings', inside the
+// email layout, which writes the frame inline from brand's look, and marks the email with the
+// language its text is written in.
+func (h *Renderer) drawEmail(ctx context.Context, email *emailtemplate.Email, lang string, text emailtemplate.Text,
+	values emailtemplate.Values, brand PageBrand) (emailtemplate.Message, error) {
+	settings, ok := reqctx.SettingsFrom(ctx)
+	if !ok {
+		return emailtemplate.Message{}, reqctx.ErrNoSettings
+	}
 	values.AppName = settings.AppName
 
-	frame := emailFrameOf(r.Context(), settings.AppName, RequestPageBrand(r.Context(), h.brands), h.baseURL)
+	frame := emailFrameOf(ctx, settings.AppName, brand, h.baseURL)
 	rendered, err := email.Render(lang, text, values, emailLookOf(frame))
 	if err != nil {
 		return emailtemplate.Message{}, errs.Wrap(err, "unable to render the email "+email.ID)
@@ -71,7 +99,7 @@ func (h *Renderer) RenderEmail(r *http.Request, email *emailtemplate.Email, valu
 	}
 	var buf bytes.Buffer
 	err = templ.ExecuteTemplate(&buf, filepath.Base(emailLayout), map[string]interface{}{
-		"ctx":          r.Context(),
+		"ctx":          ctx,
 		"appName":      settings.AppName,
 		"emailLang":    lang,
 		"emailFrame":   frame,

@@ -2924,6 +2924,101 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/email-templates/{email}/{language}/preview:
+    post:
+      tags: [Email Templates]
+      summary: Preview email template
+      description: |
+        Draw a text of one language, saved or not, as the email the auth server would send:
+        the subject, the HTML and the plain-text part, in the language the path names. It stores
+        nothing and sends nothing, and takes any scope that reads settings.
+
+        The placeholders read sample values: `{{name}}` is "Jane Doe", `{{code}}` is
+        "ABCD1234", `{{codes_left}}` is 3, and `{{link}}` is
+        `https://example.invalid/sample-link`, which leads nowhere. `{{app_name}}` is the
+        settings' app name, and `{{expiry}}` the email's real lifetime. The email is drawn in the
+        brand `brandId` names, or in the default brand without one.
+
+        A text a save would refuse is refused with the same 400. A `brandId` naming no brand is
+        refused with 400, `error_field` `/brandId` and `error_code`
+        `handler.email_template.brand_not_found`.
+      operationId: previewEmailTemplate
+      parameters:
+        - $ref: '#/components/parameters/EmailTemplateIdParam'
+        - $ref: '#/components/parameters/EmailTemplateLanguageParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewEmailTemplateRequest'
+      responses:
+        '200':
+          description: The email drawn with the sample values
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewEmailTemplateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/email-templates/{email}/{language}/send-test:
+    post:
+      tags: [Email Templates]
+      summary: Send email template test
+      description: |
+        Send a text of one language, saved or not, to `to` through the stored SMTP settings, as a
+        recipient would get it: in the language the path names, in the brand `brandId` names or
+        the default brand, and with the preview's sample values. Nothing in its subject marks it
+        as a test. Answers 200 once the SMTP server has accepted the message, with `encrypted`
+        saying whether it went over TLS.
+
+        A test send needs `authserver:manage`, as a save does: `authserver:manage-settings` is
+        refused with 403 MANAGE_SCOPE_REQUIRED. A send is audited as `sent_test_email`, naming
+        the email template and the language.
+
+        A text a save would refuse, and a `brandId` naming no brand, are refused as the preview
+        refuses them. Otherwise the 400s are those of the SMTP settings' test send,
+        `sendTestEmail`: SMTP_NOT_ENABLED while SMTP is disabled, a missing or invalid `to`, and
+        SEND_FAILED with the same fixed messages. The
+        full error of a failed send goes to the auth server's log, at Warn, as "unable to send
+        the email template test".
+      operationId: sendEmailTemplateTest
+      parameters:
+        - $ref: '#/components/parameters/EmailTemplateIdParam'
+        - $ref: '#/components/parameters/EmailTemplateLanguageParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendTestEmailTemplateRequest'
+      responses:
+        '200':
+          description: Test email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendTestEmailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/clients:
     get:
       tags: [Clients]
@@ -4274,6 +4369,10 @@ paths:
         included, to check what a save's connection does not: the encryption, the certificate,
         the credentials and the sender. Answers 200 once the SMTP server has accepted the
         message, with `encrypted` saying whether it went over TLS.
+
+        The message is the `test` email template, in the built-in language that matches the
+        caller's and in the default brand. A send is audited as `sent_test_email`, naming the
+        `test` template and that language.
 
         With `smtpEncryption` set to `none`, STARTTLS if available, a message the SMTP server
         can't take over TLS, with a certificate the auth server trusts for `smtpHost`, is sent
@@ -9442,6 +9541,74 @@ components:
           maxLength: 20000
           description: Markdown with placeholders, such as `{{name}}`, each one the email offers.
       required:
+        - subject
+        - body
+
+    PreviewEmailTemplateRequest:
+      type: object
+      properties:
+        subject:
+          type: string
+          maxLength: 200
+          description: As for a save.
+        buttonLabel:
+          type: string
+          maxLength: 60
+          description: As for a save.
+        body:
+          type: string
+          maxLength: 20000
+          description: As for a save.
+        brandId:
+          type: integer
+          format: int64
+          description: The brand to draw the email in. Leave it out for the default brand.
+      required:
+        - subject
+        - body
+
+    PreviewEmailTemplateResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+          description: The subject, with the sample values.
+        html:
+          type: string
+          description: The HTML document the email is sent as.
+        text:
+          type: string
+          description: The plain-text part sent beside the HTML.
+      required:
+        - subject
+        - html
+        - text
+
+    SendTestEmailTemplateRequest:
+      type: object
+      properties:
+        to:
+          type: string
+          format: email
+          description: The address to send the test to.
+        subject:
+          type: string
+          maxLength: 200
+          description: As for a save.
+        buttonLabel:
+          type: string
+          maxLength: 60
+          description: As for a save.
+        body:
+          type: string
+          maxLength: 20000
+          description: As for a save.
+        brandId:
+          type: integer
+          format: int64
+          description: The brand to draw the email in. Leave it out for the default brand.
+      required:
+        - to
         - subject
         - body
 

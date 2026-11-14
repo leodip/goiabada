@@ -75,7 +75,7 @@ func TestHandleSettingsEmailSendTestPost_TheTestEmailIsDrawnInTheDefaultBrandInT
 			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).
 				Return(emaildelivery.SendResult{Encrypted: true}, nil).Once()
-			auditLogger.On("Log", mock.Anything, audit.EventSentTestEmail, mock.Anything).Return().Once()
+			details := captureAuditDetails(auditLogger, audit.EventSentTestEmail)
 
 			r := sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true, AppName: "Acme Portal"})
 			rr := httptest.NewRecorder()
@@ -102,6 +102,10 @@ func TestHandleSettingsEmailSendTestPost_TheTestEmailIsDrawnInTheDefaultBrandInT
 				"the app name is drawn above the body, the default brand having no logo")
 			assert.Zero(t, brands.clientReads, "an administrator's email reads no client's brand")
 			assert.NotContains(t, sent.HtmlBody, time.Now().Format("2006"), "the date is the Date header's, not the body's")
+			// The SMTP test sends the test email template, and its entry says so and in which
+			// language (#818 decision 13).
+			assert.Equal(t, "test", (*details)["email_template"])
+			assert.Equal(t, tc.lang, (*details)["language"])
 		})
 	}
 }

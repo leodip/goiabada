@@ -157,5 +157,7 @@ func TestHandleSettingsEmailSendTestPost_AuditsTheLowercasedRecipientsDigest(t *
 	assert.Equal(t, map[string]interface{}{
 		"email_digest":   lowercaseAddressDigest("ana.lima@example.com"),
 		"logged_in_user": adminSubject,
+		"email_template": "test",
+		"language":       "en",
 	}, *details)
 }

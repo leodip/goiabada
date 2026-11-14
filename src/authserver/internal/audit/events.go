@@ -496,8 +496,11 @@ const (
 	// set no longer exists, so it is a wrong code (#257 decision 10).
 	EventRecoveryCodeReplayDetected = "recovery_code_replay_detected"
 
-	EventEnabledOTP                     = "enabled_otp"
-	EventDisabledOTP                    = "disabled_otp"
+	EventEnabledOTP  = "enabled_otp"
+	EventDisabledOTP = "disabled_otp"
+	// EventSentTestEmail records a test email the mail server accepted, from the SMTP settings or
+	// from an email template's editor, with logged_in_user, email_digest, and email_template and
+	// language: test and the language it was sent in for the SMTP settings' (#818 decision 13).
 	EventSentTestEmail                  = "sent_test_email"
 	EventUpdatedUserProfilePicture      = "updated_user_profile_picture"
 	EventDeletedUserProfilePicture      = "deleted_user_profile_picture"

@@ -365,6 +365,7 @@ cause, each a whole sentence.
 | `handler.email_template.button_not_alone` | `placeholder` (string) | Put {{.placeholder}} on a line of its own. |
 | `handler.email_template.placeholder_in_link_destination` | `placeholder` (string), `link` (string) | A link's address can hold a placeholder only as {{.link}} on its own, the whole address. This one holds {{.placeholder}}. |
 | `handler.email_template.nothing_to_read` | (none) | The body needs something to read besides the button. |
+| `handler.email_template.brand_not_found` | (none) | The brand does not exist. |
 | `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
 | `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
 | `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |

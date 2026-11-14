@@ -26,8 +26,8 @@ import (
 )
 
 // forgotPasswordCodeLifetime bounds how long a password reset code stays usable
-// after it is issued by HandleForgotPasswordPost.
-const forgotPasswordCodeLifetime = 5 * time.Minute
+// after it is issued by HandleForgotPasswordPost, emaillinks.ResetLinkLifetime.
+const forgotPasswordCodeLifetime = emaillinks.ResetLinkLifetime
 
 // setupLinkLifetime bounds the same code while the account has no password: the link an
 // administrator's "send an email to set the password" sends, emaillinks.SetupLinkLifetime.
