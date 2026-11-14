@@ -44,16 +44,21 @@ const emailContent = `{{define "title"}}{{.emailSubject}}{{end}}{{define "head"}
 // the brand of the page it was sent from as RequestPageBrand reads it, and with values, whose app
 // name is the settings'. The body is drawn inside the email layout, which writes the frame inline
 // from emailFrame, and the layout marks the email with the language its text is written in. The
-// whole email is in that language, its frame and footer as well as its text: a recipient reading a
-// language with no built-in text, one an operator added through an override catalog, gets all of
-// it in English.
+// whole email is in that language, its frame and footer as well as its text: the frame and footer
+// are drawn from the recipient's catalog when it is written in that language, so an operator's
+// fr-CA wording reaches an email in French, and from the language's own catalog when it is not, so
+// a recipient reading a language with no built-in text, one an operator added through an override
+// catalog, gets all of it in English.
 func (h *Renderer) RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error) {
 	lang := emailtemplate.Language(i18n.LocaleTag(r.Context()))
 	if _, ok := email.BuiltIn[lang]; !ok {
 		return emailtemplate.Message{}, errs.Errorf("the email %s has no built-in text in %s", email.ID, lang)
 	}
-	// lang is one of the six built-in catalogs' tags, so the recipient's language is exactly it.
-	ctx := i18n.WithRecipientLanguage(r.Context(), lang, "")
+	ctx := r.Context()
+	if !emailtemplate.SameLanguage(i18n.CatalogTag(ctx), lang) {
+		// lang is one of the six built-in catalogs' tags, so the recipient's language is exactly it.
+		ctx = i18n.WithRecipientLanguage(ctx, lang, "")
+	}
 	return h.drawEmail(ctx, email, lang, h.textToSend(ctx, email, lang), values, RequestPageBrand(ctx, h.brands))
 }
 

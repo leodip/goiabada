@@ -237,17 +237,26 @@ func TestRender_AnEmailsFooterIsInTheEmailsLanguage(t *testing.T) {
 	}
 }
 
-// A recipient reading a language an operator added through an override catalog gets the English
-// email, and its footer is English too, as its lang attribute says: the brand's fallback labels and
-// "Need help?" and "Support page", never the added catalog's words or a label for that language.
-func TestRender_AnEmailToAReaderOfAnAddedLanguageIsEnglishFooterIncluded(t *testing.T) {
+// installFooterOverrideCatalogs installs, until the test ends, an operator's two catalogs rewording
+// the footer: nl, a language Goiabada has no emails in, and fr-CA, a regional variant of French.
+func installFooterOverrideCatalogs(t *testing.T) {
+	t.Helper()
 	overrides := t.TempDir()
 	catalogs := filepath.Join(overrides, "catalogs")
 	require.NoError(t, os.Mkdir(catalogs, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(catalogs, "active.nl.toml"),
 		[]byte("\"common.footer.need_help\" = \"Hulp nodig?\"\n\"common.footer.support_page\" = \"Ondersteuningspagina\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(catalogs, "active.fr-CA.toml"),
+		[]byte("\"common.footer.need_help\" = \"Besoin de soutien ?\"\n\"common.footer.support_page\" = \"Centre de soutien\"\n"), 0o600))
 	require.NoError(t, i18n.LoadBundle(overrides))
 	t.Cleanup(func() { require.NoError(t, i18n.LoadBundle("")) })
+}
+
+// A recipient reading a language an operator added through an override catalog gets the English
+// email, and its footer is English too, as its lang attribute says: the brand's fallback labels and
+// "Need help?" and "Support page", never the added catalog's words or a label for that language.
+func TestRender_AnEmailToAReaderOfAnAddedLanguageIsEnglishFooterIncluded(t *testing.T) {
+	installFooterOverrideCatalogs(t)
 
 	links := record.BrandFooterLinks{{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"nl": "Privacybeleid"}}}
 	brands := &defaultBrandStub{brand: footerBrand(links, "", "https://acme.example/support", "")}
@@ -262,6 +271,22 @@ func TestRender_AnEmailToAReaderOfAnAddedLanguageIsEnglishFooterIncluded(t *test
 	footer := readEmailFooter(t, html)
 	assert.Equal(t, []string{"Privacy"}, footerLinkTexts(footer.links))
 	assert.Equal(t, "Need help? Support page", footer.contactText)
+}
+
+// A recipient whose catalog is a regional variant of the email's language keeps it: an email in
+// French to a reader of fr-CA draws the operator's fr-CA wording of "Need help?" and "Support page".
+func TestRender_AnEmailToAReaderOfARegionalVariantKeepsItsFooterWording(t *testing.T) {
+	installFooterOverrideCatalogs(t)
+	brands := &defaultBrandStub{brand: footerBrand(nil, "", "https://acme.example/support", "")}
+	ctx := i18n.WithRecipientLanguage(context.Background(), "fr-CA", "")
+
+	html := renderFooterEmail(t, ctx, brands)
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	require.NoError(t, err)
+	lang, _ := doc.Find("html").Attr("lang")
+	require.Equal(t, "fr", lang)
+	assert.Equal(t, "Besoin de soutien ? Centre de soutien", readEmailFooter(t, html).contactText)
 }
 
 // The address is the "to" of its mailto: link, percent-encoded where RFC 6068 section 2 says it

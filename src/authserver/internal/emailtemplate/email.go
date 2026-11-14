@@ -124,6 +124,14 @@ func Language(locale string) string {
 	return Languages[index]
 }
 
+// SameLanguage reports whether the catalog tagged tag is written in lang's language, a regional
+// variant included: fr-CA is French, while nl, a language an operator added, is not English.
+func SameLanguage(tag, lang string) bool {
+	tagBase, _ := language.Make(tag).Base()
+	langBase, _ := language.Make(lang).Base()
+	return tagBase == langBase
+}
+
 // RecipientName is what {{name}} reads for a recipient (#818 decision 15): their full name, or, for
 // one with none, the address the email is sent to, so no email reads "Hello ,".
 func RecipientName(fullName, address string) string {
