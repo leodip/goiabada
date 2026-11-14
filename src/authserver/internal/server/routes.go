@@ -71,9 +71,12 @@ func (s *Server) initRoutes(branches appBranches) {
 	emailSender := emaildelivery.NewSender(s.dataCipher, s.cfg.AuthServer.SMTPEHLOName)
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
-	// or handlers.JSONWriter (#435). Every email is rendered through it, and links its brand's logo
-	// under the public base URL (#817).
-	httpHelper := render.New(s.templateFS, s.staticFS, s.database).WithBaseURL(s.cfg.AuthServer.BaseURL)
+	// or handlers.JSONWriter (#435). Every email is rendered through it, links its brand's logo
+	// under the public base URL (#817), and is sent with its administrator's edit in the
+	// recipient's language (#818).
+	httpHelper := render.New(s.templateFS, s.staticFS, s.database).
+		WithBaseURL(s.cfg.AuthServer.BaseURL).
+		WithEmailTemplates(s.database)
 	// The one notifier every account notice goes through, after its response (#724).
 	notifier := accountnotice.New(httpHelper, emailSender, s.jobs)
 	// The one sender every logout token goes through, after the end of the session it tells of has

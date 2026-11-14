@@ -345,8 +345,15 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   the email's language, and `{{codes_left}}` a number, which the recovery code notice words alike
   for any count. `Email.Check` gives the refusals: a name the email does not offer, a required
   one the body does not draw (`{{button}}` does not draw the link), the link or the button in the
-  subject, the button not alone, a placeholder in a destination, and a body with nothing to read
-  besides the button. Its output is the auth server's second guarded `template.HTML`, which
+  subject, the button not alone, a placeholder in a destination, a body with nothing to read
+  besides the button, and the limits of a field: a subject blank, past 200 characters or on two
+  lines, a button label blank or past 60 (or present on an email with no button), a body past
+  20,000. Each send reads the email's edit in the recipient's language through the renderer's
+  `WithEmailTemplates` reader, with no cache, and `Email.TextToSend` lays its fields over the
+  built-in text; while `Email.Check` refuses that text, or the read fails, the email goes out with
+  the built-in text of the language, all of it, and the renderer logs a warning (an error for the
+  read) naming the email, the language and the rules broken, never the text. The start logs the
+  same warning for each invalid stored edit. Its output is the auth server's second guarded `template.HTML`, which
   `legalmarkdown/trusted_html_lint_test.go` holds. `TestBuiltIns_EveryTextPassesItsOwnRules` holds
   every built-in text to its email's rules in the six languages, and
   `TestEmails_EveryDefinedEmailIsDrawnInlineAlone` to the inline rules above. A change to the

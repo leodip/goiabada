@@ -303,6 +303,7 @@ func run() int {
 	} else if settings != nil {
 		logStoredIssuer(settings.Issuer, cfg.AuthServer.BaseURL)
 	}
+	logInvalidEmailTemplates(startupCtx, database)
 
 	// Validate and decode the session keys for normal operation, after the bootstrap check,
 	// which mints them on a fresh install. previousKeys is nil unless an operator is rotating

@@ -121,7 +121,7 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 		t.Run(tc.lang+"/"+tc.want, func(t *testing.T) {
 			values := testValues
 			values.Expiry = tc.duration
-			rendered, err := everything.Render(tc.lang, Text{Subject: "{{expiry}}", Body: "{{expiry}}"}, values, testLook)
+			rendered, err := everything.Render(tc.lang, Text{Subject: "{{expiry}}", ButtonLabel: "Go", Body: "{{expiry}}"}, values, testLook)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, rendered.Subject)
 			assert.Equal(t, "<p>"+tc.want+"</p>\n", string(rendered.Body))

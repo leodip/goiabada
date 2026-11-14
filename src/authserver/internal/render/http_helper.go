@@ -28,6 +28,7 @@ type Renderer struct {
 	assets     *assetFingerprints
 	brands     PageBrandReader
 	baseURL    string
+	edits      EmailTemplateReader
 }
 
 // New returns a Renderer over templateFS, which holds the layouts and pages, and staticFS, the

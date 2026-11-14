@@ -1,6 +1,7 @@
 package emailtemplate
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -56,7 +57,11 @@ func linkTo(href, label string) string {
 
 func renderBody(t *testing.T, email *Email, body string) string {
 	t.Helper()
-	rendered, err := email.Render("en", Text{Subject: "Subject", ButtonLabel: "Reset password", Body: body}, testValues, testLook)
+	text := Text{Subject: "Subject", Body: body}
+	if email.HasButton() {
+		text.ButtonLabel = "Reset password"
+	}
+	rendered, err := email.Render("en", text, testValues, testLook)
 	require.NoError(t, err)
 	return string(rendered.Body)
 }
@@ -102,7 +107,7 @@ func TestRender_SyntaxOutsideTheSetIsShownAsTyped(t *testing.T) {
 		{"a reference link", "[help][1]\n\n[1]: https://acme.example", "<p>[help][1]</p>\n<p>[1]: https://acme.example</p>\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Empty(t, everything.Check(Text{Subject: "Subject", Body: tc.body}), "syntax outside the set is never refused")
+			assert.Empty(t, everything.Check(Text{ButtonLabel: "Go", Subject: "Subject", Body: tc.body}), "syntax outside the set is never refused")
 			assert.Equal(t, tc.want, renderBody(t, everything, tc.body))
 		})
 	}
@@ -190,7 +195,7 @@ func TestRender_TheSubject(t *testing.T) {
 		{"# Not *Markdown* & <b>", "# Not *Markdown* & <b>"},
 	} {
 		t.Run(tc.subject, func(t *testing.T) {
-			rendered, err := everything.Render("en", Text{Subject: tc.subject, Body: "{{link}}"}, testValues, testLook)
+			rendered, err := everything.Render("en", Text{ButtonLabel: "Go", Subject: tc.subject, Body: "{{link}}"}, testValues, testLook)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, rendered.Subject)
 		})
@@ -213,35 +218,67 @@ func TestCheck_TheRefusals(t *testing.T) {
 			[]Problem{{Field: FieldBody, Rule: RuleUnknownPlaceholder, Placeholder: "Name"}}},
 		{"the link in a notice that offers none", notice, Text{Subject: "S", Body: "Go to {{link}}."},
 			[]Problem{{Field: FieldBody, Rule: RuleUnknownPlaceholder, Placeholder: "link"}}},
-		{"a required placeholder missing", linkRequired, Text{Subject: "S", Body: "Hello."},
+		{"a required placeholder missing", linkRequired, Text{ButtonLabel: "Go", Subject: "S", Body: "Hello."},
 			[]Problem{{Field: FieldBody, Rule: RuleRequiredPlaceholderMissing, Placeholder: "link"}}},
-		{"the button does not satisfy the link", linkRequired, Text{Subject: "S", Body: "Hello.\n{{button}}"},
+		{"the button does not satisfy the link", linkRequired, Text{ButtonLabel: "Go", Subject: "S", Body: "Hello.\n{{button}}"},
 			[]Problem{{Field: FieldBody, Rule: RuleRequiredPlaceholderMissing, Placeholder: "link"}}},
 		{"the link only in a link's title does not satisfy it", linkRequired,
-			Text{Subject: "S", Body: `[Reset](https://acme.example "{{link}}")`},
+			Text{ButtonLabel: "Go", Subject: "S", Body: `[Reset](https://acme.example "{{link}}")`},
 			[]Problem{{Field: FieldBody, Rule: RuleRequiredPlaceholderMissing, Placeholder: "link"}}},
-		{"an escaped link does not satisfy it", linkRequired, Text{Subject: "S", Body: `\{{link}}`},
+		{"an escaped link does not satisfy it", linkRequired, Text{ButtonLabel: "Go", Subject: "S", Body: `\{{link}}`},
 			[]Problem{{Field: FieldBody, Rule: RuleRequiredPlaceholderMissing, Placeholder: "link"}}},
-		{"the link in the subject", everything, Text{Subject: "Open {{link}}", Body: "{{link}}"},
+		{"the link in the subject", everything, Text{ButtonLabel: "Go", Subject: "Open {{link}}", Body: "{{link}}"},
 			[]Problem{{Field: FieldSubject, Rule: RulePlaceholderNotInSubject, Placeholder: "link"}}},
-		{"the button in the subject", everything, Text{Subject: "{{ button }}", Body: "{{link}}"},
+		{"the button in the subject", everything, Text{ButtonLabel: "Go", Subject: "{{ button }}", Body: "{{link}}"},
 			[]Problem{{Field: FieldSubject, Rule: RulePlaceholderNotInSubject, Placeholder: "button"}}},
-		{"the button inside a sentence", everything, Text{Subject: "S", Body: "Select {{button}} now.\n\n{{link}}"},
+		{"the button inside a sentence", everything, Text{ButtonLabel: "Go", Subject: "S", Body: "Select {{button}} now.\n\n{{link}}"},
 			[]Problem{{Field: FieldBody, Rule: RuleButtonNotAlone, Placeholder: "button"}}},
-		{"the button in a list item", everything, Text{Subject: "S", Body: "- {{button}}\n\n{{link}}"},
+		{"the button in a list item", everything, Text{ButtonLabel: "Go", Subject: "S", Body: "- {{button}}\n\n{{link}}"},
 			[]Problem{{Field: FieldBody, Rule: RuleButtonNotAlone, Placeholder: "button"}}},
 		{"the link as part of a longer destination", everything,
-			Text{Subject: "S", Body: "[Reset](https://evil.example/?next={{link}})\n\n{{link}}"},
+			Text{ButtonLabel: "Go", Subject: "S", Body: "[Reset](https://evil.example/?next={{link}})\n\n{{link}}"},
 			[]Problem{{Field: FieldBody, Rule: RulePlaceholderInLinkDestination, Placeholder: "link"}}},
-		{"another placeholder as a destination", everything, Text{Subject: "S", Body: "[Hi]({{name}})\n\n{{link}}"},
+		{"another placeholder as a destination", everything, Text{ButtonLabel: "Go", Subject: "S", Body: "[Hi]({{name}})\n\n{{link}}"},
 			[]Problem{{Field: FieldBody, Rule: RulePlaceholderInLinkDestination, Placeholder: "name"}}},
-		{"a body holding nothing but the button", linkRequired, Text{Subject: "S", Body: "\n  {{button}}\n\n"},
+		{"a body holding nothing but the button", linkRequired, Text{ButtonLabel: "Go", Subject: "S", Body: "\n  {{button}}\n\n"},
 			[]Problem{
 				{Field: FieldBody, Rule: RuleRequiredPlaceholderMissing, Placeholder: "link"},
 				{Field: FieldBody, Rule: RuleNothingToRead},
 			}},
 		{"an empty body", notice, Text{Subject: "S", Body: " \n "},
 			[]Problem{{Field: FieldBody, Rule: RuleNothingToRead}}},
+
+		// The limits of decision 7, counted in characters as a browser's maxlength counts them: an
+		// "é" is one, and an emoji outside the basic plane two.
+		{"an empty subject", notice, Text{Subject: "", Body: "Hello."},
+			[]Problem{{Field: FieldSubject, Rule: RuleEmpty}}},
+		{"a blank subject", notice, Text{Subject: " \t ", Body: "Hello."},
+			[]Problem{{Field: FieldSubject, Rule: RuleEmpty}}},
+		{"a subject of 201 characters", notice, Text{Subject: strings.Repeat("é", 201), Body: "Hello."},
+			[]Problem{{Field: FieldSubject, Rule: RuleTooLong}}},
+		{"a subject of 101 emoji, 202 in a browser's count", notice, Text{Subject: strings.Repeat("🔑", 101), Body: "Hello."},
+			[]Problem{{Field: FieldSubject, Rule: RuleTooLong}}},
+		{"a subject on two lines", notice, Text{Subject: "Your account\nwas deleted", Body: "Hello."},
+			[]Problem{{Field: FieldSubject, Rule: RuleNotOneLine}}},
+		{"a subject ending in a carriage return", notice, Text{Subject: "Your account\r", Body: "Hello."},
+			[]Problem{{Field: FieldSubject, Rule: RuleNotOneLine}}},
+		{"an empty button label", everything, Text{Subject: "S", ButtonLabel: "", Body: "{{link}}"},
+			[]Problem{{Field: FieldButtonLabel, Rule: RuleEmpty}}},
+		{"a blank button label", everything, Text{Subject: "S", ButtonLabel: "  ", Body: "{{link}}"},
+			[]Problem{{Field: FieldButtonLabel, Rule: RuleEmpty}}},
+		{"a button label of 61 characters", everything, Text{Subject: "S", ButtonLabel: strings.Repeat("ü", 61), Body: "{{link}}"},
+			[]Problem{{Field: FieldButtonLabel, Rule: RuleTooLong}}},
+		{"a button label for an email with no button", notice, Text{Subject: "S", ButtonLabel: "Open", Body: "Hello."},
+			[]Problem{{Field: FieldButtonLabel, Rule: RuleNoButton}}},
+		{"a body of 20,001 characters", notice, Text{Subject: "S", Body: strings.Repeat("a", 20_001)},
+			[]Problem{{Field: FieldBody, Rule: RuleTooLong}}},
+		{"every field past its limit at once", everything,
+			Text{Subject: strings.Repeat("s", 201), ButtonLabel: strings.Repeat("b", 61), Body: strings.Repeat("a", 20_001)},
+			[]Problem{
+				{Field: FieldSubject, Rule: RuleTooLong},
+				{Field: FieldButtonLabel, Rule: RuleTooLong},
+				{Field: FieldBody, Rule: RuleTooLong},
+			}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, Problems(tc.want), tc.email.Check(tc.text))
@@ -258,8 +295,19 @@ func TestCheck_TheRefusals(t *testing.T) {
 // only {{button}} is refused, as the save would refuse it.
 func TestCheck_AWelcomeBodyOfOnlyTheButtonIsRefused(t *testing.T) {
 	welcome := &Email{ID: "welcome", Placeholders: []Placeholder{{Name: AppName}, {Name: Link}, {Name: Button}}}
-	assert.Equal(t, Problems{{Field: FieldBody, Rule: RuleNothingToRead}}, welcome.Check(Text{Subject: "Welcome!", Body: "{{button}}"}))
-	assert.Empty(t, welcome.Check(Text{Subject: "Welcome!", Body: "Welcome.\n{{button}}"}))
+	assert.Equal(t, Problems{{Field: FieldBody, Rule: RuleNothingToRead}}, welcome.Check(Text{ButtonLabel: "Go", Subject: "Welcome!", Body: "{{button}}"}))
+	assert.Empty(t, welcome.Check(Text{ButtonLabel: "Go", Subject: "Welcome!", Body: "Welcome.\n{{button}}"}))
+}
+
+// A text at each limit, counted in characters, is accepted: 200 for the subject, 60 for the button
+// label and 20,000 for the body.
+func TestCheck_ATextAtEachLimitIsAccepted(t *testing.T) {
+	assert.Empty(t, everything.Check(Text{
+		Subject:     strings.Repeat("é", 200),
+		ButtonLabel: strings.Repeat("ü", 60),
+		Body:        strings.Repeat("a", 19_992) + "{{link}}",
+	}))
+	assert.Empty(t, notice.Check(Text{Subject: strings.Repeat("🔑", 100), Body: "Hello."}))
 }
 
 // Rendering refuses a look whose values are not what the frame gives, since they are written into
@@ -271,7 +319,7 @@ func TestRender_RefusesALookThatIsNotAFrames(t *testing.T) {
 		"a font list with a quote":    func() Look { l := testLook; l.FontFamily = `"Evil"; x: y`; return l }(),
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := everything.Render("en", Text{Subject: "S", Body: "{{link}}"}, testValues, look)
+			_, err := everything.Render("en", Text{ButtonLabel: "Go", Subject: "S", Body: "{{link}}"}, testValues, look)
 			require.Error(t, err)
 		})
 	}

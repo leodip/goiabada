@@ -32,7 +32,9 @@ import (
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
 // Field names a field of a Text, as a refusal names the field it is about.
@@ -66,6 +68,21 @@ const (
 	RuleNothingToRead Rule = "nothing_to_read"
 )
 
+// The limits of a text's fields (#818 decision 7), each counted in inputvalidation.TextLength's
+// unit, as a legal document's are.
+const (
+	// RuleEmpty is a subject, or the button label of an email with a button, that is empty or
+	// blank. An empty body is RuleNothingToRead.
+	RuleEmpty Rule = "empty"
+	// RuleTooLong is a field longer than its limit: record.EmailTemplateSubjectMaxLength,
+	// record.EmailTemplateButtonLabelMaxLength or record.EmailTemplateBodyMaxLength.
+	RuleTooLong Rule = "too_long"
+	// RuleNotOneLine is a subject holding a line break.
+	RuleNotOneLine Rule = "not_one_line"
+	// RuleNoButton is a button label for an email that has no button.
+	RuleNoButton Rule = "no_button"
+)
+
 // Problem is one rule a text breaks: the field it is in, the rule, and the placeholder it is
 // about, as written between the braces, for a rule about one. The email's placeholders are what a
 // refusal lists as what it offers.
@@ -88,6 +105,17 @@ func (p Problems) Error() string {
 		}
 	}
 	return "the email's text breaks the format's rules: " + strings.Join(parts, "; ")
+}
+
+// Broken answers each problem as its field and its rule, such as "body: unknown_placeholder", for a
+// log record. Unlike Error it leaves the placeholder out, since its name is whatever was typed
+// between the braces, and a log record never holds an email's text.
+func (p Problems) Broken() []string {
+	broken := make([]string, len(p))
+	for i, problem := range p {
+		broken[i] = string(problem.Field) + ": " + string(problem.Rule)
+	}
+	return broken
 }
 
 // Look is what a body takes from the frame it is drawn in (render.EmailFrame): the brand's color a
@@ -137,8 +165,29 @@ type Rendered struct {
 // text: not the values, nor the brand.
 func (e *Email) Check(text Text) Problems {
 	problems := e.checkSubject(text.Subject)
+	problems = append(problems, e.checkButtonLabel(text.ButtonLabel)...)
+	if inputvalidation.TextLength(text.Body) > record.EmailTemplateBodyMaxLength {
+		problems = append(problems, Problem{Field: FieldBody, Rule: RuleTooLong})
+	}
 	_, bodyProblems := e.body(text.Body, nil)
 	return append(problems, bodyProblems...)
+}
+
+// checkButtonLabel answers the rules a button label breaks (#818 decisions 5 and 7): for an email
+// with a button, one that is blank or past its limit; for one without, any label at all. A label is
+// plain text, so nothing in it is a placeholder.
+func (e *Email) checkButtonLabel(label string) Problems {
+	switch {
+	case !e.HasButton():
+		if label != "" {
+			return Problems{{Field: FieldButtonLabel, Rule: RuleNoButton}}
+		}
+	case strings.TrimSpace(label) == "":
+		return Problems{{Field: FieldButtonLabel, Rule: RuleEmpty}}
+	case inputvalidation.TextLength(label) > record.EmailTemplateButtonLabelMaxLength:
+		return Problems{{Field: FieldButtonLabel, Rule: RuleTooLong}}
+	}
+	return nil
 }
 
 // Render renders text, written in lang, one of Languages, with values, in look. A text Check would
@@ -169,10 +218,20 @@ func (e *Email) Render(lang string, text Text, values Values, look Look) (Render
 	}, nil
 }
 
-// checkSubject answers the rules a subject breaks: a placeholder the email does not offer, and the
-// link or the button, which a subject cannot draw.
+// checkSubject answers the rules a subject breaks: blank, past its limit or on more than one line
+// (#818 decision 7), a placeholder the email does not offer, and the link or the button, which a
+// subject cannot draw.
 func (e *Email) checkSubject(subject string) Problems {
 	var problems Problems
+	switch {
+	case strings.TrimSpace(subject) == "":
+		problems = append(problems, Problem{Field: FieldSubject, Rule: RuleEmpty})
+	case inputvalidation.TextLength(subject) > record.EmailTemplateSubjectMaxLength:
+		problems = append(problems, Problem{Field: FieldSubject, Rule: RuleTooLong})
+	}
+	if strings.ContainsAny(subject, "\r\n") {
+		problems = append(problems, Problem{Field: FieldSubject, Rule: RuleNotOneLine})
+	}
 	for _, found := range placeholdersIn(subject, false) {
 		p, offered := e.placeholder(found)
 		switch {
