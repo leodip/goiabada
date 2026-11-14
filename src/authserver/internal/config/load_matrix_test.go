@@ -130,8 +130,8 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 	}
 }
 
-// configVariables is every live GOIABADA_* variable this process loads: 30 auth server, the 2
-// admin console values it reads, 14 database and 5 top-level, of which 43 have a flag. The one
+// configVariables is every live GOIABADA_* variable this process loads: 26 auth server, the 2
+// admin console values it reads, 17 database and 5 top-level, of which 44 have a flag. The one
 // name Load mentions that is not live configuration is in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Auth server
@@ -178,12 +178,6 @@ var configVariables = []configVar{
 	boolVar("GOIABADA_AUTHSERVER_LOG_SQL", "authserver-log-sql", false,
 		true, false,
 		func(c *Config) any { return c.AuthServer.LogSQL }),
-	strVar("GOIABADA_AUTHSERVER_STATICDIR", "authserver-staticdir", "",
-		"/env/auth-static", "/flag/auth-static",
-		func(c *Config) any { return c.AuthServer.StaticDir }),
-	strVar("GOIABADA_AUTHSERVER_TEMPLATEDIR", "authserver-templatedir", "",
-		"/env/auth-templates", "/flag/auth-templates",
-		func(c *Config) any { return c.AuthServer.TemplateDir }),
 	boolVar("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS", "authserver-debug-api-requests", false,
 		true, false,
 		func(c *Config) any { return c.AuthServer.DebugAPIRequests }),
@@ -740,11 +734,12 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 // Seam 2: the registered flag set of this binary
 // -----------------------------------------------------------------------------
 
-// authServerFlags is the 42 flags the auth server registers: its own 23, the 14 database flags,
+// authServerFlags is the 44 flags the auth server registers: its own 25, the 14 database flags,
 // the 3 initial-setup flags, and the two admin console values it reads. 32 were what the split
 // left (#351); the four pool flags came after it (#394), the three metrics listener flags
-// after those (#400), the two of the connection's TLS after those (#502), and the SMTP EHLO
-// name after those (#718).
+// after those (#400), the two of the connection's TLS after those (#502), the SMTP EHLO
+// name after those (#718), and the brand safe mode after that. The template and static
+// directory flags went with the directories (#819).
 //
 // It is written out rather than derived from configVariables, and that is the whole point. A
 // derived expectation cannot fail when a flag is dropped from the table and from config.go
@@ -777,8 +772,6 @@ var authServerFlags = []string{
 	"authserver-metrics-enabled",
 	"authserver-ratelimiter-enabled",
 	"authserver-smtp-ehlo-name",
-	"authserver-staticdir",
-	"authserver-templatedir",
 	"authserver-trust-proxy-headers",
 	"authserver-trusted-proxies",
 	"db-conn-max-idle-time",
@@ -819,7 +812,13 @@ var flagsAddedAfterTheSplit = []string{
 	"db-tls-server-name",
 }
 
-// refusedFlags is the other half of the narrowing, named rather than merely absent: the 13 admin
+// flagsDroppedByBoth counts the flags both binaries registered before #351 and neither registers
+// now: the template and static directory flags of the two servers, which went with the
+// directories (#819). Counted rather than named: the exact flag set test already holds that this
+// binary registers none of them.
+const flagsDroppedByBoth = 4
+
+// refusedFlags is the other half of the narrowing, named rather than merely absent: the 11 admin
 // console settings this binary used to accept and ignore. flag.CommandLine is built with
 // ExitOnError, so `goiabada-authserver -adminconsole-log-level=debug` now prints "flag provided
 // but not defined" and exits 2 where it used to parse and change nothing.
@@ -836,8 +835,6 @@ var refusedFlags = []string{
 	"adminconsole-log-format",
 	"adminconsole-log-http-requests",
 	"adminconsole-log-level",
-	"adminconsole-staticdir",
-	"adminconsole-templatedir",
 	"adminconsole-trust-proxy-headers",
 	"adminconsole-trusted-proxies",
 }
@@ -922,16 +919,17 @@ func TestFlagLists_AgreeWithTheTable(t *testing.T) {
 		}
 	}
 
-	// 45 flags were registered by both binaries before the split, and the auth server keeps 32
-	// of them. The two lists partition that surface, so a flag that quietly left both is a
-	// flag nobody decided about. The flags added since are named, not merely counted.
+	// 45 flags were registered by both binaries before the split, and the auth server kept 32
+	// of them. The two lists partition that surface, less the four directory flags both binaries
+	// dropped (#819), so a flag that quietly left both is a flag nobody decided about. The flags
+	// added since are named, not merely counted.
 	for _, name := range flagsAddedAfterTheSplit {
 		if !expected[name] {
 			t.Errorf("flagsAddedAfterTheSplit names %q, which authServerFlags does not list", name)
 		}
 	}
-	if got := len(authServerFlags) - len(flagsAddedAfterTheSplit) + len(refusedFlags); got != 45 {
-		t.Errorf("the two lists cover %d of the flags both binaries registered before the split, want 45", got)
+	if got := len(authServerFlags) - len(flagsAddedAfterTheSplit) + len(refusedFlags) + flagsDroppedByBoth; got != 45 {
+		t.Errorf("the two lists and the %d flags both binaries dropped cover %d of the flags both binaries registered before the split, want 45", flagsDroppedByBoth, got)
 	}
 }
 

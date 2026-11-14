@@ -35,8 +35,6 @@ type AdminConsoleConfig struct {
 	LogFormat                string
 	CertFile                 string
 	KeyFile                  string
-	StaticDir                string
-	TemplateDir              string
 	OAuthClientSecret        string
 	SessionAuthenticationKey string
 	SessionEncryptionKey     string
@@ -151,8 +149,6 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			LogFormat:                        getEnv("GOIABADA_ADMINCONSOLE_LOG_FORMAT", "text"),
 			CertFile:                         getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
 			KeyFile:                          getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
-			StaticDir:                        getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
-			TemplateDir:                      getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
 			OAuthClientSecret:                getEnv("GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET", ""),
 			SessionAuthenticationKey:         getEnv("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY", ""),
 			SessionEncryptionKey:             getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", ""),
@@ -224,8 +220,6 @@ func registerFlags(fs *flag.FlagSet, c *Config, trustedProxies *string) {
 	fs.StringVar(&c.AdminConsole.LogFormat, "adminconsole-log-format", c.AdminConsole.LogFormat, "Format the admin console writes log records in. Options: text, json")
 	fs.StringVar(&c.AdminConsole.CertFile, "adminconsole-certfile", c.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")
 	fs.StringVar(&c.AdminConsole.KeyFile, "adminconsole-keyfile", c.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
-	fs.StringVar(&c.AdminConsole.StaticDir, "adminconsole-staticdir", c.AdminConsole.StaticDir, "Static files directory for admin console")
-	fs.StringVar(&c.AdminConsole.TemplateDir, "adminconsole-templatedir", c.AdminConsole.TemplateDir, "Template files directory for admin console")
 	fs.StringVar(&c.AdminConsole.InternalCAFile, "adminconsole-internal-ca-file", c.AdminConsole.InternalCAFile, "PEM file of certificate authorities trusted on top of the system roots for the calls to the auth server (admin console)")
 	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 	fs.BoolVar(&c.AdminConsole.MetricsEnabled, "adminconsole-metrics-enabled", c.AdminConsole.MetricsEnabled, "Serve Prometheus metrics on the admin console's metrics listener")

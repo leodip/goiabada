@@ -68,9 +68,9 @@ func TestEnvironmentVariablesDocs_ATableDisagreeingWithTheCodeFails(t *testing.T
 		"| `GOIABADA_ADMINCONSOLE_LOG_LEVEL`<br/>Flag: `--adminconsole-log-level`<br/>Default: `info`<br/>Read by: admin console | |\n"+
 		"| `GOIABADA_ADMINCONSOLE_METRICS_ENABLED`<br/>Flag: `--adminconsole-metrics-enabled`<br/>Default: `false`<br/>Read by: the admin console | Not a reader. |\n"+
 		"| GOIABADA_ADMINCONSOLE_LOG_FORMAT<br/>Flag: `--adminconsole-log-format`<br/>Default: `text`<br/>Read by: admin console | Not backticked. |\n"+
-		"| `GOIABADA_ADMINCONSOLE_TEMPLATEDIR`<br/>Flag: `--adminconsole-templatedir`<br/>Default: empty | No reader. |\n"+
+		"| `GOIABADA_ADMINCONSOLE_CERTFILE`<br/>Flag: `--adminconsole-certfile`<br/>Default: empty | No reader. |\n"+
 		"| `GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS`<br/>Flag: `--adminconsole-listen-port-metrics`<br/>Default: `9191`<br/>Read by: admin console |\n\n"+
-		"## Next\n\n| `GOIABADA_ADMINCONSOLE_STATICDIR`<br/>Flag: `--adminconsole-staticdir`<br/>Default: empty<br/>Read by: admin console | Outside the section. |\n")
+		"## Next\n\n| `GOIABADA_ADMINCONSOLE_KEYFILE`<br/>Flag: `--adminconsole-keyfile`<br/>Default: empty<br/>Read by: admin console | Outside the section. |\n")
 
 	vars := []configVar{
 		{env: "GOIABADA_ADMINCONSOLE_BASEURL", flag: "adminconsole-baseurl", def: "http://localhost:9091"},
@@ -81,7 +81,7 @@ func TestEnvironmentVariablesDocs_ATableDisagreeingWithTheCodeFails(t *testing.T
 		{env: "GOIABADA_ADMINCONSOLE_METRICS_ENABLED", flag: "adminconsole-metrics-enabled", def: false},
 		{env: "GOIABADA_ADMINCONSOLE_LOG_FORMAT", flag: "adminconsole-log-format", def: "text"},
 		{env: "GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", flag: "adminconsole-listen-port-metrics", def: 9191},
-		{env: "GOIABADA_ADMINCONSOLE_STATICDIR", flag: "adminconsole-staticdir", def: ""},
+		{env: "GOIABADA_ADMINCONSOLE_KEYFILE", flag: "adminconsole-keyfile", def: ""},
 	}
 	report := guard.Run(func(r guard.Reporter) {
 		assertEnvironmentVariablesDocs(r, root, docSection{"site/env.mdx", "## Every variable"}, vars)
@@ -102,11 +102,11 @@ func TestEnvironmentVariablesDocs_ATableDisagreeingWithTheCodeFails(t *testing.T
 		where + " gives GOIABADA_ADMINCONSOLE_LOG_LEVEL no meaning",
 		where + ` gives GOIABADA_ADMINCONSOLE_METRICS_ENABLED the reader "the admin console", want auth server, admin console or both`,
 		where + ` has a row whose variable is not one backticked GOIABADA_ variable: "GOIABADA_ADMINCONSOLE_LOG_FORMAT"`,
-		where + ` has a row whose variable cell is not the variable over its Flag, Default and Read by lines: "` + "`GOIABADA_ADMINCONSOLE_TEMPLATEDIR`<br/>Flag: `--adminconsole-templatedir`<br/>Default: empty" + `"`,
+		where + ` has a row whose variable cell is not the variable over its Flag, Default and Read by lines: "` + "`GOIABADA_ADMINCONSOLE_CERTFILE`<br/>Flag: `--adminconsole-certfile`<br/>Default: empty" + `"`,
 		where + ` has a row that is not two cells, the variable and its meaning: ["` + "`GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS`<br/>Flag: `--adminconsole-listen-port-metrics`<br/>Default: `9191`<br/>Read by: admin console" + `"]`,
 		where + " does not list GOIABADA_ADMINCONSOLE_LOG_FORMAT",
 		where + " does not list GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS",
-		where + " does not list GOIABADA_ADMINCONSOLE_STATICDIR",
+		where + " does not list GOIABADA_ADMINCONSOLE_KEYFILE",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)

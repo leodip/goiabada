@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 	"sync"
@@ -99,25 +98,12 @@ func NewServer(router *routing.Router, sessionStore *sessionstore.ServerSideStor
 
 		metrics:  registry,
 		upstream: upstream,
+
+		staticFS:   web.StaticFS(),
+		templateFS: web.TemplateFS(),
 	}
 	metrics.RegisterBuildInfo(s.metrics)
 	metrics.RegisterRuntime(s.metrics)
-
-	if envVar := cfg.AdminConsole.StaticDir; len(envVar) == 0 {
-		s.staticFS = web.StaticFS()
-		slog.Info("using the embedded static files")
-	} else {
-		s.staticFS = os.DirFS(envVar)
-		slog.Info("using static files from a directory", "directory", envVar)
-	}
-
-	if envVar := cfg.AdminConsole.TemplateDir; len(envVar) == 0 {
-		s.templateFS = web.TemplateFS()
-		slog.Info("using the embedded template files")
-	} else {
-		s.templateFS = os.DirFS(envVar)
-		slog.Info("using template files from a directory", "directory", envVar)
-	}
 
 	return &s
 }

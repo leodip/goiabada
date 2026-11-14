@@ -97,8 +97,6 @@ services:
       - "GOIABADA_AUTHSERVER_LOG_LEVEL=info"
       - "GOIABADA_AUTHSERVER_LOG_FORMAT=text"
       - "GOIABADA_AUTHSERVER_LOG_SQL=false"
-      - "GOIABADA_AUTHSERVER_STATICDIR="
-      - "GOIABADA_AUTHSERVER_TEMPLATEDIR="
       - "GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false"
       - "GOIABADA_DB_TYPE=mysql"
       - "GOIABADA_DB_USERNAME=root"
@@ -156,8 +154,6 @@ services:
       - "GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true"
       - "GOIABADA_ADMINCONSOLE_LOG_LEVEL=info"
       - "GOIABADA_ADMINCONSOLE_LOG_FORMAT=text"
-      - "GOIABADA_ADMINCONSOLE_STATICDIR="
-      - "GOIABADA_ADMINCONSOLE_TEMPLATEDIR="
       - "GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com"
       # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
       - "GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090"
