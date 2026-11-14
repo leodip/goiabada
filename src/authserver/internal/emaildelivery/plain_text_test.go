@@ -5,14 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"io"
-	"io/fs"
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
-	"path"
 	"regexp"
 	"strings"
 	"testing"
@@ -273,15 +271,16 @@ func (s brandStub) GetBrandAssetsByIds(context.Context, *sql.Tx, []int64) ([]rec
 // emailLink is the link every email is rendered with.
 const emailLink = "https://auth.example.com/reset-password?code=abc&email=ana%40example.com"
 
-// renderEmail renders the built-in English email body base through the email layout, for a brand
-// on Plum with a logo, and with footer links and a support contact when footer is set.
-func renderEmail(t *testing.T, base string, footer bool) string {
+// renderEmail renders the built-in email whose identifier is id, in English, from its definition
+// (#818) through the email layout, for a brand on Plum with a logo, and with footer links and a
+// support contact when footer is set.
+func renderEmail(t *testing.T, id string, footer bool) string {
 	t.Helper()
-	return renderEmailIn(t, base, "en", footer)
+	return renderEmailIn(t, id, "en", footer)
 }
 
-// renderEmailIn renders the built-in email body base written in lang, as renderEmail does.
-func renderEmailIn(t *testing.T, base, lang string, footer bool) string {
+// renderEmailIn renders the built-in email id written in lang, as renderEmail does.
+func renderEmailIn(t *testing.T, id, lang string, footer bool) string {
 	t.Helper()
 
 	brand := record.NewBrand("Shop", record.BrandAppearanceLight, "plum")
@@ -302,24 +301,18 @@ func renderEmailIn(t *testing.T, base, lang string, footer bool) string {
 	ctx = i18n.WithLocale(ctx, true, lang, "en")
 	req := httptest.NewRequest(http.MethodPost, "/", nil).WithContext(ctx)
 	renderer := render.New(web.TemplateFS(), web.StaticFS(), brands).WithBaseURL("https://auth.example.com")
-	// An email sent from its built-in definition (#818) is named by its identifier.
 	for _, email := range emailtemplate.BuiltIns() {
-		if email.ID == base {
+		if email.ID == id {
 			message, err := renderer.RenderEmail(req, email, emailtemplate.Values{
-				Name: "Ana", Link: emailLink, Code: "482915", Expiry: 5 * time.Minute,
+				Name: "Ana", Link: emailLink, Code: "482915", Expiry: 5 * time.Minute, CodesLeft: 3,
 			})
 			require.NoError(t, err)
 			require.Contains(t, message.HTML, "<img", "the email draws its brand's logo")
 			return message.HTML
 		}
 	}
-	buf, err := renderer.RenderTemplateToBuffer(req,
-		"/layouts/email_layout.html", "/emails/"+base+".html", map[string]interface{}{
-			"name": "Ana", "link": emailLink, "remaining": 3,
-		})
-	require.NoError(t, err)
-	require.Contains(t, buf.String(), "<img", "the email draws its brand's logo")
-	return buf.String()
+	require.Failf(t, "no built-in definition", "there is no built-in email %q", id)
+	return ""
 }
 
 // A built-in action email, drawn with its button, its brand's logo and its footer, reads as its
@@ -370,22 +363,10 @@ var logoSource = regexp.MustCompile(`<img src="([^"]+)"`)
 // Every built-in email, in every language it is written in, is sent with its text: the link it
 // holds written once, the button left out, no logo, and the footer written out.
 func TestSendEmail_EveryBuiltInEmailIsSentWithItsText(t *testing.T) {
-	bodies, err := fs.Glob(web.TemplateFS(), "emails/*.html")
-	require.NoError(t, err)
-	require.NotEmpty(t, bodies)
-
-	// Each email is named by its base name and the language it is written in: a template file's,
-	// email_x.html in English and email_x.<tag>.html in tag, and every built-in definition's in
-	// each of the six languages.
+	// Each email is named by its identifier and the language it is written in, every built-in
+	// definition in each of the six languages.
 	type written struct{ base, lang string }
 	var emails []written
-	for _, body := range bodies {
-		base, lang, _ := strings.Cut(strings.TrimSuffix(path.Base(body), ".html"), ".")
-		if lang == "" {
-			lang = "en"
-		}
-		emails = append(emails, written{base, lang})
-	}
 	for _, email := range emailtemplate.BuiltIns() {
 		for _, lang := range emailtemplate.Languages {
 			emails = append(emails, written{email.ID, lang})

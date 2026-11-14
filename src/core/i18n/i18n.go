@@ -412,8 +412,8 @@ func T(ctx context.Context, key string, args ...any) string {
 // LocaleTag returns the BCP 47 language tag attached to ctx by the locale
 // middleware (or refinement helpers). Returns "en" when none is attached.
 // It is the first preference asked for, whether or not a catalog matches it,
-// which is what an email's body copy is chosen from (#531): an operator may
-// ship a copy in a language that has no catalog. What marks a page's language
+// which is what an email's language is chosen from, matched against the
+// languages its text is written in (#531, #818). What marks a page's language
 // and the admin console's CLDR labels read CatalogTag instead (#645).
 func LocaleTag(ctx context.Context) string {
 	if ctx != nil {

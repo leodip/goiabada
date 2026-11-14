@@ -305,7 +305,7 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `brandkit`'s with its names unquoted, since `html/template` refuses a quote in a style value and
   `template.CSS` is a trusted type the auth server does not use; an uploaded font is drawn in
   System UI. The layout is tables, which every client lays out. `main.css` never draws an email,
-  so the auth server's `input.css` keeps the email templates out of Tailwind's scan. The logo, the dark one for a dark
+  so the auth server's `input.css` keeps the email layout out of Tailwind's scan. The logo, the dark one for a dark
   brand, is linked by an absolute URL under the base URL (`render.Renderer.WithBaseURL`), with
   width and height attributes within 64 by 424 pixels, and takes a page's alt rule. A brand that
   cannot be read is drawn in Blueberry's light colors with the app name as text, and the fault is
@@ -320,18 +320,17 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   a button. The verification code is drawn in `CodeFamily`, main.css's `--font-mono` unquoted,
   larger, in a `Subtle` box rounded as a page's multi-line box. Both are drawn by
   `internal/emailtemplate` (below).
-  `TestEmails_EveryBuiltInEmailIsDrawnInlineAlone` holds every built-in email, in every language, to
+  `TestEmails_EveryDefinedEmailIsDrawnInlineAlone` holds every built-in email, in every language, to
   these rules. There is no text template: the sender (`emaildelivery`) works every message's
   plain-text part out of the HTML, from `<main>` and then the `<footer>` outside it, so the logo and
   the app name above the body stay out of it. A block element is a paragraph and `<br>` a line
   break; a link is its URL, or its label then `<URL>` when they differ. The button's table carries
   `data-email-button`, which the sender leaves out, the URL under it being in the text already.
-- **Email templates**: an email sent from its built-in definition, today the password reset link,
-  the activation link, the welcome email, the existing-account notice, a new user's setup email, the
-  verification code and the test email, has no template file and no catalog message (#818). Its definition in `internal/emailtemplate`
+- **Email templates**: every email is sent from its built-in definition, and has no template file and
+  no catalog message (#818). Its definition in `internal/emailtemplate`
   holds its identifier, the placeholders it offers and requires, and its subject, button label and
-  body in the six built-in languages; `render.Renderer.RenderEmail` picks the language as a template
-  copy is picked (`emailtemplate.Language`, English for any other), renders the body inside
+  body in the six built-in languages; `render.Renderer.RenderEmail` matches the recipient's language
+  against those six (`emailtemplate.Language`, English for any other), renders the body inside
   `layouts/email_layout.html` with the frame above, and writes the subject as the `<title>`. The
   body is a small Markdown set: paragraphs, a single newline as a line break, bold, italic, links,
   bulleted and numbered lists. goldmark parses it with every other parser left out, so a heading, a
@@ -342,8 +341,9 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   destination of a link, never part of one; `{{button}}` alone on its line draws the button above,
   labelled with the button label, which is plain text; `{{code}}` alone in its paragraph draws the
   box above, and is text elsewhere. `{{name}}` is
-  `emailtemplate.RecipientName`, the address for a user with none, and `{{expiry}}` a lifetime in
-  the email's language. `Email.Check` gives the refusals: a name the email does not offer, a required
+  `emailtemplate.RecipientName`, the address for a user with none, `{{expiry}}` a lifetime in
+  the email's language, and `{{codes_left}}` a number, which the recovery code notice words alike
+  for any count. `Email.Check` gives the refusals: a name the email does not offer, a required
   one the body does not draw (`{{button}}` does not draw the link), the link or the button in the
   subject, the button not alone, a placeholder in a destination, and a body with nothing to read
   besides the button. Its output is the auth server's second guarded `template.HTML`, which

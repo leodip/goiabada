@@ -1,11 +1,6 @@
 package render
 
 import (
-	"context"
-	"io/fs"
-	"net/http"
-	"net/http/httptest"
-	"path"
 	"strings"
 	"testing"
 
@@ -15,9 +10,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/web"
-	"github.com/leodip/goiabada/core/i18n"
 )
 
 // The four emails whose point is one action draw it as a button in the brand's color, labelled in
@@ -102,24 +94,8 @@ func isEmailButton(link *goquery.Selection) bool {
 	return link.ParentsUntil("main").Filter("table").Length() > 0
 }
 
-// renderBodyIn renders the email body base, written in lang, for brand, through a renderer whose base
-// URL is emailBaseURL.
-func renderBodyIn(t *testing.T, base, lang string, brand *record.Brand) string {
-	t.Helper()
-	ctx := reqctx.WithSettings(context.Background(), &record.Settings{AppName: "Acme Portal"})
-	ctx = i18n.WithLocale(ctx, true, lang, "en")
-	req := httptest.NewRequest(http.MethodPost, "/", nil).WithContext(ctx)
-	brands := &defaultBrandStub{brand: brand, assets: kitAssets}
-	buf, err := New(web.TemplateFS(), web.StaticFS(), brands).WithBaseURL(emailBaseURL).RenderTemplateToBuffer(req,
-		"/layouts/email_layout.html", "/emails/"+base+".html", map[string]interface{}{
-			"name": "Ana", "link": buttonLink, "remaining": 3,
-		})
-	require.NoError(t, err)
-	return buf.String()
-}
-
-// renderActionEmail renders the action email name in lang for brand: from its built-in definition
-// when it has one (#818), else from its template file email_<name>.html.
+// renderActionEmail renders the action email name, from its built-in definition (#818), in lang for
+// brand.
 func renderActionEmail(t *testing.T, name, lang string, brand *record.Brand) string {
 	t.Helper()
 	for _, email := range emailtemplate.BuiltIns() {
@@ -127,7 +103,8 @@ func renderActionEmail(t *testing.T, name, lang string, brand *record.Brand) str
 			return renderDefinition(t, email, lang, brand).HTML
 		}
 	}
-	return renderBodyIn(t, "email_"+name, lang, brand)
+	require.Failf(t, "no built-in definition", "there is no built-in email %q", name)
+	return ""
 }
 
 // Each of the four action emails, in each built-in language, draws one button labelled in that
@@ -203,19 +180,6 @@ func TestRender_OnlyTheFourActionEmailsDrawAButton(t *testing.T) {
 		for _, color := range drawn.linkColors {
 			assert.Equal(t, "#7a3aa8", color)
 		}
-	}
-
-	bodies, err := fs.Glob(web.TemplateFS(), "emails/*.html")
-	require.NoError(t, err)
-	for _, body := range bodies {
-		name := strings.TrimSuffix(path.Base(body), ".html")
-		base, lang, _ := strings.Cut(name, ".")
-		if lang == "" {
-			lang = "en"
-		}
-		t.Run(name, func(t *testing.T) {
-			assertNoButton(t, renderBodyIn(t, base, lang, themedBrand(record.BrandAppearanceLight, "plum")))
-		})
 	}
 
 	actions := 0

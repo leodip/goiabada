@@ -50,6 +50,8 @@ The pages come in English, Portuguese (Brazil), Spanish, French, Italian and Ger
 
 </Steps>
 
+A language you add doesn't reach the emails: they're written in the six built-in languages, and a user reading yours gets them in English. See [Email bodies](#email-bodies).
+
 ## Change a few words
 
 To reword a page in a language Goiabada already has, override only the keys you change, in the same folder:
@@ -62,7 +64,7 @@ Every key you don't name keeps the built-in text. Set `GOIABADA_I18N_OVERRIDES_D
 
 ## Change the templates
 
-To change the layout of a page, or an email's body, you give a server its own copy of the templates. To restyle the pages, write a brand's [custom CSS](#custom-css) instead: it needs nothing redone when you upgrade. The templates and static files are compiled into each server's binary, and the images hold the binary alone, so there's no `web` folder inside a container to copy out.
+To change the layout of a page, or the frame drawn around every email, you give a server its own copy of the templates. To restyle the pages, write a brand's [custom CSS](#custom-css) instead: it needs nothing redone when you upgrade. The templates and static files are compiled into each server's binary, and the images hold the binary alone, so there's no `web` folder inside a container to copy out.
 
 <Steps>
 
@@ -566,11 +568,11 @@ For `ui_locales` and `Accept-Language`, the first of their languages Goiabada ha
 
 A value an admin console form won't take is refused by the auth server, in the console page's language, which is why both servers need your override catalogs.
 
-An email to a user is written in their page language. On **Automatic**, it's the **Language and region** on their profile, or English when they haven't picked one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
+An email to a user is written in their page language. On **Automatic**, it's the **Language and region** on their profile, or English when they haven't picked one. A regional language reads its language's email, so `fr-CA` gets the French one, and a language with no built-in emails gets the English one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
 
 ## Catalogs
 
-The text of every page, message and email subject is in the built-in catalogs. A key with no text in the chosen language shows in English.
+The text of every page and message is in the built-in catalogs. A key with no text in the chosen language shows in English. The emails' text isn't: see [Email bodies](#email-bodies).
 
 `GOIABADA_I18N_OVERRIDES_DIR` names a folder whose `catalogs` subfolder holds `active.<language>.toml` files. Nothing else in the folder is read: files put in the folder itself are ignored, and the server logs `override directory has no catalogs subdirectory, skipping it` when it starts. Each file is merged over the built-in catalog of its language, key by key, and the file wins. A value left empty removes the built-in text, so the key shows in English. Every value is a plain string: a `[table]` section stops the server at start.
 
@@ -580,9 +582,7 @@ The durations the admin console writes in words, under a duration field and in h
 
 ## Email bodies
 
-An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_password_changed.nl.html`, in your own [templates directory](#change-the-templates). A copy named for exactly the recipient's language wins. Otherwise the closest copy in their language does: `nl` serves a recipient reading `nl-BE`, and `pt-BR` serves one reading `pt`. A recipient with no copy in their language gets the English template.
-
-The password reset link, the activation link, the welcome email, the notice that an address already has an account, a new user's setup email, the verification code and the test email have no template and no catalog messages: their subjects, button labels and bodies are built into the auth server in the six built-in languages, and a recipient reading any other language gets them in English.
+Every email's subject, button label and body are built into the auth server in the six built-in languages, with no template and no catalog message. A recipient reading any other language gets them in English. The [templates directory](#change-the-templates) changes only the frame drawn around them, `layouts/email_layout.html`.
 
 The test email from the **Send test email** tab under **Admin**, **Email** is in the language the administrator reads the admin console in, and goes out in the default brand.
 

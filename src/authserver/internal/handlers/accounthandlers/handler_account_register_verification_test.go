@@ -124,7 +124,7 @@ func (h *registerHarness) assertNothingWrittenOrSent(t *testing.T) {
 	t.Helper()
 	h.database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 	h.userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
-	h.pageRenderer.AssertNotCalled(t, "RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	h.pageRenderer.AssertNotCalled(t, "RenderEmail", mock.Anything, mock.Anything, mock.Anything)
 	h.emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
 }
 

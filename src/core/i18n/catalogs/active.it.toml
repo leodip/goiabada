@@ -2450,28 +2450,6 @@
 "validator.authorize.redirect_uri_insecure_http" = "Parametro redirect_uri non valido. L'URI di reindirizzamento non deve usare http non cifrato su un host diverso dall'interfaccia di loopback (127.0.0.1, [::1] o localhost)."
 "validator.authorize.redirect_uri_not_registered" = "Parametro redirect_uri non valido. Questo URI di reindirizzamento non è registrato per l'applicazione."
 
-# --- Email subjects ----------------------------------------------------------
-#
-# Subjects render through T against the recipient-locale context (i18n.WithLocale)
-# at the email-send site. Email bodies use the per-locale template-file pattern:
-# emails/email_xxx.<locale>.html overrides emails/email_xxx.html when present.
-# An email sent from its built-in definition (authserver/internal/emailtemplate)
-# holds its subject and its button's label there, in the six built-in languages,
-# and has no message here (#818).
-
-"email.address_changed.subject" = "Il tuo indirizzo email è stato cambiato"
-"email.password_changed.subject" = "La tua password è stata cambiata"
-"email.password_changed_by_administrator.subject" = "Un amministratore ha cambiato la tua password"
-"email.password_reset.subject" = "La tua password è stata reimpostata"
-"email.otp_enabled.subject" = "L'autenticazione a due fattori è stata configurata"
-"email.otp_disabled.subject" = "L'autenticazione a due fattori è stata disattivata"
-"email.otp_disabled_by_administrator.subject" = "Un amministratore ha disattivato la tua autenticazione a due fattori"
-"email.recovery_code_used.subject" = "È stato usato un codice di recupero per accedere"
-"email.recovery_codes_replaced.subject" = "I tuoi codici di recupero sono stati sostituiti"
-"email.account_deleted.subject" = "Il tuo account è stato eliminato"
-"email.account_deleted_by_administrator.subject" = "Un amministratore ha eliminato il tuo account"
-"email.otp_lockout.subject" = "La tua app di autenticazione è stata bloccata dopo troppi codici errati"
-
 # --- JS bootstrap ------------------------------------------------------------
 #
 # Strings consumed by client-side JS. The JSBootstrap template helper renders

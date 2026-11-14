@@ -107,8 +107,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   labels and the two date formatters, are that console's, unexported in its `internal/render`: they
   read nothing here but `T` and `CatalogTag`, and here they put CLDR's display tables into the auth
   server. Both servers' `<html lang>` and those CLDR labels read `CatalogTag`, the catalog the page
-  was rendered from, and `LocaleTag`, the first preference asked for, is what an email's body copy
-  is chosen from (#645). `Raw` stays, because it reads the catalog state this package keeps private
+  was rendered from, and `LocaleTag`, the first preference asked for, is what an email's language
+  is chosen from (#645, #818). `Raw` stays, because it reads the catalog state this package keeps private
   (#442)
 - `inputvalidation/` - Identifier validation and the angle-bracket predicate, the two rules both
   applications apply, to text an administrator or a registering client supplies.
@@ -432,8 +432,9 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   email change's notice to the previous address and the security notices, such as a changed
   password. A handler calls `Send`, or `SendRecoveryCodeUsed` with the count of codes left, after
   its change commits; the notifier sends nothing with SMTP off or to an unverified address, hands
-  the rest to an after-response job of the notice's class, renders it in the recipient's language
-  with no link, and logs a failure as one Error record (#724, #737)
+  the rest to an after-response job of the notice's class, renders it from its built-in definition
+  in the recipient's language with no link, and logs a failure as one Error record (#724, #737,
+  #818)
 - `internal/emaillinks/` - The emailed-link round trip for password reset and activation: build the
   link, mark it followed, redeem it once. Beside `emaildelivery`, which sends it (#387)
 - `internal/legaldocuments/` - Which legal documents are in effect where: published, not retired, and

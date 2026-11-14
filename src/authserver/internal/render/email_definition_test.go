@@ -25,7 +25,7 @@ import (
 
 // definitionValues are the values the tests send an email with.
 var definitionValues = emailtemplate.Values{
-	Name: "Ana", Link: buttonLink, Code: "482915", Expiry: 5 * time.Minute,
+	Name: "Ana", Link: buttonLink, Code: "482915", Expiry: 5 * time.Minute, CodesLeft: 3,
 }
 
 // renderDefinition renders email for a recipient reading locale, in brand, through a renderer whose

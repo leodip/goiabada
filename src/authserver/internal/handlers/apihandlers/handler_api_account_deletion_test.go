@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
@@ -228,7 +229,7 @@ func (f *deletionFixture) assertDeleted(t *testing.T, rr *httptest.ResponseRecor
 		"the administrators' lock is the deletion's first statement")
 	// The renderer and the sender had no expectation until now, so a notice sent inside the
 	// request would already have failed the case.
-	captured := expectNotice(f.pageRenderer, f.emailSender, "/emails/email_account_deleted.html")
+	captured := expectNotice(f.pageRenderer, f.emailSender, emailtemplate.AccountDeleted)
 	f.jobs.runAll(t, afterresponse.ClassSecurityNotice)
 	return captured
 }
@@ -252,8 +253,8 @@ func TestHandleAccountDeletionPost_DeletesTheAccountWithThePassword(t *testing.T
 	require.NotNil(t, captured.sent)
 	assert.Equal(t, deletionAddress, captured.sent.To)
 	assert.Equal(t, "Your account was deleted", captured.sent.Subject)
-	assert.Equal(t, "Rui Costa", captured.bound["name"])
-	assert.NotContains(t, captured.bound, "link", "the notice carries no link")
+	assert.Equal(t, "Rui Costa", captured.values.Name)
+	assert.Empty(t, captured.values.Link, "the notice carries no link")
 }
 
 // The notice is in the user's language, the subject from the catalog of each built-in language.
@@ -313,7 +314,7 @@ func TestHandleAccountDeletionPost_TellsTheAddressTheDeletionRead(t *testing.T) 
 				assert.Empty(t, f.jobs.jobs, "an unverified address is sent nothing")
 				return
 			}
-			captured := expectNotice(f.pageRenderer, f.emailSender, "/emails/email_account_deleted.html")
+			captured := expectNotice(f.pageRenderer, f.emailSender, emailtemplate.AccountDeleted)
 			f.jobs.runAll(t, afterresponse.ClassSecurityNotice)
 			assert.Equal(t, "current-address@example.com", captured.sent.To)
 		})
@@ -738,7 +739,7 @@ func TestHandleAccountDeletionPost_TheCodeThatDisablesTheAuthenticatorIsTold(t *
 	require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 	assert.Equal(t, "INVALID_OTP_CODE", errorCodeOf(t, rr))
 	assert.Equal(t, 1, f.credentials.failures)
-	captured := expectNotice(f.pageRenderer, f.emailSender, "/emails/email_otp_lockout.html")
+	captured := expectNotice(f.pageRenderer, f.emailSender, emailtemplate.OTPLockout)
 	f.jobs.runAll(t, afterresponse.ClassSecurityNotice)
 	assert.Equal(t, deletionAddress, captured.sent.To)
 }

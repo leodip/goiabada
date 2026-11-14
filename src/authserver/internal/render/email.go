@@ -24,8 +24,8 @@ const emailContent = `{{define "title"}}{{.emailSubject}}{{end}}{{define "head"}
 // receives: in the built-in language that matches the language r's context carries
 // (i18n.WithRecipientLanguage for an email to a user), in the brand of the page it was sent from as
 // RequestPageBrand reads it, and with values, whose app name is the settings'. The body is drawn
-// inside the email layout, which writes the frame inline from emailFrame as a template email's is,
-// and the layout marks the email with the language its text is written in.
+// inside the email layout, which writes the frame inline from emailFrame, and the layout marks the
+// email with the language its text is written in.
 func (h *Renderer) RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error) {
 	settings, ok := reqctx.SettingsFrom(r.Context())
 	if !ok {

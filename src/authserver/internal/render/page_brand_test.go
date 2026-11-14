@@ -8,13 +8,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/brandthemes"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -208,19 +208,17 @@ func TestRender_APageWithNoReadableBrandIsStillDrawn(t *testing.T) {
 // inline (#817 decision 2); it is not a page, so it is bound none of a page's stylesheets, favicon or
 // data-theme.
 func TestRender_AnEmailReadsItsBrandForItsFrameAlone(t *testing.T) {
-	templateFS := fstest.MapFS{
-		"layouts/email_layout.html": {Data: []byte(`<html>{{ with .brandStylesheet }}linked{{ end }}{{ with .brandDataTheme }}themed{{ end }}` +
-			`{{ .emailFrame.ColorScheme }}|{{template "content" .}}</html>`)},
-		"emails/note.html": {Data: []byte(`{{define "content"}}note{{end}}`)},
-	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 	brands := &defaultBrandStub{brand: &record.Brand{Id: 7, Appearance: record.BrandAppearanceDark, Theme: "plum"}}
 
-	buf, err := New(templateFS, nil, brands).RenderTemplateToBuffer(req, "layouts/email_layout.html", "emails/note.html", nil)
+	message, err := New(web.TemplateFS(), web.StaticFS(), brands).RenderEmail(req, emailtemplate.PasswordChanged,
+		emailtemplate.Values{Name: "Ana"})
 
 	require.NoError(t, err)
-	assert.Equal(t, "<html>dark|note</html>", buf.String())
+	assert.Contains(t, message.HTML, `<meta name="color-scheme" content="dark">`)
+	assert.NotContains(t, message.HTML, "<link", "an email links no stylesheet and no favicon")
+	assert.NotContains(t, message.HTML, "data-theme")
 	assert.Equal(t, 1, brands.reads)
 }
 

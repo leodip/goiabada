@@ -165,8 +165,9 @@ test("a recovery-code sign-in sends the user a notice with the codes left, and a
 
   const signedIn = await waitForMail(request, user.email, 2);
   expect(signedIn.subject).toBe("A recovery code was used to sign in");
-  expect(signedIn.html).toContain("You have 9 unused recovery codes left.");
-  expect(signedIn.html).toContain("turn two-factor authentication off and set up a new authenticator");
+  expect(signedIn.text).toContain("Unused recovery codes left: 9.");
+  expect(signedIn.text).toContain("If you still have the app, get a new set of recovery codes there, so you can still sign in if you lose it.");
+  expect(signedIn.text).toContain("turn two-factor authentication off and set up a new authenticator");
   expect(linksIn(signedIn)).toEqual([]);
   for (const code of recoveryCodes) expect(signedIn.text + signedIn.html).not.toContain(code);
 

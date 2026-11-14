@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -18,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	accounthandlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
@@ -169,13 +169,12 @@ func TestHandleAuthOtpPost_TellsTheUserTwoFactorWasSetUpDuringTheSignIn(t *testi
 			codes := append([]string(nil), authContext.RecoveryCodes...)
 
 			var renderLocale string
-			var bound map[string]interface{}
-			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_otp_enabled.html", mock.Anything).
+			var values emailtemplate.Values
+			pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.OTPEnabled, mock.Anything).
 				Run(func(args mock.Arguments) {
 					renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
-					bound = args.Get(3).(map[string]interface{})
-				}).Return(bytes.NewBufferString("<p>rendered notice</p>"), nil).Once()
+					values = args.Get(2).(emailtemplate.Values)
+				}).Return(renderedNotice, nil).Once()
 			var sent *emaildelivery.SendEmailInput
 			emailSender.On("SendEmail", mock.Anything,
 				emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 587, FromEmail: "noreply@example.com"},
@@ -189,12 +188,10 @@ func TestHandleAuthOtpPost_TellsTheUserTwoFactorWasSetUpDuringTheSignIn(t *testi
 			assert.Equal(t, signInNoticeAddress, sent.To)
 			assert.Equal(t, "A autenticação de dois fatores foi configurada", sent.Subject)
 			assert.Equal(t, "pt-BR", renderLocale, "the notice is rendered in the user's language")
-			assert.Equal(t, "Joana Reis", bound["name"])
-			assert.NotContains(t, bound, "link", "the notice carries no link")
-			for key, value := range bound {
-				for _, code := range codes {
-					assert.NotContains(t, fmt.Sprint(value), code, "the notice carries no recovery code, found under %q", key)
-				}
+			assert.Equal(t, "Joana Reis", values.Name)
+			assert.Empty(t, values.Link, "the notice carries no link")
+			for _, code := range codes {
+				assert.NotContains(t, fmt.Sprintf("%+v", values), code, "the notice carries no recovery code")
 			}
 		})
 	}

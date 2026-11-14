@@ -153,11 +153,12 @@ func (e *Email) Render(lang string, text Text, values Values, look Look) (Render
 	r := &bodyRenderer{
 		look: look, buttonLabel: text.ButtonLabel, link: values.Link,
 		values: map[string]string{
-			AppName: values.AppName,
-			Name:    values.Name,
-			Link:    values.Link,
-			Code:    values.Code,
-			Expiry:  expiryIn(lang, values.Expiry),
+			AppName:   values.AppName,
+			Name:      values.Name,
+			Link:      values.Link,
+			Code:      values.Code,
+			Expiry:    expiryIn(lang, values.Expiry),
+			CodesLeft: strconv.Itoa(values.CodesLeft),
 		},
 	}
 	body, _ := e.body(text.Body, r)

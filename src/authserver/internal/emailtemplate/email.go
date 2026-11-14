@@ -30,6 +30,8 @@ const (
 	Code = "code"
 	// Expiry is the link's or the code's lifetime with its unit, in the email's language.
 	Expiry = "expiry"
+	// CodesLeft is how many unused recovery codes are left, a number.
+	CodesLeft = "codes_left"
 )
 
 // Placeholder is one placeholder an email offers, and whether its body cannot do without it.
@@ -83,6 +85,8 @@ type Values struct {
 	Link    string
 	Code    string
 	Expiry  time.Duration
+	// CodesLeft is how many unused recovery codes are left, which {{codes_left}} writes as a number.
+	CodesLeft int
 }
 
 // Message is an email ready to send: its subject and the HTML document it is sent as, whose
@@ -132,6 +136,9 @@ func RecipientName(fullName, address string) string {
 // builtIns are every email's built-in definition.
 var builtIns = []*Email{
 	PasswordResetLink, ActivationLink, Welcome, RegistrationExistingAccount, NewUserSetup, VerificationCode, TestEmail,
+	EmailAddressChanged, PasswordChanged, PasswordChangedByAdministrator, PasswordReset,
+	OTPEnabled, OTPDisabled, OTPDisabledByAdministrator, OTPLockout, RecoveryCodeUsed, RecoveryCodesReplaced,
+	AccountDeleted, AccountDeletedByAdministrator,
 }
 
 // BuiltIns answers every email's built-in definition. The slice is the caller's own.

@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -16,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -231,13 +231,12 @@ func TestHandleResetPasswordPost_TellsTheUserTheirPasswordWasReset(t *testing.T)
 			// The page was rendered with the sender having no expectations yet, so a notice sent
 			// inside the request would already have failed the case.
 			var renderLocale string
-			var bound map[string]interface{}
-			rt.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_password_reset.html", mock.Anything).
+			var values emailtemplate.Values
+			rt.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordReset, mock.Anything).
 				Run(func(args mock.Arguments) {
 					renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
-					bound = args.Get(3).(map[string]interface{})
-				}).Return(bytes.NewBufferString("<p>rendered notice</p>"), nil).Once()
+					values = args.Get(2).(emailtemplate.Values)
+				}).Return(renderedNotice, nil).Once()
 			var sendCtx context.Context
 			var sent *emaildelivery.SendEmailInput
 			rt.emailSender.On("SendEmail", mock.Anything,
@@ -254,11 +253,9 @@ func TestHandleResetPasswordPost_TellsTheUserTheirPasswordWasReset(t *testing.T)
 			assert.Equal(t, resetNoticeAddress, sent.To, "the notice goes to the account's own address")
 			assert.Equal(t, tc.expectSubject, sent.Subject)
 			assert.Equal(t, tc.renderLocale, renderLocale, "the notice is rendered in the user's language")
-			assert.Equal(t, "Carla Dias", bound["name"])
-			assert.NotContains(t, bound, "link", "the notice carries no link")
-			for key, value := range bound {
-				assert.NotContains(t, fmt.Sprint(value), resetNoticePassword, "the notice carries no password, found under %q", key)
-			}
+			assert.Equal(t, "Carla Dias", values.Name)
+			assert.Empty(t, values.Link, "the notice carries no link")
+			assert.NotContains(t, fmt.Sprintf("%+v", values), resetNoticePassword, "the notice carries no password")
 			assert.Equal(t, resetNoticeRequestId, requestid.FromContext(sendCtx), "the job's records carry the request's id")
 		})
 	}
@@ -316,5 +313,15 @@ func TestHandleResetPasswordPost_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 
 			assert.Empty(t, rt.jobs.jobs, "no notice is handed off")
 		})
+	}
+}
+
+// renderedNotice fakes the renderer's answer to a notice: the subject the notice's definition gives in
+// the language the request carries, which only the right email and the right language give, and a
+// body.
+func renderedNotice(r *http.Request, email *emailtemplate.Email, _ emailtemplate.Values) emailtemplate.Message {
+	return emailtemplate.Message{
+		Subject: email.BuiltIn[emailtemplate.Language(i18n.LocaleTag(r.Context()))].Subject,
+		HTML:    "<p>rendered notice</p>",
 	}
 }

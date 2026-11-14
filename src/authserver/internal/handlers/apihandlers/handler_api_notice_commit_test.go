@@ -8,6 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -30,7 +31,7 @@ import (
 type noticeRoute struct {
 	name string
 	// page is the notice's email page, the one literal the route's notice renders.
-	page string
+	email *emailtemplate.Email
 	// arm stubs the change for before, the user the request reads first, and returns the handler
 	// and the request that make it.
 	arm func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
@@ -43,7 +44,7 @@ type noticeRoute struct {
 func noticeRoutes() []noticeRoute {
 	return []noticeRoute{
 		{
-			name: "an administrator's password", page: "/emails/email_password_changed_by_administrator.html",
+			name: "an administrator's password", email: emailtemplate.PasswordChangedByAdministrator,
 			user: func(*testing.T) *record.User { return adminPasswordNoticeRow("old-hash") },
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
@@ -54,7 +55,7 @@ func noticeRoutes() []noticeRoute {
 			},
 		},
 		{
-			name: "the account's password", page: "/emails/email_password_changed.html",
+			name: "the account's password", email: emailtemplate.PasswordChanged,
 			user: passwordNoticeUser,
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
@@ -64,7 +65,7 @@ func noticeRoutes() []noticeRoute {
 			},
 		},
 		{
-			name: "an authenticator set up on the account", page: "/emails/email_otp_enabled.html",
+			name: "an authenticator set up on the account", email: emailtemplate.OTPEnabled,
 			user: otpNoticeUser,
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
@@ -75,7 +76,7 @@ func noticeRoutes() []noticeRoute {
 			},
 		},
 		{
-			name: "an authenticator removed on the account", page: "/emails/email_otp_disabled.html",
+			name: "an authenticator removed on the account", email: emailtemplate.OTPDisabled,
 			user: enrolledOTPNoticeUser,
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
@@ -85,7 +86,7 @@ func noticeRoutes() []noticeRoute {
 			},
 		},
 		{
-			name: "an authenticator an administrator removed", page: "/emails/email_otp_disabled_by_administrator.html",
+			name: "an authenticator an administrator removed", email: emailtemplate.OTPDisabledByAdministrator,
 			user: enrolledOTPNoticeUser,
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
@@ -95,7 +96,7 @@ func noticeRoutes() []noticeRoute {
 			},
 		},
 		{
-			name: "an administrator's deletion", page: "/emails/email_account_deleted_by_administrator.html",
+			name: "an administrator's deletion", email: emailtemplate.AccountDeletedByAdministrator,
 			user: func(*testing.T) *record.User { return adminDeletionNoticeRow() },
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
@@ -106,7 +107,7 @@ func noticeRoutes() []noticeRoute {
 			},
 		},
 		{
-			name: "a new set of recovery codes", page: "/emails/email_recovery_codes_replaced.html",
+			name: "a new set of recovery codes", email: emailtemplate.RecoveryCodesReplaced,
 			user: recoveryNoticeUser,
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
@@ -141,8 +142,8 @@ func answerLockedRead(t *testing.T, database *datamocks.Database, current *recor
 func TestCredentialNotices_ACommittedChangeIsToldWhenItsResponseCannotBeRead(t *testing.T) {
 	routes := noticeRoutes()
 	for _, route := range routes {
-		if route.page == "/emails/email_password_changed.html" || route.page == "/emails/email_recovery_codes_replaced.html" ||
-			route.page == "/emails/email_account_deleted_by_administrator.html" {
+		if route.email == emailtemplate.PasswordChanged || route.email == emailtemplate.RecoveryCodesReplaced ||
+			route.email == emailtemplate.AccountDeletedByAdministrator {
 			// Answered from what was read before the change, or with no read at all: no read after
 			// it to fail.
 			continue
@@ -171,7 +172,7 @@ func TestCredentialNotices_ACommittedChangeIsToldWhenItsResponseCannotBeRead(t *
 
 			require.Equal(t, http.StatusInternalServerError, rr.Code)
 			require.Len(t, jobs.jobs, 1, "the change committed, so a failed read for its response loses no notice")
-			captured := expectNotice(pageRenderer, emailSender, route.page)
+			captured := expectNotice(pageRenderer, emailSender, route.email)
 			jobs.runAll(t, afterresponse.ClassSecurityNotice)
 			require.NotNil(t, captured.sent)
 			assert.Equal(t, before.Email, captured.sent.To)
@@ -215,7 +216,7 @@ func TestCredentialNotices_GoToTheRowTheChangeCommittedBeside(t *testing.T) {
 					assert.Empty(t, jobs.jobs, "the address the change committed beside is unverified")
 					return
 				}
-				captured := expectNotice(pageRenderer, emailSender, route.page)
+				captured := expectNotice(pageRenderer, emailSender, route.email)
 				jobs.runAll(t, afterresponse.ClassSecurityNotice)
 				require.NotNil(t, captured.sent)
 				assert.Equal(t, currentAddress, captured.sent.To,

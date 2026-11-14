@@ -2445,28 +2445,6 @@
 "validator.authorize.redirect_uri_insecure_http" = "Invalid redirect_uri parameter. The redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost)."
 "validator.authorize.redirect_uri_not_registered" = "Invalid redirect_uri parameter. The application does not have this redirect URI registered."
 
-# --- Email subjects ----------------------------------------------------------
-#
-# Subjects render through T against the recipient-locale context (i18n.WithLocale)
-# at the email-send site. Email bodies use the per-locale template-file pattern:
-# emails/email_xxx.<locale>.html overrides emails/email_xxx.html when present.
-# An email sent from its built-in definition (authserver/internal/emailtemplate)
-# holds its subject and its button's label there, in the six built-in languages,
-# and has no message here (#818).
-
-"email.address_changed.subject" = "Your email address was changed"
-"email.password_changed.subject" = "Your password was changed"
-"email.password_changed_by_administrator.subject" = "An administrator changed your password"
-"email.password_reset.subject" = "Your password was reset"
-"email.otp_enabled.subject" = "Two-factor authentication was set up"
-"email.otp_disabled.subject" = "Two-factor authentication was turned off"
-"email.otp_disabled_by_administrator.subject" = "An administrator turned off your two-factor authentication"
-"email.recovery_code_used.subject" = "A recovery code was used to sign in"
-"email.recovery_codes_replaced.subject" = "Your recovery codes were replaced"
-"email.account_deleted.subject" = "Your account was deleted"
-"email.account_deleted_by_administrator.subject" = "An administrator deleted your account"
-"email.otp_lockout.subject" = "Your authenticator was disabled after too many wrong codes"
-
 # --- JS bootstrap ------------------------------------------------------------
 #
 # Strings consumed by client-side JS. The JSBootstrap template helper renders

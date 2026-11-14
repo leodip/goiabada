@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
@@ -65,7 +66,7 @@ func TestHandleAuthOtpPost_TellsTheLockoutWhenTheRefusalCannotBeShown(t *testing
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
 	require.Len(t, jobs.jobs, 1, "the disable committed, so a failed read for the form loses no notice")
 	assert.Equal(t, afterresponse.ClassSecurityNotice, jobs.classes[0])
-	captured := expectSignInNotice(pageRenderer, emailSender, "/emails/email_otp_lockout.html")
+	captured := expectSignInNotice(pageRenderer, emailSender, emailtemplate.OTPLockout)
 	jobs.jobs[0](jobs.ctxs[0])
 	require.NotNil(t, captured.sent)
 	assert.Equal(t, signInNoticeAddress, captured.sent.To)
@@ -87,8 +88,8 @@ func answerSignInLockedRead(t *testing.T, database *datamocks.Database, current 
 func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.T) {
 	const currentAddress = "current-address@example.com"
 	for _, path := range []struct {
-		name string
-		page string
+		name  string
+		email *emailtemplate.Email
 		// arm stubs the change for before, the user the step reads first, and returns the request.
 		arm func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 			ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer,
@@ -96,7 +97,7 @@ func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.
 		user func(t *testing.T) *record.User
 	}{
 		{
-			name: "an authenticator set up while signing in", page: "/emails/email_otp_enabled.html",
+			name: "an authenticator set up while signing in", email: emailtemplate.OTPEnabled,
 			user: func(*testing.T) *record.User { return signInNoticeUser() },
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer,
@@ -117,7 +118,7 @@ func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.
 			},
 		},
 		{
-			name: "the refusal that disabled the authenticator", page: "/emails/email_otp_lockout.html",
+			name: "the refusal that disabled the authenticator", email: emailtemplate.OTPLockout,
 			user: func(t *testing.T) *record.User {
 				user := enrolledNoticeUser(t, "en")
 				user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 1
@@ -133,7 +134,7 @@ func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.
 			},
 		},
 		{
-			name: "a recovery code that signed in", page: "/emails/email_recovery_code_used.html",
+			name: "a recovery code that signed in", email: emailtemplate.RecoveryCodeUsed,
 			user: func(t *testing.T) *record.User { return enrolledNoticeUser(t, "en") },
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer,
@@ -187,7 +188,7 @@ func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.
 					return
 				}
 				require.Len(t, jobs.jobs, 1, "the step hands off exactly one notice")
-				captured := expectSignInNotice(pageRenderer, emailSender, path.page)
+				captured := expectSignInNotice(pageRenderer, emailSender, path.email)
 				jobs.jobs[0](jobs.ctxs[0])
 				require.NotNil(t, captured.sent)
 				assert.Equal(t, currentAddress, captured.sent.To,
