@@ -25,10 +25,10 @@ import (
 // zero, because the mistake is one a handler written from an older one makes.
 //
 // #387 narrowed this package's own port, PageRenderer since #435, to the one method it calls,
-// RenderTemplateToBuffer, so the two page writers are not reachable through it. That makes the
-// guard cheaper to satisfy and not redundant: the scan is over receivers rather than over one type,
-// so a handler taking the concrete *render.Renderer, or a port widened back to the
-// parent's shape, is still refused here.
+// RenderTemplateToBuffer then and RenderEmail since #818, so the two page writers are not reachable
+// through it. That makes the guard cheaper to satisfy and not redundant: the scan is over receivers
+// rather than over one type, so a handler taking the concrete *render.Renderer, or a port widened
+// back to the parent's shape, is still refused here.
 //
 // The scan is lexical, like TestAPIErrorCodes_MatchTheSurvivorTable beside it: the two names are
 // only ever spelled as a direct selector call on the helper, so a regexp finds every real site and

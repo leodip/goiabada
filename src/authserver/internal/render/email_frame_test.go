@@ -7,11 +7,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -139,7 +141,7 @@ func readEmail(t *testing.T, html string) drawnEmail {
 	return email
 }
 
-// renderBrandedEmail renders the forgot-password email, whose body holds a link, in ctx through a
+// renderBrandedEmail renders the password reset link, whose body holds a link, in ctx through a
 // renderer whose base URL is emailBaseURL, and reads its frame.
 func renderBrandedEmail(t *testing.T, ctx context.Context, brands *defaultBrandStub) drawnEmail {
 	t.Helper()
@@ -158,10 +160,10 @@ func renderEmailHTML(t *testing.T, ctx context.Context, renderer *Renderer) stri
 	t.Helper()
 	ctx = reqctx.WithSettings(ctx, &record.Settings{AppName: "Acme Portal"})
 	req := httptest.NewRequest(http.MethodPost, "/forgot-password", nil).WithContext(ctx)
-	buf, err := renderer.RenderTemplateToBuffer(req, "/layouts/email_layout.html", "/emails/email_forgot_password.html",
-		map[string]interface{}{"name": "Ana", "link": "https://auth.example.com/reset-password?code=abc"})
+	message, err := renderer.RenderEmail(req, emailtemplate.PasswordResetLink,
+		emailtemplate.Values{Name: "Ana", Link: "https://auth.example.com/reset-password?code=abc", Expiry: 5 * time.Minute})
 	require.NoError(t, err)
-	return buf.String()
+	return message.HTML
 }
 
 // themedBrand is the default brand of id 7 on theme, in appearance, with the seeded kit.

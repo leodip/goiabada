@@ -71,9 +71,12 @@ func (s *Server) initRoutes(branches appBranches) {
 	emailSender := emaildelivery.NewSender(s.dataCipher, s.cfg.AuthServer.SMTPEHLOName)
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
-	// or handlers.JSONWriter (#435). Every email is rendered through it, and links its brand's logo
-	// under the public base URL (#817).
-	httpHelper := render.New(s.templateFS, s.staticFS, s.database).WithBaseURL(s.cfg.AuthServer.BaseURL)
+	// or handlers.JSONWriter (#435). Every email is rendered through it, links its brand's logo
+	// under the public base URL (#817), and is sent with its administrator's edit in the
+	// recipient's language (#818).
+	httpHelper := render.New(s.templateFS, s.staticFS, s.database).
+		WithBaseURL(s.cfg.AuthServer.BaseURL).
+		WithEmailTemplates(s.database)
 	// The one notifier every account notice goes through, after its response (#724).
 	notifier := accountnotice.New(httpHelper, emailSender, s.jobs)
 	// The one sender every logout token goes through, after the end of the session it tells of has
@@ -460,6 +463,19 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/email", apihandlers.HandleSettingsEmailGet())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/email", apihandlers.HandleSettingsEmailPut(s.database, emailValidator, auditLogger, s.dataCipher))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/email/send-test", apihandlers.HandleSettingsEmailSendTestPost(emailValidator, emailSender, httpHelper, auditLogger))
+
+		// Email templates (#818 decisions 9 and 10): reading takes any scope that reads settings;
+		// saving and resetting change what users' mail says, which the handlers reserve to
+		// authserver:manage under the settings ceiling.
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/email-templates", apihandlers.HandleEmailTemplatesGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/email-templates/{email}", apihandlers.HandleEmailTemplateGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/email-templates/{email}/{language}", apihandlers.HandleEmailTemplatePut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/email-templates/{email}/{language}", apihandlers.HandleEmailTemplateDelete(s.database, auditLogger))
+		// The preview stores and sends nothing, so it reads as the read does; the test send sends
+		// text nobody has saved, which its handler reserves to authserver:manage (#818 decisions 11
+		// and 12).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Post("/email-templates/{email}/{language}/preview", apihandlers.HandleEmailTemplatePreviewPost(s.database, httpHelper))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/email-templates/{email}/{language}/send-test", apihandlers.HandleEmailTemplateSendTestPost(s.database, emailValidator, emailSender, httpHelper, auditLogger))
 
 		// Settings - Turnstile
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/turnstile", apihandlers.HandleSettingsTurnstileGet())

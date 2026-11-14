@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -135,13 +135,12 @@ func TestHandleAccountPasswordPut_TellsTheUserAfterTheResponse(t *testing.T) {
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 
 			var renderLocale string
-			var bound map[string]interface{}
-			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_password_changed.html", mock.Anything).
+			var values emailtemplate.Values
+			pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordChanged, mock.Anything).
 				Run(func(args mock.Arguments) {
 					renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
-					bound = args.Get(3).(map[string]interface{})
-				}).Return(bytes.NewBufferString("<p>rendered notice</p>"), nil).Once()
+					values = args.Get(2).(emailtemplate.Values)
+				}).Return(renderedNotice, nil).Once()
 			var sendCtx context.Context
 			var sent *emaildelivery.SendEmailInput
 			emailSender.On("SendEmail", mock.Anything,
@@ -159,12 +158,10 @@ func TestHandleAccountPasswordPut_TellsTheUserAfterTheResponse(t *testing.T) {
 			assert.Equal(t, tc.expectSubject, sent.Subject)
 			assert.Equal(t, "<p>rendered notice</p>", sent.HtmlBody)
 			assert.Equal(t, tc.renderLocale, renderLocale, "the notice is rendered in the user's language")
-			assert.Equal(t, "Ana Silva", bound["name"])
-			assert.NotContains(t, bound, "link", "the notice carries no link")
-			for key, value := range bound {
-				for _, secret := range []string{passwordNoticeNew, passwordNoticeCurrent} {
-					assert.NotContains(t, fmt.Sprint(value), secret, "the notice carries no password, found under %q", key)
-				}
+			assert.Equal(t, "Ana Silva", values.Name)
+			assert.Empty(t, values.Link, "the notice carries no link")
+			for _, secret := range []string{passwordNoticeNew, passwordNoticeCurrent} {
+				assert.NotContains(t, fmt.Sprintf("%+v", values), secret, "the notice carries no password")
 			}
 			assert.Equal(t, passwordNoticeRequestId, requestid.FromContext(sendCtx),
 				"the job's records carry the request's id")
@@ -257,11 +254,11 @@ func TestHandleAccountPasswordPut_AFailedNoticeIsAnErrorRecordAndNothingElse(t *
 			require.Equal(t, http.StatusOK, rr.Code, "the change is answered before the notice is attempted")
 
 			if tc.renderErr != nil {
-				pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, tc.renderErr).Once()
+				pageRenderer.On("RenderEmail", mock.Anything, mock.Anything, mock.Anything).
+					Return(emailtemplate.Message{}, tc.renderErr).Once()
 			} else {
-				pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(&bytes.Buffer{}, nil).Once()
+				pageRenderer.On("RenderEmail", mock.Anything, mock.Anything, mock.Anything).
+					Return(emailtemplate.Message{Subject: "s", HTML: "<p>x</p>"}, nil).Once()
 				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, tc.sendErr).Once()
 			}
 			jobs.runAll(t, afterresponse.ClassSecurityNotice)

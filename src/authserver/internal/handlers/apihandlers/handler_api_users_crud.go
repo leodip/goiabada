@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -514,7 +515,7 @@ func HandleUserCreatePost(
 			input.ForgotPasswordCodeHash = hashutil.HashString(verificationCode)
 			input.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-			setupEmail, err = renderSetupEmail(r, pageRenderer, settings, input, verificationCode, baseURL)
+			setupEmail, err = renderSetupEmail(r, pageRenderer, input, verificationCode, baseURL)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
@@ -582,7 +583,7 @@ func HandleUserCreatePost(
 // it is for is created. The email is the new user's, in their language by the rule every email to
 // a user follows, not the administrator's: a user created here has chosen no page language and has
 // no Language and region yet, so it is in English. Once they choose, subsequent emails honor it.
-func renderSetupEmail(r *http.Request, pageRenderer PageRenderer, settings *record.Settings,
+func renderSetupEmail(r *http.Request, pageRenderer PageRenderer,
 	input *usercreation.Input, verificationCode string, baseURL string) (*emaildelivery.SendEmailInput, error) {
 
 	newUser := &record.User{
@@ -591,26 +592,24 @@ func renderSetupEmail(r *http.Request, pageRenderer PageRenderer, settings *reco
 		MiddleName: input.MiddleName,
 		FamilyName: input.FamilyName,
 	}
-	name := newUser.FullName()
-	if len(name) == 0 {
-		name = newUser.Email
-	}
-
-	bind := map[string]interface{}{
-		"name": name,
-		"link": emaillinks.ResetPasswordLink(baseURL, verificationCode, ""),
+	// The email greets a user with no name by their address and says how long the link works
+	// (#818 decisions 4 and 15).
+	values := emailtemplate.Values{
+		Name:   emailtemplate.RecipientName(newUser.FullName(), newUser.Email),
+		Link:   emaillinks.ResetPasswordLink(baseURL, verificationCode, ""),
+		Expiry: emaillinks.SetupLinkLifetime,
 	}
 
 	emailReq := r.WithContext(i18n.WithRecipientLanguage(r.Context(), newUser.PageLanguage, newUser.Locale))
-	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
+	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.NewUserSetup, values)
 	if err != nil {
 		return nil, err
 	}
 
 	return &emaildelivery.SendEmailInput{
 		To:       newUser.Email,
-		Subject:  i18n.T(emailReq.Context(), "email.newuser_set_password.subject", map[string]any{"appName": settings.AppName}),
-		HtmlBody: buf.String(),
+		Subject:  message.Subject,
+		HtmlBody: message.HTML,
 	}, nil
 }
 

@@ -683,6 +683,27 @@ type Database interface {
 	// GetLegalDocumentAcceptancesByUserId answers a user's acceptances, in id order.
 	GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
 
+	// Email template edits (#818 decision 7): at most one row for an email and a language, holding
+	// only the fields that differ from the built-in text. The email and the language are matched
+	// exactly; holding them to the 19 emails and the six built-in languages is the caller's.
+	//
+	// SaveEmailTemplate stores the edit of its email and language in one statement, creating the
+	// row or replacing the fields of the one already there, so of two saves at once the last wins
+	// and neither is refused as a second row. It stamps the record's UpdatedAt, and its CreatedAt
+	// with the same time, which is what a new row gets: a replaced row keeps the created_at of its
+	// first save. It answers the row's id on the record, and refuses an edit with no field set,
+	// whose row is deleted instead. Two first saves of one email and language can deadlock each
+	// other on MySQL and SQL Server, so a save runs inside RunInTransaction, which retries the
+	// victim.
+	SaveEmailTemplate(ctx context.Context, tx *sql.Tx, edit *record.EmailTemplate) error
+	// GetEmailTemplate answers the edit of the email in the language, or nil when there is none.
+	GetEmailTemplate(ctx context.Context, tx *sql.Tx, emailTemplate string, language string) (*record.EmailTemplate, error)
+	// GetAllEmailTemplates answers every edit, in id order.
+	GetAllEmailTemplates(ctx context.Context, tx *sql.Tx) ([]record.EmailTemplate, error)
+	// DeleteEmailTemplate removes the edit of the email in the language, and answers whether there
+	// was one.
+	DeleteEmailTemplate(ctx context.Context, tx *sql.Tx, emailTemplate string, language string) (deleted bool, err error)
+
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)

@@ -202,6 +202,22 @@ func TestExecutor_TheCallsThatSendMailOutlastTenSeconds(t *testing.T) {
 			sendsMail: true,
 		},
 		{
+			name: "the test of an email template",
+			call: func(ctx context.Context) error {
+				_, err := client.SendTestEmailTemplate(ctx, charAccessToken, "welcome", "en",
+					&api.SendTestEmailTemplateRequest{To: "jane@example.com"})
+				return err
+			},
+			sendsMail: true,
+		},
+		{
+			name: "previewing an email template",
+			call: func(ctx context.Context) error {
+				_, err := client.PreviewEmailTemplate(ctx, charAccessToken, "welcome", "en", &api.PreviewEmailTemplateRequest{})
+				return err
+			},
+		},
+		{
 			name: "creating a user with a setup email",
 			call: func(ctx context.Context) error {
 				_, err := client.CreateUserAdmin(ctx, charAccessToken, &api.CreateUserAdminRequest{

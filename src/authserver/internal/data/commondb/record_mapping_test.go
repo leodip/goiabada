@@ -8,6 +8,7 @@ import (
 	"math/bits"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -55,6 +56,12 @@ type mappingCase struct {
 	// nil for a record that has no whole-row UPDATE, which is then not checked.
 	insert func(ctx context.Context, d *Database, rec any) error
 	update func(ctx context.Context, d *Database, rec any) error
+	// upsert runs in place of insert for a record whose one write is an insert that, when the row
+	// its key names is already there, replaces that row instead (#818 decision 7). Its insert
+	// writes what insert must, and its replace what update must, each from the field tagged with
+	// the column; upsertKey is the key the replace is decided on, on the engines that name it.
+	upsert    func(ctx context.Context, d *Database, rec any) error
+	upsertKey []string
 	// insertLiterals are columns no field carries that every insert must still write, each as
 	// exactly the literal given: a NOT NULL column with no default that a previous release reads
 	// and this one does not, such as settings.ui_theme (#810 decision 2). A read or an update
@@ -999,6 +1006,30 @@ func brandAssetMapping() mappingCase {
 	}
 }
 
+// emailTemplateMapping's one write is SaveEmailTemplate, which inserts the edit or replaces the
+// row its email and language already have (#818 decision 7): the replace leaves created_at and the
+// key alone, its dont-update columns.
+func emailTemplateMapping() mappingCase {
+	return mappingCase{
+		name:   "email template",
+		table:  "email_templates",
+		record: reflect.TypeOf(record.EmailTemplate{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetEmailTemplate": func(ctx context.Context, d *Database) (any, error) {
+				// The distinct values the row carries, so the exact-match check keeps it.
+				return d.GetEmailTemplate(ctx, nil, distinctString("email_template"), distinctString("language"))
+			},
+			"GetAllEmailTemplates": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAllEmailTemplates(ctx, nil))
+			},
+		},
+		upsert: func(ctx context.Context, d *Database, rec any) error {
+			return d.SaveEmailTemplate(ctx, nil, rec.(*record.EmailTemplate))
+		},
+		upsertKey: []string{"email_template", "language"},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
@@ -1013,7 +1044,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),
 		userSessionMapping(), userSessionClientMapping(), browserSessionMapping(), userConsentMapping(),
 		settingsMapping(), keyPairMapping(), auditLogMapping(), preRegistrationMapping(),
-		brandMapping(), brandAssetMapping(),
+		brandMapping(), brandAssetMapping(), emailTemplateMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
@@ -1378,7 +1409,11 @@ func checkMapping(t *testing.T, dialect data.Dialect, c mappingCase) []string {
 			}
 			found = append(found, checkRead(t, dialect, c, fields, byColumn, name, partial.read, omitted, pass)...)
 		}
-		found = append(found, checkInsert(t, dialect, c, fields, byColumn, pass)...)
+		if c.upsert != nil {
+			found = append(found, checkUpsert(t, dialect, c, fields, byColumn, pass)...)
+		} else {
+			found = append(found, checkInsert(t, dialect, c, fields, byColumn, pass)...)
+		}
 		if c.update != nil {
 			found = append(found, checkUpdate(t, dialect, c, fields, byColumn, pass)...)
 		}
@@ -1615,6 +1650,221 @@ func checkInsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []tag
 		}
 	}
 	problems = append(problems, unwrittenLiterals(where, c, written)...)
+
+	if id := rec.Elem().FieldByName("Id"); !id.IsValid() || id.Int() != newId {
+		problems = append(problems, fmt.Sprintf("%s: the record's Id is not the id the engine answered, %d", where, newId))
+	}
+	return problems
+}
+
+// The shapes of an insert that replaces the row its key already names, one per grammar: SQLite and
+// PostgreSQL's ON CONFLICT, MySQL's ON DUPLICATE KEY UPDATE, which binds each replaced value again
+// and keeps the replaced row's id as the one the driver reports, and SQL Server's MERGE, which binds
+// each value once, into a source row its insert and its replace both read.
+var (
+	onConflictShape = regexp.MustCompile(`(?s)^INSERT INTO (\S+) \((.+?)\) VALUES \((.+?)\) ` +
+		`ON CONFLICT \((.+?)\) DO UPDATE SET (.+) RETURNING id$`)
+	onDuplicateKeyShape = regexp.MustCompile(`(?s)^INSERT INTO (\S+) \((.+?)\) VALUES \((.+?)\) ` +
+		`ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID\(id\), (.+)$`)
+	mergeShape = regexp.MustCompile(`(?s)^MERGE INTO (\S+) WITH \(HOLDLOCK\) AS target ` +
+		`USING \(VALUES \((.+?)\)\) AS source \((.+?)\) ON (.+?) ` +
+		`WHEN MATCHED THEN UPDATE SET (.+?) WHEN NOT MATCHED THEN INSERT \((.+?)\) VALUES \((.+?)\) ` +
+		`OUTPUT INSERTED\.id;$`)
+)
+
+// checkUpsert holds an insert-or-replace to the tags as checkInsert and checkUpdate hold their
+// statements: its insert writes every tagged column but the primary key, each from its field; its
+// replace writes every column the whole-row UPDATE would, each from the value the insert was given
+// for that same column, and no dont-update one; it decides on the record's key; and the record's
+// Id is the id the engine answered.
+func checkUpsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []taggedField,
+	byColumn map[string]taggedField, pass int) []string {
+	t.Helper()
+	where := fmt.Sprintf("%s upsert", dialect)
+	rec, problems := filledRecord(c, fields, pass)
+
+	script := &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1, lastInsertId: newId}}}
+	script.answer = func(string, []driver.Value) *scriptedRows {
+		return &scriptedRows{cols: []string{"id"}, values: [][]driver.Value{{int64(newId)}}}
+	}
+	if err := c.upsert(context.Background(), scriptedDBFor(t, script, dialect), rec.Interface()); err != nil {
+		return append(problems, fmt.Sprintf("%s: %v", where, err))
+	}
+	if len(script.statements) != 1 {
+		return append(problems, fmt.Sprintf("%s: %d statements reached the engine, want 1", where, len(script.statements)))
+	}
+	query := script.statements[0]
+
+	// The id comes back as a row from RETURNING or OUTPUT, and on MySQL as the driver's last
+	// insert id.
+	args := script.queryArgs
+	if dialect == data.MySQL {
+		args = script.execArgs
+		if script.execCount != 1 {
+			problems = append(problems, fmt.Sprintf("%s: the upsert did not run as a statement", where))
+		}
+	} else if script.queryCount != 1 {
+		problems = append(problems, fmt.Sprintf("%s: the upsert did not run as a query answering its id", where))
+	}
+	if len(args) != 1 {
+		return append(problems, fmt.Sprintf("%s: no arguments were recorded", where))
+	}
+
+	// What each grammar names: the table, the inserted columns and the values bound to them, the
+	// key, and the replace's assignments. replaced reads one assignment's right-hand side and
+	// answers the column whose incoming value it is, or the field's value it binds.
+	var table, key string
+	var insertColumns, insertValues, assignments []string
+	reader := &placeholderReader{dialect: dialect}
+	var replaced func(col identifier, rhs string) []string
+	incoming := func(what string, prefix string) func(identifier, string) []string {
+		return func(col identifier, rhs string) []string {
+			rhs = strings.TrimSpace(rhs)
+			if len(rhs) <= len(prefix) || !strings.EqualFold(rhs[:len(prefix)], prefix) {
+				return []string{fmt.Sprintf("%s: %s takes %s from %q, not from %s<column>", where, what, col.name, rhs, prefix)}
+			}
+			if from := parseIdentifier(rhs[len(prefix):]); from.name != col.name {
+				return []string{fmt.Sprintf("%s: %s takes %s from the value given for %s", where, what, col.name, from.name)}
+			}
+			return nil
+		}
+	}
+	switch dialect {
+	case data.SQLite, data.Postgres:
+		m := onConflictShape.FindStringSubmatch(query)
+		if m == nil {
+			return append(problems, fmt.Sprintf("%s: the statement is not an INSERT ... ON CONFLICT this test reads: %q", where, query))
+		}
+		table, key = m[1], m[4]
+		insertColumns, insertValues, assignments = strings.Split(m[2], ","), strings.Split(m[3], ","), strings.Split(m[5], ",")
+		replaced = incoming("the replace", "excluded.")
+	case data.MySQL:
+		m := onDuplicateKeyShape.FindStringSubmatch(query)
+		if m == nil {
+			return append(problems, fmt.Sprintf("%s: the statement is not an INSERT ... ON DUPLICATE KEY UPDATE this test reads: %q", where, query))
+		}
+		table = m[1]
+		insertColumns, insertValues, assignments = strings.Split(m[2], ","), strings.Split(m[3], ","), strings.Split(m[4], ",")
+		// The replace binds its values after the insert's, so the reader goes on counting.
+		replaced = func(col identifier, rhs string) []string {
+			argIndex, err := reader.read(rhs)
+			if err != nil {
+				return []string{fmt.Sprintf("%s: %v", where, err)}
+			}
+			return checkWrittenColumn(where+" replace", dialect, rec, byColumn, col, argIndex, args[0])
+		}
+	case data.MSSQL:
+		m := mergeShape.FindStringSubmatch(query)
+		if m == nil {
+			return append(problems, fmt.Sprintf("%s: the statement is not a MERGE this test reads: %q", where, query))
+		}
+		table = m[1]
+		// The values bind to the source row's columns, and the insert writes each column from the
+		// source's own.
+		insertColumns, insertValues, assignments = strings.Split(m[3], ","), strings.Split(m[2], ","), strings.Split(m[5], ",")
+		replaced = incoming("the replace", "source.")
+		into, from := strings.Split(m[6], ","), strings.Split(m[7], ",")
+		if len(into) != len(from) {
+			problems = append(problems, fmt.Sprintf("%s: the MERGE's insert has %d columns and %d values", where, len(into), len(from)))
+		} else {
+			inserted := map[string]bool{}
+			check := incoming("the MERGE's insert", "source.")
+			for i := range into {
+				col := parseIdentifier(into[i])
+				inserted[col.name] = true
+				problems = append(problems, check(col, from[i])...)
+			}
+			for _, entry := range insertColumns {
+				if col := parseIdentifier(entry); !inserted[col.name] {
+					problems = append(problems, fmt.Sprintf("%s: the MERGE's insert does not write %s", where, col.name))
+				}
+			}
+		}
+		var conditions []string
+		for _, condition := range strings.Split(m[4], " AND ") {
+			sides := strings.SplitN(condition, "=", 2)
+			if len(sides) != 2 {
+				problems = append(problems, fmt.Sprintf("%s: the MERGE's condition %q is not an equality", where, condition))
+				continue
+			}
+			col := parseIdentifier(strings.TrimPrefix(strings.TrimSpace(sides[0]), "target."))
+			problems = append(problems, incoming("the MERGE's condition", "source.")(col, sides[1])...)
+			conditions = append(conditions, col.name)
+		}
+		key = strings.Join(conditions, ", ")
+	}
+
+	if name := parseIdentifier(table).name; name != c.table {
+		problems = append(problems, fmt.Sprintf("%s: writes %s, want %s", where, name, c.table))
+	}
+	if dialect != data.MySQL {
+		var named []string
+		for _, entry := range strings.Split(key, ",") {
+			named = append(named, parseIdentifier(entry).name)
+		}
+		if !slices.Equal(named, c.upsertKey) {
+			problems = append(problems, fmt.Sprintf("%s: replaces the row %v names, want %v", where, named, c.upsertKey))
+		}
+	}
+
+	// The insert: every tagged column but the primary key, each from its field.
+	if len(insertColumns) != len(insertValues) {
+		return append(problems, fmt.Sprintf("%s: %d columns and %d values", where, len(insertColumns), len(insertValues)))
+	}
+	written := map[string]bool{}
+	for i, entry := range insertColumns {
+		col := parseIdentifier(entry)
+		if written[col.name] {
+			problems = append(problems, fmt.Sprintf("%s: writes %s twice", where, col.name))
+		}
+		written[col.name] = true
+		argIndex, err := reader.read(insertValues[i])
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("%s: %v", where, err))
+			continue
+		}
+		problems = append(problems, checkWrittenColumn(where, dialect, rec, byColumn, col, argIndex, args[0])...)
+	}
+	for _, f := range fields {
+		switch {
+		case f.pk && written[f.column]:
+			problems = append(problems, fmt.Sprintf("%s: writes the primary key %s", where, f.column))
+		case !f.pk && !written[f.column]:
+			problems = append(problems, fmt.Sprintf("%s: does not write %s", where, f.column))
+		}
+	}
+
+	// The replace: what the whole-row UPDATE would write, each from its own incoming value.
+	assigned := map[string]bool{}
+	for _, assignment := range assignments {
+		parts := strings.SplitN(assignment, "=", 2)
+		if len(parts) != 2 {
+			problems = append(problems, fmt.Sprintf("%s: %q is not an assignment", where, assignment))
+			continue
+		}
+		col := parseIdentifier(parts[0])
+		if assigned[col.name] {
+			problems = append(problems, fmt.Sprintf("%s: the replace writes %s twice", where, col.name))
+		}
+		assigned[col.name] = true
+		field, known := byColumn[col.name]
+		if !known {
+			problems = append(problems, fmt.Sprintf("%s: the replace writes %s, which no field is tagged with", where, col.name))
+			continue
+		}
+		problems = append(problems, quoteProblems(dialect, col, field, where)...)
+		problems = append(problems, replaced(col, parts[1])...)
+	}
+	for _, f := range fields {
+		switch {
+		case f.pk && assigned[f.column]:
+			problems = append(problems, fmt.Sprintf("%s: the replace writes the primary key %s", where, f.column))
+		case f.dontUpdate && assigned[f.column]:
+			problems = append(problems, fmt.Sprintf("%s: the replace writes %s, which is tagged dont-update", where, f.column))
+		case !f.pk && !f.dontUpdate && !assigned[f.column]:
+			problems = append(problems, fmt.Sprintf("%s: the replace does not write %s", where, f.column))
+		}
+	}
 
 	if id := rec.Elem().FieldByName("Id"); !id.IsValid() || id.Int() != newId {
 		problems = append(problems, fmt.Sprintf("%s: the record's Id is not the id the engine answered, %d", where, newId))
@@ -1972,4 +2222,113 @@ func mappingPaletteText() string {
 		return "{" + strings.Join(members, ",") + "}"
 	}
 	return `{"mode":"advanced","light":` + mode(1) + `,"dark":` + mode(2) + `}`
+}
+
+// The upsert checker's own cases, over the widget keyed by its name: right on every engine, and
+// then wrong in each way a replace can go wrong unseen by a data test that saves once.
+
+func rightWidgetUpsert() statement {
+	return statement{
+		sqlite: `INSERT INTO widgets (created_at, name, label, "key", enabled, visible) VALUES (?, ?, ?, ?, ?, ?) ` +
+			`ON CONFLICT (name) DO UPDATE SET name = excluded.name, label = excluded.label, "key" = excluded."key", ` +
+			`enabled = excluded.enabled, visible = excluded.visible RETURNING id`,
+		mysql: "INSERT INTO widgets (created_at, name, label, `key`, enabled, visible) VALUES (?, ?, ?, ?, ?, ?) " +
+			"ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), name = ?, label = ?, `key` = ?, enabled = ?, visible = ?",
+		postgres: `INSERT INTO widgets (created_at, name, label, "key", enabled, visible) VALUES ($1, $2, $3, $4, $5, $6) ` +
+			`ON CONFLICT (name) DO UPDATE SET name = excluded.name, label = excluded.label, "key" = excluded."key", ` +
+			`enabled = excluded.enabled, visible = excluded.visible RETURNING id`,
+		mssql: `MERGE INTO widgets WITH (HOLDLOCK) AS target USING (VALUES (@p1, @p2, @p3, @p4, @p5, @p6)) ` +
+			`AS source (created_at, name, label, "key", enabled, visible) ON target.name = source.name ` +
+			`WHEN MATCHED THEN UPDATE SET name = source.name, label = source.label, "key" = source."key", ` +
+			`enabled = source.enabled, visible = source.visible ` +
+			`WHEN NOT MATCHED THEN INSERT (created_at, name, label, "key", enabled, visible) ` +
+			`VALUES (source.created_at, source.name, source.label, source."key", source.enabled, source.visible) ` +
+			`OUTPUT INSERTED.id;`,
+	}
+}
+
+// widgetUpsertMapping is the widget written by the upsert, whose MySQL version binds the replaced
+// values after the inserted ones, in the order mysqlReplace gives them.
+func widgetUpsertMapping(upsert statement, mysqlReplace func(*widget) []any) mappingCase {
+	c := widgetMapping(rightWidgetSQL())
+	c.insert, c.update = nil, nil
+	c.upsertKey = []string{"name"}
+	c.upsert = func(ctx context.Context, d *Database, rec any) error {
+		v := rec.(*widget)
+		args := []any{v.CreatedAt, v.Name, v.Label, v.Key, v.Enabled, v.Visible}
+		var id int64
+		var err error
+		if d.Dialect == data.MySQL {
+			args = append(args, mysqlReplace(v)...)
+			id, err = d.insertReadingLastInsertId(ctx, nil, upsert.text(d.Dialect), "widget", args)
+		} else {
+			id, err = d.insertReadingReturnedId(ctx, nil, upsert.text(d.Dialect), "widget", args)
+		}
+		v.Id = id
+		return err
+	}
+	return c
+}
+
+func rightMySQLReplace(v *widget) []any {
+	return []any{v.Name, v.Label, v.Key, v.Enabled, v.Visible}
+}
+
+func TestRecordMapping_TheUpsertCheckerPassesRightSQLOnEveryEngine(t *testing.T) {
+	for _, dialect := range allDialects {
+		t.Run(string(dialect), func(t *testing.T) {
+			problems := checkMapping(t, dialect, widgetUpsertMapping(rightWidgetUpsert(), rightMySQLReplace))
+			assert.Empty(t, problems, "\n%s", strings.Join(problems, "\n"))
+		})
+	}
+}
+
+func TestRecordMapping_TheUpsertCheckerRefusesAReplaceWritingADontUpdateColumn(t *testing.T) {
+	upsert := rightWidgetUpsert()
+	upsert.sqlite = strings.Replace(upsert.sqlite, "DO UPDATE SET ", "DO UPDATE SET created_at = excluded.created_at, ", 1)
+
+	problems := checkMapping(t, data.SQLite, widgetUpsertMapping(upsert, rightMySQLReplace))
+	assert.Contains(t, strings.Join(problems, "\n"), "sqlite upsert: the replace writes created_at, which is tagged dont-update")
+}
+
+func TestRecordMapping_TheUpsertCheckerRefusesAReplaceFromAnotherColumnsValue(t *testing.T) {
+	upsert := rightWidgetUpsert()
+	upsert.postgres = strings.Replace(upsert.postgres, "label = excluded.label", "label = excluded.name", 1)
+
+	problems := checkMapping(t, data.Postgres, widgetUpsertMapping(upsert, rightMySQLReplace))
+	assert.Contains(t, strings.Join(problems, "\n"), "postgres upsert: the replace takes label from the value given for name")
+}
+
+func TestRecordMapping_TheUpsertCheckerRefusesAReplaceBindingAnotherField(t *testing.T) {
+	swapped := func(v *widget) []any { return []any{v.Label, v.Name, v.Key, v.Enabled, v.Visible} }
+
+	problems := checkMapping(t, data.MySQL, widgetUpsertMapping(rightWidgetUpsert(), swapped))
+	joined := strings.Join(problems, "\n")
+	assert.Contains(t, joined, "mysql upsert replace: column name is written value of label")
+	assert.Contains(t, joined, "mysql upsert replace: column label is written value of name")
+}
+
+func TestRecordMapping_TheUpsertCheckerRefusesAMergeInsertingAnotherSourceColumn(t *testing.T) {
+	upsert := rightWidgetUpsert()
+	upsert.mssql = strings.Replace(upsert.mssql, "VALUES (source.created_at, source.name, source.label",
+		"VALUES (source.created_at, source.label, source.label", 1)
+
+	problems := checkMapping(t, data.MSSQL, widgetUpsertMapping(upsert, rightMySQLReplace))
+	assert.Contains(t, strings.Join(problems, "\n"), "mssql upsert: the MERGE's insert takes name from the value given for label")
+}
+
+func TestRecordMapping_TheUpsertCheckerRefusesAnotherKey(t *testing.T) {
+	upsert := rightWidgetUpsert()
+	upsert.mssql = strings.Replace(upsert.mssql, "ON target.name = source.name", "ON target.label = source.label", 1)
+
+	problems := checkMapping(t, data.MSSQL, widgetUpsertMapping(upsert, rightMySQLReplace))
+	assert.Contains(t, strings.Join(problems, "\n"), "mssql upsert: replaces the row [label] names, want [name]")
+}
+
+func TestRecordMapping_TheUpsertCheckerRefusesAReplaceLeavingAColumnOut(t *testing.T) {
+	upsert := rightWidgetUpsert()
+	upsert.sqlite = strings.Replace(upsert.sqlite, ", visible = excluded.visible", "", 1)
+
+	problems := checkMapping(t, data.SQLite, widgetUpsertMapping(upsert, rightMySQLReplace))
+	assert.Contains(t, strings.Join(problems, "\n"), "sqlite upsert: the replace does not write visible")
 }

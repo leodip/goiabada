@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -231,12 +232,11 @@ func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHande
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
 	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 		mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-	var emailedLink string
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-		"/emails/email_verification.html", mock.Anything).
+	var emailed emailtemplate.Values
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.VerificationCode, mock.Anything).
 		Run(func(args mock.Arguments) {
-			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
-		}).Return(&bytes.Buffer{}, nil)
+			emailed = args.Get(2).(emailtemplate.Values)
+		}).Return(emailtemplate.Message{Subject: "Email verification", HTML: "<p>x</p>"}, nil)
 	emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).Return(emaildelivery.SendResult{}, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return()
 
@@ -248,7 +248,12 @@ func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHande
 	handler.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.Equal(t, "https://admin.test/account/email-verification", emailedLink)
+	assert.Equal(t, "https://admin.test/account/email-verification", emailed.Link)
+	// The user has no name, so the email greets them by their address, and it says the code lasts
+	// five minutes (#818 decisions 4 and 15).
+	assert.Equal(t, "someone@example.com", emailed.Name)
+	assert.Equal(t, 5*time.Minute, emailed.Expiry)
+	assert.NotEmpty(t, emailed.Code)
 }
 
 // The verification email is written in the user's page language, else their Language and region,
@@ -256,15 +261,14 @@ func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHande
 // part (#631).
 func TestHandleAccountEmailVerificationSendPost_IsWrittenInTheRecipientsLanguage(t *testing.T) {
 	for _, tc := range []struct {
-		name          string
-		pageLanguage  string
-		locale        string
-		renderLocale  string
-		subjectPrefix string
+		name         string
+		pageLanguage string
+		locale       string
+		renderLocale string
 	}{
-		{"a user who chose Portuguese, over a French locale", "pt-BR", "fr", "pt-BR", "Verificação de e-mail - código "},
-		{"a user on Automatic, with a French locale", "", "fr", "fr", "Vérification de l’adresse e-mail - code "},
-		{"a user on Automatic with no locale", "", "", "en", "Email verification - code "},
+		{"a user who chose Portuguese, over a French locale", "pt-BR", "fr", "pt-BR"},
+		{"a user on Automatic, with a French locale", "", "fr", "fr"},
+		{"a user on Automatic with no locale", "", "", "en"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -281,11 +285,10 @@ func TestHandleAccountEmailVerificationSendPost_IsWrittenInTheRecipientsLanguage
 			database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 				mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 			var renderLocale string
-			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_verification.html", mock.Anything).
+			pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.VerificationCode, mock.Anything).
 				Run(func(args mock.Arguments) {
 					renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
-				}).Return(&bytes.Buffer{}, nil)
+				}).Return(emailtemplate.Message{Subject: "the rendered subject", HTML: "<p>x</p>"}, nil)
 			var sent *emaildelivery.SendEmailInput
 			emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -305,8 +308,8 @@ func TestHandleAccountEmailVerificationSendPost_IsWrittenInTheRecipientsLanguage
 
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			require.NotNil(t, sent)
-			assert.True(t, strings.HasPrefix(sent.Subject, tc.subjectPrefix), "subject %q", sent.Subject)
-			assert.Equal(t, tc.renderLocale, renderLocale, "the body is rendered in the recipient's language")
+			assert.Equal(t, "the rendered subject", sent.Subject, "the subject is the rendered email's")
+			assert.Equal(t, tc.renderLocale, renderLocale, "the email is rendered in the recipient's language")
 		})
 	}
 }
@@ -386,8 +389,8 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		emailSender := accounthandlersmocks.NewEmailSender(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(&bytes.Buffer{}, nil).Once()
+		pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.VerificationCode, mock.Anything).
+			Return(emailtemplate.Message{Subject: "Email verification", HTML: "<p>x</p>"}, nil).Once()
 		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return().Once()
 		database := datamocks.NewDatabase(t)
@@ -437,10 +440,10 @@ func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWri
 			issuedNotAfter = args.Get(6).(time.Time)
 		}).Return(true, nil).Once()
 	var mailedCode string
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, "/emails/email_verification.html", mock.Anything).
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.VerificationCode, mock.Anything).
 		Run(func(args mock.Arguments) {
-			mailedCode, _ = args.Get(3).(map[string]interface{})["verificationCode"].(string)
-		}).Return(&bytes.Buffer{}, nil).Once()
+			mailedCode = args.Get(2).(emailtemplate.Values).Code
+		}).Return(emailtemplate.Message{Subject: "Email verification", HTML: "<p>x</p>"}, nil).Once()
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return().Once()
 
@@ -661,8 +664,8 @@ func TestHandleAccountEmailVerificationSendPost_SendFailureNamesUserIdOnly(t *te
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
 	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), address,
 		mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-		"/emails/email_verification.html", mock.Anything).Return(&bytes.Buffer{}, nil)
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.VerificationCode, mock.Anything).
+		Return(emailtemplate.Message{Subject: "Email verification", HTML: "<p>x</p>"}, nil)
 	emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
 		Return(emaildelivery.SendResult{}, errs.New("the relay is unreachable"))
 

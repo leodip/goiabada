@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"bytes"
 	"database/sql"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -112,11 +112,10 @@ func TestHandleRegisterPost_WithVerificationADeadRowIsReplacedWithAFreshLink(t *
 		}).Return(true, nil).Once()
 	details, _ := captureRequestedRegistration(h.auditLogger, &order)
 
-	var mailBind map[string]interface{}
-	h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-		"/emails/email_register_activate.html", mock.Anything).
-		Run(func(args mock.Arguments) { mailBind = args.Get(3).(map[string]interface{}) }).
-		Return(bytes.NewBufferString("activation mail"), nil).Once()
+	var mailValues emailtemplate.Values
+	h.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.ActivationLink, mock.Anything).
+		Run(func(args mock.Arguments) { mailValues = args.Get(2).(emailtemplate.Values) }).
+		Return(emailtemplate.Message{Subject: "Activate your account", HTML: "activation mail"}, nil).Once()
 	var sent *emaildelivery.SendEmailInput
 	h.emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -143,7 +142,7 @@ func TestHandleRegisterPost_WithVerificationADeadRowIsReplacedWithAFreshLink(t *
 	}, *details)
 	assert.Equal(t, []string{"replace", "audit", "send"}, order,
 		"the record is written once the row is replaced, and before the mail is sent")
-	assert.Equal(t, testBaseURL+"/account/activate?code="+code, mailBind["link"])
+	assert.Equal(t, testBaseURL+"/account/activate?code="+code, mailValues.Link)
 	require.NotNil(t, sent)
 	assert.Equal(t, registerSomeoneEmail, sent.To)
 	h.database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)

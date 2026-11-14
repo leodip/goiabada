@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -330,15 +331,15 @@ func HandleSettingsEmailSendTestPost(
 		// in the default brand, as every email an administrator's action sends is, the request naming
 		// no client, and written in the language the administrator is answered in. It names the app,
 		// and the message's Date header says when it was sent.
-		buf, err := pageRenderer.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/email_test_email.html", map[string]interface{}{})
+		message, err := pageRenderer.RenderEmail(r, emailtemplate.TestEmail, emailtemplate.Values{})
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
 		input := &emaildelivery.SendEmailInput{
 			To:       req.To,
-			Subject:  i18n.T(r.Context(), "email.test_email.subject", map[string]any{"appName": settings.AppName}),
-			HtmlBody: buf.String(),
+			Subject:  message.Subject,
+			HtmlBody: message.HTML,
 		}
 		// A failure answers the fixed message of its kind and the error goes to the log: the error
 		// carries addresses, operating-system strings and the server's own replies, and anyone who
@@ -351,10 +352,14 @@ func HandleSettingsEmailSendTestPost(
 		}
 
 		// The recipient is typed, so it is normalized as stored addresses are before it is digested:
-		// the digest then matches every other entry about that address (#779 decision 1).
+		// the digest then matches every other entry about that address (#779 decision 1). The entry
+		// names the test email template and the language it was sent in, as a test of an email
+		// template from its editor does (#818 decision 13).
 		auditLogger.Log(r.Context(), audit.EventSentTestEmail, map[string]interface{}{
 			"logged_in_user": callerSubject(r),
 			"email_digest":   hashutil.HashString(strings.ToLower(strings.TrimSpace(req.To))),
+			"email_template": emailtemplate.TestEmail.ID,
+			"language":       emailtemplate.Language(i18n.LocaleTag(r.Context())),
 		})
 
 		// Whether the message went over TLS: STARTTLS if available sends in plaintext when the relay

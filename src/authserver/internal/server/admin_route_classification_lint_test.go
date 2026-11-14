@@ -189,6 +189,13 @@ var adminRouteClassification = map[string]adminRouteClass{
 	// Settings.
 	"PUT /api/v1/admin/settings/email":      appliesCeilings(adminCeilingSettings),
 	"PUT /api/v1/admin/settings/audit-logs": appliesCeilings(adminCeilingSettings),
+	// What an email says is reserved as where it goes is (#818 decision 9).
+	"PUT /api/v1/admin/email-templates/{email}/{language}":    appliesCeilings(adminCeilingSettings),
+	"DELETE /api/v1/admin/email-templates/{email}/{language}": appliesCeilings(adminCeilingSettings),
+	// Sending text nobody has saved to a typed address is reserved as a save is (#818 decision 12).
+	"POST /api/v1/admin/email-templates/{email}/{language}/send-test": appliesCeilings(adminCeilingSettings),
+	"POST /api/v1/admin/email-templates/{email}/{language}/preview": outsideCeilings("draws an email with sample " +
+		"values and stores and sends nothing"),
 	"POST /api/v1/admin/settings/email/send-test": outsideCeilings("sends one message through the stored SMTP " +
 		"settings and changes none of them"),
 	"PUT /api/v1/admin/settings/general": outsideCeilings("changes posture and gives the caller no authority it " +

@@ -351,6 +351,19 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/settings/email", adminsettingshandlers.HandleEmailPost(httpHelper, s.sessionStore, apiClient, s.settingsCache, baseURL))
 		r.Get("/settings/email/send-test-email", adminsettingshandlers.HandleEmailSendTestGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/settings/email/send-test-email", adminsettingshandlers.HandleEmailSendTestPost(httpHelper, s.sessionStore, apiClient, baseURL))
+		// Email templates (#818 decision 14): the list, and one email's editor in one language, which
+		// saves and resets that language.
+		r.Get("/settings/email/templates", adminsettingshandlers.HandleEmailTemplatesGet(httpHelper, apiClient))
+		r.Get("/settings/email/templates/{email}", adminsettingshandlers.HandleEmailTemplateOpenGet(httpHelper, apiClient, baseURL))
+		r.Get("/settings/email/templates/{email}/{language}", adminsettingshandlers.HandleEmailTemplateGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/settings/email/templates/{email}/{language}", adminsettingshandlers.HandleEmailTemplatePost(httpHelper, s.sessionStore, apiClient, baseURL))
+		r.Post("/settings/email/templates/{email}/{language}/reset", adminsettingshandlers.HandleEmailTemplateResetPost(httpHelper, s.sessionStore, apiClient, baseURL))
+		// The editor's live preview, its subject and plain-text part, then the email itself, which the
+		// one framed route answers under a policy of its own, and Send test email with the text in the
+		// form (#818 decisions 11 and 12).
+		r.Post("/settings/email/templates/{email}/{language}/preview", adminsettingshandlers.HandleEmailTemplatePreviewPost(httpHelper, apiClient))
+		r.Post("/settings/email/templates/{email}/{language}/preview-frame", adminsettingshandlers.HandleEmailTemplatePreviewFramePost(httpHelper, apiClient, s.assetOrigins()))
+		r.Post("/settings/email/templates/{email}/{language}/send-test", adminsettingshandlers.HandleEmailTemplateSendTestPost(httpHelper, apiClient))
 		r.Get("/settings/turnstile", adminsettingshandlers.HandleTurnstileGet(httpHelper, s.sessionStore, apiClient, s.cfg.AuthServer.BaseURL))
 		r.Post("/settings/turnstile", adminsettingshandlers.HandleTurnstilePost(httpHelper, s.sessionStore, apiClient, baseURL, s.cfg.AuthServer.BaseURL))
 		r.Get("/settings/audit-logs", adminsettingshandlers.HandleAuditLogsGet(httpHelper, s.sessionStore, apiClient))

@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -98,21 +99,31 @@ func stubOTPRemove(database *datamocks.Database, auditLogger *handlersmocks.Audi
 	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
 }
 
-// expectNotice registers the render of page and the send, capturing what each was handed.
+// renderedNotice fakes the renderer's answer to a notice: the subject the notice's definition gives in
+// the language the request carries, which only the right email and the right language give, and a
+// body.
+func renderedNotice(r *http.Request, email *emailtemplate.Email, _ emailtemplate.Values) emailtemplate.Message {
+	return emailtemplate.Message{
+		Subject: email.BuiltIn[emailtemplate.Language(i18n.LocaleTag(r.Context()))].Subject,
+		HTML:    "<p>rendered notice</p>",
+	}
+}
+
+// expectNotice registers the render of email and the send, capturing what each was handed.
 type capturedNotice struct {
 	renderLocale string
-	bound        map[string]interface{}
+	values       emailtemplate.Values
 	sent         *emaildelivery.SendEmailInput
 }
 
 func expectNotice(pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender,
-	page string) *capturedNotice {
+	email *emailtemplate.Email) *capturedNotice {
 	captured := &capturedNotice{}
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", page, mock.Anything).
+	pageRenderer.On("RenderEmail", mock.Anything, email, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured.renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
-			captured.bound = args.Get(3).(map[string]interface{})
-		}).Return(bytes.NewBufferString("<p>rendered notice</p>"), nil).Once()
+			captured.values = args.Get(2).(emailtemplate.Values)
+		}).Return(renderedNotice, nil).Once()
 	emailSender.On("SendEmail", mock.Anything,
 		emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 587, FromEmail: "noreply@example.com"},
 		mock.Anything).
@@ -160,19 +171,17 @@ func TestHandleAccountOTPPut_TellsTheUserTwoFactorWasSetUp(t *testing.T) {
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
 			require.Len(t, body.RecoveryCodes, 10)
 
-			captured := expectNotice(pageRenderer, emailSender, "/emails/email_otp_enabled.html")
+			captured := expectNotice(pageRenderer, emailSender, emailtemplate.OTPEnabled)
 			jobs.runAll(t, afterresponse.ClassSecurityNotice)
 
 			require.NotNil(t, captured.sent)
 			assert.Equal(t, otpNoticeAddress, captured.sent.To)
 			assert.Equal(t, tc.expectSubject, captured.sent.Subject)
 			assert.Equal(t, tc.locale, captured.renderLocale, "the notice is rendered in the user's language")
-			assert.Equal(t, "Carla Mendes", captured.bound["name"])
-			assert.NotContains(t, captured.bound, "link", "the notice carries no link")
-			for key, value := range captured.bound {
-				for _, code := range body.RecoveryCodes {
-					assert.NotContains(t, fmt.Sprint(value), code, "the notice carries no recovery code, found under %q", key)
-				}
+			assert.Equal(t, "Carla Mendes", captured.values.Name)
+			assert.Empty(t, captured.values.Link, "the notice carries no link")
+			for _, code := range body.RecoveryCodes {
+				assert.NotContains(t, fmt.Sprintf("%+v", captured.values), code, "the notice carries no recovery code")
 			}
 			assert.NotContains(t, captured.sent.Subject+captured.sent.HtmlBody, body.RecoveryCodes[0])
 		})
@@ -205,15 +214,15 @@ func TestHandleAccountOTPPut_TellsTheUserTwoFactorWasTurnedOff(t *testing.T) {
 
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 
-			captured := expectNotice(pageRenderer, emailSender, "/emails/email_otp_disabled.html")
+			captured := expectNotice(pageRenderer, emailSender, emailtemplate.OTPDisabled)
 			jobs.runAll(t, afterresponse.ClassSecurityNotice)
 
 			require.NotNil(t, captured.sent)
 			assert.Equal(t, otpNoticeAddress, captured.sent.To)
 			assert.Equal(t, tc.expectSubject, captured.sent.Subject)
 			assert.Equal(t, tc.locale, captured.renderLocale)
-			assert.Equal(t, "Carla Mendes", captured.bound["name"])
-			assert.NotContains(t, captured.bound, "link", "the notice carries no link")
+			assert.Equal(t, "Carla Mendes", captured.values.Name)
+			assert.Empty(t, captured.values.Link, "the notice carries no link")
 		})
 	}
 }
@@ -343,8 +352,8 @@ func TestHandleAccountOTPPut_AFailedNoticeIsOneErrorRecord(t *testing.T) {
 		withNoticeContext(accountOTPDisableRequest(t, otpNoticeSubject, otpNoticePassword), passwordNoticeSettings()))
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, "/emails/email_otp_disabled.html", mock.Anything).
-		Return(bytes.NewBufferString("<p>rendered notice</p>"), nil).Once()
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.OTPDisabled, mock.Anything).
+		Return(renderedNotice, nil).Once()
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, errors.New("relay refused")).Once()
 
 	capture := logtest.CaptureSlog(t)
@@ -404,17 +413,15 @@ func TestHandleUserOTPPut_TellsTheUserAnAdministratorTurnedItOff(t *testing.T) {
 
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 
-			captured := expectNotice(pageRenderer, emailSender, "/emails/email_otp_disabled_by_administrator.html")
+			captured := expectNotice(pageRenderer, emailSender, emailtemplate.OTPDisabledByAdministrator)
 			jobs.runAll(t, afterresponse.ClassSecurityNotice)
 
 			require.NotNil(t, captured.sent)
 			assert.Equal(t, otpNoticeAddress, captured.sent.To)
 			assert.Equal(t, tc.expectSubject, captured.sent.Subject)
 			assert.Equal(t, tc.locale, captured.renderLocale)
-			assert.Equal(t, "Carla Mendes", captured.bound["name"])
-			for key, value := range captured.bound {
-				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), adminSubject, "the notice doesn't name the administrator, found under %q", key)
-			}
+			assert.Equal(t, "Carla Mendes", captured.values.Name)
+			assert.NotContains(t, strings.ToLower(fmt.Sprintf("%+v", captured.values)), adminSubject, "the notice doesn't name the administrator")
 		})
 	}
 }

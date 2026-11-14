@@ -107,8 +107,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   labels and the two date formatters, are that console's, unexported in its `internal/render`: they
   read nothing here but `T` and `CatalogTag`, and here they put CLDR's display tables into the auth
   server. Both servers' `<html lang>` and those CLDR labels read `CatalogTag`, the catalog the page
-  was rendered from, and `LocaleTag`, the first preference asked for, is what an email's body copy
-  is chosen from (#645). `Raw` stays, because it reads the catalog state this package keeps private
+  was rendered from, and `LocaleTag`, the first preference asked for, is what an email's language
+  is chosen from (#645, #818). `Raw` stays, because it reads the catalog state this package keeps private
   (#442)
 - `inputvalidation/` - Identifier validation and the angle-bracket predicate, the two rules both
   applications apply, to text an administrator or a registering client supplies.
@@ -432,8 +432,9 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   email change's notice to the previous address and the security notices, such as a changed
   password. A handler calls `Send`, or `SendRecoveryCodeUsed` with the count of codes left, after
   its change commits; the notifier sends nothing with SMTP off or to an unverified address, hands
-  the rest to an after-response job of the notice's class, renders it in the recipient's language
-  with no link, and logs a failure as one Error record (#724, #737)
+  the rest to an after-response job of the notice's class, renders it from its built-in definition
+  in the recipient's language with no link, and logs a failure as one Error record (#724, #737,
+  #818)
 - `internal/emaillinks/` - The emailed-link round trip for password reset and activation: build the
   link, mark it followed, redeem it once. Beside `emaildelivery`, which sends it (#387)
 - `internal/legaldocuments/` - Which legal documents are in effect where: published, not retired, and
@@ -448,8 +449,14 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   (#781)
 - `internal/legalmarkdown/` - A legal document's Markdown rendered to HTML through goldmark, for the
   admin API's preview and the public pages alike: CommonMark and tables, raw HTML left out,
-  dangerous addresses dropped, images drawn as links. Its output is the auth server's one
-  `template.HTML` built from data, which its `trusted_html_lint_test.go` holds (#622 decision 4)
+  dangerous addresses dropped, images drawn as links. Its output is one of the auth server's two
+  `template.HTML` values built from data, which its `trusted_html_lint_test.go` holds (#622
+  decision 4)
+- `internal/emailtemplate/` - The emails as email templates: each email's built-in definition, its
+  placeholders and its text in the six built-in languages, and the email format, a small Markdown
+  set with `{{name}}` placeholders, which `Email.Check` checks and `Email.Render` draws in the
+  brand's look; the other of the two guarded `template.HTML` values. `render.Renderer.RenderEmail`
+  draws it inside the email layout (#818)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlmatch,uuid}/` - The authserver-only utilities
   #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and
   origin predicates, UUIDs (#360); `urlmatch` also holds the back-channel logout URI rule every intake

@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -381,12 +382,17 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 		locale        string
 		renderLocale  string
 		expectSubject string
+		noName        bool
+		expectName    string
 	}{
-		{"an English user", "", "en", "en", "Your email address was changed"},
-		{"a Brazilian Portuguese user", "", "pt-BR", "pt-BR", "Seu endereço de e-mail foi alterado"},
-		{"a user with no stored locale", "", "", "en", "Your email address was changed"},
-		{"a user who chose Portuguese, over a French locale", "pt-BR", "fr", "pt-BR", "Seu endereço de e-mail foi alterado"},
-		{"a user on Automatic, with a French locale", "", "fr", "fr", "Votre adresse e-mail a été modifiée"},
+		{"an English user", "", "en", "en", "Your email address was changed", false, "Ana Silva"},
+		{"a Brazilian Portuguese user", "", "pt-BR", "pt-BR", "Seu endereço de e-mail foi alterado", false, "Ana Silva"},
+		{"a user with no stored locale", "", "", "en", "Your email address was changed", false, "Ana Silva"},
+		{"a user who chose Portuguese, over a French locale", "pt-BR", "fr", "pt-BR", "Seu endereço de e-mail foi alterado", false, "Ana Silva"},
+		{"a user on Automatic, with a French locale", "", "fr", "fr", "Votre adresse e-mail a été modifiée", false, "Ana Silva"},
+		// {{name}} is never empty (#818 decision 15): a user with no name is greeted by the address
+		// the notice goes to, the previous one, so the new one is never shown.
+		{"a user with no name", "", "en", "en", "Your email address was changed", true, "old@example.com"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -396,6 +402,9 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 			jobs := &heldJobs{}
 			user := changingUser(t, tc.locale)
 			user.PageLanguage = tc.pageLanguage
+			if tc.noName {
+				user.GivenName, user.FamilyName = "", ""
+			}
 			stubSuccessfulChange(t, database, auditLogger, user)
 
 			rr := httptest.NewRecorder()
@@ -410,13 +419,12 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 			require.Equal(t, "new@example.com", resp.User.Email)
 
 			var renderLocale string
-			var bound map[string]interface{}
-			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_address_changed.html", mock.Anything).
+			var values emailtemplate.Values
+			pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.EmailAddressChanged, mock.Anything).
 				Run(func(args mock.Arguments) {
 					renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
-					bound = args.Get(3).(map[string]interface{})
-				}).Return(bytes.NewBufferString("<p>rendered notice</p>"), nil).Once()
+					values = args.Get(2).(emailtemplate.Values)
+				}).Return(renderedNotice, nil).Once()
 			var sendCtx context.Context
 			var sent *emaildelivery.SendEmailInput
 			emailSender.On("SendEmail", mock.Anything,
@@ -434,12 +442,9 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 			assert.Equal(t, tc.expectSubject, sent.Subject)
 			assert.Equal(t, "<p>rendered notice</p>", sent.HtmlBody)
 			assert.Equal(t, tc.renderLocale, renderLocale, "the notice is rendered in the user's locale")
-			assert.Equal(t, "Ana Silva", bound["name"])
-			assert.NotContains(t, bound, "link", "the notice carries no link")
-			for key, value := range bound {
-				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), "new@example.com",
-					"the notice must not name the new address, found under %q", key)
-			}
+			assert.Equal(t, tc.expectName, values.Name)
+			assert.Empty(t, values.Link, "the notice carries no link")
+			assert.NotContains(t, strings.ToLower(fmt.Sprintf("%+v", values)), "new@example.com", "the notice must not name the new address")
 			assert.Equal(t, accountEmailRequestId, requestid.FromContext(sendCtx),
 				"the job's records carry the request's id")
 		})
@@ -467,7 +472,7 @@ func TestHandleAccountEmailPut_SendsNoNoticeWithSMTPOff(t *testing.T) {
 }
 
 // TestHandleAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody is the notice's
-// bound under concurrency (#404). The write is conditional on the address and the verified flag
+// values under concurrency (#404). The write is conditional on the address and the verified flag
 // the request read, so of concurrent changes from one read only one matches the row. Each of the
 // others writes nothing, answers 409 CONCURRENT_UPDATE, audits nothing and queues no notice: with
 // an unconditional write every one of them notified the previous address, so one verification
@@ -495,7 +500,7 @@ func TestHandleAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody(t *
 	assert.Equal(t, 0, credentials.failures, "the password was right; losing the row is not a failure")
 }
 
-// TestHandleAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress is the notice's bound: an
+// TestHandleAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress is the notice's values: an
 // address the account never verified is told nothing, because a caller may set any address they
 // do not hold and change away from it again, which would otherwise mail that address once per
 // request. The change itself is saved and answered as any other.
@@ -544,11 +549,11 @@ func TestHandleAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse(t *tes
 			require.Equal(t, http.StatusOK, rr.Code, "the change is answered before the notice is attempted")
 
 			if tc.renderErr != nil {
-				pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, tc.renderErr).Once()
+				pageRenderer.On("RenderEmail", mock.Anything, mock.Anything, mock.Anything).
+					Return(emailtemplate.Message{}, tc.renderErr).Once()
 			} else {
-				pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(&bytes.Buffer{}, nil).Once()
+				pageRenderer.On("RenderEmail", mock.Anything, mock.Anything, mock.Anything).
+					Return(emailtemplate.Message{Subject: "s", HTML: "<p>x</p>"}, nil).Once()
 				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, tc.sendErr).Once()
 			}
 			jobs.runAll(t, afterresponse.ClassAccountNotice)

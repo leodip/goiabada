@@ -15,7 +15,7 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's shown at the top of the sign-in pages and ends their titles, as in "Sign in – Acme". It also signs every email, and it's the name authenticator apps list your users' accounts under.
 
-2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and a [custom palette](#custom-palettes) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card, and [custom CSS](#custom-css) for anything the other choices don't cover. The emails your users get are drawn in the brand too: see [Branded emails](#branded-emails).
+2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and a [custom palette](#custom-palettes) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card, and [custom CSS](#custom-css) for anything the other choices don't cover. The emails your users get are drawn in the brand too: see [Branded emails](#branded-emails). To change what they say, see [Email templates](#email-templates).
 
 3. To give one client a look of its own, click **New brand** and create one, then choose it under **Brand** on the client's **Settings** tab. See [Clients](/concepts/clients/#brand) for the pages it draws.
 
@@ -50,6 +50,8 @@ The pages come in English, Portuguese (Brazil), Spanish, French, Italian and Ger
 
 </Steps>
 
+A language you add doesn't reach the emails: they're written in the six built-in languages, and a user reading yours gets them in English. See [Email templates](#email-templates).
+
 ## Change a few words
 
 To reword a page in a language Goiabada already has, override only the keys you change, in the same folder:
@@ -60,9 +62,11 @@ To reword a page in a language Goiabada already has, override only the keys you 
 
 Every key you don't name keeps the built-in text. Set `GOIABADA_I18N_OVERRIDES_DIR` and restart, as in [Add a language](#add-a-language).
 
+The catalogs don't hold the emails' text. To reword an email, edit its [email template](#email-templates) in the admin console.
+
 ## Change the templates
 
-To change the layout of a page, or an email's body, you give a server its own copy of the templates. To restyle the pages, write a brand's [custom CSS](#custom-css) instead: it needs nothing redone when you upgrade. The templates and static files are compiled into each server's binary, and the images hold the binary alone, so there's no `web` folder inside a container to copy out.
+To change the layout of a page, or the frame drawn around every email, you give a server its own copy of the templates. To restyle the pages, write a brand's [custom CSS](#custom-css) instead: it needs nothing redone when you upgrade. To change what an email says, edit its [email template](#email-templates). The templates and static files are compiled into each server's binary, and the images hold the binary alone, so there's no `web` folder inside a container to copy out.
 
 <Steps>
 
@@ -566,11 +570,11 @@ For `ui_locales` and `Accept-Language`, the first of their languages Goiabada ha
 
 A value an admin console form won't take is refused by the auth server, in the console page's language, which is why both servers need your override catalogs.
 
-An email to a user is written in their page language. On **Automatic**, it's the **Language and region** on their profile, or English when they haven't picked one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
+An email to a user is written in their page language. On **Automatic**, it's the **Language and region** on their profile, or English when they haven't picked one. A regional language reads its language's email, so `fr-CA` gets the French one, and a language with no built-in emails gets the English one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
 
 ## Catalogs
 
-The text of every page, message and email subject is in the built-in catalogs. A key with no text in the chosen language shows in English.
+The text of every page and message is in the built-in catalogs. A key with no text in the chosen language shows in English. The emails' text isn't: see [Email templates](#email-templates).
 
 `GOIABADA_I18N_OVERRIDES_DIR` names a folder whose `catalogs` subfolder holds `active.<language>.toml` files. Nothing else in the folder is read: files put in the folder itself are ignored, and the server logs `override directory has no catalogs subdirectory, skipping it` when it starts. Each file is merged over the built-in catalog of its language, key by key, and the file wins. A value left empty removes the built-in text, so the key shows in English. Every value is a plain string: a `[table]` section stops the server at start.
 
@@ -578,13 +582,131 @@ The names of countries and phone country codes, and the country in each time zon
 
 The durations the admin console writes in words, under a duration field and in how long to wait before asking for another verification code, come from the browser's own CLDR data in the page's language, or in English where the browser has none, so they need no translating either.
 
-## Email bodies
+## Email templates
 
-An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.nl.html`, in your own [templates directory](#change-the-templates). A copy named for exactly the recipient's language wins. Otherwise the closest copy in their language does: `nl` serves a recipient reading `nl-BE`, and `pt-BR` serves one reading `pt`. A recipient with no copy in their language gets the English template.
+An email template is what one of the auth server's 19 emails says: its subject, its body and, for the four with a button, the button's label. Each comes in the six built-in languages, and you can reword any of them in the admin console. How an email looks is its brand's: see [Branded emails](#branded-emails).
 
-The test email from the **Send test email** tab under **Admin**, **Email** is `emails/email_test_email.html`, with its subject in `email.test_email.subject`. It's in the language the administrator reads the admin console in, and goes out in the default brand.
+<Steps>
 
-The password reset, the activation link, a new user's setup email and the welcome email each have a button above their link, labelled from the catalogs: `email.forgot_password.button`, `email.register_activate.button`, `email.newuser_set_password.button` and `email.register_confirmation.button`. A language you add needs these four keys too.
+1. Open **Admin**, **Email**, and the **Email templates** tab. The list shows every email, when it's sent, and which languages you've edited.
+
+2. Open an email. It opens in the language you read the admin console in, or in English. Choose another language above the form.
+
+3. Edit **Subject**, **Button label** and **Body**. The buttons under **Placeholders** insert one where the cursor is, and the body must hold the ones marked **required**.
+
+4. Check the **Preview** beside the form. It draws the email as it's sent, with sample values, and follows what you type. Choose a **Brand** to see it in another one.
+
+5. To see it in a mail client, type an address under **Send test email** and send it. It sends the text in the form, saved or not, and needs email to be set up under **Configuration**.
+
+6. Click **Save**. The next email sent in that language uses it.
+
+</Steps>
+
+**Reset to default** deletes your edit of the language you're on, after asking, and the email goes back to Goiabada's text. Each language is saved and reset on its own.
+
+Only the fields you change are kept. A field you leave as it was follows the built-in text when you upgrade, so a release that rewords a body still reaches your users when you've changed only the subject.
+
+An edit applies to every brand and every client. A language you [added](#add-a-language) gets the emails in English, since email templates exist in the six built-in languages only. The [templates directory](#change-the-templates) changes only the frame drawn around every email, `layouts/email_layout.html`, never what an email says.
+
+The test email from the **Send test email** tab under **Admin**, **Email** is the **Test email** template, in the language you read the admin console in, drawn in the default brand.
+
+### The body's format
+
+The body is written in a small set of Markdown:
+
+- A blank line starts a paragraph, and a single line break is kept.
+- `**bold**` and `*italic*`.
+- `[link text](https://example.com)`, drawn in the brand's color. A link leads to an `https:`, `http:`, `mailto:` or `tel:` address. Any other, such as `javascript:`, keeps its text and loses its address.
+- Lines starting with `-` for a bulleted list, or `1.` for a numbered one.
+
+Anything else, such as a heading, a quote, a table, code or HTML, is shown as you typed it, and no image is loaded.
+
+The subject is up to 200 characters, on one line, the button label up to 60 characters, and the body up to 20,000 characters. None of them can be empty. The subject and the button label are plain text, and the button label takes no placeholders.
+
+### Placeholders
+
+A placeholder is a name between double braces, such as `{{name}}`, and the email writes its value there. `{{ name }}`, with spaces, reads the same. To write two braces, type `\{{`. A value is always written as text, so a name that looks like Markdown or HTML shows as it is.
+
+| Placeholder | What it writes |
+|---|---|
+| `{{app_name}}` | The **App name** under **Admin**, **General**. |
+| `{{name}}` | The user's full name, or the address the email is sent to when they have none. |
+| `{{link}}` | The email's link. On its own, the address drawn as a link to itself. As the whole address of a link, `[Reset your password]({{link}})`, that link. |
+| `{{button}}` | The brand's button to the link, with the **Button label** on it. It goes on a line of its own. |
+| `{{code}}` | The verification code. Alone in its paragraph, it's drawn in a box. In a sentence or the subject, it's the code as text. |
+| `{{expiry}}` | How long the link or the code lasts, in the email's language, such as "5 minutes". |
+| `{{codes_left}}` | How many unused recovery codes are left, as a number. |
+
+A save is refused when the text breaks one of these rules:
+
+- An email takes only the placeholders it offers, listed below.
+- `{{link}}` and `{{button}}` go in the body only.
+- `{{link}}` can't be part of a longer address, which would hand the link to another site, and no other placeholder can be in a link's address.
+- The body must hold something to read besides the button.
+
+The plain-text part of an email leaves the button out, and some mail clients don't draw it. So `{{button}}` doesn't count as `{{link}}` in an email that requires the link.
+
+### Each email's placeholders
+
+| Email | Identifier | Placeholders | Required |
+|---|---|---|---|
+| Password reset link | `password_reset_link` | `{{app_name}}`, `{{name}}`, `{{link}}`, `{{button}}`, `{{expiry}}` | `{{link}}` |
+| Activation link | `activation_link` | `{{app_name}}`, `{{link}}`, `{{button}}`, `{{expiry}}` | `{{link}}` |
+| Welcome | `welcome` | `{{app_name}}`, `{{link}}`, `{{button}}` | None |
+| Address already has an account | `registration_existing_account` | `{{app_name}}`, `{{link}}` | None |
+| New user's setup | `new_user_setup` | `{{app_name}}`, `{{name}}`, `{{link}}`, `{{button}}`, `{{expiry}}` | `{{link}}` |
+| Verification code | `verification_code` | `{{app_name}}`, `{{name}}`, `{{code}}`, `{{link}}`, `{{expiry}}` | `{{code}}` |
+| Test email | `test` | `{{app_name}}` | None |
+| Email address changed | `email_address_changed` | `{{app_name}}`, `{{name}}` | None |
+| Password changed | `password_changed` | `{{app_name}}`, `{{name}}` | None |
+| Password changed by an administrator | `password_changed_by_administrator` | `{{app_name}}`, `{{name}}` | None |
+| Password reset | `password_reset` | `{{app_name}}`, `{{name}}` | None |
+| Two-factor authentication set up | `otp_enabled` | `{{app_name}}`, `{{name}}` | None |
+| Two-factor authentication turned off | `otp_disabled` | `{{app_name}}`, `{{name}}` | None |
+| Two-factor authentication turned off by an administrator | `otp_disabled_by_administrator` | `{{app_name}}`, `{{name}}` | None |
+| Authenticator disabled | `otp_lockout` | `{{app_name}}`, `{{name}}` | None |
+| Recovery code used | `recovery_code_used` | `{{app_name}}`, `{{name}}`, `{{codes_left}}` | None |
+| Recovery codes replaced | `recovery_codes_replaced` | `{{app_name}}`, `{{name}}` | None |
+| Account deleted | `account_deleted` | `{{app_name}}`, `{{name}}` | None |
+| Account deleted by an administrator | `account_deleted_by_administrator` | `{{app_name}}`, `{{name}}` | None |
+
+The **Email address changed** notice goes to the account's previous address, so its `{{name}}`, for a user with no name, is that address, never the new one.
+
+### When an upgrade breaks an edit
+
+A release can change what an email offers or requires, so an edit you saved can break a rule of a later one. Such an edit is never deleted, but while it's broken, the email is sent in that language with the built-in text, all of it, even when only one field breaks a rule.
+
+The **Email templates** list marks that language as needing attention, and its tab in the editor reads **Needs attention**. The editor opens with your edit in the form, a warning saying what's wrong, and that the built-in text is being sent. Correct it and click **Save**, or click **Reset to default**.
+
+The auth server also logs a warning for each broken edit when it starts, and each time it sends the built-in text in its place, naming the email and the language. After an upgrade, check the list or the log.
+
+### Email templates through the Admin API
+
+| Operation | Route | Scope |
+|---|---|---|
+| List every email, with each language's status | [`GET /api/v1/admin/email-templates`](/reference/api/admin/operations/getemailtemplates/) | `authserver:admin-read`, `authserver:manage-settings` or `authserver:manage` |
+| Read one email: its placeholders and, for each language, its built-in text, the editor's text and its status | [`GET /api/v1/admin/email-templates/{email}`](/reference/api/admin/operations/getemailtemplate/) | `authserver:admin-read`, `authserver:manage-settings` or `authserver:manage` |
+| Save one language | [`PUT /api/v1/admin/email-templates/{email}/{language}`](/reference/api/admin/operations/saveemailtemplate/) | `authserver:manage` |
+| Reset one language | [`DELETE /api/v1/admin/email-templates/{email}/{language}`](/reference/api/admin/operations/resetemailtemplate/) | `authserver:manage` |
+| Preview a text, saved or not, with sample values | [`POST /api/v1/admin/email-templates/{email}/{language}/preview`](/reference/api/admin/operations/previewemailtemplate/) | `authserver:admin-read`, `authserver:manage-settings` or `authserver:manage` |
+| Send a test of a text, saved or not | [`POST /api/v1/admin/email-templates/{email}/{language}/send-test`](/reference/api/admin/operations/sendemailtemplatetest/) | `authserver:manage` |
+
+`{email}` is the email's [identifier](#each-emails-placeholders), and `{language}` one of `en`, `de`, `es`, `fr`, `it` and `pt-BR`. Saving, resetting and sending a test need `authserver:manage`, since whoever writes an email can put a link of their own in the mail your administrators trust.
+
+A save sends the whole text of the language, with `buttonLabel` only for an email with a button:
+
+```bash
+curl -X PUT https://auth.example.com/api/v1/admin/email-templates/password_reset_link/en \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "Reset your {{app_name}} password",
+    "buttonLabel": "Choose a new password",
+    "body": "Hello {{name}},\n\n{{button}}\n\n{{link}}\n\nThe link expires in {{expiry}}."
+  }'
+```
+
+Each language has a status: `default` with no edit, `edited` when its edit is sent, and `invalid` when its edit [breaks a rule](#when-an-upgrade-breaks-an-edit) and the built-in text is sent instead, with the problems listed. A save that leaves an edit is recorded in the [audit log](/concepts/audit-log/) as `updated_email_template`, a reset or a save of the built-in text as `reset_email_template`, and a test as `sent_test_email`.
 
 ## Templates and static files
 

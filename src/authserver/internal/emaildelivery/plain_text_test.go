@@ -5,21 +5,21 @@ import (
 	"database/sql"
 	"errors"
 	"io"
-	"io/fs"
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
-	"path"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -220,6 +220,10 @@ func TestSendEmail_TheTextOfEachPartOfABody(t *testing.T) {
 		{"a link with no label", `<p><a href="https://x.example/"></a></p>`, "https://x.example/\n"},
 		{"a mail address", `<p><a href="mailto:help%2Bdesk@x.example">help+desk@x.example</a></p>`, "help+desk@x.example\n"},
 		{"a phone number", `<p><a href="tel:+44 20 7946 0958">+44 20 7946 0958</a></p>`, "+44 20 7946 0958\n"},
+		{"a mail address with a query", `<p><a href="mailto:help@x.example?subject=Hi"></a></p>`, "help@x.example\n"},
+		{"a mail link with no address", `<p>Write <a href="mailto:?subject=Hi"></a>to us</p>`, "Write to us\n"},
+		{"a phone link with no number", `<p>Call <a href="tel:"></a>us</p>`, "Call us\n"},
+		{"a mail address of only whitespace", `<p>Write <a href="mailto:%20%09">us</a></p>`, "Write us\n"},
 		{"an image", `<p>Before<img src="https://x.example/i.png" alt="An image">after</p>`, "Beforeafter\n"},
 		{"a script", "<p>Kept</p><script>dropped()</script>", "Kept\n"},
 		{"text outside a paragraph", "Hello <b>there</b>", "Hello there\n"},
@@ -233,7 +237,8 @@ func TestSendEmail_TheTextOfEachPartOfABody(t *testing.T) {
 
 // No email is sent without its text: a body with nothing to read is refused before the dial.
 func TestSendEmail_AnEmailWithNoTextIsNotSent(t *testing.T) {
-	for _, html := range []string{"", "<p> \n </p>", `<img src="https://x.example/i.png">`} {
+	for _, html := range []string{"", "<p> \n </p>", `<img src="https://x.example/i.png">`,
+		`<p><a href="mailto:"></a></p>`, `<p><a href="tel:%20?x=1"></a></p>`} {
 		t.Run(html, func(t *testing.T) {
 			f := &fakeSMTP{ext: []string{"8BITMIME"}}
 			port := f.start(t)
@@ -271,15 +276,16 @@ func (s brandStub) GetBrandAssetsByIds(context.Context, *sql.Tx, []int64) ([]rec
 // emailLink is the link every email is rendered with.
 const emailLink = "https://auth.example.com/reset-password?code=abc&email=ana%40example.com"
 
-// renderEmail renders the built-in English email body base through the email layout, for a brand
-// on Plum with a logo, and with footer links and a support contact when footer is set.
-func renderEmail(t *testing.T, base string, footer bool) string {
+// renderEmail renders the built-in email whose identifier is id, in English, from its definition
+// (#818) through the email layout, for a brand on Plum with a logo, and with footer links and a
+// support contact when footer is set.
+func renderEmail(t *testing.T, id string, footer bool) string {
 	t.Helper()
-	return renderEmailIn(t, base, "en", footer)
+	return renderEmailIn(t, id, "en", footer)
 }
 
-// renderEmailIn renders the built-in email body base written in lang, as renderEmail does.
-func renderEmailIn(t *testing.T, base, lang string, footer bool) string {
+// renderEmailIn renders the built-in email id written in lang, as renderEmail does.
+func renderEmailIn(t *testing.T, id, lang string, footer bool) string {
 	t.Helper()
 
 	brand := record.NewBrand("Shop", record.BrandAppearanceLight, "plum")
@@ -299,13 +305,19 @@ func renderEmailIn(t *testing.T, base, lang string, footer bool) string {
 	ctx := reqctx.WithSettings(context.Background(), &record.Settings{AppName: "Acme Portal"})
 	ctx = i18n.WithLocale(ctx, true, lang, "en")
 	req := httptest.NewRequest(http.MethodPost, "/", nil).WithContext(ctx)
-	buf, err := render.New(web.TemplateFS(), web.StaticFS(), brands).WithBaseURL("https://auth.example.com").RenderTemplateToBuffer(req,
-		"/layouts/email_layout.html", "/emails/"+base+".html", map[string]interface{}{
-			"name": "Ana", "link": emailLink, "verificationCode": "482915", "remaining": 3,
-		})
-	require.NoError(t, err)
-	require.Contains(t, buf.String(), "<img", "the email draws its brand's logo")
-	return buf.String()
+	renderer := render.New(web.TemplateFS(), web.StaticFS(), brands).WithBaseURL("https://auth.example.com")
+	for _, email := range emailtemplate.BuiltIns() {
+		if email.ID == id {
+			message, err := renderer.RenderEmail(req, email, emailtemplate.Values{
+				Name: "Ana", Link: emailLink, Code: "482915", Expiry: 5 * time.Minute, CodesLeft: 3,
+			})
+			require.NoError(t, err)
+			require.Contains(t, message.HTML, "<img", "the email draws its brand's logo")
+			return message.HTML
+		}
+	}
+	require.Failf(t, "no built-in definition", "there is no built-in email %q", id)
+	return ""
 }
 
 // A built-in action email, drawn with its button, its brand's logo and its footer, reads as its
@@ -317,6 +329,8 @@ You can reset your password by clicking the link below:
 
 https://auth.example.com/reset-password?code=abc&email=ana%40example.com
 
+The link expires in 5 minutes.
+
 If you have trouble clicking the link, you can copy and paste it into your web browser.
 
 In case you didn't request a password reset, kindly disregard this email.
@@ -327,11 +341,11 @@ Acme Portal
 Privacy <https://acme.example/privacy> · Status <https://status.acme.example/>
 
 Need help? help@acme.example · +442079460958 · Support page <https://acme.example/support>
-`, textOf(t, renderEmail(t, "email_forgot_password", true)))
+`, textOf(t, renderEmail(t, "password_reset_link", true)))
 }
 
-// The verification code is on a line of its own, and a brand with no footer adds nothing under the
-// body.
+// The verification code is on a line of its own, followed by how long it lasts, and a brand with no
+// footer adds nothing under the body.
 func TestSendEmail_TheTextOfTheVerificationEmail(t *testing.T) {
 	assert.Equal(t, `Hello Ana,
 
@@ -339,11 +353,13 @@ This is your email verification code:
 
 482915
 
+The code expires in 5 minutes.
+
 You can enter your code here: https://auth.example.com/reset-password?code=abc&email=ana%40example.com
 
 Best regards,
 Acme Portal
-`, textOf(t, renderEmail(t, "email_verification", false)))
+`, textOf(t, renderEmail(t, "verification_code", false)))
 }
 
 // logoSource is the logo an email draws.
@@ -352,18 +368,19 @@ var logoSource = regexp.MustCompile(`<img src="([^"]+)"`)
 // Every built-in email, in every language it is written in, is sent with its text: the link it
 // holds written once, the button left out, no logo, and the footer written out.
 func TestSendEmail_EveryBuiltInEmailIsSentWithItsText(t *testing.T) {
-	bodies, err := fs.Glob(web.TemplateFS(), "emails/*.html")
-	require.NoError(t, err)
-	require.NotEmpty(t, bodies)
-
-	for _, body := range bodies {
-		// email_x.html is English, email_x.<tag>.html is written in tag.
-		name := strings.TrimSuffix(path.Base(body), ".html")
-		base, lang, _ := strings.Cut(name, ".")
-		if lang == "" {
-			lang = "en"
+	// Each email is named by its identifier and the language it is written in, every built-in
+	// definition in each of the six languages.
+	type written struct{ base, lang string }
+	var emails []written
+	for _, email := range emailtemplate.BuiltIns() {
+		for _, lang := range emailtemplate.Languages {
+			emails = append(emails, written{email.ID, lang})
 		}
-		t.Run(name, func(t *testing.T) {
+	}
+
+	for _, email := range emails {
+		base, lang := email.base, email.lang
+		t.Run(base+"."+lang, func(t *testing.T) {
 			html := renderEmailIn(t, base, lang, true)
 			logo := logoSource.FindStringSubmatch(html)
 			require.Len(t, logo, 2)

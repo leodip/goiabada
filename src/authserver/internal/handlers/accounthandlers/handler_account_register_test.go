@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -24,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -812,8 +812,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		// Ensure that these methods were not called
 		emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
-		pageRenderer.AssertNotCalled(t, "RenderTemplateToBuffer",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		pageRenderer.AssertNotCalled(t, "RenderEmail", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("SMTP enabled but does not require email verification", func(t *testing.T) {
@@ -867,10 +866,9 @@ func TestHandleRegisterPost(t *testing.T) {
 			Run(func(args mock.Arguments) { createdDetails = args.Get(2).(map[string]interface{}) }).
 			Return().Once()
 
-		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_register_confirmation.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			link, ok := data["link"].(string)
-			return ok && link == testAdminConsoleBaseURL+"/account/profile"
-		})).Return(bytes.NewBuffer([]byte("email content")), nil)
+		pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.Welcome,
+			emailtemplate.Values{Link: testAdminConsoleBaseURL + "/account/profile"}).
+			Return(emailtemplate.Message{Subject: "Welcome!", HTML: "email content"}, nil)
 
 		emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 2525},
 			mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
@@ -913,20 +911,19 @@ func TestHandleRegisterPost(t *testing.T) {
 // is attached the way the request chain attaches it, so the page's matcher is the production one.
 func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		accept      string
-		uiLocales   string
-		spanish     bool
-		wantTag     string
-		wantSubject string
+		name      string
+		accept    string
+		uiLocales string
+		spanish   bool
+		wantTag   string
 	}{
 		{name: "the page's matched language, not the first Accept-Language tag alone",
-			accept: "nl-BE,nl;q=0.9,pt-BR;q=0.8", wantTag: "pt-BR", wantSubject: "Bem-vindo(a)!"},
+			accept: "nl-BE,nl;q=0.9,pt-BR;q=0.8", wantTag: "pt-BR"},
 		{name: "a cross-language guess gets English for both subject and body",
-			accept: "gl", spanish: true, wantTag: "en", wantSubject: "Welcome!"},
-		{name: "a Spanish recipient keeps the operator override", accept: "es-MX", spanish: true, wantTag: "es", wantSubject: spanishConfirmationSubject},
+			accept: "gl", spanish: true, wantTag: "en"},
+		{name: "a regional Spanish recipient, with an operator's Spanish catalog", accept: "es-MX", spanish: true, wantTag: "es"},
 		{name: "ui_locales, the ceremony's explicit intent, also follows the page",
-			uiLocales: "nl pt-BR", wantTag: "pt-BR", wantSubject: "Bem-vindo(a)!"},
+			uiLocales: "nl pt-BR", wantTag: "pt-BR"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.spanish {
@@ -981,10 +978,9 @@ func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 			auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
 
 			var mailReq *http.Request
-			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_register_confirmation.html", mock.Anything).
+			pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.Welcome, mock.Anything).
 				Run(func(args mock.Arguments) { mailReq = args.Get(0).(*http.Request) }).
-				Return(bytes.NewBufferString("email content"), nil)
+				Return(emailtemplate.Message{Subject: "the rendered subject", HTML: "email content"}, nil)
 			var sent *emaildelivery.SendEmailInput
 			emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 2525},
 				mock.Anything).
@@ -999,9 +995,9 @@ func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 			assert.Equal(t, http.StatusOK, rr.Code)
 			require.NotNil(t, mailReq)
 			assert.Equal(t, tc.wantTag, i18n.LocaleTag(mailReq.Context()),
-				"the mail is rendered in the page's language, which is also what picks its body copy")
+				"the mail is rendered in the page's language, which picks its text")
 			require.NotNil(t, sent)
-			assert.Equal(t, tc.wantSubject, sent.Subject)
+			assert.Equal(t, "the rendered subject", sent.Subject)
 		})
 	}
 }

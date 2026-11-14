@@ -89,6 +89,10 @@ Demonstrating Proof of Possession ([RFC 9449](https://www.rfc-editor.org/rfc/rfc
 
 A way for a client to register itself, by calling `/connect/register`, instead of an administrator creating it in the admin console. It's off until you turn it on. See [Let clients register themselves (DCR)](/guides/let-clients-register-themselves-dcr/).
 
+### Email template
+
+What one of the auth server's emails says: its subject, its body and, for an email with a button, its button label, in each of the six built-in languages. You edit it under **Admin**, **Email**, on the **Email templates** tab, in a small set of Markdown with placeholders such as `{{name}}`, and the email is drawn around it in its brand. See [Email templates](/guides/customize-and-translate-the-pages/#email-templates).
+
 ### Grant
 
 What one sign-in gives a client: its refresh token, every refresh token that one is rotated into, and every access token issued with them, which carry its identifier as `grant_id`. A password grant makes one too. Tokens from the client credentials flow and the implicit flow belong to no grant. Your app ends a grant by sending its refresh token, or an access token of it that hasn't expired, to [`/auth/revoke`](/reference/endpoints/revoke/). See [Refresh tokens](/concepts/refresh-tokens/#revoking-a-grant).

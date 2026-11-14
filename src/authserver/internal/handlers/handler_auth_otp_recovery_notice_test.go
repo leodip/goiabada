@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	accounthandlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
@@ -88,19 +88,29 @@ func stubAcceptedRecoveryCode(database *datamocks.Database, auditLogger *handler
 // capturedSignInNotice is what one notice's render and send were handed.
 type capturedSignInNotice struct {
 	renderLocale string
-	bound        map[string]interface{}
+	values       emailtemplate.Values
 	sent         *emaildelivery.SendEmailInput
 }
 
-// expectSignInNotice registers the render of page and the send, capturing what each was handed.
+// renderedNotice fakes the renderer's answer to a notice: the subject the notice's definition gives in
+// the language the request carries, which only the right email and the right language give, and a
+// body.
+func renderedNotice(r *http.Request, email *emailtemplate.Email, _ emailtemplate.Values) emailtemplate.Message {
+	return emailtemplate.Message{
+		Subject: email.BuiltIn[emailtemplate.Language(i18n.LocaleTag(r.Context()))].Subject,
+		HTML:    "<p>rendered notice</p>",
+	}
+}
+
+// expectSignInNotice registers the render of email and the send, capturing what each was handed.
 func expectSignInNotice(pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender,
-	page string) *capturedSignInNotice {
+	email *emailtemplate.Email) *capturedSignInNotice {
 	captured := &capturedSignInNotice{}
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", page, mock.Anything).
+	pageRenderer.On("RenderEmail", mock.Anything, email, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured.renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
-			captured.bound = args.Get(3).(map[string]interface{})
-		}).Return(bytes.NewBufferString("<p>rendered notice</p>"), nil).Once()
+			captured.values = args.Get(2).(emailtemplate.Values)
+		}).Return(renderedNotice, nil).Once()
 	emailSender.On("SendEmail", mock.Anything,
 		emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 587, FromEmail: "noreply@example.com"},
 		mock.Anything).
@@ -160,20 +170,17 @@ func TestHandleAuthOtpPost_TellsTheUserARecoveryCodeSignedIn(t *testing.T) {
 			require.Len(t, jobs.jobs, 1, "the step hands off exactly one notice")
 			assert.Equal(t, afterresponse.ClassSecurityNotice, jobs.classes[0])
 
-			captured := expectSignInNotice(pageRenderer, emailSender, "/emails/email_recovery_code_used.html")
+			captured := expectSignInNotice(pageRenderer, emailSender, emailtemplate.RecoveryCodeUsed)
 			jobs.jobs[0](jobs.ctxs[0])
 
 			require.NotNil(t, captured.sent)
 			assert.Equal(t, signInNoticeAddress, captured.sent.To)
 			assert.Equal(t, tc.expectSubject, captured.sent.Subject)
 			assert.Equal(t, tc.locale, captured.renderLocale, "the notice is rendered in the user's language")
-			assert.Equal(t, "Joana Reis", captured.bound["name"])
-			assert.Equal(t, tc.remaining, captured.bound["remaining"], "the notice says how many unused codes are left")
-			assert.NotContains(t, captured.bound, "link", "the notice carries no link")
-			for key, value := range captured.bound {
-				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), recoveryCodeNormalized[:8],
-					"the notice carries no recovery code, found under %q", key)
-			}
+			assert.Equal(t, "Joana Reis", captured.values.Name)
+			assert.Equal(t, tc.remaining, captured.values.CodesLeft, "the notice says how many unused codes are left")
+			assert.Empty(t, captured.values.Link, "the notice carries no link")
+			assert.NotContains(t, strings.ToLower(fmt.Sprintf("%+v", captured.values)), recoveryCodeNormalized[:8], "the notice carries no recovery code")
 		})
 	}
 }
@@ -351,15 +358,15 @@ func TestHandleAuthOtpPost_TellsTheUserTheRefusalThatDisabledTheirAuthenticator(
 			require.Len(t, jobs.jobs, 1, "the step hands off exactly one notice")
 			assert.Equal(t, afterresponse.ClassSecurityNotice, jobs.classes[0])
 
-			captured := expectSignInNotice(pageRenderer, emailSender, "/emails/email_otp_lockout.html")
+			captured := expectSignInNotice(pageRenderer, emailSender, emailtemplate.OTPLockout)
 			jobs.jobs[0](jobs.ctxs[0])
 
 			require.NotNil(t, captured.sent)
 			assert.Equal(t, signInNoticeAddress, captured.sent.To)
 			assert.Equal(t, tc.expectSubject, captured.sent.Subject)
 			assert.Equal(t, tc.locale, captured.renderLocale, "the notice is rendered in the user's language")
-			assert.Equal(t, "Joana Reis", captured.bound["name"])
-			assert.NotContains(t, captured.bound, "link", "the notice carries no link")
+			assert.Equal(t, "Joana Reis", captured.values.Name)
+			assert.Empty(t, captured.values.Link, "the notice carries no link")
 		})
 	}
 }
@@ -462,8 +469,8 @@ func TestHandleAuthOtpPost_AFailedLockoutNoticeIsOneErrorRecord(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 	require.Len(t, jobs.jobs, 1)
 
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, "/emails/email_otp_lockout.html", mock.Anything).
-		Return(bytes.NewBufferString("<p>rendered notice</p>"), nil).Once()
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.OTPLockout, mock.Anything).
+		Return(renderedNotice, nil).Once()
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, errors.New("relay refused")).Once()
 
 	capture := logtest.CaptureSlog(t)

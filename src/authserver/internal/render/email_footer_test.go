@@ -2,6 +2,10 @@ package render
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -232,6 +237,58 @@ func TestRender_AnEmailsFooterIsInTheEmailsLanguage(t *testing.T) {
 	}
 }
 
+// installFooterOverrideCatalogs installs, until the test ends, an operator's two catalogs rewording
+// the footer: nl, a language Goiabada has no emails in, and fr-CA, a regional variant of French.
+func installFooterOverrideCatalogs(t *testing.T) {
+	t.Helper()
+	overrides := t.TempDir()
+	catalogs := filepath.Join(overrides, "catalogs")
+	require.NoError(t, os.Mkdir(catalogs, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(catalogs, "active.nl.toml"),
+		[]byte("\"common.footer.need_help\" = \"Hulp nodig?\"\n\"common.footer.support_page\" = \"Ondersteuningspagina\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(catalogs, "active.fr-CA.toml"),
+		[]byte("\"common.footer.need_help\" = \"Besoin de soutien ?\"\n\"common.footer.support_page\" = \"Centre de soutien\"\n"), 0o600))
+	require.NoError(t, i18n.LoadBundle(overrides))
+	t.Cleanup(func() { require.NoError(t, i18n.LoadBundle("")) })
+}
+
+// A recipient reading a language an operator added through an override catalog gets the English
+// email, and its footer is English too, as its lang attribute says: the brand's fallback labels and
+// "Need help?" and "Support page", never the added catalog's words or a label for that language.
+func TestRender_AnEmailToAReaderOfAnAddedLanguageIsEnglishFooterIncluded(t *testing.T) {
+	installFooterOverrideCatalogs(t)
+
+	links := record.BrandFooterLinks{{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"nl": "Privacybeleid"}}}
+	brands := &defaultBrandStub{brand: footerBrand(links, "", "https://acme.example/support", "")}
+	ctx := i18n.WithRecipientLanguage(context.Background(), "nl", "")
+
+	html := renderFooterEmail(t, ctx, brands)
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	require.NoError(t, err)
+	lang, _ := doc.Find("html").Attr("lang")
+	require.Equal(t, "en", lang)
+	footer := readEmailFooter(t, html)
+	assert.Equal(t, []string{"Privacy"}, footerLinkTexts(footer.links))
+	assert.Equal(t, "Need help? Support page", footer.contactText)
+}
+
+// A recipient whose catalog is a regional variant of the email's language keeps it: an email in
+// French to a reader of fr-CA draws the operator's fr-CA wording of "Need help?" and "Support page".
+func TestRender_AnEmailToAReaderOfARegionalVariantKeepsItsFooterWording(t *testing.T) {
+	installFooterOverrideCatalogs(t)
+	brands := &defaultBrandStub{brand: footerBrand(nil, "", "https://acme.example/support", "")}
+	ctx := i18n.WithRecipientLanguage(context.Background(), "fr-CA", "")
+
+	html := renderFooterEmail(t, ctx, brands)
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	require.NoError(t, err)
+	lang, _ := doc.Find("html").Attr("lang")
+	require.Equal(t, "fr", lang)
+	assert.Equal(t, "Besoin de soutien ? Centre de soutien", readEmailFooter(t, html).contactText)
+}
+
 // The address is the "to" of its mailto: link, percent-encoded where RFC 6068 section 2 says it
 // must be, and shown as stored; and every value is drawn as text: a label and an address holding
 // markup characters are escaped, and a stored URL that is not one a page may link is not linked.
@@ -256,4 +313,47 @@ func TestRender_AnEmailsFooterEscapesEveryValue(t *testing.T) {
 	assert.Equal(t, "mailto:50%2541off@acme.example", footer.contact[0].Href)
 	assert.Equal(t, "50%41off@acme.example", footer.contact[0].Text)
 	assert.Equal(t, "+1<script>", footer.contact[1].Text)
+}
+
+// The preview and the test send of an email template draw the email in the language being edited
+// (#818 decisions 11 and 12), its footer included: the brand's link labels and "Need help?" and
+// "Support page" in that language, as the real email in it reads, whatever language the
+// administrator asking reads the console in, a page language of their own included. The brand is
+// the default one, or the one chosen.
+func TestRender_AnEmailSampleDrawsItsFooterInTheLanguageEdited(t *testing.T) {
+	brand := footerBrand(threeLinks, "help@acme.example", "https://acme.example/support", "")
+	for _, tc := range []struct {
+		name   string
+		caller func(context.Context) context.Context
+		chosen *record.Brand
+	}{
+		{"a caller reading English, the default brand", func(ctx context.Context) context.Context {
+			return i18n.WithLocale(ctx, true, "en")
+		}, nil},
+		{"a caller with a page language of their own, the brand chosen", func(ctx context.Context) context.Context {
+			return i18n.WithPageLanguage(i18n.WithLocale(ctx, true, "fr"), "pt-BR")
+		}, brand},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tc.caller(reqctx.WithSettings(context.Background(), &record.Settings{AppName: "Acme Portal"}))
+			req := httptest.NewRequest(http.MethodPost, "/", nil).WithContext(ctx)
+			r := New(web.TemplateFS(), web.StaticFS(), &defaultBrandStub{brand: brand}).WithBaseURL(emailBaseURL)
+
+			message, err := r.RenderEmailSample(req, emailtemplate.PasswordResetLink, "de",
+				emailtemplate.PasswordResetLink.BuiltIn["de"], definitionValues, tc.chosen)
+			require.NoError(t, err)
+
+			footer := readEmailFooter(t, message.HTML)
+			assert.Equal(t, []string{"Datenschutz", "Status", "Acme"}, footerLinkTexts(footer.links))
+			assert.Equal(t, "Brauchen Sie Hilfe? help@acme.example Supportseite", footer.contactText)
+		})
+	}
+}
+
+func footerLinkTexts(links []emailFooterLink) []string {
+	texts := make([]string, len(links))
+	for i, link := range links {
+		texts[i] = link.Text
+	}
+	return texts
 }

@@ -20,7 +20,6 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/requestid"
 	"github.com/leodip/goiabada/core/stylingcontract"
-	"golang.org/x/text/language"
 )
 
 // Renderer renders pages from the template file system it was built over, and writes JSON.
@@ -29,6 +28,7 @@ type Renderer struct {
 	assets     *assetFingerprints
 	brands     PageBrandReader
 	baseURL    string
+	edits      EmailTemplateReader
 }
 
 // New returns a Renderer over templateFS, which holds the layouts and pages, and staticFS, the
@@ -181,57 +181,22 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 	templateName = strings.TrimPrefix(templateName, "/")
 	layoutName = strings.TrimPrefix(layoutName, "/")
 
-	// Per-locale email template lookup. For emails (templateName under
-	// "emails/"), a copy for exactly the recipient's tag still wins first,
-	// and when there is none the locale is matched against the languages a
-	// copy of this email exists in, not taken literally, with the English
-	// fallback the senders give the subject (i18n.WithRecipientLanguage for
-	// an email to a user, the registration page's language for one to an
-	// address with no account). A regional variant
-	// then falls back to its base language (es-MX renders the .es copy, the
-	// subject renders from the es catalog), and a locale no copy shares a
-	// language with keeps <name>.html, the English baseline. The default
-	// locale "en" is always served by the base file (#531).
-	//
-	// The layout marks the email with the language of the copy chosen, which
-	// is the body's, not the recipient's locale (#645 decision 10).
-	if strings.HasPrefix(templateName, "emails/") {
-		requested := templateName
-		locale := i18n.LocaleTag(r.Context())
-		if locale != "" && locale != "en" {
-			ext := filepath.Ext(templateName)
-			base := strings.TrimSuffix(templateName, ext)
-			candidate := base + "." + locale + ext
-			if _, err := fs.Stat(h.templateFS, candidate); err == nil {
-				templateName = candidate
-			} else {
-				templateName = localizedEmailTemplate(h.templateFS, templateName, locale)
-			}
-		}
-		data["emailLang"] = emailCopyLang(requested, templateName)
-		// An email is drawn in the brand of the page it was sent from, as RequestPageBrand reads it
-		// from the request it is rendered with, and the email layout writes emailFrame's values
-		// inline, since an email links no stylesheet (#817 decision 1). It is bound none of a page's
-		// brand values, so an email layout copied from an older release draws as before.
-		data["emailFrame"] = emailFrameOf(r.Context(), settings.AppName, RequestPageBrand(r.Context(), h.brands), h.baseURL)
-	} else {
-		// A page is drawn in its brand: the layouts write brandDataTheme on the html element
-		// and link brandStylesheet after main.css, draw brandLogo and brandDarkLogo above the app
-		// name on the card, or in its place while brandHideAppName, and link brandFavicon in place
-		// of Goiabada's icons (#813 decisions 4 and 5), and draw brandFooter under the card, bound
-		// only for a brand with links or a contact (#814). ui_theme is no longer bound, so a layout
-		// copied from an older release, which reads it, draws every page automatic in the built-in
-		// colors.
-		brand := RequestPageBrand(r.Context(), h.brands)
-		data["brandDataTheme"] = brand.DataTheme
-		data["brandStylesheet"] = brand.Stylesheet
-		data["brandLogo"] = brand.Logo
-		data["brandDarkLogo"] = brand.DarkLogo
-		data["brandHideAppName"] = brand.HideAppName
-		data["brandFavicon"] = brand.Favicon
-		if footer := FooterOf(r.Context(), brand); footer != nil {
-			data["brandFooter"] = footer
-		}
+	// A page is drawn in its brand: the layouts write brandDataTheme on the html element
+	// and link brandStylesheet after main.css, draw brandLogo and brandDarkLogo above the app
+	// name on the card, or in its place while brandHideAppName, and link brandFavicon in place
+	// of Goiabada's icons (#813 decisions 4 and 5), and draw brandFooter under the card, bound
+	// only for a brand with links or a contact (#814). ui_theme is no longer bound, so a layout
+	// copied from an older release, which reads it, draws every page automatic in the built-in
+	// colors.
+	brand := RequestPageBrand(r.Context(), h.brands)
+	data["brandDataTheme"] = brand.DataTheme
+	data["brandStylesheet"] = brand.Stylesheet
+	data["brandLogo"] = brand.Logo
+	data["brandDarkLogo"] = brand.DarkLogo
+	data["brandHideAppName"] = brand.HideAppName
+	data["brandFavicon"] = brand.Favicon
+	if footer := FooterOf(r.Context(), brand); footer != nil {
+		data["brandFooter"] = footer
 	}
 
 	templateFiles := []string{
@@ -252,8 +217,8 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		return nil, errs.Wrap(err, "unable to render template")
 	}
 	// Both layouts write dataPage on <body>, the value the page names in its data-page template,
-	// so custom CSS can aim a rule at one page (#816 decision 7). A page that names none, such as an
-	// email or a template copied from an older release, carries no data-page.
+	// so custom CSS can aim a rule at one page (#816 decision 7). A page that names none, such as a
+	// template copied from an older release, carries no data-page.
 	if page := stylingcontract.PageName(templ); page != "" {
 		data["dataPage"] = page
 	}
@@ -263,91 +228,6 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		return nil, errs.Wrap(err, "unable to execute template")
 	}
 	return &buf, nil
-}
-
-// localizedEmailTemplate answers the name of the email template copy to render
-// for a recipient reading locale, or templateName itself when the English base
-// template is the right body. It is consulted only when no copy named for
-// exactly the locale exists, which the caller's own lookup settles.
-//
-// The choice mirrors how the catalog matcher resolves the subject
-// (core/i18n localizerFor): the languages a copy of this email exists in are
-// the available languages, English first because the base file renders it, and
-// the locale is matched followed by English, the fallback the stored-locale
-// senders attach beside it. A base-language copy serves a regional variant of
-// that language. Without the fallback the matcher answers a guess in another
-// language or script (an sr copy for ru, zh for zh-TW, a stray note.bak.html,
-// Bashkir, for ru) where the subject's English fallback wins; with it, a locale
-// no copy shares a language with resolves to English - the base file. The
-// returned name always maps back to a file the directory actually holds, via
-// the index the matcher answers rather than the tag it prints, because a
-// matched tag can come back region-extended (es-MX matched against es answers
-// "es-u-rg-mxzzzz") (#531).
-func localizedEmailTemplate(templateFS fs.FS, templateName, locale string) string {
-	ext := filepath.Ext(templateName)
-	base := strings.TrimSuffix(templateName, ext)
-	fileName := filepath.Base(templateName)
-	stem := strings.TrimSuffix(fileName, ext)
-
-	// suffixes[i] is the filename piece between the stem and the extension of
-	// the copy whose language tag is tags[i]; the empty suffix at index 0 is
-	// the English base file, the matcher's no-match answer.
-	suffixes := []string{""}
-	tags := []language.Tag{language.English}
-
-	entries, err := fs.ReadDir(templateFS, filepath.Dir(templateName))
-	if err != nil {
-		return templateName
-	}
-	seen := map[language.Tag]bool{language.English: true}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if name == fileName || !strings.HasPrefix(name, stem+".") || !strings.HasSuffix(name, ext) {
-			continue
-		}
-		suffix := strings.TrimSuffix(strings.TrimPrefix(name, stem+"."), ext)
-		tag, parseErr := language.Parse(suffix)
-		// A suffix that is not a well-formed language tag, or a second copy of
-		// a language already listed, is not a choice this email offers.
-		if parseErr != nil || seen[tag] {
-			continue
-		}
-		seen[tag] = true
-		suffixes = append(suffixes, suffix)
-		tags = append(tags, tag)
-	}
-
-	// The catalog side parses the same string with ParseAcceptLanguage, so a
-	// locale it would reject leaves the base template here too.
-	parsed, _, err := language.ParseAcceptLanguage(locale)
-	if err != nil || len(parsed) == 0 {
-		return templateName
-	}
-	_, idx, _ := language.NewMatcher(tags).Match(append(parsed, language.English)...)
-	if suffixes[idx] == "" {
-		return templateName
-	}
-	return base + "." + suffixes[idx] + ext
-}
-
-// emailCopyLang answers the language the chosen copy of an email is written in:
-// English for the base file, and for a copy <name>.<tag>.html its own tag,
-// written as BCP 47 spells it, so an operator's .es copy is es and the .pt-BR
-// copy pt-BR. A suffix that does not parse is written as it stands, being
-// the only name the copy has for its language.
-func emailCopyLang(requested, chosen string) string {
-	if chosen == requested {
-		return "en"
-	}
-	ext := filepath.Ext(requested)
-	suffix := strings.TrimSuffix(strings.TrimPrefix(chosen, strings.TrimSuffix(requested, ext)+"."), ext)
-	if tag, err := language.Parse(suffix); err == nil {
-		return tag.String()
-	}
-	return suffix
 }
 
 func (h *Renderer) JSONError(w http.ResponseWriter, r *http.Request, err error) {

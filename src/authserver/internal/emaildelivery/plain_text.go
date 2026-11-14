@@ -14,7 +14,7 @@ import (
 // it once (#817 decision 10).
 const emailButtonAttr = "data-email-button"
 
-// plainText works out the plain-text part of an email from the HTML it is sent as (#817 decision
+// PlainText works out the plain-text part of an email from the HTML it is sent as (#817 decision
 // 10): the body, which is the <main> element or, with none, the whole <body>, then each <footer>
 // outside it. A block is a paragraph, a blank line between two, and a <br> breaks a line; bold and
 // other inline elements are plain words. A link is its URL, or its label then its URL in angle
@@ -22,7 +22,10 @@ const emailButtonAttr = "data-email-button"
 // the head, scripts and the button are left out, and with them the logo and the app name above the
 // body, which are outside <main>. An email with no text to read is an error: none is sent without
 // its text.
-func plainText(source string) (string, error) {
+//
+// The sender sends it beside the HTML, and an email template's preview answers it (#818 decision 11),
+// so the preview's plain text is the one a recipient gets.
+func PlainText(source string) (string, error) {
 	doc, err := html.Parse(strings.NewReader(source))
 	if err != nil {
 		return "", errs.Wrap(err, "unable to read the email's HTML")
@@ -185,6 +188,8 @@ func (w *textWriter) link(n *html.Node) {
 			if unescaped, err := url.PathUnescape(target); err == nil {
 				target = unescaped
 			}
+			// An address or number of only whitespace is none.
+			target = strings.TrimSpace(target)
 		}
 	}
 

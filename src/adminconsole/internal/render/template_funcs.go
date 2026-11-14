@@ -254,18 +254,10 @@ var templateFuncMap = template.FuncMap{
 	"isAdminBrandingPage": func(urlPath string) bool {
 		return inSection(urlPath, "/admin/settings/branding")
 	},
+	// The Email entry is current on its three tabs and on an email template's editor (#818 decision
+	// 14).
 	"isAdminSettingsEmailPage": func(urlPath string) bool {
-		if urlPath == "/admin/settings" {
-			return true
-		}
-
-		if strings.HasPrefix(urlPath, "/admin/settings/") {
-			if strings.HasSuffix(urlPath, "/email") ||
-				strings.HasSuffix(urlPath, "/email/send-test-email") {
-				return true
-			}
-		}
-		return false
+		return urlPath == "/admin/settings" || inSection(urlPath, "/admin/settings/email")
 	},
 }
 

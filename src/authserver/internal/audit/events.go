@@ -228,11 +228,19 @@ const (
 	// default brand (#812 decision 3); no event is written for each client it moved.
 	// uploaded_brand_asset is an asset stored by an upload (#813 decision 10), with brand_asset_id,
 	// kind and logged_in_user and no brand: the brand write that names the asset is its own event.
-	EventCreatedBrand                 = "created_brand"
-	EventUpdatedBrand                 = "updated_brand"
-	EventDeletedBrand                 = "deleted_brand"
-	EventUpdatedDefaultBrand          = "updated_default_brand"
-	EventUploadedBrandAsset           = "uploaded_brand_asset"
+	EventCreatedBrand        = "created_brand"
+	EventUpdatedBrand        = "updated_brand"
+	EventDeletedBrand        = "deleted_brand"
+	EventUpdatedDefaultBrand = "updated_default_brand"
+	EventUploadedBrandAsset  = "uploaded_brand_asset"
+	// The email templates (#818 decision 13), written by the admin API after each committed change,
+	// every row with email_template (the email's identifier), language and logged_in_user, and never
+	// a subject, a body or a label. updated_email_template is a save that leaves an edit stored, and
+	// adds edited_fields, which of subject, button_label and body the edit now holds.
+	// reset_email_template is an edit removed, by a reset or by a save whose text is the built-in
+	// one; a reset where there was no edit writes none.
+	EventUpdatedEmailTemplate         = "updated_email_template"
+	EventResetEmailTemplate           = "reset_email_template"
 	EventUpdatedAuditLogsSettings     = "updated_audit_logs_settings"
 	EventUpdatedWebOrigins            = "updated_web_origins"
 	EventUpdatedClientSettings        = "updated_client_settings"
@@ -488,8 +496,11 @@ const (
 	// set no longer exists, so it is a wrong code (#257 decision 10).
 	EventRecoveryCodeReplayDetected = "recovery_code_replay_detected"
 
-	EventEnabledOTP                     = "enabled_otp"
-	EventDisabledOTP                    = "disabled_otp"
+	EventEnabledOTP  = "enabled_otp"
+	EventDisabledOTP = "disabled_otp"
+	// EventSentTestEmail records a test email the mail server accepted, from the SMTP settings or
+	// from an email template's editor, with logged_in_user, email_digest, and email_template and
+	// language: test and the language it was sent in for the SMTP settings' (#818 decision 13).
 	EventSentTestEmail                  = "sent_test_email"
 	EventUpdatedUserProfilePicture      = "updated_user_profile_picture"
 	EventDeletedUserProfilePicture      = "deleted_user_profile_picture"
@@ -793,6 +804,7 @@ var auditEventTypes = []string{
 	EventRefreshTokenReplayDetected,
 	EventRequestedPasswordReset,
 	EventRequestedRegistration,
+	EventResetEmailTemplate,
 	EventRestoredLegalDocument,
 	EventRetiredLegalDocument,
 	EventRevokedAccessToken,
@@ -830,6 +842,7 @@ var auditEventTypes = []string{
 	EventUpdatedClientSettings,
 	EventUpdatedClientTokens,
 	EventUpdatedDefaultBrand,
+	EventUpdatedEmailTemplate,
 	EventUpdatedGeneralSettings,
 	EventUpdatedGroup,
 	EventUpdatedGroupAttribute,

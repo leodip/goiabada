@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
@@ -22,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
@@ -269,19 +269,18 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// The job renders the mail in the recipient's language (i18n.WithRecipientLanguage), so
 		// the request it renders with is not the handler's. mock.Anything keeps the expectation
 		// focused on the layout / template / bind args.
-		var emailedLink string
-		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).
+		var emailed emailtemplate.Values
+		pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordResetLink, mock.Anything).
 			Run(func(args mock.Arguments) {
-				emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
-			}).Return(&bytes.Buffer{}, nil)
+				emailed = args.Get(2).(emailtemplate.Values)
+			}).Return(emailtemplate.Message{Subject: "the rendered subject", HTML: "<p>the rendered email</p>"}, nil)
 
 		// The relay is the request's settings, which is the whole of what the handler now reads
-		// for the send (#433).
+		// for the send (#433), and the message is the one rendered.
 		emailSender.On("SendEmail", mock.Anything,
 			emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 587, FromEmail: "noreply@example.com"},
-			mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
-				return input.To == "existing@example.com" && input.Subject == "Password reset"
-			})).Return(emaildelivery.SendResult{}, nil)
+			&emaildelivery.SendEmailInput{To: "existing@example.com", Subject: "the rendered subject", HtmlBody: "<p>the rendered email</p>"}).
+			Return(emaildelivery.SendResult{}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["outcome"] == "code_issued" && details["user_id"] == int64(1)
@@ -306,8 +305,11 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// shape and the absence of an address in it belong to emaillinks.ResetPasswordLink's own tests
 		// (#112 decision 5). Asserting the exact string here would pin the shape in a
 		// second place and let the two disagree.
-		assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode, ""), emailedLink,
+		assert.Equal(t, emaillinks.ResetPasswordLink(testBaseURL, issuedCode, ""), emailed.Link,
 			"the emailed link must be the shared builder's output for the code that was issued")
+		// The user has no name, so the email greets them by their address (#818 decision 15). The
+		// link's lifetime the email states is checked in TheEmailSaysHowLongTheResetAcceptsTheLink.
+		assert.Equal(t, "existing@example.com", emailed.Name)
 
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -439,19 +441,18 @@ func assertOneErrorRecordOnTheRequest(t *testing.T, capture *logtest.SlogCapture
 // page, never the email.
 func TestHandleForgotPasswordPost_WritesTheEmailInTheRecipientsLanguage(t *testing.T) {
 	for _, tc := range []struct {
-		name          string
-		signedIn      string
-		pageLanguage  string
-		locale        string
-		renderLocale  string
-		expectSubject string
+		name         string
+		signedIn     string
+		pageLanguage string
+		locale       string
+		renderLocale string
 	}{
-		{"a recipient who chose Portuguese, over a French locale", "", "pt-BR", "fr", "pt-BR", "Redefinição de senha"},
-		{"a recipient on Automatic, with a French locale", "", "", "fr", "fr", "Réinitialisation du mot de passe"},
-		{"a recipient on Automatic with no locale", "", "", "", "en", "Password reset"},
-		{"from a browser signed in as a user who chose German: the recipient's choice", "de", "pt-BR", "fr", "pt-BR", "Redefinição de senha"},
-		{"from a browser signed in as a user who chose German: the recipient's locale", "de", "", "fr", "fr", "Réinitialisation du mot de passe"},
-		{"from a browser signed in as a user who chose German: English", "de", "", "", "en", "Password reset"},
+		{"a recipient who chose Portuguese, over a French locale", "", "pt-BR", "fr", "pt-BR"},
+		{"a recipient on Automatic, with a French locale", "", "", "fr", "fr"},
+		{"a recipient on Automatic with no locale", "", "", "", "en"},
+		{"from a browser signed in as a user who chose German: the recipient's choice", "de", "pt-BR", "fr", "pt-BR"},
+		{"from a browser signed in as a user who chose German: the recipient's locale", "de", "", "fr", "fr"},
+		{"from a browser signed in as a user who chose German: English", "de", "", "", "en"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -480,10 +481,10 @@ func TestHandleForgotPasswordPost_WritesTheEmailInTheRecipientsLanguage(t *testi
 			database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(1), "existing@example.com",
 				mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
 			var renderLocale string
-			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).
+			pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordResetLink, mock.Anything).
 				Run(func(args mock.Arguments) {
 					renderLocale = i18n.LocaleTag(args.Get(0).(*http.Request).Context())
-				}).Return(&bytes.Buffer{}, nil).Once()
+				}).Return(emailtemplate.Message{Subject: "Redefinição de senha", HTML: "<p>x</p>"}, nil).Once()
 			var sent *emaildelivery.SendEmailInput
 			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -494,8 +495,8 @@ func TestHandleForgotPasswordPost_WritesTheEmailInTheRecipientsLanguage(t *testi
 			jobs.runAll(t, afterresponse.ClassRecovery)
 
 			require.NotNil(t, sent)
-			assert.Equal(t, tc.expectSubject, sent.Subject)
-			assert.Equal(t, tc.renderLocale, renderLocale, "the body is rendered in the recipient's language")
+			assert.Equal(t, "Redefinição de senha", sent.Subject, "the subject is the rendered email's")
+			assert.Equal(t, tc.renderLocale, renderLocale, "the email is rendered in the recipient's language")
 		})
 	}
 }
@@ -581,7 +582,7 @@ func TestHandleForgotPasswordPost_SendsNothingUnlessTheAccountIsVerifiedAndEnabl
 					mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			}
 			database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
-			pageRenderer.AssertNotCalled(t, "RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			pageRenderer.AssertNotCalled(t, "RenderEmail", mock.Anything, mock.Anything, mock.Anything)
 			emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -628,7 +629,7 @@ func TestHandleForgotPasswordPost_AnswersAfterTheLookupAlone(t *testing.T) {
 			database.AssertNotCalled(t, "TryStoreForgotPasswordCode", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-			pageRenderer.AssertNotCalled(t, "RenderTemplateToBuffer", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			pageRenderer.AssertNotCalled(t, "RenderEmail", mock.Anything, mock.Anything, mock.Anything)
 			emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
 
 			require.Len(t, jobs.jobs, 1, "the rest is handed to one job")
@@ -716,8 +717,8 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 			Return(&record.User{Id: 7, Enabled: true, Email: "someone@example.com", EmailVerified: true}, nil).Once()
 		database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 			mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
-		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-			"/emails/email_forgot_password.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
+		pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordResetLink, mock.Anything).
+			Return(emailtemplate.Message{Subject: "Password reset", HTML: "<p>x</p>"}, nil).Once()
 		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(mock.Arguments) { order = append(order, "send") }).Return(emaildelivery.SendResult{}, nil).Once()
 		expectLinkSentPage(pageRenderer, rr, req)
@@ -765,8 +766,8 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 			Return(&record.User{Id: 7, Enabled: true, Email: "someone@example.com", EmailVerified: true}, nil).Once()
 		database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 			mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
-		pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-			"/emails/email_forgot_password.html", mock.Anything).Return(&bytes.Buffer{}, nil).Once()
+		pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordResetLink, mock.Anything).
+			Return(emailtemplate.Message{Subject: "Password reset", HTML: "<p>x</p>"}, nil).Once()
 		emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, assert.AnError).Once()
 		bound := expectLinkSentPage(pageRenderer, rr, req)
 		details := captureRequestedPasswordReset(auditLogger)
@@ -829,6 +830,52 @@ func TestForgotPasswordRequiresEmail(t *testing.T) {
 	})
 }
 
+// The email says how long the reset accepts its link (#818 decision 4): a reset code's five minutes
+// for an account with a password, and a setup link's day for one with none yet, such as a user an
+// administrator created with the setup email, whose code the reset accepts that long.
+func TestHandleForgotPasswordPost_TheEmailSaysHowLongTheResetAcceptsTheLink(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		passwordHash string
+		wantExpiry   time.Duration
+	}{
+		{name: "an account with a password", passwordHash: "$2a$10$hash", wantExpiry: 5 * time.Minute},
+		{name: "an account with no password yet", passwordHash: "", wantExpiry: 24 * time.Hour},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			database := datamocks.NewDatabase(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			jobs := &heldJobs{}
+
+			handler := HandleForgotPasswordPost(pageRenderer, database, emailSender, auditLogger, jobs, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+			req := forgotPasswordRequest("existing@example.com")
+			rr := httptest.NewRecorder()
+
+			user := &record.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true, PasswordHash: tc.passwordHash}
+			database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(user, nil)
+			expectLinkSentPage(pageRenderer, rr, req)
+			handler.ServeHTTP(rr, req)
+			require.Equal(t, http.StatusOK, rr.Code)
+
+			database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(1), "existing@example.com",
+				mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
+			var emailed emailtemplate.Values
+			pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordResetLink, mock.Anything).
+				Run(func(args mock.Arguments) {
+					emailed = args.Get(2).(emailtemplate.Values)
+				}).Return(emailtemplate.Message{Subject: "Password reset", HTML: "<p>x</p>"}, nil)
+			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil)
+			auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.Anything).Return().Once()
+
+			jobs.runAll(t, afterresponse.ClassRecovery)
+
+			assert.Equal(t, tc.wantExpiry, emailed.Expiry)
+		})
+	}
+}
+
 // A request made on a forgot-password page whose URL names a sign-in mails a link naming it beside
 // the code; one naming an id of the wrong shape, or none, mails the code alone. The id is echoed
 // without being looked up, so the answer is the same page whatever it names (#812 decision 9).
@@ -865,10 +912,10 @@ func TestHandleForgotPasswordPost_TheLinkNamesTheSignInThePageNamed(t *testing.T
 			database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(1), "existing@example.com",
 				mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
 			var emailedLink string
-			pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html", "/emails/email_forgot_password.html", mock.Anything).
+			pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordResetLink, mock.Anything).
 				Run(func(args mock.Arguments) {
-					emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
-				}).Return(&bytes.Buffer{}, nil)
+					emailedLink = args.Get(2).(emailtemplate.Values).Link
+				}).Return(emailtemplate.Message{Subject: "Password reset", HTML: "<p>x</p>"}, nil)
 			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, nil)
 			auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.Anything).Return().Once()
 

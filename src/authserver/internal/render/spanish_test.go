@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -38,57 +39,29 @@ func TestSpanish_SignInPageFromRequestPreferences(t *testing.T) {
 	}
 }
 
-func TestSpanish_RegionalRecipientsGetEverySubjectAndBody(t *testing.T) {
-	for _, tc := range []struct{ body, key, subject, sentence string }{
-		{"email_forgot_password", "forgot_password", "Restablecimiento de contraseña", "Para restablecer tu contraseña"},
-		{"email_register_activate", "register_activate", "Activa tu cuenta", "El enlace caduca a los 5 minutos."},
-		{"email_register_existing_account", "register_existing_account", "Ya tienes una cuenta", "Tu cuenta no ha cambiado."},
-		{"email_register_confirmation", "register_confirmation", "¡Te damos la bienvenida!", "¡Tu cuenta ya está creada!"},
-		{"email_newuser_set_password", "newuser_set_password", "Acme - crea una contraseña para tu nueva cuenta", "El enlace es válido durante 24 horas."},
-		{"email_verification", "verification", "Verificación del correo - código 123456", "Este es tu código de verificación"},
-		{"email_address_changed", "address_changed", "Tu dirección de correo electrónico ha cambiado", "puede que otra persona conozca tu contraseña."},
-		{"email_password_changed", "password_changed", "Tu contraseña ha cambiado", "puede que otra persona esté usando tu cuenta."},
-		{"email_password_changed_by_administrator", "password_changed_by_administrator", "Un administrador ha cambiado tu contraseña", "Si no lo esperabas, contacta con tu administrador."},
-		{"email_password_reset", "password_reset", "Tu contraseña se ha restablecido", "puede que otra persona lea tu correo y esté usando tu cuenta."},
-		{"email_otp_enabled", "otp_enabled", "Se ha configurado la autenticación de dos factores", "Viene con un nuevo conjunto de códigos de recuperación"},                                                    //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
-		{"email_otp_disabled", "otp_disabled", "Se ha desactivado la autenticación de dos factores", "vuelve a configurar la autenticación de dos factores"},                                                    //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
-		{"email_otp_disabled_by_administrator", "otp_disabled_by_administrator", "Un administrador ha desactivado tu autenticación de dos factores", "Puedes configurar una nueva aplicación de autenticación"}, //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
-		{"email_recovery_code_used", "recovery_code_used", "Se ha usado un código de recuperación para iniciar sesión", "Te quedan 3 códigos de recuperación sin usar."},
-		{"email_recovery_codes_replaced", "recovery_codes_replaced", "Se han sustituido tus códigos de recuperación", "Tus códigos de recuperación anteriores ya no sirven"},
-		{"email_otp_lockout", "otp_lockout", "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos", "Inicia sesión con uno de tus códigos de recuperación"},
-		{"email_account_deleted", "account_deleted", "Se ha eliminado tu cuenta", "Si no has sido tú, otra persona conocía tu contraseña."},
-		{"email_account_deleted_by_administrator", "account_deleted_by_administrator", "Un administrador ha eliminado tu cuenta", "Si no lo esperabas, contacta con tu administrador."},
-		{"email_test_email", "test_email", "Acme - correo de prueba", "Este es un correo de prueba enviado por Acme."},
-	} {
-		for _, locale := range []string{"es", "es-MX", "es-419"} {
-			t.Run(tc.body+" "+locale, func(t *testing.T) {
-				r := httptest.NewRequest(http.MethodGet, "/", nil)
-				r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{AppName: "Acme"}))
-				r = r.WithContext(i18n.WithLocale(r.Context(), true, locale, "en"))
-				assert.Equal(t, tc.subject, i18n.T(r.Context(), "email."+tc.key+".subject", map[string]any{"code": "123456", "appName": "Acme"}))
-				buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(r,
-					"layouts/email_layout.html", "emails/"+tc.body+".html", map[string]interface{}{
-						"name": "Ana", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3,
-					})
-				require.NoError(t, err)
-				assert.Contains(t, buf.String(), `<html lang="es">`)
-				assert.Contains(t, buf.String(), tc.sentence)
-				assert.Contains(t, buf.String(), "Acme")
-				// A notice of a change carries no link, and nor does the test email.
-				notice := map[string]bool{"email_address_changed": true, "email_password_changed": true,
-					"email_password_changed_by_administrator": true, "email_password_reset": true,
-					"email_otp_enabled": true, "email_otp_disabled": true, "email_otp_disabled_by_administrator": true,
-					"email_recovery_code_used": true, "email_recovery_codes_replaced": true, "email_otp_lockout": true,
-					"email_account_deleted": true, "email_account_deleted_by_administrator": true, "email_test_email": true}
-				if !notice[tc.body] {
-					assert.Contains(t, buf.String(), `href="https://example.com/continue"`)
-				} else {
-					assert.NotContains(t, buf.String(), "href")
-				}
-				if tc.body == "email_verification" {
-					assert.Contains(t, buf.String(), "123456")
-				}
-			})
-		}
-	}
+// Every email, sent from its built-in definition (#818), follows a recipient reading Spanish, in any
+// region: the subject, the language the email is marked with, and a sentence of the body, the
+// activation link's and the verification code's saying how long they last, and the recovery code
+// notice's giving the codes left.
+func TestSpanish_EveryDefinedEmailFollowsTheRecipient(t *testing.T) {
+	assertDefinedEmailsFollowTheRecipient(t, []string{"es", "es-MX", "es-419"}, "es", []definedEmail{
+		{emailtemplate.ActivationLink, "Activa tu cuenta", "El enlace caduca en 5 minutos."},
+		{emailtemplate.RegistrationExistingAccount, "Ya tienes una cuenta", "Tu cuenta no ha cambiado."},
+		{emailtemplate.Welcome, "¡Te damos la bienvenida!", "¡Tu cuenta ya está creada!"},
+		{emailtemplate.VerificationCode, "Verificación del correo - código 482915", "El código caduca en 5 minutos."},
+		{emailtemplate.NewUserSetup, "Acme Portal - crea una contraseña para tu nueva cuenta", "Para crear tu contraseña, abre este enlace:"},
+		{emailtemplate.TestEmail, "Acme Portal - correo de prueba", "Este es un correo de prueba enviado por Acme Portal."},
+		{emailtemplate.EmailAddressChanged, "Tu dirección de correo electrónico ha cambiado", "puede que otra persona conozca tu contraseña."},
+		{emailtemplate.PasswordChanged, "Tu contraseña ha cambiado", "puede que otra persona esté usando tu cuenta."},
+		{emailtemplate.PasswordChangedByAdministrator, "Un administrador ha cambiado tu contraseña", "Si no lo esperabas, contacta con tu administrador."},
+		{emailtemplate.PasswordReset, "Tu contraseña se ha restablecido", "puede que otra persona lea tu correo y esté usando tu cuenta."},
+		{emailtemplate.OTPEnabled, "Se ha configurado la autenticación de dos factores", "Viene con un nuevo conjunto de códigos de recuperación"},                                //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
+		{emailtemplate.OTPDisabled, "Se ha desactivado la autenticación de dos factores", "vuelve a configurar la autenticación de dos factores"},                                 //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
+		{emailtemplate.OTPDisabledByAdministrator, "Un administrador ha desactivado tu autenticación de dos factores", "Puedes configurar una nueva aplicación de autenticación"}, //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
+		{emailtemplate.RecoveryCodeUsed, "Se ha usado un código de recuperación para iniciar sesión", "Códigos de recuperación sin usar restantes: 3."},
+		{emailtemplate.RecoveryCodesReplaced, "Se han sustituido tus códigos de recuperación", "Tus códigos de recuperación anteriores ya no sirven"},
+		{emailtemplate.OTPLockout, "Tu aplicación de autenticación se ha bloqueado tras demasiados códigos incorrectos", "Inicia sesión con uno de tus códigos de recuperación"},
+		{emailtemplate.AccountDeleted, "Se ha eliminado tu cuenta", "Si no has sido tú, otra persona conocía tu contraseña."},
+		{emailtemplate.AccountDeletedByAdministrator, "Un administrador ha eliminado tu cuenta", "Si no lo esperabas, contacta con tu administrador."},
+	})
 }

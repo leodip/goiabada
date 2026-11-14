@@ -248,7 +248,8 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   forgot-password and registration forms carry its widget, and each response drawing one of them
   through `turnstile.WithWidget` adds the constant `https://challenges.cloudflare.com` to
   `script-src` (`core/httpmw.SetContentSecurityPolicy`). Every other page, those three with the
-  challenge off, and an error page replacing one of them, keep the policy above. Page
+  challenge off, and an error page replacing one of them, keep the policy above, as does every
+  console response but the email template preview's frame (Email templates, below). Page
   behaviour lives in static files, `static/utils.js`, the console's `static/shell.js` and
   `static/pages/<page>.js`, attached with `addEventListener`. A template hands a script data in a
   JSON data block, `<script type="application/json" id="…">{{ . }}</script>`, or in `data-`
@@ -305,7 +306,7 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `brandkit`'s with its names unquoted, since `html/template` refuses a quote in a style value and
   `template.CSS` is a trusted type the auth server does not use; an uploaded font is drawn in
   System UI. The layout is tables, which every client lays out. `main.css` never draws an email,
-  so the auth server's `input.css` keeps the email templates out of Tailwind's scan. The logo, the dark one for a dark
+  so the auth server's `input.css` keeps the email layout out of Tailwind's scan. The logo, the dark one for a dark
   brand, is linked by an absolute URL under the base URL (`render.Renderer.WithBaseURL`), with
   width and height attributes within 64 by 424 pixels, and takes a page's alt rule. A brand that
   cannot be read is drawn in Blueberry's light colors with the app name as text, and the fault is
@@ -313,19 +314,70 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   `emailFrame.Footer`, which is `render.FooterOf`, the page's footer, in the language of the
   email's catalog, in the muted ink with each link in the brand's color, and nil for a brand with
   neither; the values are apart by a middle dot hidden from assistive technology, since a client may
-  drop a margin. An email whose point is one action, the forgot-password, activation, setup and
-  welcome emails, draws it with `{{ template "email_button" (args . (T .ctx "email.<name>.button")) }}`
-  above its URL, which stays as a link to copy: a table whose cell carries the brand's color as
-  `bgcolor` and inline, since a client may drop a link's padding, around a link in `OnBrand`,
-  rounded as a page's control (`0`, `8px` or `9999px`). No other link is a button. The verification
-  code is drawn with `{{ template "email_code" . }}`, in `CodeFamily`, main.css's `--font-mono`
-  unquoted, larger, in a `Subtle` box rounded as a page's multi-line box.
-  `TestEmails_EveryBuiltInEmailIsDrawnInlineAlone` holds every built-in email, in every language, to
+  drop a margin. An email whose point is one action, the password reset, activation, setup and
+  welcome emails, draws it as a button above its URL, which stays as a link to copy: a table whose
+  cell carries the brand's color as `bgcolor` and inline, since a client may drop a link's padding,
+  around a link in `OnBrand`, rounded as a page's control (`0`, `8px` or `9999px`). No other link is
+  a button. The verification code is drawn in `CodeFamily`, main.css's `--font-mono` unquoted,
+  larger, in a `Subtle` box rounded as a page's multi-line box. Both are drawn by
+  `internal/emailtemplate` (below).
+  `TestEmails_EveryDefinedEmailIsDrawnInlineAlone` holds every built-in email, in every language, to
   these rules. There is no text template: the sender (`emaildelivery`) works every message's
   plain-text part out of the HTML, from `<main>` and then the `<footer>` outside it, so the logo and
   the app name above the body stay out of it. A block element is a paragraph and `<br>` a line
   break; a link is its URL, or its label then `<URL>` when they differ. The button's table carries
   `data-email-button`, which the sender leaves out, the URL under it being in the text already.
+- **Email templates**: every email is sent from its built-in definition, and has no template file and
+  no catalog message (#818). Its definition in `internal/emailtemplate`
+  holds its identifier, the placeholders it offers and requires, and its subject, button label and
+  body in the six built-in languages; `render.Renderer.RenderEmail` matches the recipient's language
+  against those six (`emailtemplate.Language`, English for any other), renders the body inside
+  `layouts/email_layout.html` with the frame above, and writes the subject as the `<title>`. The
+  body is a small Markdown set: paragraphs, a single newline as a line break, bold, italic, links,
+  bulleted and numbered lists. goldmark parses it with every other parser left out, so a heading, a
+  quote, a table, code, an image or raw HTML shows as typed, and `format.go` draws it, not goldmark's
+  renderer: every link inline in `emailFrame.Link`, and one to an address other than `http`, `https`,
+  `mailto` or `tel` as its text alone. A placeholder is `{{name}}`, its value written as text,
+  escaped; `\{{` writes the braces. `{{link}}` alone is the URL as a link to itself, or the whole
+  destination of a link, never part of one; `{{button}}` alone on its line draws the button above,
+  labelled with the button label, which is plain text; `{{code}}` alone in its paragraph draws the
+  box above, and is text elsewhere. `{{name}}` is
+  `emailtemplate.RecipientName`, the address for a user with none, `{{expiry}}` a lifetime in
+  the email's language, and `{{codes_left}}` a number, which the recovery code notice words alike
+  for any count. `Email.Check` gives the refusals: a name the email does not offer, a required
+  one the body does not draw (`{{button}}` does not draw the link), the link or the button in the
+  subject, the button not alone, a placeholder in a destination, a body with nothing to read
+  besides the button, and the limits of a field: a subject blank, past 200 characters or on two
+  lines, a button label blank or past 60 (or present on an email with no button), a body past
+  20,000. Each send reads the email's edit in the recipient's language through the renderer's
+  `WithEmailTemplates` reader, with no cache, and `Email.TextToSend` lays its fields over the
+  built-in text; while `Email.Check` refuses that text, or the read fails, the email goes out with
+  the built-in text of the language, all of it, and the renderer logs a warning (an error for the
+  read) naming the email, the language and the rules broken, never the text. The start logs the
+  same warning for each invalid stored edit. Its output is the auth server's second guarded `template.HTML`, which
+  `legalmarkdown/trusted_html_lint_test.go` holds. `TestBuiltIns_EveryTextPassesItsOwnRules` holds
+  every built-in text to its email's rules in the six languages, and
+  `TestEmails_EveryDefinedEmailIsDrawnInlineAlone` to the inline rules above. A change to the
+  placeholders an email offers or requires can make an administrator's edit of it invalid, so it
+  needs a release-notes line. The console's Email templates tab, under Admin, Email, lists the
+  emails in its own groups, with their names and when each is sent in its catalogs under
+  `adminconsole.email_templates.email.<identifier>`, so an email added to the auth server needs
+  its row in `emailTemplateGroups` and its two messages. Its editor is one language of one email,
+  opened from the list in the built-in language matching the console's catalog, and it is the
+  console's one page that asks before discarding text not saved (`email-template-editor.js`):
+  another language asks in its `discardChanges` dialog, and leaving any other way lets the browser
+  ask, unless a save or a confirmed Reset is what leaves. Beside the form, `email-template-preview.js`
+  asks the console's JSON preview for the subject and the plain-text part as the text changes,
+  saying a refusal where the preview is and keeping the last good preview; only after an answer
+  does it load the email into a sandboxed frame through a hidden form posting the same text to
+  `…/preview-frame`. That route is the console's one framed answer (#818 decision 11): it draws
+  the email from the text through the admin API, never from markup the browser sends, and
+  replaces the console's headers with `X-Frame-Options: SAMEORIGIN` and
+  `default-src 'none'; style-src-attr 'unsafe-inline'; img-src <auth server origin>; base-uri
+  'none'; form-action 'none'; frame-ancestors 'self'; sandbox`, and puts `<base target="_blank">`
+  in the email's head, so its links open a window the sandbox refuses. Send test email posts the
+  same text, the brand chosen for the preview and the typed address to `…/send-test`, from the
+  page's script, its button disabled while SMTP is off.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state, appearance and theme. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon

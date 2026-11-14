@@ -66,8 +66,12 @@ test("a test email from Settings - Email arrives framed, naming the app", async 
   ).toBeVisible();
   const mail = await waitForMail(request, to);
   expect(mail.subject).toBe(`${appName} - test email`);
-  expect(mail.html).toContain(`This is a test email from ${appName}.`);
-  expect(mail.html).toContain("It was sent from the email settings to check that email can be sent.");
+  // Sent from its built-in definition, with its subject as its title.
+  expect(mail.html).toContain(`<title>${appName} - test email</title>`);
+  expect(mail.html).toContain(`<p>This is a test email from ${appName}.</p>`);
+  expect(mail.text).toContain(
+    "It was sent from the email settings to check that email can be sent. If you can read it, there is nothing else to do.",
+  );
   // The date is the message's Date header, no longer a sentence of the body.
   expect(mail.html).not.toContain("Today is");
   // Drawn through the email layout, as every other email is: on a card, its colors written inline,
@@ -301,8 +305,14 @@ test("the user verifies their email with the mailed code, and the administrator 
   await expect(own.page.locator("#verification-status")).toHaveText(`We sent a code to ${user.email}. Check your inbox and spam folder.`);
 
   const mail = await waitForMail(request, user.email);
-  const code = mail.html.match(/verification code:<\/p>\s*<p[^>]*>\s*([^<\s]+)\s*<\/p>/)?.[1];
+  // The code is boxed in a paragraph of its own under the sentence that introduces it, and named in
+  // the subject, which is also the title.
+  const code = mail.html.match(/verification code:<\/p>\s*<p style="[^"]*font-size: 28px;[^"]*">([^<\s]+)<\/p>/)?.[1];
   expect(code, mail.html).toBeTruthy();
+  expect(mail.subject).toBe(`Email verification - code ${code}`);
+  expect(mail.html).toContain(`<title>Email verification - code ${code}</title>`);
+  // The email says how long the code lasts.
+  expect(mail.text.replace(/\r\n/g, "\n")).toContain(`${code}\n\nThe code expires in 5 minutes.\n\nYou can enter your code here: ${env.adminUrl}/account/email-verification`);
   await own.page.locator("#verificationCode").fill(code!);
   await own.page.getByRole("button", { name: "Verify", exact: true }).click();
   await expect(own.page.getByText("Email address verified.", { exact: true })).toBeVisible();

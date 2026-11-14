@@ -85,6 +85,13 @@ var (
 	charCreateLegalDocument = &api.CreateLegalDocumentRequest{Kind: "must_accept", ShortName: "terms", Title: "Terms"}
 	charSaveLegalDocDraft   = &api.SaveLegalDocumentDraftRequest{Title: "Terms", Markdown: "Be kind."}
 	charUpdateLegalDocApps  = &api.UpdateLegalDocumentAppsRequest{AppliesTo: "selected_apps", ClientIds: []int64{3, 4}, ExpectedClientIds: []int64{3}}
+
+	charSaveEmailTemplate    = &api.SaveEmailTemplateRequest{Subject: "Reset your password", ButtonLabel: "Reset", Body: "Hello {{name}},\n\n{{link}}"}
+	charBrandId              = int64(4)
+	charPreviewEmailTemplate = &api.PreviewEmailTemplateRequest{Subject: "Reset your password", ButtonLabel: "Reset",
+		Body: "Hello {{name}},\n\n{{button}}\n\n{{link}}", BrandId: &charBrandId}
+	charSendTestEmailTemplate = &api.SendTestEmailTemplateRequest{To: "jane@example.com", Subject: "Reset your password",
+		ButtonLabel: "Reset", Body: "Hello {{name}},\n\n{{link}}", BrandId: &charBrandId}
 )
 
 const (
@@ -1845,6 +1852,84 @@ func wireCharacterization() []wireCase {
 			verb: "GET", path: "/api/v1/account/legal-document-acceptances",
 			successStatus: 200, reply: `{"acceptances":[{"id":3,"shortName":"terms","version":2,"url":"https://auth.example.com/legal/terms/versions/2"}]}`,
 			want: "https://auth.example.com/legal/terms/versions/2",
+		},
+
+		// --- email_templates.go -----------------------------------------------------------
+		{
+			name: "GetEmailTemplates",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetEmailTemplates(ctx, charAccessToken)
+				if err != nil {
+					return nil, err
+				}
+				return got[0].Languages[0].Status, nil
+			},
+			verb: "GET", path: "/api/v1/admin/email-templates",
+			successStatus: 200, reply: `{"emailTemplates":[{"id":"welcome","languages":[{"language":"en","status":"edited"}]}]}`,
+			want: "edited",
+		},
+		{
+			name: "GetEmailTemplate",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetEmailTemplate(ctx, charAccessToken, "password_reset_link")
+				if err != nil {
+					return nil, err
+				}
+				return got.Languages[0].EditorText.Subject, nil
+			},
+			verb: "GET", path: "/api/v1/admin/email-templates/password_reset_link",
+			successStatus: 200,
+			reply:         `{"emailTemplate":{"id":"password_reset_link","languages":[{"language":"en","editorText":{"subject":"Reset","body":"Hi"}}]}}`,
+			want:          "Reset",
+		},
+		{
+			name: "SaveEmailTemplate",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.SaveEmailTemplate(ctx, charAccessToken, "password_reset_link", "pt-BR", charSaveEmailTemplate)
+				if err != nil {
+					return nil, err
+				}
+				return got.Status, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/email-templates/password_reset_link/pt-BR", contentType: charJSON,
+			bodyOf:        charSaveEmailTemplate,
+			successStatus: 200, reply: `{"language":"pt-BR","status":"edited"}`, want: "edited",
+		},
+		{
+			name: "ResetEmailTemplate",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.ResetEmailTemplate(ctx, charAccessToken, "password_reset_link", "pt-BR")
+			},
+			verb: "DELETE", path: "/api/v1/admin/email-templates/password_reset_link/pt-BR",
+			successStatus: 204,
+		},
+		{
+			name: "PreviewEmailTemplate",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.PreviewEmailTemplate(ctx, charAccessToken, "password_reset_link", "pt-BR", charPreviewEmailTemplate)
+				if err != nil {
+					return nil, err
+				}
+				return *got, nil
+			},
+			verb: "POST", path: "/api/v1/admin/email-templates/password_reset_link/pt-BR/preview", contentType: charJSON,
+			bodyOf:        charPreviewEmailTemplate,
+			successStatus: 200, reply: `{"subject":"Reset your password","html":"<!DOCTYPE html><p>Hello</p>","text":"Hello"}`,
+			want: api.PreviewEmailTemplateResponse{Subject: "Reset your password", Html: "<!DOCTYPE html><p>Hello</p>", Text: "Hello"},
+		},
+		{
+			name: "SendTestEmailTemplate",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.SendTestEmailTemplate(ctx, charAccessToken, "password_reset_link", "pt-BR", charSendTestEmailTemplate)
+				if err != nil {
+					return nil, err
+				}
+				return *got, nil
+			},
+			verb: "POST", path: "/api/v1/admin/email-templates/password_reset_link/pt-BR/send-test", contentType: charJSON,
+			bodyOf:        charSendTestEmailTemplate,
+			successStatus: 200, reply: `{"success":true,"encrypted":false}`,
+			want: api.SendTestEmailResponse{Success: true, Encrypted: false},
 		},
 	}
 }

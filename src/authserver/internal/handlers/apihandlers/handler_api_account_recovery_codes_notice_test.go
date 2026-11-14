@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -15,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -95,19 +95,17 @@ func TestHandleAccountRecoveryCodesPost_TellsTheUserANewSetWasMade(t *testing.T)
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
 			require.Len(t, body.RecoveryCodes, 10)
 
-			captured := expectNotice(pageRenderer, emailSender, "/emails/email_recovery_codes_replaced.html")
+			captured := expectNotice(pageRenderer, emailSender, emailtemplate.RecoveryCodesReplaced)
 			jobs.runAll(t, afterresponse.ClassSecurityNotice)
 
 			require.NotNil(t, captured.sent)
 			assert.Equal(t, recoveryNoticeAddress, captured.sent.To)
 			assert.Equal(t, tc.expectSubject, captured.sent.Subject)
 			assert.Equal(t, tc.locale, captured.renderLocale, "the notice is rendered in the user's language")
-			assert.Equal(t, "Tiago Lopes", captured.bound["name"])
-			assert.NotContains(t, captured.bound, "link", "the notice carries no link")
-			for key, value := range captured.bound {
-				for _, code := range body.RecoveryCodes {
-					assert.NotContains(t, fmt.Sprint(value), code, "the notice carries no recovery code, found under %q", key)
-				}
+			assert.Equal(t, "Tiago Lopes", captured.values.Name)
+			assert.Empty(t, captured.values.Link, "the notice carries no link")
+			for _, code := range body.RecoveryCodes {
+				assert.NotContains(t, fmt.Sprintf("%+v", captured.values), code, "the notice carries no recovery code")
 			}
 		})
 	}
@@ -194,8 +192,8 @@ func TestHandleAccountRecoveryCodesPost_AFailedNoticeIsOneErrorRecord(t *testing
 		ServeHTTP(rr, recoveryNoticeRequest(t, passwordNoticeSettings(), recoveryCodesPassword))
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 
-	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, mock.Anything, "/emails/email_recovery_codes_replaced.html", mock.Anything).
-		Return((*bytes.Buffer)(nil), errors.New("template missing")).Once()
+	pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.RecoveryCodesReplaced, mock.Anything).
+		Return(emailtemplate.Message{}, errors.New("template missing")).Once()
 
 	capture := logtest.CaptureSlog(t)
 	jobs.runAll(t, afterresponse.ClassSecurityNotice)

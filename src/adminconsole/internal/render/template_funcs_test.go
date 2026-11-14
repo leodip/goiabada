@@ -186,6 +186,8 @@ func TestTemplateFuncMap_TheSectionPredicatesCoverEveryPageOfARecord(t *testing.
 			"/admin/legal-documents/7/versions/2"},
 		"isAdminBrandingPage": {"/admin/settings/branding", "/admin/settings/branding/new",
 			"/admin/settings/branding/4/edit", "/admin/settings/branding/4/delete"},
+		"isAdminSettingsEmailPage": {"/admin/settings/email", "/admin/settings/email/send-test-email",
+			"/admin/settings/email/templates", "/admin/settings/email/templates/welcome/fr"},
 	} {
 		in := templateFuncMap[name].(func(string) bool)
 		for _, path := range paths {

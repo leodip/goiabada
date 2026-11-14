@@ -10,9 +10,9 @@
 package handlersmocks
 
 import (
-	"bytes"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -150,6 +150,78 @@ func (_c *PageRenderer_NotFound_Call) RunAndReturn(run func(w http.ResponseWrite
 	return _c
 }
 
+// RenderEmail provides a mock function for the type PageRenderer
+func (_mock *PageRenderer) RenderEmail(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error) {
+	ret := _mock.Called(r, email, values)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RenderEmail")
+	}
+
+	var r0 emailtemplate.Message
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*http.Request, *emailtemplate.Email, emailtemplate.Values) (emailtemplate.Message, error)); ok {
+		return returnFunc(r, email, values)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*http.Request, *emailtemplate.Email, emailtemplate.Values) emailtemplate.Message); ok {
+		r0 = returnFunc(r, email, values)
+	} else {
+		r0 = ret.Get(0).(emailtemplate.Message)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*http.Request, *emailtemplate.Email, emailtemplate.Values) error); ok {
+		r1 = returnFunc(r, email, values)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// PageRenderer_RenderEmail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RenderEmail'
+type PageRenderer_RenderEmail_Call struct {
+	*mock.Call
+}
+
+// RenderEmail is a helper method to define mock.On call
+//   - r *http.Request
+//   - email *emailtemplate.Email
+//   - values emailtemplate.Values
+func (_e *PageRenderer_Expecter) RenderEmail(r any, email any, values any) *PageRenderer_RenderEmail_Call {
+	return &PageRenderer_RenderEmail_Call{Call: _e.mock.On("RenderEmail", r, email, values)}
+}
+
+func (_c *PageRenderer_RenderEmail_Call) Run(run func(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values)) *PageRenderer_RenderEmail_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *http.Request
+		if args[0] != nil {
+			arg0 = args[0].(*http.Request)
+		}
+		var arg1 *emailtemplate.Email
+		if args[1] != nil {
+			arg1 = args[1].(*emailtemplate.Email)
+		}
+		var arg2 emailtemplate.Values
+		if args[2] != nil {
+			arg2 = args[2].(emailtemplate.Values)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *PageRenderer_RenderEmail_Call) Return(message emailtemplate.Message, err error) *PageRenderer_RenderEmail_Call {
+	_c.Call.Return(message, err)
+	return _c
+}
+
+func (_c *PageRenderer_RenderEmail_Call) RunAndReturn(run func(r *http.Request, email *emailtemplate.Email, values emailtemplate.Values) (emailtemplate.Message, error)) *PageRenderer_RenderEmail_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RenderTemplate provides a mock function for the type PageRenderer
 func (_mock *PageRenderer) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string, data map[string]interface{}) error {
 	ret := _mock.Called(w, r, layoutName, templateName, data)
@@ -221,86 +293,6 @@ func (_c *PageRenderer_RenderTemplate_Call) Return(err error) *PageRenderer_Rend
 }
 
 func (_c *PageRenderer_RenderTemplate_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, layoutName string, templateName string, data map[string]interface{}) error) *PageRenderer_RenderTemplate_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// RenderTemplateToBuffer provides a mock function for the type PageRenderer
-func (_mock *PageRenderer) RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string, data map[string]interface{}) (*bytes.Buffer, error) {
-	ret := _mock.Called(r, layoutName, templateName, data)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RenderTemplateToBuffer")
-	}
-
-	var r0 *bytes.Buffer
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*http.Request, string, string, map[string]interface{}) (*bytes.Buffer, error)); ok {
-		return returnFunc(r, layoutName, templateName, data)
-	}
-	if returnFunc, ok := ret.Get(0).(func(*http.Request, string, string, map[string]interface{}) *bytes.Buffer); ok {
-		r0 = returnFunc(r, layoutName, templateName, data)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*bytes.Buffer)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(*http.Request, string, string, map[string]interface{}) error); ok {
-		r1 = returnFunc(r, layoutName, templateName, data)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// PageRenderer_RenderTemplateToBuffer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RenderTemplateToBuffer'
-type PageRenderer_RenderTemplateToBuffer_Call struct {
-	*mock.Call
-}
-
-// RenderTemplateToBuffer is a helper method to define mock.On call
-//   - r *http.Request
-//   - layoutName string
-//   - templateName string
-//   - data map[string]interface{}
-func (_e *PageRenderer_Expecter) RenderTemplateToBuffer(r any, layoutName any, templateName any, data any) *PageRenderer_RenderTemplateToBuffer_Call {
-	return &PageRenderer_RenderTemplateToBuffer_Call{Call: _e.mock.On("RenderTemplateToBuffer", r, layoutName, templateName, data)}
-}
-
-func (_c *PageRenderer_RenderTemplateToBuffer_Call) Run(run func(r *http.Request, layoutName string, templateName string, data map[string]interface{})) *PageRenderer_RenderTemplateToBuffer_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *http.Request
-		if args[0] != nil {
-			arg0 = args[0].(*http.Request)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		var arg3 map[string]interface{}
-		if args[3] != nil {
-			arg3 = args[3].(map[string]interface{})
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-		)
-	})
-	return _c
-}
-
-func (_c *PageRenderer_RenderTemplateToBuffer_Call) Return(buffer *bytes.Buffer, err error) *PageRenderer_RenderTemplateToBuffer_Call {
-	_c.Call.Return(buffer, err)
-	return _c
-}
-
-func (_c *PageRenderer_RenderTemplateToBuffer_Call) RunAndReturn(run func(r *http.Request, layoutName string, templateName string, data map[string]interface{}) (*bytes.Buffer, error)) *PageRenderer_RenderTemplateToBuffer_Call {
 	_c.Call.Return(run)
 	return _c
 }

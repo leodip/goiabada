@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,7 +16,8 @@ import (
 )
 
 // The recovery-code and lockout notices over real SMTP (#724, #737). A sign-in with a recovery code
-// tells the account's verified address how many unused codes are left. A new set of recovery codes
+// tells the account's verified address how many unused codes are left, as a number in one wording
+// for every count, from the notice's built-in definition (#818 decision 4). A new set of recovery codes
 // made on the Account pages tells it. The wrong code that disables the authenticator, after 100 in
 // a row, tells it, once per lockout. Each arrives once, in the user's language, with no link and no
 // code. An address the account never verified is told nothing.
@@ -53,13 +55,14 @@ func TestRecoveryCode_SigningInTellsTheUserHowManyCodesAreLeft(t *testing.T) {
 	for _, tc := range []struct {
 		locale  string
 		subject string
+		lang    string
 		left    string
 		advice  string
 	}{
-		{"en", recoveryCodeUsedSubjectEn, "You have 9 unused recovery codes left.",
-			"turn two-factor authentication off and set up a new authenticator"},
-		{"es", "Se ha usado un código de recuperación para iniciar sesión", "Te quedan 9 códigos de recuperación sin usar.",
-			"desactiva la autenticación de dos factores y configura una nueva aplicación de autenticación"}, //nolint:misspell // the es catalog's text: "factores" is Spanish, not a misspelling of "factors"
+		{"en", recoveryCodeUsedSubjectEn, "en", "Unused recovery codes left: 9.",
+			"If you still have the app, get a new set of recovery codes there, so you can still sign in if you lose it."},
+		{"es-MX", "Se ha usado un código de recuperación para iniciar sesión", "es", "Códigos de recuperación sin usar restantes: 9.",
+			"Si aún tienes la aplicación, obtén allí un nuevo conjunto de códigos de recuperación, para poder iniciar sesión si la pierdes."},
 	} {
 		t.Run(tc.locale, func(t *testing.T) {
 			client, redirectUri, user, password, _, codes := enrolledNoticeUser(t, tc.locale, true)
@@ -71,19 +74,25 @@ func TestRecoveryCode_SigningInTellsTheUserHowManyCodesAreLeft(t *testing.T) {
 			messages := awaitMailTo(t, user.Email)
 			require.Len(t, messages, 1, "the account's address is told exactly once")
 			assert.Equal(t, tc.subject, messages[0].Subject)
-			assert.Contains(t, messages[0].HTML, tc.left, "the notice says how many unused codes are left")
-			assert.Contains(t, messages[0].HTML, tc.advice, "the notice says to set up a new authenticator")
+			title, lang, text := readEmail(t, messages[0])
+			assert.Equal(t, tc.subject, title, "the title is the subject")
+			assert.Equal(t, tc.lang, lang)
+			assert.Contains(t, text, tc.left, "the notice says how many unused codes are left")
+			assert.Contains(t, text, tc.advice, "the advice holds for any count")
 			assert.NotContains(t, messages[0].HTML, "href", "the notice carries no link")
 			assertNoCodeIn(t, messages[0].HTML, messages[0].Text, codes)
 		})
 	}
 }
 
-// The last code says none are left.
+// The last code gives the codes left as 0, in the same wording, and a user with no name is greeted
+// by their address (#818 decision 15) where the notice read "Hello ," before.
 func TestRecoveryCode_SigningInWithTheLastCodeSaysNoneAreLeft(t *testing.T) {
 	useMailpitSMTP(t)
 
 	client, redirectUri, user, password, _, codes := enrolledNoticeUser(t, "en", true)
+	user.GivenName, user.MiddleName, user.FamilyName = "", "", ""
+	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 	for _, code := range codes[1:] {
 		require.True(t, claimRecoveryCodeForTest(t, user.Id, code))
 	}
@@ -94,7 +103,11 @@ func TestRecoveryCode_SigningInWithTheLastCodeSaysNoneAreLeft(t *testing.T) {
 
 	messages := awaitMailTo(t, user.Email)
 	require.Len(t, messages, 1)
-	assert.Contains(t, messages[0].HTML, "You have no unused recovery codes left.")
+	_, _, text := readEmail(t, messages[0])
+	assert.True(t, strings.HasPrefix(text, "Hello "+user.Email+",\n"), "greeted by the address: %q", text)
+	assert.Contains(t, text, "Unused recovery codes left: 0.")
+	assert.Contains(t, text, "If you still have the app, get a new set of recovery codes there, so you can still sign in if you lose it.")
+	assert.NotContains(t, text, "no unused recovery codes left", "the wording does not change with the count")
 }
 
 // A refused recovery code, and a sign-in for an unverified address, tell nothing. Their absence is

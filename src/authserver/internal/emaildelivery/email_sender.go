@@ -691,7 +691,7 @@ func isLocalHost(host string) bool {
 func (e *Sender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]byte, error) {
 
 	// No email is sent without its text (#817 decision 10).
-	text, err := plainText(input.HtmlBody)
+	text, err := PlainText(input.HtmlBody)
 	if err != nil {
 		return nil, err
 	}

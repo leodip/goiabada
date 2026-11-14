@@ -1,12 +1,11 @@
 package render
 
 import (
-	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"testing/fstest"
 
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/web"
@@ -38,73 +37,29 @@ func TestFrench_SignInPageUsesQueryOrCanadianHeader(t *testing.T) {
 	}
 }
 
-func TestFrench_EveryEmailSubjectAndBodyFollowsTheRecipient(t *testing.T) {
-	for _, locale := range []string{"fr", "fr-FR", "fr-CA", "fr-BE", "fr-CH"} {
-		for _, tc := range []struct{ name, subject, body string }{
-			{"forgot_password", "Réinitialisation du mot de passe", "Pour réinitialiser votre mot de passe"},
-			{"register_activate", "Activez votre compte", "Le lien expire dans 5 minutes."},
-			{"register_existing_account", "Vous avez déjà un compte", "Aucun nouveau compte n’a donc été créé."},
-			{"register_confirmation", "Bienvenue\u00a0!", "Votre compte a été créé."},
-			{"verification", "Vérification de l’adresse e-mail - code 123456", "Voici votre code de vérification"},
-			{"newuser_set_password", "Test - créez un mot de passe pour votre nouveau compte", "Le lien est valable 24 heures."},
-			{"address_changed", "Votre adresse e-mail a été modifiée", "une autre personne connaît peut-être votre mot de passe."},
-			{"password_changed", "Votre mot de passe a été modifié", "Sinon, une autre personne utilise peut-être votre compte."},
-			{"password_changed_by_administrator", "Un administrateur a modifié votre mot de passe", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
-			{"password_reset", "Votre mot de passe a été réinitialisé", "Sinon, une autre personne lit peut-être vos e-mails et utilise votre compte."},
-			{"otp_enabled", "L’authentification à deux facteurs a été configurée", "Un nouveau jeu de codes de récupération a été créé avec elle."},
-			{"otp_disabled", "L’authentification à deux facteurs a été désactivée", "configurez à nouveau l’authentification à deux facteurs"},
-			{"otp_disabled_by_administrator", "Un administrateur a désactivé votre authentification à deux facteurs", "Vous pouvez configurer une nouvelle application d’authentification"},
-			{"recovery_code_used", "Un code de récupération a été utilisé pour vous connecter", "Il vous reste 3 codes de récupération inutilisés."},
-			{"recovery_codes_replaced", "Vos codes de récupération ont été remplacés", "Vos anciens codes de récupération ne fonctionnent plus"},
-			{"otp_lockout", "Votre application d’authentification a été bloquée après trop de codes erronés", "Connectez-vous avec l’un de vos codes de récupération"},
-			{"account_deleted", "Votre compte a été supprimé", "Sinon, une autre personne connaissait votre mot de passe."},
-			{"account_deleted_by_administrator", "Un administrateur a supprimé votre compte", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
-			{"test_email", "Test - e-mail de test", "Ceci est un e-mail de test envoyé par Test."},
-		} {
-			t.Run(locale+"/"+tc.name, func(t *testing.T) {
-				req := httptest.NewRequest(http.MethodGet, "/", nil)
-				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
-				// A recipient's locale replaces the sender's explicit English preference.
-				ctx := i18n.WithLocale(i18n.WithLocale(req.Context(), true, "en"), true, locale, "en")
-				req = req.WithContext(ctx)
-				assert.Equal(t, tc.subject, i18n.T(ctx, "email."+tc.name+".subject", map[string]any{"code": "123456", "appName": "Test"}))
-				buf, err := New(web.TemplateFS(), web.StaticFS(), nil).RenderTemplateToBuffer(req,
-					"layouts/email_layout.html", "emails/email_"+tc.name+".html",
-					map[string]interface{}{"name": "Camille", "link": "https://example.com/continue", "verificationCode": "123456", "remaining": 3})
-				require.NoError(t, err)
-				assert.Contains(t, buf.String(), `<html lang="fr">`)
-				assert.Contains(t, buf.String(), tc.body)
-				assert.NotContains(t, buf.String(), "<no value>")
-				if tc.name == "verification" {
-					assert.Contains(t, buf.String(), "123456")
-				}
-			})
-		}
-	}
-}
-
-func TestFrench_ExactRegionalEmailOverrideStillWins(t *testing.T) {
-	// A configured template directory replaces the embedded set. Copy that set
-	// here, then add the operator's exact regional copy as a real deployment does.
-	templates := fstest.MapFS{}
-	require.NoError(t, fs.WalkDir(web.TemplateFS(), ".", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
-		}
-		data, err := fs.ReadFile(web.TemplateFS(), path)
-		if err == nil {
-			templates[path] = &fstest.MapFile{Data: data}
-		}
-		return err
-	}))
-	templates["emails/email_forgot_password.fr-CA.html"] = &fstest.MapFile{Data: []byte(`{{define "title"}}Courriel personnalisé{{end}}{{define "head"}}{{end}}{{define "body"}}Votre courriel de récupération{{end}}`)}
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
-	req = req.WithContext(i18n.WithLocale(req.Context(), true, "fr-CA", "en"))
-	buf, err := New(templates, web.StaticFS(), nil).RenderTemplateToBuffer(req,
-		"layouts/email_layout.html", "emails/email_forgot_password.html", nil)
-	require.NoError(t, err)
-	assert.Contains(t, buf.String(), `<html lang="fr-CA">`)
-	assert.Contains(t, buf.String(), "Votre courriel de récupération")
-	assert.NotContains(t, buf.String(), "Pour réinitialiser votre mot de passe")
+// Every email, sent from its built-in definition (#818), follows a recipient reading French, in any
+// region: the subject, the language the email is marked with, and a sentence of the body, the
+// activation link's and the verification code's saying how long they last, and the recovery code
+// notice's giving the codes left.
+func TestFrench_EveryDefinedEmailFollowsTheRecipient(t *testing.T) {
+	assertDefinedEmailsFollowTheRecipient(t, []string{"fr", "fr-FR", "fr-CA", "fr-BE", "fr-CH"}, "fr", []definedEmail{
+		{emailtemplate.ActivationLink, "Activez votre compte", "Le lien expire dans 5 minutes."},
+		{emailtemplate.RegistrationExistingAccount, "Vous avez déjà un compte", "Aucun nouveau compte n’a donc été créé."},
+		{emailtemplate.Welcome, "Bienvenue\u00a0!", "Votre compte a été créé."},
+		{emailtemplate.VerificationCode, "Vérification de l’adresse e-mail - code 482915", "Le code expire dans 5 minutes."},
+		{emailtemplate.NewUserSetup, "Acme Portal - créez un mot de passe pour votre nouveau compte", "Pour créer votre mot de passe"},
+		{emailtemplate.TestEmail, "Acme Portal - e-mail de test", "Ceci est un e-mail de test envoyé par Acme Portal."},
+		{emailtemplate.EmailAddressChanged, "Votre adresse e-mail a été modifiée", "une autre personne connaît peut-être votre mot de passe."},
+		{emailtemplate.PasswordChanged, "Votre mot de passe a été modifié", "Sinon, une autre personne utilise peut-être votre compte."},
+		{emailtemplate.PasswordChangedByAdministrator, "Un administrateur a modifié votre mot de passe", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
+		{emailtemplate.PasswordReset, "Votre mot de passe a été réinitialisé", "Sinon, une autre personne lit peut-être vos e-mails et utilise votre compte."},
+		{emailtemplate.OTPEnabled, "L’authentification à deux facteurs a été configurée", "Un nouveau jeu de codes de récupération a été créé avec elle."},
+		{emailtemplate.OTPDisabled, "L’authentification à deux facteurs a été désactivée", "configurez à nouveau l’authentification à deux facteurs"},
+		{emailtemplate.OTPDisabledByAdministrator, "Un administrateur a désactivé votre authentification à deux facteurs", "Vous pouvez configurer une nouvelle application d’authentification"},
+		{emailtemplate.RecoveryCodeUsed, "Un code de récupération a été utilisé pour vous connecter", "Codes de récupération inutilisés restants : 3."},
+		{emailtemplate.RecoveryCodesReplaced, "Vos codes de récupération ont été remplacés", "Vos anciens codes de récupération ne fonctionnent plus"},
+		{emailtemplate.OTPLockout, "Votre application d’authentification a été bloquée après trop de codes erronés", "Connectez-vous avec l’un de vos codes de récupération"},
+		{emailtemplate.AccountDeleted, "Votre compte a été supprimé", "Sinon, une autre personne connaissait votre mot de passe."},
+		{emailtemplate.AccountDeletedByAdministrator, "Un administrateur a supprimé votre compte", "Si vous ne vous y attendiez pas, contactez votre administrateur."},
+	})
 }

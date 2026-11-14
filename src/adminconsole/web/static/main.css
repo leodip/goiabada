@@ -307,11 +307,20 @@
   .h-4 {
     height: calc(var(--spacing) * 4);
   }
+  .h-\[36rem\] {
+    height: 36rem;
+  }
   .max-h-\[50vh\] {
     max-height: 50vh;
   }
+  .w-1\/3 {
+    width: calc(1 / 3 * 100%);
+  }
   .w-4 {
     width: calc(var(--spacing) * 4);
+  }
+  .w-full {
+    width: 100%;
   }
   .max-w-2xl {
     max-width: var(--container-2xl);
@@ -354,6 +363,9 @@
   }
   .resize {
     resize: both;
+  }
+  .list-disc {
+    list-style-type: disc;
   }
   .appearance-auto {
     appearance: auto;
@@ -424,6 +436,9 @@
   }
   .p-3 {
     padding: calc(var(--spacing) * 3);
+  }
+  .pl-5 {
+    padding-left: calc(var(--spacing) * 5);
   }
   .text-right {
     text-align: right;

@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"bytes"
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -232,11 +232,10 @@ func TestHandleRegisterPost_WithVerificationTheLinkCarriesTheSignIn(t *testing.T
 			h.database.On("CreatePreRegistration", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.PreRegistration")).
 				Run(func(args mock.Arguments) { created = args.Get(2).(*record.PreRegistration) }).Return(nil).Once()
 			h.auditLogger.On("Log", mock.Anything, audit.EventRequestedRegistration, mock.Anything).Return().Once()
-			var mailBind map[string]interface{}
-			h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
-				"/emails/email_register_activate.html", mock.Anything).
-				Run(func(args mock.Arguments) { mailBind = args.Get(3).(map[string]interface{}) }).
-				Return(bytes.NewBufferString("activation mail"), nil).Once()
+			var mailValues emailtemplate.Values
+			h.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.ActivationLink, mock.Anything).
+				Run(func(args mock.Arguments) { mailValues = args.Get(2).(emailtemplate.Values) }).
+				Return(emailtemplate.Message{Subject: "Activate your account", HTML: "activation mail"}, nil).Once()
 			h.emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).
 				Return(emaildelivery.SendResult{}, nil).Once()
 
@@ -248,7 +247,7 @@ func TestHandleRegisterPost_WithVerificationTheLinkCarriesTheSignIn(t *testing.T
 			require.NotNil(t, created)
 			code, err := testDataCipher.Decrypt(created.VerificationCodeEncrypted)
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantLink(code), mailBind["link"])
+			assert.Equal(t, tc.wantLink(code), mailValues.Link)
 		})
 	}
 }

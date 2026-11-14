@@ -18,9 +18,9 @@
 @import "tailwindcss" source(none);
 
 @source "../template";
-/* An email is drawn by the inline styles its templates write and never by main.css (#817), and
-   the words of those styles, "inline" or "border-collapse", would each become a rule here. */
-@source not "../template/emails";
+/* An email is drawn by the inline styles its layout writes and never by main.css (#817), and
+   the words of those styles, "inline" or "border-collapse", would each become a rule here. Its
+   body is drawn by internal/emailtemplate, which no @source reads (#818). */
 @source not "../template/layouts/email_layout.html";
 @source "../static/*.js";
 @source "../static/pages/*.js";

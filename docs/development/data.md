@@ -175,6 +175,23 @@ admin API bounds it to 65,536 bytes. The rules it is held to are the admin API's
 reads the text as given and checks nothing, so a value written to the row by hand reaches the
 brand's full stylesheet unchecked.
 
+## Email template edits
+
+An administrator's edit of one email in one language is one row of `email_templates`, unique on
+`email_template` and `language` (#818 decision 7). Each of `subject`, `button_label` and `body` is
+`NULL` for a field left as the built-in text, and a row holds at least one of them:
+`SaveEmailTemplate` refuses an edit with none, whose row the caller deletes with
+`DeleteEmailTemplate` instead, which answers whether there was one. Nothing about an edit's validity
+is stored. The save is one insert-or-replace statement per engine (`ON CONFLICT` on SQLite and
+PostgreSQL, `ON DUPLICATE KEY UPDATE` on MySQL, `MERGE` under `HOLDLOCK` on SQL Server), so two
+saves of one email and language leave the last one's edit and neither is refused as a second row;
+the data tier's `email_template_test.go` shows two overlapping first saves on every engine. Two
+first saves can deadlock each other on MySQL and SQL Server, so the caller saves inside
+`RunInTransaction`. The record mapping test reads the statement through its `upsert` hook. The data
+layer stores any email and language it is given, refusing only an empty one, one ending in a space
+and one that is not ASCII, which the engines' `=` would fold onto another row; holding them to the
+19 emails and the six built-in languages is the caller's.
+
 ## Schema golden files
 
 Each engine's fully migrated catalog is recorded in

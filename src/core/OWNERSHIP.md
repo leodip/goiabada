@@ -142,6 +142,19 @@ command itself and fails on a tree it changed.
 | `core/api` | `CreateUserAttributeResponse` | both-apps | — |
 | `core/api` | `CreateUserResponse` | both-apps | — |
 | `core/api` | `DeleteAccountRequest` | both-apps | — |
+| `core/api` | `EmailTemplateFieldBody` | both-apps | — |
+| `core/api` | `EmailTemplateFieldButtonLabel` | both-apps | — |
+| `core/api` | `EmailTemplateFieldSubject` | both-apps | — |
+| `core/api` | `EmailTemplateLanguageResponse` | both-apps | — |
+| `core/api` | `EmailTemplateLanguageStatusResponse` | reachable | — |
+| `core/api` | `EmailTemplatePlaceholderResponse` | reachable | — |
+| `core/api` | `EmailTemplateProblemResponse` | reachable | — |
+| `core/api` | `EmailTemplateResponse` | both-apps | — |
+| `core/api` | `EmailTemplateStatusDefault` | both-apps | — |
+| `core/api` | `EmailTemplateStatusEdited` | both-apps | — |
+| `core/api` | `EmailTemplateStatusInvalid` | both-apps | — |
+| `core/api` | `EmailTemplateSummaryResponse` | both-apps | — |
+| `core/api` | `EmailTemplateTextResponse` | both-apps | — |
 | `core/api` | `ErrorResponse` | both-apps | — |
 | `core/api` | `GenerateUserEmailVerificationCodeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetAuditEventTypesResponse` | both-apps | — |
@@ -157,6 +170,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `GetClientSecretResponse` | both-apps | — |
 | `core/api` | `GetClientSessionsResponse` | both-apps | — |
 | `core/api` | `GetClientsResponse` | both-apps | — |
+| `core/api` | `GetEmailTemplateResponse` | both-apps | — |
+| `core/api` | `GetEmailTemplatesResponse` | both-apps | — |
 | `core/api` | `GetGroupAttributeResponse` | both-apps | — |
 | `core/api` | `GetGroupAttributesResponse` | both-apps | — |
 | `core/api` | `GetGroupMembersResponse` | both-apps | — |
@@ -194,6 +209,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `PermissionResponse` | both-apps | — |
 | `core/api` | `PhoneCountryResponse` | contract | The element of `GET /api/v1/admin/phone-countries`, a published admin API route that stays when the admin console stops calling it, because its pages build the list from `core/phonecountries` (#563 decisions 1 and 2). The auth server writes it and no admin console file reads it. |
 | `core/api` | `PostLogoutRedirectURIResponse` | reachable | — |
+| `core/api` | `PreviewEmailTemplateRequest` | both-apps | — |
+| `core/api` | `PreviewEmailTemplateResponse` | both-apps | — |
 | `core/api` | `PreviewLegalDocumentRequest` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `PreviewLegalDocumentResponse` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `ProfilePictureInfoResponse` | both-apps | — |
@@ -203,6 +220,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `RedirectURIResponse` | reachable | — |
 | `core/api` | `ResourcePermissionUpsert` | both-apps | — |
 | `core/api` | `ResourceResponse` | both-apps | — |
+| `core/api` | `SaveEmailTemplateRequest` | both-apps | — |
 | `core/api` | `SaveLegalDocumentDraftRequest` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `SearchGroupsWithPermissionAnnotationResponse` | both-apps | — |
 | `core/api` | `SearchUsersResponse` | both-apps | — |
@@ -210,6 +228,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `SearchUsersWithPermissionAnnotationResponse` | both-apps | — |
 | `core/api` | `SendTestEmailRequest` | both-apps | — |
 | `core/api` | `SendTestEmailResponse` | both-apps | — |
+| `core/api` | `SendTestEmailTemplateRequest` | both-apps | — |
 | `core/api` | `SessionClientResponse` | both-apps | — |
 | `core/api` | `SessionLoadRequest` | both-apps | — |
 | `core/api` | `SessionLoadResponse` | both-apps | — |
@@ -573,6 +592,20 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeEmailAlreadyRegistered` | both-apps | — |
 | `core/i18n` | `ErrCodeEmailInvalidFormat` | both-apps | — |
 | `core/i18n` | `ErrCodeEmailRequired` | both-apps | — |
+| `core/i18n` | `ErrCodeEmailTemplateBodyTooLong` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateBrandNotFound` | contract | Catalog key of an admin API refusal of an email template's preview or test send naming a brand that is not there, whose `error_description` is in the request's language while its `error_code` is the key itself (#818 decisions 11 and 12). Only the auth server writes it until the console's framed preview names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateButtonLabelRequired` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateButtonLabelTooLong` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateButtonNotAlone` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateNoButton` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateNothingToRead` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplatePlaceholderInLinkDestination` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplatePlaceholderNotInSubject` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateRequiredPlaceholderMissing` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateSubjectNotOneLine` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateSubjectRequired` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateSubjectTooLong` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeEmailTemplateUnknownPlaceholder` | contract | Catalog key of an admin API refusal of an email template's text, whose `error_description` names the rule, and the placeholder it is about, in the request's language while its `error_code` is the key itself (#818 decisions 3 and 10). Only the auth server writes it until the console's Email templates editor names it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeEmailTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodeEmailVerificationAccountChanged` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeEmailVerificationCodeInvalid` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |

@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
+	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -285,13 +286,17 @@ func finishForgotPassword(
 
 	// The link names the sign-in this page's URL named, when the id is well formed, so a reset in
 	// the browser holding it carries it on (#812 decision 9). The id is echoed, never looked up: the
-	// answer to the request was the same whatever it named, and so is what is decided here.
-	bind := map[string]interface{}{
-		"name": user.FullName(),
-		"link": emaillinks.ResetPasswordLink(baseURL, verificationCode, registrationCeremonyId(r)),
+	// answer to the request was the same whatever it named, and so is what is decided here. The
+	// email says how long the reset accepts the link, which is a setup link's lifetime while the
+	// account has no password (codeLifetime), and greets a user with no name by their address (#818
+	// decisions 4 and 15).
+	values := emailtemplate.Values{
+		Name:   emailtemplate.RecipientName(user.FullName(), user.Email),
+		Link:   emaillinks.ResetPasswordLink(baseURL, verificationCode, registrationCeremonyId(r)),
+		Expiry: codeLifetime(user),
 	}
 	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, user.PageLanguage, user.Locale))
-	buf, err := pageRenderer.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
+	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.PasswordResetLink, values)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to render the password reset email", "user_id", user.Id, "error", err)
 		return
@@ -304,8 +309,8 @@ func finishForgotPassword(
 	}
 	input := &emaildelivery.SendEmailInput{
 		To:       user.Email,
-		Subject:  i18n.T(emailReq.Context(), "email.forgot_password.subject"),
-		HtmlBody: buf.String(),
+		Subject:  message.Subject,
+		HtmlBody: message.HTML,
 	}
 	if _, err := emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
 		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.Id, "error", err)

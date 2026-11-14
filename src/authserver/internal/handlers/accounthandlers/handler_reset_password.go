@@ -26,15 +26,12 @@ import (
 )
 
 // forgotPasswordCodeLifetime bounds how long a password reset code stays usable
-// after it is issued by HandleForgotPasswordPost.
-const forgotPasswordCodeLifetime = 5 * time.Minute
+// after it is issued by HandleForgotPasswordPost, emaillinks.ResetLinkLifetime.
+const forgotPasswordCodeLifetime = emaillinks.ResetLinkLifetime
 
 // setupLinkLifetime bounds the same code while the account has no password: the link an
-// administrator's "send an email to set the password" sends, which the new user reads when they
-// read mail, not within minutes. Five minutes left them a link dead before they saw it, and nothing
-// to recover with, since Forgot password? sends nothing to an unverified address and nothing sends
-// the setup link again (#542). Until a password is set, a leaked link has no password to replace.
-const setupLinkLifetime = 24 * time.Hour
+// administrator's "send an email to set the password" sends, emaillinks.SetupLinkLifetime.
+const setupLinkLifetime = emaillinks.SetupLinkLifetime
 
 // codeLifetime is how long the code user holds stays usable: setupLinkLifetime while the account
 // has no password, which is every account created with the setup email until its user sets one, and
